@@ -3,17 +3,25 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "sidecar:dev": "yarn workspace @hip/sidecar dev",
+    "sidecar:build": "yarn workspace @hip/sidecar build",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-shell": "^2",
+    "@hip/protocol": "*",
+    "zustand": "^5",
+    "nanoid": "^5"
   },
   "devDependencies": {
     "@types/react": "^18.3.1",

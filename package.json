@@ -14,7 +14,9 @@
     "sidecar:dev": "yarn workspace @hip/sidecar dev",
     "sidecar:dev-bin": "bash scripts/make-sidecar-dev-bin.sh",
     "sidecar:build": "yarn workspace @hip/sidecar build",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hip/protocol": "*",

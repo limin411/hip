@@ -26,7 +26,7 @@ export function ChatPane() {
           <MessageBubble
             key={`${activeSessionId}-${m.id}-${i}`}
             message={m}
-            streaming={false}
+            streaming={m.role === 'assistant' && i === messages.length - 1}
           />
         ))}
         <div ref={bottomRef} />

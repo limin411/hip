@@ -11,6 +11,7 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@hip/protocol": resolve(__dirname, "packages/protocol/src/index.ts"),
+      "@": resolve(__dirname, "src"),
     },
   },
 

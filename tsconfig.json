@@ -23,7 +23,8 @@
     /* Workspace paths */
     "baseUrl": ".",
     "paths": {
-      "@hip/protocol": ["packages/protocol/src/index.ts"]
+      "@hip/protocol": ["packages/protocol/src/index.ts"],
+      "@/*": ["src/*"]
     }
   },
   "include": ["src"],

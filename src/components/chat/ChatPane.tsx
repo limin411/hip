@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react'
 import { useUiStore } from '@/store/uiStore'
 import { MessageBubble } from './MessageBubble'
 
+const EMPTY: never[] = []
+
 export function ChatPane() {
   const activeSessionId = useUiStore((s) => s.activeSessionId)
-  const messages = useUiStore((s) => s.messagesBySession[activeSessionId] ?? [])
+  const messages = useUiStore((s) => s.messagesBySession[activeSessionId] ?? EMPTY)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

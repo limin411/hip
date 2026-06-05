@@ -8,8 +8,11 @@ const DEFAULT_CONFIG = {
 }
 
 export function SessionTabs() {
-  const { sessions, activeSessionId, setActive, destroySession, createSession } =
-    useSessionStore()
+  const sessions = useSessionStore((s) => s.sessions)
+  const activeSessionId = useSessionStore((s) => s.activeSessionId)
+  const setActive = useSessionStore((s) => s.setActive)
+  const destroySession = useSessionStore((s) => s.destroySession)
+  const createSession = useSessionStore((s) => s.createSession)
 
   function newSession() {
     const id = createSession(DEFAULT_CONFIG)

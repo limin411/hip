@@ -1,6 +1,7 @@
 import { useUiStore } from '@/store/uiStore'
 import { NewChatButton } from './NewChatButton'
 import { SearchBox } from './SearchBox'
+import { SessionList } from './SessionList'
 
 export function Sidebar() {
   const collapsed = useUiStore((s) => s.collapsed)
@@ -13,7 +14,7 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2">
-        {!collapsed && <div className="py-2 text-[12px] text-ink-tertiary">会话列表占位</div>}
+        {!collapsed && <SessionList />}
       </div>
 
       <div className="border-t border-border p-2.5">

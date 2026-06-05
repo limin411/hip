@@ -1,0 +1,42 @@
+import { X } from 'lucide-react'
+import type { MockSession } from '@/mock/types'
+import { cn } from '@/lib/utils'
+
+interface SessionItemProps {
+  session: MockSession
+  active: boolean
+  onSelect: () => void
+  onDelete: () => void
+}
+
+export function SessionItem({ session, active, onSelect, onDelete }: SessionItemProps) {
+  return (
+    <div
+      onClick={onSelect}
+      className={cn(
+        'group flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors',
+        active ? 'bg-accent-subtle' : 'hover:bg-surface-muted',
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className={cn('truncate text-[13px] font-medium', active ? 'text-accent' : 'text-ink')}>
+          {session.title}
+        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+          className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"
+          title="删除会话"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[12px] text-ink-tertiary">{session.preview}</span>
+        <span className="shrink-0 text-[11px] text-ink-tertiary">{session.updatedAt}</span>
+      </div>
+    </div>
+  )
+}

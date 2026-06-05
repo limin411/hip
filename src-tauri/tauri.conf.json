@@ -36,8 +36,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "sidecar": true
+      "open": true
     }
   }
 }

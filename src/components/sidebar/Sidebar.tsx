@@ -2,6 +2,7 @@ import { useUiStore } from '@/store/uiStore'
 import { NewChatButton } from './NewChatButton'
 import { SearchBox } from './SearchBox'
 import { SessionList } from './SessionList'
+import { UserMenu } from './UserMenu'
 
 export function Sidebar() {
   const collapsed = useUiStore((s) => s.collapsed)
@@ -17,8 +18,8 @@ export function Sidebar() {
         {!collapsed && <SessionList />}
       </div>
 
-      <div className="border-t border-border p-2.5">
-        {!collapsed && <div className="text-[12px] text-ink-tertiary">用户菜单占位</div>}
+      <div className="border-t border-border p-2">
+        <UserMenu collapsed={collapsed} />
       </div>
     </div>
   )

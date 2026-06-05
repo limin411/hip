@@ -14,11 +14,12 @@ fn get_sidecar_port(state: tauri::State<SidecarPort>) -> Option<u16> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(SidecarPort(Mutex::new(None)))
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match sidecar::spawn_sidecar().await {
+                match sidecar::spawn_sidecar(&handle).await {
                     Ok(port) => {
                         *handle.state::<SidecarPort>().0.lock().unwrap() = Some(port);
                         println!("[tauri] sidecar ready on port {port}");

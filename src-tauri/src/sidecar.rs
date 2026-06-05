@@ -1,31 +1,27 @@
 use serde::Deserialize;
-use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command;
+use tauri::AppHandle;
+use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::ShellExt;
 
 #[derive(Deserialize)]
 struct PortMsg {
     port: u16,
 }
 
-pub async fn spawn_sidecar() -> Result<u16, String> {
-    // Dev mode: run sidecar via yarn workspace
-    // Production: replace with a bundled binary invocation
-    let mut child = Command::new("yarn")
-        .args(["workspace", "@hip/sidecar", "dev"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
+    let (mut rx, _child) = app
+        .shell()
+        .sidecar("sidecar")
+        .map_err(|e| e.to_string())?
         .spawn()
-        .map_err(|e| format!("failed to spawn sidecar: {e}"))?;
+        .map_err(|e| e.to_string())?;
 
-    let stdout = child.stdout.take().ok_or("sidecar has no stdout")?;
-    let mut lines = BufReader::new(stdout).lines();
-
-    while let Some(line) = lines.next_line().await.map_err(|e| e.to_string())? {
-        if let Ok(msg) = serde_json::from_str::<PortMsg>(&line) {
-            // Keep child alive by leaking (process lives for app lifetime)
-            std::mem::forget(child);
-            return Ok(msg.port);
+    while let Some(event) = rx.recv().await {
+        if let CommandEvent::Stdout(line_bytes) = event {
+            let text = String::from_utf8_lossy(&line_bytes);
+            if let Ok(msg) = serde_json::from_str::<PortMsg>(text.trim()) {
+                return Ok(msg.port);
+            }
         }
     }
     Err("sidecar exited before reporting port".into())

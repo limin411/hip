@@ -6,6 +6,7 @@ import { ChatHeader } from '@/components/chat/ChatHeader'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
+import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
 
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
@@ -38,7 +39,7 @@ export function AppLayout() {
   }, [panelOpen])
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-surface">
+    <div className="relative h-screen w-screen overflow-hidden bg-surface">
       <PanelGroup direction="horizontal">
         <Panel
           ref={sidebarRef}
@@ -46,11 +47,11 @@ export function AppLayout() {
           minSize={12}
           maxSize={22}
           collapsible
-          collapsedSize={4}
+          collapsedSize={0}
           onCollapse={() => setCollapsed(true)}
           onExpand={() => setCollapsed(false)}
         >
-          <Sidebar />
+          {!collapsed && <Sidebar />}
         </Panel>
 
         <PanelResizeHandle className="w-px bg-border transition-colors hover:bg-accent data-[resize-handle-state=drag]:bg-accent" />
@@ -78,6 +79,8 @@ export function AppLayout() {
           <ArtifactPanel />
         </Panel>
       </PanelGroup>
+
+      <SidebarPeek />
     </div>
   )
 }

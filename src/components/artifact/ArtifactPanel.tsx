@@ -4,6 +4,7 @@ import { useUiStore } from '@/store/uiStore'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { Button } from '@/components/ui/Button'
 import { DocRenderer } from './DocRenderer'
+import { FileTree } from './FileTree'
 import { cn } from '@/lib/utils'
 
 const TABS: { value: ArtifactTab; label: string; icon: typeof FileText }[] = [
@@ -48,7 +49,9 @@ export function ArtifactPanel() {
       <TabsContent value="doc" className="p-4">
         <DocRenderer />
       </TabsContent>
-      <TabsContent value="files" className="p-2">文件树占位</TabsContent>
+      <TabsContent value="files" className="p-2">
+        <FileTree />
+      </TabsContent>
       <TabsContent value="agents" className="p-3">智能体占位</TabsContent>
       <TabsContent value="diff" className="p-0">Diff 占位</TabsContent>
     </Tabs>

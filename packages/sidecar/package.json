@@ -20,7 +20,7 @@
     "@types/node": "^22",
     "@types/ws": "^8",
     "tsx": "^4",
-    "typescript": "~5.6.2",
+    "typescript": "~5.8.2",
     "@vercel/ncc": "^0.38"
   }
 }

@@ -6,7 +6,7 @@
 
 **Architecture:** yarn workspaces monorepo. Root = Tauri frontend. `packages/protocol` = shared WS message types. `packages/sidecar` = Node.js LangGraph server. `src-tauri` Rust shell spawns the sidecar on startup and exposes the port via a Tauri command. Frontend connects via WebSocket and manages sessions in Zustand.
 
-**Tech Stack:** Tauri 2, React 18, TypeScript 5.6, `@langchain/langgraph`, `ws`, Zustand 5, nanoid 5, tsx (sidecar dev), `@vercel/ncc` (sidecar prod bundle), yarn workspaces.
+**Tech Stack:** Tauri 2, React 19, TypeScript 5.8, `@langchain/langgraph`, `ws`, Zustand 5, nanoid 5, tsx (sidecar dev), `@vercel/ncc` (sidecar prod bundle), yarn workspaces.
 
 ---
 
@@ -204,10 +204,10 @@ Expected: `node_modules/@hip/protocol` symlink appears.
   },
   "dependencies": {
     "@hip/protocol": "workspace:*",
-    "@langchain/langgraph": "^0.2",
-    "@langchain/core": "^0.3",
-    "@langchain/anthropic": "^0.3",
-    "@langchain/openai": "^0.3",
+    "@langchain/langgraph": "^1.3",
+    "@langchain/core": "^1.1",
+    "@langchain/anthropic": "^1.4",
+    "@langchain/openai": "^1.4",
     "ws": "^8"
   },
   "devDependencies": {

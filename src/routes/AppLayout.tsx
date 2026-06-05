@@ -1,3 +1,12 @@
+import { Sidebar } from '@/components/sidebar/Sidebar'
+
 export function AppLayout() {
-  return <div className="flex h-screen items-center justify-center text-ink-tertiary">主界面占位</div>
+  return (
+    <div className="flex h-screen">
+      <div className="w-60 border-r border-border">
+        <Sidebar />
+      </div>
+      <div className="flex-1 bg-surface" />
+    </div>
+  )
 }

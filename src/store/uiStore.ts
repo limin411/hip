@@ -26,11 +26,13 @@ interface UiState {
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
   togglePanel: () => void
+  setPanelOpen: (v: boolean) => void
   toggleFullscreen: () => void
 
   agents: MockAgent[]
   setAgents: (agents: MockAgent[]) => void
   setAgentStatus: (id: string, status: MockAgent['status']) => void
+  setAgentElapsed: (id: string, elapsedMs: number) => void
   appendAgentTokens: (id: string, delta: string) => void
 }
 
@@ -95,12 +97,15 @@ export const useUiStore = create<UiState>((set) => ({
   activeTab: 'agents',
   setTab: (t) => set({ activeTab: t }),
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
+  setPanelOpen: (v) => set({ panelOpen: v }),
   toggleFullscreen: () => set((s) => ({ panelFullscreen: !s.panelFullscreen })),
 
   agents: mockAgents,
   setAgents: (agents) => set({ agents }),
   setAgentStatus: (id, status) =>
     set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, status } : a)) })),
+  setAgentElapsed: (id, elapsedMs) =>
+    set((s) => ({ agents: s.agents.map((a) => (a.id === id ? { ...a, elapsedMs } : a)) })),
   appendAgentTokens: (id, delta) =>
     set((s) => ({
       agents: s.agents.map((a) =>

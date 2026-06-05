@@ -13,6 +13,7 @@ export function AppLayout() {
   const collapsed = useUiStore((s) => s.collapsed)
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
+  const setPanelOpen = useUiStore((s) => s.setPanelOpen)
 
   // 侧边栏折叠 ↔ store.collapsed 双向同步
   useEffect(() => {
@@ -65,6 +66,8 @@ export function AppLayout() {
           maxSize={44}
           collapsible
           collapsedSize={0}
+          onCollapse={() => setPanelOpen(false)}
+          onExpand={() => setPanelOpen(true)}
         >
           <ArtifactPanel />
         </Panel>

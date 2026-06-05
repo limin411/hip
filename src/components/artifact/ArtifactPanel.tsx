@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { DocRenderer } from './DocRenderer'
 import { FileTree } from './FileTree'
 import { AgentDashboard } from './AgentDashboard'
+import { DiffViewer } from './DiffViewer'
 import { cn } from '@/lib/utils'
 
 const TABS: { value: ArtifactTab; label: string; icon: typeof FileText }[] = [
@@ -56,7 +57,9 @@ export function ArtifactPanel() {
       <TabsContent value="agents" className="p-3">
         <AgentDashboard />
       </TabsContent>
-      <TabsContent value="diff" className="p-0">Diff 占位</TabsContent>
+      <TabsContent value="diff" className="p-0">
+        <DiffViewer />
+      </TabsContent>
     </Tabs>
   )
 

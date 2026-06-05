@@ -27,8 +27,10 @@ export function UserMenu({ collapsed }: { collapsed: boolean }) {
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            'flex items-center gap-2.5 rounded-md p-1.5 transition-colors hover:bg-surface-muted',
-            collapsed ? 'w-9 justify-center' : 'w-full',
+            'flex items-center gap-2.5 rounded-md transition-colors',
+            collapsed
+              ? 'h-9 w-9 shrink-0 justify-center bg-surface p-0 hover:bg-surface-muted'
+              : 'w-full p-1.5 hover:bg-surface-muted',
           )}
         >
           <Avatar name={mockUser.name} src={mockUser.avatarUrl} size={28} />

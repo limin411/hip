@@ -1,4 +1,5 @@
 import { useUiStore } from '@/store/uiStore'
+import { cn } from '@/lib/utils'
 import { NewChatButton } from './NewChatButton'
 import { SearchBox } from './SearchBox'
 import { SessionList } from './SessionList'
@@ -8,8 +9,8 @@ export function Sidebar() {
   const collapsed = useUiStore((s) => s.collapsed)
 
   return (
-    <div className="flex h-full flex-col bg-surface-subtle">
-      <div className="flex flex-col gap-2 p-2.5">
+    <div className={cn('flex h-full flex-col bg-surface-subtle', collapsed && 'items-center')}>
+      <div className={cn('flex flex-col gap-2', collapsed ? 'p-1.5' : 'p-2.5')}>
         <NewChatButton collapsed={collapsed} />
         {!collapsed && <SearchBox />}
       </div>
@@ -18,7 +19,7 @@ export function Sidebar() {
         {!collapsed && <SessionList />}
       </div>
 
-      <div className="border-t border-border p-2">
+      <div className={cn('border-t border-border', collapsed ? 'p-1.5' : 'p-2')}>
         <UserMenu collapsed={collapsed} />
       </div>
     </div>

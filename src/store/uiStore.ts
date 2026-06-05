@@ -44,7 +44,7 @@ function nextId(prefix: string): string {
 
 export const useUiStore = create<UiState>((set) => ({
   collapsed: false,
-  setCollapsed: (v) => set({ collapsed: v }),
+  setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
   toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
 
   sessions: mockSessions,
@@ -97,7 +97,7 @@ export const useUiStore = create<UiState>((set) => ({
   activeTab: 'agents',
   setTab: (t) => set({ activeTab: t }),
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
-  setPanelOpen: (v) => set({ panelOpen: v }),
+  setPanelOpen: (v) => set((s) => (s.panelOpen === v ? s : { panelOpen: v })),
   toggleFullscreen: () => set((s) => ({ panelFullscreen: !s.panelFullscreen })),
 
   agents: mockAgents,

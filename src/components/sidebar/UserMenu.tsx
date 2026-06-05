@@ -13,10 +13,10 @@ import { mockUser } from '@/mock/user'
 import { cn } from '@/lib/utils'
 
 const PAGES = [
-  { icon: User, label: '个人资料' },
-  { icon: Settings, label: '设置' },
-  { icon: CreditCard, label: '账单与用量' },
-  { icon: HelpCircle, label: '帮助与支持' },
+  { icon: User, label: '个人资料', path: '/profile' },
+  { icon: Settings, label: '设置', path: '/settings' },
+  { icon: CreditCard, label: '账单与用量', path: '/billing' },
+  { icon: HelpCircle, label: '帮助与支持', path: '/help' },
 ]
 
 export function UserMenu({ collapsed }: { collapsed: boolean }) {
@@ -48,7 +48,7 @@ export function UserMenu({ collapsed }: { collapsed: boolean }) {
         <DropdownMenuLabel>{mockUser.email}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {PAGES.map((page) => (
-          <DropdownMenuItem key={page.label}>
+          <DropdownMenuItem key={page.label} onSelect={() => navigate(page.path)}>
             <page.icon size={15} className="text-ink-secondary" />
             {page.label}
           </DropdownMenuItem>

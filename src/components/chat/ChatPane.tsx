@@ -4,12 +4,15 @@ import { MessageBubble } from './MessageBubble'
 
 export function ChatPane() {
   const activeSessionId = useUiStore((s) => s.activeSessionId)
-  const messages = useUiStore((s) => s.messagesBySession[s.activeSessionId] ?? [])
+  const messages = useUiStore((s) => s.messagesBySession[activeSessionId] ?? [])
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    const el = bottomRef.current
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages.length])
 
   if (messages.length === 0) {
     return (

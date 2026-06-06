@@ -83,7 +83,7 @@ export function AppLayout() {
           ref={panelRef}
           defaultSize={26}
           minSize={18}
-          maxSize={44}
+          maxSize={65}
           collapsible
           collapsedSize={0}
           onCollapse={() => setPanelOpen(false)}

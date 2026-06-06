@@ -1,4 +1,4 @@
-import { Maximize2, Minimize2, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { ArtifactTab } from '@/mock/types'
 import { useUiStore } from '@/store/uiStore'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
@@ -18,61 +18,46 @@ const TABS: { value: ArtifactTab; label: string }[] = [
 export function ArtifactPanel() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
-  const fullscreen = useUiStore((s) => s.panelFullscreen)
-  const toggleFullscreen = useUiStore((s) => s.toggleFullscreen)
   const togglePanel = useUiStore((s) => s.togglePanel)
 
-  const body = (
-    <Tabs
-      value={activeTab}
-      onValueChange={(v) => setTab(v as ArtifactTab)}
-      className="flex h-full flex-col"
-    >
-      <div
-        data-tauri-drag-region
-        className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2"
+  return (
+    <div className="h-full bg-surface">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setTab(v as ArtifactTab)}
+        className="flex h-full flex-col"
       >
-        <TabsList className="h-full gap-4" data-tauri-drag-region="false">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" onClick={toggleFullscreen} title={fullscreen ? '还原' : '全屏'} data-tauri-drag-region="false">
-            {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={togglePanel} title="关闭面板" data-tauri-drag-region="false">
-            <X size={16} />
-          </Button>
+        <div
+          data-tauri-drag-region
+          className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2"
+        >
+          <TabsList className="h-full gap-4" data-tauri-drag-region="false">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="icon" onClick={togglePanel} title="关闭面板" data-tauri-drag-region="false">
+              <X size={16} />
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <TabsContent value="doc" className="p-4">
-        <DocRenderer />
-      </TabsContent>
-      <TabsContent value="files" className="p-2">
-        <FileTree />
-      </TabsContent>
-      <TabsContent value="agents" className="p-3">
-        <AgentDashboard />
-      </TabsContent>
-      <TabsContent value="diff" className="p-0">
-        <DiffViewer />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="doc" className="p-4">
+          <DocRenderer />
+        </TabsContent>
+        <TabsContent value="files" className="p-2">
+          <FileTree />
+        </TabsContent>
+        <TabsContent value="agents" className="p-3">
+          <AgentDashboard />
+        </TabsContent>
+        <TabsContent value="diff" className="p-0">
+          <DiffViewer />
+        </TabsContent>
+      </Tabs>
+    </div>
   )
-
-  if (fullscreen) {
-    return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/20 p-6">
-        <div className="h-full w-full max-w-5xl overflow-hidden rounded-xl border border-border bg-surface shadow-float">
-          {body}
-        </div>
-      </div>
-    )
-  }
-
-  return <div className="h-full bg-surface">{body}</div>
 }

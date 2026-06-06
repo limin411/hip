@@ -1321,7 +1321,7 @@ export function LoginScreen() {
           </div>
           <div className="text-center">
             <div className="text-2xl font-semibold text-ink">hip</div>
-            <div className="mt-1 text-sm text-ink-secondary">智能体编码工作台</div>
+            <div className="mt-1 text-sm text-ink-secondary">没有人比我更懂摸鱼</div>
           </div>
         </div>
       </div>

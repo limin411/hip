@@ -60,7 +60,7 @@ export function AgentDashboard() {
     <div className="flex flex-col gap-3">
       {supervisor && <AgentCard agent={supervisor} />}
       <div className="text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">并行子智能体</div>
-      <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
+      <div className="flex flex-col gap-2.5">
         {children.map((agent) => (
           <AgentCard key={agent.id} agent={agent} />
         ))}

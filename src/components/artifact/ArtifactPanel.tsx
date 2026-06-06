@@ -1,4 +1,4 @@
-import { FileText, FolderTree, Network, GitCompare, Maximize2, Minimize2, X } from 'lucide-react'
+import { Maximize2, Minimize2, X } from 'lucide-react'
 import type { ArtifactTab } from '@/mock/types'
 import { useUiStore } from '@/store/uiStore'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
@@ -8,11 +8,11 @@ import { FileTree } from './FileTree'
 import { AgentDashboard } from './AgentDashboard'
 import { DiffViewer } from './DiffViewer'
 
-const TABS: { value: ArtifactTab; label: string; icon: typeof FileText }[] = [
-  { value: 'doc', label: '文档', icon: FileText },
-  { value: 'files', label: '文件', icon: FolderTree },
-  { value: 'agents', label: '智能体', icon: Network },
-  { value: 'diff', label: 'Diff', icon: GitCompare },
+const TABS: { value: ArtifactTab; label: string }[] = [
+  { value: 'doc', label: '文档' },
+  { value: 'files', label: '文件' },
+  { value: 'agents', label: '智能体' },
+  { value: 'diff', label: 'Diff' },
 ]
 
 export function ArtifactPanel() {
@@ -28,11 +28,10 @@ export function ArtifactPanel() {
       onValueChange={(v) => setTab(v as ArtifactTab)}
       className="flex h-full flex-col"
     >
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-2">
-        <TabsList>
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
+        <TabsList className="h-full gap-4">
           {TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>
-              <t.icon size={14} />
               {t.label}
             </TabsTrigger>
           ))}

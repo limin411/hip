@@ -1,6 +1,6 @@
 import { useContext, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Settings, CreditCard, HelpCircle, LogOut, ChevronsUpDown } from 'lucide-react'
+import { Settings, LogOut, ChevronsUpDown } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import {
   DropdownMenu,
@@ -11,27 +11,18 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/DropdownMenu'
 import { Modal } from '@/components/ui/Modal'
-import { ProfilePanel } from '@/components/account/ProfilePanel'
 import { SettingsPanel } from '@/components/account/SettingsPanel'
-import { BillingPanel } from '@/components/account/BillingPanel'
-import { HelpPanel } from '@/components/account/HelpPanel'
 import { SidebarPeekLockContext } from './sidebarPeekContext'
 import { mockUser } from '@/mock/user'
 
-type PageKey = 'profile' | 'settings' | 'billing' | 'help'
+type PageKey = 'settings'
 
-const PAGES: { key: PageKey; icon: typeof User; label: string }[] = [
-  { key: 'profile', icon: User, label: '个人资料' },
+const PAGES: { key: PageKey; icon: typeof Settings; label: string }[] = [
   { key: 'settings', icon: Settings, label: '设置' },
-  { key: 'billing', icon: CreditCard, label: '账单与用量' },
-  { key: 'help', icon: HelpCircle, label: '帮助与支持' },
 ]
 
 const PANELS: Record<PageKey, () => JSX.Element> = {
-  profile: ProfilePanel,
   settings: SettingsPanel,
-  billing: BillingPanel,
-  help: HelpPanel,
 }
 
 export function UserMenu() {

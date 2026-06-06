@@ -1,7 +1,7 @@
 // src/domain/sessionService.ts
 import type { ServerMessage, SessionConfig } from '@hip/protocol'
 import type { Transport } from './transport'
-import { MockTransport } from './mockTransport'
+import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 
 let sessionSeq = 0
@@ -67,10 +67,7 @@ export class SessionService {
 }
 
 /**
- * App 单例：默认接 MockTransport。
- * 接 live 后端只需改这一处：
- *   import { WsTransport } from './wsTransport'
- *   export const sessionService = new SessionService(new WsTransport())
- * 其余 facade 逻辑与所有 UI 都无需改动。
+ * App 单例：接 live 后端（WsTransport）。
+ * 若要在无 Tauri 环境下使用 mock，临时改为 MockTransport 即可。
  */
-export const sessionService = new SessionService(new MockTransport())
+export const sessionService = new SessionService(new WsTransport())

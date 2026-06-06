@@ -44,7 +44,7 @@ export function AppLayout() {
   }, [panelOpen])
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-surface">
+    <div className="relative h-dvh w-screen overflow-hidden bg-surface">
       <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={sidebarRef}

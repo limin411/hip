@@ -1,15 +1,16 @@
-import type { MockAgent, Role } from '@/mock/types'
-import { useUiStore } from '@/store/uiStore'
+import type { AgentRole } from '@hip/protocol'
+import type { AgentVM } from '@/domain'
+import { useAgents } from '@/domain'
 import { cn } from '@/lib/utils'
 
-const ROLE_COLOR: Record<Role, string> = {
+const ROLE_COLOR: Record<AgentRole, string> = {
   supervisor: 'var(--role-supervisor)',
   planner: 'var(--role-planner)',
   coder: 'var(--role-coder)',
   reviewer: 'var(--role-reviewer)',
 }
 
-function StatusDot({ status, color }: { status: MockAgent['status']; color: string }) {
+function StatusDot({ status, color }: { status: AgentVM['status']; color: string }) {
   if (status === 'running') {
     return <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: color }} />
   }
@@ -19,7 +20,7 @@ function StatusDot({ status, color }: { status: MockAgent['status']; color: stri
   return <span className="h-2 w-2 rounded-full border border-border" />
 }
 
-function AgentCard({ agent }: { agent: MockAgent }) {
+function AgentCard({ agent }: { agent: AgentVM }) {
   const color = ROLE_COLOR[agent.role]
   return (
     <div
@@ -52,7 +53,7 @@ function AgentCard({ agent }: { agent: MockAgent }) {
 }
 
 export function AgentDashboard() {
-  const agents = useUiStore((s) => s.agents)
+  const agents = useAgents()
   const supervisor = agents.find((a) => a.role === 'supervisor')
   const children = agents.filter((a) => a.role !== 'supervisor')
 

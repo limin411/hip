@@ -1,9 +1,9 @@
 import { X } from 'lucide-react'
-import type { MockSession } from '@/mock/types'
+import type { SessionVM } from '@/domain'
 import { cn } from '@/lib/utils'
 
 interface SessionItemProps {
-  session: MockSession
+  session: SessionVM
   active: boolean
   onSelect: () => void
   onDelete: () => void

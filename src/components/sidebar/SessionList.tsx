@@ -1,13 +1,12 @@
 import { useUiStore } from '@/store/uiStore'
+import { useSessions, useActiveSessionId, sessionService } from '@/domain'
 import { filterSessions } from '@/lib/sessions'
 import { SessionItem } from './SessionItem'
 
 export function SessionList() {
-  const sessions = useUiStore((s) => s.sessions)
+  const sessions = useSessions()
   const search = useUiStore((s) => s.search)
-  const activeSessionId = useUiStore((s) => s.activeSessionId)
-  const selectSession = useUiStore((s) => s.selectSession)
-  const deleteSession = useUiStore((s) => s.deleteSession)
+  const activeSessionId = useActiveSessionId()
 
   const filtered = filterSessions(sessions, search)
 
@@ -22,8 +21,8 @@ export function SessionList() {
           key={session.id}
           session={session}
           active={session.id === activeSessionId}
-          onSelect={() => selectSession(session.id)}
-          onDelete={() => deleteSession(session.id)}
+          onSelect={() => sessionService.selectSession(session.id)}
+          onDelete={() => sessionService.deleteSession(session.id)}
         />
       ))}
     </div>

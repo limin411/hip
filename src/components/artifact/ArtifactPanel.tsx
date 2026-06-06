@@ -7,7 +7,6 @@ import { DocRenderer } from './DocRenderer'
 import { FileTree } from './FileTree'
 import { AgentDashboard } from './AgentDashboard'
 import { DiffViewer } from './DiffViewer'
-import { cn } from '@/lib/utils'
 
 const TABS: { value: ArtifactTab; label: string; icon: typeof FileText }[] = [
   { value: 'doc', label: '文档', icon: FileText },
@@ -73,5 +72,5 @@ export function ArtifactPanel() {
     )
   }
 
-  return <div className={cn('h-full border-l border-border bg-surface-subtle')}>{body}</div>
+  return <div className="h-full">{body}</div>
 }

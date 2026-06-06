@@ -16,7 +16,7 @@
         "width": 1800,
         "height": 1200,
         "maximized": true,
-        "titleBarStyle": "overlay",
+        "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {
           "x": 19,

@@ -15,7 +15,13 @@
         "title": "hip",
         "width": 1800,
         "height": 1200,
-        "maximized": true
+        "maximized": true,
+        "titleBarStyle": "overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 19,
+          "y": 25
+        }
       }
     ],
     "security": {

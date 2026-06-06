@@ -53,7 +53,7 @@ export function SidebarPeek() {
         onMouseLeave={() => dispatch({ type: 'leave' })}
         style={{ width: PEEK_WIDTH, transitionDuration: `${PEEK_ANIM_MS}ms` }}
         className={cn(
-          'absolute left-0 top-0 z-40 h-full border-r border-border shadow-float transition-transform ease-out motion-reduce:transition-none',
+          'absolute left-0 top-0 z-40 h-full bg-surface rounded-r-xl border-r border-border shadow-float transition-transform ease-out motion-reduce:transition-none',
           state.open ? 'translate-x-0' : '-translate-x-full',
         )}
       >

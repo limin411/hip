@@ -5,7 +5,7 @@ import { UserMenu } from './UserMenu'
 
 export function Sidebar() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col p-3">
       <div className="flex flex-col gap-2 p-2.5">
         <NewChatButton />
         <SearchBox />

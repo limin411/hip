@@ -17,6 +17,7 @@ export function AppLayout() {
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
 
+  // 侧边栏折叠 ↔ store.collapsed 双向同步（setTimeout 避免同步死循环）
   useEffect(() => {
     const p = sidebarRef.current
     if (!p) return
@@ -27,6 +28,7 @@ export function AppLayout() {
     return () => clearTimeout(t)
   }, [collapsed])
 
+  // 右侧面板开关 ↔ store.panelOpen
   useEffect(() => {
     const p = panelRef.current
     if (!p) return

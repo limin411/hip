@@ -19,7 +19,7 @@ export function PanelCard({
   return (
     <div
       className={cn(
-        'flex flex-col h-full w-full overflow-hidden rounded-xl border border-border bg-surface transition-shadow duration-200',
+        'flex flex-col h-full w-full m-2 overflow-hidden rounded-xl border border-border bg-surface transition-shadow duration-200',
         shadow === 'float' ? 'shadow-float' : 'shadow-pop',
         direction === 'left' && 'animate-in-left',
         direction === 'right' && 'animate-in-right',

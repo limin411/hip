@@ -11,7 +11,7 @@ export function ChatHeader() {
   const active = sessions.find((s) => s.id === activeSessionId)
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+    <div className="mx-2 mb-2 flex h-12 shrink-0 items-center justify-between rounded-xl border border-border bg-surface px-4 shadow-pop">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={toggleCollapsed} title="折叠侧边栏">
           <PanelLeft size={17} />

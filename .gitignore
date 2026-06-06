@@ -41,3 +41,4 @@ src-tauri/gen
 
 # Superpowers brainstorm sessions
 .superpowers/
+tsconfig.node.tsbuildinfo

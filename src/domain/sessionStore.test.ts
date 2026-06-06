@@ -1,6 +1,6 @@
 // src/domain/sessionStore.test.ts
 import { describe, it, expect } from 'vitest'
-import { applyServerMessage, type SessionVM } from './sessionStore'
+import { applyServerMessage, useDomainStore, type SessionVM } from './sessionStore'
 
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
@@ -70,9 +70,22 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 'nope', agentId: 'a1' }, 0)
     expect(next.sessions[0].agents).toHaveLength(0)
   })
-})
 
-import { useDomainStore } from './sessionStore'
+  it('session:created adds an empty session and ignores duplicates', () => {
+    const s0 = { sessions: [baseSession()] }
+    const added = applyServerMessage(s0, { type: 'session:created', sessionId: 's2' }, 0)
+    expect(added.sessions.map((s) => s.id)).toEqual(['s1', 's2'])
+    const dup = applyServerMessage(added, { type: 'session:created', sessionId: 's1' }, 0)
+    expect(dup.sessions).toHaveLength(2)
+  })
+
+  it('token:stream for an unknown agent is a no-op (arrives before agent:started)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'ghost', delta: 'x' }, 0)
+    expect(next.sessions[0].agents).toHaveLength(0)
+    expect(next.sessions[0].messages).toHaveLength(1)
+  })
+})
 
 function reset() {
   useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })

@@ -1,4 +1,5 @@
 // src/domain/sessionStore.ts
+import { create } from 'zustand'
 import type { AgentRole, Message, ServerMessage, SessionConfig } from '@hip/protocol'
 import { seedSessions } from './seed'
 
@@ -10,7 +11,7 @@ export interface AgentVM {
   title: string        // 派生自 role
   status: AgentStatus
   tokens: string
-  tokenCount: number   // 物化：tokens.length
+  tokenCount: number   // 物化：tokens.length（字符数，非 LLM token 数；UI 仍按 mock 习惯显示为 "tokens"）
   elapsedMs: number    // 物化：finishedAt - startedAt
   startedAt: number    // 内部：agent:started 时的 now（不渲染）
 }
@@ -118,8 +119,6 @@ export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle' }
 }
 
-import { create } from 'zustand'
-
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
 
 interface DomainStore {
@@ -159,13 +158,16 @@ export const useDomainStore = create<DomainStore>((set) => ({
     }),
 
   appendUserMessage: (sessionId, content) =>
-    set((s) => ({
-      sessions: s.sessions.map((sess) =>
-        sess.id !== sessionId
-          ? sess
-          : { ...sess, messages: [...sess.messages, { id: `u-${(userSeq += 1)}`, role: 'user' as const, content, timestamp: userSeq }] },
-      ),
-    })),
+    set((s) => {
+      const id = `u-${(userSeq += 1)}`
+      return {
+        sessions: s.sessions.map((sess) =>
+          sess.id !== sessionId
+            ? sess
+            : { ...sess, messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+        ),
+      }
+    }),
 
   setConnection: (connection) => set({ connection }),
 }))

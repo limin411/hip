@@ -6,6 +6,7 @@ import { mockAgents } from '@/mock/agents'
 import type { AgentVM, SessionVM } from './sessionStore'
 
 // Matches DEFAULT_CONFIG in sessionStore.ts — inlined to avoid circular ESM dependency
+// 必须与 sessionStore.ts 的 DEFAULT_CONFIG 保持一致（此处内联以打破 seed.ts ↔ sessionStore.ts 的运行时循环依赖）
 const SEED_CONFIG: SessionConfig = { llmProvider: 'anthropic', model: 'claude-opus-4-8', tools: [] }
 
 function seedMessages(): Message[] {

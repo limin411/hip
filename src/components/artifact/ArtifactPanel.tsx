@@ -28,7 +28,10 @@ export function ArtifactPanel() {
       onValueChange={(v) => setTab(v as ArtifactTab)}
       className="flex h-full flex-col"
     >
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
+      <div
+        data-tauri-drag-region
+        className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2"
+      >
         <TabsList className="h-full gap-4">
           {TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>
@@ -37,10 +40,10 @@ export function ArtifactPanel() {
           ))}
         </TabsList>
         <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" onClick={toggleFullscreen} title={fullscreen ? '还原' : '全屏'}>
+          <Button variant="ghost" size="icon" onClick={toggleFullscreen} title={fullscreen ? '还原' : '全屏'} data-tauri-drag-region="false">
             {fullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={togglePanel} title="关闭面板">
+          <Button variant="ghost" size="icon" onClick={togglePanel} title="关闭面板" data-tauri-drag-region="false">
             <X size={16} />
           </Button>
         </div>

@@ -46,7 +46,7 @@ export class Session {
     try {
       const run = await this.agent.streamEvents(
         { messages: [{ role: 'user' as const, content }] },
-        { version: 'v3' },
+        { version: 'v3', signal: this.abortController.signal },
       )
 
       for await (const msg of run.messages) {

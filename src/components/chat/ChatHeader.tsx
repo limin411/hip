@@ -1,14 +1,12 @@
 import { PanelLeft, PanelRight } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
+import { useActiveSession } from '@/domain'
 import { Button } from '@/components/ui/Button'
 
 export function ChatHeader() {
-  const sessions = useUiStore((s) => s.sessions)
-  const activeSessionId = useUiStore((s) => s.activeSessionId)
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed)
   const togglePanel = useUiStore((s) => s.togglePanel)
-
-  const active = sessions.find((s) => s.id === activeSessionId)
+  const active = useActiveSession()
 
   return (
     <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border bg-surface px-3">

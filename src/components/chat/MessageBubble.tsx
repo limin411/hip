@@ -1,12 +1,12 @@
 import ReactMarkdown from 'react-markdown'
-import type { MockMessage } from '@/mock/types'
+import type { Message } from '@hip/protocol'
 import { Avatar } from '@/components/ui/Avatar'
 import { mockUser } from '@/mock/user'
 import { StreamingCursor } from './StreamingCursor'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
-  message: MockMessage
+  message: Message
   streaming?: boolean
 }
 

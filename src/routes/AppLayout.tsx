@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useUiStore } from '@/store/uiStore'
+import { sessionService } from '@/domain'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatHeader } from '@/components/chat/ChatHeader'
 import { ChatPane } from '@/components/chat/ChatPane'
@@ -15,6 +16,10 @@ export function AppLayout() {
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
+
+  useEffect(() => {
+    sessionService.connect()
+  }, [])
 
   // 侧边栏折叠 ↔ store.collapsed 双向同步（setTimeout 避免同步死循环）
   useEffect(() => {

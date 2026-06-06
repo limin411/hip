@@ -1,12 +1,10 @@
 import { useEffect, useRef } from 'react'
-import { useUiStore } from '@/store/uiStore'
+import { useActiveSessionId, useActiveMessages } from '@/domain'
 import { MessageBubble } from './MessageBubble'
 
-const EMPTY: never[] = []
-
 export function ChatPane() {
-  const activeSessionId = useUiStore((s) => s.activeSessionId)
-  const messages = useUiStore((s) => s.messagesBySession[activeSessionId] ?? EMPTY)
+  const activeSessionId = useActiveSessionId()
+  const messages = useActiveMessages()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

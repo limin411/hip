@@ -1,19 +1,17 @@
 import { useState } from 'react'
 import { ArrowUp, ChevronDown } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
-import { useSimulatedStream } from '@/hooks/useSimulatedStream'
+import { sessionService } from '@/domain'
 
 const MODELS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'gpt-4o']
 
 export function InputBar() {
   const [value, setValue] = useState('')
   const [model, setModel] = useState(MODELS[0])
-  const { send } = useSimulatedStream()
-
   function submit() {
     const text = value.trim()
     if (!text) return
-    send(text)
+    sessionService.sendMessage(text)
     setValue('')
   }
 

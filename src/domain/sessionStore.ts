@@ -116,3 +116,55 @@ export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'anthropic', model: 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle' }
 }
+
+import { create } from 'zustand'
+
+export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
+
+interface DomainStore {
+  sessions: SessionVM[]
+  activeSessionId: string | null
+  connection: Connection
+
+  apply: (msg: ServerMessage) => void
+  createSession: (id: string, config: SessionConfig) => string
+  selectSession: (id: string) => void
+  deleteSession: (id: string) => void
+  appendUserMessage: (sessionId: string, content: string) => void
+  setConnection: (c: Connection) => void
+}
+
+let userSeq = 0
+
+export const useDomainStore = create<DomainStore>((set) => ({
+  sessions: [], // ← Task A4 改为 seedSessions()
+  activeSessionId: null, // ← Task A4 改为 seed 的首个会话 id
+  connection: 'disconnected',
+
+  apply: (msg) => set((s) => applyServerMessage(s, msg, Date.now())),
+
+  createSession: (id, config) => {
+    set((s) => ({ sessions: [{ ...emptySession(id), config }, ...s.sessions], activeSessionId: id }))
+    return id
+  },
+
+  selectSession: (id) => set({ activeSessionId: id }),
+
+  deleteSession: (id) =>
+    set((s) => {
+      const sessions = s.sessions.filter((x) => x.id !== id)
+      const activeSessionId = s.activeSessionId === id ? (sessions[0]?.id ?? null) : s.activeSessionId
+      return { sessions, activeSessionId }
+    }),
+
+  appendUserMessage: (sessionId, content) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId
+          ? sess
+          : { ...sess, messages: [...sess.messages, { id: `u-${(userSeq += 1)}`, role: 'user' as const, content, timestamp: userSeq }] },
+      ),
+    })),
+
+  setConnection: (connection) => set({ connection }),
+}))

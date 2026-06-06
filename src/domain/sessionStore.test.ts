@@ -71,3 +71,43 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].agents).toHaveLength(0)
   })
 })
+
+import { useDomainStore } from './sessionStore'
+
+function reset() {
+  useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
+}
+
+describe('useDomainStore actions', () => {
+  it('createSession prepends and activates', () => {
+    reset()
+    const id = useDomainStore.getState().createSession('s-new', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    expect(useDomainStore.getState().sessions[0].id).toBe(id)
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+  })
+
+  it('appendUserMessage adds a user message to the session', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().appendUserMessage('s1', 'hello')
+    const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0]).toMatchObject({ role: 'user', content: 'hello' })
+  })
+
+  it('deleteSession removes and reassigns active', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s2', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().deleteSession('s2')
+    expect(useDomainStore.getState().sessions.map((s) => s.id)).toEqual(['s1'])
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+  })
+
+  it('apply routes a ServerMessage through the reducer', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().apply({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'coder' })
+    expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Coder')
+  })
+})

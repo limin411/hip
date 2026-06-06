@@ -30,7 +30,12 @@ export const useUiStore = create<UiState>((set) => ({
   panelFullscreen: false,
   activeTab: 'agents',
   setTab: (t) => set({ activeTab: t }),
-  togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
-  setPanelOpen: (v) => set((s) => (s.panelOpen === v ? s : { panelOpen: v })),
+  togglePanel: () => set((s) => ({
+    panelOpen: !s.panelOpen,
+    panelFullscreen: s.panelOpen ? false : s.panelFullscreen,
+  })),
+  setPanelOpen: (v) => set((s) =>
+    s.panelOpen === v ? s : { panelOpen: v, ...(v ? {} : { panelFullscreen: false }) },
+  ),
   toggleFullscreen: () => set((s) => ({ panelFullscreen: !s.panelFullscreen })),
 }))

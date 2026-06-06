@@ -41,20 +41,10 @@ export default {
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
         pulse: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.4' } },
-        'in-left': {
-          '0%': { opacity: '0', transform: 'translateX(-8px) scale(0.98)' },
-          '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
-        },
-        'in-right': {
-          '0%': { opacity: '0', transform: 'translateX(8px) scale(0.98)' },
-          '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
-        },
       },
       animation: {
         blink: 'blink 1s step-start infinite',
         pulse: 'pulse 1.2s ease-in-out infinite',
-        'in-left': 'in-left 0.3s ease-out',
-        'in-right': 'in-right 0.3s ease-out',
       },
     },
   },

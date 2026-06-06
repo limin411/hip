@@ -32,7 +32,7 @@ export function ArtifactPanel() {
         data-tauri-drag-region
         className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2"
       >
-        <TabsList className="h-full gap-4">
+        <TabsList className="h-full gap-4" data-tauri-drag-region="false">
           {TABS.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>
               {t.label}

@@ -1,6 +1,8 @@
 import type { ServerMessage, SessionConfig, AgentRole } from '@hip/protocol'
 import { createDeepAgent } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
+import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
+import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -20,21 +22,24 @@ function buildModel(config: SessionConfig): ChatOpenAI {
 
 export class Session {
   private readonly agent: ReturnType<typeof createDeepAgent>
+  private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
 
   constructor(
     readonly id: string,
     readonly config: SessionConfig,
+    model?: BaseLanguageModel,
   ) {
     this.agent = createDeepAgent({
-      model: buildModel(config),
+      model: model ?? buildModel(config),
       systemPrompt: config.systemPrompt ?? 'You are a helpful coding assistant.',
     })
   }
 
   async sendMessage(content: string, _send: SendFn): Promise<void> {
+    this.messages.push(new HumanMessage(content))
     this.abortController = new AbortController()
-    let fullContent = ''
+    let aiText = ''
 
     _send({
       type: 'agent:started',
@@ -45,13 +50,13 @@ export class Session {
 
     try {
       const run = await this.agent.streamEvents(
-        { messages: [{ role: 'user' as const, content }] },
+        { messages: this.messages },
         { version: 'v3', signal: this.abortController.signal },
       )
 
       for await (const msg of run.messages) {
         for await (const token of msg.text) {
-          fullContent += token
+          aiText += token
           _send({
             type: 'token:stream',
             sessionId: this.id,
@@ -67,16 +72,18 @@ export class Session {
         agentId: AGENT_ID,
       })
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return
+      const isAbort = err instanceof Error && err.name === 'AbortError'
 
       _send({
         type: 'error',
         sessionId: this.id,
-        code: 'AGENT_ERROR',
-        message: err instanceof Error ? err.message : String(err),
+        code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
+        message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
       })
       return
     }
+
+    this.messages.push(new AIMessage(aiText))
 
     _send({
       type: 'message:complete',
@@ -84,7 +91,7 @@ export class Session {
       message: {
         id: `asst-${AGENT_ID}-${Date.now()}`,
         role: 'assistant',
-        content: fullContent,
+        content: aiText,
         agentId: AGENT_ID,
         timestamp: Date.now(),
       },

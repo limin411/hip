@@ -11,6 +11,7 @@ export function InputBar() {
   function submit() {
     const text = value.trim()
     if (!text) return
+    // TODO: 模型选择（model）暂未接入 sessionService / SessionConfig —— 与既有 mock 行为一致，目前仅为占位 UI
     sessionService.sendMessage(text)
     setValue('')
   }

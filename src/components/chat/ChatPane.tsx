@@ -27,7 +27,7 @@ export function ChatPane() {
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-6">
         {messages.map((m, i) => (
           <MessageBubble
-            key={`${activeSessionId}-${m.id}-${i}`}
+            key={`${activeSessionId ?? 'none'}-${m.id}-${i}`}
             message={m}
             streaming={m.role === 'assistant' && i === messages.length - 1}
           />

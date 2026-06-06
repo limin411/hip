@@ -10,12 +10,10 @@ interface UiState {
   setSearch: (q: string) => void
 
   panelOpen: boolean
-  panelFullscreen: boolean
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
   togglePanel: () => void
   setPanelOpen: (v: boolean) => void
-  toggleFullscreen: () => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -27,15 +25,12 @@ export const useUiStore = create<UiState>((set) => ({
   setSearch: (q) => set({ search: q }),
 
   panelOpen: true,
-  panelFullscreen: false,
   activeTab: 'agents',
   setTab: (t) => set({ activeTab: t }),
   togglePanel: () => set((s) => ({
     panelOpen: !s.panelOpen,
-    panelFullscreen: s.panelOpen ? false : s.panelFullscreen,
   })),
   setPanelOpen: (v) => set((s) =>
-    s.panelOpen === v ? s : { panelOpen: v, ...(v ? {} : { panelFullscreen: false }) },
+    s.panelOpen === v ? s : { panelOpen: v },
   ),
-  toggleFullscreen: () => set((s) => ({ panelFullscreen: !s.panelFullscreen })),
 }))

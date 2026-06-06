@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import type { ArtifactTab } from '@/mock/types'
+import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { Button } from '@/components/ui/Button'

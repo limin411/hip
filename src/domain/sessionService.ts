@@ -54,9 +54,11 @@ export class SessionService {
   sendMessage(content: string): void {
     const text = content.trim()
     if (!text) return
-    const { activeSessionId, appendUserMessage } = useDomainStore.getState()
-    if (!activeSessionId) return
-    appendUserMessage(activeSessionId, text)
+    let { activeSessionId } = useDomainStore.getState()
+    if (!activeSessionId) {
+      activeSessionId = this.createSession()
+    }
+    useDomainStore.getState().appendUserMessage(activeSessionId, text)
     this.transport.send({ type: 'message:send', sessionId: activeSessionId, content: text, role: 'user' })
   }
 

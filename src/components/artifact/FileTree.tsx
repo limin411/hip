@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react'
-import type { FileNode } from '@/mock/types'
-import { mockFileTree } from '@/mock/fileTree'
 import { cn } from '@/lib/utils'
+
+interface FileNode {
+  name: string
+  path: string
+  type: 'file' | 'dir'
+  children?: FileNode[]
+}
 
 interface TreeNodeProps {
   node: FileNode
@@ -48,9 +53,24 @@ function TreeNode({ node, depth, selected, onSelect }: TreeNodeProps) {
 
 export function FileTree() {
   const [selected, setSelected] = useState('')
+  // TODO: wire to real workspace filesystem once agent tools are enabled
+  const root: FileNode | null = null
+
+  if (!root) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-ink-tertiary">
+        <Folder size={32} className="opacity-40" />
+        <div className="text-[13px]">暂无文件</div>
+        <div className="max-w-[180px] text-center text-[12px] opacity-70">
+          与智能体协作时，文件将自动显示在这里
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="py-1">
-      <TreeNode node={mockFileTree} depth={0} selected={selected} onSelect={setSelected} />
+      <TreeNode node={root} depth={0} selected={selected} onSelect={setSelected} />
     </div>
   )
 }

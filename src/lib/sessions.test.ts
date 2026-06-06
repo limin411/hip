@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { filterSessions } from './sessions'
-import type { MockSession } from '@/mock/types'
 
-const data: MockSession[] = [
+interface TestSession {
+  id: string
+  title: string
+  preview: string
+  updatedAt: string
+}
+
+const data: TestSession[] = [
   { id: '1', title: 'WebSocket 重构', preview: 'ws client', updatedAt: '' },
   { id: '2', title: '布局', preview: '三栏 layout', updatedAt: '' },
 ]

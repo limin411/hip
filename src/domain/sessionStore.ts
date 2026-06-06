@@ -1,7 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
 import type { AgentRole, Message, ServerMessage, SessionConfig } from '@hip/protocol'
-import { seedSessions } from './seed'
 
 export type AgentStatus = 'idle' | 'running' | 'done'
 
@@ -113,7 +112,7 @@ export function applyServerMessage(
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'anthropic', model: 'claude-opus-4-8', tools: [] }
+export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle' }
@@ -137,8 +136,8 @@ interface DomainStore {
 let userSeq = 0
 
 export const useDomainStore = create<DomainStore>((set) => ({
-  sessions: seedSessions(),
-  activeSessionId: 's1',
+  sessions: [],
+  activeSessionId: null,
   connection: 'disconnected',
 
   apply: (msg) => set((s) => applyServerMessage(s, msg, Date.now())),

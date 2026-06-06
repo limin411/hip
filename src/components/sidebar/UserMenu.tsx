@@ -13,7 +13,8 @@ import {
 import { Modal } from '@/components/ui/Modal'
 import { SettingsPanel } from '@/components/account/SettingsPanel'
 import { SidebarPeekLockContext } from './sidebarPeekContext'
-import { mockUser } from '@/mock/user'
+// TODO: replace with real authenticated user once auth flow is implemented
+const currentUser = { name: '用户', email: 'user@example.com', avatarUrl: undefined }
 
 type PageKey = 'settings'
 
@@ -41,17 +42,17 @@ export function UserMenu() {
       <DropdownMenu modal={false} onOpenChange={(open) => (open ? peekLock?.lock() : peekLock?.unlock())}>
         <DropdownMenuTrigger asChild>
           <button className="flex w-full items-center gap-2.5 rounded-md p-1.5 transition-colors hover:bg-surface-muted">
-            <Avatar name={mockUser.name} src={mockUser.avatarUrl} size={28} />
+            <Avatar name={currentUser.name} src={currentUser.avatarUrl} size={28} />
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <span className="truncate text-[13px] font-medium text-ink">{mockUser.name}</span>
-              <span className="truncate text-[11px] text-ink-tertiary">{mockUser.email}</span>
+              <span className="truncate text-[13px] font-medium text-ink">{currentUser.name}</span>
+              <span className="truncate text-[11px] text-ink-tertiary">{currentUser.email}</span>
             </div>
             <ChevronsUpDown size={14} className="shrink-0 text-ink-tertiary" />
           </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent side="top" align="start" className="w-[240px]">
-          <DropdownMenuLabel>{mockUser.email}</DropdownMenuLabel>
+          <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {PAGES.map((page) => (
             <DropdownMenuItem key={page.key} onSelect={() => setOpenKey(page.key)}>

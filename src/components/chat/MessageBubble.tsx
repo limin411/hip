@@ -1,8 +1,10 @@
 import ReactMarkdown from 'react-markdown'
 import type { Message } from '@hip/protocol'
 import { Avatar } from '@/components/ui/Avatar'
-import { mockUser } from '@/mock/user'
 import { StreamingCursor } from './StreamingCursor'
+
+// TODO: replace with real authenticated user once auth flow is implemented
+const currentUserName = '用户'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
@@ -16,7 +18,7 @@ export function MessageBubble({ message, streaming }: MessageBubbleProps) {
   return (
     <div className="flex gap-3">
       {isUser ? (
-        <Avatar name={mockUser.name} size={28} />
+        <Avatar name={currentUserName} size={28} />
       ) : (
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
           AI

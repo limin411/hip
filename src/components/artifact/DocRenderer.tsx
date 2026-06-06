@@ -1,7 +1,21 @@
 import ReactMarkdown from 'react-markdown'
-import { mockDoc } from '@/mock/doc'
 
 export function DocRenderer() {
+  // TODO: wire to real agent-generated documentation once tools are enabled
+  const doc = ''
+
+  if (!doc) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-ink-tertiary">
+        <span className="text-[24px] opacity-40">📝</span>
+        <div className="text-[13px]">暂无文档</div>
+        <div className="max-w-[200px] text-center text-[12px] opacity-70">
+          智能体生成文档后，内容将显示在这里
+        </div>
+      </div>
+    )
+  }
+
   return (
     <article
       className="
@@ -18,7 +32,7 @@ export function DocRenderer() {
         [&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5
       "
     >
-      <ReactMarkdown>{mockDoc}</ReactMarkdown>
+      <ReactMarkdown>{doc}</ReactMarkdown>
     </article>
   )
 }

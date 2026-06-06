@@ -1,14 +1,28 @@
-import type { DiffFile, DiffLine } from '@/mock/types'
-import { mockDiff } from '@/mock/diff'
 import { cn } from '@/lib/utils'
 
-function lineStyle(type: DiffLine['type']): string {
+type DiffLineType = 'add' | 'del' | 'ctx'
+
+interface DiffLine {
+  type: DiffLineType
+  content: string
+  oldNo: number | null
+  newNo: number | null
+}
+
+interface DiffFile {
+  path: string
+  additions: number
+  deletions: number
+  lines: DiffLine[]
+}
+
+function lineStyle(type: DiffLineType): string {
   if (type === 'add') return 'bg-success/10'
   if (type === 'del') return 'bg-danger/10'
   return ''
 }
 
-function sign(type: DiffLine['type']): string {
+function sign(type: DiffLineType): string {
   if (type === 'add') return '+'
   if (type === 'del') return '-'
   return ' '
@@ -47,9 +61,24 @@ function FileDiff({ file }: { file: DiffFile }) {
 }
 
 export function DiffViewer() {
+  // TODO: wire to real agent-generated diffs once coder tools are enabled
+  const files: DiffFile[] = []
+
+  if (files.length === 0) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-ink-tertiary">
+        <span className="text-[24px] opacity-40">±</span>
+        <div className="text-[13px]">暂无 Diff</div>
+        <div className="max-w-[200px] text-center text-[12px] opacity-70">
+          智能体修改代码后，变更将显示在这里
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
-      {mockDiff.map((file) => (
+      {files.map((file) => (
         <FileDiff key={file.path} file={file} />
       ))}
     </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { ArtifactTab } from '@/mock/types'
+
+export type ArtifactTab = 'doc' | 'files' | 'agents' | 'diff'
 
 interface UiState {
   collapsed: boolean

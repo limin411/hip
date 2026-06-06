@@ -7,7 +7,6 @@ import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
-import { PanelCard } from '@/components/layout/PanelCard'
 
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
@@ -40,61 +39,54 @@ export function AppLayout() {
   }, [panelOpen])
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-surface-subtle">
-      <ChatHeader />
+    <div className="relative h-screen w-screen overflow-hidden bg-surface">
+      <PanelGroup direction="horizontal" className="h-full w-full">
+        <Panel
+          ref={sidebarRef}
+          defaultSize={14}
+          minSize={12}
+          maxSize={22}
+          collapsible
+          collapsedSize={0}
+          onCollapse={() => setCollapsed(true)}
+          onExpand={() => setCollapsed(false)}
+        >
+          {!collapsed && (
+            <div className="h-full bg-surface-subtle">
+              <Sidebar />
+            </div>
+          )}
+        </Panel>
 
-      <div className="flex-1">
-        <PanelGroup direction="horizontal">
-          <Panel
-            ref={sidebarRef}
-            defaultSize={14}
-            minSize={12}
-            maxSize={22}
-            collapsible
-            collapsedSize={0}
-            onCollapse={() => setCollapsed(true)}
-            onExpand={() => setCollapsed(false)}
-          >
-            {!collapsed && (
-              <PanelCard shadow="float" direction="left">
-                <Sidebar />
-              </PanelCard>
-            )}
-          </Panel>
+        <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
+          <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+        </PanelResizeHandle>
 
-          <PanelResizeHandle className="group relative z-10 w-3 -mx-1 flex items-center justify-center bg-transparent transition-colors hover:bg-accent/5 data-[resize-handle-state=drag]:bg-accent/10">
-            <div className="h-8 w-1 rounded-full bg-border transition-colors group-hover:bg-accent/40 group-data-[resize-handle-state=drag]:bg-accent" />
-          </PanelResizeHandle>
+        <Panel minSize={34}>
+          <div className="flex h-full flex-col bg-surface">
+            <ChatHeader />
+            <ChatPane />
+            <InputBar />
+          </div>
+        </Panel>
 
-          <Panel minSize={34}>
-            <PanelCard shadow="pop">
-              <ChatPane />
-              <InputBar />
-            </PanelCard>
-          </Panel>
+        <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
+          <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+        </PanelResizeHandle>
 
-          <PanelResizeHandle className="group relative z-10 w-3 -mx-1 flex items-center justify-center bg-transparent transition-colors hover:bg-accent/5 data-[resize-handle-state=drag]:bg-accent/10">
-            <div className="h-8 w-1 rounded-full bg-border transition-colors group-hover:bg-accent/40 group-data-[resize-handle-state=drag]:bg-accent" />
-          </PanelResizeHandle>
-
-          <Panel
-            ref={panelRef}
-            defaultSize={26}
-            minSize={18}
-            maxSize={44}
-            collapsible
-            collapsedSize={0}
-            onCollapse={() => setPanelOpen(false)}
-            onExpand={() => setPanelOpen(true)}
-          >
-            {panelOpen && (
-              <PanelCard shadow="float" direction="right">
-                <ArtifactPanel />
-              </PanelCard>
-            )}
-          </Panel>
-        </PanelGroup>
-      </div>
+        <Panel
+          ref={panelRef}
+          defaultSize={26}
+          minSize={18}
+          maxSize={44}
+          collapsible
+          collapsedSize={0}
+          onCollapse={() => setPanelOpen(false)}
+          onExpand={() => setPanelOpen(true)}
+        >
+          {panelOpen && <ArtifactPanel />}
+        </Panel>
+      </PanelGroup>
 
       <SidebarPeek />
     </div>

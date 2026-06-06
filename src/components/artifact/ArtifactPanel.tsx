@@ -71,5 +71,5 @@ export function ArtifactPanel() {
     )
   }
 
-  return <div className="h-full p-3">{body}</div>
+  return <div className="h-full bg-surface">{body}</div>
 }

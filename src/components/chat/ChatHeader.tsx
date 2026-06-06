@@ -11,13 +11,12 @@ export function ChatHeader() {
   const active = sessions.find((s) => s.id === activeSessionId)
 
   return (
-    <div className="mx-2 mb-2 flex h-12 shrink-0 items-center justify-between rounded-xl border border-border bg-surface px-4 shadow-pop">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={toggleCollapsed} title="折叠侧边栏">
-          <PanelLeft size={17} />
-        </Button>
-        <span className="text-[13px] font-medium text-ink">{active?.title ?? '对话'}</span>
-      </div>
+    <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border bg-surface px-3">
+      <Button variant="ghost" size="icon" onClick={toggleCollapsed} title="折叠侧边栏">
+        <PanelLeft size={17} />
+      </Button>
+      <span className="truncate text-[13px] font-medium text-ink">{active?.title ?? '对话'}</span>
+      <div className="flex-1" />
       <Button variant="ghost" size="icon" onClick={togglePanel} title="切换产物面板">
         <PanelRight size={17} />
       </Button>

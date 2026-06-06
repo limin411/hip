@@ -231,3 +231,24 @@ hip/
 ├── wdio.conf.ts                     # WebDriverIO 配置
 └── AGENTS.md                        # 本文件
 ```
+
+## 开发启动
+
+创建 `.env.local` 文件（已 gitignored）：
+
+```bash
+cp .env.local.example .env.local
+# 编辑 .env.local，填入你的 DeepSeek API Key
+```
+
+一键启动完整应用（自动清理 Vite 端口占用）：
+
+```bash
+yarn dev:live
+```
+
+或者临时通过环境变量启动：
+
+```bash
+DEEPSEEK_API_KEY=sk-xxx yarn dev:live
+```

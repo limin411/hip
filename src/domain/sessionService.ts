@@ -66,5 +66,11 @@ export class SessionService {
   }
 }
 
-/** App 单例：默认接 MockTransport。切 live = 改成 `new WsTransport()`。 */
+/**
+ * App 单例：默认接 MockTransport。
+ * 接 live 后端只需改这一处：
+ *   import { WsTransport } from './wsTransport'
+ *   export const sessionService = new SessionService(new WsTransport())
+ * 其余 facade 逻辑与所有 UI 都无需改动。
+ */
 export const sessionService = new SessionService(new MockTransport())

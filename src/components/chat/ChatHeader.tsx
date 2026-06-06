@@ -10,9 +10,9 @@ export function ChatHeader() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border bg-surface px-3"
+      className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface pl-14 pr-3"
     >
-      <span className="min-w-0 truncate text-[13px] font-medium text-ink">
+      <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-[13px] font-medium text-ink">
         {active?.title ?? '对话'}
       </span>
       <div className="flex-1" />

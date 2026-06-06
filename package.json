@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@hip/protocol": "*",
+    "@radix-ui/react-dialog": "^1",
     "@radix-ui/react-dropdown-menu": "^2",
     "@radix-ui/react-tabs": "^1",
     "@tauri-apps/api": "^2",

@@ -66,14 +66,14 @@ export class MockTransport implements Transport {
     this.at(2000, () => this.emit({ type: 'agent:finished', sessionId, agentId: 'a1' }))
     this.at(2400, () => this.emit({ type: 'agent:finished', sessionId, agentId: 'a3' }))
 
-    const total = 1000 + chunks.length * 28
-    this.at(total + 100, () => this.emit({ type: 'agent:finished', sessionId, agentId: 'a0' }))
-    this.at(total + 200, () => {
+    const streamDoneMs = 1000 + chunks.length * 28
+    this.at(streamDoneMs + 100, () => this.emit({ type: 'agent:finished', sessionId, agentId: 'a0' }))
+    this.at(streamDoneMs + 200, () => {
       this.emit({ type: 'agent:finished', sessionId, agentId: 'a2' })
       this.emit({
         type: 'message:complete',
         sessionId,
-        message: { id: `a-${(replySeq += 1)}`, role: 'assistant', content: CANNED_REPLY, agentId: 'a0', timestamp: replySeq },
+        message: { id: `a-${(replySeq += 1)}`, role: 'assistant', content: CANNED_REPLY, agentId: 'a0', timestamp: Date.now() },
       })
     })
   }

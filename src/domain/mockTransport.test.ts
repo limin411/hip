@@ -25,23 +25,25 @@ describe('MockTransport', () => {
     transport.send({ type: 'message:send', sessionId: 's1', content: 'hi', role: 'user' })
     vi.advanceTimersByTime(10_000)
 
-    const started = events.filter((e) => e.type === 'agent:started').map((e) => (e as any).role)
+    const started = events.filter((e): e is Extract<ServerMessage, { type: 'agent:started' }> => e.type === 'agent:started').map((e) => e.role)
     expect(new Set(started)).toEqual(new Set(['supervisor', 'planner', 'coder', 'reviewer']))
 
-    const finished = events.filter((e) => e.type === 'agent:finished').map((e) => (e as any).agentId)
+    const finished = events.filter((e): e is Extract<ServerMessage, { type: 'agent:finished' }> => e.type === 'agent:finished').map((e) => e.agentId)
     expect(new Set(finished)).toEqual(new Set(['a0', 'a1', 'a2', 'a3']))
 
     const last = events[events.length - 1]
     expect(last.type).toBe('message:complete')
-    expect((last as any).message.role).toBe('assistant')
-    expect((last as any).message.content.length).toBeGreaterThan(0)
+    if (last.type === 'message:complete') {
+      expect(last.message.role).toBe('assistant')
+      expect(last.message.content.length).toBeGreaterThan(0)
+    }
   })
 
   it('streams the assistant reply as supervisor (a0) tokens', () => {
     const { events, transport } = collect()
     transport.send({ type: 'message:send', sessionId: 's1', content: 'hi', role: 'user' })
     vi.advanceTimersByTime(10_000)
-    const a0Tokens = events.filter((e) => e.type === 'token:stream' && (e as any).agentId === 'a0')
+    const a0Tokens = events.filter((e): e is Extract<ServerMessage, { type: 'token:stream' }> => e.type === 'token:stream').filter((e) => e.agentId === 'a0')
     expect(a0Tokens.length).toBeGreaterThan(5)
   })
 

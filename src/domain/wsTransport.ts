@@ -1,6 +1,7 @@
 // src/domain/wsTransport.ts
 import { invoke } from '@tauri-apps/api/core'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
+// 注意：wsClient 是模块级单例；多个 WsTransport 实例会共享同一连接（接 live 时若需多实例须重构）。
 import { wsClient } from '@/ipc/ws-client'
 import type { Transport } from './transport'
 

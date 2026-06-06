@@ -8,10 +8,15 @@ let sessionSeq = 0
 
 export class SessionService {
   private readonly transport: Transport
+  private readonly unsubscribe: () => void
 
   constructor(transport: Transport) {
     this.transport = transport
-    this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
+    this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
+  }
+
+  dispose(): void {
+    this.unsubscribe()
   }
 
   async connect(): Promise<void> {
@@ -20,7 +25,8 @@ export class SessionService {
     try {
       await this.transport.connect()
       store.setConnection('connected')
-    } catch {
+    } catch (e) {
+      console.error('[SessionService] connect failed', e)
       store.setConnection('error')
     }
   }

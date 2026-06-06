@@ -15,7 +15,7 @@ export function LoginScreen() {
             <Bot size={64} className="text-white" strokeWidth={1.5} />
           </div>
           <div className="text-center">
-            <div className="text-2xl font-semibold text-ink">hip</div>
+            <div className="text-2xl font-bold tracking-tight text-ink">hip</div>
             <div className="mt-1 text-sm text-ink-secondary">智能体编码工作台</div>
           </div>
         </div>
@@ -24,7 +24,7 @@ export function LoginScreen() {
       {/* 右侧登录方式 */}
       <div className="flex flex-1 items-center justify-center px-8">
         <div className="w-full max-w-sm">
-          <h1 className="text-xl font-semibold text-ink">登录到 hip</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">登录到 hip</h1>
           <p className="mt-1.5 text-sm text-ink-secondary">选择一种方式继续</p>
 
           <div className="mt-8 flex flex-col gap-3">

@@ -63,7 +63,7 @@ export function SidebarPeek() {
             <button
               onClick={() => setCollapsed(false)}
               title="固定侧边栏"
-              className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-surface text-ink-tertiary shadow-pop transition-colors hover:text-ink"
+              className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-ink-tertiary transition-colors hover:text-ink"
             >
               <Pin size={15} />
             </button>

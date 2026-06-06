@@ -34,9 +34,30 @@ export default {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['SF Mono', 'JetBrains Mono', 'Menlo', 'monospace'],
       },
+      // 扁平化：移除所有圆角；保留 full 供圆形头像/状态点
+      borderRadius: {
+        none: '0',
+        sm: '0',
+        DEFAULT: '0',
+        md: '0',
+        lg: '0',
+        xl: '0',
+        '2xl': '0',
+        '3xl': '0',
+        full: '9999px',
+      },
+      // 扁平化：移除所有阴影（浮层改用发丝边框界定）
       boxShadow: {
-        pop: '0 1px 3px rgba(0,0,0,0.08)',
-        float: '0 8px 24px rgba(0,0,0,0.12)',
+        none: 'none',
+        sm: 'none',
+        DEFAULT: 'none',
+        md: 'none',
+        lg: 'none',
+        xl: 'none',
+        '2xl': 'none',
+        inner: 'none',
+        pop: 'none',
+        float: 'none',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },

@@ -18,7 +18,7 @@ export function PageHeader({ title, className }: PageHeaderProps) {
       >
         <ArrowLeft size={18} />
       </button>
-      <h1 className="text-[15px] font-semibold text-ink">{title}</h1>
+      <h1 className="text-[17px] font-bold tracking-tight text-ink">{title}</h1>
     </div>
   )
 }

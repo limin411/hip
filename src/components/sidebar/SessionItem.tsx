@@ -19,7 +19,7 @@ export function SessionItem({ session, active, onSelect, onDelete }: SessionItem
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={cn('truncate text-[13px] font-medium', active ? 'text-accent' : 'text-ink')}>
+        <span className={cn('truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
           {session.title}
         </span>
         <button

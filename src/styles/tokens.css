@@ -3,19 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --bg-app: #ffffff;
-  --bg-subtle: #f7f7f8;
-  --bg-muted: #f0f0f1;
-  --border: #e6e6e8;
-  --text-primary: #1a1a1a;
-  --text-secondary: #6b6b70;
-  --text-tertiary: #9b9ba0;
-  --accent: #5b5bd6;
-  --accent-hover: #4a4ac4;
-  --accent-subtle: #eeeefb;
+  /* 单色 chrome —— 极浅灰白背景、近黑正文、灰色辅助文字 */
+  --bg-app: #fafafa;
+  --bg-subtle: #f5f5f5;
+  --bg-muted: #efefef;
+  --border: #e4e4e4;
+  --text-primary: #111111;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  /* 强调色单色化（原紫色 → 近黑）；激活态用中性灰底而非彩色块 */
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-subtle: #e8e8e8;
+  /* 功能状态色 —— 保留语义 */
   --success: #3d9a50;
   --danger: #d64545;
   --warning: #c77a1a;
+  /* 智能体角色色 —— 保留，作为功能性指示 */
   --role-supervisor: #5b5bd6;
   --role-planner: #1a8cd8;
   --role-coder: #3d9a50;
@@ -32,12 +36,25 @@ body {
   margin: 0;
   background: var(--bg-app);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* 链接：深色文字 + 下划线，不用蓝紫。仅命中 markdown 内容链接。 */
+a {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: #000000;
 }

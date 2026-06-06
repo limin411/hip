@@ -48,7 +48,7 @@ function SettingControl({ item }: { item: (typeof mockSettings)[0]['items'][0] }
         title={on ? '开启' : '关闭'}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5.5' : 'translate-x-0.5'}`}
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${on ? 'translate-x-5.5' : 'translate-x-0.5'}`}
           style={{ transform: on ? 'translateX(18px)' : 'translateX(2px)' }}
         />
       </button>

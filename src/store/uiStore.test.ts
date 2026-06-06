@@ -6,25 +6,25 @@ beforeEach(() => {
   useUiStore.setState({
     collapsed: false,
     search: '',
-    panelOpen: true,
+    panelOpen: false,
     activeTab: 'agents',
   })
 })
 
 describe('uiStore - panel state management', () => {
-  it('initial state: panel is open', () => {
+  it('initial state: panel is closed', () => {
     const s = useUiStore.getState()
-    expect(s.panelOpen).toBe(true)
+    expect(s.panelOpen).toBe(false)
   })
 
   // ---- panelOpen ↔ togglePanel / setPanelOpen ----
 
   it('togglePanel toggles panelOpen', () => {
     useUiStore.getState().togglePanel()
-    expect(useUiStore.getState().panelOpen).toBe(false)
+    expect(useUiStore.getState().panelOpen).toBe(true)
 
     useUiStore.getState().togglePanel()
-    expect(useUiStore.getState().panelOpen).toBe(true)
+    expect(useUiStore.getState().panelOpen).toBe(false)
   })
 
   it('setPanelOpen(true) opens panel', () => {
@@ -39,7 +39,7 @@ describe('uiStore - panel state management', () => {
 
   it('setPanelOpen to same value is a no-op (optimistic guard)', () => {
     const before = useUiStore.getState()
-    useUiStore.getState().setPanelOpen(true)
+    useUiStore.getState().setPanelOpen(false)
     expect(useUiStore.getState()).toBe(before) // same reference
   })
 

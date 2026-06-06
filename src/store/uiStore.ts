@@ -24,7 +24,7 @@ export const useUiStore = create<UiState>((set) => ({
   search: '',
   setSearch: (q) => set({ search: q }),
 
-  panelOpen: true,
+  panelOpen: false,
   activeTab: 'agents',
   setTab: (t) => set({ activeTab: t }),
   togglePanel: () => set((s) => ({

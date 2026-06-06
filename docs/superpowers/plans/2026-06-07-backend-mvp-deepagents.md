@@ -4,9 +4,9 @@
 
 **Goal:** Replace custom LangGraph StateGraph stubs with `deepagents` `createDeepAgent`, connecting to DeepSeek API via OpenAI-compatible interface for basic conversation.
 
-**Architecture:** `createDeepAgent` returns a compiled LangGraph graph. `Session` calls `agent.streamEvents()` on each user message, mapping `on_chat_model_stream` events to `token:stream` WebSocket messages via `@hip/protocol`. Frontend and protocol remain unchanged except adding `'deepseek'` to `llmProvider`.
+**Architecture:** `createDeepAgent` returns a compiled LangGraph graph. `Session` calls `agent.streamEvents({ version: "v3" })` on each user message, iterating `run.messages` → `msg.text` to extract streaming tokens and mapping them to `token:stream` WebSocket messages via `@hip/protocol`. Frontend and protocol remain unchanged except adding `'deepseek'` to `llmProvider` and `systemPrompt` to `SessionConfig`.
 
-**Tech Stack:** `deepagents` (npm), `@langchain/openai` (already a dep — repurposed for DeepSeek's OpenAI-compatible API), `ws`, `@hip/protocol`
+**Tech Stack:** `deepagents` v1.10.2 (npm), `@langchain/openai` (already a dep — repurposed for DeepSeek's OpenAI-compatible API), `ws`, `@hip/protocol`
 
 ---
 

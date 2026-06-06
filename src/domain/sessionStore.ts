@@ -1,5 +1,6 @@
 // src/domain/sessionStore.ts
 import type { AgentRole, Message, ServerMessage, SessionConfig } from '@hip/protocol'
+import { seedSessions } from './seed'
 
 export type AgentStatus = 'idle' | 'running' | 'done'
 
@@ -137,8 +138,8 @@ interface DomainStore {
 let userSeq = 0
 
 export const useDomainStore = create<DomainStore>((set) => ({
-  sessions: [], // ← Task A4 改为 seedSessions()
-  activeSessionId: null, // ← Task A4 改为 seed 的首个会话 id
+  sessions: seedSessions(),
+  activeSessionId: 's1',
   connection: 'disconnected',
 
   apply: (msg) => set((s) => applyServerMessage(s, msg, Date.now())),

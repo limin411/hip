@@ -66,6 +66,27 @@ export class SessionManager {
         send({ type: 'session:title', sessionId: msg.sessionId, title })
         break
       }
+      case 'session:setCwd': {
+        const s = this.ensureSession(msg.sessionId)
+        s.setCwd(msg.cwd)
+        this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
+        break
+      }
+      case 'fs:ls': {
+        const r = await this.ensureSession(msg.sessionId).lsDir(msg.path)
+        send({ type: 'fs:ls:result', sessionId: msg.sessionId, path: msg.path, entries: r.entries ?? [], error: r.error })
+        break
+      }
+      case 'fs:read': {
+        const r = await this.ensureSession(msg.sessionId).readForPreview(msg.path)
+        send(
+          'error' in r
+            ? { type: 'fs:read:result', sessionId: msg.sessionId, path: msg.path, error: r.error }
+            : { type: 'fs:read:result', sessionId: msg.sessionId, path: msg.path, content: r.content, encoding: r.encoding, mimeType: r.mimeType, truncated: r.truncated },
+        )
+        break
+      }
     }
   }
 

@@ -28,8 +28,12 @@ fi
 mkdir -p "$BIN_DIR"
 WRAPPER="$BIN_DIR/sidecar-$TARGET_TRIPLE"
 
-# Note: the generated wrapper is executed from src-tauri/target/<profile>/, where
-# Tauri copies externalBin at build time, so `../../..` resolves to the repo root.
+# Note: this wrapper is copied by Tauri to different locations depending on the
+# build (src-tauri/target/<profile>/ for `tauri dev`, or inside the .app bundle
+# for `tauri build`). To work from ANY location — so e.g. WebdriverIO E2E can run
+# the bundled app with a live sidecar — we bake in the absolute repo root at
+# generation time. (This file is gitignored and regenerated per machine.) `node`
+# stays PATH-resolved: the process inherits the launching shell's PATH.
 cat > "$WRAPPER" <<EOF
 #!/bin/bash
 # Sidecar wrapper for dev mode on $TARGET_TRIPLE (generated — do not edit).
@@ -43,7 +47,7 @@ cat > "$WRAPPER" <<EOF
 # the freshly-spawned sidecar, and a key change silently fails to take effect.
 # 'node --import tsx' runs the TypeScript entry in-process (no child), so this
 # PID *is* the WS server and child.kill() tears it down cleanly.
-cd "\$(dirname "\$0")/../../.."
+cd "$ROOT_DIR"
 exec node --import tsx packages/sidecar/src/main.ts
 EOF
 

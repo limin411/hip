@@ -41,14 +41,16 @@ export const config: Options.Testrunner = {
 
   logLevel: 'info',
   bail: 0,
-  waitforTimeout: 10000,
+  waitforTimeout: 20000,
   connectionRetryTimeout: 90000,
   connectionRetryCount: 3,
 
   framework: 'mocha',
   mochaOpts: {
     ui: 'bdd',
-    timeout: 60000,
+    // Generous: the debug bundle loads the Vite-dev frontend, so a cold WebKit
+    // webview can take ~30s+ to mount and the first sidecar round-trip adds more.
+    timeout: 180000,
   },
 
   reporters: ['spec'],

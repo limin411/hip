@@ -6,12 +6,16 @@ type StatusHandler = (s: ConnectionStatus) => void
 type Resolver = () => Promise<{ port: number; token: string }>
 
 const MAX_BACKOFF_MS = 10_000
+const MAX_QUEUE = 100
 
 class WsClient {
   private ws: WebSocket | null = null
   private resolver: Resolver | null = null
   private readonly handlers = new Set<MessageHandler>()
   private readonly statusHandlers = new Set<StatusHandler>()
+  // Messages sent before the socket is OPEN are buffered and flushed on connect,
+  // so actions taken during the (cold-start) connecting window aren't silently lost.
+  private queue: ClientMessage[] = []
   private backoff = 500
   private stopped = false
   // Each start()/disconnect() bumps the epoch; a stale reconnect loop whose epoch
@@ -61,6 +65,7 @@ class WsClient {
       ws.onopen = () => {
         this.backoff = 500
         this.setStatus('connected')
+        this.flushQueue()
         onConnected()
       }
       ws.onmessage = (e) => {
@@ -92,7 +97,19 @@ class WsClient {
   }
 
   send(msg: ClientMessage): void {
-    this.ws?.send(JSON.stringify(msg))
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg))
+    } else if (this.queue.length < MAX_QUEUE) {
+      this.queue.push(msg)
+    }
+  }
+
+  /** Flush buffered messages once the socket is open (FIFO). */
+  private flushQueue(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+    const pending = this.queue
+    this.queue = []
+    for (const m of pending) this.ws.send(JSON.stringify(m))
   }
 
   onMessage(h: MessageHandler): () => void {

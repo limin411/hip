@@ -1,5 +1,6 @@
 use crate::SidecarState;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -25,6 +26,13 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         Some(key) => cmd.env("DEEPSEEK_API_KEY", key),
         None => cmd.env("DEEPSEEK_API_KEY", ""),
     };
+    // Tell the sidecar where to persist sessions (the app data dir). Create the dir
+    // so the first launch on a fresh machine succeeds; if it's unavailable the
+    // sidecar falls back to an in-memory DB rather than failing to start.
+    if let Ok(dir) = app.path().app_data_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        cmd = cmd.env("HIP_DB_PATH", db_path_for(&dir).to_string_lossy().into_owned());
+    }
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
 
     let state = app.state::<SidecarState>();
@@ -93,6 +101,11 @@ pub fn read_api_key() -> Option<String> {
     crate::get_secret_value("DEEPSEEK_API_KEY")
 }
 
+/// The sidecar's SQLite file lives in the app data dir as `hip.db`.
+pub fn db_path_for(data_dir: &Path) -> PathBuf {
+    data_dir.join("hip.db")
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_info_line;
@@ -116,5 +129,11 @@ mod tests {
         assert!(parse_info_line("starting up").is_none());
         assert!(parse_info_line("{\"port\":7}").is_none()); // missing token
         assert!(parse_info_line("").is_none());
+    }
+
+    #[test]
+    fn db_path_is_hip_db_under_data_dir() {
+        let p = super::db_path_for(std::path::Path::new("/tmp/app"));
+        assert_eq!(p, std::path::PathBuf::from("/tmp/app/hip.db"));
     }
 }

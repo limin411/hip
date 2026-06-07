@@ -1,7 +1,7 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun } from '@hip/protocol'
 import { createDeepAgent } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
-import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { SUBAGENTS, SUPERVISOR_PROMPT, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
@@ -14,6 +14,30 @@ const TITLE_LEN = 40
 function deriveTitle(content: string): string {
   const oneLine = content.replace(/\s+/g, ' ').trim()
   return oneLine.length > TITLE_LEN ? oneLine.slice(0, TITLE_LEN) + '…' : oneLine || '新对话'
+}
+
+export type TitleGenerator = (input: { firstUserMessage: string; firstReply: string }) => Promise<string>
+
+const TITLE_SYSTEM_PROMPT =
+  'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
+  'Use the same language as the user. Reply with ONLY the title — no quotes, no trailing punctuation.'
+
+/** Production title generator: one cheap DeepSeek completion. Not used when a model is injected (tests). */
+function buildDefaultTitleGenerator(config: SessionConfig): TitleGenerator {
+  return async ({ firstUserMessage, firstReply }) => {
+    const model = new ChatOpenAI({
+      model: config.model || DEFAULT_MODEL,
+      apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
+      configuration: { baseURL: 'https://api.deepseek.com/v1' },
+      maxTokens: 24,
+      temperature: 0.3,
+    })
+    const res = await model.invoke([
+      new SystemMessage(TITLE_SYSTEM_PROMPT),
+      new HumanMessage(`${firstUserMessage}\n\n[assistant reply]: ${firstReply.slice(0, 200)}`),
+    ])
+    return typeof res.content === 'string' ? res.content : ''
+  }
 }
 
 function buildModel(config: SessionConfig): ChatOpenAI {
@@ -31,14 +55,19 @@ export class Session {
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
   private readonly usesEnvModel: boolean
+  private readonly titleGenerator?: TitleGenerator
 
   constructor(
     readonly id: string,
     readonly config: SessionConfig,
     model?: BaseLanguageModel,
     private readonly store?: SessionStore,
+    titleGenerator?: TitleGenerator,
   ) {
     this.usesEnvModel = !model
+    // Inject a generator (tests), else build the real one only for the env-keyed
+    // production model. Injected-model sessions get no generator → no LLM title.
+    this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
     this.agent = createDeepAgent({
       model: model ?? buildModel(config),
       systemPrompt: config.systemPrompt ?? SUPERVISOR_PROMPT,
@@ -66,10 +95,17 @@ export class Session {
 
     // Persist the user message + bump/derive session metadata before running.
     const userTs = Date.now()
+    let isFirstTurn = false
     if (this.store) {
       const seq = this.store.insertMessage({ id: userMessageId ?? `u-${userTs}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: userTs })
       this.store.touchSession(this.id, userTs)
-      if (seq === 1) this.store.updateTitle(this.id, deriveTitle(content))
+      isFirstTurn = seq === 1
+      if (isFirstTurn) {
+        const title = deriveTitle(content)
+        if (this.store.updateTitleIfAuto(this.id, title) === 1) {
+          _send({ type: 'session:title', sessionId: this.id, title })
+        }
+      }
     }
 
     this.messages.push(new HumanMessage(content))

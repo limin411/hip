@@ -62,6 +62,19 @@ describe('SessionStore', () => {
     expect(hits.some((h) => h.sessionId === 's1' && h.messageId === null)).toBe(true)
   })
 
+  it('updateTitleIfAuto changes an auto title and reports the change count', () => {
+    store.insertSession({ id: 's1', title: '新对话', config: cfg, createdAt: 1, updatedAt: 1 })
+    expect(store.updateTitleIfAuto('s1', '截取标题')).toBe(1)
+    expect(store.getSession('s1')!.title).toBe('截取标题')
+  })
+
+  it('updateTitleIfAuto is a no-op once a title is pinned', () => {
+    store.insertSession({ id: 's1', title: '新对话', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.setCustomTitle('s1', '我的标题')
+    expect(store.updateTitleIfAuto('s1', '自动标题')).toBe(0)
+    expect(store.getSession('s1')!.title).toBe('我的标题')
+  })
+
   it('deleteSession cascades to messages, agent_runs, and FTS', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '可搜索内容', timestamp: 1 })

@@ -22,8 +22,14 @@ export class SessionStore {
     this.db.prepare(`UPDATE sessions SET updated_at=? WHERE id=?`).run(updatedAt, id)
   }
 
-  updateTitle(id: string, title: string): void {
-    this.db.prepare(`UPDATE sessions SET title=? WHERE id=?`).run(title, id)
+  /** Set the title only if it hasn't been user-pinned. Returns the number of rows changed (0 or 1). */
+  updateTitleIfAuto(id: string, title: string): number {
+    return this.db.prepare(`UPDATE sessions SET title=? WHERE id=? AND title_custom=0`).run(title, id).changes
+  }
+
+  /** Set a user-chosen title and pin it so auto-titling never overwrites it. */
+  setCustomTitle(id: string, title: string): void {
+    this.db.prepare(`UPDATE sessions SET title=?, title_custom=1 WHERE id=?`).run(title, id)
   }
 
   private nextSeq(sessionId: string): number {

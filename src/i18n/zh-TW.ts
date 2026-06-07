@@ -13,7 +13,6 @@ export const zhTW = {
     },
     sidebar: {
       collapse: '折疊側邊欄',
-      pin: '固定側邊欄',
       search: '搜索會話',
       noMatches: '沒有匹配的會話',
       deleteSession: '刪除會話',

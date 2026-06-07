@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useReducer } from 'react'
-import { useTranslation } from 'react-i18next'
-import { ChevronRight, Pin } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { peekReducer, initialPeekState, PEEK_CLOSE_DELAY_MS, PEEK_ANIM_MS } from '@/lib/hoverPeek'
@@ -11,9 +10,7 @@ import { SidebarPeekLockContext } from './sidebarPeekContext'
 const PEEK_WIDTH = 260
 
 export function SidebarPeek() {
-  const { t } = useTranslation()
   const collapsed = useUiStore((s) => s.collapsed)
-  const setCollapsed = useUiStore((s) => s.setCollapsed)
   const [state, dispatch] = useReducer(peekReducer, initialPeekState)
 
   // 侧栏重新停靠时，强制关闭浮层。
@@ -60,15 +57,7 @@ export function SidebarPeek() {
         )}
       >
         <SidebarPeekLockContext.Provider value={lockValue}>
-          <div className="relative h-full">
-            {/* 图钉 = 停靠（变回常驻）。位置可在打磨阶段微调，避免与「新对话」按钮视觉相撞。 */}
-            <button
-              onClick={() => setCollapsed(false)}
-              title={t('sidebar.pin')}
-              className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-ink-tertiary transition-colors hover:text-ink"
-            >
-              <Pin size={15} />
-            </button>
+          <div className="h-full">
             <Sidebar />
           </div>
         </SidebarPeekLockContext.Provider>

@@ -13,7 +13,6 @@ export const en = {
     },
     sidebar: {
       collapse: 'Collapse Sidebar',
-      pin: 'Pin Sidebar',
       search: 'Search sessions',
       noMatches: 'No matching sessions',
       deleteSession: 'Delete Session',

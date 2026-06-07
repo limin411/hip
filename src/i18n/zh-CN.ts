@@ -13,7 +13,6 @@ export const zhCN = {
     },
     sidebar: {
       collapse: '折叠侧边栏',
-      pin: '固定侧边栏',
       search: '搜索会话',
       noMatches: '没有匹配的会话',
       deleteSession: '删除会话',

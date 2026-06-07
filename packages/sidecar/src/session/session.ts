@@ -16,6 +16,18 @@ function deriveTitle(content: string): string {
   return oneLine.length > TITLE_LEN ? oneLine.slice(0, TITLE_LEN) + '…' : oneLine || '新对话'
 }
 
+/** Normalize a generated/echoed title: one line, no wrapping quotes, no trailing punctuation, bounded length. */
+export function sanitizeTitle(raw: string): string {
+  const oneLine = raw
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^["'""''「」『』]+/, '')
+    .replace(/["'""''「」『』]+$/, '')
+    .replace(/[。.！!？?，,、；;：:]+$/, '')
+    .trim()
+  return oneLine.length > TITLE_LEN ? oneLine.slice(0, TITLE_LEN) : oneLine
+}
+
 export type TitleGenerator = (input: { firstUserMessage: string; firstReply: string }) => Promise<string>
 
 const TITLE_SYSTEM_PROMPT =
@@ -219,6 +231,20 @@ export class Session {
         timestamp: ts,
       },
     })
+
+    // Auto-title refine: once, on the first turn, only while still auto-titled.
+    // Best-effort — failures keep the truncated title. The pinned guard lives in
+    // updateTitleIfAuto, so a rename during this turn wins (changes === 0 here).
+    if (isFirstTurn && this.titleGenerator && supervisorText && this.store) {
+      try {
+        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: content, firstReply: supervisorText }))
+        if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
+          _send({ type: 'session:title', sessionId: this.id, title: refined })
+        }
+      } catch {
+        // swallow: the title is non-critical
+      }
+    }
   }
 
   cancel(): void {

@@ -12,7 +12,9 @@ import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const panelRef = useRef<ImperativePanelHandle>(null)
-  const hasInitializedPanel = useRef(false)
+  // react-resizable-panels fires onExpand on initial mount even when not user-initiated;
+  // we track this so we don't accidentally open the right panel on app launch.
+  const hasHandledInitialExpand = useRef(false)
   const collapsed = useUiStore((s) => s.collapsed)
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
@@ -89,8 +91,8 @@ export function AppLayout() {
           collapsedSize={0}
           onCollapse={() => setPanelOpen(false)}
           onExpand={() => {
-            if (!hasInitializedPanel.current) {
-              hasInitializedPanel.current = true
+            if (!hasHandledInitialExpand.current) {
+              hasHandledInitialExpand.current = true
               return
             }
             setPanelOpen(true)

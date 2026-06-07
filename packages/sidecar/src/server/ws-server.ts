@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'http'
 import { createServer } from 'net'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionManager } from '../session/session-manager.js'
+import type { SessionStore } from '../persistence/store.js'
 
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:1420',
@@ -15,9 +16,9 @@ export class WsServer {
   private readonly wss: WebSocketServer
   private readonly sessionManager: SessionManager
 
-  constructor(private readonly port: number, private readonly token: string) {
+  constructor(private readonly port: number, private readonly token: string, store?: SessionStore) {
     this.wss = new WebSocketServer({ port })
-    this.sessionManager = new SessionManager()
+    this.sessionManager = new SessionManager(store)
   }
 
   start(): Promise<void> {

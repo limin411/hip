@@ -18,9 +18,13 @@ pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
 
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     let mut cmd = app.shell().sidecar("sidecar").map_err(|e| e.to_string())?;
-    if let Some(key) = read_api_key() {
-        cmd = cmd.env("DEEPSEEK_API_KEY", key);
-    }
+    // Inject the keychain key, or an empty value to OVERRIDE any inherited
+    // DEEPSEEK_API_KEY (the child inherits the parent env). Empty → the sidecar's
+    // NO_API_KEY guard fires, so a cleared key truly disables the agent.
+    cmd = match read_api_key() {
+        Some(key) => cmd.env("DEEPSEEK_API_KEY", key),
+        None => cmd.env("DEEPSEEK_API_KEY", ""),
+    };
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
 
     let state = app.state::<SidecarState>();
@@ -81,13 +85,11 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     Ok(info.port)
 }
 
-/// DEEPSEEK_API_KEY from env (dev) first, then the OS keychain (production).
+/// The sidecar's API key comes ONLY from the OS keychain — the single source of
+/// truth the user controls via Settings. We deliberately do NOT fall back to the
+/// process env: the spawned sidecar inherits the parent env, so an inherited (or
+/// dev `.env`) DEEPSEEK_API_KEY would otherwise mask an explicit "clear" in the UI.
 pub fn read_api_key() -> Option<String> {
-    if let Ok(v) = std::env::var("DEEPSEEK_API_KEY") {
-        if !v.is_empty() {
-            return Some(v);
-        }
-    }
     crate::get_secret_value("DEEPSEEK_API_KEY")
 }
 

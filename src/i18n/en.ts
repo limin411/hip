@@ -48,6 +48,7 @@ export const en = {
       apiKeyPlaceholder: 'sk-...',
       apiKeySave: 'Save',
       apiKeyClear: 'Clear',
+      apiKeyError: 'Failed to update the API key. Please try again.',
     },
     login: {
       slogan: 'Nobody knows slacking better than me',

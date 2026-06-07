@@ -1,5 +1,6 @@
 use crate::SidecarState;
 use serde::Deserialize;
+use std::sync::atomic::Ordering;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandEvent;
@@ -21,7 +22,9 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     }
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
 
-    *app.state::<SidecarState>().child.lock().unwrap() = Some(child);
+    let state = app.state::<SidecarState>();
+    let my_gen = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
+    *state.child.lock().unwrap() = Some(child);
 
     let app_handle = app.clone();
     let (port_tx, port_rx) = tokio::sync::oneshot::channel::<u16>();
@@ -46,8 +49,13 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
                 }
                 CommandEvent::Terminated(payload) => {
                     eprintln!("[sidecar] terminated: {payload:?}");
-                    *app_handle.state::<SidecarState>().port.lock().unwrap() = None;
-                    *app_handle.state::<SidecarState>().child.lock().unwrap() = None;
+                    let state = app_handle.state::<SidecarState>();
+                    // Only clear if we're still the current generation — a restart that
+                    // already installed a newer child/port must not be clobbered.
+                    if state.generation.load(Ordering::SeqCst) == my_gen {
+                        *state.port.lock().unwrap() = None;
+                        *state.child.lock().unwrap() = None;
+                    }
                     break;
                 }
                 _ => {}

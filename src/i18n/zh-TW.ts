@@ -48,6 +48,7 @@ export const zhTW = {
       apiKeyPlaceholder: 'sk-...',
       apiKeySave: '儲存',
       apiKeyClear: '清除',
+      apiKeyError: '更新 API Key 失敗，請重試。',
     },
     login: {
       slogan: '沒有人比我更懂摸魚',

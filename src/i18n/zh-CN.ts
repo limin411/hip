@@ -48,6 +48,7 @@ export const zhCN = {
       apiKeyPlaceholder: 'sk-...',
       apiKeySave: '保存',
       apiKeyClear: '清除',
+      apiKeyError: '更新 API Key 失败，请重试。',
     },
     login: {
       slogan: '没有人比我更懂摸鱼',

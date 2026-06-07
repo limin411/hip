@@ -15,6 +15,7 @@ export function SettingsPanel() {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     isApiKeyConfigured().then(setConfigured).catch(() => setConfigured(false))
@@ -23,11 +24,15 @@ export function SettingsPanel() {
   async function onSave() {
     if (!value.trim()) return
     setBusy(true)
+    setError(null)
     try {
       await saveApiKey(value.trim())
       await restartSidecar()
       setConfigured(true)
       setValue('')
+    } catch (e) {
+      console.error('[settings] save api key failed', e)
+      setError(t('settings.apiKeyError'))
     } finally {
       setBusy(false)
     }
@@ -35,10 +40,14 @@ export function SettingsPanel() {
 
   async function onClear() {
     setBusy(true)
+    setError(null)
     try {
       await clearApiKey()
       await restartSidecar()
       setConfigured(false)
+    } catch (e) {
+      console.error('[settings] clear api key failed', e)
+      setError(t('settings.apiKeyError'))
     } finally {
       setBusy(false)
     }
@@ -78,6 +87,7 @@ export function SettingsPanel() {
             {t('settings.apiKeyClear')}
           </button>
         </div>
+        {error && <div className="mt-2 text-[12px] text-red-500">{error}</div>}
       </div>
 
       {/* Language (unchanged) */}

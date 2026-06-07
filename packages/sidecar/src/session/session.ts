@@ -39,7 +39,7 @@ export class Session {
   }
 
   async sendMessage(content: string, _send: SendFn): Promise<void> {
-    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY) {
+    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
       _send({
         type: 'error',
         sessionId: this.id,

@@ -1,5 +1,6 @@
 mod sidecar;
 
+use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
@@ -7,6 +8,8 @@ use tauri_plugin_shell::process::CommandChild;
 pub struct SidecarState {
     pub port: Mutex<Option<u16>>,
     pub child: Mutex<Option<CommandChild>>,
+    /// Bumped on every spawn so a dying sidecar's reader task can't clobber a newer one.
+    pub generation: AtomicU64,
 }
 
 impl SidecarState {
@@ -14,6 +17,7 @@ impl SidecarState {
         Self {
             port: Mutex::new(None),
             child: Mutex::new(None),
+            generation: AtomicU64::new(0),
         }
     }
 }
@@ -44,7 +48,11 @@ pub fn get_secret_value(key: &str) -> Option<String> {
     let entry = keyring::Entry::new(SECRET_SERVICE, key).ok()?;
     match entry.get_password() {
         Ok(v) => Some(v),
-        Err(_) => None,
+        Err(keyring::Error::NoEntry) => None,
+        Err(e) => {
+            eprintln!("[tauri] keychain read error for {key}: {e}");
+            None
+        }
     }
 }
 

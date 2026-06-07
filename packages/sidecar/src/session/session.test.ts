@@ -4,14 +4,12 @@ import { ChatOpenAI } from '@langchain/openai'
 import { Session } from './session.js'
 
 const apiKey = process.env.DEEPSEEK_API_KEY
-if (!apiKey) {
-  throw new Error('DEEPSEEK_API_KEY is required for real-LLM tests')
-}
+const hasKey = !!apiKey
 
 function createModel() {
   return new ChatOpenAI({
     model: 'deepseek-chat',
-    apiKey,
+    apiKey: apiKey!,
     configuration: {
       baseURL: 'https://api.deepseek.com/v1',
     },
@@ -28,7 +26,7 @@ async function collectEvents(session: Session, content: string): Promise<AnyServ
   return events
 }
 
-describe('Session with real DeepSeek API', () => {
+describe.skipIf(!hasKey)('Session with real DeepSeek API', () => {
   it('streams a single-turn response and emits complete protocol events', async () => {
     const session = new Session(
       'test-single',

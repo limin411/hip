@@ -124,7 +124,7 @@ stop_one() {
   pf="$(pid_file "$svc")"
   if is_running "$svc"; then
     pid="$(cat "$pf")"
-    echo "[dev] 停止 $svc (pid $pid，连同子进程)…"
+    echo "[dev] 停止 $svc (pid ${pid}，连同子进程)…"
     kill_tree "$pid"   # 杀整棵树：app 模式下含 tauri/vite/cargo/hip 窗口/sidecar
   else
     echo "[dev] $svc 未在运行"
@@ -160,7 +160,7 @@ dispatch() {
     app)     "${action}_app" ;;
     web)     "${action}_web" ;;
     sidecar) "${action}_sidecar" ;;
-    *) echo "未知目标：$target（可选 app|web|sidecar）" >&2; exit 1 ;;
+    *) echo "未知目标：${target}（可选 app|web|sidecar）" >&2; exit 1 ;;
   esac
 }
 
@@ -172,7 +172,7 @@ case "${1:-}" in
   stop)
     case "$TARGET" in
       app|web|sidecar) stop_one "$TARGET" ;;
-      *) echo "未知目标：$TARGET（可选 app|web|sidecar）" >&2; exit 1 ;;
+      *) echo "未知目标：${TARGET}（可选 app|web|sidecar）" >&2; exit 1 ;;
     esac ;;
   restart)
     "$0" stop "$TARGET"

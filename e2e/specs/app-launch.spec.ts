@@ -35,7 +35,11 @@ describe('hip desktop app', () => {
     const root = await browser.$('#root')
     const rootText = await root.getText()
 
-    expect(rootText).toContain('重构 WebSocket 客户端')
+    // The seeded "重构 WebSocket 客户端" mock session was removed when the UI was
+    // wired to the real domain/WS layer, so assert the chat interface itself
+    // rendered (new-chat action + empty-state prompt) rather than seed content.
     expect(rootText).toContain('hip')
+    expect(rootText).toContain('新对话')
+    expect(rootText).toContain('发送一条消息开始对话')
   })
 })

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { AgentRole } from '@hip/protocol'
 import type { AgentVM } from '@/domain'
 import { useAgents } from '@/domain'
@@ -21,6 +22,7 @@ function StatusDot({ status, color }: { status: AgentVM['status']; color: string
 }
 
 function AgentCard({ agent }: { agent: AgentVM }) {
+  const { t } = useTranslation()
   const color = ROLE_COLOR[agent.role]
   return (
     <div
@@ -41,7 +43,7 @@ function AgentCard({ agent }: { agent: AgentVM }) {
       </div>
 
       <div className="min-h-[32px] rounded-md bg-surface-muted px-2.5 py-1.5 text-[12px] leading-snug text-ink-secondary">
-        {agent.tokens || <span className="text-ink-tertiary">等待中…</span>}
+        {agent.tokens || <span className="text-ink-tertiary">{t('artifact.waiting')}</span>}
       </div>
 
       <div className="flex items-center gap-3 text-[11px] text-ink-tertiary">
@@ -53,6 +55,7 @@ function AgentCard({ agent }: { agent: AgentVM }) {
 }
 
 export function AgentDashboard() {
+  const { t } = useTranslation()
   const agents = useAgents()
   const supervisor = agents.find((a) => a.role === 'supervisor')
   const children = agents.filter((a) => a.role !== 'supervisor')
@@ -60,7 +63,7 @@ export function AgentDashboard() {
   return (
     <div className="flex flex-col gap-3">
       {supervisor && <AgentCard agent={supervisor} />}
-      <div className="text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">并行子智能体</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.parallelAgents')}</div>
       <div className="flex flex-col gap-2.5">
         {children.map((agent) => (
           <AgentCard key={agent.id} agent={agent} />

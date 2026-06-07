@@ -54,6 +54,7 @@ export const en = {
     },
     common: {
       close: 'Close',
+      logout: 'Log Out',
     },
   },
 } as const

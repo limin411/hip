@@ -1,4 +1,5 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +12,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onOpenChange, title, children, className }: ModalProps) {
+  const { t } = useTranslation()
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -27,7 +29,7 @@ export function Modal({ open, onOpenChange, title, children, className }: ModalP
             </DialogPrimitive.Title>
             <DialogPrimitive.Close
               className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted"
-              title="关闭"
+              title={t('common.close')}
             >
               <X size={18} />
             </DialogPrimitive.Close>

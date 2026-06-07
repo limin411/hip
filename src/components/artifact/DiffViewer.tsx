@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 type DiffLineType = 'add' | 'del' | 'ctx'
@@ -61,6 +62,7 @@ function FileDiff({ file }: { file: DiffFile }) {
 }
 
 export function DiffViewer() {
+  const { t } = useTranslation()
   // TODO: wire to real agent-generated diffs once coder tools are enabled
   const files: DiffFile[] = []
 
@@ -68,9 +70,9 @@ export function DiffViewer() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-ink-tertiary">
         <span className="text-[24px] opacity-40">±</span>
-        <div className="text-[13px]">暂无 Diff</div>
+        <div className="text-[13px]">{t('artifact.noDiff')}</div>
         <div className="max-w-[200px] text-center text-[12px] opacity-70">
-          智能体修改代码后，变更将显示在这里
+          {t('artifact.noDiffDesc')}
         </div>
       </div>
     )

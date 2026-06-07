@@ -1,9 +1,11 @@
+import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, sessionService } from '@/domain'
 import { filterSessions } from '@/lib/sessions'
 import { SessionItem } from './SessionItem'
 
 export function SessionList() {
+  const { t } = useTranslation()
   const sessions = useSessions()
   const search = useUiStore((s) => s.search)
   const activeSessionId = useActiveSessionId()
@@ -11,7 +13,7 @@ export function SessionList() {
   const filtered = filterSessions(sessions, search)
 
   if (filtered.length === 0) {
-    return <div className="px-2.5 py-4 text-[12px] text-ink-tertiary">没有匹配的会话</div>
+    return <div className="px-2.5 py-4 text-[12px] text-ink-tertiary">{t('sidebar.noMatches')}</div>
   }
 
   return (

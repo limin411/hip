@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useActiveSessionId, useActiveMessages } from '@/domain'
 import { MessageBubble } from './MessageBubble'
 
 export function ChatPane() {
+  const { t } = useTranslation()
   const activeSessionId = useActiveSessionId()
   const messages = useActiveMessages()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -17,7 +19,7 @@ export function ChatPane() {
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-[13px] text-ink-tertiary">
-        发送一条消息开始对话
+        {t('chat.sendMessage')}
       </div>
     )
   }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { PanelLeft } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { NewChatButton } from './NewChatButton'
@@ -6,6 +7,7 @@ import { SessionList } from './SessionList'
 import { UserMenu } from './UserMenu'
 
 export function Sidebar() {
+  const { t } = useTranslation()
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed)
 
   return (
@@ -20,7 +22,7 @@ export function Sidebar() {
         <span className="text-sm font-bold text-ink select-none">hip</span>
         <button
           onClick={toggleCollapsed}
-          title="折叠侧边栏"
+          title={t('sidebar.collapse')}
           className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:text-ink"
           data-tauri-drag-region="false"
         >

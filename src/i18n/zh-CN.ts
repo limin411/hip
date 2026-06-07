@@ -54,6 +54,7 @@ export const zhCN = {
     },
     common: {
       close: '关闭',
+      logout: '退出登录',
     },
   },
 } as const

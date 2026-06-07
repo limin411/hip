@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +53,7 @@ function TreeNode({ node, depth, selected, onSelect }: TreeNodeProps) {
 }
 
 export function FileTree() {
+  const { t } = useTranslation()
   const [selected, setSelected] = useState('')
   // TODO: wire to real workspace filesystem once agent tools are enabled
   const root: FileNode | null = null
@@ -60,9 +62,9 @@ export function FileTree() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-ink-tertiary">
         <Folder size={32} className="opacity-40" />
-        <div className="text-[13px]">暂无文件</div>
+        <div className="text-[13px]">{t('artifact.noFiles')}</div>
         <div className="max-w-[180px] text-center text-[12px] opacity-70">
-          与智能体协作时，文件将自动显示在这里
+          {t('artifact.noFilesDesc')}
         </div>
       </div>
     )

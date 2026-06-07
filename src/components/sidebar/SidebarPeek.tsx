@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, Pin } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ import { SidebarPeekLockContext } from './sidebarPeekContext'
 const PEEK_WIDTH = 260
 
 export function SidebarPeek() {
+  const { t } = useTranslation()
   const collapsed = useUiStore((s) => s.collapsed)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const [state, dispatch] = useReducer(peekReducer, initialPeekState)
@@ -62,7 +64,7 @@ export function SidebarPeek() {
             {/* 图钉 = 停靠（变回常驻）。位置可在打磨阶段微调，避免与「新对话」按钮视觉相撞。 */}
             <button
               onClick={() => setCollapsed(false)}
-              title="固定侧边栏"
+              title={t('sidebar.pin')}
               className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-md border border-border bg-surface text-ink-tertiary transition-colors hover:text-ink"
             >
               <Pin size={15} />

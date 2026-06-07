@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUp, ChevronDown } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
 import { sessionService } from '@/domain'
@@ -6,6 +7,7 @@ import { sessionService } from '@/domain'
 const MODELS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'gpt-4o']
 
 export function InputBar() {
+  const { t } = useTranslation()
   const [value, setValue] = useState('')
   const [model, setModel] = useState(MODELS[0])
   function submit() {
@@ -29,7 +31,7 @@ export function InputBar() {
             }
           }}
           rows={2}
-          placeholder="给 hip 发消息…（Enter 发送，Shift+Enter 换行）"
+          placeholder={t('chat.inputPlaceholder')}
           className="border-0 px-2 py-1 focus-visible:ring-0"
         />
         <div className="flex items-center justify-between px-1 pt-1">
@@ -51,7 +53,7 @@ export function InputBar() {
             onClick={submit}
             disabled={!value.trim()}
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
-            title="发送"
+            title={t('chat.send')}
           >
             <ArrowUp size={17} />
           </button>

@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
@@ -8,14 +9,14 @@ import { FileTree } from './FileTree'
 import { AgentDashboard } from './AgentDashboard'
 import { DiffViewer } from './DiffViewer'
 
-const TABS: { value: ArtifactTab; label: string }[] = [
-  { value: 'doc', label: '文档' },
-  { value: 'files', label: '文件' },
-  { value: 'agents', label: '智能体' },
-  { value: 'diff', label: 'Diff' },
-]
-
 export function ArtifactPanel() {
+  const { t } = useTranslation()
+  const TABS: { value: ArtifactTab; label: string }[] = [
+    { value: 'doc', label: t('artifact.doc') },
+    { value: 'files', label: t('artifact.files') },
+    { value: 'agents', label: t('artifact.agents') },
+    { value: 'diff', label: t('artifact.diff') },
+  ]
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
   const togglePanel = useUiStore((s) => s.togglePanel)
@@ -32,14 +33,14 @@ export function ArtifactPanel() {
           className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2"
         >
           <TabsList className="h-full gap-4" data-tauri-drag-region="false">
-            {TABS.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>
-                {t.label}
+            {TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
           <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" onClick={togglePanel} title="关闭面板" data-tauri-drag-region="false">
+            <Button variant="ghost" size="icon" onClick={togglePanel} title={t('artifact.closePanel')} data-tauri-drag-region="false">
               <X size={16} />
             </Button>
           </div>

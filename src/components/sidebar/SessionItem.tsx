@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import type { SessionVM } from '@/domain'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ interface SessionItemProps {
 }
 
 export function SessionItem({ session, active, onSelect, onDelete }: SessionItemProps) {
+  const { t } = useTranslation()
   return (
     <div
       onClick={onSelect}
@@ -28,7 +30,7 @@ export function SessionItem({ session, active, onSelect, onDelete }: SessionItem
             onDelete()
           }}
           className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"
-          title="删除会话"
+          title={t('sidebar.deleteSession')}
         >
           <X size={14} />
         </button>

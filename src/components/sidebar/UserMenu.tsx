@@ -1,4 +1,5 @@
 import { useContext, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Settings, LogOut, ChevronsUpDown } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
@@ -14,22 +15,23 @@ import { Modal } from '@/components/ui/Modal'
 import { SettingsPanel } from '@/components/account/SettingsPanel'
 import { SidebarPeekLockContext } from './sidebarPeekContext'
 // TODO: replace with real authenticated user once auth flow is implemented
-const currentUser = { name: '用户', email: 'user@example.com', avatarUrl: undefined }
+const currentUser = { name: 'User', email: 'user@example.com', avatarUrl: undefined }
 
 type PageKey = 'settings'
-
-const PAGES: { key: PageKey; icon: typeof Settings; label: string }[] = [
-  { key: 'settings', icon: Settings, label: '设置' },
-]
 
 const PANELS: Record<PageKey, () => JSX.Element> = {
   settings: SettingsPanel,
 }
 
 export function UserMenu() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const peekLock = useContext(SidebarPeekLockContext)
   const [openKey, setOpenKey] = useState<PageKey | null>(null)
+
+  const PAGES: { key: PageKey; icon: typeof Settings; label: string }[] = [
+    { key: 'settings', icon: Settings, label: t('settings.title') },
+  ]
 
   const active = PAGES.find((p) => p.key === openKey)
   const ActivePanel = openKey ? PANELS[openKey] : null
@@ -63,7 +65,7 @@ export function UserMenu() {
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={() => navigate('/login')}>
             <LogOut size={15} />
-            退出登录
+            {t('common.logout')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

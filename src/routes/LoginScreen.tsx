@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight, Bot } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
 
 export function LoginScreen() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const enter = () => navigate('/app')
 
@@ -16,7 +18,7 @@ export function LoginScreen() {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold tracking-tight text-ink">hip</div>
-            <div className="mt-1 text-sm text-ink-secondary">没有人比我更懂摸鱼</div>
+            <div className="mt-1 text-sm text-ink-secondary">{t('login.slogan')}</div>
           </div>
         </div>
       </div>
@@ -24,20 +26,20 @@ export function LoginScreen() {
       {/* 右侧登录方式 */}
       <div className="flex flex-1 items-center justify-center px-8">
         <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">登录到 hip</h1>
-          <p className="mt-1.5 text-sm text-ink-secondary">选择一种方式继续</p>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{t('login.title')}</h1>
+          <p className="mt-1.5 text-sm text-ink-secondary">{t('login.subtitle')}</p>
 
           <div className="mt-8 flex flex-col gap-3">
-            <AuthButton icon={Mail} label="使用邮箱登录" onClick={enter} variant="solid" />
-            <AuthButton icon={Github} label="使用 GitHub 登录" onClick={enter} />
-            <AuthButton icon={Chrome} label="使用 Google 登录" onClick={enter} />
+            <AuthButton icon={Mail} label={t('login.email')} onClick={enter} variant="solid" />
+            <AuthButton icon={Github} label={t('login.github')} onClick={enter} />
+            <AuthButton icon={Chrome} label={t('login.google')} onClick={enter} />
           </div>
 
           <button
             onClick={enter}
             className="mt-6 flex w-full items-center justify-center gap-1.5 text-sm text-ink-tertiary transition-colors hover:text-ink-secondary"
           >
-            跳过登录
+            {t('login.skip')}
             <ArrowRight size={15} />
           </button>
         </div>

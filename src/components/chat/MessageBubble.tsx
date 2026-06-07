@@ -1,10 +1,8 @@
 import ReactMarkdown from 'react-markdown'
+import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
 import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
-
-// TODO: replace with real authenticated user once auth flow is implemented
-const currentUserName = '用户'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
@@ -13,19 +11,20 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, streaming }: MessageBubbleProps) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
 
   return (
     <div className="flex gap-3">
       {isUser ? (
-        <Avatar name={currentUserName} size={28} />
+        <Avatar name={t('chat.user')} size={28} />
       ) : (
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
           AI
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="mb-1 text-[12px] font-medium text-ink-secondary">{isUser ? '你' : 'hip'}</div>
+        <div className="mb-1 text-[12px] font-medium text-ink-secondary">{isUser ? t('chat.you') : 'hip'}</div>
         <div
           className={cn(
             'max-w-none text-[14px] leading-relaxed text-ink',

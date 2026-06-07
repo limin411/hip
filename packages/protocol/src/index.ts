@@ -41,8 +41,12 @@ export interface SearchHit {
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
-  | { type: 'message:send'; sessionId: string; content: string; role: 'user' }
+  | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
   | { type: 'message:cancel'; sessionId: string }
+  | { type: 'session:list' }
+  | { type: 'session:load'; sessionId: string }
+  | { type: 'session:search'; query: string }
+  | { type: 'session:delete'; sessionId: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -52,3 +56,7 @@ export type ServerMessage =
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }
+  | { type: 'session:list:result'; sessions: SessionSummary[] }
+  | { type: 'session:loaded'; sessionId: string; messages: Message[]; agentRuns: AgentRun[] }
+  | { type: 'session:search:result'; query: string; hits: SearchHit[] }
+  | { type: 'session:deleted'; sessionId: string }

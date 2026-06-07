@@ -6,6 +6,11 @@ import type { SessionStore } from '../persistence/store.js'
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
 
+/** Normalize a user-typed rename: one line, bounded length, blank → default. */
+function sanitizeRename(raw: string): string {
+  return raw.replace(/\s+/g, ' ').trim().slice(0, 200) || '新对话'
+}
+
 export class SessionManager {
   private readonly sessions = new Map<string, Session>()
 
@@ -55,6 +60,12 @@ export class SessionManager {
         this.sessions.delete(msg.sessionId)
         send({ type: 'session:deleted', sessionId: msg.sessionId })
         break
+      case 'session:rename': {
+        const title = sanitizeRename(msg.title)
+        this.store?.setCustomTitle(msg.sessionId, title)
+        send({ type: 'session:title', sessionId: msg.sessionId, title })
+        break
+      }
     }
   }
 

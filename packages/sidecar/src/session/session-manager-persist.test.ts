@@ -56,4 +56,19 @@ describe('SessionManager persistence', () => {
     expect(store.getSession('s1')).toBeUndefined()
     expect(sent.some((m) => m.type === 'session:deleted')).toBe(true)
   })
+
+  it('session:rename sets a pinned custom title and echoes session:title', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    sent = []
+    mgr.handle({ type: 'session:rename', sessionId: 's1', title: '  我的项目  ' }, send)
+    expect(store.getSession('s1')!.title).toBe('我的项目')
+    const echo = sent.find((m) => m.type === 'session:title') as Extract<ServerMessage, { type: 'session:title' }>
+    expect(echo).toMatchObject({ sessionId: 's1', title: '我的项目' })
+  })
+
+  it('session:rename falls back to 新对话 for blank input', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    mgr.handle({ type: 'session:rename', sessionId: 's1', title: '   ' }, send)
+    expect(store.getSession('s1')!.title).toBe('新对话')
+  })
 })

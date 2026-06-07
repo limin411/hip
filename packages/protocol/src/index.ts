@@ -47,6 +47,7 @@ export type ClientMessage =
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }
   | { type: 'session:delete'; sessionId: string }
+  | { type: 'session:rename'; sessionId: string; title: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -60,3 +61,4 @@ export type ServerMessage =
   | { type: 'session:loaded'; sessionId: string; messages: Message[]; agentRuns: AgentRun[] }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   | { type: 'session:deleted'; sessionId: string }
+  | { type: 'session:title'; sessionId: string; title: string }

@@ -5,6 +5,7 @@ export interface SessionConfig {
   model: string
   tools: string[]
   systemPrompt?: string
+  cwd?: string                 // absolute project root; undefined → virtual FS (no real file tools)
 }
 
 export interface Message {
@@ -38,6 +39,14 @@ export interface SearchHit {
   timestamp: number
 }
 
+/** One immediate child of a directory. `path` is a real absolute host path. */
+export interface FsEntry {
+  name: string
+  path: string
+  isDir: boolean
+  size?: number
+}
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
@@ -48,6 +57,9 @@ export type ClientMessage =
   | { type: 'session:search'; query: string }
   | { type: 'session:delete'; sessionId: string }
   | { type: 'session:rename'; sessionId: string; title: string }
+  | { type: 'session:setCwd'; sessionId: string; cwd: string }
+  | { type: 'fs:ls'; sessionId: string; path: string }
+  | { type: 'fs:read'; sessionId: string; path: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -62,3 +74,6 @@ export type ServerMessage =
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   | { type: 'session:deleted'; sessionId: string }
   | { type: 'session:title'; sessionId: string; title: string }
+  | { type: 'session:cwd'; sessionId: string; cwd: string }
+  | { type: 'fs:ls:result'; sessionId: string; path: string; entries: FsEntry[]; error?: string }
+  | { type: 'fs:read:result'; sessionId: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }

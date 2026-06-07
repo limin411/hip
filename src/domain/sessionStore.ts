@@ -15,6 +15,12 @@ export interface AgentVM {
   startedAt: number    // 内部：agent:started 时的 now（不渲染）
 }
 
+/** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
+export interface SessionError {
+  code: string
+  message: string
+}
+
 export interface SessionVM {
   id: string
   config: SessionConfig
@@ -24,6 +30,7 @@ export interface SessionVM {
   messages: Message[]
   agents: AgentVM[]
   status: 'idle' | 'running' | 'error'
+  error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
 }
 
 const ROLE_TITLE: Record<AgentRole, string> = {
@@ -72,6 +79,7 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({
         ...s,
         status: 'running',
+        error: null,
         agents: upsertAgent(s.agents, {
           id: msg.agentId,
           role: msg.role,
@@ -105,7 +113,11 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, msg.message) }))
 
     case 'error':
-      return msg.sessionId ? update(msg.sessionId, (s) => ({ ...s, status: 'error' })) : state
+      // A cancel is intentional, not a failure: return to idle and surface nothing.
+      // Errors without a sessionId (e.g. PARSE_ERROR) can't be attributed to a session.
+      if (!msg.sessionId) return state
+      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null }))
+      return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
 
     default:
       return state
@@ -115,7 +127,7 @@ export function applyServerMessage(
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle' }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle', error: null }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -169,7 +181,8 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sessions: s.sessions.map((sess) =>
           sess.id !== sessionId
             ? sess
-            : { ...sess, messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+            // Clear any prior error: appending a user message means a retry is underway.
+            : { ...sess, error: null, messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
         ),
       }
     }),

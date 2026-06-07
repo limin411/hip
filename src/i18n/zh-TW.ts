@@ -16,6 +16,9 @@ export const zhTW = {
       connectionError: '連線錯誤',
       connectionRetry: '重試',
       noApiKey: '未配置密鑰',
+      errorNoApiKey: '未配置 DeepSeek API Key，請在「設置」中配置後重試。',
+      errorGeneric: '出錯了：{{message}}',
+      openSettings: '前往設置',
     },
     sidebar: {
       collapse: '折疊側邊欄',

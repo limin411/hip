@@ -15,6 +15,11 @@ interface UiState {
   setTab: (t: ArtifactTab) => void
   togglePanel: () => void
   setPanelOpen: (v: boolean) => void
+
+  // Settings modal open state, lifted here so any view (e.g. the chat's no-key
+  // notice) can open Settings — not just the user menu that hosts the modal.
+  settingsOpen: boolean
+  setSettingsOpen: (v: boolean) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -34,4 +39,7 @@ export const useUiStore = create<UiState>((set) => ({
   setPanelOpen: (v) => set((s) =>
     s.panelOpen === v ? s : { panelOpen: v },
   ),
+
+  settingsOpen: false,
+  setSettingsOpen: (v) => set((s) => (s.settingsOpen === v ? s : { settingsOpen: v })),
 }))

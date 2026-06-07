@@ -16,6 +16,9 @@ export const en = {
       connectionError: 'Connection error',
       connectionRetry: 'Retry',
       noApiKey: 'No API key',
+      errorNoApiKey: 'DeepSeek API key not configured. Set it in Settings to continue.',
+      errorGeneric: 'Something went wrong: {{message}}',
+      openSettings: 'Open Settings',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

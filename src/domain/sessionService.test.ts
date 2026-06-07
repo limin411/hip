@@ -23,7 +23,7 @@ beforeEach(() => {
   // NOTE: drop the `true` (replace) flag — Zustand v5 setState with replace=true
   // wipes action methods from the store, causing "X is not a function" errors.
   // Using merge (no second arg) keeps actions intact and resets only data fields.
-  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', messages: [], agents: [], status: 'idle' }], activeSessionId: 's1', connection: 'disconnected' })
+  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', messages: [], agents: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
 })
 
 describe('SessionService', () => {

@@ -1,7 +1,8 @@
-import { useContext, useState } from 'react'
+import { useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Settings, LogOut, ChevronsUpDown } from 'lucide-react'
+import { useUiStore } from '@/store/uiStore'
 import { Avatar } from '@/components/ui/Avatar'
 import {
   DropdownMenu,
@@ -18,25 +19,13 @@ import { useAuthStore } from '@/store/authStore'
 // TODO: replace with real authenticated user once auth flow is implemented
 const currentUser = { name: 'User', email: 'user@example.com', avatarUrl: undefined }
 
-type PageKey = 'settings'
-
-const PANELS: Record<PageKey, () => JSX.Element> = {
-  settings: SettingsPanel,
-}
-
 export function UserMenu() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const peekLock = useContext(SidebarPeekLockContext)
-  const [openKey, setOpenKey] = useState<PageKey | null>(null)
-
-  const PAGES: { key: PageKey; icon: typeof Settings; label: string }[] = [
-    { key: 'settings', icon: Settings, label: t('settings.title') },
-  ]
-
-  const active = PAGES.find((p) => p.key === openKey)
-  const ActivePanel = openKey ? PANELS[openKey] : null
+  const settingsOpen = useUiStore((s) => s.settingsOpen)
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
 
   return (
     <>
@@ -58,12 +47,10 @@ export function UserMenu() {
         <DropdownMenuContent side="top" align="start" className="w-[240px]">
           <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {PAGES.map((page) => (
-            <DropdownMenuItem key={page.key} onSelect={() => setOpenKey(page.key)}>
-              <page.icon size={15} className="text-ink-secondary" />
-              {page.label}
-            </DropdownMenuItem>
-          ))}
+          <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+            <Settings size={15} className="text-ink-secondary" />
+            {t('settings.title')}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={() => { logout(); navigate('/login') }}>
             <LogOut size={15} />
@@ -73,11 +60,11 @@ export function UserMenu() {
       </DropdownMenu>
 
       <Modal
-        open={openKey !== null}
-        onOpenChange={(open) => !open && setOpenKey(null)}
-        title={active?.label ?? ''}
+        open={settingsOpen}
+        onOpenChange={(open) => !open && setSettingsOpen(false)}
+        title={t('settings.title')}
       >
-        {ActivePanel && <ActivePanel />}
+        <SettingsPanel />
       </Modal>
     </>
   )

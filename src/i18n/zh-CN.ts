@@ -16,6 +16,9 @@ export const zhCN = {
       connectionError: '连接错误',
       connectionRetry: '重试',
       noApiKey: '未配置密钥',
+      errorNoApiKey: '未配置 DeepSeek API Key，请在「设置」中配置后重试。',
+      errorGeneric: '出错了：{{message}}',
+      openSettings: '前往设置',
     },
     sidebar: {
       collapse: '折叠侧边栏',

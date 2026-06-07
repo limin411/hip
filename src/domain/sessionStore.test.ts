@@ -12,6 +12,7 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
     messages: [],
     agents: [],
     status: 'idle',
+    error: null,
     ...over,
   }
 }
@@ -85,6 +86,35 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].agents).toHaveLength(0)
     expect(next.sessions[0].messages).toHaveLength(1)
   })
+
+  it('error stores code+message on the session so the UI can surface it', () => {
+    const next = applyServerMessage(
+      { sessions: [baseSession()] },
+      { type: 'error', sessionId: 's1', code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' },
+      0,
+    )
+    expect(next.sessions[0].status).toBe('error')
+    expect(next.sessions[0].error).toEqual({ code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
+  })
+
+  it('error with CANCELLED returns the session to idle without surfacing an error notice', () => {
+    const s0 = { sessions: [baseSession({ status: 'running' })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].status).toBe('idle')
+    expect(next.sessions[0].error).toBeNull()
+  })
+
+  it('error without a sessionId is ignored (cannot attribute to a session)', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'error', code: 'PARSE_ERROR', message: 'bad json' }, 0)
+    expect(next.sessions[0].error).toBeNull()
+  })
+
+  it('agent:started clears a prior error (a fresh run is underway)', () => {
+    const s0 = { sessions: [baseSession({ status: 'error', error: { code: 'NO_API_KEY', message: 'x' } })] }
+    const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'supervisor' }, 0)
+    expect(next.sessions[0].error).toBeNull()
+  })
 })
 
 function reset() {
@@ -106,6 +136,15 @@ describe('useDomainStore actions', () => {
     const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
     expect(msgs).toHaveLength(1)
     expect(msgs[0]).toMatchObject({ role: 'user', content: 'hello' })
+  })
+
+  it('appendUserMessage clears a prior error (the user is retrying)', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().apply({ type: 'error', sessionId: 's1', code: 'NO_API_KEY', message: 'x' })
+    expect(useDomainStore.getState().sessions[0].error).toEqual({ code: 'NO_API_KEY', message: 'x' })
+    useDomainStore.getState().appendUserMessage('s1', 'retry')
+    expect(useDomainStore.getState().sessions[0].error).toBeNull()
   })
 
   it('deleteSession removes and reassigns active', () => {

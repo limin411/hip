@@ -3,22 +3,23 @@ import { invoke } from '@tauri-apps/api/core'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 // 注意：wsClient 是模块级单例；多个 WsTransport 实例会共享同一连接（接 live 时若需多实例须重构）。
 import { wsClient } from '@/ipc/ws-client'
-import type { Transport } from './transport'
+import type { Transport, ConnectionStatus } from './transport'
 
-async function getSidecarPort(): Promise<number> {
+interface SidecarInfo { port: number; token: string }
+
+async function getSidecarInfo(): Promise<SidecarInfo> {
   for (let i = 0; i < 20; i++) {
-    const port = await invoke<number | null>('get_sidecar_port')
-    if (port !== null) return port
+    const info = await invoke<SidecarInfo | null>('get_sidecar_info')
+    if (info) return info
     await new Promise((r) => setTimeout(r, 500))
   }
-  throw new Error('sidecar port not available after 10 s')
+  throw new Error('sidecar info not available after 10 s')
 }
 
 /** 真后端缝。日后把 sessionService 单例从 MockTransport 换成它即可。 */
 export class WsTransport implements Transport {
-  async connect(): Promise<void> {
-    const port = await getSidecarPort()
-    await wsClient.connect(port)
+  connect(): Promise<void> {
+    return wsClient.start(getSidecarInfo)
   }
   disconnect(): void {
     wsClient.disconnect()
@@ -28,5 +29,8 @@ export class WsTransport implements Transport {
   }
   onMessage(handler: (m: ServerMessage) => void): () => void {
     return wsClient.onMessage(handler)
+  }
+  onStatus(handler: (s: ConnectionStatus) => void): () => void {
+    return wsClient.onStatus(handler)
   }
 }

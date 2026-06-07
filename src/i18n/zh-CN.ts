@@ -10,6 +10,11 @@ export const zhCN = {
       user: '用户',
       you: '你',
       togglePanel: '切换产物面板',
+      connectionConnected: '已连接',
+      connectionConnecting: '连接中…',
+      connectionDisconnected: '已断开',
+      connectionError: '连接错误',
+      connectionRetry: '重试',
     },
     sidebar: {
       collapse: '折叠侧边栏',

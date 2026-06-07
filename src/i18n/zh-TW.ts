@@ -10,6 +10,11 @@ export const zhTW = {
       user: '用戶',
       you: '你',
       togglePanel: '切換產物面板',
+      connectionConnected: '已連線',
+      connectionConnecting: '連線中…',
+      connectionDisconnected: '已斷開',
+      connectionError: '連線錯誤',
+      connectionRetry: '重試',
     },
     sidebar: {
       collapse: '折疊側邊欄',
@@ -61,6 +66,7 @@ export const zhTW = {
     },
     common: {
       close: '關閉',
+      logout: '登出',
     },
   },
 } as const

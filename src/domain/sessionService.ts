@@ -9,26 +9,30 @@ let sessionSeq = 0
 export class SessionService {
   private readonly transport: Transport
   private readonly unsubscribe: () => void
+  private readonly unsubStatus: () => void
 
   constructor(transport: Transport) {
     this.transport = transport
     this.unsubscribe = this.transport.onMessage((msg: ServerMessage) => this.receive(msg))
+    this.unsubStatus = this.transport.onStatus((s) => useDomainStore.getState().setConnection(s))
   }
 
   dispose(): void {
     this.unsubscribe()
+    this.unsubStatus()
   }
 
   async connect(): Promise<void> {
-    const store = useDomainStore.getState()
-    store.setConnection('connecting')
     try {
       await this.transport.connect()
-      store.setConnection('connected')
     } catch (e) {
       console.error('[SessionService] connect failed', e)
-      store.setConnection('error')
+      useDomainStore.getState().setConnection('error')
     }
+  }
+
+  reconnect(): void {
+    void this.connect()
   }
 
   private receive(msg: ServerMessage): void {

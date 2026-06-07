@@ -3,16 +3,20 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionService } from './sessionService'
 import { useDomainStore } from './sessionStore'
-import type { Transport } from './transport'
+import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
   sent: ClientMessage[] = []
   private handler: ((m: ServerMessage) => void) | null = null
-  async connect() {}
+  private statusHandler: ((s: ConnectionStatus) => void) | null = null
+  // Mirror the real transport: opening drives a 'connected' status through onStatus.
+  async connect() { this.statusHandler?.('connected') }
   disconnect() {}
   send(msg: ClientMessage) { this.sent.push(msg) }
   onMessage(h: (m: ServerMessage) => void) { this.handler = h; return () => { this.handler = null } }
+  onStatus(h: (s: ConnectionStatus) => void) { this.statusHandler = h; return () => { this.statusHandler = null } }
   push(m: ServerMessage) { this.handler?.(m) }
+  pushStatus(s: ConnectionStatus) { this.statusHandler?.(s) }
 }
 
 beforeEach(() => {
@@ -52,8 +56,22 @@ describe('SessionService', () => {
   })
 
   it('connect updates connection status', async () => {
+    // New model: status flows via transport.onStatus(...) -> setConnection,
+    // not a direct setConnection inside connect(). FakeTransport.connect() drives
+    // a 'connected' status through the stored handler to mirror a real WS open.
     const t = new FakeTransport()
     await new SessionService(t).connect()
     expect(useDomainStore.getState().connection).toBe('connected')
+  })
+
+  it('transport status changes propagate to the store', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.pushStatus('connecting')
+    expect(useDomainStore.getState().connection).toBe('connecting')
+    t.pushStatus('disconnected')
+    expect(useDomainStore.getState().connection).toBe('disconnected')
+    t.pushStatus('error')
+    expect(useDomainStore.getState().connection).toBe('error')
   })
 })

@@ -10,6 +10,11 @@ export const en = {
       user: 'User',
       you: 'You',
       togglePanel: 'Toggle Artifact Panel',
+      connectionConnected: 'Connected',
+      connectionConnecting: 'Connecting…',
+      connectionDisconnected: 'Disconnected',
+      connectionError: 'Connection error',
+      connectionRetry: 'Retry',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

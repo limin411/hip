@@ -35,7 +35,7 @@ export const en = {
       noFiles: 'No files yet',
       noFilesDesc: 'Files will automatically appear when collaborating with agents',
       waiting: 'Waiting…',
-      parallelAgents: 'Parallel Sub-agents',
+      parallelAgents: 'Sub-agents',
     },
     settings: {
       title: 'Settings',

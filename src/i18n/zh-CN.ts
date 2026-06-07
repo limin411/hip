@@ -35,7 +35,7 @@ export const zhCN = {
       noFiles: '暂无文件',
       noFilesDesc: '与智能体协作时，文件将自动显示在这里',
       waiting: '等待中…',
-      parallelAgents: '并行子智能体',
+      parallelAgents: '协作子智能体',
     },
     settings: {
       title: '设置',

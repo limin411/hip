@@ -35,7 +35,7 @@ export const zhTW = {
       noFiles: '暫無文件',
       noFilesDesc: '與智能體協作時，文件將自動顯示在這裡',
       waiting: '等待中…',
-      parallelAgents: '並行子智能體',
+      parallelAgents: '協作子智能體',
     },
     settings: {
       title: '設置',

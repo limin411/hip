@@ -50,4 +50,14 @@ describe('readForPreview', () => {
   it('throws when the path escapes root', async () => {
     await expect(readForPreview(root, '/etc/passwd')).rejects.toThrow()
   })
+  it('throws when an in-cwd symlink points outside root (no content leak)', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-outside-'))
+    await fs.writeFile(path.join(outside, 'secret.txt'), 'TOP-SECRET')
+    await fs.symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'))
+    try {
+      await expect(readForPreview(root, path.join(root, 'link.txt'))).rejects.toThrow()
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
 })

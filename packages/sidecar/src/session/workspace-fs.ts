@@ -18,19 +18,45 @@ export type PreviewResult =
   | { content: string; encoding: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean }
   | { error: string }
 
-/** Resolve `abs` and assert it stays within `cwd`. Throws on escape (sandbox 2nd line of defense). */
+function within(root: string, target: string): boolean {
+  return target === root || target.startsWith(root + path.sep)
+}
+
+/** Resolve `abs` and assert it stays within `cwd` lexically. Throws on escape (sandbox 2nd line of defense). */
 export function resolveWithin(cwd: string, abs: string): string {
   const root = path.resolve(cwd)
   const target = path.resolve(abs)
-  if (target !== root && !target.startsWith(root + path.sep)) {
+  if (!within(root, target)) {
     throw new Error(`path escapes project root: ${abs}`)
+  }
+  return target
+}
+
+/**
+ * Lexical `resolveWithin` plus a symlink-aware check: if the resolved path exists,
+ * its real (symlink-followed) location must also stay within the real project root.
+ * Closes the read-path leak where an in-cwd symlink points outside the workspace.
+ */
+async function resolveRealWithin(cwd: string, abs: string): Promise<string> {
+  const target = resolveWithin(cwd, abs)
+  let realRoot: string
+  let realTarget: string
+  try {
+    realRoot = await fs.realpath(path.resolve(cwd))
+    realTarget = await fs.realpath(target)
+  } catch {
+    // Path doesn't exist yet (or root unresolvable) — the lexical check already held.
+    return target
+  }
+  if (!within(realRoot, realTarget)) {
+    throw new Error(`path escapes project root via symlink: ${abs}`)
   }
   return target
 }
 
 /** List immediate children of `dirAbs` (non-recursive): dirs first, then alphabetical. */
 export async function lsDir(cwd: string, dirAbs: string): Promise<FsEntry[]> {
-  const dir = resolveWithin(cwd, dirAbs)
+  const dir = await resolveRealWithin(cwd, dirAbs)
   const dirents = await fs.readdir(dir, { withFileTypes: true })
   const entries: FsEntry[] = []
   for (const d of dirents) {
@@ -59,7 +85,7 @@ async function readHead(file: string, n: number): Promise<Buffer> {
 
 /** Read a file for UI preview. Text → utf8 (capped+truncated); images → base64; else error. */
 export async function readForPreview(cwd: string, abs: string): Promise<PreviewResult> {
-  const file = resolveWithin(cwd, abs)
+  const file = await resolveRealWithin(cwd, abs)
   const ext = path.extname(file).toLowerCase()
   const stat = await fs.stat(file)
   if (stat.isDirectory()) return { error: 'is_directory' }

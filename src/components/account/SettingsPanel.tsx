@@ -5,12 +5,14 @@ const LANGUAGE_KEYS = ['zh-CN', 'zh-TW', 'en'] as const
 
 export function SettingsPanel() {
   const { t, i18n } = useTranslation()
-  const currentLang = i18n.language as (typeof LANGUAGE_KEYS)[number]
+  const currentLang = LANGUAGE_KEYS.includes(i18n.language as (typeof LANGUAGE_KEYS)[number])
+    ? (i18n.language as (typeof LANGUAGE_KEYS)[number])
+    : LANGUAGE_KEYS[0]
 
   const cycleLanguage = () => {
     const idx = LANGUAGE_KEYS.indexOf(currentLang)
-    const next = LANGUAGE_KEYS[(idx + 1) % LANGUAGE_KEYS.length]
-    i18n.changeLanguage(next)
+    const nextIdx = idx >= 0 ? (idx + 1) % LANGUAGE_KEYS.length : 0
+    i18n.changeLanguage(LANGUAGE_KEYS[nextIdx])
   }
 
   return (

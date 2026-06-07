@@ -75,6 +75,12 @@ describe('SessionStore', () => {
     expect(store.getSession('s1')!.title).toBe('我的标题')
   })
 
+  it('updateConfig overwrites the stored config blob', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.updateConfig('s1', JSON.stringify({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd: '/proj' }))
+    expect(JSON.parse(store.getSession('s1')!.config).cwd).toBe('/proj')
+  })
+
   it('deleteSession cascades to messages, agent_runs, and FTS', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '可搜索内容', timestamp: 1 })

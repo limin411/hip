@@ -18,6 +18,11 @@ export class SessionStore {
       | undefined
   }
 
+  /** Replace the persisted config blob (e.g. when cwd changes). */
+  updateConfig(id: string, config: string): void {
+    this.db.prepare(`UPDATE sessions SET config=? WHERE id=?`).run(config, id)
+  }
+
   touchSession(id: string, updatedAt: number): void {
     this.db.prepare(`UPDATE sessions SET updated_at=? WHERE id=?`).run(updatedAt, id)
   }

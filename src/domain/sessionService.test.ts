@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionService } from './sessionService'
 import { useDomainStore } from './sessionStore'
+import { useFsStore } from '@/store/fsStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -24,6 +25,7 @@ beforeEach(() => {
   // wipes action methods from the store, causing "X is not a function" errors.
   // Using merge (no second arg) keeps actions intact and resets only data fields.
   useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], agents: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
+  useFsStore.setState({ bySession: {} })
 })
 
 describe('SessionService', () => {
@@ -81,5 +83,33 @@ describe('SessionService', () => {
     new SessionService(t).renameSession('s1', 'My Title')
     expect(useDomainStore.getState().sessions[0].title).toBe('My Title')
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:rename', sessionId: 's1', title: 'My Title' })
+  })
+
+  it('setProjectDir optimistically sets cwd and sends session:setCwd', () => {
+    const t = new FakeTransport()
+    new SessionService(t).setProjectDir('s1', '/proj')
+    expect(useDomainStore.getState().sessions[0].config.cwd).toBe('/proj')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setCwd', sessionId: 's1', cwd: '/proj' })
+  })
+
+  it('readFile marks the preview loading and sends fs:read', () => {
+    const t = new FakeTransport()
+    new SessionService(t).readFile('s1', '/proj/a.md')
+    expect(useFsStore.getState().bySession.s1.preview).toMatchObject({ status: 'loading', path: '/proj/a.md' })
+    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:read', sessionId: 's1', path: '/proj/a.md' })
+  })
+
+  it('fs:ls:result populates entries', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:ls:result', sessionId: 's1', path: '/proj', entries: [{ name: 'a.md', path: '/proj/a.md', isDir: false }] })
+    expect(useFsStore.getState().bySession.s1.entriesByDir['/proj']).toHaveLength(1)
+  })
+
+  it('fs:read:result populates the preview', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:read:result', sessionId: 's1', path: '/proj/a.md', content: '# Hi', encoding: 'utf8', mimeType: 'text/markdown' })
+    expect(useFsStore.getState().bySession.s1.preview).toMatchObject({ status: 'ready', content: '# Hi' })
   })
 })

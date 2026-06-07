@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
+import { useFsStore } from '@/store/fsStore'
 
 export class SessionService {
   private readonly transport: Transport
@@ -41,8 +42,22 @@ export class SessionService {
 
   private receive(msg: ServerMessage): void {
     useDomainStore.getState().apply(msg)
-    // Once the sidecar signals readiness, pull the persisted session list.
-    if (msg.type === 'ready') this.transport.send({ type: 'session:list' })
+    if (msg.type === 'ready') {
+      this.transport.send({ type: 'session:list' })
+    } else if (msg.type === 'fs:ls:result') {
+      useFsStore.getState().setEntries(msg.sessionId, msg.path, msg.entries)
+    } else if (msg.type === 'fs:read:result') {
+      useFsStore.getState().setPreview(msg.sessionId, {
+        status: 'ready', path: msg.path, content: msg.content, encoding: msg.encoding, mimeType: msg.mimeType, truncated: msg.truncated, error: msg.error,
+      })
+    } else if (msg.type === 'message:complete') {
+      // The agent may have written files this turn — re-pull every loaded dir + the open file.
+      const fsState = useFsStore.getState().bySession[msg.sessionId]
+      if (fsState) {
+        for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
+        if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
+      }
+    }
   }
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
@@ -67,6 +82,21 @@ export class SessionService {
   renameSession(id: string, title: string): void {
     useDomainStore.getState().renameSession(id, title)
     this.transport.send({ type: 'session:rename', sessionId: id, title })
+  }
+
+  setProjectDir(id: string, cwd: string): void {
+    useDomainStore.getState().apply({ type: 'session:cwd', sessionId: id, cwd }) // optimistic
+    useFsStore.getState().clearSession(id)
+    this.transport.send({ type: 'session:setCwd', sessionId: id, cwd })
+  }
+
+  lsDir(sessionId: string, path: string): void {
+    this.transport.send({ type: 'fs:ls', sessionId, path })
+  }
+
+  readFile(sessionId: string, path: string): void {
+    useFsStore.getState().setPreview(sessionId, { status: 'loading', path })
+    this.transport.send({ type: 'fs:read', sessionId, path })
   }
 
   search(query: string): void {

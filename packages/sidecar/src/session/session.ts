@@ -1,10 +1,11 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun } from '@hip/protocol'
-import { createDeepAgent } from 'deepagents'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry } from '@hip/protocol'
+import { createDeepAgent, FilesystemBackend } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { SUBAGENTS, SUPERVISOR_PROMPT, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
+import * as workspaceFs from './workspace-fs.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -63,7 +64,9 @@ function buildModel(config: SessionConfig): ChatOpenAI {
 }
 
 export class Session {
-  private readonly agent: ReturnType<typeof createDeepAgent>
+  private agent!: ReturnType<typeof createDeepAgent>
+  private _config: SessionConfig
+  private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
   private readonly usesEnvModel: boolean
@@ -71,19 +74,36 @@ export class Session {
 
   constructor(
     readonly id: string,
-    readonly config: SessionConfig,
+    config: SessionConfig,
     model?: BaseLanguageModel,
     private readonly store?: SessionStore,
     titleGenerator?: TitleGenerator,
   ) {
+    this._config = config
+    this.injectedModel = model
     this.usesEnvModel = !model
     // Inject a generator (tests), else build the real one only for the env-keyed
     // production model. Injected-model sessions get no generator → no LLM title.
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
+    this.buildAgent()
+  }
+
+  /** Current config (cwd may change via setCwd). */
+  get config(): SessionConfig {
+    return this._config
+  }
+
+  /** (Re)build the deep agent — with a sandboxed FilesystemBackend when a cwd is bound. */
+  private buildAgent(): void {
+    const model = this.injectedModel ?? buildModel(this._config)
+    const backend = this._config.cwd
+      ? new FilesystemBackend({ rootDir: this._config.cwd, virtualMode: true, maxFileSizeMb: 10 })
+      : undefined
     this.agent = createDeepAgent({
-      model: model ?? buildModel(config),
-      systemPrompt: config.systemPrompt ?? SUPERVISOR_PROMPT,
+      model,
+      systemPrompt: this._config.systemPrompt ?? SUPERVISOR_PROMPT,
       subagents: SUBAGENTS as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
+      ...(backend ? { backend } : {}),
     })
   }
 
@@ -91,6 +111,32 @@ export class Session {
   hydrate(messages: Message[]): void {
     for (const m of messages) {
       this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+    }
+  }
+
+  /** Bind/replace the project directory and rebuild the agent. Conversation history is preserved. */
+  setCwd(cwd: string): void {
+    this._config = { ...this._config, cwd }
+    this.buildAgent()
+  }
+
+  /** List a directory for the UI tree. Absolute path. */
+  async lsDir(absPath: string): Promise<{ entries?: FsEntry[]; error?: string }> {
+    if (!this._config.cwd) return { error: 'no_workspace' }
+    try {
+      return { entries: await workspaceFs.lsDir(this._config.cwd, absPath) }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
+  /** Read a file for the UI preview. Absolute path. */
+  async readForPreview(absPath: string): Promise<workspaceFs.PreviewResult> {
+    if (!this._config.cwd) return { error: 'no_workspace' }
+    try {
+      return await workspaceFs.readForPreview(this._config.cwd, absPath)
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
     }
   }
 

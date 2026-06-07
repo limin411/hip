@@ -9,7 +9,8 @@ export const SUBAGENTS = [
   {
     name: 'coder',
     description: 'Writes or edits code to satisfy the plan.',
-    systemPrompt: 'You are the Coder. Implement the plan. Output the code and a one-line summary.',
+    systemPrompt:
+      'You are the Coder. Implement the plan. You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the project directory; use them to read and write actual files. All paths are relative to the project root (e.g. "/src/index.ts"). Output the code and a one-line summary.',
   },
   {
     name: 'reviewer',

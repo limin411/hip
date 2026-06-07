@@ -15,9 +15,11 @@ interface SessionItemProps {
   active: boolean
   onSelect: () => void
   onDelete: () => void
+  /** Search-match snippet; when present, renders a second line under the title. */
+  snippet?: string
 }
 
-export function SessionItem({ session, active, onSelect, onDelete }: SessionItemProps) {
+export function SessionItem({ session, active, onSelect, onDelete, snippet }: SessionItemProps) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(session.title)
@@ -52,7 +54,7 @@ export function SessionItem({ session, active, onSelect, onDelete }: SessionItem
             active ? 'bg-accent-subtle' : 'hover:bg-surface-muted',
           )}
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             {editing ? (
               <input
                 ref={inputRef}
@@ -67,22 +69,24 @@ export function SessionItem({ session, active, onSelect, onDelete }: SessionItem
                 className="min-w-0 flex-1 rounded border border-accent/40 bg-surface px-1 py-0 text-[13px] text-ink outline-none"
               />
             ) : (
-              <span className={cn('truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
-                {session.title}
-              </span>
+              <>
+                <span className={cn('min-w-0 flex-1 truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
+                  {session.title}
+                </span>
+                <span className="shrink-0 text-[11px] text-ink-tertiary">{session.updatedAt}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete() }}
+                  className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"
+                  title={t('sidebar.deleteSession')}
+                >
+                  <X size={14} />
+                </button>
+              </>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"
-              title={t('sidebar.deleteSession')}
-            >
-              <X size={14} />
-            </button>
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-[12px] text-ink-tertiary">{session.preview}</span>
-            <span className="shrink-0 text-[11px] text-ink-tertiary">{session.updatedAt}</span>
-          </div>
+          {snippet && !editing && (
+            <span className="block truncate text-[12px] text-ink-tertiary">{snippet}</span>
+          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>

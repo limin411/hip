@@ -45,7 +45,8 @@ export function SessionList() {
         return (
           <SessionItem
             key={`hit-${h.sessionId}`}
-            session={{ ...s, preview: h.snippet }}
+            session={s}
+            snippet={h.snippet}
             active={s.id === activeSessionId}
             onSelect={() => sessionService.selectSession(s.id)}
             onDelete={() => sessionService.deleteSession(s.id)}

@@ -153,6 +153,9 @@ export function applyServerMessage(
     case 'session:deleted':
       return { sessions: state.sessions.filter((s) => s.id !== msg.sessionId) }
 
+    case 'session:title':
+      return update(msg.sessionId, (s) => ({ ...s, title: msg.title }))
+
     default:
       return state
   }
@@ -177,6 +180,7 @@ interface DomainStore {
   createSession: (id: string, config: SessionConfig) => string
   selectSession: (id: string) => void
   deleteSession: (id: string) => void
+  renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string) => void
   setConnection: (c: Connection) => void
 }
@@ -209,6 +213,9 @@ export const useDomainStore = create<DomainStore>((set) => ({
       const activeSessionId = s.activeSessionId === id ? (sessions[0]?.id ?? null) : s.activeSessionId
       return { sessions, activeSessionId }
     }),
+
+  renameSession: (id, title) =>
+    set((s) => ({ sessions: s.sessions.map((x) => (x.id === id ? { ...x, title } : x)) })),
 
   appendUserMessage: (sessionId, id, content) =>
     set((s) => ({

@@ -75,4 +75,11 @@ describe('SessionService', () => {
     t.pushStatus('error')
     expect(useDomainStore.getState().connection).toBe('error')
   })
+
+  it('renameSession optimistically updates the store and sends session:rename', () => {
+    const t = new FakeTransport()
+    new SessionService(t).renameSession('s1', 'My Title')
+    expect(useDomainStore.getState().sessions[0].title).toBe('My Title')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:rename', sessionId: 's1', title: 'My Title' })
+  })
 })

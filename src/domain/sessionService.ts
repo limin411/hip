@@ -64,6 +64,11 @@ export class SessionService {
     this.transport.send({ type: 'session:delete', sessionId: id })
   }
 
+  renameSession(id: string, title: string): void {
+    useDomainStore.getState().renameSession(id, title)
+    this.transport.send({ type: 'session:rename', sessionId: id, title })
+  }
+
   search(query: string): void {
     this.transport.send({ type: 'session:search', query })
   }

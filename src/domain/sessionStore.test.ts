@@ -144,6 +144,11 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(base, { type: 'session:deleted', sessionId: 's1' }, 0)
     expect(next.sessions.map((s) => s.id)).toEqual(['s2'])
   })
+
+  it('session:title updates the session title', () => {
+    const next = applyServerMessage({ sessions: [baseSession()] }, { type: 'session:title', sessionId: 's1', title: 'New Name' }, 0)
+    expect(next.sessions[0].title).toBe('New Name')
+  })
 })
 
 function reset() {
@@ -198,5 +203,12 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().hasApiKey).toBe(false)
     useDomainStore.getState().apply({ type: 'ready', hasApiKey: true })
     expect(useDomainStore.getState().hasApiKey).toBe(true)
+  })
+
+  it('renameSession updates the title optimistically', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().renameSession('s1', 'Renamed')
+    expect(useDomainStore.getState().sessions[0].title).toBe('Renamed')
   })
 })

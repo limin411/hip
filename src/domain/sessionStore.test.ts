@@ -1,6 +1,6 @@
 // src/domain/sessionStore.test.ts
 import { describe, it, expect } from 'vitest'
-import { applyServerMessage, useDomainStore, type SessionVM } from './sessionStore'
+import { applyServerMessage, emptySession, useDomainStore, type SessionVM } from './sessionStore'
 
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
@@ -9,6 +9,8 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
     title: 'T',
     preview: 'P',
     updatedAt: 'now',
+    updatedAtMs: 0,
+    loaded: true,
     messages: [],
     agents: [],
     status: 'idle',
@@ -115,6 +117,33 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'supervisor' }, 0)
     expect(next.sessions[0].error).toBeNull()
   })
+
+  it('session:list:result populates unloaded summaries', () => {
+    const next = applyServerMessage(
+      { sessions: [] },
+      { type: 'session:list:result', sessions: [{ id: 's1', title: 'T', preview: 'P', updatedAt: 1000, messageCount: 2 }] },
+      2000,
+    )
+    expect(next.sessions[0]).toMatchObject({ id: 's1', title: 'T', loaded: false, updatedAtMs: 1000 })
+  })
+
+  it('session:loaded fills messages + agents and marks loaded', () => {
+    const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
+    const next = applyServerMessage(base, {
+      type: 'session:loaded', sessionId: 's1',
+      messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 1 }],
+      agentRuns: [{ agentId: 'planner', role: 'planner', output: 'p', startedAt: 1, finishedAt: 2, seq: 0 }],
+    }, 0)
+    expect(next.sessions[0].loaded).toBe(true)
+    expect(next.sessions[0].messages).toHaveLength(1)
+    expect(next.sessions[0].agents[0].id).toBe('planner')
+  })
+
+  it('session:deleted removes the session', () => {
+    const base = { sessions: [emptySession('s1'), emptySession('s2')] }
+    const next = applyServerMessage(base, { type: 'session:deleted', sessionId: 's1' }, 0)
+    expect(next.sessions.map((s) => s.id)).toEqual(['s2'])
+  })
 })
 
 function reset() {
@@ -132,7 +161,7 @@ describe('useDomainStore actions', () => {
   it('appendUserMessage adds a user message to the session', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
-    useDomainStore.getState().appendUserMessage('s1', 'hello')
+    useDomainStore.getState().appendUserMessage('s1', 'u1', 'hello')
     const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
     expect(msgs).toHaveLength(1)
     expect(msgs[0]).toMatchObject({ role: 'user', content: 'hello' })
@@ -143,7 +172,7 @@ describe('useDomainStore actions', () => {
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.getState().apply({ type: 'error', sessionId: 's1', code: 'NO_API_KEY', message: 'x' })
     expect(useDomainStore.getState().sessions[0].error).toEqual({ code: 'NO_API_KEY', message: 'x' })
-    useDomainStore.getState().appendUserMessage('s1', 'retry')
+    useDomainStore.getState().appendUserMessage('s1', 'u2', 'retry')
     expect(useDomainStore.getState().sessions[0].error).toBeNull()
   })
 

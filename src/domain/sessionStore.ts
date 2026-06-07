@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AgentRole, Message, ServerMessage, SessionConfig } from '@hip/protocol'
+import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary } from '@hip/protocol'
 
 export type AgentStatus = 'idle' | 'running' | 'done'
 
@@ -10,7 +10,7 @@ export interface AgentVM {
   title: string        // 派生自 role
   status: AgentStatus
   tokens: string
-  tokenCount: number   // 物化：tokens.length（字符数，非 LLM token 数；UI 仍按 mock 习惯显示为 "tokens"）
+  tokenCount: number   // 物化：tokens.length
   elapsedMs: number    // 物化：finishedAt - startedAt
   startedAt: number    // 内部：agent:started 时的 now（不渲染）
 }
@@ -24,9 +24,11 @@ export interface SessionError {
 export interface SessionVM {
   id: string
   config: SessionConfig
-  title: string        // 展示字符串（seed 或 '新对话'，不派生）
+  title: string        // 展示字符串
   preview: string      // 展示字符串
   updatedAt: string    // 展示字符串（'2m ago' / 'now'）
+  updatedAtMs: number  // 数值排序键（epoch ms）
+  loaded: boolean      // false = 仅摘要（消息尚未拉取）
   messages: Message[]
   agents: AgentVM[]
   status: 'idle' | 'running' | 'error'
@@ -57,6 +59,22 @@ function appendAssistantDelta(messages: Message[], delta: string, agentId: strin
 function finalizeAssistant(messages: Message[], message: Message): Message[] {
   const last = messages[messages.length - 1]
   return last && last.role === 'assistant' ? [...messages.slice(0, -1), message] : [...messages, message]
+}
+
+function formatRelative(ms: number): string {
+  const diff = Date.now() - ms
+  if (diff < 60_000) return 'now'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  return `${Math.floor(diff / 86_400_000)}d ago`
+}
+
+function summaryToVM(s: SessionSummary): SessionVM {
+  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAt: formatRelative(s.updatedAt), updatedAtMs: s.updatedAt, loaded: false, messages: [], agents: [], status: 'idle', error: null }
+}
+
+function agentVMfromRun(r: AgentRun): AgentVM {
+  return { id: r.agentId, role: r.role, title: ROLE_TITLE[r.role], status: r.finishedAt ? 'done' : 'running', tokens: r.output, tokenCount: r.output.length, elapsedMs: r.finishedAt ? r.finishedAt - r.startedAt : 0, startedAt: r.startedAt }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -114,10 +132,26 @@ export function applyServerMessage(
 
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
-      // Errors without a sessionId (e.g. PARSE_ERROR) can't be attributed to a session.
       if (!msg.sessionId) return state
       if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null }))
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
+
+    case 'session:list:result': {
+      const incoming = msg.sessions.map(summaryToVM)
+      // 保留已加载会话；用摘要替换/插入；按更新时间倒序。
+      const byId = new Map(state.sessions.map((s) => [s.id, s]))
+      for (const vm of incoming) {
+        const prev = byId.get(vm.id)
+        byId.set(vm.id, prev?.loaded ? { ...prev, title: vm.title, preview: vm.preview, updatedAt: vm.updatedAt, updatedAtMs: vm.updatedAtMs } : vm)
+      }
+      return { sessions: [...byId.values()].sort((a, b) => b.updatedAtMs - a.updatedAtMs) }
+    }
+
+    case 'session:loaded':
+      return update(msg.sessionId, (s) => ({ ...s, loaded: true, messages: msg.messages, agents: msg.agentRuns.map(agentVMfromRun) }))
+
+    case 'session:deleted':
+      return { sessions: state.sessions.filter((s) => s.id !== msg.sessionId) }
 
     default:
       return state
@@ -127,7 +161,7 @@ export function applyServerMessage(
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', messages: [], agents: [], status: 'idle', error: null }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], agents: [], status: 'idle', error: null }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -137,16 +171,15 @@ interface DomainStore {
   activeSessionId: string | null
   connection: Connection
   hasApiKey: boolean
+  searchHits: SearchHit[]
 
   apply: (msg: ServerMessage) => void
   createSession: (id: string, config: SessionConfig) => string
   selectSession: (id: string) => void
   deleteSession: (id: string) => void
-  appendUserMessage: (sessionId: string, content: string) => void
+  appendUserMessage: (sessionId: string, id: string, content: string) => void
   setConnection: (c: Connection) => void
 }
-
-let userSeq = 0
 
 export const useDomainStore = create<DomainStore>((set) => ({
   sessions: [],
@@ -154,11 +187,14 @@ export const useDomainStore = create<DomainStore>((set) => ({
   connection: 'disconnected',
   // Optimistic until the sidecar reports via 'ready' — avoids flashing "no key" before connect.
   hasApiKey: true,
+  searchHits: [],
 
   apply: (msg) =>
-    set((s) =>
-      msg.type === 'ready' ? { hasApiKey: msg.hasApiKey } : applyServerMessage(s, msg, Date.now()),
-    ),
+    set((s) => {
+      if (msg.type === 'ready') return { hasApiKey: msg.hasApiKey }
+      if (msg.type === 'session:search:result') return { searchHits: msg.hits }
+      return applyServerMessage(s, msg, Date.now())
+    }),
 
   createSession: (id, config) => {
     set((s) => ({ sessions: [{ ...emptySession(id), config }, ...s.sessions], activeSessionId: id }))
@@ -174,18 +210,15 @@ export const useDomainStore = create<DomainStore>((set) => ({
       return { sessions, activeSessionId }
     }),
 
-  appendUserMessage: (sessionId, content) =>
-    set((s) => {
-      const id = `u-${(userSeq += 1)}`
-      return {
-        sessions: s.sessions.map((sess) =>
-          sess.id !== sessionId
-            ? sess
-            // Clear any prior error: appending a user message means a retry is underway.
-            : { ...sess, error: null, messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
-        ),
-      }
-    }),
+  appendUserMessage: (sessionId, id, content) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId
+          ? sess
+          // Clear any prior error: appending a user message means a retry is underway.
+          : { ...sess, error: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+      ),
+    })),
 
   setConnection: (connection) => set({ connection }),
 }))

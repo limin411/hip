@@ -1,10 +1,9 @@
 // src/domain/sessionService.ts
 import type { ServerMessage, SessionConfig } from '@hip/protocol'
+import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
-
-let sessionSeq = 0
 
 export class SessionService {
   private readonly transport: Transport
@@ -42,10 +41,12 @@ export class SessionService {
 
   private receive(msg: ServerMessage): void {
     useDomainStore.getState().apply(msg)
+    // Once the sidecar signals readiness, pull the persisted session list.
+    if (msg.type === 'ready') this.transport.send({ type: 'session:list' })
   }
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
-    const id = `s-new-${(sessionSeq += 1)}`
+    const id = nanoid()
     useDomainStore.getState().createSession(id, config)
     this.transport.send({ type: 'session:create', id, config })
     return id
@@ -53,11 +54,18 @@ export class SessionService {
 
   selectSession(id: string): void {
     useDomainStore.getState().selectSession(id)
+    // Lazily fetch history the first time a summary-only session is opened.
+    const s = useDomainStore.getState().sessions.find((x) => x.id === id)
+    if (s && !s.loaded) this.transport.send({ type: 'session:load', sessionId: id })
   }
 
   deleteSession(id: string): void {
     useDomainStore.getState().deleteSession(id)
-    this.transport.send({ type: 'session:destroy', sessionId: id })
+    this.transport.send({ type: 'session:delete', sessionId: id })
+  }
+
+  search(query: string): void {
+    this.transport.send({ type: 'session:search', query })
   }
 
   sendMessage(content: string): void {
@@ -67,8 +75,9 @@ export class SessionService {
     if (!activeSessionId) {
       activeSessionId = this.createSession()
     }
-    useDomainStore.getState().appendUserMessage(activeSessionId, text)
-    this.transport.send({ type: 'message:send', sessionId: activeSessionId, content: text, role: 'user' })
+    const id = nanoid()
+    useDomainStore.getState().appendUserMessage(activeSessionId, id, text)
+    this.transport.send({ type: 'message:send', sessionId: activeSessionId, id, content: text, role: 'user' })
   }
 
   cancel(): void {

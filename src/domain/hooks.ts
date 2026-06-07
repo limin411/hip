@@ -1,5 +1,5 @@
 // src/domain/hooks.ts
-import type { Message } from '@hip/protocol'
+import type { Message, SearchHit } from '@hip/protocol'
 import { useDomainStore, type AgentVM, type SessionError, type SessionVM } from './sessionStore'
 
 const EMPTY_MESSAGES: Message[] = []
@@ -35,4 +35,8 @@ export function useConnectionStatus(): string {
 
 export function useHasApiKey(): boolean {
   return useDomainStore((s) => s.hasApiKey)
+}
+
+export function useSearchHits(): SearchHit[] {
+  return useDomainStore((s) => s.searchHits)
 }

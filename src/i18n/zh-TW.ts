@@ -25,6 +25,7 @@ export const zhTW = {
       search: '搜索會話',
       noMatches: '沒有匹配的會話',
       deleteSession: '刪除會話',
+      renameSession: '重新命名',
     },
     artifact: {
       doc: '文檔',

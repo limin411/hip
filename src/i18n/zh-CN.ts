@@ -25,6 +25,7 @@ export const zhCN = {
       search: '搜索会话',
       noMatches: '没有匹配的会话',
       deleteSession: '删除会话',
+      renameSession: '重命名',
     },
     artifact: {
       doc: '文档',

@@ -25,6 +25,7 @@ export const en = {
       search: 'Search sessions',
       noMatches: 'No matching sessions',
       deleteSession: 'Delete Session',
+      renameSession: 'Rename',
     },
     artifact: {
       doc: 'Docs',

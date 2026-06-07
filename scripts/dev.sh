@@ -17,7 +17,8 @@
 #   scripts/dev.sh status                      # 查看运行状态
 #   scripts/dev.sh logs    <app|web|sidecar>   # tail -f 实时日志
 #
-# 进程 PID 与日志写入 logs/（已被 .gitignore 忽略）。DEEPSEEK_API_KEY 从 .env 读取。
+# 进程 PID 与日志写入 logs/（已被 .gitignore 忽略）。
+# 桌面 app 的 DeepSeek Key 由应用内「设置」写入系统钥匙串；.env 仅供独立 sidecar（及测试）使用。
 
 set -euo pipefail
 
@@ -87,7 +88,7 @@ warn_missing_key() {
 
 start_app() {
   if is_running app; then echo "[dev] app 已在运行 (pid $(cat "$(pid_file app)"))"; return 0; fi
-  load_env; warn_missing_key
+  echo "[dev] 桌面应用从「设置」面板(系统钥匙串)读取 DeepSeek Key；首次启动需在应用内填入一次。"
   free_port "$WEB_PORT"   # tauri 的 beforeDevCommand 会在该端口起 vite
   echo "[dev] 启动桌面应用 (yarn tauri dev)… 改动过 Rust 时需编译，窗口会稍后弹出。"
   # exec 让记录的 PID 就是真正的进程（而非临时子 shell），停止时 kill_tree 才能命中整棵树

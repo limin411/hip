@@ -247,21 +247,19 @@ hip/
 
 ## 开发启动
 
-创建 `.env.local` 文件（已 gitignored）：
+一键启动完整桌面应用（编译 Rust + 原生窗口 + 自动拉起 sidecar，并清理 Vite 端口占用）：
 
 ```bash
-cp .env.example .env
-# 编辑 .env，填入你的 DeepSeek API Key
+scripts/dev.sh start        # 后台启动；scripts/dev.sh logs app 跟踪日志；scripts/dev.sh stop 停止
+# 或前台直接： yarn tauri dev
 ```
 
-一键启动完整应用（自动清理 Vite 端口占用）：
+桌面应用的 DeepSeek API Key 在应用内 **设置** 面板填入，存于系统钥匙串；首次启动需填入一次。
+
+`.env` 仅供**测试套件**与**独立 sidecar 调试**使用（桌面应用不再读取它）：
 
 ```bash
-yarn dev:live
-```
-
-或者临时通过环境变量启动：
-
-```bash
-DEEPSEEK_API_KEY=sk-xxx yarn dev:live
+cp .env.example .env           # 编辑 .env，填入 DEEPSEEK_API_KEY=sk-...
+scripts/dev.sh start sidecar   # 仅启 DeepSeek 后端（读 .env）
+yarn test                      # 真实 LLM 测试会从 .env 读取 key，否则自动跳过
 ```

@@ -36,8 +36,9 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
 ## Development setup
 
 > The DeepSeek API key is entered in the app's **Settings** panel and stored in
-> the OS keychain. For development, a `DEEPSEEK_API_KEY` environment variable (or
-> `.env`) is used as a fallback.
+> the OS keychain — the desktop app reads it from there only. A `.env` file (see
+> `.env.example`) is read solely by the test suite and the standalone sidecar
+> (`scripts/dev.sh start sidecar`), never by the desktop app.
 
 ```bash
 # 1. Install workspace dependencies

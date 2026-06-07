@@ -12,6 +12,7 @@ import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const panelRef = useRef<ImperativePanelHandle>(null)
+  const hasInitializedPanel = useRef(false)
   const collapsed = useUiStore((s) => s.collapsed)
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
@@ -87,7 +88,13 @@ export function AppLayout() {
           collapsible
           collapsedSize={0}
           onCollapse={() => setPanelOpen(false)}
-          onExpand={() => setPanelOpen(true)}
+          onExpand={() => {
+            if (!hasInitializedPanel.current) {
+              hasInitializedPanel.current = true
+              return
+            }
+            setPanelOpen(true)
+          }}
         >
           {panelOpen && <ArtifactPanel />}
         </Panel>

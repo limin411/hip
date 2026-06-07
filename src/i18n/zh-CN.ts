@@ -41,6 +41,13 @@ export const zhCN = {
         'zh-TW': '繁體中文',
         'en': 'English',
       },
+      apiKey: 'DeepSeek API Key',
+      apiKeyDesc: '安全存储于系统钥匙串，供智能体运行时使用。',
+      apiKeyConfigured: '已配置',
+      apiKeyNotConfigured: '未配置',
+      apiKeyPlaceholder: 'sk-...',
+      apiKeySave: '保存',
+      apiKeyClear: '清除',
     },
     login: {
       slogan: '没有人比我更懂摸鱼',

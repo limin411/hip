@@ -41,6 +41,13 @@ export const en = {
         'zh-TW': '繁體中文',
         'en': 'English',
       },
+      apiKey: 'DeepSeek API Key',
+      apiKeyDesc: 'Stored securely in your system keychain. Used by the agent runtime.',
+      apiKeyConfigured: 'Configured',
+      apiKeyNotConfigured: 'Not configured',
+      apiKeyPlaceholder: 'sk-...',
+      apiKeySave: 'Save',
+      apiKeyClear: 'Clear',
     },
     login: {
       slogan: 'Nobody knows slacking better than me',

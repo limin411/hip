@@ -1,19 +1,18 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, ChevronDown } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
 import { sessionService } from '@/domain'
 
-const MODELS = ['deepseek-chat']
+const ACTIVE_MODEL = 'deepseek-chat'
 
 export function InputBar() {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
-  const [model, setModel] = useState(MODELS[0])
+
   function submit() {
     const text = value.trim()
     if (!text) return
-    // TODO: 模型选择（model）暂未接入 sessionService / SessionConfig —— 与既有 mock 行为一致，目前仅为占位 UI
     sessionService.sendMessage(text)
     setValue('')
   }
@@ -35,20 +34,7 @@ export function InputBar() {
           className="border-0 px-2 py-1 focus-visible:ring-0"
         />
         <div className="flex items-center justify-between px-1 pt-1">
-          <label className="flex items-center gap-1 text-[12px] text-ink-secondary">
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="cursor-pointer appearance-none bg-transparent pr-4 text-[12px] text-ink-secondary focus:outline-none"
-            >
-              {MODELS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="-ml-4 pointer-events-none text-ink-tertiary" />
-          </label>
+          <span className="text-[12px] text-ink-tertiary">{ACTIVE_MODEL}</span>
           <button
             onClick={submit}
             disabled={!value.trim()}

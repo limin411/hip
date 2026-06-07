@@ -15,6 +15,7 @@
 ## File Structure
 
 **New (sidecar persistence module):**
+- `packages/sidecar/src/persistence/sqlite.ts` — loads `node:sqlite` via `createRequire` (Vite/vitest can't statically resolve the experimental builtin); exports `DatabaseSync` + minimal local types. **All other persistence files import `DatabaseSync` from here, never from `node:sqlite` directly.**
 - `packages/sidecar/src/persistence/schema.ts` — DDL strings + `migrate(db)` (one responsibility: schema/migrations).
 - `packages/sidecar/src/persistence/open.ts` — `openDatabase(path)`: pragmas, migrate, FTS probe.
 - `packages/sidecar/src/persistence/store.ts` — `SessionStore` class: all prepared-statement CRUD + search.
@@ -64,9 +65,10 @@ deleteSession(id: string): void
 ## Task 0: Spike — verify FTS5 + `trigram` on `node:sqlite`
 
 **Files:**
+- Create: `packages/sidecar/src/persistence/sqlite.ts` (createRequire loader)
 - Create: `packages/sidecar/src/persistence/fts-probe.test.ts`
 
-This decides the engine. If it fails, switch the engine in later tasks to `better-sqlite3` (same SQL; `ncc` copies the `.node`), or degrade search to `LIKE`.
+**RESULT (done):** FTS5 + `trigram` + CJK substring matching confirmed feasible in Node 24 — `node:sqlite` is the engine, no `better-sqlite3` fallback needed. A static `import … from 'node:sqlite'` fails under vitest (Vite strips the `node:` prefix and tries to bundle `sqlite`), and neither `server.deps.external` nor a `pre` resolveId plugin fixes it. The fix is `sqlite.ts`, which loads the module via `createRequire(import.meta.url)` so the specifier stays a runtime string Vite never analyzes (works identically under `node --import tsx` in production). No vitest config change is required.
 
 - [ ] **Step 1: Write the probe test**
 
@@ -114,7 +116,7 @@ git commit -m "test(persistence): spike node:sqlite FTS5 + trigram feasibility"
 
 ```ts
 // packages/sidecar/src/persistence/schema.ts
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.js'
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS sessions (
@@ -188,7 +190,7 @@ export function tryEnableFts(db: DatabaseSync): boolean {
 
 ```ts
 // packages/sidecar/src/persistence/open.ts
-import { DatabaseSync } from 'node:sqlite'
+import { DatabaseSync } from './sqlite.js'
 import { migrate, tryEnableFts } from './schema.js'
 
 export interface OpenedDb { db: DatabaseSync; ftsEnabled: boolean }
@@ -230,9 +232,10 @@ describe('openDatabase', () => {
   })
 })
 
-function migrateAgain(db: import('node:sqlite').DatabaseSync) {
+async function migrateAgain(db: import('./sqlite.js').DatabaseSync) {
   // Re-running migrate on an already-migrated db is a no-op.
-  return require('./schema.js').migrate(db)
+  const { migrate } = await import('./schema.js')
+  return migrate(db)
 }
 ```
 
@@ -340,7 +343,7 @@ Run: `yarn vitest run packages/sidecar/src/persistence/store.test.ts` → Expect
 
 ```ts
 // packages/sidecar/src/persistence/store.ts
-import type { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from './sqlite.js'
 import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit } from '@hip/protocol'
 
 const PREVIEW_LEN = 80
@@ -1400,3 +1403,4 @@ Use `superpowers:finishing-a-development-branch` to merge/PR.
 - **Trajectory keying:** build `AgentRun[]` straight from the `trajectory` map's entries (key = agentId). Do not invent extra helpers.
 - **FTS query safety:** always wrap the user query as a quoted FTS literal (`"…"` with internal `"`→`""`) and only use FTS for queries ≥ 3 chars; otherwise LIKE. This avoids FTS5 syntax errors on punctuation.
 - **Backward-compatible Session:** the store is the 4th constructor arg and optional — existing `new Session(id, config, model)` tests must keep passing untouched.
+- **Never import `node:sqlite` directly:** always `import { DatabaseSync } from './sqlite.js'` (or `'../persistence/sqlite.js'`). A static `import` from `node:sqlite` breaks under vitest. `sqlite.ts` (created in Task 0) is the only file that touches the builtin, via `createRequire`.

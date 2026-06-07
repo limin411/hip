@@ -40,7 +40,7 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
 END;
 `
 
-/** Create core tables (migration v1). Idempotent. */
+/** Create core tables (v1) and apply incremental migrations. Idempotent. */
 export function migrate(db: DatabaseSync): void {
   const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
   if (version < 1) {
@@ -48,6 +48,18 @@ export function migrate(db: DatabaseSync): void {
     try {
       db.exec(DDL)
       db.exec('PRAGMA user_version = 1')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+  if (version < 2) {
+    db.exec('BEGIN')
+    try {
+      // title_custom: 0 = auto-derived title, 1 = user-set (never auto-overwritten).
+      db.exec(`ALTER TABLE sessions ADD COLUMN title_custom INTEGER NOT NULL DEFAULT 0`)
+      db.exec('PRAGMA user_version = 2')
       db.exec('COMMIT')
     } catch (e) {
       db.exec('ROLLBACK')

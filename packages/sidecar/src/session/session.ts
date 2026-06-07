@@ -3,12 +3,11 @@ import { createDeepAgent } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
+import { SUBAGENTS, SUPERVISOR_PROMPT, roleForName } from './agents.js'
 
 type SendFn = (msg: ServerMessage) => void
 
 const DEFAULT_MODEL = 'deepseek-chat'
-const AGENT_ID = 'deepagent'
-const AGENT_ROLE: AgentRole = 'supervisor'
 
 function buildModel(config: SessionConfig): ChatOpenAI {
   return new ChatOpenAI({
@@ -34,7 +33,8 @@ export class Session {
     this.usesEnvModel = !model
     this.agent = createDeepAgent({
       model: model ?? buildModel(config),
-      systemPrompt: config.systemPrompt ?? 'You are a helpful coding assistant.',
+      systemPrompt: config.systemPrompt ?? SUPERVISOR_PROMPT,
+      subagents: SUBAGENTS as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
     })
   }
 
@@ -50,60 +50,78 @@ export class Session {
     }
     this.messages.push(new HumanMessage(content))
     this.abortController = new AbortController()
-    let aiText = ''
 
-    _send({
-      type: 'agent:started',
-      sessionId: this.id,
-      agentId: AGENT_ID,
-      role: AGENT_ROLE,
-    })
+    const started = new Set<string>()
+    const ensureStarted = (agentId: string, role: AgentRole) => {
+      if (started.has(agentId)) return
+      started.add(agentId)
+      _send({ type: 'agent:started', sessionId: this.id, agentId, role })
+    }
+    const finishRemaining = () => {
+      for (const id of started) _send({ type: 'agent:finished', sessionId: this.id, agentId: id })
+      started.clear()
+    }
 
+    let supervisorText = ''
     try {
       const run = await this.agent.streamEvents(
         { messages: this.messages },
         { version: 'v3', signal: this.abortController.signal },
       )
 
-      for await (const msg of run.messages) {
-        for await (const token of msg.text) {
-          aiText += token
-          _send({
-            type: 'token:stream',
-            sessionId: this.id,
-            agentId: AGENT_ID,
-            delta: token,
-          })
+      const pumpSupervisor = async () => {
+        for await (const msg of run.messages) {
+          ensureStarted('supervisor', 'supervisor')
+          for await (const delta of msg.text) {
+            if (!delta) continue
+            supervisorText += delta
+            _send({ type: 'token:stream', sessionId: this.id, agentId: 'supervisor', delta })
+          }
         }
       }
 
-      _send({
-        type: 'agent:finished',
-        sessionId: this.id,
-        agentId: AGENT_ID,
-      })
+      const pumpSubagents = async () => {
+        for await (const sub of run.subagents) {
+          const agentId = sub.name
+          ensureStarted(agentId, roleForName(sub.name))
+          for await (const msg of sub.messages) {
+            for await (const delta of msg.text) {
+              if (!delta) continue
+              _send({ type: 'token:stream', sessionId: this.id, agentId, delta })
+            }
+          }
+          if (started.delete(agentId)) _send({ type: 'agent:finished', sessionId: this.id, agentId })
+        }
+      }
+
+      await Promise.all([pumpSupervisor(), pumpSubagents()])
+      finishRemaining()
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
-
+      finishRemaining()
       _send({
         type: 'error',
         sessionId: this.id,
         code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
-        message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
+        message: isAbort
+          ? 'User cancelled the request'
+          : err instanceof Error
+            ? err.message
+            : String(err),
       })
       return
     }
 
-    this.messages.push(new AIMessage(aiText))
+    this.messages.push(new AIMessage(supervisorText))
 
     _send({
       type: 'message:complete',
       sessionId: this.id,
       message: {
-        id: `asst-${AGENT_ID}-${Date.now()}`,
+        id: `asst-supervisor-${Date.now()}`,
         role: 'assistant',
-        content: aiText,
-        agentId: AGENT_ID,
+        content: supervisorText,
+        agentId: 'supervisor',
         timestamp: Date.now(),
       },
     })

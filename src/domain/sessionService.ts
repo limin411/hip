@@ -35,6 +35,11 @@ export class SessionService {
     void this.connect()
   }
 
+  /** Stop the transport's connect/reconnect loop (e.g. on AppLayout unmount). */
+  disconnect(): void {
+    this.transport.disconnect()
+  }
+
   private receive(msg: ServerMessage): void {
     useDomainStore.getState().apply(msg)
   }

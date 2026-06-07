@@ -31,15 +31,23 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     let (info_tx, info_rx) = tokio::sync::oneshot::channel::<SidecarInfo>();
     tauri::async_runtime::spawn(async move {
         let mut info_tx_slot = Some(info_tx);
+        let mut known_token: Option<String> = None;
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) => {
                     let line = String::from_utf8_lossy(&bytes);
                     if info_tx_slot.is_some() {
                         if let Some(info) = parse_info_line(&line) {
+                            known_token = Some(info.token.clone());
                             if let Some(tx) = info_tx_slot.take() {
                                 let _ = tx.send(info);
                             }
+                            continue;
+                        }
+                    }
+                    // Defense-in-depth: never echo a line containing the auth token.
+                    if let Some(tok) = &known_token {
+                        if line.contains(tok.as_str()) {
                             continue;
                         }
                     }

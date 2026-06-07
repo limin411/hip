@@ -22,6 +22,7 @@ export function AppLayout() {
 
   useEffect(() => {
     sessionService.connect()
+    return () => sessionService.disconnect()
   }, [])
 
   // 侧边栏折叠 ↔ store.collapsed 双向同步（setTimeout 避免同步死循环）

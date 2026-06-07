@@ -28,3 +28,7 @@ export function useAgents(): AgentVM[] {
 export function useConnectionStatus(): string {
   return useDomainStore((s) => s.connection)
 }
+
+export function useHasApiKey(): boolean {
+  return useDomainStore((s) => s.hasApiKey)
+}

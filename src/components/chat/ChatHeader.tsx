@@ -1,7 +1,7 @@
 import { PanelRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/store/uiStore'
-import { useActiveSession, useConnectionStatus, sessionService } from '@/domain'
+import { useActiveSession, useConnectionStatus, useHasApiKey, sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
 
 const DOT: Record<string, string> = {
@@ -16,6 +16,7 @@ export function ChatHeader() {
   const togglePanel = useUiStore((s) => s.togglePanel)
   const active = useActiveSession()
   const status = useConnectionStatus()
+  const hasApiKey = useHasApiKey()
 
   return (
     <div
@@ -26,22 +27,31 @@ export function ChatHeader() {
         {active?.title ?? t('chat.title')}
       </span>
       <div className="flex items-center gap-1.5" data-tauri-drag-region="false">
-        <span className={`h-2 w-2 rounded-full ${DOT[status] ?? DOT.disconnected}`} />
-        <span className="text-[11px] text-ink-tertiary">
-          {{
-            connecting: t('chat.connectionConnecting'),
-            connected: t('chat.connectionConnected'),
-            disconnected: t('chat.connectionDisconnected'),
-            error: t('chat.connectionError'),
-          }[status] ?? t('chat.connectionDisconnected')}
-        </span>
-        {(status === 'error' || status === 'disconnected') && (
-          <button
-            onClick={() => sessionService.reconnect()}
-            className="text-[11px] text-accent hover:underline"
-          >
-            {t('chat.connectionRetry')}
-          </button>
+        {status === 'connected' && !hasApiKey ? (
+          <>
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span className="text-[11px] text-amber-600">{t('chat.noApiKey')}</span>
+          </>
+        ) : (
+          <>
+            <span className={`h-2 w-2 rounded-full ${DOT[status] ?? DOT.disconnected}`} />
+            <span className="text-[11px] text-ink-tertiary">
+              {{
+                connecting: t('chat.connectionConnecting'),
+                connected: t('chat.connectionConnected'),
+                disconnected: t('chat.connectionDisconnected'),
+                error: t('chat.connectionError'),
+              }[status] ?? t('chat.connectionDisconnected')}
+            </span>
+            {(status === 'error' || status === 'disconnected') && (
+              <button
+                onClick={() => sessionService.reconnect()}
+                className="text-[11px] text-accent hover:underline"
+              >
+                {t('chat.connectionRetry')}
+              </button>
+            )}
+          </>
         )}
       </div>
       <div className="flex-1" />

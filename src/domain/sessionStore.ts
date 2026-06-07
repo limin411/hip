@@ -124,6 +124,7 @@ interface DomainStore {
   sessions: SessionVM[]
   activeSessionId: string | null
   connection: Connection
+  hasApiKey: boolean
 
   apply: (msg: ServerMessage) => void
   createSession: (id: string, config: SessionConfig) => string
@@ -139,8 +140,13 @@ export const useDomainStore = create<DomainStore>((set) => ({
   sessions: [],
   activeSessionId: null,
   connection: 'disconnected',
+  // Optimistic until the sidecar reports via 'ready' — avoids flashing "no key" before connect.
+  hasApiKey: true,
 
-  apply: (msg) => set((s) => applyServerMessage(s, msg, Date.now())),
+  apply: (msg) =>
+    set((s) =>
+      msg.type === 'ready' ? { hasApiKey: msg.hasApiKey } : applyServerMessage(s, msg, Date.now()),
+    ),
 
   createSession: (id, config) => {
     set((s) => ({ sessions: [{ ...emptySession(id), config }, ...s.sessions], activeSessionId: id }))

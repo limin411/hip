@@ -15,6 +15,7 @@ export const en = {
       connectionDisconnected: 'Disconnected',
       connectionError: 'Connection error',
       connectionRetry: 'Retry',
+      noApiKey: 'No API key',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

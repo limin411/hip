@@ -15,6 +15,7 @@ export const zhCN = {
       connectionDisconnected: '已断开',
       connectionError: '连接错误',
       connectionRetry: '重试',
+      noApiKey: '未配置密钥',
     },
     sidebar: {
       collapse: '折叠侧边栏',

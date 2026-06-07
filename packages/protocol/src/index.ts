@@ -28,3 +28,4 @@ export type ServerMessage =
   | { type: 'agent:finished'; sessionId: string; agentId: string }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
+  | { type: 'ready'; hasApiKey: boolean }

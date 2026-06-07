@@ -123,4 +123,12 @@ describe('useDomainStore actions', () => {
     useDomainStore.getState().apply({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'coder' })
     expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Coder')
   })
+
+  it("apply('ready') updates hasApiKey from the sidecar", () => {
+    reset()
+    useDomainStore.getState().apply({ type: 'ready', hasApiKey: false })
+    expect(useDomainStore.getState().hasApiKey).toBe(false)
+    useDomainStore.getState().apply({ type: 'ready', hasApiKey: true })
+    expect(useDomainStore.getState().hasApiKey).toBe(true)
+  })
 })

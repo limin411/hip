@@ -15,6 +15,7 @@ export const zhTW = {
       connectionDisconnected: '已斷開',
       connectionError: '連線錯誤',
       connectionRetry: '重試',
+      noApiKey: '未配置密鑰',
     },
     sidebar: {
       collapse: '折疊側邊欄',

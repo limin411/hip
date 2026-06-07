@@ -46,8 +46,8 @@ describe('uiStore - panel state management', () => {
   // ---- activeTab switching ----
 
   it('setTab switches active tab', () => {
-    useUiStore.getState().setTab('doc')
-    expect(useUiStore.getState().activeTab).toBe('doc')
+    useUiStore.getState().setTab('files')
+    expect(useUiStore.getState().activeTab).toBe('files')
 
     useUiStore.getState().setTab('files')
     expect(useUiStore.getState().activeTab).toBe('files')

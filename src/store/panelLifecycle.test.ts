@@ -18,8 +18,8 @@ describe('ArtifactPanel — lifecycle state transitions', () => {
   it('open panel → switch tabs → close panel', () => {
     const s = useUiStore.getState()
 
-    s.setTab('doc')
-    expect(useUiStore.getState().activeTab).toBe('doc')
+    s.setTab('files')
+    expect(useUiStore.getState().activeTab).toBe('files')
 
     s.setTab('files')
     expect(useUiStore.getState().activeTab).toBe('files')
@@ -37,11 +37,11 @@ describe('ArtifactPanel — lifecycle state transitions', () => {
   // ── setPanelOpen edge cases ──
 
   it('setPanelOpen(true) when already open is safe (no state change)', () => {
-    useUiStore.getState().setTab('doc')
+    useUiStore.getState().setTab('files')
     useUiStore.getState().setPanelOpen(true)
 
     expect(useUiStore.getState().panelOpen).toBe(true)
-    expect(useUiStore.getState().activeTab).toBe('doc')
+    expect(useUiStore.getState().activeTab).toBe('files')
   })
 
   it('setPanelOpen(false) when already closed is a no-op', () => {

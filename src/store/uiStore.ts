@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ArtifactTab = 'doc' | 'files' | 'agents' | 'diff'
+export type ArtifactTab = 'files' | 'agents' | 'diff'
 
 interface UiState {
   collapsed: boolean

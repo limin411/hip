@@ -212,3 +212,11 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().sessions[0].title).toBe('Renamed')
   })
 })
+
+describe('applyServerMessage session:cwd', () => {
+  it('sets cwd on the matching session config', () => {
+    const base = emptySession('s1')
+    const next = applyServerMessage({ sessions: [base] }, { type: 'session:cwd', sessionId: 's1', cwd: '/proj' }, 0)
+    expect(next.sessions[0].config.cwd).toBe('/proj')
+  })
+})

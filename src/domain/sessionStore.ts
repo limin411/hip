@@ -156,6 +156,9 @@ export function applyServerMessage(
     case 'session:title':
       return update(msg.sessionId, (s) => ({ ...s, title: msg.title }))
 
+    case 'session:cwd':
+      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, cwd: msg.cwd } }))
+
     default:
       return state
   }

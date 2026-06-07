@@ -222,12 +222,25 @@ hip/
 │   │   │   └── MessageBubble.tsx    # 消息气泡
 │   │   └── sidebar/
 │   │       └── ...
+│   ├── domain/
+│   │   ├── sessionService.ts        # App singleton (live WsTransport)
+│   │   ├── sessionStore.ts          # Domain Zustand store
+│   │   ├── transport.ts             # Transport interface
+│   │   ├── wsTransport.ts           # Live WebSocket transport
+│   │   ├── hooks.ts                 # Domain hooks (useSessions, useConnectionStatus, …)
+│   │   └── index.ts                 # Re-exports
 │   └── store/
-│       └── uiStore.ts               # Zustand store
+│       └── uiStore.ts               # UI-chrome-only store (layout, panel state)
 ├── src-tauri/
 │   ├── Cargo.toml                   # Rust 依赖（含 wdio plugin）
 │   ├── src/lib.rs                   # Rust 入口（注册 plugin）
 │   └── capabilities/default.json    # 权限配置
+├── packages/
+│   └── sidecar/                     # Node.js sidecar (LangGraph WS server)
+│       └── src/session/
+│           ├── session.ts           # Session (single-turn LLM interaction)
+│           ├── agents.ts            # Supervisor + Planner/Coder/Reviewer sub-agents
+│           └── session-manager.ts   # Multi-session registry
 ├── wdio.conf.ts                     # WebDriverIO 配置
 └── AGENTS.md                        # 本文件
 ```

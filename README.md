@@ -3,7 +3,8 @@
 A desktop AI agent app (à la Claude Code Desktop / Codex Desktop). A single
 Node.js **sidecar** process manages multiple [LangGraph](https://langchain-ai.github.io/langgraphjs/)
 agent instances; each UI tab is an independent session, and within a session a
-Supervisor agent can coordinate sub-agents (Planner, Coder, Reviewer) in parallel.
+Supervisor agent delegates sequentially to sub-agents (Planner → Coder → Reviewer)
+via the deepagents `task` tool.
 
 ## Architecture
 
@@ -33,6 +34,10 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
 [`docs/superpowers/plans/`](docs/superpowers/plans/) for the implementation plan.
 
 ## Development setup
+
+> The DeepSeek API key is entered in the app's **Settings** panel and stored in
+> the OS keychain. For development, a `DEEPSEEK_API_KEY` environment variable (or
+> `.env`) is used as a fallback.
 
 ```bash
 # 1. Install workspace dependencies

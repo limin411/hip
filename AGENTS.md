@@ -237,8 +237,8 @@ hip/
 创建 `.env.local` 文件（已 gitignored）：
 
 ```bash
-cp .env.local.example .env.local
-# 编辑 .env.local，填入你的 DeepSeek API Key
+cp .env.example .env
+# 编辑 .env，填入你的 DeepSeek API Key
 ```
 
 一键启动完整应用（自动清理 Vite 端口占用）：

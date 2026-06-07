@@ -4,7 +4,7 @@ import { ArrowUp, ChevronDown } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
 import { sessionService } from '@/domain'
 
-const MODELS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'gpt-4o']
+const MODELS = ['deepseek-chat']
 
 export function InputBar() {
   const { t } = useTranslation()

@@ -36,7 +36,7 @@ src-tauri/gen
 
 # Environment variables
 .env
-.env.local
+.env
 .env.*.local
 
 # Superpowers brainstorm sessions

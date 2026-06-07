@@ -20,7 +20,7 @@ const ROOT = resolve(__dirname, '..')
 const PORT = 1420
 
 function findEnvFile() {
-  const candidates = ['.env.local', '.env']
+  const candidates = ['.env', '.env']
   for (const name of candidates) {
     const path = resolve(ROOT, name)
     if (existsSync(path)) return path
@@ -99,7 +99,7 @@ async function main() {
   if (!env.DEEPSEEK_API_KEY) {
     console.error('[dev:live] DEEPSEEK_API_KEY is not set.')
     console.error('Either:')
-    console.error('  1. Create .env.local with DEEPSEEK_API_KEY=sk-...')
+    console.error('  1. Create .env with DEEPSEEK_API_KEY=sk-...')
     console.error('  2. Or run: DEEPSEEK_API_KEY=sk-... yarn dev:live')
     process.exit(1)
   }

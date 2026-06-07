@@ -2,11 +2,13 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight, Bot } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
+import { useAuthStore } from '@/store/authStore'
 
 export function LoginScreen() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const enter = () => navigate('/app')
+  const login = useAuthStore((s) => s.login)
+  const enter = () => { login(); navigate('/app') }
 
   return (
     <div className="flex h-screen">

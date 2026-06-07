@@ -14,6 +14,7 @@ import {
 import { Modal } from '@/components/ui/Modal'
 import { SettingsPanel } from '@/components/account/SettingsPanel'
 import { SidebarPeekLockContext } from './sidebarPeekContext'
+import { useAuthStore } from '@/store/authStore'
 // TODO: replace with real authenticated user once auth flow is implemented
 const currentUser = { name: 'User', email: 'user@example.com', avatarUrl: undefined }
 
@@ -26,6 +27,7 @@ const PANELS: Record<PageKey, () => JSX.Element> = {
 export function UserMenu() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const logout = useAuthStore((s) => s.logout)
   const peekLock = useContext(SidebarPeekLockContext)
   const [openKey, setOpenKey] = useState<PageKey | null>(null)
 
@@ -63,7 +65,7 @@ export function UserMenu() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={() => navigate('/login')}>
+          <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={() => { logout(); navigate('/login') }}>
             <LogOut size={15} />
             {t('common.logout')}
           </DropdownMenuItem>

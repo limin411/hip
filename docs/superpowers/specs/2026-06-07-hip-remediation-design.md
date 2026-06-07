@@ -161,3 +161,14 @@ Phase 4 质量:  W8            (覆盖最终的单/多 agent 行为)
 - 未登录无法直达 `/app`。
 - `yarn test`(无 key)全绿;带 key 时集成测试通过。
 - 无死代码残留(`tokenize`、MockTransport 注释、悬空 `useConnectionStatus`)。
+
+## 9. W1 Spike 结论(2026-06-07,真实 DeepSeek 实测)
+
+deepagents 1.10.2 多智能体流式实测,**推翻了 Phase 2 计划的若干假设**,实现以此为准:
+
+1. **流式归属用 v3 投影,不用 v2 `langgraph_node`。** `streamEvents({version:'v3'})` 返回的对象同时暴露 `run.messages`(Supervisor 顶层 token)与 `run.subagents`(每个子 agent,`sub.name` 直接是 `planner`/`coder`/`reviewer`,`sub.messages` 是其 token 流)。v2 的 `metadata.langgraph_node` 恒为 `"model_request"`,无法区分子 agent——计划 Task 3 的 `attribution.ts`(基于 langgraph_node)作废,改为直接由两个投影驱动事件发射。
+2. **子 agent 配置字段是 `systemPrompt`,不是 `prompt`。**(`SubAgent` 接口:`name`/`description`/`systemPrompt` 必填,`tools?`/`model?`/`middleware?` 可选)
+3. **子 agent 默认不是纯推理。** `createDeepAgent` 自动给每个子 agent 注入默认中间件(filesystem/todo),`tools: []` 不能去掉它们;但默认后端是**内存 `StateBackend`,不写真实磁盘**(安全),代价是延迟与 token(coder 一轮 ~37s)。**决定:本期接受 deepagents 默认(内存工具,不碰真实磁盘),不强行抑制中间件**;真实磁盘工具仍为未来项目。这满足 spec 第 7 节"不碰用户真实文件"的安全意图。
+4. **子 agent 严格串行**(经内置 `task` 工具依次委派),非并行。UI"并行智能体"区会逐个出现卡片;README/UI 文案在 Phase 4 据此微调为"协作子智能体"。
+5. **委派依赖模型听话**:Supervisor prompt 必须强制要求调用 `task` 工具,否则 DeepSeek 可能直接作答、不委派(集成测试需用强制 prompt,否则会 flaky)。
+6. 取消时仍需对已 `agent:started` 的 agent 补发 `agent:finished`(计划 Task 4/6 此点正确)。

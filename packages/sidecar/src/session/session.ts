@@ -13,7 +13,7 @@ const AGENT_ROLE: AgentRole = 'supervisor'
 function buildModel(config: SessionConfig): ChatOpenAI {
   return new ChatOpenAI({
     model: config.model || DEFAULT_MODEL,
-    apiKey: process.env.DEEPSEEK_API_KEY,
+    apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
     configuration: {
       baseURL: 'https://api.deepseek.com/v1',
     },
@@ -24,12 +24,14 @@ export class Session {
   private readonly agent: ReturnType<typeof createDeepAgent>
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
+  private readonly usesEnvModel: boolean
 
   constructor(
     readonly id: string,
     readonly config: SessionConfig,
     model?: BaseLanguageModel,
   ) {
+    this.usesEnvModel = !model
     this.agent = createDeepAgent({
       model: model ?? buildModel(config),
       systemPrompt: config.systemPrompt ?? 'You are a helpful coding assistant.',
@@ -37,6 +39,15 @@ export class Session {
   }
 
   async sendMessage(content: string, _send: SendFn): Promise<void> {
+    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY) {
+      _send({
+        type: 'error',
+        sessionId: this.id,
+        code: 'NO_API_KEY',
+        message: 'DeepSeek API key not configured. Set it in Settings.',
+      })
+      return
+    }
     this.messages.push(new HumanMessage(content))
     this.abortController = new AbortController()
     let aiText = ''

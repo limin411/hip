@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { roleForName, agentIdForRole, SUBAGENTS, SUPERVISOR_PROMPT } from './agents.js'
+import { roleForName, SUBAGENTS, SUPERVISOR_PROMPT } from './agents.js'
 
 describe('roleForName', () => {
   it('maps planner/coder/reviewer to themselves', () => {
@@ -16,15 +16,6 @@ describe('roleForName', () => {
     expect(roleForName('researcher')).toBe('supervisor')
     expect(roleForName('')).toBe('supervisor')
     expect(roleForName('PLANNER')).toBe('supervisor')
-  })
-})
-
-describe('agentIdForRole', () => {
-  it('returns the role string as the agent id', () => {
-    expect(agentIdForRole('supervisor')).toBe('supervisor')
-    expect(agentIdForRole('planner')).toBe('planner')
-    expect(agentIdForRole('coder')).toBe('coder')
-    expect(agentIdForRole('reviewer')).toBe('reviewer')
   })
 })
 

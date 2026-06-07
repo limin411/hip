@@ -63,6 +63,9 @@ export class Session {
     }
 
     let supervisorText = ''
+    // The supervisor always runs; announce it up front so its card appears even
+    // if it delegates without emitting any top-level text of its own.
+    ensureStarted('supervisor', 'supervisor')
     try {
       const run = await this.agent.streamEvents(
         { messages: this.messages },
@@ -71,7 +74,6 @@ export class Session {
 
       const pumpSupervisor = async () => {
         for await (const msg of run.messages) {
-          ensureStarted('supervisor', 'supervisor')
           for await (const delta of msg.text) {
             if (!delta) continue
             supervisorText += delta
@@ -112,7 +114,9 @@ export class Session {
       return
     }
 
-    this.messages.push(new AIMessage(supervisorText))
+    // Don't append an empty assistant turn — some providers reject an empty
+    // assistant message on the next request, corrupting multi-turn history.
+    if (supervisorText) this.messages.push(new AIMessage(supervisorText))
 
     _send({
       type: 'message:complete',

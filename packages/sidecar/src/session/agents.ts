@@ -30,7 +30,3 @@ const NAME_TO_ROLE: Record<string, AgentRole> = {
 export function roleForName(name: string | undefined): AgentRole {
   return name && name in NAME_TO_ROLE ? NAME_TO_ROLE[name] : 'supervisor'
 }
-
-export function agentIdForRole(role: AgentRole): string {
-  return role
-}

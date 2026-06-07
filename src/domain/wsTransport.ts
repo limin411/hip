@@ -16,7 +16,7 @@ async function getSidecarInfo(): Promise<SidecarInfo> {
   throw new Error('sidecar info not available after 10 s')
 }
 
-/** 真后端缝。日后把 sessionService 单例从 MockTransport 换成它即可。 */
+/** WsTransport: WebSocket implementation between the domain layer and the live sidecar. */
 export class WsTransport implements Transport {
   connect(): Promise<void> {
     return wsClient.start(getSidecarInfo)

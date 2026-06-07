@@ -77,8 +77,5 @@ export class SessionService {
   }
 }
 
-/**
- * App 单例：接 live 后端（WsTransport）。
- * 若要在无 Tauri 环境下使用 mock，临时改为 MockTransport 即可。
- */
+/** App singleton: connects to the live sidecar over WsTransport. */
 export const sessionService = new SessionService(new WsTransport())

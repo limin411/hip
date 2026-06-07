@@ -15,6 +15,29 @@ export interface Message {
   timestamp: number
 }
 
+export interface AgentRun {
+  agentId: string
+  role: AgentRole
+  output: string
+  startedAt: number
+  finishedAt: number | null
+  seq: number
+}
+export interface SessionSummary {
+  id: string
+  title: string
+  preview: string
+  updatedAt: number
+  messageCount: number
+}
+export interface SearchHit {
+  sessionId: string
+  messageId: string | null
+  title: string
+  snippet: string
+  timestamp: number
+}
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }

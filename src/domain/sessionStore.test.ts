@@ -5,7 +5,7 @@ import { applyServerMessage, useDomainStore, type SessionVM } from './sessionSto
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
     id: 's1',
-    config: { llmProvider: 'anthropic', model: 'm', tools: [] },
+    config: { llmProvider: 'deepseek', model: 'm', tools: [] },
     title: 'T',
     preview: 'P',
     updatedAt: 'now',
@@ -94,14 +94,14 @@ function reset() {
 describe('useDomainStore actions', () => {
   it('createSession prepends and activates', () => {
     reset()
-    const id = useDomainStore.getState().createSession('s-new', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    const id = useDomainStore.getState().createSession('s-new', { llmProvider: 'deepseek', model: 'm', tools: [] })
     expect(useDomainStore.getState().sessions[0].id).toBe(id)
     expect(useDomainStore.getState().activeSessionId).toBe(id)
   })
 
   it('appendUserMessage adds a user message to the session', () => {
     reset()
-    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.getState().appendUserMessage('s1', 'hello')
     const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
     expect(msgs).toHaveLength(1)
@@ -110,8 +110,8 @@ describe('useDomainStore actions', () => {
 
   it('deleteSession removes and reassigns active', () => {
     reset()
-    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
-    useDomainStore.getState().createSession('s2', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s2', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.getState().deleteSession('s2')
     expect(useDomainStore.getState().sessions.map((s) => s.id)).toEqual(['s1'])
     expect(useDomainStore.getState().activeSessionId).toBe('s1')
@@ -119,7 +119,7 @@ describe('useDomainStore actions', () => {
 
   it('apply routes a ServerMessage through the reducer', () => {
     reset()
-    useDomainStore.getState().createSession('s1', { llmProvider: 'anthropic', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.getState().apply({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'coder' })
     expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Coder')
   })

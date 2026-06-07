@@ -1,7 +1,7 @@
 export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer'
 
 export interface SessionConfig {
-  llmProvider: 'anthropic' | 'openai' | 'ollama' | 'deepseek'
+  llmProvider: 'deepseek'
   model: string
   tools: string[]
   systemPrompt?: string

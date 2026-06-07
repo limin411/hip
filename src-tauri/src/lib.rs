@@ -7,6 +7,7 @@ use tauri_plugin_shell::process::CommandChild;
 
 pub struct SidecarState {
     pub port: Mutex<Option<u16>>,
+    pub token: Mutex<Option<String>>,
     pub child: Mutex<Option<CommandChild>>,
     /// Bumped on every spawn so a dying sidecar's reader task can't clobber a newer one.
     pub generation: AtomicU64,
@@ -16,6 +17,7 @@ impl SidecarState {
     pub fn new() -> Self {
         Self {
             port: Mutex::new(None),
+            token: Mutex::new(None),
             child: Mutex::new(None),
             generation: AtomicU64::new(0),
         }
@@ -23,8 +25,10 @@ impl SidecarState {
 }
 
 #[tauri::command]
-fn get_sidecar_port(state: tauri::State<SidecarState>) -> Option<u16> {
-    *state.port.lock().unwrap()
+fn get_sidecar_info(state: tauri::State<SidecarState>) -> Option<sidecar::SidecarInfo> {
+    let port = (*state.port.lock().unwrap())?;
+    let token = (*state.token.lock().unwrap()).clone()?;
+    Some(sidecar::SidecarInfo { port, token })
 }
 
 #[tauri::command]
@@ -35,7 +39,9 @@ async fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
         let _ = child.kill();
     }
     *app.state::<SidecarState>().port.lock().unwrap() = None;
+    *app.state::<SidecarState>().token.lock().unwrap() = None;
 
+    // spawn_sidecar stores the fresh token internally and returns the port.
     let port = sidecar::spawn_sidecar(&app).await?;
     *app.state::<SidecarState>().port.lock().unwrap() = Some(port);
     Ok(port)
@@ -108,7 +114,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_sidecar_port,
+            get_sidecar_info,
             restart_sidecar,
             set_secret,
             get_secret,

@@ -1,13 +1,21 @@
 import { WebSocketServer, WebSocket } from 'ws'
+import type { IncomingMessage } from 'http'
 import { createServer } from 'net'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionManager } from '../session/session-manager.js'
+
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:1420',
+  'tauri://localhost',
+  'http://tauri.localhost',
+  'https://tauri.localhost',
+])
 
 export class WsServer {
   private readonly wss: WebSocketServer
   private readonly sessionManager: SessionManager
 
-  constructor(private readonly port: number) {
+  constructor(private readonly port: number, private readonly token: string) {
     this.wss = new WebSocketServer({ port })
     this.sessionManager = new SessionManager()
   }
@@ -15,11 +23,24 @@ export class WsServer {
   start(): Promise<void> {
     return new Promise((resolve) => {
       this.wss.on('listening', resolve)
-      this.wss.on('connection', (ws) => this.handleConnection(ws))
+      this.wss.on('connection', (ws, req) => this.handleConnection(ws, req))
     })
   }
 
-  private handleConnection(ws: WebSocket): void {
+  private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+    // Origin: allow native (no origin) or an allow-listed origin.
+    const origin = req.headers.origin
+    if (origin && !ALLOWED_ORIGINS.has(origin)) {
+      ws.close(1008, 'origin not allowed')
+      return
+    }
+    // Token: required, from the query string (?token=...).
+    const url = new URL(req.url ?? '', 'ws://localhost')
+    if (url.searchParams.get('token') !== this.token) {
+      ws.close(1008, 'invalid token')
+      return
+    }
+
     const send = (msg: ServerMessage) => ws.send(JSON.stringify(msg))
     ws.on('message', (data) => {
       try {

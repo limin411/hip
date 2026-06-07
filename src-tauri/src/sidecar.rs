@@ -1,18 +1,19 @@
 use crate::SidecarState;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandEvent;
 use tauri_plugin_shell::ShellExt;
 
-#[derive(Deserialize)]
-struct PortMsg {
-    port: u16,
+#[derive(Deserialize, Serialize, Clone)]
+pub struct SidecarInfo {
+    pub port: u16,
+    pub token: String,
 }
 
-pub fn parse_port_line(line: &str) -> Option<u16> {
-    serde_json::from_str::<PortMsg>(line.trim()).ok().map(|m| m.port)
+pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
+    serde_json::from_str::<SidecarInfo>(line.trim()).ok()
 }
 
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
@@ -27,17 +28,17 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     *state.child.lock().unwrap() = Some(child);
 
     let app_handle = app.clone();
-    let (port_tx, port_rx) = tokio::sync::oneshot::channel::<u16>();
+    let (info_tx, info_rx) = tokio::sync::oneshot::channel::<SidecarInfo>();
     tauri::async_runtime::spawn(async move {
-        let mut port_tx = Some(port_tx);
+        let mut info_tx_slot = Some(info_tx);
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(bytes) => {
                     let line = String::from_utf8_lossy(&bytes);
-                    if port_tx.is_some() {
-                        if let Some(port) = parse_port_line(&line) {
-                            if let Some(tx) = port_tx.take() {
-                                let _ = tx.send(port);
+                    if info_tx_slot.is_some() {
+                        if let Some(info) = parse_info_line(&line) {
+                            if let Some(tx) = info_tx_slot.take() {
+                                let _ = tx.send(info);
                             }
                             continue;
                         }
@@ -54,6 +55,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
                     // already installed a newer child/port must not be clobbered.
                     if state.generation.load(Ordering::SeqCst) == my_gen {
                         *state.port.lock().unwrap() = None;
+                        *state.token.lock().unwrap() = None;
                         *state.child.lock().unwrap() = None;
                     }
                     break;
@@ -63,9 +65,12 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         }
     });
 
-    port_rx
+    let info = info_rx
         .await
-        .map_err(|_| "sidecar exited before reporting port".to_string())
+        .map_err(|_| "sidecar exited before reporting info".to_string())?;
+    // Store the auth token; return the port so callers can store it.
+    *app.state::<SidecarState>().token.lock().unwrap() = Some(info.token.clone());
+    Ok(info.port)
 }
 
 /// DEEPSEEK_API_KEY from env (dev) first, then the OS keychain (production).
@@ -80,18 +85,26 @@ pub fn read_api_key() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_port_line;
+    use super::parse_info_line;
 
     #[test]
-    fn parses_port_json() {
-        assert_eq!(parse_port_line("{\"port\":54321}"), Some(54321));
-        assert_eq!(parse_port_line("  {\"port\":7}  \n"), Some(7));
+    fn parses_port_and_token() {
+        let info = parse_info_line("{\"port\":54321,\"token\":\"abc\"}").unwrap();
+        assert_eq!(info.port, 54321);
+        assert_eq!(info.token, "abc");
     }
 
     #[test]
-    fn ignores_non_port_lines() {
-        assert_eq!(parse_port_line("starting up"), None);
-        assert_eq!(parse_port_line("{\"foo\":1}"), None);
-        assert_eq!(parse_port_line(""), None);
+    fn parses_port_and_token_with_whitespace() {
+        let info = parse_info_line("  {\"port\":7,\"token\":\"xyz\"}  \n").unwrap();
+        assert_eq!(info.port, 7);
+        assert_eq!(info.token, "xyz");
+    }
+
+    #[test]
+    fn ignores_non_info_lines() {
+        assert!(parse_info_line("starting up").is_none());
+        assert!(parse_info_line("{\"port\":7}").is_none()); // missing token
+        assert!(parse_info_line("").is_none());
     }
 }

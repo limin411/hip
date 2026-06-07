@@ -34,8 +34,17 @@ cat > "$WRAPPER" <<EOF
 #!/bin/bash
 # Sidecar wrapper for dev mode on $TARGET_TRIPLE (generated — do not edit).
 # In production this is replaced by a bundled native binary.
+#
+# IMPORTANT: this MUST launch the sidecar as a SINGLE process. Tauri's
+# child.kill() (used by restart_sidecar and on app exit) only kills the direct
+# child PID. A wrapper layer like 'yarn … dev' spawns yarn → tsx → node, so
+# killing the wrapper orphans the real Node WS server: it keeps the old port and
+# WS connection alive, the client never sees a disconnect, never reconnects to
+# the freshly-spawned sidecar, and a key change silently fails to take effect.
+# 'node --import tsx' runs the TypeScript entry in-process (no child), so this
+# PID *is* the WS server and child.kill() tears it down cleanly.
 cd "\$(dirname "\$0")/../../.."
-exec yarn workspace @hip/sidecar dev
+exec node --import tsx packages/sidecar/src/main.ts
 EOF
 
 chmod +x "$WRAPPER"

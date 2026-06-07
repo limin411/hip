@@ -19,7 +19,7 @@ export const SUBAGENTS = [
 ] as const
 
 export const SUPERVISOR_PROMPT =
-  'You are the Supervisor coordinating a coding task. You MUST use the `task` tool to delegate work: first to the "planner" subagent, then to the "coder" subagent, then to the "reviewer" subagent. Do not do the work yourself — delegate each step. After all three finish, give a short synthesized final answer to the user.'
+  'You are the Supervisor. You have a `task` tool that delegates work to subagents named "planner", "coder", and "reviewer". You are NOT allowed to plan, write, or review code yourself. You MUST complete the task using exactly three sequential `task` tool calls and nothing else first: (1) call `task` with subagent "planner" to get a plan, (2) call `task` with subagent "coder" to implement it, (3) call `task` with subagent "reviewer" to review it. Do NOT write any prose or final answer before all three `task` tool calls have been made — your VERY FIRST action must be the `task` tool call to "planner". Only after all three subagents have returned may you write a short final summary.'
 
 const NAME_TO_ROLE: Record<string, AgentRole> = {
   planner: 'planner',

@@ -30,6 +30,9 @@ export const en = {
       thinking: 'Thinking…',
       retry: 'Retry',
       stopped: 'Stopped',
+      thinkingMode: 'Thinking',
+      thinkingModeHint: "Show the model's reasoning (deepseek-reasoner; slower, pricier)",
+      thoughtFor: 'Thought for {{seconds}}s',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

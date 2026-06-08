@@ -30,6 +30,9 @@ export const zhTW = {
       thinking: '思考中…',
       retry: '重試',
       stopped: '已停止',
+      thinkingMode: '思考',
+      thinkingModeHint: '顯示模型的思考過程（deepseek-reasoner；較慢、較貴）',
+      thoughtFor: '已思考 {{seconds}} 秒',
     },
     sidebar: {
       collapse: '折疊側邊欄',

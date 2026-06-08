@@ -30,6 +30,9 @@ export const zhCN = {
       thinking: '思考中…',
       retry: '重试',
       stopped: '已停止',
+      thinkingMode: '思考',
+      thinkingModeHint: '显示模型的思考过程（deepseek-reasoner；更慢、更贵）',
+      thoughtFor: '已思考 {{seconds}} 秒',
     },
     sidebar: {
       collapse: '折叠侧边栏',

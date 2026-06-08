@@ -36,6 +36,7 @@ describe('SessionService', () => {
     const svc = new SessionService(t)
     svc.sendMessage('  hello  ')
     expect(useDomainStore.getState().sessions[0].messages.at(-1)).toMatchObject({ role: 'user', content: 'hello' })
+    expect(useDomainStore.getState().sessions[0].status).toBe('running')
     expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', sessionId: 's1', content: 'hello' })
     expect((t.sent.at(-1) as { id?: string }).id).toBeTruthy()
   })

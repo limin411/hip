@@ -22,7 +22,7 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
   const code = codeTextOf(children)
 
   const onCopy = async () => {
-    if (await copyText(code)) {
+    if (code && (await copyText(code))) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     }

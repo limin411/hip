@@ -71,8 +71,7 @@ export class Session {
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
-  // Re-entrancy guard for regenerate(), which has no UI lock. sendMessage is
-  // serialized by the WS dispatch + the composer's send↔stop toggle, so it is unguarded.
+  // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
@@ -155,6 +154,7 @@ export class Session {
   }
 
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
+    if (this.running) return
     if (!this.requireApiKey(_send)) return
 
     // Persist the user message + bump/derive session metadata before running.

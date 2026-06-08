@@ -230,7 +230,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sess.id !== sessionId
           ? sess
           // Clear any prior error: appending a user message means a retry is underway.
-          : { ...sess, error: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+          : { ...sess, status: 'running' as const, error: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
       ),
     })),
 

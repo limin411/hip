@@ -7,8 +7,11 @@ export function defaultScratchRoot(): string {
   return path.join(os.homedir(), '.hip', 'scratch')
 }
 
-/** Deterministic scratch dir path for a session (pure, no IO). */
+/** Deterministic scratch dir path for a session. Rejects ids that aren't a single safe path segment. */
 export function scratchDirFor(sessionId: string, root: string = defaultScratchRoot()): string {
+  if (!sessionId || sessionId.includes('/') || sessionId.includes('\\') || sessionId.includes('..')) {
+    throw new Error(`invalid scratch session id: ${sessionId}`)
+  }
   return path.join(root, sessionId)
 }
 

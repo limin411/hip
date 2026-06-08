@@ -22,4 +22,9 @@ describe('scratch', () => {
     expect(existsSync(dir)).toBe(false)
     expect(() => removeScratchDir('never', root)).not.toThrow()
   })
+  it('scratchDirFor rejects ids that would escape the root', () => {
+    expect(() => scratchDirFor('../evil', root)).toThrow()
+    expect(() => scratchDirFor('a/b', root)).toThrow()
+    expect(() => scratchDirFor('', root)).toThrow()
+  })
 })

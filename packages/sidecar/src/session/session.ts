@@ -3,7 +3,7 @@ import { createDeepAgent, FilesystemBackend } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
-import { SUBAGENTS, SUPERVISOR_PROMPT, roleForName } from './agents.js'
+import { buildSubagents, buildSupervisorPrompt, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
 import { consumeToolCalls, trajectoryToRuns, type TraceRun, type TraceRecorder } from './tool-trace.js'
@@ -112,10 +112,11 @@ export class Session {
     const backend = this._config.cwd
       ? new FilesystemBackend({ rootDir: this._config.cwd, virtualMode: true, maxFileSizeMb: 10 })
       : undefined
+    const promptCwd = this._config.cwd ?? '/'
     this.agent = createDeepAgent({
       model,
-      systemPrompt: this._config.systemPrompt ?? SUPERVISOR_PROMPT,
-      subagents: SUBAGENTS as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
+      systemPrompt: this._config.systemPrompt ?? buildSupervisorPrompt(promptCwd),
+      subagents: buildSubagents(promptCwd) as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
       ...(backend ? { backend } : {}),
     })
   }

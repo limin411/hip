@@ -78,6 +78,29 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 4) {
+    db.exec('BEGIN')
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS tool_calls (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          agent_run_id INTEGER NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+          call_id TEXT NOT NULL, agent_id TEXT NOT NULL, name TEXT NOT NULL,
+          input TEXT NOT NULL, output TEXT, status TEXT NOT NULL, error TEXT,
+          seq INTEGER NOT NULL, truncated INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_tool_calls_run ON tool_calls(agent_run_id);
+      `)
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN task_input TEXT`)
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN parent_agent_id TEXT`)
+      db.exec('PRAGMA user_version = 4')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

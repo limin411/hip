@@ -81,6 +81,13 @@ export class SessionManager {
         send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
         break
       }
+      case 'session:setThinking': {
+        const s = this.ensureSession(msg.sessionId)
+        s.setThinking(msg.thinking)
+        this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: msg.thinking })
+        break
+      }
       case 'fs:ls': {
         const r = await this.ensureSession(msg.sessionId).lsDir(msg.path)
         send({ type: 'fs:ls:result', sessionId: msg.sessionId, path: msg.path, entries: r.entries ?? [], error: r.error })
@@ -128,7 +135,7 @@ export class SessionManager {
     const existing = this.sessions.get(id)
     if (existing) return existing
     const row = this.store?.getSession(id)
-    const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
+    const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
     const session = new Session(id, config, this.modelFactory(config), this.store)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)

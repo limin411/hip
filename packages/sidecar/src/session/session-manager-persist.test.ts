@@ -75,4 +75,19 @@ describe('SessionManager persistence', () => {
     mgr.handle({ type: 'session:rename', sessionId: 's1', title: '   ' }, send)
     expect(store.getSession('s1')!.title).toBe('新对话')
   })
+
+  it('session:setThinking persists thinking into the session config', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    mgr.handle({ type: 'session:setThinking', sessionId: 's1', thinking: false }, send)
+    const row = store.getSession('s1')
+    expect(JSON.parse(row!.config).thinking).toBe(false)
+  })
+
+  it('session:setThinking echoes session:thinking with store-backed manager', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    sent = []
+    mgr.handle({ type: 'session:setThinking', sessionId: 's1', thinking: false }, send)
+    const echo = sent.find((m) => m.type === 'session:thinking') as Extract<ServerMessage, { type: 'session:thinking' }>
+    expect(echo).toMatchObject({ sessionId: 's1', thinking: false })
+  })
 })

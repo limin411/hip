@@ -28,6 +28,18 @@ describe('session-manager fs', () => {
     expect(sent).toContainEqual({ type: 'session:cwd', sessionId: 's1', cwd: root })
   })
 
+  it('session:setThinking echoes session:thinking', () => {
+    const { mgr, sent, send } = setup()
+    mgr.handle({ type: 'session:setThinking', sessionId: 's1', thinking: false }, send)
+    expect(sent).toContainEqual({ type: 'session:thinking', sessionId: 's1', thinking: false })
+  })
+
+  it('session:setThinking true echoes session:thinking true', () => {
+    const { mgr, sent, send } = setup()
+    mgr.handle({ type: 'session:setThinking', sessionId: 's1', thinking: true }, send)
+    expect(sent).toContainEqual({ type: 'session:thinking', sessionId: 's1', thinking: true })
+  })
+
   it('fs:ls returns directory entries', async () => {
     const { mgr, sent, send } = setup()
     mgr.handle({ type: 'session:setCwd', sessionId: 's1', cwd: root }, send)

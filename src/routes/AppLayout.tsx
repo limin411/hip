@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useUiStore } from '@/store/uiStore'
-import { sessionService } from '@/domain'
+import { sessionService, useActiveSessionId } from '@/domain'
+import { NewConversation } from '@/components/chat/NewConversation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatHeader } from '@/components/chat/ChatHeader'
 import { ChatPane } from '@/components/chat/ChatPane'
@@ -19,6 +20,7 @@ export function AppLayout() {
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
+  const activeSessionId = useActiveSessionId()
 
   useEffect(() => {
     sessionService.connect()
@@ -74,8 +76,14 @@ export function AppLayout() {
         <Panel minSize={34}>
           <div className="flex h-full flex-col bg-surface">
             <ChatHeader />
-            <ChatPane />
-            <InputBar />
+            {activeSessionId == null ? (
+              <NewConversation />
+            ) : (
+              <>
+                <ChatPane />
+                <InputBar />
+              </>
+            )}
           </div>
         </Panel>
 

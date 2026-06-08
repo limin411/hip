@@ -1,5 +1,6 @@
 import type { ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
+import * as path from 'node:path'
 import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
@@ -138,12 +139,14 @@ export class SessionManager {
 
   /** List a directory keyed by a raw cwd (for un-committed drafts — no session needed). */
   private async lsCwd(cwd: string, p: string): Promise<{ entries?: FsEntry[]; error?: string }> {
+    if (!path.isAbsolute(cwd)) return { error: 'cwd must be an absolute path' }
     try { return { entries: await workspaceFs.lsDir(cwd, p) } }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
   }
 
   /** Read a file for preview keyed by a raw cwd (draft). */
   private async readCwd(cwd: string, p: string): Promise<workspaceFs.PreviewResult> {
+    if (!path.isAbsolute(cwd)) return { error: 'cwd must be an absolute path' }
     try { return await workspaceFs.readForPreview(cwd, p) }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
   }

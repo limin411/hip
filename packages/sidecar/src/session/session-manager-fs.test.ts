@@ -71,4 +71,22 @@ describe('session-manager fs', () => {
     const ls = sent.find((m) => m.type === 'fs:lsCwd:result') as Extract<ServerMessage, { type: 'fs:lsCwd:result' }>
     expect(ls.error).toBeTruthy()
   })
+
+  it('fs:readCwd rejects a path outside the cwd', async () => {
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr2 = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    await mgr2.handleAsync({ type: 'fs:readCwd', cwd: root, path: '/etc/hosts' }, send)
+    const read = sent.find((m) => m.type === 'fs:readCwd:result') as Extract<ServerMessage, { type: 'fs:readCwd:result' }>
+    expect(read.error).toBeTruthy()
+  })
+
+  it('fs:lsCwd rejects a relative cwd', async () => {
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr2 = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    await mgr2.handleAsync({ type: 'fs:lsCwd', cwd: 'relative/dir', path: 'relative/dir' }, send)
+    const ls = sent.find((m) => m.type === 'fs:lsCwd:result') as Extract<ServerMessage, { type: 'fs:lsCwd:result' }>
+    expect(ls.error).toBeTruthy()
+  })
 })

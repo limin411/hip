@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { CodeBlock } from './CodeBlock'
+import { TurnTimeline } from './TurnTimeline'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
@@ -44,6 +45,9 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
             '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_p]:my-1.5',
           )}
         >
+          {message.role === 'assistant' && (
+            <TurnTimeline steps={message.timeline} toolCalls={message.toolCalls} />
+          )}
           <ReactMarkdown components={{ pre: CodeBlock }}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>

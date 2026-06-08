@@ -14,14 +14,19 @@ export function ChatPane() {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  const last = messages[messages.length - 1]
+  const lastActivity =
+    last?.role === 'assistant'
+      ? last.content.length + (last.timeline?.length ?? 0) + (last.toolCalls?.length ?? 0)
+      : 0
+
   useEffect(() => {
     const el = bottomRef.current
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages.length, error])
+  }, [messages.length, error, lastActivity])
 
-  const last = messages[messages.length - 1]
   const showThinking = status === 'running' && last?.role === 'user'
 
   return (

@@ -65,9 +65,15 @@ describe('new conversation', () => {
 
   it('sending the first message commits the session and replaces the landing', async () => {
     const before = (await sessionItems()).length
+    // Focus + browser.keys (not setValue, whose clearValue() desyncs a React-controlled
+    // textarea and can leave draft.text empty). Waiting for the send button to enable
+    // confirms the composer's onChange propagated to the draft store.
     const ta = await browser.$('[data-testid="new-conversation"] textarea')
-    await ta.setValue('hello world')
-    await (await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')).click()
+    await ta.click()
+    await browser.keys('hello world')
+    const send = await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')
+    await send.waitForEnabled({ timeout: 10000 })
+    await send.click()
     // Landing disappears (a committed session is now active)…
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ reverse: true, timeout: 30000 })
     // …and exactly one sidebar row appears.

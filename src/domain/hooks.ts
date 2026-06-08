@@ -29,6 +29,10 @@ export function useActiveSessionError(): SessionError | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.error ?? null)
 }
 
+export function useActiveSessionStatus(): SessionVM['status'] {
+  return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.status ?? 'idle')
+}
+
 export function useConnectionStatus(): string {
   return useDomainStore((s) => s.connection)
 }

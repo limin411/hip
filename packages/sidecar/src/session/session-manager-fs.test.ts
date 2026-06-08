@@ -44,4 +44,31 @@ describe('session-manager fs', () => {
     expect(read.content).toContain('# Hi')
     expect(read.encoding).toBe('utf8')
   })
+
+  it('fs:lsCwd lists a directory without a session', async () => {
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr2 = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    await mgr2.handleAsync({ type: 'fs:lsCwd', cwd: root, path: root }, send)
+    const ls = sent.find((m) => m.type === 'fs:lsCwd:result') as Extract<ServerMessage, { type: 'fs:lsCwd:result' }>
+    expect(ls.entries.some((e) => e.name === 'README.md')).toBe(true)
+  })
+
+  it('fs:readCwd reads a file without a session', async () => {
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr2 = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    await mgr2.handleAsync({ type: 'fs:readCwd', cwd: root, path: path.join(root, 'README.md') }, send)
+    const read = sent.find((m) => m.type === 'fs:readCwd:result') as Extract<ServerMessage, { type: 'fs:readCwd:result' }>
+    expect(read.content).toContain('# Hi')
+  })
+
+  it('fs:lsCwd rejects a path outside the cwd', async () => {
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr2 = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    await mgr2.handleAsync({ type: 'fs:lsCwd', cwd: root, path: '/etc' }, send)
+    const ls = sent.find((m) => m.type === 'fs:lsCwd:result') as Extract<ServerMessage, { type: 'fs:lsCwd:result' }>
+    expect(ls.error).toBeTruthy()
+  })
 })

@@ -1,8 +1,9 @@
-import type { ClientMessage, ServerMessage, SessionConfig } from '@hip/protocol'
+import type { ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
+import * as workspaceFs from './workspace-fs.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -90,6 +91,20 @@ export class SessionManager {
         )
         break
       }
+      case 'fs:lsCwd': {
+        const r = await this.lsCwd(msg.cwd, msg.path)
+        send({ type: 'fs:lsCwd:result', cwd: msg.cwd, path: msg.path, entries: r.entries ?? [], error: r.error })
+        break
+      }
+      case 'fs:readCwd': {
+        const r = await this.readCwd(msg.cwd, msg.path)
+        send(
+          'error' in r
+            ? { type: 'fs:readCwd:result', cwd: msg.cwd, path: msg.path, error: r.error }
+            : { type: 'fs:readCwd:result', cwd: msg.cwd, path: msg.path, content: r.content, encoding: r.encoding, mimeType: r.mimeType, truncated: r.truncated },
+        )
+        break
+      }
     }
   }
 
@@ -119,5 +134,17 @@ export class SessionManager {
   private destroySession(id: string): void {
     this.sessions.get(id)?.destroy()
     this.sessions.delete(id)
+  }
+
+  /** List a directory keyed by a raw cwd (for un-committed drafts — no session needed). */
+  private async lsCwd(cwd: string, p: string): Promise<{ entries?: FsEntry[]; error?: string }> {
+    try { return { entries: await workspaceFs.lsDir(cwd, p) } }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
+  }
+
+  /** Read a file for preview keyed by a raw cwd (draft). */
+  private async readCwd(cwd: string, p: string): Promise<workspaceFs.PreviewResult> {
+    try { return await workspaceFs.readForPreview(cwd, p) }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
   }
 }

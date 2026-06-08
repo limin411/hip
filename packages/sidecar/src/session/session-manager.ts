@@ -83,9 +83,11 @@ export class SessionManager {
       }
       case 'session:setThinking': {
         const s = this.ensureSession(msg.sessionId)
-        s.setThinking(msg.thinking)
-        this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: msg.thinking })
+        const applied = s.setThinking(msg.thinking)
+        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        // Echo the session's REAL thinking state (true by default) so the client syncs to truth
+        // even if the toggle was rejected mid-turn.
+        send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: s.config.thinking ?? true })
         break
       }
       case 'fs:ls': {

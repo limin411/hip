@@ -140,11 +140,12 @@ export class Session {
     this.buildAgent()
   }
 
-  /** Toggle the thinking (reasoner) model and rebuild the agent. NO-OP while a turn is running. */
-  setThinking(thinking: boolean): void {
-    if (this.running) return
+  /** Toggle the thinking (reasoner) model and rebuild the agent. NO-OP (returns false) while a turn is running. */
+  setThinking(thinking: boolean): boolean {
+    if (this.running) return false
     this._config = { ...this._config, thinking }
     this.buildAgent()
+    return true
   }
 
   /** List a directory for the UI tree. Absolute path. */

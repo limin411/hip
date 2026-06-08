@@ -9,6 +9,26 @@ function collect(session: Session, text: string): Promise<Ev[]> {
   return session.sendMessage(text, (m) => events.push(m as Ev)).then(() => events)
 }
 
+describe('Session.setThinking', () => {
+  it('returns true and updates config when session is idle', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-thinking-idle', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], thinking: true }, model)
+    const applied = session.setThinking(false)
+    expect(applied).toBe(true)
+    expect(session.config.thinking).toBe(false)
+  })
+
+  it('returns false and leaves config unchanged when a turn is running', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-thinking-running', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], thinking: true }, model)
+    // Simulate a running turn by setting the private field via type cast.
+    ;(session as unknown as { running: boolean }).running = true
+    const applied = session.setThinking(false)
+    expect(applied).toBe(false)
+    expect(session.config.thinking).toBe(true)
+  })
+})
+
 describe('Session NO_API_KEY guard', () => {
   let saved: string | undefined
   beforeEach(() => { saved = process.env.DEEPSEEK_API_KEY; delete process.env.DEEPSEEK_API_KEY })

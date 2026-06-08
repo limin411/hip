@@ -190,4 +190,55 @@ describe('SessionStore', () => {
     store.deleteSession('s1')
     expect(store.countToolCalls('s1')).toBe(0)
   })
+
+  it('round-trips an assistant message timeline (reasoning + tool) and hydrates toolCalls in order', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      {
+        id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3,
+        timeline: [
+          { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'let me think' },
+          { kind: 'tool', stepSeq: 1, agentId: 'coder', role: 'coder', callId: 'c1' },
+        ],
+      },
+      's1',
+      [{
+        agentId: 'coder', role: 'coder', output: 'wrote it', startedAt: 1, finishedAt: 2, seq: 1,
+        toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{"path":"/a.ts"}', output: 'ok', status: 'finished', seq: 1 }],
+      }],
+    )
+    const msg = store.loadMessages('s1').find((m) => m.id === 'a1')!
+    expect(msg.timeline).toEqual([
+      { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'let me think' },
+      { kind: 'tool', stepSeq: 1, agentId: 'coder', role: 'coder', callId: 'c1' },
+    ])
+    expect(msg.toolCalls!.map((t) => [t.callId, t.name, t.status])).toEqual([['c1', 'write_file', 'finished']])
+    expect(msg.toolCalls![0]).toMatchObject({ output: 'ok', seq: 1 })
+  })
+
+  it('loads a legacy assistant turn (no timeline) with timeline and toolCalls undefined', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn({ id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'ans', timestamp: 2 }, 's1', [])
+    const msg = store.loadMessages('s1').find((m) => m.id === 'a1')!
+    expect(msg.timeline).toBeUndefined()
+    expect(msg.toolCalls).toBeUndefined()
+  })
+
+  it('deleteSession still cascades a message that carries a timeline', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      {
+        id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3,
+        timeline: [{ kind: 'tool', stepSeq: 0, agentId: 'coder', role: 'coder', callId: 'c1' }],
+      },
+      's1',
+      [{ agentId: 'coder', role: 'coder', output: 'x', startedAt: 1, finishedAt: 2, seq: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 0 }] }],
+    )
+    store.deleteSession('s1')
+    expect(store.loadMessages('s1')).toHaveLength(0)
+    expect(store.countToolCalls('s1')).toBe(0)
+  })
 })

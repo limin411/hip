@@ -1,5 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit, ToolCall, ToolStatus } from '@hip/protocol'
+import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus } from '@hip/protocol'
 
 const PREVIEW_LEN = 80
 
@@ -50,7 +50,7 @@ export class SessionStore {
   }
 
   insertTurn(
-    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean } | null,
+    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null,
     sessionId: string,
     runs: AgentRun[],
   ): void {
@@ -58,6 +58,8 @@ export class SessionStore {
     try {
       if (assistant) {
         this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
+        const tl = assistant.timeline && assistant.timeline.length ? JSON.stringify(assistant.timeline) : null
+        this.db.prepare(`UPDATE messages SET timeline=? WHERE id=?`).run(tl, assistant.id)
       }
       const runStmt = this.db.prepare(
         `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id) VALUES(?,?,?,?,?,?,?,?,?,?)`,
@@ -80,9 +82,23 @@ export class SessionStore {
   }
 
   loadMessages(sessionId: string): Message[] {
-    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number }[]
-    return rows.map((r) => ({ id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}) }))
+    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped,timeline FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number; timeline: string | null }[]
+    const toolStmt = this.db.prepare(
+      `SELECT tc.call_id,tc.agent_id,tc.name,tc.input,tc.output,tc.status,tc.error,tc.seq,tc.truncated
+       FROM tool_calls tc JOIN agent_runs ar ON ar.id = tc.agent_run_id
+       WHERE ar.message_id=? ORDER BY tc.seq`,
+    )
+    return rows.map((r) => {
+      const base: Message = { id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}) }
+      if (r.timeline != null) {
+        base.timeline = JSON.parse(r.timeline) as TimelineStep[]
+        const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
+          .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
+        if (tools.length) base.toolCalls = tools
+      }
+      return base
+    })
   }
 
   loadAgentRuns(sessionId: string): AgentRun[] {

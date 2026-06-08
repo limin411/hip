@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { Composer } from './Composer'
-import { sessionService, useActiveSessionStatus } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus } from '@/domain'
 
 export function InputBar() {
   const [value, setValue] = useState('')
   const status = useActiveSessionStatus()
+  const session = useActiveSession()
+  const activeSessionId = useActiveSessionId()
+  const thinking = session?.config.thinking ?? true
   const submit = () => {
     const text = value.trim()
     if (!text) return
@@ -20,6 +23,9 @@ export function InputBar() {
           onSubmit={submit}
           running={status === 'running'}
           onStop={() => sessionService.cancel()}
+          thinking={thinking}
+          thinkingDisabled={status === 'running'}
+          onToggleThinking={activeSessionId ? (next) => sessionService.setThinking(activeSessionId, next) : undefined}
         />
       </div>
     </div>

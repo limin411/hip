@@ -97,6 +97,11 @@ export class SessionService {
     this.transport.send({ type: 'session:setCwd', sessionId: id, cwd })
   }
 
+  setThinking(id: string, thinking: boolean): void {
+    useDomainStore.getState().apply({ type: 'session:thinking', sessionId: id, thinking }) // optimistic
+    this.transport.send({ type: 'session:setThinking', sessionId: id, thinking })
+  }
+
   lsDir(sessionId: string, path: string): void {
     this.transport.send({ type: 'fs:ls', sessionId, path })
   }

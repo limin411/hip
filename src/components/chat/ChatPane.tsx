@@ -19,7 +19,7 @@ export function ChatPane() {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages.length, error, status])
+  }, [messages.length, error])
 
   const last = messages[messages.length - 1]
   const showThinking = status === 'running' && last?.role === 'user'

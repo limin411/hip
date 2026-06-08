@@ -18,19 +18,17 @@ export function MessageActions({ message, isLastAssistant }: { message: Message;
     }
   }
 
+  // Hover reveal needs an ancestor with className="group" (MessageBubble's wrapper provides it).
   return (
-    <>
-      {/* Hover reveal needs an ancestor with className="group" (MessageBubble's wrapper provides it). */}
-      <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-        <button onClick={onCopy} data-testid="msg-copy" title={t('chat.copy')} aria-label={t('chat.copy')} className={BTN}>
-          {copied ? <Check size={14} /> : <Copy size={14} />}
+    <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <button onClick={onCopy} data-testid="msg-copy" title={t('chat.copy')} aria-label={t('chat.copy')} className={BTN}>
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+      </button>
+      {isLastAssistant && (
+        <button onClick={() => sessionService.regenerate()} data-testid="msg-regenerate" title={t('chat.regenerate')} aria-label={t('chat.regenerate')} className={BTN}>
+          <RefreshCw size={14} />
         </button>
-        {isLastAssistant && (
-          <button onClick={() => sessionService.regenerate()} data-testid="msg-regenerate" title={t('chat.regenerate')} aria-label={t('chat.regenerate')} className={BTN}>
-            <RefreshCw size={14} />
-          </button>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   )
 }

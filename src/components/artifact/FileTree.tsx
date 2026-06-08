@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, FolderGit2, RefreshCw } from 'lucide-react'
 import type { FsEntry } from '@hip/protocol'
-import { useActiveSession, sessionService } from '@/domain'
+import { sessionService } from '@/domain'
 import { useFsStore } from '@/store/fsStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useDraftStore } from '@/store/draftStore'
@@ -22,7 +22,10 @@ function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: str
   const onClick = () => {
     if (entry.isDir) {
       useFsStore.getState().toggleExpanded(scopeId, entry.path)
-      if (!children) (isDraft ? sessionService.lsDraft(scopeId, entry.path) : sessionService.lsDir(scopeId, entry.path))
+      if (!children) {
+        if (isDraft) sessionService.lsDraft(scopeId, entry.path)
+        else sessionService.lsDir(scopeId, entry.path)
+      }
     } else {
       useFsStore.getState().setActive(scopeId, entry.path)
       if (isDraft) sessionService.readDraftFile(scopeId, entry.path)
@@ -57,7 +60,6 @@ function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: str
 
 export function FileTree() {
   const { t } = useTranslation()
-  const active = useActiveSession()
   const { scopeId, cwd, isDraft, chatDraft } = useFsScope()
   const rootEntries = useFsStore((s) => (scopeId && cwd ? s.bySession[scopeId]?.entriesByDir[cwd] : undefined))
 
@@ -72,7 +74,7 @@ export function FileTree() {
   const choose = async () => {
     const dir = await pickDirectory()
     if (!dir) return
-    if (active) sessionService.setProjectDir(active.id, dir)
+    if (!isDraft && scopeId) sessionService.setProjectDir(scopeId, dir)
     else useDraftStore.getState().pickProject(dir)
   }
 

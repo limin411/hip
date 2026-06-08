@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { useActiveSession } from '@/domain'
+import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
 import { cn } from '@/lib/utils'
 import { previewKind } from './previewKind'
@@ -33,8 +33,8 @@ function TruncBanner({ text }: { text: string }) {
 
 export function FilePreview() {
   const { t } = useTranslation()
-  const sessionId = useActiveSession()?.id ?? null
-  const preview = useFsStore((s) => (sessionId ? s.bySession[sessionId]?.preview : undefined))
+  const scopeId = useFsScope().scopeId
+  const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
 
   if (!preview || preview.status === 'idle') return <Centered text={t('artifact.selectFileToPreview')} testid="preview-empty" />
   if (preview.status === 'loading') return <Centered text={t('artifact.loading')} testid="preview-loading" />

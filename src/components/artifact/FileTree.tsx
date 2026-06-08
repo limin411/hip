@@ -4,6 +4,8 @@ import { ChevronRight, ChevronDown, File, Folder, FolderOpen, FolderGit2, Refres
 import type { FsEntry } from '@hip/protocol'
 import { useActiveSession, sessionService } from '@/domain'
 import { useFsStore } from '@/store/fsStore'
+import { useFsScope } from '@/store/useFsScope'
+import { useDraftStore } from '@/store/draftStore'
 import { pickDirectory } from '@/ipc/dialog'
 import { cn } from '@/lib/utils'
 
@@ -12,18 +14,19 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p
 }
 
-function Node({ entry, sessionId, depth }: { entry: FsEntry; sessionId: string; depth: number }) {
-  const open = useFsStore((s) => !!s.bySession[sessionId]?.expanded[entry.path])
-  const active = useFsStore((s) => s.bySession[sessionId]?.activePath === entry.path)
-  const children = useFsStore((s) => s.bySession[sessionId]?.entriesByDir[entry.path])
+function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: string; isDraft: boolean; depth: number }) {
+  const open = useFsStore((s) => !!s.bySession[scopeId]?.expanded[entry.path])
+  const active = useFsStore((s) => s.bySession[scopeId]?.activePath === entry.path)
+  const children = useFsStore((s) => s.bySession[scopeId]?.entriesByDir[entry.path])
 
   const onClick = () => {
     if (entry.isDir) {
-      useFsStore.getState().toggleExpanded(sessionId, entry.path)
-      if (!children) sessionService.lsDir(sessionId, entry.path)
+      useFsStore.getState().toggleExpanded(scopeId, entry.path)
+      if (!children) (isDraft ? sessionService.lsDraft(scopeId, entry.path) : sessionService.lsDir(scopeId, entry.path))
     } else {
-      useFsStore.getState().setActive(sessionId, entry.path)
-      sessionService.readFile(sessionId, entry.path)
+      useFsStore.getState().setActive(scopeId, entry.path)
+      if (isDraft) sessionService.readDraftFile(scopeId, entry.path)
+      else sessionService.readFile(scopeId, entry.path)
     }
   }
 
@@ -47,7 +50,7 @@ function Node({ entry, sessionId, depth }: { entry: FsEntry; sessionId: string; 
           : <File size={15} className="text-ink-tertiary" />}
         <span className="truncate">{entry.name}</span>
       </div>
-      {entry.isDir && open && children?.map((c) => <Node key={c.path} entry={c} sessionId={sessionId} depth={depth + 1} />)}
+      {entry.isDir && open && children?.map((c) => <Node key={c.path} entry={c} scopeId={scopeId} isDraft={isDraft} depth={depth + 1} />)}
     </div>
   )
 }
@@ -55,22 +58,33 @@ function Node({ entry, sessionId, depth }: { entry: FsEntry; sessionId: string; 
 export function FileTree() {
   const { t } = useTranslation()
   const active = useActiveSession()
-  const sessionId = active?.id ?? null
-  const cwd = active?.config.cwd
-  const rootEntries = useFsStore((s) => (sessionId && cwd ? s.bySession[sessionId]?.entriesByDir[cwd] : undefined))
+  const { scopeId, cwd, isDraft, chatDraft } = useFsScope()
+  const rootEntries = useFsStore((s) => (scopeId && cwd ? s.bySession[scopeId]?.entriesByDir[cwd] : undefined))
 
   // Load the root listing once a workspace is bound and not yet cached.
   useEffect(() => {
-    if (sessionId && cwd && !rootEntries) sessionService.lsDir(sessionId, cwd)
-  }, [sessionId, cwd, rootEntries])
+    if (scopeId && cwd && !rootEntries) {
+      if (isDraft) sessionService.lsDraft(scopeId, cwd)
+      else sessionService.lsDir(scopeId, cwd)
+    }
+  }, [scopeId, cwd, isDraft, rootEntries])
 
   const choose = async () => {
-    const sid = sessionId ?? sessionService.createSession()
     const dir = await pickDirectory()
-    if (dir) sessionService.setProjectDir(sid, dir)
+    if (!dir) return
+    if (active) sessionService.setProjectDir(active.id, dir)
+    else useDraftStore.getState().pickProject(dir)
   }
 
   if (!cwd) {
+    if (chatDraft) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
+          <Folder size={32} className="opacity-40" />
+          <div className="max-w-[220px] text-[13px]">{t('artifact.sandboxPending')}</div>
+        </div>
+      )
+    }
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
         <Folder size={32} className="opacity-40" />
@@ -97,7 +111,7 @@ export function FileTree() {
           <button
             title={t('artifact.refresh')}
             data-testid="refresh-tree"
-            onClick={() => sessionId && sessionService.lsDir(sessionId, cwd)}
+            onClick={() => scopeId && (isDraft ? sessionService.lsDraft(scopeId, cwd) : sessionService.lsDir(scopeId, cwd))}
             className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
           >
             <RefreshCw size={13} />
@@ -112,7 +126,7 @@ export function FileTree() {
         </div>
       </div>
       <div className="flex-1 overflow-auto py-1">
-        {sessionId && rootEntries?.map((e) => <Node key={e.path} entry={e} sessionId={sessionId} depth={0} />)}
+        {scopeId && rootEntries?.map((e) => <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} />)}
       </div>
     </div>
   )

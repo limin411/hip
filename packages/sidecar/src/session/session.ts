@@ -6,7 +6,7 @@ import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { buildSubagents, buildSupervisorPrompt, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
-import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 
 type SendFn = (msg: ServerMessage) => void
@@ -242,20 +242,15 @@ export class Session {
     }
     // An open reasoning burst per agent: the first reasoning delta opens it (claiming a stepSeq);
     // subsequent deltas append at that same stepSeq; a tool-start or agent-finish closes it.
-    const openReasoning = new Map<string, { stepSeq: number; content: string }>()
+    const reasoning = new ReasoningTracker(nextSeq)
     const reasoningDelta = (agentId: string, role: AgentRole, delta: string) => {
       if (!delta) return
-      let burst = openReasoning.get(agentId)
-      if (!burst) { burst = { stepSeq: nextSeq(), content: '' }; openReasoning.set(agentId, burst) }
-      if (burst.content.length < REASONING_CAP) burst.content = (burst.content + delta).slice(0, REASONING_CAP)
-      send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId, role, stepSeq: burst.stepSeq, delta })
+      const stepSeq = reasoning.push(agentId, delta)
+      send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId, role, stepSeq, delta })
     }
     const closeReasoning = (agentId: string) => {
-      const burst = openReasoning.get(agentId)
-      if (!burst) return
-      openReasoning.delete(agentId)
-      const r = trajectory.get(agentId)
-      if (r) r.reasoningBursts.push({ stepSeq: burst.stepSeq, content: burst.content, ...(burst.content.length >= REASONING_CAP ? { truncated: true } : {}) })
+      const burst = reasoning.close(agentId)
+      if (burst) { const r = trajectory.get(agentId); if (r) r.reasoningBursts.push(burst) }
     }
     const traceCtx = {
       sessionId: this.id,
@@ -372,7 +367,7 @@ export class Session {
     const ts = Date.now()
     const runs: AgentRun[] = trajectoryToRuns(trajectory)
     const timeline = trajectoryToTimeline(trajectory)
-    const toolCalls = runs.flatMap((r) => r.toolCalls ?? [])
+    const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
     if (this.store) {
       this.store.insertTurn(
         finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null,

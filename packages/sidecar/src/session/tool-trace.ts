@@ -23,6 +23,34 @@ export interface ReasoningBurst {
   truncated?: boolean
 }
 
+/**
+ * Tracks one open reasoning burst per agent during a turn. A burst opens on the agent's
+ * first delta (claiming the next turn-global stepSeq), accumulates subsequent deltas, and
+ * is closed (clipped to REASONING_CAP) into a ReasoningBurst when a tool fires or the agent
+ * finishes. Pure: the caller owns emitting reasoning:delta and pushing the closed burst.
+ */
+export class ReasoningTracker {
+  private open = new Map<string, { stepSeq: number; content: string }>()
+  constructor(private readonly nextSeq: () => number) {}
+
+  /** Append a delta for an agent, opening a burst (drawing a stepSeq) if none is open. Returns the burst's stepSeq. */
+  push(agentId: string, delta: string): number {
+    let b = this.open.get(agentId)
+    if (!b) { b = { stepSeq: this.nextSeq(), content: '' }; this.open.set(agentId, b) }
+    b.content += delta
+    return b.stepSeq
+  }
+
+  /** Close the agent's open burst into a clipped ReasoningBurst, or undefined if none is open. */
+  close(agentId: string): ReasoningBurst | undefined {
+    const b = this.open.get(agentId)
+    if (!b) return undefined
+    this.open.delete(agentId)
+    const { text, truncated } = clipReasoning(b.content)
+    return { stepSeq: b.stepSeq, content: text, ...(truncated ? { truncated: true } : {}) }
+  }
+}
+
 /** Stringify a tool arg/result for transport + storage. Strings pass through. */
 export function stringify(v: unknown): string {
   if (typeof v === 'string') return v

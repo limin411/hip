@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ServerMessage, ToolCall } from '@hip/protocol'
-import { clip, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
+import { clip, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, ReasoningTracker, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
 
 // A fake ToolCallStream whose Promises are already resolved.
 function fakeTool(over: Partial<ToolCallStreamLike> & { name: string; callId: string }): ToolCallStreamLike {
@@ -168,6 +168,65 @@ describe('clipReasoning', () => {
     const out = clipReasoning(big)
     expect(out.truncated).toBe(true)
     expect(out.text.length).toBe(REASONING_CAP)
+  })
+})
+
+describe('ReasoningTracker', () => {
+  const counter = () => { let s = 0; return () => s++ }
+
+  it('opens a burst on the first delta drawing the next seq; a second push appends at the SAME stepSeq', () => {
+    const t = new ReasoningTracker(counter())
+    expect(t.push('a', 'hel')).toBe(0)   // opens, draws seq 0
+    expect(t.push('a', 'lo')).toBe(0)    // appends, same seq, no new draw
+    expect(t.close('a')).toEqual({ stepSeq: 0, content: 'hello' })
+  })
+
+  it('draws different stepSeqs for two agents from the shared counter, in call order', () => {
+    const t = new ReasoningTracker(counter())
+    expect(t.push('a', 'x')).toBe(0)
+    expect(t.push('b', 'y')).toBe(1)
+  })
+
+  it('close returns the full concatenated content with no truncated key when under cap', () => {
+    const t = new ReasoningTracker(counter())
+    t.push('a', 'foo')
+    t.push('a', 'bar')
+    const burst = t.close('a')
+    expect(burst).toEqual({ stepSeq: 0, content: 'foobar' })
+    expect(burst).not.toHaveProperty('truncated')
+  })
+
+  it('close clips content over REASONING_CAP to exactly the cap and flags truncated', () => {
+    const t = new ReasoningTracker(counter())
+    t.push('a', 'r'.repeat(REASONING_CAP + 100))
+    const burst = t.close('a')!
+    expect(burst.content.length).toBe(REASONING_CAP)
+    expect(burst.truncated).toBe(true)
+  })
+
+  it('close on an agent with no open burst returns undefined', () => {
+    const t = new ReasoningTracker(counter())
+    expect(t.close('nobody')).toBeUndefined()
+  })
+
+  it('a push after close opens a NEW burst with a NEW higher stepSeq (reasoning→tool→reasoning)', () => {
+    const t = new ReasoningTracker(counter())
+    expect(t.push('a', 'first')).toBe(0)
+    t.close('a')
+    expect(t.push('a', 'second')).toBe(1)   // new burst, new seq
+    expect(t.close('a')).toEqual({ stepSeq: 1, content: 'second' })
+  })
+
+  it('interleaves with a tool drawing a seq directly between two bursts of the same agent', () => {
+    let s = 0
+    const next = () => s++
+    const t = new ReasoningTracker(next)
+    const first = t.push('a', 'plan')   // 0
+    t.close('a')
+    next()                              // 1 — simulate a tool claiming the next seq
+    const second = t.push('a', 'more')  // 2
+    expect(first).toBe(0)
+    expect(second).toBe(2)
   })
 })
 

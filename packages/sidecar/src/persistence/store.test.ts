@@ -81,6 +81,19 @@ describe('SessionStore', () => {
     expect(JSON.parse(store.getSession('s1')!.config).cwd).toBe('/proj')
   })
 
+  it('persists and loads the stopped flag on an assistant turn', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn({ id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'partial', timestamp: 2, stopped: true }, 's1', [])
+    expect(store.loadMessages('s1').at(-1)).toMatchObject({ id: 'a1', role: 'assistant', content: 'partial', stopped: true })
+  })
+
+  it('omits stopped for a normal (non-cancelled) message', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    expect(store.loadMessages('s1')[0].stopped).toBeUndefined()
+  })
+
   it('deleteSession cascades to messages, agent_runs, and FTS', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '可搜索内容', timestamp: 1 })

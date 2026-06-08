@@ -42,22 +42,22 @@ export class SessionStore {
     return row.n
   }
 
-  insertMessage(r: { id: string; sessionId: string; role: 'user' | 'assistant'; agentId: string | null; content: string; timestamp: number }): number {
+  insertMessage(r: { id: string; sessionId: string; role: 'user' | 'assistant'; agentId: string | null; content: string; timestamp: number; stopped?: boolean }): number {
     const seq = this.nextSeq(r.sessionId)
-    this.db.prepare(`INSERT INTO messages(id,session_id,seq,role,agent_id,content,timestamp) VALUES(?,?,?,?,?,?,?)`)
-      .run(r.id, r.sessionId, seq, r.role, r.agentId, r.content, r.timestamp)
+    this.db.prepare(`INSERT INTO messages(id,session_id,seq,role,agent_id,content,timestamp,stopped) VALUES(?,?,?,?,?,?,?,?)`)
+      .run(r.id, r.sessionId, seq, r.role, r.agentId, r.content, r.timestamp, r.stopped ? 1 : 0)
     return seq
   }
 
   insertTurn(
-    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number } | null,
+    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean } | null,
     sessionId: string,
     runs: AgentRun[],
   ): void {
     this.db.exec('BEGIN')
     try {
       if (assistant) {
-        this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp })
+        this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
       }
       const stmt = this.db.prepare(
         `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?)`,
@@ -73,9 +73,9 @@ export class SessionStore {
   }
 
   loadMessages(sessionId: string): Message[] {
-    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number }[]
-    return rows.map((r) => ({ id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp }))
+    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number }[]
+    return rows.map((r) => ({ id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}) }))
   }
 
   loadAgentRuns(sessionId: string): AgentRun[] {

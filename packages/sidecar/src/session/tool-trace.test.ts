@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ServerMessage, ToolCall } from '@hip/protocol'
-import { clip, stringify, consumeToolCalls, trajectoryToRuns, type ToolCallStreamLike, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { clip, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
 
 // A fake ToolCallStream whose Promises are already resolved.
 function fakeTool(over: Partial<ToolCallStreamLike> & { name: string; callId: string }): ToolCallStreamLike {
@@ -22,7 +22,7 @@ function recorderInto(runs: Map<string, TraceRun>): TraceRecorder {
     },
   }
 }
-function freshRun(): TraceRun { return { role: 'coder', output: '', startedAt: 0, finishedAt: null, seq: 0, toolCalls: new Map() } }
+function freshRun(): TraceRun { return { role: 'coder', output: '', startedAt: 0, finishedAt: null, seq: 0, toolCalls: new Map(), reasoningBursts: [] } }
 
 describe('clip', () => {
   it('passes short strings through untouched', () => {
@@ -140,13 +140,14 @@ describe('consumeToolCalls', () => {
 describe('trajectoryToRuns', () => {
   it('sorts tool calls by seq and coerces a dangling running tool to error', () => {
     const runs = new Map<string, TraceRun>([
-      ['supervisor', { role: 'supervisor', output: 'final', startedAt: 0, finishedAt: 9, seq: 0, toolCalls: new Map() }],
+      ['supervisor', { role: 'supervisor', output: 'final', startedAt: 0, finishedAt: 9, seq: 0, toolCalls: new Map(), reasoningBursts: [] }],
       ['coder', {
         role: 'coder', output: 'c', startedAt: 1, finishedAt: 8, seq: 1, parentAgentId: 'supervisor', taskInput: 'do it',
         toolCalls: new Map<string, ToolCall>([
           ['c2', { callId: 'c2', agentId: 'coder', name: 'read_file', input: '{}', status: 'finished', output: 'r', seq: 3 }],
           ['c1', { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 2 }],
         ]),
+        reasoningBursts: [],
       }],
     ])
     const out = trajectoryToRuns(runs)
@@ -155,5 +156,64 @@ describe('trajectoryToRuns', () => {
     expect(coder.toolCalls!.map((t) => t.callId)).toEqual(['c1', 'c2'])       // sorted by seq
     expect(coder.toolCalls![0]).toMatchObject({ status: 'error', error: 'interrupted' })  // dangling running coerced
     expect(out.find((r) => r.agentId === 'supervisor')!.toolCalls).toEqual([])
+  })
+})
+
+describe('clipReasoning', () => {
+  it('passes short reasoning through untouched', () => {
+    expect(clipReasoning('thinking…')).toEqual({ text: 'thinking…', truncated: false })
+  })
+  it('clips reasoning at REASONING_CAP and flags truncated', () => {
+    const big = 'r'.repeat(REASONING_CAP + 500)
+    const out = clipReasoning(big)
+    expect(out.truncated).toBe(true)
+    expect(out.text.length).toBe(REASONING_CAP)
+  })
+})
+
+describe('trajectoryToTimeline', () => {
+  function run(over: Partial<TraceRun> & { role: TraceRun['role'] }): TraceRun {
+    return { output: '', startedAt: 0, finishedAt: null, seq: 0, toolCalls: new Map(), reasoningBursts: [], ...over }
+  }
+  it('returns [] for an empty trajectory', () => {
+    expect(trajectoryToTimeline(new Map())).toEqual([])
+  })
+  it('interleaves reasoning + tool steps across two agents by stepSeq', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['supervisor', run({ role: 'supervisor', reasoningBursts: [{ stepSeq: 0, content: 'plan the work' }] })],
+      ['coder', run({
+        role: 'coder',
+        reasoningBursts: [{ stepSeq: 2, content: 'now I write the file' }],
+        toolCalls: new Map<string, ToolCall>([['c1', { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', output: 'ok', seq: 1 }]]),
+      })],
+    ])
+    expect(trajectoryToTimeline(trajectory)).toEqual([
+      { kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'plan the work' },
+      { kind: 'tool', stepSeq: 1, agentId: 'coder', role: 'coder', callId: 'c1' },
+      { kind: 'reasoning', stepSeq: 2, agentId: 'coder', role: 'coder', content: 'now I write the file' },
+    ])
+  })
+  it('uses each tool call seq as its stepSeq', () => {
+    const trajectory = new Map<string, TraceRun>([
+      ['coder', run({
+        role: 'coder',
+        toolCalls: new Map<string, ToolCall>([
+          ['c2', { callId: 'c2', agentId: 'coder', name: 'read_file', input: '{}', status: 'finished', output: 'r', seq: 7 }],
+          ['c1', { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', output: 'w', seq: 4 }],
+        ]),
+      })],
+    ])
+    expect(trajectoryToTimeline(trajectory)).toEqual([
+      { kind: 'tool', stepSeq: 4, agentId: 'coder', role: 'coder', callId: 'c1' },
+      { kind: 'tool', stepSeq: 7, agentId: 'coder', role: 'coder', callId: 'c2' },
+    ])
+  })
+  it('propagates the sticky truncated flag on a reasoning burst', () => {
+    const trajectory = new Map<string, TraceRun>([['supervisor', run({ role: 'supervisor', reasoningBursts: [{ stepSeq: 0, content: 'clipped…', truncated: true }] })]])
+    expect(trajectoryToTimeline(trajectory)[0]).toEqual({ kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'clipped…', truncated: true })
+  })
+  it('omits the truncated key when a reasoning burst was not clipped', () => {
+    const trajectory = new Map<string, TraceRun>([['supervisor', run({ role: 'supervisor', reasoningBursts: [{ stepSeq: 0, content: 'short' }] })]])
+    expect(trajectoryToTimeline(trajectory)[0]).not.toHaveProperty('truncated')
   })
 })

@@ -226,7 +226,7 @@ export class Session {
     const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
       if (started.has(agentId)) return
       started.add(agentId)
-      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
       send({ type: 'agent:started', sessionId: this.id, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
     }
     const finishRemaining = () => {

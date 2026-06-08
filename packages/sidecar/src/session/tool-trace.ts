@@ -1,10 +1,24 @@
-import type { AgentRole, AgentRun, ServerMessage, ToolCall, ToolStatus } from '@hip/protocol'
+import type { AgentRole, AgentRun, ServerMessage, TimelineStep, ToolCall, ToolStatus } from '@hip/protocol'
 
 export const TOOL_BLOB_CAP = 4096
 
 /** Clip a blob to the cap and report whether it was shortened. */
 export function clip(s: string, cap = TOOL_BLOB_CAP): { text: string; truncated: boolean } {
   return s.length > cap ? { text: s.slice(0, cap), truncated: true } : { text: s, truncated: false }
+}
+
+export const REASONING_CAP = 4096
+
+/** Clip an agent's reasoning burst to REASONING_CAP, reusing the blob-clip pattern. */
+export function clipReasoning(s: string): { text: string; truncated: boolean } {
+  return clip(s, REASONING_CAP)
+}
+
+/** One contiguous burst of reasoning deltas from a single agent. */
+export interface ReasoningBurst {
+  stepSeq: number
+  content: string
+  truncated?: boolean
 }
 
 /** Stringify a tool arg/result for transport + storage. Strings pass through. */
@@ -35,6 +49,7 @@ export interface TraceRun {
   finishedAt: number | null
   seq: number
   toolCalls: Map<string, ToolCall>
+  reasoningBursts: ReasoningBurst[]
   taskInput?: string
   parentAgentId?: string
 }
@@ -121,4 +136,22 @@ export function trajectoryToRuns(trajectory: Map<string, TraceRun>): AgentRun[] 
       .sort((a, b) => a.seq - b.seq)
       .map((tc): ToolCall => (tc.status === 'running' ? { ...tc, status: 'error' as ToolStatus, error: tc.error ?? 'interrupted' } : tc)),
   }))
+}
+
+/**
+ * Flatten the live trajectory into a single turn-ordered timeline. Emit each run's reasoning
+ * bursts (kind:'reasoning', carrying the burst's stepSeq) and tool calls (kind:'tool',
+ * stepSeq = toolCall.seq), then sort by the shared turn-global stepSeq ascending.
+ */
+export function trajectoryToTimeline(trajectory: Map<string, TraceRun>): TimelineStep[] {
+  const steps: TimelineStep[] = []
+  for (const [agentId, r] of trajectory) {
+    for (const b of r.reasoningBursts) {
+      steps.push({ kind: 'reasoning', stepSeq: b.stepSeq, agentId, role: r.role, content: b.content, ...(b.truncated ? { truncated: true } : {}) })
+    }
+    for (const tc of r.toolCalls.values()) {
+      steps.push({ kind: 'tool', stepSeq: tc.seq, agentId, role: r.role, callId: tc.callId })
+    }
+  }
+  return steps.sort((a, b) => a.stepSeq - b.stepSeq)
 }

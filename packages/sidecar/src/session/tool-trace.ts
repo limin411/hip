@@ -7,7 +7,9 @@ export function clip(s: string, cap = TOOL_BLOB_CAP): { text: string; truncated:
   return s.length > cap ? { text: s.slice(0, cap), truncated: true } : { text: s, truncated: false }
 }
 
-export const REASONING_CAP = 4096
+// Reasoning traces are far longer than tool blobs; cap generously (32 KB) to keep
+// most of a turn's chain-of-thought while still bounding per-message DB growth.
+export const REASONING_CAP = 32768
 
 /** Clip an agent's reasoning burst to REASONING_CAP, reusing the blob-clip pattern. */
 export function clipReasoning(s: string): { text: string; truncated: boolean } {

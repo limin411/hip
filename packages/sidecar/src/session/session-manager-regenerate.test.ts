@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import type { ServerMessage } from '@hip/protocol'
 import { SessionManager } from './session-manager.js'
@@ -9,11 +10,13 @@ import { SessionStore } from '../persistence/store.js'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
 
+const scratch = mkdtempSync(path.join(os.tmpdir(), 'hip-test-scratch-regen-'))
+afterAll(() => { rmSync(scratch, { recursive: true, force: true }) })
+
 describe('SessionManager message:regenerate routing', () => {
   it('routes message:regenerate to Session.regenerate (assistant count stays 1)', async () => {
     const { db, ftsEnabled } = openDatabase(':memory:')
     const store = new SessionStore(db, ftsEnabled)
-    const scratch = path.join(os.tmpdir(), 'hip-test-scratch-regen')
     const mgr = new SessionManager(store, () => new FakeListChatModel({ responses: ['answer'] }), scratch)
     const events: ServerMessage[] = []
     const send = (m: ServerMessage) => events.push(m)

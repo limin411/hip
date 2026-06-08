@@ -135,13 +135,20 @@ describe.skipIf(!apiKey)('Session real multi-agent orchestration (DeepSeek)', ()
       await promise
       clearInterval(checkInterval)
 
+      const hasPartial = events.some((e) => e.type === 'token:stream')
       const msgs = store.loadMessages('it-cancel-persist')
       const asst = msgs.find((m) => m.role === 'assistant')
-      expect(asst).toBeDefined()
-      expect(asst!.stopped).toBe(true)
-      expect((asst!.content ?? '').length).toBeGreaterThan(0)
-      // The partial was finalized for the client too.
-      expect(events.some((e) => e.type === 'message:complete')).toBe(true)
+      if (hasPartial) {
+        // Cancel landed mid-stream → the partial is finalized and persisted as stopped.
+        expect(asst).toBeDefined()
+        expect(asst!.stopped).toBe(true)
+        expect((asst!.content ?? '').length).toBeGreaterThan(0)
+        expect(events.some((e) => e.type === 'message:complete')).toBe(true)
+      } else {
+        // Cancel landed before any token → nothing persisted, CANCELLED surfaced.
+        expect(asst).toBeUndefined()
+        expect(events.some((e) => e.type === 'error' && (e as Ev).code === 'CANCELLED')).toBe(true)
+      }
     },
     90_000,
   )

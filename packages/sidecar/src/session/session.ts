@@ -71,6 +71,8 @@ export class Session {
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
+  // Re-entrancy guard for regenerate(), which has no UI lock. sendMessage is
+  // serialized by the WS dispatch + the composer's send↔stop toggle, so it is unguarded.
   private running = false
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
@@ -143,11 +145,17 @@ export class Session {
     }
   }
 
-  async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
+  /** Emit NO_API_KEY and return false when the env-keyed model has no key. */
+  private requireApiKey(send: SendFn): boolean {
     if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
-      _send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
-      return
+      send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
+      return false
     }
+    return true
+  }
+
+  async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
+    if (!this.requireApiKey(_send)) return
 
     // Persist the user message + bump/derive session metadata before running.
     const userTs = Date.now()
@@ -289,10 +297,7 @@ export class Session {
   /** Re-run the last turn: drop the trailing assistant reply (if any) and stream a fresh one. */
   async regenerate(send: SendFn): Promise<void> {
     if (this.running) return
-    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
-      send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
-      return
-    }
+    if (!this.requireApiKey(send)) return
     const tail = this.messages[this.messages.length - 1]
     if (tail instanceof AIMessage) {
       this.messages.pop()

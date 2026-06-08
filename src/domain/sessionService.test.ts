@@ -171,4 +171,25 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().activeSessionId).toBeNull()
     expect(useDraftStore.getState().draft).not.toBeNull()
   })
+
+  it('regenerate optimistically drops the trailing assistant and sends message:regenerate', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }], agents: [], status: 'idle', error: null }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    new SessionService(t).regenerate()
+    expect(useDomainStore.getState().sessions[0].messages.map((m) => m.role)).toEqual(['user'])
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:regenerate', sessionId: 's1' })
+  })
+
+  it('regenerate is a no-op while a turn is running', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], agents: [], status: 'running', error: null }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    new SessionService(t).regenerate()
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
+  })
 })

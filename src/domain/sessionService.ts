@@ -151,6 +151,15 @@ export class SessionService {
     const { activeSessionId } = useDomainStore.getState()
     if (activeSessionId) this.transport.send({ type: 'message:cancel', sessionId: activeSessionId })
   }
+
+  regenerate(): void {
+    const { activeSessionId, sessions } = useDomainStore.getState()
+    if (!activeSessionId) return
+    const sess = sessions.find((x) => x.id === activeSessionId)
+    if (!sess || sess.status === 'running') return
+    useDomainStore.getState().regenerateLastTurn(activeSessionId)
+    this.transport.send({ type: 'message:regenerate', sessionId: activeSessionId })
+  }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

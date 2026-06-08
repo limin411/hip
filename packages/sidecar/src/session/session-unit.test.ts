@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
-import { Session } from './session.js'
+import { Session, resolveModel } from './session.js'
 
 type Ev = { type: string; [k: string]: unknown }
 
@@ -8,6 +8,24 @@ function collect(session: Session, text: string): Promise<Ev[]> {
   const events: Ev[] = []
   return session.sendMessage(text, (m) => events.push(m as Ev)).then(() => events)
 }
+
+describe('resolveModel', () => {
+  it('returns deepseek-reasoner when model is empty and thinking is true', () => {
+    expect(resolveModel({ llmProvider: 'deepseek', model: '', tools: [], thinking: true })).toBe('deepseek-reasoner')
+  })
+
+  it('returns deepseek-chat when model is empty and thinking is false', () => {
+    expect(resolveModel({ llmProvider: 'deepseek', model: '', tools: [], thinking: false })).toBe('deepseek-chat')
+  })
+
+  it('returns deepseek-reasoner when model is empty and thinking is undefined (defaults to reasoner)', () => {
+    expect(resolveModel({ llmProvider: 'deepseek', model: '', tools: [] })).toBe('deepseek-reasoner')
+  })
+
+  it('returns the explicit model when model is set, even if thinking is true', () => {
+    expect(resolveModel({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], thinking: true })).toBe('deepseek-chat')
+  })
+})
 
 describe('Session.setThinking', () => {
   it('returns true and updates config when session is idle', () => {

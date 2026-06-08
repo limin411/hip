@@ -6,6 +6,13 @@ import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
+import i18n from '@/i18n'
+
+/** Map the current i18next language to one of the three SessionConfig-supported values. */
+function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
+  const l = i18n.resolvedLanguage ?? i18n.language ?? 'en'
+  return l === 'zh-CN' || l === 'zh-TW' ? l : 'en'
+}
 
 export class SessionService {
   private readonly transport: Transport
@@ -69,8 +76,9 @@ export class SessionService {
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
     const id = nanoid()
-    useDomainStore.getState().createSession(id, config)
-    this.transport.send({ type: 'session:create', id, config })
+    const enriched: SessionConfig = { ...config, language: currentLanguage() }
+    useDomainStore.getState().createSession(id, enriched)
+    this.transport.send({ type: 'session:create', id, config: enriched })
     return id
   }
 

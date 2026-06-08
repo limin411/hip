@@ -246,6 +246,23 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].messages).toHaveLength(2)
   })
 
+  it('error CANCELLED marks a reasoning-only provisional (empty content, reasoning timeline, no tools) as stopped', () => {
+    // Cancel during reasoning: content is still '' but the timeline has reasoning steps.
+    // The old guard required running tools; this new case must also be coerced+stopped.
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: '', agentId: 'supervisor', timestamp: 5,
+        timeline: [{ kind: 'reasoning', stepSeq: 0, agentId: 'supervisor', role: 'supervisor', content: 'Let me think…' }],
+        toolCalls: [] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.id).toBe('t1')
+    expect(m.stopped).toBe(true)
+    expect(next.sessions[0].messages).toHaveLength(2)
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
   it('session:loaded hydrates toolCalls + delegation from agentRuns', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {

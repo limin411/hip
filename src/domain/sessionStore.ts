@@ -68,9 +68,9 @@ function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] |
   return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
 }
 
-/** On cancel, finalize the in-flight (trailing) assistant message: drop it if it's an empty
- *  provisional (no content/timeline/tools), else coerce its still-running tools to error and
- *  mark it stopped. Guarded so a prior completed turn's message is never touched. */
+/** On cancel, finalize the in-flight (trailing) assistant message: drop it if it's a fully empty
+ *  provisional (no content/timeline/tools), else if it is still in-flight (empty content OR has
+ *  running tools) coerce tools to error and mark it stopped. Prior completed turns are left alone. */
 function finalizeCancelledMessage(messages: Message[]): Message[] {
   let idx = -1
   for (let k = messages.length - 1; k >= 0; k--) { if (messages[k].role === 'assistant') { idx = k; break } }
@@ -78,7 +78,8 @@ function finalizeCancelledMessage(messages: Message[]): Message[] {
   const m = messages[idx]
   const empty = m.content === '' && !(m.timeline?.length) && !(m.toolCalls?.length)
   if (empty) return messages.filter((_, k) => k !== idx)
-  if (!m.toolCalls?.some((tc) => tc.status === 'running')) return messages // not an in-flight msg with spinning tools — leave prior turns alone
+  const inFlight = m.content === '' || !!m.toolCalls?.some((tc) => tc.status === 'running')
+  if (!inFlight) return messages // prior completed turn — leave alone
   return messages.map((x, k) => (k === idx ? { ...x, toolCalls: coerceRunningToolCalls(x.toolCalls), stopped: true } : x))
 }
 
@@ -300,7 +301,7 @@ export function applyServerMessage(
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], thinking: true }
+export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], agents: [], status: 'idle', error: null }

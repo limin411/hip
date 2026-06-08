@@ -57,4 +57,8 @@ describe('verifyWrites — no false positives', () => {
   it('an errored write does NOT count → lie correction', () => {
     expect(verifyWrites(trajectory(['coder', run('coder', tool({ callId: 'c1', name: 'write_file', status: 'error', error: 'EACCES' }))]), 'I created self-intro.html for you.', 'en')).toEqual({ correction: EN_NOTE })
   })
+  it('a generic denial with no named file does not trigger (conservative by design)', () => {
+    expect(verifyWrites(trajectory(['supervisor', run('supervisor')]), 'No files were created this turn.', 'en')).toEqual({})
+    expect(verifyWrites(trajectory(['supervisor', run('supervisor')]), 'I did not create any files.', 'en')).toEqual({})
+  })
 })

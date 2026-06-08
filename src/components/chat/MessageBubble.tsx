@@ -3,19 +3,22 @@ import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
 import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
+import { MessageActions } from './MessageActions'
+import { CodeBlock } from './CodeBlock'
 import { cn } from '@/lib/utils'
 
 interface MessageBubbleProps {
   message: Message
   streaming?: boolean
+  isLastAssistant?: boolean
 }
 
-export function MessageBubble({ message, streaming }: MessageBubbleProps) {
+export function MessageBubble({ message, streaming, isLastAssistant }: MessageBubbleProps) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
 
   return (
-    <div className="flex gap-3">
+    <div className="group flex gap-3">
       {isUser ? (
         <Avatar name={t('chat.user')} size={28} />
       ) : (
@@ -24,7 +27,14 @@ export function MessageBubble({ message, streaming }: MessageBubbleProps) {
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="mb-1 text-[12px] font-medium text-ink-secondary">{isUser ? t('chat.you') : 'hip'}</div>
+        <div className="mb-1 flex items-center gap-2 text-[12px] font-medium text-ink-secondary">
+          <span>{isUser ? t('chat.you') : 'hip'}</span>
+          {message.stopped && (
+            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] font-normal text-ink-tertiary" data-testid="stopped-badge">
+              {t('chat.stopped')}
+            </span>
+          )}
+        </div>
         <div
           className={cn(
             'max-w-none text-[14px] leading-relaxed text-ink',
@@ -34,9 +44,10 @@ export function MessageBubble({ message, streaming }: MessageBubbleProps) {
             '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_p]:my-1.5',
           )}
         >
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <ReactMarkdown components={{ pre: CodeBlock }}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>
+        {!streaming && <MessageActions message={message} isLastAssistant={!!isLastAssistant} />}
       </div>
     </div>
   )

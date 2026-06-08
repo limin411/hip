@@ -6,6 +6,8 @@ export interface SessionConfig {
   tools: string[]
   systemPrompt?: string
   cwd?: string                 // absolute project root; undefined → virtual FS (no real file tools)
+  thinking?: boolean           // surface reasoning steps; undefined ⇒ treated as true
+  language?: 'en' | 'zh-CN' | 'zh-TW'  // UI / assistant output language
 }
 
 export interface Message {
@@ -15,6 +17,8 @@ export interface Message {
   agentId?: string
   timestamp: number
   stopped?: boolean // assistant turn was cancelled mid-stream; partial content kept
+  timeline?: TimelineStep[]  // ordered reasoning+tool steps for this turn (assistant only)
+  toolCalls?: ToolCall[]     // flat tool calls for this turn, referenced by timeline tool steps via callId
 }
 
 export interface AgentRun {
@@ -42,6 +46,17 @@ export interface ToolCall {
   seq: number              // monotonic per turn → deterministic ordering
   truncated?: boolean      // input and/or output was clipped; sticky-OR
 }
+
+/**
+ * One step in an assistant turn's execution trace. `stepSeq` is a single
+ * turn-global monotonic counter shared across reasoning and tool steps, so a
+ * timeline interleaves them in true wall-clock order. A 'tool' step carries no
+ * payload — it references a ToolCall (on Message.toolCalls) by callId.
+ */
+export type TimelineStep =
+  | { kind: 'reasoning'; stepSeq: number; agentId: string; role: AgentRole; content: string; truncated?: boolean }
+  | { kind: 'tool'; stepSeq: number; agentId: string; role: AgentRole; callId: string }
+
 export interface SessionSummary {
   id: string
   title: string
@@ -77,6 +92,7 @@ export type ClientMessage =
   | { type: 'session:delete'; sessionId: string }
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
+  | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
@@ -84,11 +100,13 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
-  | { type: 'agent:started'; sessionId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string }
-  | { type: 'token:stream'; sessionId: string; agentId: string; delta: string }
-  | { type: 'agent:finished'; sessionId: string; agentId: string }
-  | { type: 'tool:started'; sessionId: string; agentId: string; callId: string; name: string; input: string; seq: number; truncated?: boolean }
-  | { type: 'tool:finished'; sessionId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
+  | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string }
+  | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string }
+  | { type: 'agent:finished'; sessionId: string; turnId: string; agentId: string }
+  | { type: 'reasoning:delta'; sessionId: string; turnId: string; agentId: string; role: AgentRole; stepSeq: number; delta: string }
+  | { type: 'tool:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; callId: string; name: string; input: string; seq: number; truncated?: boolean }
+  | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
+  | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }

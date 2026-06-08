@@ -1,22 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
+import { mkdtempSync, rmSync } from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import type { ServerMessage } from '@hip/protocol'
 import { SessionManager } from './session-manager.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
-function mk() {
+function mk(scratchRoot: string) {
   const { db, ftsEnabled } = openDatabase(':memory:')
   const store = new SessionStore(db, ftsEnabled)
-  const mgr = new SessionManager(store, () => new FakeListChatModel({ responses: ['ok'] }))
+  const mgr = new SessionManager(store, () => new FakeListChatModel({ responses: ['ok'] }), scratchRoot)
   return { store, mgr }
 }
 
 describe('SessionManager persistence', () => {
-  let store: SessionStore, mgr: SessionManager, sent: ServerMessage[]
+  let store: SessionStore, mgr: SessionManager, sent: ServerMessage[], scratchRoot: string
   const send = (m: ServerMessage) => sent.push(m)
-  beforeEach(() => { ({ store, mgr } = mk()); sent = [] })
+  beforeEach(() => { scratchRoot = mkdtempSync(path.join(os.tmpdir(), 'hip-scr-')); ({ store, mgr } = mk(scratchRoot)); sent = [] })
+  afterEach(() => { rmSync(scratchRoot, { recursive: true, force: true }) })
 
   it('persists the session row on session:create', () => {
     mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)

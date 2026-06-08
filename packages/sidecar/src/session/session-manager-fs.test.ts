@@ -16,7 +16,7 @@ afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
 function setup() {
   const sent: ServerMessage[] = []
   const send = (m: ServerMessage) => sent.push(m)
-  const mgr = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }))
+  const mgr = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
   mgr.handle({ type: 'session:create', id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] } }, send)
   return { mgr, sent, send }
 }

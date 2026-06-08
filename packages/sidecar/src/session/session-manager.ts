@@ -2,6 +2,7 @@ import type { ClientMessage, ServerMessage, SessionConfig } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
+import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -18,6 +19,7 @@ export class SessionManager {
   constructor(
     private readonly store?: SessionStore,
     private readonly modelFactory: ModelFactory = () => undefined,
+    private readonly scratchRoot: string = defaultScratchRoot(),
   ) {}
 
   handle(msg: ClientMessage, send: SendFn): void {
@@ -58,6 +60,7 @@ export class SessionManager {
       case 'session:delete':
         this.store?.deleteSession(msg.sessionId)
         this.sessions.delete(msg.sessionId)
+        removeScratchDir(msg.sessionId, this.scratchRoot)
         send({ type: 'session:deleted', sessionId: msg.sessionId })
         break
       case 'session:rename': {
@@ -91,10 +94,14 @@ export class SessionManager {
   }
 
   private createSession(id: string, config: SessionConfig, send: SendFn): void {
+    let cfg = config
+    if (!cfg.cwd) cfg = { ...cfg, cwd: ensureScratchDir(id, this.scratchRoot) }
     const now = Date.now()
-    this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(config), createdAt: now, updatedAt: now })
-    this.sessions.set(id, new Session(id, config, this.modelFactory(config), this.store))
+    this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
+    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store))
     send({ type: 'session:created', sessionId: id })
+    // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
+    if (!config.cwd) send({ type: 'session:cwd', sessionId: id, cwd: cfg.cwd! })
   }
 
   /** Get the in-memory session, or rebuild it from the DB (lazy resume). */

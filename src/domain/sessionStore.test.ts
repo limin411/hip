@@ -186,6 +186,19 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].agents[0].toolCalls[0].status).toBe('running')
   })
 
+  it('tool:started for an unknown agent is a no-op (arrives before agent:started)', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'tool:started', sessionId: 's1', agentId: 'ghost', callId: 'c1', name: 'read_file', input: '{}', seq: 0 }, 0)
+    expect(next.sessions[0].agents).toHaveLength(0)
+  })
+
+  it('tool:finished can update a tool call even after its agent is marked done', () => {
+    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'done', tokens: 'x', tokenCount: 1, elapsedMs: 100, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }] })] }
+    const next = applyServerMessage(s0, { type: 'tool:finished', sessionId: 's1', agentId: 'coder', callId: 'c1', status: 'finished', output: 'ok' }, 0)
+    expect(next.sessions[0].agents[0].status).toBe('done')
+    expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'finished', output: 'ok' })
+  })
+
   it('session:loaded hydrates toolCalls + delegation from agentRuns', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {

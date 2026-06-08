@@ -54,15 +54,15 @@ describe('consumeToolCalls', () => {
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'task', callId: 't0' }),                              // filtered out
       fakeTool({ name: 'read_file', callId: 'c1', input: { path: '/a.ts' }, output: Promise.resolve('contents') }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => seq++, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => seq++, pending, record: recorderInto(runs) })
     await Promise.all(pending)
 
     const started = sent.filter((m) => m.type === 'tool:started')
     const finished = sent.filter((m) => m.type === 'tool:finished')
     expect(started).toHaveLength(1)
     expect(finished).toHaveLength(1)
-    expect(started[0]).toMatchObject({ type: 'tool:started', agentId: 'coder', callId: 'c1', name: 'read_file', input: '{"path":"/a.ts"}', seq: 0 })
-    expect(finished[0]).toMatchObject({ type: 'tool:finished', callId: 'c1', status: 'finished', output: 'contents' })
+    expect(started[0]).toMatchObject({ type: 'tool:started', turnId: 'turn1', role: 'coder', agentId: 'coder', callId: 'c1', name: 'read_file', input: '{"path":"/a.ts"}', seq: 0 })
+    expect(finished[0]).toMatchObject({ type: 'tool:finished', turnId: 'turn1', callId: 'c1', status: 'finished', output: 'contents' })
     expect(runs.get('coder')!.toolCalls.get('c1')).toMatchObject({ status: 'finished', output: 'contents', seq: 0 })
     expect(sent.indexOf(started[0])).toBeLessThan(sent.indexOf(finished[0]))
   })
@@ -74,10 +74,10 @@ describe('consumeToolCalls', () => {
     const pending: Promise<void>[] = []
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'write_file', callId: 'c9', status: Promise.resolve('error'), error: Promise.resolve('EACCES') }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => seq++, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => seq++, pending, record: recorderInto(runs) })
     await Promise.all(pending)
-    expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ status: 'error', error: 'EACCES' })
-    expect(sent.find((m) => m.type === 'tool:started')).toMatchObject({ seq: 5 })
+    expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ turnId: 'turn1', status: 'error', error: 'EACCES' })
+    expect(sent.find((m) => m.type === 'tool:started')).toMatchObject({ turnId: 'turn1', role: 'coder', seq: 5 })
     const fin = sent.find((m) => m.type === 'tool:finished') as Extract<ServerMessage, { type: 'tool:finished' }>
     expect(fin.output).toBeUndefined()
   })
@@ -89,7 +89,7 @@ describe('consumeToolCalls', () => {
     const big = 'x'.repeat(5000)
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'read_file', callId: 'c1', output: Promise.resolve(big) }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
     await Promise.all(pending)
     const fin = sent.find((m) => m.type === 'tool:finished') as Extract<ServerMessage, { type: 'tool:finished' }>
     expect(fin.truncated).toBe(true)
@@ -103,7 +103,7 @@ describe('consumeToolCalls', () => {
     const pending: Promise<void>[] = []
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'write_file', callId: 'c1', input: { blob: 'y'.repeat(5000) } }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
     await Promise.all(pending)
     const started = sent.find((m) => m.type === 'tool:started') as Extract<ServerMessage, { type: 'tool:started' }>
     expect(started.truncated).toBe(true)
@@ -117,11 +117,11 @@ describe('consumeToolCalls', () => {
     const pending: Promise<void>[] = []
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'write_file', callId: 'c1', status: Promise.resolve('error'), error: Promise.resolve('boom'), output: Promise.reject(new Error('torn down')) }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
     await Promise.allSettled(pending)
     // let any unhandled rejection surface before the test ends
     await new Promise((r) => setTimeout(r, 10))
-    expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ status: 'error', error: 'boom' })
+    expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ turnId: 'turn1', status: 'error', error: 'boom' })
   })
 
   it('does not emit tool:finished for a non-terminal (running) status', async () => {
@@ -130,7 +130,7 @@ describe('consumeToolCalls', () => {
     const pending: Promise<void>[] = []
     await consumeToolCalls('coder', iter(
       fakeTool({ name: 'read_file', callId: 'c1', status: Promise.resolve('running') }),
-    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    ), { sessionId: 's1', turnId: 'turn1', roleOf: () => 'coder', onToolStart: () => {}, send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
     await Promise.all(pending)
     expect(sent.some((m) => m.type === 'tool:finished')).toBe(false)
     expect(runs.get('coder')!.toolCalls.get('c1')!.status).toBe('running')

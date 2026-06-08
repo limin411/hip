@@ -6,12 +6,18 @@ import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { buildSubagents, buildSupervisorPrompt, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
-import { consumeToolCalls, trajectoryToRuns, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { verifyWrites } from './verify.js'
 
 type SendFn = (msg: ServerMessage) => void
 
-const DEFAULT_MODEL = 'deepseek-chat'
+const TITLE_MODEL = 'deepseek-chat'
 const TITLE_LEN = 40
+
+/** thinking === false → fast non-reasoning model; otherwise the reasoner (default). A caller-pinned config.model still wins. */
+export function resolveModel(config: SessionConfig): string {
+  return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
+}
 
 function deriveTitle(content: string): string {
   const oneLine = content.replace(/\s+/g, ' ').trim()
@@ -38,10 +44,10 @@ const TITLE_SYSTEM_PROMPT =
   'Use the same language as the user. Reply with ONLY the title — no quotes, no trailing punctuation.'
 
 /** Production title generator: one cheap DeepSeek completion. Not used when a model is injected (tests). */
-function buildDefaultTitleGenerator(config: SessionConfig): TitleGenerator {
+function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   return async ({ firstUserMessage, firstReply }) => {
     const model = new ChatOpenAI({
-      model: config.model || DEFAULT_MODEL,
+      model: TITLE_MODEL,
       apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
       configuration: { baseURL: 'https://api.deepseek.com/v1' },
       maxTokens: 24,
@@ -57,7 +63,7 @@ function buildDefaultTitleGenerator(config: SessionConfig): TitleGenerator {
 
 function buildModel(config: SessionConfig): ChatOpenAI {
   return new ChatOpenAI({
-    model: config.model || DEFAULT_MODEL,
+    model: resolveModel(config),
     apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
     configuration: {
       baseURL: 'https://api.deepseek.com/v1',
@@ -134,6 +140,13 @@ export class Session {
     this.buildAgent()
   }
 
+  /** Toggle the thinking (reasoner) model and rebuild the agent. NO-OP while a turn is running. */
+  setThinking(thinking: boolean): void {
+    if (this.running) return
+    this._config = { ...this._config, thinking }
+    this.buildAgent()
+  }
+
   /** List a directory for the UI tree. Absolute path. */
   async lsDir(absPath: string): Promise<{ entries?: FsEntry[]; error?: string }> {
     if (!this._config.cwd) return { error: 'no_workspace' }
@@ -204,9 +217,13 @@ export class Session {
     this.abortController = new AbortController()
     this.running = true
 
+    const turnId = `asst-supervisor-${Date.now()}`
     const trajectory = new Map<string, TraceRun>()
     let agentSeq = 0
-    let toolSeq = 0
+    // ONE turn-global step counter shared by tool calls AND reasoning bursts, so the timeline
+    // interleaves them in true wall-clock order.
+    let stepSeq = 0
+    const nextSeq = () => stepSeq++
     const pending: Promise<void>[] = []
     const started = new Set<string>()
     const recorder: TraceRecorder = {
@@ -223,17 +240,44 @@ export class Session {
         if (truncated || tc.truncated) tc.truncated = true   // sticky-OR
       },
     }
-    const traceCtx = { sessionId: this.id, send, nextSeq: () => toolSeq++, pending, record: recorder }
+    // An open reasoning burst per agent: the first reasoning delta opens it (claiming a stepSeq);
+    // subsequent deltas append at that same stepSeq; a tool-start or agent-finish closes it.
+    const openReasoning = new Map<string, { stepSeq: number; content: string }>()
+    const reasoningDelta = (agentId: string, role: AgentRole, delta: string) => {
+      if (!delta) return
+      let burst = openReasoning.get(agentId)
+      if (!burst) { burst = { stepSeq: nextSeq(), content: '' }; openReasoning.set(agentId, burst) }
+      if (burst.content.length < REASONING_CAP) burst.content = (burst.content + delta).slice(0, REASONING_CAP)
+      send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId, role, stepSeq: burst.stepSeq, delta })
+    }
+    const closeReasoning = (agentId: string) => {
+      const burst = openReasoning.get(agentId)
+      if (!burst) return
+      openReasoning.delete(agentId)
+      const r = trajectory.get(agentId)
+      if (r) r.reasoningBursts.push({ stepSeq: burst.stepSeq, content: burst.content, ...(burst.content.length >= REASONING_CAP ? { truncated: true } : {}) })
+    }
+    const traceCtx = {
+      sessionId: this.id,
+      turnId,
+      send,
+      nextSeq,
+      roleOf: (agentId: string) => trajectory.get(agentId)?.role ?? 'supervisor',
+      onToolStart: (agentId: string) => closeReasoning(agentId),
+      pending,
+      record: recorder,
+    }
     const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
       if (started.has(agentId)) return
       started.add(agentId)
       trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
-      send({ type: 'agent:started', sessionId: this.id, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
     }
     const finishRemaining = () => {
       for (const id of started) {
+        closeReasoning(id)
         const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
-        send({ type: 'agent:finished', sessionId: this.id, agentId: id })
+        send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: id })
       }
       started.clear()
     }
@@ -245,14 +289,23 @@ export class Session {
         { messages: this.messages },
         { version: 'v3', signal: this.abortController.signal },
       )
+      // Supervisor and subagent message streams are the same ChatModelStream shape at runtime
+      // (streaming `.text` + `.reasoning`), but the subagents projection's static type collapses
+      // to AIMessage (whose `.text` is a plain string and has no `.reasoning`) because the
+      // subagent specs are passed through an `as unknown` cast in buildAgent. Re-project the
+      // subagent message to the supervisor stream's element type so both pumps read tokens.
+      type StreamedMessage = typeof run.messages extends AsyncIterable<infer M> ? M : never
       const pumpSupervisor = async () => {
         for await (const msg of run.messages) {
-          for await (const delta of msg.text) {
-            if (!delta) continue
-            supervisorText += delta
-            const r = trajectory.get('supervisor'); if (r) r.output += delta
-            send({ type: 'token:stream', sessionId: this.id, agentId: 'supervisor', delta })
-          }
+          await Promise.all([
+            (async () => { for await (const delta of msg.text) {
+              if (!delta) continue
+              supervisorText += delta
+              const r = trajectory.get('supervisor'); if (r) r.output += delta
+              send({ type: 'token:stream', sessionId: this.id, turnId, agentId: 'supervisor', delta })
+            } })(),
+            (async () => { for await (const delta of msg.reasoning) { reasoningDelta('supervisor', 'supervisor', delta) } })(),
+          ])
         }
       }
       const pumpSubagents = async () => {
@@ -262,19 +315,24 @@ export class Session {
           ensureStarted(agentId, roleForName(sub.name), 'supervisor', taskInput)
           await Promise.all([
             (async () => {
-              for await (const msg of sub.messages) {
-                for await (const delta of msg.text) {
-                  if (!delta) continue
-                  const r = trajectory.get(agentId); if (r) r.output += delta
-                  send({ type: 'token:stream', sessionId: this.id, agentId, delta })
-                }
+              for await (const rawMsg of sub.messages) {
+                const msg = rawMsg as unknown as StreamedMessage
+                await Promise.all([
+                  (async () => { for await (const delta of msg.text) {
+                    if (!delta) continue
+                    const r = trajectory.get(agentId); if (r) r.output += delta
+                    send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta })
+                  } })(),
+                  (async () => { for await (const delta of msg.reasoning) { reasoningDelta(agentId, roleForName(sub.name), delta) } })(),
+                ])
               }
             })(),
             consumeToolCalls(agentId, sub.toolCalls, traceCtx),
           ])
           if (started.delete(agentId)) {
+            closeReasoning(agentId)
             const r = trajectory.get(agentId); if (r) r.finishedAt = Date.now()
-            send({ type: 'agent:finished', sessionId: this.id, agentId })
+            send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
           }
         }
       }
@@ -287,7 +345,7 @@ export class Session {
       await Promise.allSettled(pending)
       if (isAbort && supervisorText) {
         // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
-        this.finalizeAndPersist(send, supervisorText, trajectory, true)
+        return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
       } else {
         send({
           type: 'error',
@@ -302,19 +360,22 @@ export class Session {
       this.abortController = null
     }
 
-    this.finalizeAndPersist(send, supervisorText, trajectory, false)
-    return supervisorText
+    return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false)
   }
 
-  /** Push the assistant message into context, persist the turn, and emit message:complete. */
-  private finalizeAndPersist(send: SendFn, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean): void {
-    if (supervisorText) this.messages.push(new AIMessage(supervisorText))
+  /** Run the phantom-write safety net, push the assistant message into context, persist the turn
+   *  (with its timeline), and emit message:complete. Returns the final (possibly corrected) text. */
+  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean): string {
+    const { correction } = verifyWrites(trajectory, supervisorText, this._config.language ?? 'en')
+    const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
+    if (finalText) this.messages.push(new AIMessage(finalText))
     const ts = Date.now()
-    const assistantId = `asst-supervisor-${ts}`
     const runs: AgentRun[] = trajectoryToRuns(trajectory)
+    const timeline = trajectoryToTimeline(trajectory)
+    const toolCalls = runs.flatMap((r) => r.toolCalls ?? [])
     if (this.store) {
       this.store.insertTurn(
-        supervisorText ? { id: assistantId, sessionId: this.id, agentId: 'supervisor', content: supervisorText, timestamp: ts, stopped } : null,
+        finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null,
         this.id,
         runs,
       )
@@ -323,8 +384,9 @@ export class Session {
     send({
       type: 'message:complete',
       sessionId: this.id,
-      message: { id: assistantId, role: 'assistant', content: supervisorText, agentId: 'supervisor', timestamp: ts, ...(stopped ? { stopped: true } : {}) },
+      message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, ...(stopped ? { stopped: true } : {}) },
     })
+    return finalText
   }
 
   /** Re-run the last turn: drop the trailing assistant reply (if any) and stream a fresh one. */

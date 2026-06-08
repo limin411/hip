@@ -64,8 +64,13 @@ export interface TraceRecorder {
 
 export interface ConsumeCtx {
   sessionId: string
+  turnId: string
   send: (msg: ServerMessage) => void
   nextSeq: () => number
+  /** Resolve an agent's role for the tool:started event (defaults to 'supervisor' if unknown). */
+  roleOf: (agentId: string) => AgentRole
+  /** Called before assigning a tool's stepSeq so the session can close any open reasoning burst. */
+  onToolStart: (agentId: string) => void
   pending: Promise<void>[]
   record: TraceRecorder
 }
@@ -85,10 +90,13 @@ export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable
     // rejection. The awaits below still read the settled values independently.
     void Promise.resolve(tc.output).catch(() => {})
     void Promise.resolve(tc.error).catch(() => {})
+    // Close any open reasoning burst BEFORE this tool claims the next stepSeq, so the
+    // burst's stepSeq stays strictly below the tool's in the turn-global ordering.
+    ctx.onToolStart(agentId)
     const seq = ctx.nextSeq()
     const inClip = clip(stringify(tc.input))
     ctx.record.start(agentId, tc.callId, tc.name, inClip.text, seq, inClip.truncated)
-    ctx.send({ type: 'tool:started', sessionId: ctx.sessionId, agentId, callId: tc.callId, name: tc.name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
+    ctx.send({ type: 'tool:started', sessionId: ctx.sessionId, turnId: ctx.turnId, agentId, role: ctx.roleOf(agentId), callId: tc.callId, name: tc.name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
     ctx.pending.push((async () => {
       // Resolve the result Promises OFF the critical path. Only the awaits are inside the try
       // (so a torn-down/aborted stream is tolerated); record.finish/send run AFTER it, so a bug
@@ -117,7 +125,7 @@ export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable
         return
       }
       ctx.record.finish(agentId, tc.callId, status, output, error, truncated)
-      ctx.send({ type: 'tool:finished', sessionId: ctx.sessionId, agentId, callId: tc.callId, status, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}), ...(truncated ? { truncated: true } : {}) })
+      ctx.send({ type: 'tool:finished', sessionId: ctx.sessionId, turnId: ctx.turnId, agentId, callId: tc.callId, status, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}), ...(truncated ? { truncated: true } : {}) })
     })())
   }
 }

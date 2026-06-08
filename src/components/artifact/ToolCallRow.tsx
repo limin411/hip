@@ -30,7 +30,7 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
   const hint = targetHint(tool.input)
   return (
     <div className="rounded-md border border-border bg-surface-muted/40">
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-2 py-1.5 text-left" data-testid="tool-row">
+      <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-2 py-1.5 text-left" data-testid="tool-row">
         <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
         <span className="shrink-0 font-mono text-[12px] text-ink">{tool.name}</span>
         {hint && <span className="truncate font-mono text-[11px] text-ink-tertiary">{hint}</span>}

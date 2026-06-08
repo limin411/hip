@@ -101,6 +101,20 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 5) {
+    db.exec('BEGIN')
+    try {
+      // timeline: JSON blob of TimelineStep[] for an assistant turn (reasoning
+      // content inline; tool steps reference tool_calls rows by call_id). NULL
+      // for user rows and legacy (pre-v5) assistant turns.
+      db.exec(`ALTER TABLE messages ADD COLUMN timeline TEXT`)
+      db.exec('PRAGMA user_version = 5')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

@@ -23,5 +23,6 @@ describe('migrate', () => {
     migrate(db)
     migrate(db) // second run must not throw (e.g. duplicate column)
     expect(columns(db, 'sessions').filter((c) => c === 'title_custom')).toHaveLength(1)
+    expect(columns(db, 'messages').filter((c) => c === 'stopped')).toHaveLength(1)
   })
 })

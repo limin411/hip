@@ -94,6 +94,13 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')[0].stopped).toBeUndefined()
   })
 
+  it('omits stopped for a normal assistant turn inserted via insertTurn', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn({ id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'ans', timestamp: 2 }, 's1', [])
+    expect(store.loadMessages('s1').at(-1)!.stopped).toBeUndefined()
+  })
+
   it('deleteLastAssistantMessage removes a trailing assistant turn and cascades agent_runs', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
@@ -105,6 +112,7 @@ describe('SessionStore', () => {
     expect(store.deleteLastAssistantMessage('s1')).toBe(true)
     expect(store.loadMessages('s1').map((m) => m.id)).toEqual(['u1'])
     expect(store.loadAgentRuns('s1')).toHaveLength(0)
+    expect(store.search('ans')).toHaveLength(0) // evicted from the FTS index too
   })
 
   it('deleteLastAssistantMessage is a no-op when the last message is a user message', () => {

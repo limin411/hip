@@ -66,6 +66,18 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 3) {
+    db.exec('BEGIN')
+    try {
+      // stopped: 1 = assistant turn was cancelled mid-stream (partial content kept).
+      db.exec(`ALTER TABLE messages ADD COLUMN stopped INTEGER NOT NULL DEFAULT 0`)
+      db.exec('PRAGMA user_version = 3')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

@@ -7,13 +7,15 @@ function columns(db: DatabaseSync, table: string): string[] {
 }
 
 describe('migrate', () => {
-  it('adds title_custom (default 0) and reaches user_version 2', () => {
+  it('adds title_custom, a stopped column, and reaches user_version 3', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('title_custom')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(2)
+    expect(columns(db, 'messages')).toContain('stopped')
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(3)
     db.exec(`INSERT INTO sessions(id,title,config,created_at,updated_at) VALUES('s','t','{}',1,1)`)
-    expect((db.prepare(`SELECT title_custom FROM sessions WHERE id='s'`).get() as { title_custom: number }).title_custom).toBe(0)
+    db.exec(`INSERT INTO messages(id,session_id,seq,role,content,timestamp) VALUES('m','s',1,'user','hi',1)`)
+    expect((db.prepare(`SELECT stopped FROM messages WHERE id='m'`).get() as { stopped: number }).stopped).toBe(0)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {

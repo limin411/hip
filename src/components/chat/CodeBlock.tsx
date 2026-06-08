@@ -35,7 +35,8 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
         onClick={onCopy}
         data-testid="code-copy"
         title={t('chat.copyCode')}
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-surface/80 text-ink-tertiary opacity-0 transition-opacity hover:text-ink-secondary group-hover/code:opacity-100"
+        aria-label={t('chat.copyCode')}
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-surface/80 text-ink-tertiary opacity-0 transition-opacity hover:text-ink-secondary group-hover/code:opacity-100 focus-visible:opacity-100"
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>

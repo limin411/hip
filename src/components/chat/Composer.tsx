@@ -29,7 +29,7 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            onSubmit()
+            if (!running) onSubmit()
           }
         }}
         rows={2}

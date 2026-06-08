@@ -191,5 +191,15 @@ describe('SessionService', () => {
     const t = new FakeTransport()
     new SessionService(t).regenerate()
     expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
+    // The guard lives in the service: the store must be left untouched.
+    expect(useDomainStore.getState().sessions[0].messages).toHaveLength(1)
+    expect(useDomainStore.getState().sessions[0].status).toBe('running')
+  })
+
+  it('regenerate is a no-op when there is no active session', () => {
+    useDomainStore.setState({ activeSessionId: null })
+    const t = new FakeTransport()
+    new SessionService(t).regenerate()
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
   })
 })

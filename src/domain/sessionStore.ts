@@ -51,6 +51,16 @@ function upsertAgent(agents: AgentVM[], agent: AgentVM): AgentVM[] {
     : [...agents, agent]
 }
 
+/** Turn-end sweep: coerce any tool still 'running' to error — mirrors the sidecar's trajectoryToRuns
+ *  so the live view matches the persisted/reloaded trace after a cancel/interruption. */
+function coerceRunningTools(agents: AgentVM[]): AgentVM[] {
+  return agents.map((a) =>
+    a.toolCalls.some((tc) => tc.status === 'running')
+      ? { ...a, toolCalls: a.toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc)) }
+      : a,
+  )
+}
+
 function appendAssistantDelta(messages: Message[], delta: string, agentId: string, now: number): Message[] {
   const last = messages[messages.length - 1]
   if (last && last.role === 'assistant') {
@@ -170,12 +180,12 @@ export function applyServerMessage(
       }))
 
     case 'message:complete':
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, msg.message) }))
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, msg.message), agents: coerceRunningTools(s.agents) }))
 
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
-      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null }))
+      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, agents: coerceRunningTools(s.agents) }))
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
 
     case 'session:list:result': {

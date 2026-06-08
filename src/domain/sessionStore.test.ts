@@ -199,6 +199,18 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'finished', output: 'ok' })
   })
 
+  it('message:complete coerces any still-running tool to error (matches persisted trace)', () => {
+    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }], messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
+    const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: { id: 'a1', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, stopped: true } }, 5)
+    expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'error', error: 'interrupted' })
+  })
+
+  it('error CANCELLED coerces still-running tools to error', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].agents[0].toolCalls[0].status).toBe('error')
+  })
+
   it('session:loaded hydrates toolCalls + delegation from agentRuns', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {

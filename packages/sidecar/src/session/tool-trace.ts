@@ -62,6 +62,12 @@ export interface ConsumeCtx {
 export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable<ToolCallStreamLike>, ctx: ConsumeCtx): Promise<void> {
   for await (const tc of toolCalls) {
     if (tc.name === 'task') continue
+    // The result Promises are created eagerly by the stream and may reject on tool-error or
+    // stream teardown. Attach no-op catches up front so branches that don't await them (the
+    // error path, the non-terminal return) and aborts that bypass them never leak an unhandled
+    // rejection. The awaits below still read the settled values independently.
+    void Promise.resolve(tc.output).catch(() => {})
+    void Promise.resolve(tc.error).catch(() => {})
     const seq = ctx.nextSeq()
     const inClip = clip(stringify(tc.input))
     ctx.record.start(agentId, tc.callId, tc.name, inClip.text, seq, inClip.truncated)

@@ -111,6 +111,19 @@ describe('consumeToolCalls', () => {
     expect(runs.get('coder')!.toolCalls.get('c1')!.truncated).toBe(true)
   })
 
+  it('swallows a rejected output Promise on the error path (no unhandled rejection)', async () => {
+    const runs = new Map<string, TraceRun>([['coder', freshRun()]])
+    const sent: ServerMessage[] = []
+    const pending: Promise<void>[] = []
+    await consumeToolCalls('coder', iter(
+      fakeTool({ name: 'write_file', callId: 'c1', status: Promise.resolve('error'), error: Promise.resolve('boom'), output: Promise.reject(new Error('torn down')) }),
+    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    await Promise.allSettled(pending)
+    // let any unhandled rejection surface before the test ends
+    await new Promise((r) => setTimeout(r, 10))
+    expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ status: 'error', error: 'boom' })
+  })
+
   it('does not emit tool:finished for a non-terminal (running) status', async () => {
     const runs = new Map<string, TraceRun>([['coder', freshRun()]])
     const sent: ServerMessage[] = []

@@ -14,6 +14,7 @@ export interface Message {
   content: string
   agentId?: string
   timestamp: number
+  stopped?: boolean // assistant turn was cancelled mid-stream; partial content kept
 }
 
 export interface AgentRun {
@@ -52,6 +53,7 @@ export type ClientMessage =
   | { type: 'session:destroy'; sessionId: string }
   | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
   | { type: 'message:cancel'; sessionId: string }
+  | { type: 'message:regenerate'; sessionId: string }
   | { type: 'session:list' }
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }

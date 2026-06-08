@@ -60,6 +60,8 @@ export type ClientMessage =
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
+  | { type: 'fs:lsCwd'; cwd: string; path: string }
+  | { type: 'fs:readCwd'; cwd: string; path: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -77,3 +79,5 @@ export type ServerMessage =
   | { type: 'session:cwd'; sessionId: string; cwd: string }
   | { type: 'fs:ls:result'; sessionId: string; path: string; entries: FsEntry[]; error?: string }
   | { type: 'fs:read:result'; sessionId: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
+  | { type: 'fs:lsCwd:result'; cwd: string; path: string; entries: FsEntry[]; error?: string }
+  | { type: 'fs:readCwd:result'; cwd: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }

@@ -48,6 +48,9 @@ export class SessionManager {
       case 'message:cancel':
         this.sessions.get(msg.sessionId)?.cancel()
         break
+      case 'message:regenerate':
+        await this.ensureSession(msg.sessionId).regenerate(send)
+        break
       case 'session:list':
         send({ type: 'session:list:result', sessions: this.store?.listSessions() ?? [] })
         break

@@ -84,6 +84,15 @@ describe.skipIf(!hasKey)('Session with real DeepSeek API', () => {
     await promise
     clearInterval(checkInterval)
 
-    expect(events.some((e) => e.type === 'error')).toBe(true)
+    // Task 6: on cancel with a non-empty partial, we persist + emit message:complete (stopped=true)
+    // rather than an error. An empty partial (no tokens yet) still emits CANCELLED.
+    const hasPartial = events.some((e) => e.type === 'token:stream')
+    if (hasPartial) {
+      const complete = events.find((e) => e.type === 'message:complete') as (AnyServerMessage & { message?: { stopped?: boolean } }) | undefined
+      expect(complete).toBeDefined()
+      expect(complete?.message?.stopped).toBe(true)
+    } else {
+      expect(events.some((e) => e.type === 'error')).toBe(true)
+    }
   })
 })

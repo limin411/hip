@@ -97,10 +97,18 @@ describe.skipIf(!apiKey)('Session real multi-agent orchestration (DeepSeek)', ()
       await promise
       clearInterval(checkInterval)
 
-      // Cancellation surfaced as a CANCELLED error.
-      const err = events.find((e) => e.type === 'error')
-      expect(err).toBeDefined()
-      expect((err as Ev).code).toBe('CANCELLED')
+      // Task 6: on cancel with tokens received, we persist the partial (message:complete, stopped=true).
+      // An empty partial (no tokens yet) still emits CANCELLED.
+      const hasPartial = events.some((e) => e.type === 'token:stream')
+      if (hasPartial) {
+        const complete = events.find((e) => e.type === 'message:complete') as (Ev & { message?: { stopped?: boolean } }) | undefined
+        expect(complete).toBeDefined()
+        expect(complete?.message?.stopped).toBe(true)
+      } else {
+        const err = events.find((e) => e.type === 'error')
+        expect(err).toBeDefined()
+        expect((err as Ev).code).toBe('CANCELLED')
+      }
 
       // No agent left hanging: every started agent got a finished.
       const finished = finishedIds(events)

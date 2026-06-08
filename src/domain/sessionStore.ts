@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary } from '@hip/protocol'
+import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, ToolCall } from '@hip/protocol'
 
 export type AgentStatus = 'idle' | 'running' | 'done'
 
@@ -13,6 +13,9 @@ export interface AgentVM {
   tokenCount: number   // 物化：tokens.length
   elapsedMs: number    // 物化：finishedAt - startedAt
   startedAt: number    // 内部：agent:started 时的 now（不渲染）
+  toolCalls: ToolCall[]      // 执行轨迹，按 seq 排序
+  taskInput?: string         // 子代理收到的委派指令
+  parentAgentId?: string     // 委派者（子代理恒为 'supervisor'）
 }
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
@@ -74,7 +77,16 @@ function summaryToVM(s: SessionSummary): SessionVM {
 }
 
 function agentVMfromRun(r: AgentRun): AgentVM {
-  return { id: r.agentId, role: r.role, title: ROLE_TITLE[r.role], status: r.finishedAt ? 'done' : 'running', tokens: r.output, tokenCount: r.output.length, elapsedMs: r.finishedAt ? r.finishedAt - r.startedAt : 0, startedAt: r.startedAt }
+  return {
+    id: r.agentId, role: r.role, title: ROLE_TITLE[r.role],
+    status: r.finishedAt ? 'done' : 'running',
+    tokens: r.output, tokenCount: r.output.length,
+    elapsedMs: r.finishedAt ? r.finishedAt - r.startedAt : 0,
+    startedAt: r.startedAt,
+    toolCalls: r.toolCalls ?? [],
+    ...(r.taskInput ? { taskInput: r.taskInput } : {}),
+    ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
+  }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -107,6 +119,9 @@ export function applyServerMessage(
           tokenCount: 0,
           elapsedMs: 0,
           startedAt: now,
+          toolCalls: [],
+          ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
+          ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
         }),
       }))
 
@@ -125,6 +140,33 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({
         ...s,
         agents: s.agents.map((a) => (a.id === msg.agentId ? { ...a, status: 'done', elapsedMs: now - a.startedAt } : a)),
+      }))
+
+    case 'tool:started':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        agents: s.agents.map((a) =>
+          a.id === msg.agentId
+            ? { ...a, toolCalls: [...a.toolCalls, { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running' as const, seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }] }
+            : a,
+        ),
+      }))
+
+    case 'tool:finished':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        agents: s.agents.map((a) =>
+          a.id === msg.agentId
+            ? {
+                ...a,
+                toolCalls: a.toolCalls.map((tc) =>
+                  tc.callId === msg.callId
+                    ? { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
+                    : tc,
+                ),
+              }
+            : a,
+        ),
       }))
 
     case 'message:complete':

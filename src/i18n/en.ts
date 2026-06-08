@@ -46,7 +46,6 @@ export const en = {
       noDiff: 'No diff yet',
       noDiffDesc: 'Changes made by agents will appear here',
       waiting: 'Waiting…',
-      parallelAgents: 'Sub-agents',
       subAgents: 'Sub-agents',
       toolsCount: '{{count}} tools',
       delegatedBy: 'delegated by',

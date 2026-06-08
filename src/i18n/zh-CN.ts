@@ -46,7 +46,6 @@ export const zhCN = {
       noDiff: '暂无 Diff',
       noDiffDesc: '智能体修改代码后，变更将显示在这里',
       waiting: '等待中…',
-      parallelAgents: '协作子智能体',
       subAgents: '子智能体',
       toolsCount: '{{count}} 次工具调用',
       delegatedBy: '委派自',

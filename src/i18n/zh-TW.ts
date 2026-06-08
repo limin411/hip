@@ -46,7 +46,6 @@ export const zhTW = {
       noDiff: '暫無 Diff',
       noDiffDesc: '智能體修改代碼後，變更將顯示在這裡',
       waiting: '等待中…',
-      parallelAgents: '協作子智能體',
       subAgents: '子智能體',
       toolsCount: '{{count}} 次工具調用',
       delegatedBy: '委派自',

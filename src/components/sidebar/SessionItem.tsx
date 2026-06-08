@@ -48,6 +48,7 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+          data-testid="session-item"
           onClick={editing ? undefined : onSelect}
           className={cn(
             'group flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors',

@@ -50,7 +50,7 @@ describe('SessionService', () => {
   it('inbound ServerMessage flows into the store', () => {
     const t = new FakeTransport()
     new SessionService(t)
-    t.push({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'planner' })
+    t.push({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'planner', turnId: 't1' })
     expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Planner')
   })
 

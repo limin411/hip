@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, ToolCall } from '@hip/protocol'
+import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
 export type AgentStatus = 'idle' | 'running' | 'done'
 
@@ -59,6 +59,33 @@ function coerceRunningTools(agents: AgentVM[]): AgentVM[] {
       ? { ...a, toolCalls: a.toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc)) }
       : a,
   )
+}
+
+/** Mirror of coerceRunningTools for a Message-level ToolCall[]: turn-end sweep so a
+ *  delivered/finalized message matches the persisted trace after a cancel/interruption. */
+function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] | undefined {
+  if (!toolCalls?.some((tc) => tc.status === 'running')) return toolCalls
+  return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
+}
+
+/** Ensure the provisional assistant message keyed by turnId exists (idempotent). */
+function ensureAssistantMessage(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
+  if (messages.some((m) => m.id === turnId)) return messages
+  return [...messages, { id: turnId, role: 'assistant', content: '', agentId, timestamp: now, timeline: [], toolCalls: [] }]
+}
+
+/** Upsert a reasoning step on the turn's message: same stepSeq concatenates the delta. No-op if the turn is unknown. */
+function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: number; agentId: string; role: AgentRole; delta: string }): Message[] {
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return messages.map((m) => {
+    if (m.id !== turnId) return m
+    const timeline = m.timeline ?? []
+    const exists = timeline.some((t) => t.kind === 'reasoning' && t.stepSeq === step.stepSeq)
+    const nextTimeline = exists
+      ? timeline.map((t) => (t.kind === 'reasoning' && t.stepSeq === step.stepSeq ? { ...t, content: t.content + step.delta } : t))
+      : [...timeline, { kind: 'reasoning' as const, stepSeq: step.stepSeq, agentId: step.agentId, role: step.role, content: step.delta }]
+    return { ...m, timeline: nextTimeline }
+  })
 }
 
 function appendAssistantDelta(messages: Message[], delta: string, agentId: string, now: number): Message[] {
@@ -120,6 +147,7 @@ export function applyServerMessage(
         ...s,
         status: 'running',
         error: null,
+        messages: msg.role === 'supervisor' ? ensureAssistantMessage(s.messages, msg.turnId, msg.agentId, now) : s.messages,
         agents: upsertAgent(s.agents, {
           id: msg.agentId,
           role: msg.role,
@@ -146,6 +174,12 @@ export function applyServerMessage(
         return { ...s, agents, messages }
       })
 
+    case 'reasoning:delta':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        messages: upsertReasoning(s.messages, msg.turnId, { stepSeq: msg.stepSeq, agentId: msg.agentId, role: msg.role, delta: msg.delta }),
+      }))
+
     case 'agent:finished':
       return update(msg.sessionId, (s) => ({
         ...s,
@@ -155,6 +189,15 @@ export function applyServerMessage(
     case 'tool:started':
       return update(msg.sessionId, (s) => ({
         ...s,
+        messages: s.messages.map((m) =>
+          m.id === msg.turnId
+            ? {
+                ...m,
+                timeline: [...(m.timeline ?? []), { kind: 'tool' as const, stepSeq: msg.seq, agentId: msg.agentId, role: msg.role, callId: msg.callId } satisfies TimelineStep],
+                toolCalls: [...(m.toolCalls ?? []), { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running' as const, seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }],
+              }
+            : m,
+        ),
         agents: s.agents.map((a) =>
           a.id === msg.agentId
             ? { ...a, toolCalls: [...a.toolCalls, { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running' as const, seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }] }
@@ -165,6 +208,18 @@ export function applyServerMessage(
     case 'tool:finished':
       return update(msg.sessionId, (s) => ({
         ...s,
+        messages: s.messages.map((m) =>
+          m.toolCalls?.some((tc) => tc.callId === msg.callId)
+            ? {
+                ...m,
+                toolCalls: m.toolCalls.map((tc) =>
+                  tc.callId === msg.callId
+                    ? { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
+                    : tc,
+                ),
+              }
+            : m,
+        ),
         agents: s.agents.map((a) =>
           a.id === msg.agentId
             ? {
@@ -179,8 +234,13 @@ export function applyServerMessage(
         ),
       }))
 
-    case 'message:complete':
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, msg.message), agents: coerceRunningTools(s.agents) }))
+    case 'message:complete': {
+      const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, finalized), agents: coerceRunningTools(s.agents) }))
+    }
+
+    case 'session:thinking':
+      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
@@ -216,7 +276,7 @@ export function applyServerMessage(
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
+export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], thinking: true }
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], agents: [], status: 'idle', error: null }

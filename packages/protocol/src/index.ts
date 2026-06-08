@@ -24,6 +24,23 @@ export interface AgentRun {
   startedAt: number
   finishedAt: number | null
   seq: number
+  taskInput?: string        // instruction this sub-agent received
+  parentAgentId?: string    // who delegated (always 'supervisor' for our 2-level tree)
+  toolCalls?: ToolCall[]     // ordered by seq; hydrated from the tool_calls table
+}
+
+export type ToolStatus = 'running' | 'finished' | 'error'
+
+export interface ToolCall {
+  callId: string
+  agentId: string          // who called it: supervisor | planner | coder | reviewer
+  name: string             // 'read_file' | 'write_file' | 'edit_file' | … (never 'task')
+  input: string            // JSON-stringified args; clipped to ~4 KB if huge
+  output?: string          // JSON-stringified result; absent while running
+  status: ToolStatus
+  error?: string
+  seq: number              // monotonic per turn → deterministic ordering
+  truncated?: boolean      // input and/or output was clipped; sticky-OR
 }
 export interface SessionSummary {
   id: string
@@ -67,9 +84,11 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
-  | { type: 'agent:started'; sessionId: string; agentId: string; role: AgentRole }
+  | { type: 'agent:started'; sessionId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string }
   | { type: 'token:stream'; sessionId: string; agentId: string; delta: string }
   | { type: 'agent:finished'; sessionId: string; agentId: string }
+  | { type: 'tool:started'; sessionId: string; agentId: string; callId: string; name: string; input: string; seq: number; truncated?: boolean }
+  | { type: 'tool:finished'; sessionId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }

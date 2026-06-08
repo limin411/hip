@@ -135,4 +135,59 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')).toHaveLength(0)
     expect(store.search('可搜索内容')).toHaveLength(0)
   })
+
+  it('round-trips tool calls + delegation through insertTurn/loadAgentRuns', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3 },
+      's1',
+      [
+        { agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 3, seq: 0, toolCalls: [] },
+        {
+          agentId: 'coder', role: 'coder', output: 'wrote it', startedAt: 1, finishedAt: 2, seq: 1,
+          parentAgentId: 'supervisor', taskInput: 'implement the plan',
+          toolCalls: [
+            { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{"path":"/a.ts"}', output: 'ok', status: 'finished', seq: 2 },
+            { callId: 'c2', agentId: 'coder', name: 'read_file', input: '{"path":"/b.ts"}', status: 'error', error: 'ENOENT', seq: 3, truncated: true },
+          ],
+        },
+      ],
+    )
+    const runs = store.loadAgentRuns('s1')
+    const coder = runs.find((r) => r.agentId === 'coder')!
+    expect(coder).toMatchObject({ taskInput: 'implement the plan', parentAgentId: 'supervisor' })
+    expect(coder.toolCalls!.map((t) => [t.callId, t.name, t.status])).toEqual([
+      ['c1', 'write_file', 'finished'],
+      ['c2', 'read_file', 'error'],
+    ])
+    expect(coder.toolCalls![0]).toMatchObject({ output: 'ok' })
+    expect(coder.toolCalls![1]).toMatchObject({ error: 'ENOENT', truncated: true })
+    expect(runs.find((r) => r.agentId === 'supervisor')!.toolCalls).toEqual([])
+  })
+
+  it('deleteLastAssistantMessage cascades tool_calls', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3 },
+      's1',
+      [{ agentId: 'coder', role: 'coder', output: 'x', startedAt: 1, finishedAt: 2, seq: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 0 }] }],
+    )
+    expect(store.deleteLastAssistantMessage('s1')).toBe(true)
+    expect(store.loadAgentRuns('s1')).toHaveLength(0)
+    expect(store.countToolCalls('s1')).toBe(0)
+  })
+
+  it('deleteSession cascades tool_calls', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3 },
+      's1',
+      [{ agentId: 'coder', role: 'coder', output: 'x', startedAt: 1, finishedAt: 2, seq: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 0 }] }],
+    )
+    store.deleteSession('s1')
+    expect(store.countToolCalls('s1')).toBe(0)
+  })
 })

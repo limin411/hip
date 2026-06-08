@@ -1,5 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit } from '@hip/protocol'
+import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit, ToolCall, ToolStatus } from '@hip/protocol'
 
 const PREVIEW_LEN = 80
 
@@ -59,11 +59,18 @@ export class SessionStore {
       if (assistant) {
         this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
       }
-      const stmt = this.db.prepare(
-        `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?)`,
+      const runStmt = this.db.prepare(
+        `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+      )
+      const toolStmt = this.db.prepare(
+        `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
       )
       for (const run of runs) {
-        stmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt)
+        const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null)
+        const runId = info.lastInsertRowid
+        for (const tc of run.toolCalls ?? []) {
+          toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
+        }
       }
       this.db.exec('COMMIT')
     } catch (e) {
@@ -79,9 +86,19 @@ export class SessionStore {
   }
 
   loadAgentRuns(sessionId: string): AgentRun[] {
-    const rows = this.db.prepare(`SELECT agent_id,role,output,started_at,finished_at,seq FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number }[]
-    return rows.map((r) => ({ agentId: r.agent_id, role: r.role, output: r.output, startedAt: r.started_at, finishedAt: r.finished_at, seq: r.seq }))
+    const rows = this.db.prepare(`SELECT id,agent_id,role,output,started_at,finished_at,seq,task_input,parent_agent_id FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: number; agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number; task_input: string | null; parent_agent_id: string | null }[]
+    const toolStmt = this.db.prepare(`SELECT call_id,agent_id,name,input,output,status,error,seq,truncated FROM tool_calls WHERE agent_run_id=? ORDER BY seq`)
+    return rows.map((r) => {
+      const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
+        .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
+      return { agentId: r.agent_id, role: r.role, output: r.output, startedAt: r.started_at, finishedAt: r.finished_at, seq: r.seq, ...(r.task_input != null ? { taskInput: r.task_input } : {}), ...(r.parent_agent_id != null ? { parentAgentId: r.parent_agent_id } : {}), toolCalls: tools }
+    })
+  }
+
+  /** Test/diagnostic helper: total tool_calls rows for a session. */
+  countToolCalls(sessionId: string): number {
+    return (this.db.prepare(`SELECT COUNT(*) AS n FROM tool_calls WHERE session_id=?`).get(sessionId) as { n: number }).n
   }
 
   listSessions(): SessionSummary[] {

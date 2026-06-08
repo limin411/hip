@@ -125,6 +125,7 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'hello' })
     expect(useDraftStore.getState().draft).toBeNull()
     expect(useDomainStore.getState().activeSessionId).toBe(create.id)
+    expect(useFsStore.getState().bySession['/proj']).toMatchObject({ activePath: null, entriesByDir: {} })
   })
 
   it('commits a chat draft with no cwd in the config', () => {
@@ -154,6 +155,13 @@ describe('SessionService', () => {
     new SessionService(t)
     t.push({ type: 'fs:lsCwd:result', cwd: '/proj', path: '/proj', entries: [{ name: 'a.md', path: '/proj/a.md', isDir: false }] })
     expect(useFsStore.getState().bySession['/proj'].entriesByDir['/proj']).toHaveLength(1)
+  })
+
+  it('fs:readCwd:result populates the preview under the cwd key', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:readCwd:result', cwd: '/proj', path: '/proj/a.md', content: '# Hi', encoding: 'utf8', mimeType: 'text/markdown' })
+    expect(useFsStore.getState().bySession['/proj'].preview).toMatchObject({ status: 'ready', content: '# Hi' })
   })
 
   it('newConversation ensures a draft and deselects the active session', () => {

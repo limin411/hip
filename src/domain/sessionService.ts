@@ -112,6 +112,8 @@ export class SessionService {
     useDomainStore.getState().deselect()
   }
 
+  // Draft FS: fsStore is keyed by an arbitrary scope string — a committed session's
+  // nanoid id, or (for an un-committed draft) its absolute cwd. The two never collide.
   /** List a directory for an un-committed draft (cwd-keyed, no session). */
   lsDraft(cwd: string, path: string): void {
     this.transport.send({ type: 'fs:lsCwd', cwd, path })

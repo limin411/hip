@@ -4,18 +4,12 @@ import { ChevronRight, Brain } from 'lucide-react'
 import type { AgentRole, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
-
-const ROLE_COLOR: Record<AgentRole, string> = {
-  supervisor: 'var(--role-supervisor)',
-  planner: 'var(--role-planner)',
-  coder: 'var(--role-coder)',
-  reviewer: 'var(--role-reviewer)',
-}
+import { ROLE_COLOR } from '@/lib/roleColor'
 
 function AgentBadge({ role }: { role: AgentRole }) {
   return (
     <span
-      className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
       style={{ background: ROLE_COLOR[role] }}
       aria-hidden
     />
@@ -49,7 +43,7 @@ function ThinkingDisclosure({
             size={12}
             className={cn('shrink-0 transition-transform', open && 'rotate-90')}
           />
-          <Brain size={12} className="shrink-0" />
+          <Brain size={12} className="shrink-0" aria-hidden />
           <span>{label}</span>
         </button>
         {open && (
@@ -65,11 +59,10 @@ function ThinkingDisclosure({
 interface TurnTimelineProps {
   steps?: TimelineStep[]
   toolCalls?: ToolCall[]
-  onToolClick?: (callId: string) => void
 }
 
 /** Inline, flat per-turn activity (reasoning + tool steps), ordered by the turn-global stepSeq. */
-export function TurnTimeline({ steps, toolCalls, onToolClick }: TurnTimelineProps) {
+export function TurnTimeline({ steps, toolCalls }: TurnTimelineProps) {
   if (!steps || steps.length === 0) return null
   const ordered = [...steps].sort((a, b) => a.stepSeq - b.stepSeq)
   const byCallId = new Map((toolCalls ?? []).map((tc) => [tc.callId, tc]))
@@ -90,10 +83,7 @@ export function TurnTimeline({ steps, toolCalls, onToolClick }: TurnTimelineProp
         return (
           <div key={`t-${step.stepSeq}`} className="flex gap-2">
             <AgentBadge role={step.role} />
-            <div
-              className="min-w-0 flex-1"
-              onClickCapture={onToolClick ? () => onToolClick(step.callId) : undefined}
-            >
+            <div className="min-w-0 flex-1">
               <ToolCallRow tool={tool} />
             </div>
           </div>

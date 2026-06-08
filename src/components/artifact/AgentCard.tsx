@@ -1,17 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
-import type { AgentRole } from '@hip/protocol'
 import type { AgentVM } from '@/domain'
 import { cn } from '@/lib/utils'
+import { ROLE_COLOR } from '@/lib/roleColor'
 import { ToolTrace } from './ToolTrace'
-
-const ROLE_COLOR: Record<AgentRole, string> = {
-  supervisor: 'var(--role-supervisor)',
-  planner: 'var(--role-planner)',
-  coder: 'var(--role-coder)',
-  reviewer: 'var(--role-reviewer)',
-}
 
 function StatusDot({ status, color }: { status: AgentVM['status']; color: string }) {
   if (status === 'running') return <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: color }} />

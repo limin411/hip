@@ -6,6 +6,7 @@ import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { SUBAGENTS, SUPERVISOR_PROMPT, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
+import { consumeToolCalls, trajectoryToRuns, type TraceRun, type TraceRecorder } from './tool-trace.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -31,7 +32,6 @@ export function sanitizeTitle(raw: string): string {
 
 export type TitleGenerator = (input: { firstUserMessage: string; firstReply: string }) => Promise<string>
 
-type Run = { role: AgentRole; output: string; startedAt: number; finishedAt: number | null; seq: number }
 
 const TITLE_SYSTEM_PROMPT =
   'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
@@ -63,6 +63,15 @@ function buildModel(config: SessionConfig): ChatOpenAI {
       baseURL: 'https://api.deepseek.com/v1',
     },
   })
+}
+
+/** Resolve a sub-agent's delegation instruction defensively (it is known at delegation time). */
+async function safeTaskInput(sub: { taskInput: Promise<string> }): Promise<string | undefined> {
+  try {
+    return await sub.taskInput
+  } catch {
+    return undefined
+  }
 }
 
 export class Session {
@@ -194,14 +203,31 @@ export class Session {
     this.abortController = new AbortController()
     this.running = true
 
-    const trajectory = new Map<string, Run>()
+    const trajectory = new Map<string, TraceRun>()
     let agentSeq = 0
+    let toolSeq = 0
+    const pending: Promise<void>[] = []
     const started = new Set<string>()
-    const ensureStarted = (agentId: string, role: AgentRole) => {
+    const recorder: TraceRecorder = {
+      start: (agentId, callId, name, input, seq, truncated) => {
+        const r = trajectory.get(agentId)
+        if (r) r.toolCalls.set(callId, { callId, agentId, name, input, status: 'running', seq, ...(truncated ? { truncated: true } : {}) })
+      },
+      finish: (agentId, callId, status, output, error, truncated) => {
+        const tc = trajectory.get(agentId)?.toolCalls.get(callId)
+        if (!tc) return
+        tc.status = status
+        if (output !== undefined) tc.output = output
+        if (error !== undefined) tc.error = error
+        if (truncated || tc.truncated) tc.truncated = true   // sticky-OR
+      },
+    }
+    const traceCtx = { sessionId: this.id, send, nextSeq: () => toolSeq++, pending, record: recorder }
+    const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
       if (started.has(agentId)) return
       started.add(agentId)
-      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++ })
-      send({ type: 'agent:started', sessionId: this.id, agentId, role })
+      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      send({ type: 'agent:started', sessionId: this.id, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
     }
     const finishRemaining = () => {
       for (const id of started) {
@@ -231,25 +257,33 @@ export class Session {
       const pumpSubagents = async () => {
         for await (const sub of run.subagents) {
           const agentId = sub.name
-          ensureStarted(agentId, roleForName(sub.name))
-          for await (const msg of sub.messages) {
-            for await (const delta of msg.text) {
-              if (!delta) continue
-              const r = trajectory.get(agentId); if (r) r.output += delta
-              send({ type: 'token:stream', sessionId: this.id, agentId, delta })
-            }
-          }
+          const taskInput = await safeTaskInput(sub)
+          ensureStarted(agentId, roleForName(sub.name), 'supervisor', taskInput)
+          await Promise.all([
+            (async () => {
+              for await (const msg of sub.messages) {
+                for await (const delta of msg.text) {
+                  if (!delta) continue
+                  const r = trajectory.get(agentId); if (r) r.output += delta
+                  send({ type: 'token:stream', sessionId: this.id, agentId, delta })
+                }
+              }
+            })(),
+            consumeToolCalls(agentId, sub.toolCalls, traceCtx),
+          ])
           if (started.delete(agentId)) {
             const r = trajectory.get(agentId); if (r) r.finishedAt = Date.now()
             send({ type: 'agent:finished', sessionId: this.id, agentId })
           }
         }
       }
-      await Promise.all([pumpSupervisor(), pumpSubagents()])
+      await Promise.all([pumpSupervisor(), pumpSubagents(), consumeToolCalls('supervisor', run.toolCalls, traceCtx)])
+      await Promise.allSettled(pending)
       finishRemaining()
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
       finishRemaining()
+      await Promise.allSettled(pending)
       if (isAbort && supervisorText) {
         // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
         this.finalizeAndPersist(send, supervisorText, trajectory, true)
@@ -272,13 +306,11 @@ export class Session {
   }
 
   /** Push the assistant message into context, persist the turn, and emit message:complete. */
-  private finalizeAndPersist(send: SendFn, supervisorText: string, trajectory: Map<string, Run>, stopped: boolean): void {
+  private finalizeAndPersist(send: SendFn, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean): void {
     if (supervisorText) this.messages.push(new AIMessage(supervisorText))
     const ts = Date.now()
     const assistantId = `asst-supervisor-${ts}`
-    const runs: AgentRun[] = [...trajectory.entries()].map(([agentId, r]) => ({
-      agentId, role: r.role, output: r.output, startedAt: r.startedAt, finishedAt: r.finishedAt, seq: r.seq,
-    }))
+    const runs: AgentRun[] = trajectoryToRuns(trajectory)
     if (this.store) {
       this.store.insertTurn(
         supervisorText ? { id: assistantId, sessionId: this.id, agentId: 'supervisor', content: supervisorText, timestamp: ts, stopped } : null,

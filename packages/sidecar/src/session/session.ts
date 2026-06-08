@@ -242,12 +242,17 @@ export class Session {
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
       finishRemaining()
-      send({
-        type: 'error',
-        sessionId: this.id,
-        code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
-        message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
-      })
+      if (isAbort && supervisorText) {
+        // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
+        this.finalizeAndPersist(send, supervisorText, trajectory, true)
+      } else {
+        send({
+          type: 'error',
+          sessionId: this.id,
+          code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
+          message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
+        })
+      }
       return ''
     } finally {
       this.running = false

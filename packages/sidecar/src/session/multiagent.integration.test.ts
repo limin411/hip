@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { ChatOpenAI } from '@langchain/openai'
 import { Session } from './session.js'
+import { openDatabase } from '../persistence/open.js'
+import { SessionStore } from '../persistence/store.js'
 
 const apiKey = process.env.DEEPSEEK_API_KEY
 
@@ -105,6 +107,33 @@ describe.skipIf(!apiKey)('Session real multi-agent orchestration (DeepSeek)', ()
       for (const id of startedIds(events)) {
         expect(finished.has(id)).toBe(true)
       }
+    },
+    90_000,
+  )
+
+  it(
+    'on cancel keeps the partial reply, persisted with stopped=true',
+    async () => {
+      const { db, ftsEnabled } = openDatabase(':memory:')
+      const store = new SessionStore(db, ftsEnabled)
+      store.insertSession({ id: 'it-cancel-persist', title: '新对话', config: JSON.stringify({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }), createdAt: 1, updatedAt: 1 })
+      const session = new Session('it-cancel-persist', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, createModel(), store)
+
+      const events: Ev[] = []
+      const promise = session.sendMessage('Write a very long, detailed TypeScript module with many functions.', (m) => events.push(m as Ev), 'u1')
+      const checkInterval = setInterval(() => {
+        if (events.some((e) => e.type === 'token:stream')) { session.cancel(); clearInterval(checkInterval) }
+      }, 50)
+      await promise
+      clearInterval(checkInterval)
+
+      const msgs = store.loadMessages('it-cancel-persist')
+      const asst = msgs.find((m) => m.role === 'assistant')
+      expect(asst).toBeDefined()
+      expect(asst!.stopped).toBe(true)
+      expect((asst!.content ?? '').length).toBeGreaterThan(0)
+      // The partial was finalized for the client too.
+      expect(events.some((e) => e.type === 'message:complete')).toBe(true)
     },
     90_000,
   )

@@ -19,14 +19,9 @@ export function ChatPane() {
     }
   }, [messages.length, error])
 
-  if (messages.length === 0 && !error) {
-    return (
-      <div className="flex flex-1 items-center justify-center text-[13px] text-ink-tertiary">
-        {t('chat.sendMessage')}
-      </div>
-    )
-  }
-
+  // The empty/new-conversation state is owned by <NewConversation> (shown when no
+  // session is active). A committed session that's still loading renders an empty
+  // transcript here (not a placeholder), so we never flash "send a message" over it.
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-6">

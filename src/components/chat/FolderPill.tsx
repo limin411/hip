@@ -28,14 +28,20 @@ export function FolderPill() {
       <div className="flex items-center gap-2 text-[12px] text-ink-secondary">
         <button
           onClick={pick}
-          data-testid="pick-folder"
+          data-testid="change-folder"
           title={bound}
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 hover:bg-surface-muted"
         >
           <Folder size={13} className="text-accent" />
           {basename(bound)}
         </button>
-        <button onClick={() => useDraftStore.getState().clearProject()} className="text-ink-tertiary hover:text-ink">
+        <button
+          onClick={() => useDraftStore.getState().clearProject()}
+          data-testid="clear-folder"
+          title={t('chat.clearFolder')}
+          aria-label={t('chat.clearFolder')}
+          className="text-ink-tertiary hover:text-ink"
+        >
           {t('chat.clearFolder')}
         </button>
       </div>

@@ -286,6 +286,23 @@ export class Session {
     })
   }
 
+  /** Re-run the last turn: drop the trailing assistant reply (if any) and stream a fresh one. */
+  async regenerate(send: SendFn): Promise<void> {
+    if (this.running) return
+    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
+      send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
+      return
+    }
+    const tail = this.messages[this.messages.length - 1]
+    if (tail instanceof AIMessage) {
+      this.messages.pop()
+      this.store?.deleteLastAssistantMessage(this.id)
+    }
+    // After dropping an assistant reply, the tail must be the user turn to redo.
+    if (!(this.messages[this.messages.length - 1] instanceof HumanMessage)) return
+    await this.runTurn(send)
+  }
+
   cancel(): void {
     this.abortController?.abort()
   }

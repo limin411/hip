@@ -23,6 +23,13 @@ export const zhTW = {
       pickFolder: '選擇專案資料夾',
       orJustChat: '或直接對話（沙箱）',
       clearFolder: '純對話',
+      stop: '停止',
+      copy: '複製',
+      copyCode: '複製程式碼',
+      regenerate: '重新生成',
+      thinking: '思考中…',
+      retry: '重試',
+      stopped: '已停止',
     },
     sidebar: {
       collapse: '折疊側邊欄',

@@ -23,6 +23,13 @@ export const zhCN = {
       pickFolder: '选择项目文件夹',
       orJustChat: '或直接对话（沙箱）',
       clearFolder: '纯对话',
+      stop: '停止',
+      copy: '复制',
+      copyCode: '复制代码',
+      regenerate: '重新生成',
+      thinking: '思考中…',
+      retry: '重试',
+      stopped: '已停止',
     },
     sidebar: {
       collapse: '折叠侧边栏',

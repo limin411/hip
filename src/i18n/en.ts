@@ -23,6 +23,13 @@ export const en = {
       pickFolder: 'Choose project folder',
       orJustChat: 'or just chat (sandbox)',
       clearFolder: 'Pure chat',
+      stop: 'Stop',
+      copy: 'Copy',
+      copyCode: 'Copy code',
+      regenerate: 'Regenerate',
+      thinking: 'Thinking…',
+      retry: 'Retry',
+      stopped: 'Stopped',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

@@ -31,6 +31,8 @@ export function sanitizeTitle(raw: string): string {
 
 export type TitleGenerator = (input: { firstUserMessage: string; firstReply: string }) => Promise<string>
 
+type Run = { role: AgentRole; output: string; startedAt: number; finishedAt: number | null; seq: number }
+
 const TITLE_SYSTEM_PROMPT =
   'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
   'Use the same language as the user. Reply with ONLY the title — no quotes, no trailing punctuation.'
@@ -69,6 +71,7 @@ export class Session {
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
+  private running = false
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
 
@@ -142,12 +145,7 @@ export class Session {
 
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
     if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
-      _send({
-        type: 'error',
-        sessionId: this.id,
-        code: 'NO_API_KEY',
-        message: 'DeepSeek API key not configured. Set it in Settings.',
-      })
+      _send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
       return
     }
 
@@ -167,120 +165,9 @@ export class Session {
     }
 
     this.messages.push(new HumanMessage(content))
-    this.abortController = new AbortController()
-
-    // Trajectory: per-agent accumulated output + timings, in start order.
-    type Run = { role: AgentRole; output: string; startedAt: number; finishedAt: number | null; seq: number }
-    const trajectory = new Map<string, Run>()
-    let agentSeq = 0
-
-    const started = new Set<string>()
-    const ensureStarted = (agentId: string, role: AgentRole) => {
-      if (started.has(agentId)) return
-      started.add(agentId)
-      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++ })
-      _send({ type: 'agent:started', sessionId: this.id, agentId, role })
-    }
-    const finishRemaining = () => {
-      for (const id of started) {
-        const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
-        _send({ type: 'agent:finished', sessionId: this.id, agentId: id })
-      }
-      started.clear()
-    }
-
-    let supervisorText = ''
-    // The supervisor always runs; announce it up front so its card appears even
-    // if it delegates without emitting any top-level text of its own.
-    ensureStarted('supervisor', 'supervisor')
-    try {
-      const run = await this.agent.streamEvents(
-        { messages: this.messages },
-        { version: 'v3', signal: this.abortController.signal },
-      )
-
-      const pumpSupervisor = async () => {
-        for await (const msg of run.messages) {
-          for await (const delta of msg.text) {
-            if (!delta) continue
-            supervisorText += delta
-            const r = trajectory.get('supervisor'); if (r) r.output += delta
-            _send({ type: 'token:stream', sessionId: this.id, agentId: 'supervisor', delta })
-          }
-        }
-      }
-
-      const pumpSubagents = async () => {
-        for await (const sub of run.subagents) {
-          const agentId = sub.name
-          ensureStarted(agentId, roleForName(sub.name))
-          for await (const msg of sub.messages) {
-            for await (const delta of msg.text) {
-              if (!delta) continue
-              const r = trajectory.get(agentId); if (r) r.output += delta
-              _send({ type: 'token:stream', sessionId: this.id, agentId, delta })
-            }
-          }
-          if (started.delete(agentId)) {
-            const r = trajectory.get(agentId); if (r) r.finishedAt = Date.now()
-            _send({ type: 'agent:finished', sessionId: this.id, agentId })
-          }
-        }
-      }
-
-      await Promise.all([pumpSupervisor(), pumpSubagents()])
-      finishRemaining()
-    } catch (err) {
-      const isAbort = err instanceof Error && err.name === 'AbortError'
-      finishRemaining()
-      _send({
-        type: 'error',
-        sessionId: this.id,
-        code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
-        message: isAbort
-          ? 'User cancelled the request'
-          : err instanceof Error
-            ? err.message
-            : String(err),
-      })
-      return
-    }
-
-    // Don't append an empty assistant turn — some providers reject an empty
-    // assistant message on the next request, corrupting multi-turn history.
-    if (supervisorText) this.messages.push(new AIMessage(supervisorText))
-
-    const ts = Date.now()
-    const assistantId = `asst-supervisor-${ts}`
-    // Trajectory is keyed by agentId — build AgentRun[] directly from its entries.
-    const runs: AgentRun[] = [...trajectory.entries()].map(([agentId, r]) => ({
-      agentId, role: r.role, output: r.output, startedAt: r.startedAt, finishedAt: r.finishedAt, seq: r.seq,
-    }))
-    // Persist the turn (assistant message only when non-empty, matching LangChain history).
-    if (this.store) {
-      this.store.insertTurn(
-        supervisorText ? { id: assistantId, sessionId: this.id, agentId: 'supervisor', content: supervisorText, timestamp: ts } : null,
-        this.id,
-        runs,
-      )
-      this.store.touchSession(this.id, ts)
-    }
-
-    _send({
-      type: 'message:complete',
-      sessionId: this.id,
-      message: {
-        id: assistantId,
-        role: 'assistant',
-        content: supervisorText,
-        agentId: 'supervisor',
-        timestamp: ts,
-      },
-    })
+    const supervisorText = await this.runTurn(_send)
 
     // Auto-title refine: once, on the first turn, only while still auto-titled.
-    // Best-effort — failures keep the truncated title. The pinned guard lives in
-    // updateTitleIfAuto, so a rename during this turn wins (changes === 0 here).
     if (isFirstTurn && this.titleGenerator && supervisorText && this.store) {
       try {
         const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: content, firstReply: supervisorText }))
@@ -291,6 +178,107 @@ export class Session {
         // swallow: the title is non-critical
       }
     }
+  }
+
+  /** Stream one turn for the HumanMessage already at the tail of this.messages.
+   *  Returns the supervisor text on clean completion, or '' on abort/error. */
+  private async runTurn(send: SendFn): Promise<string> {
+    this.abortController = new AbortController()
+    this.running = true
+
+    const trajectory = new Map<string, Run>()
+    let agentSeq = 0
+    const started = new Set<string>()
+    const ensureStarted = (agentId: string, role: AgentRole) => {
+      if (started.has(agentId)) return
+      started.add(agentId)
+      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++ })
+      send({ type: 'agent:started', sessionId: this.id, agentId, role })
+    }
+    const finishRemaining = () => {
+      for (const id of started) {
+        const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
+        send({ type: 'agent:finished', sessionId: this.id, agentId: id })
+      }
+      started.clear()
+    }
+
+    let supervisorText = ''
+    ensureStarted('supervisor', 'supervisor')
+    try {
+      const run = await this.agent.streamEvents(
+        { messages: this.messages },
+        { version: 'v3', signal: this.abortController.signal },
+      )
+      const pumpSupervisor = async () => {
+        for await (const msg of run.messages) {
+          for await (const delta of msg.text) {
+            if (!delta) continue
+            supervisorText += delta
+            const r = trajectory.get('supervisor'); if (r) r.output += delta
+            send({ type: 'token:stream', sessionId: this.id, agentId: 'supervisor', delta })
+          }
+        }
+      }
+      const pumpSubagents = async () => {
+        for await (const sub of run.subagents) {
+          const agentId = sub.name
+          ensureStarted(agentId, roleForName(sub.name))
+          for await (const msg of sub.messages) {
+            for await (const delta of msg.text) {
+              if (!delta) continue
+              const r = trajectory.get(agentId); if (r) r.output += delta
+              send({ type: 'token:stream', sessionId: this.id, agentId, delta })
+            }
+          }
+          if (started.delete(agentId)) {
+            const r = trajectory.get(agentId); if (r) r.finishedAt = Date.now()
+            send({ type: 'agent:finished', sessionId: this.id, agentId })
+          }
+        }
+      }
+      await Promise.all([pumpSupervisor(), pumpSubagents()])
+      finishRemaining()
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      finishRemaining()
+      send({
+        type: 'error',
+        sessionId: this.id,
+        code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
+        message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
+      })
+      return ''
+    } finally {
+      this.running = false
+      this.abortController = null
+    }
+
+    this.finalizeAndPersist(send, supervisorText, trajectory, false)
+    return supervisorText
+  }
+
+  /** Push the assistant message into context, persist the turn, and emit message:complete. */
+  private finalizeAndPersist(send: SendFn, supervisorText: string, trajectory: Map<string, Run>, stopped: boolean): void {
+    if (supervisorText) this.messages.push(new AIMessage(supervisorText))
+    const ts = Date.now()
+    const assistantId = `asst-supervisor-${ts}`
+    const runs: AgentRun[] = [...trajectory.entries()].map(([agentId, r]) => ({
+      agentId, role: r.role, output: r.output, startedAt: r.startedAt, finishedAt: r.finishedAt, seq: r.seq,
+    }))
+    if (this.store) {
+      this.store.insertTurn(
+        supervisorText ? { id: assistantId, sessionId: this.id, agentId: 'supervisor', content: supervisorText, timestamp: ts, stopped } : null,
+        this.id,
+        runs,
+      )
+      this.store.touchSession(this.id, ts)
+    }
+    send({
+      type: 'message:complete',
+      sessionId: this.id,
+      message: { id: assistantId, role: 'assistant', content: supervisorText, agentId: 'supervisor', timestamp: ts, ...(stopped ? { stopped: true } : {}) },
+    })
   }
 
   cancel(): void {

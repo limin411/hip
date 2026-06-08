@@ -94,6 +94,31 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')[0].stopped).toBeUndefined()
   })
 
+  it('deleteLastAssistantMessage removes a trailing assistant turn and cascades agent_runs', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'ans', timestamp: 2 },
+      's1',
+      [{ agentId: 'planner', role: 'planner', output: 'p', startedAt: 1, finishedAt: 2, seq: 0 }],
+    )
+    expect(store.deleteLastAssistantMessage('s1')).toBe(true)
+    expect(store.loadMessages('s1').map((m) => m.id)).toEqual(['u1'])
+    expect(store.loadAgentRuns('s1')).toHaveLength(0)
+  })
+
+  it('deleteLastAssistantMessage is a no-op when the last message is a user message', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    expect(store.deleteLastAssistantMessage('s1')).toBe(false)
+    expect(store.loadMessages('s1')).toHaveLength(1)
+  })
+
+  it('deleteLastAssistantMessage is a no-op on an empty session', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    expect(store.deleteLastAssistantMessage('s1')).toBe(false)
+  })
+
   it('deleteSession cascades to messages, agent_runs, and FTS', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '可搜索内容', timestamp: 1 })

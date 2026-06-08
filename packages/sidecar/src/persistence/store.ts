@@ -124,6 +124,16 @@ export class SessionStore {
     return [...titleOut, ...rows]
   }
 
+  /** Delete the most recent message iff it is an assistant turn. Cascades agent_runs + FTS via triggers/FKs. Returns true if one was removed. */
+  deleteLastAssistantMessage(sessionId: string): boolean {
+    const last = this.db.prepare(`SELECT id, role FROM messages WHERE session_id=? ORDER BY seq DESC LIMIT 1`).get(sessionId) as
+      | { id: string; role: string }
+      | undefined
+    if (!last || last.role !== 'assistant') return false
+    this.db.prepare(`DELETE FROM messages WHERE id=?`).run(last.id)
+    return true
+  }
+
   deleteSession(id: string): void {
     this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
   }

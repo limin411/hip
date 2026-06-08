@@ -211,6 +211,41 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].agents[0].toolCalls[0].status).toBe('error')
   })
 
+  it('error CANCELLED coerces the in-flight provisional message tools and marks it stopped', () => {
+    // No message:complete arrives on cancel; the CANCELLED branch must finalize the trailing message.
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, timeline: [{ kind: 'tool', stepSeq: 0, agentId: 'coder', role: 'coder', callId: 'c1' }], toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.toolCalls![0]).toMatchObject({ status: 'error', error: 'interrupted' })
+    expect(m.stopped).toBe(true)
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('error CANCELLED drops an empty provisional assistant message', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: '', agentId: 'supervisor', timestamp: 5, timeline: [], toolCalls: [] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    expect(next.sessions[0].messages.map((m) => m.id)).toEqual(['u1'])
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('error CANCELLED leaves a prior completed assistant message untouched (not stopped)', () => {
+    const s0 = { sessions: [baseSession({ status: 'running', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'done reply', agentId: 'supervisor', timestamp: 5, timeline: [], toolCalls: [] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m).toMatchObject({ id: 't1', content: 'done reply' })
+    expect(m.stopped).toBeUndefined()
+    expect(next.sessions[0].messages).toHaveLength(2)
+  })
+
   it('session:loaded hydrates toolCalls + delegation from agentRuns', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {

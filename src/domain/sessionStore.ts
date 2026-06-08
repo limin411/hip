@@ -68,7 +68,35 @@ function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] |
   return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
 }
 
-/** Ensure the provisional assistant message keyed by turnId exists (idempotent). */
+/** On cancel, finalize the in-flight (trailing) assistant message: drop it if it's an empty
+ *  provisional (no content/timeline/tools), else coerce its still-running tools to error and
+ *  mark it stopped. Guarded so a prior completed turn's message is never touched. */
+function finalizeCancelledMessage(messages: Message[]): Message[] {
+  let idx = -1
+  for (let k = messages.length - 1; k >= 0; k--) { if (messages[k].role === 'assistant') { idx = k; break } }
+  if (idx === -1) return messages
+  const m = messages[idx]
+  const empty = m.content === '' && !(m.timeline?.length) && !(m.toolCalls?.length)
+  if (empty) return messages.filter((_, k) => k !== idx)
+  if (!m.toolCalls?.some((tc) => tc.status === 'running')) return messages // not an in-flight msg with spinning tools — leave prior turns alone
+  return messages.map((x, k) => (k === idx ? { ...x, toolCalls: coerceRunningToolCalls(x.toolCalls), stopped: true } : x))
+}
+
+/** Build a freshly-started ToolCall from a tool:started message. Shared by the message- and agent-level maps so they never drift. */
+function makeRunningToolCall(msg: { callId: string; agentId: string; name: string; input: string; seq: number; truncated?: boolean }): ToolCall {
+  return { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running', seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }
+}
+
+/** Apply a tool:finished patch to an existing ToolCall (sticky-OR truncated). Shared by the message- and agent-level maps so they never drift. */
+function patchFinishedToolCall(tc: ToolCall, msg: { status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }): ToolCall {
+  return { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
+}
+
+/** Ensure the provisional assistant message keyed by turnId exists (idempotent).
+ *  Invariant: this provisional message is always the trailing assistant message while the turn
+ *  streams — agent:started (which appends it) precedes any token:stream/tool:* /finalize for the
+ *  turn, and nothing else appends an assistant message mid-turn. So token/finalize handlers can
+ *  safely target the tail. */
 function ensureAssistantMessage(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
   if (messages.some((m) => m.id === turnId)) return messages
   return [...messages, { id: turnId, role: 'assistant', content: '', agentId, timestamp: now, timeline: [], toolCalls: [] }]
@@ -89,6 +117,8 @@ function upsertReasoning(messages: Message[], turnId: string, step: { stepSeq: n
 }
 
 function appendAssistantDelta(messages: Message[], delta: string, agentId: string, now: number): Message[] {
+  // Relies on the ensureAssistantMessage invariant: the provisional turnId message is the trailing
+  // assistant message when tokens arrive, so appending to the tail extends the right turn.
   const last = messages[messages.length - 1]
   if (last && last.role === 'assistant') {
     return [...messages.slice(0, -1), { ...last, content: last.content + delta }]
@@ -193,14 +223,16 @@ export function applyServerMessage(
           m.id === msg.turnId
             ? {
                 ...m,
+                // stepSeq === toolCall.seq: both come from the turn-global step counter, so the
+                // timeline step and its ToolCall share the same ordinal.
                 timeline: [...(m.timeline ?? []), { kind: 'tool' as const, stepSeq: msg.seq, agentId: msg.agentId, role: msg.role, callId: msg.callId } satisfies TimelineStep],
-                toolCalls: [...(m.toolCalls ?? []), { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running' as const, seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }],
+                toolCalls: [...(m.toolCalls ?? []), makeRunningToolCall(msg)],
               }
             : m,
         ),
         agents: s.agents.map((a) =>
           a.id === msg.agentId
-            ? { ...a, toolCalls: [...a.toolCalls, { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running' as const, seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }] }
+            ? { ...a, toolCalls: [...a.toolCalls, makeRunningToolCall(msg)] }
             : a,
         ),
       }))
@@ -212,11 +244,7 @@ export function applyServerMessage(
           m.toolCalls?.some((tc) => tc.callId === msg.callId)
             ? {
                 ...m,
-                toolCalls: m.toolCalls.map((tc) =>
-                  tc.callId === msg.callId
-                    ? { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
-                    : tc,
-                ),
+                toolCalls: m.toolCalls.map((tc) => (tc.callId === msg.callId ? patchFinishedToolCall(tc, msg) : tc)),
               }
             : m,
         ),
@@ -224,11 +252,7 @@ export function applyServerMessage(
           a.id === msg.agentId
             ? {
                 ...a,
-                toolCalls: a.toolCalls.map((tc) =>
-                  tc.callId === msg.callId
-                    ? { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
-                    : tc,
-                ),
+                toolCalls: a.toolCalls.map((tc) => (tc.callId === msg.callId ? patchFinishedToolCall(tc, msg) : tc)),
               }
             : a,
         ),
@@ -245,7 +269,7 @@ export function applyServerMessage(
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
-      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, agents: coerceRunningTools(s.agents) }))
+      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, messages: finalizeCancelledMessage(s.messages), agents: coerceRunningTools(s.agents) }))
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
 
     case 'session:list:result': {

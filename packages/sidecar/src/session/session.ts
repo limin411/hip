@@ -88,6 +88,8 @@ export class Session {
   private abortController: AbortController | null = null
   // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
+  // Monotonic per-session turn counter — appended to turnId so two turns in the same millisecond cannot collide.
+  private turnSeq = 0
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
 
@@ -218,7 +220,7 @@ export class Session {
     this.abortController = new AbortController()
     this.running = true
 
-    const turnId = `asst-supervisor-${Date.now()}`
+    const turnId = `asst-supervisor-${Date.now()}-${this.turnSeq++}`
     const trajectory = new Map<string, TraceRun>()
     let agentSeq = 0
     // ONE turn-global step counter shared by tool calls AND reasoning bursts, so the timeline

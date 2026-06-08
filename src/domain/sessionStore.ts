@@ -182,6 +182,7 @@ interface DomainStore {
   apply: (msg: ServerMessage) => void
   createSession: (id: string, config: SessionConfig) => string
   selectSession: (id: string) => void
+  deselect: () => void
   deleteSession: (id: string) => void
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string) => void
@@ -209,6 +210,8 @@ export const useDomainStore = create<DomainStore>((set) => ({
   },
 
   selectSession: (id) => set({ activeSessionId: id }),
+
+  deselect: () => set({ activeSessionId: null }),
 
   deleteSession: (id) =>
     set((s) => {

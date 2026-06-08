@@ -4,6 +4,7 @@ import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionService } from './sessionService'
 import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
+import { useDraftStore } from '@/store/draftStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -26,6 +27,7 @@ beforeEach(() => {
   // Using merge (no second arg) keeps actions intact and resets only data fields.
   useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], agents: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
+  useDraftStore.setState({ draft: null })
 })
 
 describe('SessionService', () => {
@@ -111,5 +113,54 @@ describe('SessionService', () => {
     new SessionService(t)
     t.push({ type: 'fs:read:result', sessionId: 's1', path: '/proj/a.md', content: '# Hi', encoding: 'utf8', mimeType: 'text/markdown' })
     expect(useFsStore.getState().bySession.s1.preview).toMatchObject({ status: 'ready', content: '# Hi' })
+  })
+
+  it('commits a project draft on first send: session:create with cwd, then message:send, draft cleared', () => {
+    useDomainStore.setState({ activeSessionId: null })
+    useDraftStore.setState({ draft: { tempId: 'd1', mode: 'project', cwd: '/proj', text: '' } })
+    const t = new FakeTransport()
+    new SessionService(t).sendMessage('hello')
+    const create = t.sent.find((m) => m.type === 'session:create') as Extract<ClientMessage, { type: 'session:create' }>
+    expect(create.config.cwd).toBe('/proj')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'hello' })
+    expect(useDraftStore.getState().draft).toBeNull()
+    expect(useDomainStore.getState().activeSessionId).toBe(create.id)
+  })
+
+  it('commits a chat draft with no cwd in the config', () => {
+    useDomainStore.setState({ activeSessionId: null })
+    useDraftStore.setState({ draft: { tempId: 'd2', mode: 'chat', text: '' } })
+    const t = new FakeTransport()
+    new SessionService(t).sendMessage('hi there')
+    const create = t.sent.find((m) => m.type === 'session:create') as Extract<ClientMessage, { type: 'session:create' }>
+    expect(create.config.cwd).toBeUndefined()
+  })
+
+  it('lsDraft sends fs:lsCwd', () => {
+    const t = new FakeTransport()
+    new SessionService(t).lsDraft('/proj', '/proj/src')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:lsCwd', cwd: '/proj', path: '/proj/src' })
+  })
+
+  it('readDraftFile marks preview loading (keyed by cwd) and sends fs:readCwd', () => {
+    const t = new FakeTransport()
+    new SessionService(t).readDraftFile('/proj', '/proj/a.md')
+    expect(useFsStore.getState().bySession['/proj'].preview).toMatchObject({ status: 'loading', path: '/proj/a.md' })
+    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:readCwd', cwd: '/proj', path: '/proj/a.md' })
+  })
+
+  it('fs:lsCwd:result populates entries under the cwd key', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:lsCwd:result', cwd: '/proj', path: '/proj', entries: [{ name: 'a.md', path: '/proj/a.md', isDir: false }] })
+    expect(useFsStore.getState().bySession['/proj'].entriesByDir['/proj']).toHaveLength(1)
+  })
+
+  it('newConversation ensures a draft and deselects the active session', () => {
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const t = new FakeTransport()
+    new SessionService(t).newConversation()
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+    expect(useDraftStore.getState().draft).not.toBeNull()
   })
 })

@@ -33,6 +33,15 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         let _ = std::fs::create_dir_all(&dir);
         cmd = cmd.env("HIP_DB_PATH", db_path_for(&dir).to_string_lossy().into_owned());
     }
+    // Tie the sidecar's lifetime to ours. tauri-plugin-shell pipes the child's
+    // stdin and holds the write end, so when this app process dies by ANY means —
+    // including the SIGTERM/SIGKILL the WebdriverIO E2E harness sends, which run
+    // none of our exit handlers — the kernel closes that pipe and the sidecar sees
+    // EOF. HIP_PARENT_WATCH tells it to exit on that EOF (see main.ts), preventing
+    // the orphaned `node … sidecar/src/main.ts` that held the SQLite lock between
+    // runs. Both the dev wrapper (which `exec`s node, inheriting this env) and the
+    // bundled binary go through this same spawn, so both paths are covered.
+    cmd = cmd.env("HIP_PARENT_WATCH", "1");
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
 
     let state = app.state::<SidecarState>();

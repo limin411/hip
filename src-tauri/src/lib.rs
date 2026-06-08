@@ -125,11 +125,25 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    app.run(|app_handle, event| {
-        if let tauri::RunEvent::ExitRequested { .. } = event {
+    app.run(|app_handle, event| match event {
+        // Graceful quit (Cmd+Q / AppHandle::exit): kill the managed sidecar.
+        // NOTE: this fires ONLY for GUI/programmatic exits — a SIGTERM/SIGKILL to
+        // this process (e.g. E2E teardown) runs no handler, so the sidecar also
+        // self-terminates when our stdin pipe closes (HIP_PARENT_WATCH; sidecar.rs).
+        tauri::RunEvent::ExitRequested { .. } => {
             if let Some(child) = app_handle.state::<SidecarState>().child.lock().unwrap().take() {
                 let _ = child.kill();
             }
         }
+        // On macOS, closing the (single) window does not quit the app by default,
+        // which would leave the sidecar running. For this single-window app, treat
+        // window close as quit: exit() routes through ExitRequested above.
+        tauri::RunEvent::WindowEvent {
+            event: tauri::WindowEvent::CloseRequested { .. },
+            ..
+        } => {
+            app_handle.exit(0);
+        }
+        _ => {}
     });
 }

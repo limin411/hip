@@ -68,6 +68,13 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].status).toBe('idle')
   })
 
+  it('message:complete carries the stopped flag through finalize', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'asst', role: 'assistant', content: 'partial', timestamp: 5 }] })] }
+    const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: { id: 'asst', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, stopped: true } }, 10)
+    expect(next.sessions[0].messages.at(-1)).toMatchObject({ content: 'partial', stopped: true })
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
   it('ignores events for unknown sessions', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 'nope', agentId: 'a1' }, 0)
@@ -218,5 +225,36 @@ describe('applyServerMessage session:cwd', () => {
     const base = emptySession('s1')
     const next = applyServerMessage({ sessions: [base] }, { type: 'session:cwd', sessionId: 's1', cwd: '/proj' }, 0)
     expect(next.sessions[0].config.cwd).toBe('/proj')
+  })
+})
+
+describe('regenerateLastTurn', () => {
+  it('drops a trailing assistant message, clears agents, and resets to running', () => {
+    useDomainStore.setState({
+      sessions: [baseSession({
+        messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }],
+        agents: [{ id: 'supervisor', role: 'supervisor', title: 'Supervisor', status: 'done', tokens: 'ans', tokenCount: 3, elapsedMs: 1, startedAt: 0 }],
+        status: 'idle', error: { code: 'X', message: 'y' },
+      })],
+      activeSessionId: 's1',
+    })
+    useDomainStore.getState().regenerateLastTurn('s1')
+    const s = useDomainStore.getState().sessions[0]
+    expect(s.messages.map((m) => m.id)).toEqual(['u1'])
+    expect(s.agents).toEqual([])
+    expect(s.status).toBe('running')
+    expect(s.error).toBeNull()
+  })
+
+  it('keeps a trailing user message (retry-after-error path)', () => {
+    useDomainStore.setState({
+      sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], status: 'error', error: { code: 'AGENT_ERROR', message: 'boom' } })],
+      activeSessionId: 's1',
+    })
+    useDomainStore.getState().regenerateLastTurn('s1')
+    const s = useDomainStore.getState().sessions[0]
+    expect(s.messages.map((m) => m.id)).toEqual(['u1'])
+    expect(s.status).toBe('running')
+    expect(s.error).toBeNull()
   })
 })

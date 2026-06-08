@@ -186,6 +186,7 @@ interface DomainStore {
   deleteSession: (id: string) => void
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string) => void
+  regenerateLastTurn: (sessionId: string) => void
   setConnection: (c: Connection) => void
 }
 
@@ -231,6 +232,16 @@ export const useDomainStore = create<DomainStore>((set) => ({
           // Clear any prior error: appending a user message means a retry is underway.
           : { ...sess, error: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
       ),
+    })),
+
+  regenerateLastTurn: (sessionId) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) => {
+        if (sess.id !== sessionId) return sess
+        const last = sess.messages[sess.messages.length - 1]
+        const messages = last && last.role === 'assistant' ? sess.messages.slice(0, -1) : sess.messages
+        return { ...sess, messages, agents: [], status: 'running' as const, error: null }
+      }),
     })),
 
   setConnection: (connection) => set({ connection }),

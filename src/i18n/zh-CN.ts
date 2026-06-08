@@ -19,6 +19,10 @@ export const zhCN = {
       errorNoApiKey: '未配置 DeepSeek API Key，请在「设置」中配置后重试。',
       errorGeneric: '出错了：{{message}}',
       openSettings: '前往设置',
+      newConversationGreeting: '我们来做点什么？',
+      pickFolder: '选择项目文件夹',
+      orJustChat: '或直接对话（沙箱）',
+      clearFolder: '纯对话',
     },
     sidebar: {
       collapse: '折叠侧边栏',
@@ -45,6 +49,7 @@ export const zhCN = {
       fileTooLarge: '文件过大，无法预览',
       previewTruncated: '仅显示前 1 MB',
       loading: '加载中…',
+      sandboxPending: '发送第一条消息后将创建沙箱工作区',
     },
     settings: {
       title: '设置',

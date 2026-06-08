@@ -19,6 +19,10 @@ export const zhTW = {
       errorNoApiKey: '未配置 DeepSeek API Key，請在「設置」中配置後重試。',
       errorGeneric: '出錯了：{{message}}',
       openSettings: '前往設置',
+      newConversationGreeting: '我們來做點什麼？',
+      pickFolder: '選擇專案資料夾',
+      orJustChat: '或直接對話（沙箱）',
+      clearFolder: '純對話',
     },
     sidebar: {
       collapse: '折疊側邊欄',
@@ -45,6 +49,7 @@ export const zhTW = {
       fileTooLarge: '檔案過大，無法預覽',
       previewTruncated: '僅顯示前 1 MB',
       loading: '載入中…',
+      sandboxPending: '傳送第一則訊息後將建立沙箱工作區',
     },
     settings: {
       title: '設置',

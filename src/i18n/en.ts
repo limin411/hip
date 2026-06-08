@@ -19,6 +19,10 @@ export const en = {
       errorNoApiKey: 'DeepSeek API key not configured. Set it in Settings to continue.',
       errorGeneric: 'Something went wrong: {{message}}',
       openSettings: 'Open Settings',
+      newConversationGreeting: 'What are we building?',
+      pickFolder: 'Choose project folder',
+      orJustChat: 'or just chat (sandbox)',
+      clearFolder: 'Pure chat',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',
@@ -45,6 +49,7 @@ export const en = {
       fileTooLarge: 'File is too large to preview',
       previewTruncated: 'Showing the first 1 MB',
       loading: 'Loading…',
+      sandboxPending: 'A sandbox workspace is created when you send the first message',
     },
     settings: {
       title: 'Settings',

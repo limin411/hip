@@ -38,6 +38,11 @@ describe('stringify', () => {
     expect(stringify('x')).toBe('x')
     expect(stringify({ a: 1 })).toBe('{"a":1}')
   })
+  it('falls back to String(v) for non-JSON-serializable values', () => {
+    const circ: Record<string, unknown> = {}
+    circ.self = circ
+    expect(stringify(circ)).toBe('[object Object]')
+  })
 })
 
 describe('consumeToolCalls', () => {
@@ -59,6 +64,7 @@ describe('consumeToolCalls', () => {
     expect(started[0]).toMatchObject({ type: 'tool:started', agentId: 'coder', callId: 'c1', name: 'read_file', input: '{"path":"/a.ts"}', seq: 0 })
     expect(finished[0]).toMatchObject({ type: 'tool:finished', callId: 'c1', status: 'finished', output: 'contents' })
     expect(runs.get('coder')!.toolCalls.get('c1')).toMatchObject({ status: 'finished', output: 'contents', seq: 0 })
+    expect(sent.indexOf(started[0])).toBeLessThan(sent.indexOf(finished[0]))
   })
 
   it('reports the error path', async () => {
@@ -72,6 +78,8 @@ describe('consumeToolCalls', () => {
     await Promise.all(pending)
     expect(sent.find((m) => m.type === 'tool:finished')).toMatchObject({ status: 'error', error: 'EACCES' })
     expect(sent.find((m) => m.type === 'tool:started')).toMatchObject({ seq: 5 })
+    const fin = sent.find((m) => m.type === 'tool:finished') as Extract<ServerMessage, { type: 'tool:finished' }>
+    expect(fin.output).toBeUndefined()
   })
 
   it('clips an oversized output and flags truncated on the event + record', async () => {
@@ -87,6 +95,32 @@ describe('consumeToolCalls', () => {
     expect(fin.truncated).toBe(true)
     expect(fin.output!.length).toBe(4096)
     expect(runs.get('coder')!.toolCalls.get('c1')!.truncated).toBe(true)
+  })
+
+  it('clips an oversized input and flags truncated on tool:started', async () => {
+    const runs = new Map<string, TraceRun>([['coder', freshRun()]])
+    const sent: ServerMessage[] = []
+    const pending: Promise<void>[] = []
+    await consumeToolCalls('coder', iter(
+      fakeTool({ name: 'write_file', callId: 'c1', input: { blob: 'y'.repeat(5000) } }),
+    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    await Promise.all(pending)
+    const started = sent.find((m) => m.type === 'tool:started') as Extract<ServerMessage, { type: 'tool:started' }>
+    expect(started.truncated).toBe(true)
+    expect(started.input.length).toBe(4096)
+    expect(runs.get('coder')!.toolCalls.get('c1')!.truncated).toBe(true)
+  })
+
+  it('does not emit tool:finished for a non-terminal (running) status', async () => {
+    const runs = new Map<string, TraceRun>([['coder', freshRun()]])
+    const sent: ServerMessage[] = []
+    const pending: Promise<void>[] = []
+    await consumeToolCalls('coder', iter(
+      fakeTool({ name: 'read_file', callId: 'c1', status: Promise.resolve('running') }),
+    ), { sessionId: 's1', send: (m) => sent.push(m), nextSeq: () => 0, pending, record: recorderInto(runs) })
+    await Promise.all(pending)
+    expect(sent.some((m) => m.type === 'tool:finished')).toBe(false)
+    expect(runs.get('coder')!.toolCalls.get('c1')!.status).toBe('running')
   })
 })
 

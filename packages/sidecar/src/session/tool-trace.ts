@@ -67,20 +67,34 @@ export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable
     ctx.record.start(agentId, tc.callId, tc.name, inClip.text, seq, inClip.truncated)
     ctx.send({ type: 'tool:started', sessionId: ctx.sessionId, agentId, callId: tc.callId, name: tc.name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
     ctx.pending.push((async () => {
+      // Resolve the result Promises OFF the critical path. Only the awaits are inside the try
+      // (so a torn-down/aborted stream is tolerated); record.finish/send run AFTER it, so a bug
+      // in them propagates instead of being silently swallowed.
+      let status: 'finished' | 'error'
+      let output: string | undefined
+      let error: string | undefined
+      let truncated = false
       try {
-        const status = await tc.status
-        if (status === 'error') {
-          const error = await tc.error
-          ctx.record.finish(agentId, tc.callId, 'error', undefined, error, false)
-          ctx.send({ type: 'tool:finished', sessionId: ctx.sessionId, agentId, callId: tc.callId, status: 'error', ...(error ? { error } : {}) })
-        } else {
+        const resolved = await tc.status
+        if (resolved === 'error') {
+          status = 'error'
+          error = await tc.error
+        } else if (resolved === 'finished') {
+          status = 'finished'
           const outClip = clip(stringify(await tc.output))
-          ctx.record.finish(agentId, tc.callId, 'finished', outClip.text, undefined, outClip.truncated)
-          ctx.send({ type: 'tool:finished', sessionId: ctx.sessionId, agentId, callId: tc.callId, status: 'finished', output: outClip.text, ...(outClip.truncated ? { truncated: true } : {}) })
+          output = outClip.text
+          truncated = outClip.truncated
+        } else {
+          // Non-terminal status (should not happen for a resolved stream) — leave the record
+          // running; trajectoryToRuns coerces it to error at finalize.
+          return
         }
       } catch {
         // aborted / stream torn down — leave the record non-terminal; trajectoryToRuns coerces it.
+        return
       }
+      ctx.record.finish(agentId, tc.callId, status, output, error, truncated)
+      ctx.send({ type: 'tool:finished', sessionId: ctx.sessionId, agentId, callId: tc.callId, status, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}), ...(truncated ? { truncated: true } : {}) })
     })())
   }
 }

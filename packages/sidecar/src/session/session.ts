@@ -436,7 +436,7 @@ export class Session {
     const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
     if (finalText) this.messages.push(new AIMessage(finalText))
     const ts = Date.now()
-    const runs: AgentRun[] = trajectoryToRuns(trajectory)
+    const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => ({ ...r, messageId: turnId }))
     const timeline = trajectoryToTimeline(trajectory)
     const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
     if (this.store) {
@@ -450,7 +450,7 @@ export class Session {
     send({
       type: 'message:complete',
       sessionId: this.id,
-      message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, ...(stopped ? { stopped: true } : {}) },
+      message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(stopped ? { stopped: true } : {}) },
     })
     return finalText
   }

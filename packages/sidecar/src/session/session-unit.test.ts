@@ -47,6 +47,18 @@ describe('Session.setThinking', () => {
   })
 })
 
+describe('Session message:complete agentRuns', () => {
+  it('message:complete carries per-turn agentRuns stamped with messageId', async () => {
+    const model = new FakeListChatModel({ responses: ['hello world'] })
+    const session = new Session('t-agent-runs', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, model)
+    const events = await collect(session, 'hi')
+    const complete = events.find((e) => e.type === 'message:complete') as { type: 'message:complete'; message: { id: string; agentRuns?: Array<{ messageId?: string }> } } | undefined
+    expect(complete).toBeDefined()
+    expect(complete!.message.agentRuns?.length).toBeGreaterThan(0)
+    for (const r of complete!.message.agentRuns!) expect(r.messageId).toBe(complete!.message.id)
+  })
+})
+
 describe('Session NO_API_KEY guard', () => {
   let saved: string | undefined
   beforeEach(() => { saved = process.env.DEEPSEEK_API_KEY; delete process.env.DEEPSEEK_API_KEY })

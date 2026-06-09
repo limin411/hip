@@ -1,6 +1,6 @@
 /** Sentinel control chars wrapping a matched term in a search snippet (set by the sidecar FTS query). */
-const MARK_START = '\x01'
-const MARK_END = '\x02'
+const MARK_START = ''
+const MARK_END = ''
 
 export interface SnippetSegment {
   text: string
@@ -18,7 +18,7 @@ export function splitSnippet(s: string): SnippetSegment[] {
   while (i < s.length) {
     const start = s.indexOf(MARK_START, i)
     if (start === -1) {
-      if (i < s.length) out.push({ text: s.slice(i), mark: false })
+      out.push({ text: s.slice(i), mark: false })
       break
     }
     if (start > i) out.push({ text: s.slice(i, start), mark: false })

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { splitSnippet } from './snippet'
 
-const S = '\x01' // match start sentinel
-const E = '\x02' // match end sentinel
+const S = '' // match start sentinel
+const E = '' // match end sentinel
 
 describe('splitSnippet', () => {
   it('no markers → a single unmarked segment', () => {
@@ -38,5 +38,9 @@ describe('splitSnippet', () => {
       { text: 'b', mark: true },
       { text: 'c', mark: true },
     ])
+  })
+
+  it('a lone end-sentinel with no start is treated as plain text', () => {
+    expect(splitSnippet(`${E}plain`)).toEqual([{ text: `${E}plain`, mark: false }])
   })
 })

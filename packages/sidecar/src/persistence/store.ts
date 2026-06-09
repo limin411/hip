@@ -158,7 +158,7 @@ export class SessionStore {
       const literal = `"${q.replace(/"/g, '""')}"`
       const rows = this.db.prepare(`
         SELECT m.session_id AS sessionId, m.id AS messageId, s.title AS title,
-          snippet(messages_fts, 0, '[', ']', '…', 12) AS snippet, m.timestamp AS timestamp
+          snippet(messages_fts, 0, char(1), char(2), '…', 12) AS snippet, m.timestamp AS timestamp
         FROM messages_fts JOIN messages m ON m.rowid = messages_fts.rowid
         JOIN sessions s ON s.id = m.session_id
         WHERE messages_fts MATCH ? ORDER BY rank LIMIT 50

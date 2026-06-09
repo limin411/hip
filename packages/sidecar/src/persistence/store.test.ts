@@ -62,6 +62,17 @@ describe('SessionStore', () => {
     expect(hits.some((h) => h.sessionId === 's1' && h.messageId === null)).toBe(true)
   })
 
+  it('FTS content snippet wraps the match in sentinel delimiters', () => {
+    store.insertSession({ id: 's1', title: '关于配置', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '未配置密钥请在设置中配置', timestamp: 1 })
+    const hit = store.search('设置中').find((h) => h.messageId === 'u1')
+    expect(hit).toBeDefined()
+    // U+0001 / U+0002 wrap the matched term; the legacy '[' / ']' must be gone.
+    expect(hit!.snippet).toContain('\u0001')
+    expect(hit!.snippet).toContain('\u0002')
+    expect(hit!.snippet).not.toContain('[')
+  })
+
   it('updateTitleIfAuto changes an auto title and reports the change count', () => {
     store.insertSession({ id: 's1', title: '新对话', config: cfg, createdAt: 1, updatedAt: 1 })
     expect(store.updateTitleIfAuto('s1', '截取标题')).toBe(1)

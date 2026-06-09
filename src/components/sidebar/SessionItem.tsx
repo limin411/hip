@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { type SessionVM, sessionService } from '@/domain'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime, formatAbsolute } from '@/lib/datetime'
+import { splitSnippet } from '@/lib/snippet'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -92,7 +93,17 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
             )}
           </div>
           {snippet && !editing && (
-            <span className="block truncate text-[12px] text-ink-tertiary">{snippet}</span>
+            <span className="block truncate text-[12px] text-ink-tertiary">
+              {splitSnippet(snippet).map((seg, i) =>
+                seg.mark ? (
+                  <mark key={i} className="rounded bg-accent-subtle px-0.5 text-ink">
+                    {seg.text}
+                  </mark>
+                ) : (
+                  <span key={i}>{seg.text}</span>
+                ),
+              )}
+            </span>
           )}
         </div>
       </ContextMenuTrigger>

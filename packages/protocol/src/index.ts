@@ -19,6 +19,7 @@ export interface Message {
   stopped?: boolean // assistant turn was cancelled mid-stream; partial content kept
   timeline?: TimelineStep[]  // ordered reasoning+tool steps for this turn (assistant only)
   toolCalls?: ToolCall[]     // flat tool calls for this turn, referenced by timeline tool steps via callId
+  agentRuns?: AgentRun[]     // per-agent run metadata for THIS turn (taskInput/output/timing/parent)
 }
 
 export interface AgentRun {
@@ -31,6 +32,7 @@ export interface AgentRun {
   taskInput?: string        // instruction this sub-agent received
   parentAgentId?: string    // who delegated (always 'supervisor' for our 2-level tree)
   toolCalls?: ToolCall[]     // ordered by seq; hydrated from the tool_calls table
+  messageId?: string         // turn this run belongs to (maps agent_runs.message_id; NULL → no assistant message)
 }
 
 export type ToolStatus = 'running' | 'finished' | 'error'

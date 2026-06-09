@@ -203,4 +203,25 @@ describe('SessionService', () => {
     new SessionService(t).regenerate()
     expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
   })
+
+  it('on ready, resyncs the active session when its turn was running', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], status: 'running', error: null }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'ready', hasApiKey: true })
+    expect(t.sent.some((m) => m.type === 'session:list')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's1')).toBe(true)
+  })
+
+  it('on ready with no running active session, only lists sessions (no session:load)', () => {
+    // beforeEach sets status: 'idle' for s1
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'ready', hasApiKey: true })
+    expect(t.sent.some((m) => m.type === 'session:list')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'session:load')).toBe(false)
+  })
 })

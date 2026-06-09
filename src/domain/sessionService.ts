@@ -52,6 +52,7 @@ export class SessionService {
     useDomainStore.getState().apply(msg)
     if (msg.type === 'ready') {
       this.transport.send({ type: 'session:list' })
+      this.resyncActiveIfRunning()
     } else if (msg.type === 'fs:ls:result') {
       useFsStore.getState().setEntries(msg.sessionId, msg.path, msg.entries)
     } else if (msg.type === 'fs:read:result') {
@@ -172,6 +173,15 @@ export class SessionService {
     if (!sess || sess.status === 'running') return
     useDomainStore.getState().regenerateLastTurn(activeSessionId)
     this.transport.send({ type: 'message:regenerate', sessionId: activeSessionId })
+  }
+
+  /** On (re)connect, if the active session had an in-flight turn, force a history resync so a
+   *  turn that finished/was interrupted during the outage is reconciled (see session:loaded). */
+  private resyncActiveIfRunning(): void {
+    const { activeSessionId, sessions } = useDomainStore.getState()
+    if (!activeSessionId) return
+    const s = sessions.find((x) => x.id === activeSessionId)
+    if (s?.status === 'running') this.transport.send({ type: 'session:load', sessionId: activeSessionId })
   }
 }
 

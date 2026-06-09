@@ -37,6 +37,7 @@ export const zhCN = {
       reconnecting: '重新连接中…',
       errorInterrupted: '连接中断，回复未完成。',
       errorTimeout: '响应超时，已停止。',
+      jumpToLatest: '回到最新',
     },
     sidebar: {
       collapse: '折叠侧边栏',

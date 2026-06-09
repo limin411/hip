@@ -37,6 +37,7 @@ export const zhTW = {
       reconnecting: '重新連線中…',
       errorInterrupted: '連線中斷，回覆未完成。',
       errorTimeout: '回應逾時，已停止。',
+      jumpToLatest: '回到最新',
     },
     sidebar: {
       collapse: '折疊側邊欄',

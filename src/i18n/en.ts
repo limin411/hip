@@ -37,6 +37,7 @@ export const en = {
       reconnecting: 'Reconnecting…',
       errorInterrupted: 'Connection lost — the reply didn\'t finish.',
       errorTimeout: 'Response timed out and was stopped.',
+      jumpToLatest: 'Jump to latest',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

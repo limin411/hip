@@ -35,14 +35,15 @@ describe('SessionManager persistence', () => {
     expect(res.sessions.map((s) => s.id)).toContain('s1')
   })
 
-  it('session:load returns messages + agentRuns', async () => {
+  it('session:load returns messages with per-message agentRuns', async () => {
     mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
     await mgr.handleAsync({ type: 'message:send', sessionId: 's1', id: 'u1', content: 'hi', role: 'user' }, send)
     sent = []
     mgr.handle({ type: 'session:load', sessionId: 's1' }, send)
     const loaded = sent.find((m) => m.type === 'session:loaded') as Extract<ServerMessage, { type: 'session:loaded' }>
     expect(loaded.messages.some((m) => m.id === 'u1')).toBe(true)
-    expect(loaded.agentRuns.length).toBeGreaterThan(0)
+    const assistant = loaded.messages.find((m) => m.role === 'assistant')!
+    expect(assistant.agentRuns!.length).toBeGreaterThan(0)
   })
 
   it('session:load attaches agentRuns to each message', async () => {

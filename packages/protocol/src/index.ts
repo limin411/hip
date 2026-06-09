@@ -113,7 +113,7 @@ export type ServerMessage =
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }
   | { type: 'session:list:result'; sessions: SessionSummary[] }
-  | { type: 'session:loaded'; sessionId: string; messages: Message[]; agentRuns: AgentRun[] }
+  | { type: 'session:loaded'; sessionId: string; messages: Message[] }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   | { type: 'session:deleted'; sessionId: string }
   | { type: 'session:title'; sessionId: string; title: string }

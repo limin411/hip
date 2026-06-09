@@ -117,7 +117,6 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(base, {
       type: 'session:loaded', sessionId: 's1',
       messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 1 }],
-      agentRuns: [{ agentId: 'planner', role: 'planner', output: 'p', startedAt: 1, finishedAt: 2, seq: 0 }],
     }, 0)
     expect(next.sessions[0].loaded).toBe(true)
     expect(next.sessions[0].messages).toHaveLength(1)

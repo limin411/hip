@@ -55,9 +55,7 @@ export class SessionManager {
         send({ type: 'session:list:result', sessions: this.store?.listSessions() ?? [] })
         break
       case 'session:load':
-        send({ type: 'session:loaded', sessionId: msg.sessionId,
-          messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [],
-          agentRuns: this.store?.loadAgentRuns(msg.sessionId) ?? [] })
+        send({ type: 'session:loaded', sessionId: msg.sessionId, messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [] })
         break
       case 'session:search':
         send({ type: 'session:search:result', query: msg.query, hits: this.store?.search(msg.query) ?? [] })

@@ -54,12 +54,19 @@ export function ChatPane() {
     if (el) {
       el.scrollIntoView({ block: 'center' })
       setHighlightedId(scrollTargetMessageId)
-      setScrollTarget(null)
-      const timer = setTimeout(() => setHighlightedId(null), 2000)
-      return () => clearTimeout(timer)
     }
-    if (messages.length > 0) setScrollTarget(null)
+    // Either way the target is consumed: found → highlighted; absent (and messages present) → stale, drop it.
+    if (el || messages.length > 0) setScrollTarget(null)
   }, [scrollTargetMessageId, messages, setScrollTarget])
+
+  // Fade the landing highlight ~2s after it is set. Kept in its own effect (keyed on highlightedId)
+  // so that clearing the scroll target above — which re-runs the jump effect — cannot cancel this
+  // timer before it fires.
+  useEffect(() => {
+    if (!highlightedId) return
+    const timer = setTimeout(() => setHighlightedId(null), 2000)
+    return () => clearTimeout(timer)
+  }, [highlightedId])
 
   const showThinking = status === 'running' && last?.role === 'user'
 

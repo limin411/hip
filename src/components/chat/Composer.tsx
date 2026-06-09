@@ -61,6 +61,7 @@ export function Composer({
           <div className="flex items-center gap-2">
             {reconnecting && <span className="text-[12px] text-ink-tertiary">{t('chat.reconnecting')}</span>}
             <button
+              type="button"
               onClick={onStop}
               disabled={reconnecting}
               data-testid="composer-stop"

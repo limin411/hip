@@ -420,7 +420,7 @@ export class Session {
       await Promise.allSettled(pending)
       if (isAbort && supervisorText) {
         // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
-        const text = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
+        const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true)
         // A stall is terminal: emit TIMEOUT *after* the finalize so the client ends in `error`, not `idle`.
         if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
         return text

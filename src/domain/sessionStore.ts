@@ -21,8 +21,7 @@ export interface SessionVM {
   error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
 }
 
-/** Turn-end sweep for a Message-level ToolCall[]: turn-end sweep so a
- *  delivered/finalized message matches the persisted trace after a cancel/interruption. */
+/** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
 function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] | undefined {
   if (!toolCalls?.some((tc) => tc.status === 'running')) return toolCalls
   return toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc))
@@ -43,12 +42,12 @@ function finalizeCancelledMessage(messages: Message[]): Message[] {
   return messages.map((x, k) => (k === idx ? { ...x, toolCalls: coerceRunningToolCalls(x.toolCalls), stopped: true } : x))
 }
 
-/** Build a freshly-started ToolCall from a tool:started message. Shared by the message- and agent-level maps so they never drift. */
+/** Build a freshly-started ToolCall from a tool:started message. */
 function makeRunningToolCall(msg: { callId: string; agentId: string; name: string; input: string; seq: number; truncated?: boolean }): ToolCall {
   return { callId: msg.callId, agentId: msg.agentId, name: msg.name, input: msg.input, status: 'running', seq: msg.seq, ...(msg.truncated ? { truncated: true } : {}) }
 }
 
-/** Apply a tool:finished patch to an existing ToolCall (sticky-OR truncated). Shared by the message- and agent-level maps so they never drift. */
+/** Apply a tool:finished patch to an existing ToolCall (sticky-OR truncated). */
 function patchFinishedToolCall(tc: ToolCall, msg: { status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }): ToolCall {
   return { ...tc, status: msg.status, ...(msg.output !== undefined ? { output: msg.output } : {}), ...(msg.error !== undefined ? { error: msg.error } : {}), ...(tc.truncated || msg.truncated ? { truncated: true } : {}) }
 }

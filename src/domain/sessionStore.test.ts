@@ -213,6 +213,22 @@ describe('applyServerMessage', () => {
     const finished = applyServerMessage(started, { type: 'tool:finished', sessionId: 's1', turnId: 't1', agentId: 'coder', callId: 'c1', status: 'finished', output: 'ok' }, 0)
     expect(finished.sessions[0].messages[0].toolCalls![0]).toMatchObject({ callId: 'c1', status: 'finished', output: 'ok' })
   })
+  it('tool:finished sticky-ORs truncated on the message ToolCall', () => {
+    // Start a tool with truncated:true, finish it without truncated — result must stay truncated.
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timeline: [], toolCalls: [], timestamp: 0 }] })] }
+    const started = applyServerMessage(s0, { type: 'tool:started', sessionId: 's1', turnId: 't1', agentId: 'coder', role: 'coder', callId: 'c2', name: 'read_file', input: '{}', seq: 0, truncated: true }, 0)
+    const finished = applyServerMessage(started, { type: 'tool:finished', sessionId: 's1', turnId: 't1', agentId: 'coder', callId: 'c2', status: 'finished', output: 'data' }, 0)
+    const tc = finished.sessions[0].messages[0].toolCalls![0]
+    expect(tc).toMatchObject({ callId: 'c2', status: 'finished', output: 'data' })
+    expect(tc.truncated).toBe(true)
+    // Also verify: finish sets truncated even when the started ToolCall had none.
+    const s1 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timeline: [], toolCalls: [], timestamp: 0 }] })] }
+    const started2 = applyServerMessage(s1, { type: 'tool:started', sessionId: 's1', turnId: 't1', agentId: 'coder', role: 'coder', callId: 'c3', name: 'read_file', input: '{}', seq: 1 }, 0)
+    const finished2 = applyServerMessage(started2, { type: 'tool:finished', sessionId: 's1', turnId: 't1', agentId: 'coder', callId: 'c3', status: 'finished', output: 'data', truncated: true }, 0)
+    const tc2 = finished2.sessions[0].messages[0].toolCalls![0]
+    expect(tc2).toMatchObject({ callId: 'c3', status: 'finished', output: 'data' })
+    expect(tc2.truncated).toBe(true)
+  })
   it('message:complete replaces with authoritative timeline and coerces a running tool', () => {
     const s0 = { sessions: [baseSession({ messages: [
       { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },

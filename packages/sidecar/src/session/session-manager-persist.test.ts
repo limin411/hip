@@ -45,6 +45,22 @@ describe('SessionManager persistence', () => {
     expect(loaded.agentRuns.length).toBeGreaterThan(0)
   })
 
+  it('session:load attaches agentRuns to each message', async () => {
+    const sessionId = 's2'
+    mgr.handle({ type: 'session:create', id: sessionId, config: cfg }, send)
+    await mgr.handleAsync({ type: 'message:send', sessionId, id: 'u2', content: 'hello', role: 'user' }, send)
+    sent = []
+    // Use a fresh manager over the same store (shared in-memory DB) to prove cold-load path
+    const mgr2 = new SessionManager(store, () => new FakeListChatModel({ responses: ['ok'] }), scratchRoot)
+    mgr2.handle({ type: 'session:load', sessionId }, (m) => sent.push(m))
+    await Promise.resolve()
+    const loaded = sent.find((m) => m.type === 'session:loaded') as Extract<ServerMessage, { type: 'session:loaded' }>
+    const assistant = loaded.messages.find((m) => m.role === 'assistant')!
+    expect(assistant.agentRuns).toBeDefined()
+    expect(assistant.agentRuns!.length).toBeGreaterThan(0)
+    expect(assistant.agentRuns!.some((r) => r.messageId === assistant.id)).toBe(true)
+  })
+
   it('rehydrates a cold session from the DB on message:send', async () => {
     store.insertSession({ id: 's9', title: 't', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u0', sessionId: 's9', role: 'user', agentId: null, content: '我叫小明', timestamp: 1 })

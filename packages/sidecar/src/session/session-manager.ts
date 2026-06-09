@@ -56,7 +56,7 @@ export class SessionManager {
         break
       case 'session:load':
         send({ type: 'session:loaded', sessionId: msg.sessionId,
-          messages: this.store?.loadMessages(msg.sessionId) ?? [],
+          messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [],
           agentRuns: this.store?.loadAgentRuns(msg.sessionId) ?? [] })
         break
       case 'session:search':

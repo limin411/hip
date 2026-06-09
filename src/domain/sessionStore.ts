@@ -127,24 +127,28 @@ function appendAssistantDelta(messages: Message[], delta: string, agentId: strin
   return [...messages, { id: `asst-${agentId}-${now}`, role: 'assistant', content: delta, agentId, timestamp: now }]
 }
 
-/** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown. */
+/** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown.
+ *  Assigns a provisional insertion-order seq on append; preserves the prior seq on replace.
+ *  (message:complete later overwrites runs with the sidecar's authoritative seqs.) */
 function upsertRun(messages: Message[], turnId: string, run: AgentRun): Message[] {
   if (!messages.some((m) => m.id === turnId)) return messages
   return messages.map((m) => {
     if (m.id !== turnId) return m
     const runs = m.agentRuns ?? []
-    return runs.some((r) => r.agentId === run.agentId)
-      ? { ...m, agentRuns: runs.map((r) => (r.agentId === run.agentId ? run : r)) }
-      : { ...m, agentRuns: [...runs, run] }
+    const i = runs.findIndex((r) => r.agentId === run.agentId)
+    return i >= 0
+      ? { ...m, agentRuns: runs.map((r, k) => (k === i ? { ...run, seq: r.seq } : r)) }
+      : { ...m, agentRuns: [...runs, { ...run, seq: runs.length }] }
   })
 }
 
-/** Append a delta to a subagent run's output on the trailing assistant message. */
-function appendRunOutput(messages: Message[], agentId: string, delta: string): Message[] {
-  const idx = messages.length - 1
-  const last = messages[idx]
-  if (!last || last.role !== 'assistant' || !last.agentRuns) return messages
-  return messages.map((m, k) => (k !== idx ? m : { ...m, agentRuns: m.agentRuns!.map((r) => (r.agentId === agentId ? { ...r, output: r.output + delta } : r)) }))
+/** Append a delta to a subagent run's output on the turn's message (keyed by turnId). No-op if unknown. */
+function appendRunOutput(messages: Message[], turnId: string, agentId: string, delta: string): Message[] {
+  return messages.map((m) =>
+    m.id !== turnId || !m.agentRuns
+      ? m
+      : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, output: r.output + delta } : r)) },
+  )
 }
 
 /** Set finishedAt on the run for the given turn + agent. */
@@ -242,7 +246,7 @@ export function applyServerMessage(
         const isSupervisor = run ? run.role === 'supervisor' : agent ? agent.role === 'supervisor' : msg.agentId === 'supervisor'
         const messages = isSupervisor
           ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now)
-          : appendRunOutput(s.messages, msg.agentId, msg.delta)
+          : appendRunOutput(s.messages, msg.turnId, msg.agentId, msg.delta)
         return { ...s, agents, messages }
       })
 

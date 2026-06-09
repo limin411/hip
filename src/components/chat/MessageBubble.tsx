@@ -1,6 +1,8 @@
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
+import { formatClockTime, formatAbsolute } from '@/lib/datetime'
 import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
@@ -15,7 +17,8 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, streaming, isLastAssistant }: MessageBubbleProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? 'en'
   const isUser = message.role === 'user'
 
   return (
@@ -30,6 +33,13 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center gap-2 text-[12px] font-medium text-ink-secondary">
           <span>{isUser ? t('chat.you') : 'hip'}</span>
+          <span
+            className="text-[11px] font-normal text-ink-tertiary"
+            title={formatAbsolute(message.timestamp, locale)}
+            data-testid="message-time"
+          >
+            {formatClockTime(message.timestamp, locale)}
+          </span>
           {message.stopped && (
             <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] font-normal text-ink-tertiary" data-testid="stopped-badge">
               {t('chat.stopped')}
@@ -48,7 +58,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           {message.role === 'assistant' && (
             <TurnTimeline steps={message.timeline} toolCalls={message.toolCalls} agentRuns={message.agentRuns} />
           )}
-          <ReactMarkdown components={{ pre: CodeBlock }}>{message.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>
         {!streaming && <MessageActions message={message} isLastAssistant={!!isLastAssistant} />}

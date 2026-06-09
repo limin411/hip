@@ -13,6 +13,9 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(NOW - 3 * 3_600_000, 'en', NOW)).toBe('3 hours ago')
     expect(formatRelativeTime(NOW - 25 * 3_600_000, 'en', NOW)).toBe('yesterday')
   })
+  it('exactly 60s rolls to "1 minute ago" (en)', () => {
+    expect(formatRelativeTime(NOW - 60_000, 'en', NOW)).toBe('1 minute ago')
+  })
   it('localizes to zh-CN (differs from en, contains CJK)', () => {
     const zh = formatRelativeTime(NOW - 2 * 60_000, 'zh-CN', NOW)
     expect(zh).not.toBe('2 minutes ago')

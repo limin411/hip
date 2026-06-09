@@ -10,6 +10,11 @@ interface UiState {
   search: string
   setSearch: (q: string) => void
 
+  // Transient scroll target: the messageId of a clicked search hit. ChatPane scrolls
+  // to it + briefly highlights it, then clears it. Not persisted.
+  scrollTargetMessageId: string | null
+  setScrollTarget: (id: string | null) => void
+
   panelOpen: boolean
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
@@ -29,6 +34,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   search: '',
   setSearch: (q) => set({ search: q }),
+
+  scrollTargetMessageId: null,
+  setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
 
   panelOpen: false,
   activeTab: 'agents',

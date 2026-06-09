@@ -56,3 +56,17 @@ describe('uiStore - panel state management', () => {
     expect(useUiStore.getState().activeTab).toBe('diff')
   })
 })
+
+describe('uiStore - scroll target', () => {
+  it('initial scrollTargetMessageId is null', () => {
+    useUiStore.setState({ scrollTargetMessageId: null })
+    expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
+  })
+
+  it('setScrollTarget stores an id and clears it with null', () => {
+    useUiStore.getState().setScrollTarget('m42')
+    expect(useUiStore.getState().scrollTargetMessageId).toBe('m42')
+    useUiStore.getState().setScrollTarget(null)
+    expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
+  })
+})

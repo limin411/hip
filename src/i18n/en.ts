@@ -33,6 +33,7 @@ export const en = {
       thinkingMode: 'Thinking',
       thinkingModeHint: "Show the model's reasoning (deepseek-reasoner; slower, pricier)",
       thoughtFor: 'Thought for {{seconds}}s',
+      delegatedTo: 'Delegated to {{role}}',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

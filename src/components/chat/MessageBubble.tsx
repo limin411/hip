@@ -46,7 +46,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           )}
         >
           {message.role === 'assistant' && (
-            <TurnTimeline steps={message.timeline} toolCalls={message.toolCalls} />
+            <TurnTimeline steps={message.timeline} toolCalls={message.toolCalls} agentRuns={message.agentRuns} />
           )}
           <ReactMarkdown components={{ pre: CodeBlock }}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}

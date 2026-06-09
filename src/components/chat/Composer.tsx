@@ -13,6 +13,7 @@ export function Composer({
   thinking = true,
   onToggleThinking,
   thinkingDisabled,
+  reconnecting,
 }: {
   value: string
   onChange: (v: string) => void
@@ -23,6 +24,7 @@ export function Composer({
   thinking?: boolean
   onToggleThinking?: (next: boolean) => void
   thinkingDisabled?: boolean
+  reconnecting?: boolean
 }) {
   const { t } = useTranslation()
   const toggleDisabled = thinkingDisabled || !onToggleThinking
@@ -56,14 +58,18 @@ export function Composer({
           <span>{t('chat.thinkingMode')}</span>
         </button>
         {running && onStop ? (
-          <button
-            onClick={onStop}
-            data-testid="composer-stop"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white transition-colors hover:bg-accent-hover"
-            title={t('chat.stop')}
-          >
-            <Square size={15} />
-          </button>
+          <div className="flex items-center gap-2">
+            {reconnecting && <span className="text-[12px] text-ink-tertiary">{t('chat.reconnecting')}</span>}
+            <button
+              onClick={onStop}
+              disabled={reconnecting}
+              data-testid="composer-stop"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('chat.stop')}
+            >
+              <Square size={15} />
+            </button>
+          </div>
         ) : (
           <button
             onClick={onSubmit}

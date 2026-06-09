@@ -56,7 +56,11 @@ export function ChatPane() {
             <p>
               {error.code === 'NO_API_KEY'
                 ? t('chat.errorNoApiKey')
-                : t('chat.errorGeneric', { message: error.message })}
+                : error.code === 'INTERRUPTED'
+                  ? t('chat.errorInterrupted')
+                  : error.code === 'TIMEOUT'
+                    ? t('chat.errorTimeout')
+                    : t('chat.errorGeneric', { message: error.message })}
             </p>
             {error.code === 'NO_API_KEY' ? (
               <button

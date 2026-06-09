@@ -2,22 +2,6 @@
 import { create } from 'zustand'
 import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
-export type AgentStatus = 'idle' | 'running' | 'done'
-
-export interface AgentVM {
-  id: string
-  role: AgentRole
-  title: string        // 派生自 role
-  status: AgentStatus
-  tokens: string
-  tokenCount: number   // 物化：tokens.length
-  elapsedMs: number    // 物化：finishedAt - startedAt
-  startedAt: number    // 内部：agent:started 时的 now（不渲染）
-  toolCalls: ToolCall[]      // 执行轨迹，按 seq 排序
-  taskInput?: string         // 子代理收到的委派指令
-  parentAgentId?: string     // 委派者（子代理恒为 'supervisor'）
-}
-
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
   code: string
@@ -33,35 +17,11 @@ export interface SessionVM {
   updatedAtMs: number  // 数值排序键（epoch ms）
   loaded: boolean      // false = 仅摘要（消息尚未拉取）
   messages: Message[]
-  agents: AgentVM[]
   status: 'idle' | 'running' | 'error'
   error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
 }
 
-const ROLE_TITLE: Record<AgentRole, string> = {
-  supervisor: 'Supervisor',
-  planner: 'Planner',
-  coder: 'Coder',
-  reviewer: 'Reviewer',
-}
-
-function upsertAgent(agents: AgentVM[], agent: AgentVM): AgentVM[] {
-  return agents.some((a) => a.id === agent.id)
-    ? agents.map((a) => (a.id === agent.id ? agent : a))
-    : [...agents, agent]
-}
-
-/** Turn-end sweep: coerce any tool still 'running' to error — mirrors the sidecar's trajectoryToRuns
- *  so the live view matches the persisted/reloaded trace after a cancel/interruption. */
-function coerceRunningTools(agents: AgentVM[]): AgentVM[] {
-  return agents.map((a) =>
-    a.toolCalls.some((tc) => tc.status === 'running')
-      ? { ...a, toolCalls: a.toolCalls.map((tc) => (tc.status === 'running' ? { ...tc, status: 'error' as const, error: tc.error ?? 'interrupted' } : tc)) }
-      : a,
-  )
-}
-
-/** Mirror of coerceRunningTools for a Message-level ToolCall[]: turn-end sweep so a
+/** Turn-end sweep for a Message-level ToolCall[]: turn-end sweep so a
  *  delivered/finalized message matches the persisted trace after a cancel/interruption. */
 function coerceRunningToolCalls(toolCalls: ToolCall[] | undefined): ToolCall[] | undefined {
   if (!toolCalls?.some((tc) => tc.status === 'running')) return toolCalls
@@ -170,20 +130,7 @@ function formatRelative(ms: number): string {
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAt: formatRelative(s.updatedAt), updatedAtMs: s.updatedAt, loaded: false, messages: [], agents: [], status: 'idle', error: null }
-}
-
-function agentVMfromRun(r: AgentRun): AgentVM {
-  return {
-    id: r.agentId, role: r.role, title: ROLE_TITLE[r.role],
-    status: r.finishedAt ? 'done' : 'running',
-    tokens: r.output, tokenCount: r.output.length,
-    elapsedMs: r.finishedAt ? r.finishedAt - r.startedAt : 0,
-    startedAt: r.startedAt,
-    toolCalls: r.toolCalls ?? [],
-    ...(r.taskInput ? { taskInput: r.taskInput } : {}),
-    ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
-  }
+  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAt: formatRelative(s.updatedAt), updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -215,39 +162,21 @@ export function applyServerMessage(
           status: 'running',
           error: null,
           messages: upsertRun(base, msg.turnId, run),
-          agents: upsertAgent(s.agents, {
-            id: msg.agentId,
-            role: msg.role,
-            title: ROLE_TITLE[msg.role],
-            status: 'running',
-            tokens: '',
-            tokenCount: 0,
-            elapsedMs: 0,
-            startedAt: now,
-            toolCalls: [],
-            ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
-            ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
-          }),
         }
       })
     }
 
     case 'token:stream':
       return update(msg.sessionId, (s) => {
-        const agent = s.agents.find((a) => a.id === msg.agentId) // KEEP (s.agents removed later)
-        const agents = s.agents.map((a) =>
-          a.id === msg.agentId ? { ...a, tokens: a.tokens + msg.delta, tokenCount: a.tokens.length + msg.delta.length } : a,
-        )
         // token:stream carries no role; resolve supervisor (→ body) vs subagent (→ run output)
-        // from the folded run on the trailing assistant message, then the existing AgentVM,
-        // falling back to the literal agentId.
+        // from the folded run on the trailing assistant message, falling back to the literal agentId.
         const trailing = s.messages[s.messages.length - 1]
         const run = trailing?.role === 'assistant' ? trailing.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
-        const isSupervisor = run ? run.role === 'supervisor' : agent ? agent.role === 'supervisor' : msg.agentId === 'supervisor'
+        const isSupervisor = run ? run.role === 'supervisor' : msg.agentId === 'supervisor'
         const messages = isSupervisor
           ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now)
           : appendRunOutput(s.messages, msg.turnId, msg.agentId, msg.delta)
-        return { ...s, agents, messages }
+        return { ...s, messages }
       })
 
     case 'reasoning:delta':
@@ -260,7 +189,6 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({
         ...s,
         messages: setRunFinished(s.messages, msg.turnId, msg.agentId, now),
-        agents: s.agents.map((a) => (a.id === msg.agentId ? { ...a, status: 'done', elapsedMs: now - a.startedAt } : a)),
       }))
 
     case 'tool:started':
@@ -277,11 +205,6 @@ export function applyServerMessage(
               }
             : m,
         ),
-        agents: s.agents.map((a) =>
-          a.id === msg.agentId
-            ? { ...a, toolCalls: [...a.toolCalls, makeRunningToolCall(msg)] }
-            : a,
-        ),
       }))
 
     case 'tool:finished':
@@ -295,19 +218,11 @@ export function applyServerMessage(
               }
             : m,
         ),
-        agents: s.agents.map((a) =>
-          a.id === msg.agentId
-            ? {
-                ...a,
-                toolCalls: a.toolCalls.map((tc) => (tc.callId === msg.callId ? patchFinishedToolCall(tc, msg) : tc)),
-              }
-            : a,
-        ),
       }))
 
     case 'message:complete': {
       const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, finalized), agents: coerceRunningTools(s.agents) }))
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, finalized) }))
     }
 
     case 'session:thinking':
@@ -316,7 +231,7 @@ export function applyServerMessage(
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
-      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, messages: finalizeCancelledMessage(s.messages), agents: coerceRunningTools(s.agents) }))
+      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, messages: finalizeCancelledMessage(s.messages) }))
       return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
 
     case 'session:list:result': {
@@ -331,7 +246,7 @@ export function applyServerMessage(
     }
 
     case 'session:loaded':
-      return update(msg.sessionId, (s) => ({ ...s, loaded: true, messages: msg.messages, agents: msg.agentRuns.map(agentVMfromRun) }))
+      return update(msg.sessionId, (s) => ({ ...s, loaded: true, messages: msg.messages }))
 
     case 'session:deleted':
       return { sessions: state.sessions.filter((s) => s.id !== msg.sessionId) }
@@ -350,7 +265,7 @@ export function applyServerMessage(
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], agents: [], status: 'idle', error: null }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -423,7 +338,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
         if (sess.id !== sessionId) return sess
         const last = sess.messages[sess.messages.length - 1]
         const messages = last && last.role === 'assistant' ? sess.messages.slice(0, -1) : sess.messages
-        return { ...sess, messages, agents: [], status: 'running' as const, error: null }
+        return { ...sess, messages, status: 'running' as const, error: null }
       }),
     })),
 

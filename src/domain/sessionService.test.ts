@@ -25,7 +25,7 @@ beforeEach(() => {
   // NOTE: drop the `true` (replace) flag — Zustand v5 setState with replace=true
   // wipes action methods from the store, causing "X is not a function" errors.
   // Using merge (no second arg) keeps actions intact and resets only data fields.
-  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], agents: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
+  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
 })
@@ -50,8 +50,8 @@ describe('SessionService', () => {
   it('inbound ServerMessage flows into the store', () => {
     const t = new FakeTransport()
     new SessionService(t)
-    t.push({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'planner', turnId: 't1' })
-    expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Planner')
+    t.push({ type: 'agent:started', sessionId: 's1', agentId: 'supervisor', role: 'supervisor', turnId: 't1' })
+    expect(useDomainStore.getState().sessions[0].messages.at(-1)!.agentRuns).toMatchObject([{ agentId: 'supervisor', role: 'supervisor' }])
   })
 
   it('createSession sends session:create and activates', () => {
@@ -175,7 +175,7 @@ describe('SessionService', () => {
 
   it('regenerate optimistically drops the trailing assistant and sends message:regenerate', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }], agents: [], status: 'idle', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }], status: 'idle', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()
@@ -186,7 +186,7 @@ describe('SessionService', () => {
 
   it('regenerate is a no-op while a turn is running', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], agents: [], status: 'running', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], status: 'running', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()

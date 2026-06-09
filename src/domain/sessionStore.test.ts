@@ -12,7 +12,6 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
     updatedAtMs: 0,
     loaded: true,
     messages: [],
-    agents: [],
     status: 'idle',
     error: null,
     ...over,
@@ -20,43 +19,23 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
 }
 
 describe('applyServerMessage', () => {
-  it('agent:started adds a running agent with derived title and startedAt', () => {
-    const next = applyServerMessage(
-      { sessions: [baseSession()] },
-      { type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'planner', turnId: 't1' },
-      1000,
-    )
-    const a = next.sessions[0].agents[0]
-    expect(a).toMatchObject({ id: 'a1', role: 'planner', title: 'Planner', status: 'running', startedAt: 1000 })
-    expect(next.sessions[0].status).toBe('running')
-  })
-
-  it('token:stream accumulates agent tokens and tokenCount', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'a1', role: 'planner', title: 'Planner', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [] }] })] }
-    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'a1', delta: 'abc', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents[0].tokens).toBe('abc')
-    expect(next.sessions[0].agents[0].tokenCount).toBe(3)
-  })
-
-  it('token:stream from a supervisor also streams into a new assistant message', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'a0', role: 'supervisor', title: 'Supervisor', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [] }], messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
-    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'a0', delta: 'Hel', turnId: 't1' }, 5)
-    const msgs = next.sessions[0].messages
-    expect(msgs).toHaveLength(2)
-    expect(msgs[1]).toMatchObject({ role: 'assistant', content: 'Hel' })
+  it('token:stream from a supervisor streams into the answer body', () => {
+    const s0 = { sessions: [baseSession({ messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: '', timestamp: 5, agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 5, finishedAt: null, seq: 0, messageId: 't1' }] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'supervisor', delta: 'Hel', turnId: 't1' }, 6)
+    expect(next.sessions[0].messages.at(-1)!.content).toBe('Hel')
   })
 
   it('supervisor token appends to the existing streaming assistant message', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'a0', role: 'supervisor', title: 'Supervisor', status: 'running', tokens: 'Hel', tokenCount: 3, elapsedMs: 0, startedAt: 0, toolCalls: [] }], messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'asst', role: 'assistant', content: 'Hel', timestamp: 5 }] })] }
-    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'a0', delta: 'lo', turnId: 't1' }, 6)
+    const s0 = { sessions: [baseSession({ messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'Hel', timestamp: 5, agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 5, finishedAt: null, seq: 0, messageId: 't1' }] },
+    ] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'supervisor', delta: 'lo', turnId: 't1' }, 6)
     expect(next.sessions[0].messages).toHaveLength(2)
-    expect(next.sessions[0].messages[1].content).toBe('Hello')
-  })
-
-  it('agent:finished marks done and materializes elapsedMs', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'a1', role: 'planner', title: 'Planner', status: 'running', tokens: 'x', tokenCount: 1, elapsedMs: 0, startedAt: 1000, toolCalls: [] }] })] }
-    const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 's1', agentId: 'a1', turnId: 't1' }, 3400)
-    expect(next.sessions[0].agents[0]).toMatchObject({ status: 'done', elapsedMs: 2400 })
+    expect(next.sessions[0].messages.at(-1)!.content).toBe('Hello')
   })
 
   it('message:complete replaces the streaming assistant message', () => {
@@ -78,7 +57,7 @@ describe('applyServerMessage', () => {
   it('ignores events for unknown sessions', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 'nope', agentId: 'a1', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents).toHaveLength(0)
+    expect(next).toBe(s0)
   })
 
   it('session:created adds an empty session and ignores duplicates', () => {
@@ -92,7 +71,6 @@ describe('applyServerMessage', () => {
   it('token:stream for an unknown agent is a no-op (arrives before agent:started)', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
     const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'ghost', delta: 'x', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents).toHaveLength(0)
     expect(next.sessions[0].messages).toHaveLength(1)
   })
 
@@ -134,7 +112,7 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0]).toMatchObject({ id: 's1', title: 'T', loaded: false, updatedAtMs: 1000 })
   })
 
-  it('session:loaded fills messages + agents and marks loaded', () => {
+  it('session:loaded fills messages and marks loaded', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {
       type: 'session:loaded', sessionId: 's1',
@@ -143,7 +121,6 @@ describe('applyServerMessage', () => {
     }, 0)
     expect(next.sessions[0].loaded).toBe(true)
     expect(next.sessions[0].messages).toHaveLength(1)
-    expect(next.sessions[0].agents[0].id).toBe('planner')
   })
 
   it('session:deleted removes the session', () => {
@@ -155,60 +132,6 @@ describe('applyServerMessage', () => {
   it('session:title updates the session title', () => {
     const next = applyServerMessage({ sessions: [baseSession()] }, { type: 'session:title', sessionId: 's1', title: 'New Name' }, 0)
     expect(next.sessions[0].title).toBe('New Name')
-  })
-
-  it('agent:started seeds toolCalls/taskInput/parentAgentId', () => {
-    const next = applyServerMessage(
-      { sessions: [baseSession()] },
-      { type: 'agent:started', sessionId: 's1', agentId: 'coder', role: 'coder', parentAgentId: 'supervisor', taskInput: 'do it', turnId: 't1' },
-      1000,
-    )
-    expect(next.sessions[0].agents[0]).toMatchObject({ id: 'coder', toolCalls: [], parentAgentId: 'supervisor', taskInput: 'do it' })
-  })
-
-  it('tool:started appends a running tool to the matching agent', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [] }] })] }
-    const next = applyServerMessage(s0, { type: 'tool:started', sessionId: 's1', agentId: 'coder', role: 'coder', callId: 'c1', name: 'write_file', input: '{"path":"/a.ts"}', seq: 0, turnId: 't1' }, 0)
-    expect(next.sessions[0].agents[0].toolCalls).toEqual([
-      { callId: 'c1', agentId: 'coder', name: 'write_file', input: '{"path":"/a.ts"}', status: 'running', seq: 0 },
-    ])
-  })
-
-  it('tool:finished updates the matching call by callId (sticky-OR truncated)', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'read_file', input: '{}', status: 'running', seq: 0, truncated: true }] }] })] }
-    const next = applyServerMessage(s0, { type: 'tool:finished', sessionId: 's1', agentId: 'coder', callId: 'c1', status: 'finished', output: 'data', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'finished', output: 'data', truncated: true })
-  })
-
-  it('tool:finished is a no-op for an unknown callId', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'read_file', input: '{}', status: 'running', seq: 0 }] }] })] }
-    const next = applyServerMessage(s0, { type: 'tool:finished', sessionId: 's1', agentId: 'coder', callId: 'zzz', status: 'finished', output: 'x', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents[0].toolCalls[0].status).toBe('running')
-  })
-
-  it('tool:started for an unknown agent is a no-op (arrives before agent:started)', () => {
-    const s0 = { sessions: [baseSession()] }
-    const next = applyServerMessage(s0, { type: 'tool:started', sessionId: 's1', agentId: 'ghost', role: 'coder', callId: 'c1', name: 'read_file', input: '{}', seq: 0, turnId: 't1' }, 0)
-    expect(next.sessions[0].agents).toHaveLength(0)
-  })
-
-  it('tool:finished can update a tool call even after its agent is marked done', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'done', tokens: 'x', tokenCount: 1, elapsedMs: 100, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }] })] }
-    const next = applyServerMessage(s0, { type: 'tool:finished', sessionId: 's1', agentId: 'coder', callId: 'c1', status: 'finished', output: 'ok', turnId: 't1' }, 0)
-    expect(next.sessions[0].agents[0].status).toBe('done')
-    expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'finished', output: 'ok' })
-  })
-
-  it('message:complete coerces any still-running tool to error (matches persisted trace)', () => {
-    const s0 = { sessions: [baseSession({ agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }], messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
-    const next = applyServerMessage(s0, { type: 'message:complete', sessionId: 's1', message: { id: 'a1', role: 'assistant', content: 'partial', agentId: 'supervisor', timestamp: 5, stopped: true } }, 5)
-    expect(next.sessions[0].agents[0].toolCalls[0]).toMatchObject({ status: 'error', error: 'interrupted' })
-  })
-
-  it('error CANCELLED coerces still-running tools to error', () => {
-    const s0 = { sessions: [baseSession({ status: 'running', agents: [{ id: 'coder', role: 'coder', title: 'Coder', status: 'running', tokens: '', tokenCount: 0, elapsedMs: 0, startedAt: 0, toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'running', seq: 0 }] }] })] }
-    const next = applyServerMessage(s0, { type: 'error', sessionId: 's1', code: 'CANCELLED', message: 'User cancelled the request' }, 0)
-    expect(next.sessions[0].agents[0].toolCalls[0].status).toBe('error')
   })
 
   it('error CANCELLED coerces the in-flight provisional message tools and marks it stopped', () => {
@@ -263,25 +186,12 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].status).toBe('idle')
   })
 
-  it('session:loaded hydrates toolCalls + delegation from agentRuns', () => {
-    const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
-    const next = applyServerMessage(base, {
-      type: 'session:loaded', sessionId: 's1',
-      messages: [],
-      agentRuns: [{ agentId: 'coder', role: 'coder', output: 'c', startedAt: 1, finishedAt: 2, seq: 1, parentAgentId: 'supervisor', taskInput: 'do it', toolCalls: [{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 2 }] }],
-    }, 0)
-    const a = next.sessions[0].agents[0]
-    expect(a).toMatchObject({ id: 'coder', parentAgentId: 'supervisor', taskInput: 'do it' })
-    expect(a.toolCalls).toEqual([{ callId: 'c1', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 2 }])
-  })
-
   it('supervisor agent:started creates a provisional assistant message keyed by turnId', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
     const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'supervisor', role: 'supervisor', turnId: 't1' }, 1000)
     const msgs = next.sessions[0].messages
     expect(msgs).toHaveLength(2)
     expect(msgs[1]).toMatchObject({ id: 't1', role: 'assistant', content: '', timeline: [], toolCalls: [] })
-    expect(next.sessions[0].agents[0]).toMatchObject({ id: 'supervisor', role: 'supervisor', status: 'running' })
   })
   it('supervisor agent:started reuses an existing message with the same turnId', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: 'partial', timeline: [], toolCalls: [], timestamp: 5 }] })] }
@@ -401,8 +311,10 @@ describe('useDomainStore actions', () => {
   it('apply routes a ServerMessage through the reducer', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
-    useDomainStore.getState().apply({ type: 'agent:started', sessionId: 's1', agentId: 'a1', role: 'coder', turnId: 't1' })
-    expect(useDomainStore.getState().sessions[0].agents[0].title).toBe('Coder')
+    useDomainStore.getState().apply({ type: 'agent:started', sessionId: 's1', agentId: 'supervisor', role: 'supervisor', turnId: 't1' })
+    const m = useDomainStore.getState().sessions[0].messages.at(-1)!
+    expect(m.agentRuns).toMatchObject([{ agentId: 'supervisor', role: 'supervisor' }])
+    expect(useDomainStore.getState().sessions[0].status).toBe('running')
   })
 
   it("apply('ready') updates hasApiKey from the sidecar", () => {
@@ -430,11 +342,10 @@ describe('applyServerMessage session:cwd', () => {
 })
 
 describe('regenerateLastTurn', () => {
-  it('drops a trailing assistant message, clears agents, and resets to running', () => {
+  it('drops a trailing assistant message and resets to running', () => {
     useDomainStore.setState({
       sessions: [baseSession({
         messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }],
-        agents: [{ id: 'supervisor', role: 'supervisor', title: 'Supervisor', status: 'done', tokens: 'ans', tokenCount: 3, elapsedMs: 1, startedAt: 0, toolCalls: [] }],
         status: 'idle', error: { code: 'X', message: 'y' },
       })],
       activeSessionId: 's1',
@@ -442,7 +353,6 @@ describe('regenerateLastTurn', () => {
     useDomainStore.getState().regenerateLastTurn('s1')
     const s = useDomainStore.getState().sessions[0]
     expect(s.messages.map((m) => m.id)).toEqual(['u1'])
-    expect(s.agents).toEqual([])
     expect(s.status).toBe('running')
     expect(s.error).toBeNull()
   })

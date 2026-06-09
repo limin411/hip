@@ -76,6 +76,8 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
                 <span className={cn('min-w-0 flex-1 truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
                   {session.title}
                 </span>
+                {/* Relative time is formatted at render from updatedAtMs (localized; recomputed on each
+                    re-render, e.g. on activity/search/language change). No per-minute ticker by design. */}
                 <span className="shrink-0 text-[11px] text-ink-tertiary" title={formatAbsolute(session.updatedAtMs, locale)}>
                   {formatRelativeTime(session.updatedAtMs, locale)}
                 </span>

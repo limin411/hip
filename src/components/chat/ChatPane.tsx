@@ -31,7 +31,7 @@ export function ChatPane() {
   // target effect positions the view and we stay unpinned until the user scrolls back down.
   // Read the target via getState (not a subscription) so clearing it later does not re-arm autoscroll.
   useEffect(() => {
-    setAtBottom(useUiStore.getState().scrollTargetMessageId ? false : true)
+    setAtBottom(!useUiStore.getState().scrollTargetMessageId)
   }, [activeSessionId])
 
   const onScroll = () => {
@@ -50,7 +50,7 @@ export function ChatPane() {
   // regenerated since indexing), clear the stale target so it doesn't linger.
   useEffect(() => {
     if (!scrollTargetMessageId) return
-    const el = scrollRef.current?.querySelector(`[data-message-id="${scrollTargetMessageId}"]`)
+    const el = scrollRef.current?.querySelector(`[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`)
     if (el) {
       el.scrollIntoView({ block: 'center' })
       setHighlightedId(scrollTargetMessageId)
@@ -80,9 +80,11 @@ export function ChatPane() {
               <div
                 key={`${activeSessionId ?? 'none'}-${m.id}-${i}`}
                 data-message-id={m.id}
+                // Transition lives on the always-present base classes so the highlight fades on the
+                // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
-                  highlightedId === m.id &&
-                    'rounded-lg ring-2 ring-accent/50 bg-accent-subtle transition-[background,box-shadow] duration-700',
+                  'transition-[background-color,box-shadow] duration-700',
+                  highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
                 )}
               >
                 <MessageBubble

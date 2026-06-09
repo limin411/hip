@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
+import { cn } from '@/lib/utils'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 
@@ -13,9 +14,12 @@ export function ChatPane() {
   const error = useActiveSessionError()
   const status = useActiveSessionStatus()
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
+  const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
+  const setScrollTarget = useUiStore((s) => s.setScrollTarget)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
   const last = messages[messages.length - 1]
   const lastActivity =
@@ -23,8 +27,12 @@ export function ChatPane() {
       ? last.content.length + (last.timeline?.length ?? 0) + (last.toolCalls?.length ?? 0)
       : 0
 
-  // Reset to "follow" when switching sessions so a freshly opened thread starts pinned to the latest.
-  useEffect(() => { setAtBottom(true) }, [activeSessionId])
+  // On session switch, follow the latest — UNLESS a search jump is pending, in which case the
+  // target effect positions the view and we stay unpinned until the user scrolls back down.
+  // Read the target via getState (not a subscription) so clearing it later does not re-arm autoscroll.
+  useEffect(() => {
+    setAtBottom(useUiStore.getState().scrollTargetMessageId ? false : true)
+  }, [activeSessionId])
 
   const onScroll = () => {
     const el = scrollRef.current
@@ -32,9 +40,26 @@ export function ChatPane() {
   }
 
   useEffect(() => {
-    if (!atBottom) return
+    if (!atBottom || scrollTargetMessageId) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, error, lastActivity, atBottom])
+  }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
+
+  // Search jump: when a target message id is set, center it and flash a highlight, then clear the
+  // target. If the session is still loading, `messages` is empty and the effect no-ops until they
+  // arrive (it re-runs on `messages`). If messages are present but the anchor is gone (deleted/
+  // regenerated since indexing), clear the stale target so it doesn't linger.
+  useEffect(() => {
+    if (!scrollTargetMessageId) return
+    const el = scrollRef.current?.querySelector(`[data-message-id="${scrollTargetMessageId}"]`)
+    if (el) {
+      el.scrollIntoView({ block: 'center' })
+      setHighlightedId(scrollTargetMessageId)
+      setScrollTarget(null)
+      const timer = setTimeout(() => setHighlightedId(null), 2000)
+      return () => clearTimeout(timer)
+    }
+    if (messages.length > 0) setScrollTarget(null)
+  }, [scrollTargetMessageId, messages, setScrollTarget])
 
   const showThinking = status === 'running' && last?.role === 'user'
 
@@ -45,12 +70,20 @@ export function ChatPane() {
           {messages.map((m, i) => {
             const isLastMessage = i === messages.length - 1
             return (
-              <MessageBubble
+              <div
                 key={`${activeSessionId ?? 'none'}-${m.id}-${i}`}
-                message={m}
-                streaming={status === 'running' && m.role === 'assistant' && isLastMessage}
-                isLastAssistant={m.role === 'assistant' && isLastMessage && status !== 'running'}
-              />
+                data-message-id={m.id}
+                className={cn(
+                  highlightedId === m.id &&
+                    'rounded-lg ring-2 ring-accent/50 bg-accent-subtle transition-[background,box-shadow] duration-700',
+                )}
+              >
+                <MessageBubble
+                  message={m}
+                  streaming={status === 'running' && m.role === 'assistant' && isLastMessage}
+                  isLastAssistant={m.role === 'assistant' && isLastMessage && status !== 'running'}
+                />
+              </div>
             )
           })}
           {showThinking && <ThinkingBubble />}

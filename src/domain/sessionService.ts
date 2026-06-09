@@ -6,6 +6,7 @@ import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
+import { useUiStore } from '@/store/uiStore'
 import i18n from '@/i18n'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
@@ -83,11 +84,13 @@ export class SessionService {
     return id
   }
 
-  selectSession(id: string): void {
+  selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
     // Lazily fetch history the first time a summary-only session is opened.
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
     if (s && !s.loaded) this.transport.send({ type: 'session:load', sessionId: id })
+    // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
+    useUiStore.getState().setScrollTarget(messageId ?? null)
   }
 
   deleteSession(id: string): void {

@@ -5,6 +5,7 @@ import { SessionService } from './sessionService'
 import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
+import { useUiStore } from '@/store/uiStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -28,6 +29,7 @@ beforeEach(() => {
   useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
+  useUiStore.setState({ scrollTargetMessageId: null })
 })
 
 describe('SessionService', () => {
@@ -224,5 +226,30 @@ describe('SessionService', () => {
     t.push({ type: 'ready', hasApiKey: true })
     expect(t.sent.some((m) => m.type === 'session:list')).toBe(true)
     expect(t.sent.some((m) => m.type === 'session:load')).toBe(false)
+  })
+
+  it('selectSession with a messageId sets activeSessionId and the scroll target', () => {
+    const t = new FakeTransport()
+    new SessionService(t).selectSession('s1', 'm9')
+    expect(useDomainStore.getState().activeSessionId).toBe('s1')
+    expect(useUiStore.getState().scrollTargetMessageId).toBe('m9')
+  })
+
+  it('selectSession without a messageId clears any stale scroll target', () => {
+    useUiStore.setState({ scrollTargetMessageId: 'stale' })
+    const t = new FakeTransport()
+    new SessionService(t).selectSession('s1')
+    expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
+  })
+
+  it('selectSession lazy-loads history for an unloaded session and still sets the target', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's2', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T2', preview: 'P', updatedAtMs: 0, loaded: false, messages: [], status: 'idle', error: null }],
+      activeSessionId: null,
+    })
+    const t = new FakeTransport()
+    new SessionService(t).selectSession('s2', 'm1')
+    expect(t.sent.some((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's2')).toBe(true)
+    expect(useUiStore.getState().scrollTargetMessageId).toBe('m1')
   })
 })

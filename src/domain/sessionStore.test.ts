@@ -327,6 +327,36 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'reasoning:delta', sessionId: 's1', turnId: 'ghost', agentId: 'supervisor', role: 'supervisor', stepSeq: 0, delta: 'x' }, 0)
     expect(next.sessions[0].messages).toEqual(s0.sessions[0].messages)
   })
+
+  it('agent:started folds a run onto the turn message (supervisor creates the message)', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
+    const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'supervisor', role: 'supervisor', turnId: 't1' }, 100)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.id).toBe('t1')
+    expect(m.agentRuns).toMatchObject([{ agentId: 'supervisor', role: 'supervisor', messageId: 't1', finishedAt: null }])
+  })
+
+  it('subagent agent:started folds a run with taskInput onto the existing turn message', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'supervisor', role: 'supervisor', output: '', startedAt: 100, finishedAt: null, seq: 0, messageId: 't1' }] }] })] }
+    const next = applyServerMessage(s0, { type: 'agent:started', sessionId: 's1', agentId: 'planner-1', role: 'planner', turnId: 't1', parentAgentId: 'supervisor', taskInput: 'make a plan' }, 110)
+    const runs = next.sessions[0].messages.at(-1)!.agentRuns!
+    expect(runs.map((r) => r.agentId)).toEqual(['supervisor', 'planner-1'])
+    expect(runs[1]).toMatchObject({ taskInput: 'make a plan', parentAgentId: 'supervisor', messageId: 't1' })
+  })
+
+  it('subagent token:stream appends to that run\'s output, not the answer body', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'planner-1', role: 'planner', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' }] }] })] }
+    const next = applyServerMessage(s0, { type: 'token:stream', sessionId: 's1', agentId: 'planner-1', delta: 'a plan', turnId: 't1' }, 120)
+    const m = next.sessions[0].messages.at(-1)!
+    expect(m.content).toBe('') // answer body untouched
+    expect(m.agentRuns![0].output).toBe('a plan')
+  })
+
+  it('agent:finished sets finishedAt on the run', () => {
+    const s0 = { sessions: [baseSession({ messages: [{ id: 't1', role: 'assistant', content: '', timestamp: 100, agentRuns: [{ agentId: 'planner-1', role: 'planner', output: '', startedAt: 100, finishedAt: null, seq: 1, messageId: 't1' }] }] })] }
+    const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 's1', agentId: 'planner-1', turnId: 't1' }, 2600)
+    expect(next.sessions[0].messages.at(-1)!.agentRuns![0].finishedAt).toBe(2600)
+  })
 })
 
 function reset() {

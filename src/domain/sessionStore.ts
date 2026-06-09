@@ -127,6 +127,31 @@ function appendAssistantDelta(messages: Message[], delta: string, agentId: strin
   return [...messages, { id: `asst-${agentId}-${now}`, role: 'assistant', content: delta, agentId, timestamp: now }]
 }
 
+/** Upsert an AgentRun onto the turn's trailing assistant message (keyed by turnId). No-op if the turn is unknown. */
+function upsertRun(messages: Message[], turnId: string, run: AgentRun): Message[] {
+  if (!messages.some((m) => m.id === turnId)) return messages
+  return messages.map((m) => {
+    if (m.id !== turnId) return m
+    const runs = m.agentRuns ?? []
+    return runs.some((r) => r.agentId === run.agentId)
+      ? { ...m, agentRuns: runs.map((r) => (r.agentId === run.agentId ? run : r)) }
+      : { ...m, agentRuns: [...runs, run] }
+  })
+}
+
+/** Append a delta to a subagent run's output on the trailing assistant message. */
+function appendRunOutput(messages: Message[], agentId: string, delta: string): Message[] {
+  const idx = messages.length - 1
+  const last = messages[idx]
+  if (!last || last.role !== 'assistant' || !last.agentRuns) return messages
+  return messages.map((m, k) => (k !== idx ? m : { ...m, agentRuns: m.agentRuns!.map((r) => (r.agentId === agentId ? { ...r, output: r.output + delta } : r)) }))
+}
+
+/** Set finishedAt on the run for the given turn + agent. */
+function setRunFinished(messages: Message[], turnId: string, agentId: string, now: number): Message[] {
+  return messages.map((m) => (m.id !== turnId || !m.agentRuns ? m : { ...m, agentRuns: m.agentRuns.map((r) => (r.agentId === agentId ? { ...r, finishedAt: now } : r)) }))
+}
+
 function finalizeAssistant(messages: Message[], message: Message): Message[] {
   const last = messages[messages.length - 1]
   return last && last.role === 'assistant' ? [...messages.slice(0, -1), message] : [...messages, message]
@@ -173,35 +198,51 @@ export function applyServerMessage(
       if (state.sessions.some((s) => s.id === msg.sessionId)) return state
       return { sessions: [...state.sessions, emptySession(msg.sessionId)] }
 
-    case 'agent:started':
-      return update(msg.sessionId, (s) => ({
-        ...s,
-        status: 'running',
-        error: null,
-        messages: msg.role === 'supervisor' ? ensureAssistantMessage(s.messages, msg.turnId, msg.agentId, now) : s.messages,
-        agents: upsertAgent(s.agents, {
-          id: msg.agentId,
-          role: msg.role,
-          title: ROLE_TITLE[msg.role],
+    case 'agent:started': {
+      const run: AgentRun = {
+        agentId: msg.agentId, role: msg.role, output: '', startedAt: now, finishedAt: null, seq: 0, messageId: msg.turnId,
+        ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
+        ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
+      }
+      return update(msg.sessionId, (s) => {
+        const base = msg.role === 'supervisor' ? ensureAssistantMessage(s.messages, msg.turnId, msg.agentId, now) : s.messages
+        return {
+          ...s,
           status: 'running',
-          tokens: '',
-          tokenCount: 0,
-          elapsedMs: 0,
-          startedAt: now,
-          toolCalls: [],
-          ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
-          ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
-        }),
-      }))
+          error: null,
+          messages: upsertRun(base, msg.turnId, run),
+          agents: upsertAgent(s.agents, {
+            id: msg.agentId,
+            role: msg.role,
+            title: ROLE_TITLE[msg.role],
+            status: 'running',
+            tokens: '',
+            tokenCount: 0,
+            elapsedMs: 0,
+            startedAt: now,
+            toolCalls: [],
+            ...(msg.taskInput ? { taskInput: msg.taskInput } : {}),
+            ...(msg.parentAgentId ? { parentAgentId: msg.parentAgentId } : {}),
+          }),
+        }
+      })
+    }
 
     case 'token:stream':
       return update(msg.sessionId, (s) => {
-        const agent = s.agents.find((a) => a.id === msg.agentId)
+        const agent = s.agents.find((a) => a.id === msg.agentId) // KEEP (s.agents removed later)
         const agents = s.agents.map((a) =>
           a.id === msg.agentId ? { ...a, tokens: a.tokens + msg.delta, tokenCount: a.tokens.length + msg.delta.length } : a,
         )
-        const messages =
-          agent?.role === 'supervisor' ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now) : s.messages
+        // token:stream carries no role; resolve supervisor (→ body) vs subagent (→ run output)
+        // from the folded run on the trailing assistant message, then the existing AgentVM,
+        // falling back to the literal agentId.
+        const trailing = s.messages[s.messages.length - 1]
+        const run = trailing?.role === 'assistant' ? trailing.agentRuns?.find((r) => r.agentId === msg.agentId) : undefined
+        const isSupervisor = run ? run.role === 'supervisor' : agent ? agent.role === 'supervisor' : msg.agentId === 'supervisor'
+        const messages = isSupervisor
+          ? appendAssistantDelta(s.messages, msg.delta, msg.agentId, now)
+          : appendRunOutput(s.messages, msg.agentId, msg.delta)
         return { ...s, agents, messages }
       })
 
@@ -214,6 +255,7 @@ export function applyServerMessage(
     case 'agent:finished':
       return update(msg.sessionId, (s) => ({
         ...s,
+        messages: setRunFinished(s.messages, msg.turnId, msg.agentId, now),
         agents: s.agents.map((a) => (a.id === msg.agentId ? { ...a, status: 'done', elapsedMs: now - a.startedAt } : a)),
       }))
 

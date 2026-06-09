@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ROLE_COLOR, ROLE_TITLE } from '@/lib/roleColor'
+import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { ToolTrace } from './ToolTrace'
 
@@ -23,7 +23,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
         <div className="flex min-w-0 items-center gap-2">
           <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
-          <span className="truncate text-[13px] font-semibold text-ink">{ROLE_TITLE[agent.role]}</span>
+          <span className="truncate text-[13px] font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
           {agent.tools.length > 0 && <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-ink-tertiary">{t('artifact.toolsCount', { count: agent.tools.length })}</span>}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -39,7 +39,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
         <div className="flex flex-col gap-2 border-t border-border p-3 pt-2.5">
           {agent.taskInput && (
             <div className="rounded-md bg-surface-muted px-2.5 py-1.5 text-[12px] leading-snug text-ink-secondary">
-              <span className="text-ink-tertiary">{t('artifact.delegatedBy')} {ROLE_TITLE.supervisor} · </span>
+              <span className="text-ink-tertiary">{t('artifact.delegatedBy')} {t(ROLE_NAME_KEY.supervisor)} · </span>
               {agent.taskInput}
             </div>
           )}

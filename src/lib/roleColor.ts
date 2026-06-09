@@ -8,10 +8,10 @@ export const ROLE_COLOR: Record<AgentRole, string> = {
   reviewer: 'var(--role-reviewer)',
 }
 
-/** Role → display title, shared by the agent panel and the inline timeline. */
-export const ROLE_TITLE: Record<AgentRole, string> = {
-  supervisor: 'Supervisor',
-  planner: 'Planner',
-  coder: 'Coder',
-  reviewer: 'Reviewer',
-}
+/** Role → i18n key for its localized display name (artifact.roles.*). */
+export const ROLE_NAME_KEY = {
+  supervisor: 'artifact.roles.supervisor',
+  planner: 'artifact.roles.planner',
+  coder: 'artifact.roles.coder',
+  reviewer: 'artifact.roles.reviewer',
+} as const satisfies Record<AgentRole, string>

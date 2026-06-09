@@ -51,6 +51,7 @@ export const en = {
       noDiffDesc: 'Changes made by agents will appear here',
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',
+      roles: { supervisor: 'Supervisor', planner: 'Planner', coder: 'Coder', reviewer: 'Reviewer' },
       toolsCount: '{{count}} tools',
       delegatedBy: 'delegated by',
       arguments: 'Arguments',

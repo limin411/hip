@@ -51,6 +51,7 @@ export const zhTW = {
       noDiffDesc: '智能體修改代碼後，變更將顯示在這裡',
       waiting: '等待中…',
       subAgents: '子智能體',
+      roles: { supervisor: '主管', planner: '規劃員', coder: '編碼員', reviewer: '審查員' },
       toolsCount: '{{count}} 次工具調用',
       delegatedBy: '委派自',
       arguments: '參數',

@@ -4,7 +4,7 @@ import { ChevronRight, Brain } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
-import { ROLE_COLOR, ROLE_TITLE } from '@/lib/roleColor'
+import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
 
 function AgentBadge({ role }: { role: AgentRole }) {
   return (
@@ -82,7 +82,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
               <div key={`d-${step.agentId}`} className="flex items-center gap-2 text-[12px] text-ink-tertiary" data-testid="delegation-row">
                 <AgentBadge role={step.role} />
                 <span className="truncate">
-                  <span className="font-medium text-ink-secondary">{t('chat.delegatedTo', { role: ROLE_TITLE[step.role] })}</span>: {task}
+                  <span className="font-medium text-ink-secondary">{t('chat.delegatedTo', { role: t(ROLE_NAME_KEY[step.role]) })}</span>: {task}
                 </span>
               </div>,
             )

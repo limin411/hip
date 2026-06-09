@@ -51,6 +51,7 @@ export const zhCN = {
       noDiffDesc: '智能体修改代码后，变更将显示在这里',
       waiting: '等待中…',
       subAgents: '子智能体',
+      roles: { supervisor: '主管', planner: '规划员', coder: '编码员', reviewer: '审查员' },
       toolsCount: '{{count}} 次工具调用',
       delegatedBy: '委派自',
       arguments: '参数',

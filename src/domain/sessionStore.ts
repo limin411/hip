@@ -245,7 +245,19 @@ export function applyServerMessage(
     }
 
     case 'session:loaded':
-      return update(msg.sessionId, (s) => ({ ...s, loaded: true, messages: msg.messages }))
+      return update(msg.sessionId, (s) => {
+        // A completed conversation always ends with an assistant reply; a trailing user
+        // message means the last turn never finished (drop/crash/timeout) → interrupted.
+        const last = msg.messages[msg.messages.length - 1]
+        const interrupted = last?.role === 'user'
+        return {
+          ...s,
+          loaded: true,
+          messages: msg.messages,
+          status: interrupted ? 'error' : 'idle',
+          error: interrupted ? { code: 'INTERRUPTED', message: '' } : null,
+        }
+      })
 
     case 'session:deleted':
       return { sessions: state.sessions.filter((s) => s.id !== msg.sessionId) }

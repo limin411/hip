@@ -116,10 +116,41 @@ describe('applyServerMessage', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {
       type: 'session:loaded', sessionId: 's1',
-      messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 1 }],
+      messages: [
+        { id: 'u1', role: 'user', content: 'hi', timestamp: 1 },
+        { id: 'a1', role: 'assistant', content: 'reply', timestamp: 2 },
+      ],
     }, 0)
     expect(next.sessions[0].loaded).toBe(true)
-    expect(next.sessions[0].messages).toHaveLength(1)
+    expect(next.sessions[0].messages).toHaveLength(2)
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('session:loaded marks interrupted when the trailing persisted message is a user turn', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', loaded: false, status: 'running' })] }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+    ] }, 0)
+    expect(next.sessions[0]).toMatchObject({ loaded: true, status: 'error' })
+    expect(next.sessions[0].error).toEqual({ code: 'INTERRUPTED', message: '' })
+  })
+
+  it('session:loaded settles to idle when the trailing message is an assistant reply', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', loaded: false, status: 'running' })] }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'done', timestamp: 1 },
+    ] }, 0)
+    expect(next.sessions[0]).toMatchObject({ loaded: true, status: 'idle', error: null })
+  })
+
+  it('session:loaded with a trailing stopped assistant settles idle (Stopped badge path)', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', loaded: false })] }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+      { id: 't1', role: 'assistant', content: 'partial', timestamp: 1, stopped: true },
+    ] }, 0)
+    expect(next.sessions[0].status).toBe('idle')
   })
 
   it('session:deleted removes the session', () => {

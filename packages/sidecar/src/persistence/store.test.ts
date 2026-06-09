@@ -67,10 +67,14 @@ describe('SessionStore', () => {
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '未配置密钥请在设置中配置', timestamp: 1 })
     const hit = store.search('设置中').find((h) => h.messageId === 'u1')
     expect(hit).toBeDefined()
-    // U+0001 / U+0002 wrap the matched term; the legacy '[' / ']' must be gone.
+    // Relies on FTS being active (ftsEnabled=true for the :memory: db). If this fails with no
+    // sentinels in the snippet, FTS5/trigram is unavailable in this build (the LIKE fallback
+    // emits a plain substr with no markers) — see fts-probe.test.ts.
+    // U+0001 / U+0002 wrap the matched term; the legacy '[' / ']' delimiters must be gone.
     expect(hit!.snippet).toContain('\u0001')
     expect(hit!.snippet).toContain('\u0002')
     expect(hit!.snippet).not.toContain('[')
+    expect(hit!.snippet).not.toContain(']')
   })
 
   it('updateTitleIfAuto changes an auto title and reports the change count', () => {

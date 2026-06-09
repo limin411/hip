@@ -241,4 +241,22 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')).toHaveLength(0)
     expect(store.countToolCalls('s1')).toBe(0)
   })
+
+  it('loadMessagesWithRuns attaches each turn\'s agent runs to its message by message_id', () => {
+    const store2 = freshStore()
+    store2.insertSession({ id: 's1', title: 'T', config: '{}', createdAt: 1, updatedAt: 1 })
+    store2.insertTurn(
+      { id: 'turn1', sessionId: 's1', agentId: 'supervisor', content: 'final answer', timestamp: 10 },
+      's1',
+      [
+        { agentId: 'supervisor', role: 'supervisor', output: 'final answer', startedAt: 10, finishedAt: 20, seq: 0 },
+        { agentId: 'planner-1', role: 'planner', output: 'the plan', startedAt: 11, finishedAt: 15, seq: 1, taskInput: 'make a plan', parentAgentId: 'supervisor' },
+      ],
+    )
+    const msgs = store2.loadMessagesWithRuns('s1')
+    expect(msgs).toHaveLength(1)
+    const runs = msgs[0].agentRuns!
+    expect(runs.map((r) => r.agentId)).toEqual(['supervisor', 'planner-1'])
+    expect(runs[1]).toMatchObject({ taskInput: 'make a plan', parentAgentId: 'supervisor', output: 'the plan', messageId: 'turn1' })
+  })
 })

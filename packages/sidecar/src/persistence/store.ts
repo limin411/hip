@@ -102,13 +102,30 @@ export class SessionStore {
   }
 
   loadAgentRuns(sessionId: string): AgentRun[] {
-    const rows = this.db.prepare(`SELECT id,agent_id,role,output,started_at,finished_at,seq,task_input,parent_agent_id FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: number; agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number; task_input: string | null; parent_agent_id: string | null }[]
+    const rows = this.db.prepare(`SELECT id,message_id,agent_id,role,output,started_at,finished_at,seq,task_input,parent_agent_id FROM agent_runs WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: number; message_id: string | null; agent_id: string; role: AgentRole; output: string; started_at: number; finished_at: number | null; seq: number; task_input: string | null; parent_agent_id: string | null }[]
     const toolStmt = this.db.prepare(`SELECT call_id,agent_id,name,input,output,status,error,seq,truncated FROM tool_calls WHERE agent_run_id=? ORDER BY seq`)
     return rows.map((r) => {
       const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
         .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
-      return { agentId: r.agent_id, role: r.role, output: r.output, startedAt: r.started_at, finishedAt: r.finished_at, seq: r.seq, ...(r.task_input != null ? { taskInput: r.task_input } : {}), ...(r.parent_agent_id != null ? { parentAgentId: r.parent_agent_id } : {}), toolCalls: tools }
+      return { agentId: r.agent_id, role: r.role, output: r.output, startedAt: r.started_at, finishedAt: r.finished_at, seq: r.seq, ...(r.message_id != null ? { messageId: r.message_id } : {}), ...(r.task_input != null ? { taskInput: r.task_input } : {}), ...(r.parent_agent_id != null ? { parentAgentId: r.parent_agent_id } : {}), toolCalls: tools }
+    })
+  }
+
+  /** Load messages with each turn's agent runs attached by message_id. Runs with a NULL
+   *  message_id (a turn that produced no assistant message) have no message to attach to and are dropped. */
+  loadMessagesWithRuns(sessionId: string): Message[] {
+    const messages = this.loadMessages(sessionId)
+    const byMessage = new Map<string, AgentRun[]>()
+    for (const r of this.loadAgentRuns(sessionId)) {
+      if (r.messageId == null) continue
+      const arr = byMessage.get(r.messageId) ?? []
+      arr.push(r)
+      byMessage.set(r.messageId, arr)
+    }
+    return messages.map((m) => {
+      const runs = byMessage.get(m.id)
+      return runs && runs.length ? { ...m, agentRuns: runs } : m
     })
   }
 

@@ -1,19 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
-import type { AgentRole, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { ROLE_COLOR, ROLE_TITLE } from '@/lib/roleColor'
+import type { TurnAgent } from '@/lib/turnAgents'
 import { ToolTrace } from './ToolTrace'
-
-/** Per-turn, per-agent activity bucket (derived from a Message's timeline + toolCalls). */
-export interface TurnAgent {
-  agentId: string
-  role: AgentRole
-  reasoning: string
-  tools: ToolCall[]
-  status: 'running' | 'done'
-}
 
 function StatusDot({ status, color }: { status: TurnAgent['status']; color: string }) {
   if (status === 'running') return <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: color }} />
@@ -37,13 +28,29 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <StatusDot status={agent.status} color={color} />
-          <span className="text-[11px] capitalize text-ink-tertiary">{agent.status}</span>
+          <span className="text-[11px] capitalize text-ink-tertiary">
+            {agent.status === 'done' && agent.elapsedMs > 0
+              ? t('chat.thoughtFor', { seconds: Math.round(agent.elapsedMs / 1000) })
+              : agent.status}
+          </span>
         </div>
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-border p-3 pt-2.5">
+          {agent.taskInput && (
+            <div className="rounded-md bg-surface-muted px-2.5 py-1.5 text-[12px] leading-snug text-ink-secondary">
+              <span className="text-ink-tertiary">{t('artifact.delegatedBy')} {ROLE_TITLE.supervisor} · </span>
+              {agent.taskInput}
+            </div>
+          )}
           {agent.reasoning && <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-[12px] leading-snug text-ink-secondary">{agent.reasoning}</pre>}
           <ToolTrace tools={agent.tools} />
+          {agent.role !== 'supervisor' && agent.output && (
+            <div>
+              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.output')}</div>
+              <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-[12px] leading-snug text-ink-secondary">{agent.output}</pre>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -1,27 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import type { AgentRole, Message, TimelineStep, ToolCall } from '@hip/protocol'
+import type { Message } from '@hip/protocol'
 import { useActiveMessages, useActiveSessionStatus } from '@/domain'
-import { AgentCard, type TurnAgent } from './AgentCard'
-
-/** Group a turn's flat timeline + toolCalls into per-agent buckets (derived OUTSIDE any selector). */
-function groupByAgent(message: Message | null, live: boolean): TurnAgent[] {
-  if (!message) return []
-  const steps: TimelineStep[] = message.timeline ?? []
-  const toolByCallId = new Map((message.toolCalls ?? []).map((tc) => [tc.callId, tc]))
-  const order: string[] = []
-  const buckets = new Map<string, { role: AgentRole; reasoning: string[]; tools: ToolCall[] }>()
-  for (const step of [...steps].sort((a, b) => a.stepSeq - b.stepSeq)) {
-    let b = buckets.get(step.agentId)
-    if (!b) { b = { role: step.role, reasoning: [], tools: [] }; buckets.set(step.agentId, b); order.push(step.agentId) }
-    if (step.kind === 'reasoning') b.reasoning.push(step.content)
-    else { const tc = toolByCallId.get(step.callId); if (tc) b.tools.push(tc) }
-  }
-  return order.map((agentId) => {
-    const b = buckets.get(agentId)!
-    const anyRunning = b.tools.some((tc) => tc.status === 'running')
-    return { agentId, role: b.role, reasoning: b.reasoning.join('\n\n'), tools: b.tools, status: live && anyRunning ? 'running' : 'done' }
-  })
-}
+import { groupByAgent } from '@/lib/turnAgents'
+import { AgentCard } from './AgentCard'
 
 export function AgentDashboard() {
   const { t } = useTranslation()

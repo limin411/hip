@@ -7,3 +7,11 @@ export const ROLE_COLOR: Record<AgentRole, string> = {
   coder: 'var(--role-coder)',
   reviewer: 'var(--role-reviewer)',
 }
+
+/** Role → display title, shared by the agent panel and the inline timeline. */
+export const ROLE_TITLE: Record<AgentRole, string> = {
+  supervisor: 'Supervisor',
+  planner: 'Planner',
+  coder: 'Coder',
+  reviewer: 'Reviewer',
+}

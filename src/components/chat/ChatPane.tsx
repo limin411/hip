@@ -54,6 +54,10 @@ export function ChatPane() {
     if (el) {
       el.scrollIntoView({ block: 'center' })
       setHighlightedId(scrollTargetMessageId)
+      // Unpin from the bottom so that clearing the target below (which re-runs the autoscroll
+      // effect) doesn't yank us to the latest message — covers a jump within the already-active
+      // session, where the session-switch reset doesn't fire to do this for us.
+      setAtBottom(false)
     }
     // Either way the target is consumed: found → highlighted; absent (and messages present) → stale, drop it.
     if (el || messages.length > 0) setScrollTarget(null)

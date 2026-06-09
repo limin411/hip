@@ -61,8 +61,76 @@ function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   }
 }
 
+/** Stable content-block index for the re-projected reasoning block — distinct from text (0)
+ *  and tool-call chunk indices so it accumulates as its own block in convertChunksToEvents. */
+const REASONING_BLOCK_INDEX = 7
+
+/** Strip re-projected `reasoning`/`thinking` content blocks from a message's content so they never
+ *  reach the OpenAI request body. langchain's v0 outbound converter passes array blocks through raw,
+ *  and these blocks also leak into ToolMessages (which carry no output_version tag and so bypass the
+ *  v1 text-only filter), making DeepSeek 400 ("unknown variant `reasoning`"). Mutates in place. */
+function stripReasoningBlocks(messages: readonly { content: unknown }[]): void {
+  for (const m of messages) {
+    if (!Array.isArray(m.content)) continue
+    const kept = m.content.filter((b) => {
+      const t = (b as { type?: unknown } | null)?.type
+      return t !== 'reasoning' && t !== 'thinking'
+    })
+    if (kept.length === m.content.length) continue
+    // Collapse to a plain string when only a single text block survives (the common case),
+    // else keep the filtered array. Empty → '' so the assistant turn still serializes.
+    if (kept.length === 1 && (kept[0] as { type?: unknown }).type === 'text') {
+      ;(m as { content: unknown }).content = (kept[0] as { text?: string }).text ?? ''
+    } else {
+      ;(m as { content: unknown }).content = kept.length === 0 ? '' : kept
+    }
+  }
+}
+
+/**
+ * @langchain/openai surfaces DeepSeek chain-of-thought ONLY as
+ * additional_kwargs.reasoning_content; langchain-core's v3 stream-event producer reads
+ * `content` and ignores additional_kwargs, so ChatModelStream.reasoning (deepagents'
+ * msg.reasoning) is empty. Re-project each reasoning delta into a typed `reasoning`
+ * content block (stable index) so 2nd+ chunks emit `reasoning-delta` events that feed
+ * `.reasoning`. That block accumulates into langgraph's message state, so on the *next*
+ * request we strip it back out (stripReasoningBlocks) before super builds the outbound body —
+ * otherwise DeepSeek 400s on the re-serialized `reasoning` block. withConfig is overridden too:
+ * ChatOpenAI.withConfig rebuilds a plain ChatOpenAI from `this.fields`, which would drop this
+ * subclass (deepagents calls withConfig).
+ */
+class ReasoningChatOpenAI extends ChatOpenAI {
+  async *_streamResponseChunks(
+    messages: Parameters<ChatOpenAI['_streamResponseChunks']>[0],
+    options: Parameters<ChatOpenAI['_streamResponseChunks']>[1],
+    runManager?: Parameters<ChatOpenAI['_streamResponseChunks']>[2],
+  ): ReturnType<ChatOpenAI['_streamResponseChunks']> {
+    stripReasoningBlocks(messages)
+    for await (const chunk of super._streamResponseChunks(messages, options, runManager)) {
+      const msg = chunk.message as unknown as { content: unknown; additional_kwargs?: { reasoning_content?: unknown } }
+      const rc = msg.additional_kwargs?.reasoning_content
+      if (typeof rc === 'string' && rc.length > 0 && typeof msg.content === 'string') {
+        const blocks: Array<Record<string, unknown>> = [{ type: 'reasoning', reasoning: rc, index: REASONING_BLOCK_INDEX }]
+        if (msg.content.length > 0) blocks.push({ type: 'text', text: msg.content, index: 0 })
+        msg.content = blocks as unknown as string
+      }
+      yield chunk
+    }
+  }
+
+  withConfig(config: Parameters<ChatOpenAI['withConfig']>[0]): ReasoningChatOpenAI {
+    const f = (this as unknown as { fields: ConstructorParameters<typeof ChatOpenAI>[0] }).fields
+    const m = new ReasoningChatOpenAI(f)
+    ;(m as unknown as { defaultOptions: unknown }).defaultOptions = {
+      ...(this as unknown as { defaultOptions: Record<string, unknown> }).defaultOptions,
+      ...config,
+    }
+    return m
+  }
+}
+
 function buildModel(config: SessionConfig): ChatOpenAI {
-  return new ChatOpenAI({
+  return new ReasoningChatOpenAI({
     model: resolveModel(config),
     apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
     configuration: {

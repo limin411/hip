@@ -176,7 +176,10 @@ export class SessionService {
   }
 
   /** On (re)connect, if the active session had an in-flight turn, force a history resync so a
-   *  turn that finished/was interrupted during the outage is reconciled (see session:loaded). */
+   *  turn that finished/was interrupted during the outage is reconciled (see the session:loaded
+   *  reducer). The resync REPLACES optimistic in-memory messages with the persisted truth: the
+   *  user message is persisted before the turn runs (so it is never lost), and an unfinished
+   *  assistant reply reconciles to "interrupted + retry" rather than a stuck spinner. */
   private resyncActiveIfRunning(): void {
     const { activeSessionId, sessions } = useDomainStore.getState()
     if (!activeSessionId) return

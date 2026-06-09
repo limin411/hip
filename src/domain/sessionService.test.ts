@@ -213,7 +213,8 @@ describe('SessionService', () => {
     new SessionService(t)
     t.push({ type: 'ready', hasApiKey: true })
     expect(t.sent.some((m) => m.type === 'session:list')).toBe(true)
-    expect(t.sent.some((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's1')).toBe(true)
+    const loads = t.sent.filter((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's1')
+    expect(loads).toHaveLength(1)
   })
 
   it('on ready with no running active session, only lists sessions (no session:load)', () => {

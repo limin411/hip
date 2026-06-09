@@ -44,7 +44,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
             </div>
           )}
           {agent.reasoning && <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-[12px] leading-snug text-ink-secondary">{agent.reasoning}</pre>}
-          <ToolTrace tools={agent.tools} />
+          {agent.tools.length > 0 && <ToolTrace tools={agent.tools} />}
           {agent.role !== 'supervisor' && agent.output && (
             <div>
               <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.output')}</div>

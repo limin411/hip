@@ -34,6 +34,9 @@ export const zhCN = {
       thinkingModeHint: '显示模型的思考过程（deepseek-reasoner；更慢、更贵）',
       thoughtFor: '已思考 {{seconds}} 秒',
       delegatedTo: '委派给 {{role}}',
+      reconnecting: '重新连接中…',
+      errorInterrupted: '连接中断，回复未完成。',
+      errorTimeout: '响应超时，已停止。',
     },
     sidebar: {
       collapse: '折叠侧边栏',

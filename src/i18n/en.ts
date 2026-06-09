@@ -34,6 +34,9 @@ export const en = {
       thinkingModeHint: "Show the model's reasoning (deepseek-reasoner; slower, pricier)",
       thoughtFor: 'Thought for {{seconds}}s',
       delegatedTo: 'Delegated to {{role}}',
+      reconnecting: 'Reconnecting…',
+      errorInterrupted: 'Connection lost — the reply didn\'t finish.',
+      errorTimeout: 'Response timed out and was stopped.',
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

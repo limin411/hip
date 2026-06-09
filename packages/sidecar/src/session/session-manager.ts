@@ -147,6 +147,12 @@ export class SessionManager {
     this.sessions.delete(id)
   }
 
+  /** Cancel every in-flight turn — called when the sole client disconnects (ws close).
+   *  Safe no-op for idle sessions (Session.cancel() aborts only if a turn is running). */
+  cancelAllRunning(): void {
+    for (const s of this.sessions.values()) s.cancel()
+  }
+
   /** List a directory keyed by a raw cwd (for un-committed drafts — no session needed). */
   private async lsCwd(cwd: string, p: string): Promise<{ entries?: FsEntry[]; error?: string }> {
     if (!path.isAbsolute(cwd)) return { error: 'cwd must be an absolute path' }

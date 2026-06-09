@@ -42,7 +42,9 @@ export class WsServer {
       return
     }
 
-    const send = (msg: ServerMessage) => ws.send(JSON.stringify(msg))
+    const send = (msg: ServerMessage) => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
+    }
     // Tell the client whether this sidecar has a usable API key, so the UI can
     // surface "no key configured" without waiting for a failed send.
     send({ type: 'ready', hasApiKey: !!process.env.DEEPSEEK_API_KEY?.trim() })
@@ -54,6 +56,7 @@ export class WsServer {
         send({ type: 'error', code: 'PARSE_ERROR', message: String(err) })
       }
     })
+    ws.on('close', () => this.sessionManager.cancelAllRunning())
     ws.on('error', (err) => console.error('[ws] client error', err))
   }
 

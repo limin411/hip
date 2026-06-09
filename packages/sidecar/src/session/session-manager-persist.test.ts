@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
+import type { BaseMessage } from '@langchain/core/messages'
+import type { ChatGenerationChunk } from '@langchain/core/outputs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -7,6 +9,30 @@ import type { ServerMessage } from '@hip/protocol'
 import { SessionManager } from './session-manager.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
+
+/** A model whose stream hangs until the abort signal fires (mirrors HangingChatModel in session-unit.test.ts). */
+class HangingChatModel extends FakeListChatModel {
+  constructor() { super({ responses: ['unreached'] }) }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bindTools(): any { return this }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async _generate(_messages: BaseMessage[], options: any): Promise<any> { return hang(options?.signal) }
+  async *_streamResponseChunks(
+    _messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    await hang(options.signal)
+    yield undefined as unknown as ChatGenerationChunk
+  }
+}
+
+function hang(signal?: AbortSignal): Promise<never> {
+  return new Promise<never>((_resolve, reject) => {
+    const fail = () => { const e = new Error('Aborted'); e.name = 'AbortError'; reject(e) }
+    if (signal?.aborted) return fail()
+    signal?.addEventListener('abort', fail, { once: true })
+  })
+}
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
 function mk(scratchRoot: string) {
@@ -106,5 +132,44 @@ describe('SessionManager persistence', () => {
     mgr.handle({ type: 'session:setThinking', sessionId: 's1', thinking: false }, send)
     const echo = sent.find((m) => m.type === 'session:thinking') as Extract<ServerMessage, { type: 'session:thinking' }>
     expect(echo).toMatchObject({ sessionId: 's1', thinking: false })
+  })
+
+  it('cancelAllRunning cancels an in-flight turn', async () => {
+    // Build a manager that uses the HangingChatModel so the turn stays in-flight.
+    const { db, ftsEnabled } = openDatabase(':memory:')
+    const hangingStore = new SessionStore(db, ftsEnabled)
+    const hangingMgr = new SessionManager(hangingStore, () => new HangingChatModel(), scratchRoot)
+
+    hangingMgr.handle({ type: 'session:create', id: 'h1', config: cfg }, send)
+
+    const turnEvents: ServerMessage[] = []
+    const turnSend = (m: ServerMessage) => turnEvents.push(m)
+
+    // Start the turn but don't await — it hangs until aborted.
+    const turnPromise = hangingMgr.handleAsync(
+      { type: 'message:send', sessionId: 'h1', id: 'u-hang', content: 'hang', role: 'user' },
+      turnSend,
+    )
+
+    // Give it a tick to actually start running.
+    await Promise.resolve()
+
+    // Cancel all running turns (simulates ws close).
+    hangingMgr.cancelAllRunning()
+
+    // The turn must now settle.
+    await turnPromise
+
+    // Either an error (CANCELLED/TIMEOUT/AbortError) or a message:complete with stopped=true.
+    const hasError = turnEvents.some((m) => m.type === 'error')
+    const hasComplete = turnEvents.some((m) => m.type === 'message:complete')
+    expect(hasError || hasComplete).toBe(true)
+  })
+
+  it('cancelAllRunning is a no-op when nothing is running', () => {
+    // Fresh manager with no sessions — must not throw.
+    const { db, ftsEnabled } = openDatabase(':memory:')
+    const idleMgr = new SessionManager(new SessionStore(db, ftsEnabled), () => new FakeListChatModel({ responses: ['ok'] }), scratchRoot)
+    expect(() => idleMgr.cancelAllRunning()).not.toThrow()
   })
 })

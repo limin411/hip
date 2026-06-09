@@ -1,6 +1,6 @@
 /** Sentinel control chars wrapping a matched term in a search snippet (set by the sidecar FTS query). */
-const MARK_START = ''
-const MARK_END = ''
+const MARK_START = '\u0001'
+const MARK_END = '\u0002'
 
 export interface SnippetSegment {
   text: string

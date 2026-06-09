@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { splitSnippet } from './snippet'
 
-const S = '' // match start sentinel
-const E = '' // match end sentinel
+const S = '\u0001' // match start sentinel
+const E = '\u0002' // match end sentinel
 
 describe('splitSnippet', () => {
   it('no markers → a single unmarked segment', () => {

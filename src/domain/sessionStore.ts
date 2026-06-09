@@ -13,7 +13,6 @@ export interface SessionVM {
   config: SessionConfig
   title: string        // 展示字符串
   preview: string      // 展示字符串
-  updatedAt: string    // 展示字符串（'2m ago' / 'now'）
   updatedAtMs: number  // 数值排序键（epoch ms）
   loaded: boolean      // false = 仅摘要（消息尚未拉取）
   messages: Message[]
@@ -120,16 +119,8 @@ function finalizeAssistant(messages: Message[], message: Message): Message[] {
   return last && last.role === 'assistant' ? [...messages.slice(0, -1), message] : [...messages, message]
 }
 
-function formatRelative(ms: number): string {
-  const diff = Date.now() - ms
-  if (diff < 60_000) return 'now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  return `${Math.floor(diff / 86_400_000)}d ago`
-}
-
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAt: formatRelative(s.updatedAt), updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null }
+  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -239,7 +230,7 @@ export function applyServerMessage(
       const byId = new Map(state.sessions.map((s) => [s.id, s]))
       for (const vm of incoming) {
         const prev = byId.get(vm.id)
-        byId.set(vm.id, prev?.loaded ? { ...prev, title: vm.title, preview: vm.preview, updatedAt: vm.updatedAt, updatedAtMs: vm.updatedAtMs } : vm)
+        byId.set(vm.id, prev?.loaded ? { ...prev, title: vm.title, preview: vm.preview, updatedAtMs: vm.updatedAtMs } : vm)
       }
       return { sessions: [...byId.values()].sort((a, b) => b.updatedAtMs - a.updatedAtMs) }
     }
@@ -276,7 +267,7 @@ export function applyServerMessage(
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAt: 'now', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'

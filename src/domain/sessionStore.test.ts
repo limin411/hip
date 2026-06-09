@@ -8,7 +8,6 @@ function baseSession(over: Partial<SessionVM> = {}): SessionVM {
     config: { llmProvider: 'deepseek', model: 'm', tools: [] },
     title: 'T',
     preview: 'P',
-    updatedAt: 'now',
     updatedAtMs: 0,
     loaded: true,
     messages: [],

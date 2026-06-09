@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { type SessionVM, sessionService } from '@/domain'
 import { cn } from '@/lib/utils'
+import { formatRelativeTime, formatAbsolute } from '@/lib/datetime'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -20,7 +21,8 @@ interface SessionItemProps {
 }
 
 export function SessionItem({ session, active, onSelect, onDelete, snippet }: SessionItemProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(session.title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -74,7 +76,9 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
                 <span className={cn('min-w-0 flex-1 truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
                   {session.title}
                 </span>
-                <span className="shrink-0 text-[11px] text-ink-tertiary">{session.updatedAt}</span>
+                <span className="shrink-0 text-[11px] text-ink-tertiary" title={formatAbsolute(session.updatedAtMs, locale)}>
+                  {formatRelativeTime(session.updatedAtMs, locale)}
+                </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete() }}
                   className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"

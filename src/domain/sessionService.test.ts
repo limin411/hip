@@ -25,7 +25,7 @@ beforeEach(() => {
   // NOTE: drop the `true` (replace) flag — Zustand v5 setState with replace=true
   // wipes action methods from the store, causing "X is not a function" errors.
   // Using merge (no second arg) keeps actions intact and resets only data fields.
-  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
+  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
 })
@@ -175,7 +175,7 @@ describe('SessionService', () => {
 
   it('regenerate optimistically drops the trailing assistant and sends message:regenerate', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }], status: 'idle', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }], status: 'idle', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()
@@ -186,7 +186,7 @@ describe('SessionService', () => {
 
   it('regenerate is a no-op while a turn is running', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], status: 'running', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }], status: 'running', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()
@@ -206,7 +206,7 @@ describe('SessionService', () => {
 
   it('on ready, resyncs the active session when its turn was running', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAt: 'now', updatedAtMs: 0, loaded: true, messages: [], status: 'running', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'running', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()

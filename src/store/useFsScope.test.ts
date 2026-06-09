@@ -5,7 +5,7 @@ import type { Draft } from '@/store/draftStore'
 
 const session = (id: string, cwd?: string): SessionVM => ({
   id, config: { llmProvider: 'deepseek', model: 'm', tools: [], cwd },
-  title: 'T', preview: '', updatedAt: 'now', updatedAtMs: 0, loaded: true,
+  title: 'T', preview: '', updatedAtMs: 0, loaded: true,
   messages: [], status: 'idle', error: null,
 })
 const projectDraft: Draft = { tempId: 'd', mode: 'project', cwd: '/q', text: '' }

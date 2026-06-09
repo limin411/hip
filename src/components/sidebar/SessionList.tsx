@@ -48,7 +48,7 @@ export function SessionList() {
             session={s}
             snippet={h.snippet}
             active={s.id === activeSessionId}
-            onSelect={() => sessionService.selectSession(s.id)}
+            onSelect={() => sessionService.selectSession(s.id, h.messageId ?? undefined)}
             onDelete={() => sessionService.deleteSession(s.id)}
           />
         )

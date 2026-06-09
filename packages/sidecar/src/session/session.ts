@@ -8,11 +8,15 @@ import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
 import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
+import { IdleWatchdog } from './idle-watchdog.js'
 
 type SendFn = (msg: ServerMessage) => void
 
 const TITLE_MODEL = 'deepseek-chat'
 const TITLE_LEN = 40
+
+/** A turn with no outbound activity for this long is treated as a stalled provider stream and aborted. */
+export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
 
 /** thinking === false → fast non-reasoning model; otherwise the reasoner (default). A caller-pinned config.model still wins. */
 export function resolveModel(config: SessionConfig): string {
@@ -167,6 +171,7 @@ export class Session {
     model?: BaseLanguageModel,
     private readonly store?: SessionStore,
     titleGenerator?: TitleGenerator,
+    private readonly idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS,
   ) {
     this._config = config
     this.injectedModel = model
@@ -284,9 +289,13 @@ export class Session {
 
   /** Stream one turn for the HumanMessage already at the tail of this.messages.
    *  Returns the supervisor text on clean completion, or '' on abort/error. */
-  private async runTurn(send: SendFn): Promise<string> {
+  private async runTurn(rawSend: SendFn): Promise<string> {
     this.abortController = new AbortController()
     this.running = true
+    let timedOut = false
+    const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
+    // Every outbound activity kicks the watchdog; a stall (no sends for idleTimeoutMs) aborts the turn.
+    const send: SendFn = (msg) => { watchdog.kick(); rawSend(msg) }
 
     const turnId = `asst-supervisor-${Date.now()}-${this.turnSeq++}`
     const trajectory = new Map<string, TraceRun>()
@@ -411,17 +420,20 @@ export class Session {
       await Promise.allSettled(pending)
       if (isAbort && supervisorText) {
         // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
-        return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
-      } else {
-        send({
-          type: 'error',
-          sessionId: this.id,
-          code: isAbort ? 'CANCELLED' : 'AGENT_ERROR',
-          message: isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
-        })
+        const text = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
+        // A stall is terminal: emit TIMEOUT *after* the finalize so the client ends in `error`, not `idle`.
+        if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
+        return text
       }
+      rawSend({
+        type: 'error',
+        sessionId: this.id,
+        code: timedOut ? 'TIMEOUT' : isAbort ? 'CANCELLED' : 'AGENT_ERROR',
+        message: timedOut ? '' : isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err),
+      })
       return ''
     } finally {
+      watchdog.stop()
       this.running = false
       this.abortController = null
     }

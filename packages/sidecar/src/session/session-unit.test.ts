@@ -1,8 +1,49 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
+import type { BaseMessage } from '@langchain/core/messages'
+import type { ChatGenerationChunk } from '@langchain/core/outputs'
 import { Session, resolveModel } from './session.js'
 
 type Ev = { type: string; [k: string]: unknown }
+
+/** A model whose stream HANGS — it never yields a chunk and only settles (rejecting with an
+ *  AbortError) once the turn's abort signal fires. Simulates a half-open provider stream so the
+ *  idle watchdog is the only thing that can end the turn. `bindTools` keeps `this` because
+ *  FakeListChatModel.bindTools builds a fresh *base* instance, which would drop these overrides. */
+class HangingChatModel extends FakeListChatModel {
+  constructor() {
+    super({ responses: ['unreached'] })
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bindTools(): any {
+    return this
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async _generate(_messages: BaseMessage[], options: any): Promise<any> {
+    return hang(options?.signal)
+  }
+  async *_streamResponseChunks(
+    _messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): AsyncGenerator<ChatGenerationChunk> {
+    await hang(options.signal)
+    // Unreachable: hang() only ever rejects.
+    yield undefined as unknown as ChatGenerationChunk
+  }
+}
+
+/** Never resolves; rejects with an AbortError when the signal fires (or is already aborted). */
+function hang(signal?: AbortSignal): Promise<never> {
+  return new Promise<never>((_resolve, reject) => {
+    const fail = () => {
+      const e = new Error('Aborted')
+      e.name = 'AbortError'
+      reject(e)
+    }
+    if (signal?.aborted) return fail()
+    signal?.addEventListener('abort', fail, { once: true })
+  })
+}
 
 function collect(session: Session, text: string): Promise<Ev[]> {
   const events: Ev[] = []
@@ -79,5 +120,25 @@ describe('Session NO_API_KEY guard', () => {
     const events = await collect(session, 'hi')
     expect(events[0]?.type).toBe('agent:started')
     expect(events.some((e) => e.type === 'message:complete')).toBe(true)
+  })
+})
+
+describe('Session idle-timeout watchdog', () => {
+  it('aborts a stalled turn after the idle timeout and emits a TIMEOUT error', async () => {
+    const sent: Ev[] = []
+    // idleTimeoutMs = 20; the model's stream hangs until the watchdog aborts the turn.
+    const session = new Session('t-stall', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, new HangingChatModel(), undefined, undefined, 20)
+    await session.sendMessage('hi', (m) => sent.push(m as Ev))
+    expect(sent.some((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT')).toBe(true)
+  })
+
+  it('does not emit a TIMEOUT error for a normal fast turn', async () => {
+    const sent: Ev[] = []
+    // Normal fast turn with a generous idleTimeoutMs — completes well before the watchdog fires.
+    const model = new FakeListChatModel({ responses: ['hello world'] })
+    const session = new Session('t-fast', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, model, undefined, undefined, 10_000)
+    await session.sendMessage('hi', (m) => sent.push(m as Ev))
+    expect(sent.some((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT')).toBe(false)
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
   })
 })

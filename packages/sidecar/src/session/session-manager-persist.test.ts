@@ -134,6 +134,34 @@ describe('SessionManager persistence', () => {
     expect(echo).toMatchObject({ sessionId: 's1', thinking: false })
   })
 
+  it('session:setSystemPrompt persists systemPrompt into the session config', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    mgr.handle({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: 'Be terse' }, send)
+    expect(JSON.parse(store.getSession('s1')!.config).systemPrompt).toBe('Be terse')
+  })
+
+  it('session:setSystemPrompt null clears the persisted systemPrompt', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: { ...cfg, systemPrompt: 'old' } }, send)
+    mgr.handle({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: null }, send)
+    expect(JSON.parse(store.getSession('s1')!.config).systemPrompt).toBeUndefined()
+  })
+
+  it('session:setSystemPrompt echoes session:systemPrompt with the real state', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    sent = []
+    mgr.handle({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: 'Be terse' }, send)
+    const echo = sent.find((m) => m.type === 'session:systemPrompt') as Extract<ServerMessage, { type: 'session:systemPrompt' }>
+    expect(echo).toMatchObject({ sessionId: 's1', systemPrompt: 'Be terse' })
+  })
+
+  it('session:load echoes the persisted config', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: { ...cfg, systemPrompt: 'X' } }, send)
+    sent = []
+    mgr.handle({ type: 'session:load', sessionId: 's1' }, send)
+    const loaded = sent.find((m) => m.type === 'session:loaded') as Extract<ServerMessage, { type: 'session:loaded' }>
+    expect(loaded.config?.systemPrompt).toBe('X')
+  })
+
   it('cancelAllRunning cancels an in-flight turn', async () => {
     // Build a manager that uses the HangingChatModel so the turn stays in-flight.
     const { db, ftsEnabled } = openDatabase(':memory:')

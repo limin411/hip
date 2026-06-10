@@ -54,9 +54,13 @@ export class SessionManager {
       case 'session:list':
         send({ type: 'session:list:result', sessions: this.store?.listSessions() ?? [] })
         break
-      case 'session:load':
-        send({ type: 'session:loaded', sessionId: msg.sessionId, messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [] })
+      case 'session:load': {
+        const config = this.store
+          ? (JSON.parse(this.store.getSession(msg.sessionId)?.config ?? 'null') ?? undefined)
+          : undefined
+        send({ type: 'session:loaded', sessionId: msg.sessionId, messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [], config })
         break
+      }
       case 'session:search':
         send({ type: 'session:search:result', query: msg.query, hits: this.store?.search(msg.query) ?? [] })
         break
@@ -86,6 +90,13 @@ export class SessionManager {
         // Echo the session's REAL thinking state (true by default) so the client syncs to truth
         // even if the toggle was rejected mid-turn.
         send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: s.config.thinking ?? true })
+        break
+      }
+      case 'session:setSystemPrompt': {
+        const s = this.ensureSession(msg.sessionId)
+        const applied = s.setSystemPrompt(msg.systemPrompt)
+        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        send({ type: 'session:systemPrompt', sessionId: msg.sessionId, systemPrompt: s.config.systemPrompt ?? null })
         break
       }
       case 'fs:ls': {

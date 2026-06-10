@@ -51,6 +51,10 @@ export const config: Options.Testrunner = {
     // Generous: the debug bundle loads the Vite-dev frontend, so a cold WebKit
     // webview can take ~30s+ to mount and the first sidecar round-trip adds more.
     timeout: 180000,
+    // Optional selective run: E2E_GREP filters by test title; E2E_INVERT=1 turns
+    // it into an exclusion (run everything EXCEPT matches). Used to skip the
+    // live-agent "send first message" flow, which is manual GUI-acceptance only.
+    ...(process.env.E2E_GREP ? { grep: process.env.E2E_GREP, invert: process.env.E2E_INVERT === '1' } : {}),
   },
 
   reporters: ['spec'],

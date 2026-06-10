@@ -28,12 +28,33 @@ fi
 mkdir -p "$BIN_DIR"
 WRAPPER="$BIN_DIR/sidecar-$TARGET_TRIPLE"
 
+# Resolve node's ABSOLUTE path at generation time and bake it into the wrapper.
+# Rationale: Tauri spawns this wrapper as the app's child. When the app is itself
+# launched from a GUI/automation context (Finder, `open`, or the @wdio/tauri-service
+# E2E harness), macOS hands it a SANITIZED PATH (/usr/bin:/bin:/usr/sbin:/sbin) that
+# omits Homebrew/nvm dirs like /usr/local/bin — so a bare `exec node` fails with
+# "node: not found", the sidecar never starts, and the WS stays "connecting" forever
+# (every directory listing / session op hangs). Baking the absolute path makes the
+# wrapper independent of the runtime PATH. We also prepend node's dir to PATH so any
+# grandchild tooling resolves too. (This file is gitignored and regenerated per
+# machine, matching how we already bake in the absolute repo root below.)
+# Use process.execPath, not `command -v node`: when this script runs via
+# `yarn sidecar:dev-bin`, yarn injects an EPHEMERAL temp dir (…/T/yarn--…/node)
+# onto PATH that `command -v` would resolve to — baking that transient path would
+# break the wrapper as soon as yarn exits. process.execPath is always the real,
+# absolute node executable regardless of how node was launched.
+NODE_BIN="$(node -e 'process.stdout.write(process.execPath)' 2>/dev/null || true)"
+if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
+  echo "error: could not resolve a real node executable at generation time" >&2
+  exit 1
+fi
+NODE_DIR="$(cd "$(dirname "$NODE_BIN")" && pwd)"
+
 # Note: this wrapper is copied by Tauri to different locations depending on the
 # build (src-tauri/target/<profile>/ for `tauri dev`, or inside the .app bundle
 # for `tauri build`). To work from ANY location — so e.g. WebdriverIO E2E can run
 # the bundled app with a live sidecar — we bake in the absolute repo root at
-# generation time. (This file is gitignored and regenerated per machine.) `node`
-# stays PATH-resolved: the process inherits the launching shell's PATH.
+# generation time.
 cat > "$WRAPPER" <<EOF
 #!/bin/bash
 # Sidecar wrapper for dev mode on $TARGET_TRIPLE (generated — do not edit).
@@ -47,8 +68,13 @@ cat > "$WRAPPER" <<EOF
 # the freshly-spawned sidecar, and a key change silently fails to take effect.
 # 'node --import tsx' runs the TypeScript entry in-process (no child), so this
 # PID *is* the WS server and child.kill() tears it down cleanly.
+#
+# node is referenced by ABSOLUTE path (baked at generation time): a GUI/E2E launch
+# gives this wrapper a sanitized PATH without /usr/local/bin, so a bare \`node\`
+# would not resolve. PATH is also augmented for any grandchild tooling.
 cd "$ROOT_DIR"
-exec node --import tsx packages/sidecar/src/main.ts
+export PATH="$NODE_DIR:\$PATH"
+exec "$NODE_BIN" --import tsx packages/sidecar/src/main.ts
 EOF
 
 chmod +x "$WRAPPER"

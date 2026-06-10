@@ -79,11 +79,17 @@ export function DiffViewer() {
     if (sessionId) sessionService.requestDiff(sessionId)
   }, [sessionId])
 
+  // A reconnect sweeps a lost in-flight request back to 'idle' (resetTransient) —
+  // re-request so the pane recovers without the user toggling tabs.
+  useEffect(() => {
+    if (sessionId && diff.status === 'idle') sessionService.requestDiff(sessionId)
+  }, [sessionId, diff.status])
+
   if (!sessionId) {
     return <Empty title={t('artifact.diffView.noSession')} desc={t('artifact.diffView.noSessionDesc')} />
   }
 
-  if (diff.status !== 'ready') {
+  if (diff.status !== 'ready' && !diff.state) {
     return (
       <div className="flex h-full items-center justify-center text-ink-tertiary">
         <Loader2 size={16} className="animate-spin" />
@@ -132,7 +138,7 @@ export function DiffViewer() {
           onClick={() => sessionService.requestDiff(sessionId)}
           className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
         >
-          <RefreshCw size={13} />
+          <RefreshCw size={13} className={cn(diff.status === 'loading' && 'animate-spin')} />
         </button>
       </div>
       {diff.files.length === 0 ? (
@@ -141,8 +147,8 @@ export function DiffViewer() {
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {diff.files.map((file) => (
-            <FileDiff key={file.path} file={file} />
+          {diff.files.map((file, i) => (
+            <FileDiff key={`${file.path}-${i}`} file={file} />
           ))}
           {diff.totalFiles > diff.files.length && (
             <div className="px-3 py-2 text-[12px] text-ink-tertiary">

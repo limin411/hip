@@ -34,7 +34,7 @@ export function UserMenu() {
           导致整个界面无法再点击。下拉菜单本身无需模态化。 */}
       <DropdownMenu modal={false} onOpenChange={(open) => (open ? peekLock?.lock() : peekLock?.unlock())}>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-2.5 rounded-md p-1.5 transition-colors hover:bg-surface-muted">
+          <button className="flex w-full items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-surface-muted">
             <Avatar name={currentUser.name} src={currentUser.avatarUrl} size={28} />
             <div className="flex min-w-0 flex-1 flex-col items-start">
               <span className="truncate text-[13px] font-medium text-ink">{currentUser.name}</span>

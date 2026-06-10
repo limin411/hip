@@ -70,7 +70,7 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
                   else if (e.key === 'Escape') { e.preventDefault(); cancel() }
                 }}
                 onBlur={commit}
-                className="min-w-0 flex-1 rounded border border-accent/40 bg-surface px-1 py-0 text-[13px] text-ink outline-none"
+                className="min-w-0 flex-1 rounded border border-accent/40 bg-surface px-1 py-0 text-[13px] text-ink outline-none transition-shadow"
               />
             ) : (
               <>
@@ -84,7 +84,7 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete() }}
-                  className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block"
+                  className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block transition-colors"
                   title={t('sidebar.deleteSession')}
                 >
                   <X size={14} />

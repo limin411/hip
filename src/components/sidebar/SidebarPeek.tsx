@@ -42,7 +42,7 @@ export function SidebarPeek() {
       >
         <ChevronRight
           size={16}
-          className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded bg-surface text-ink-tertiary opacity-0 shadow-pop transition-opacity group-hover:opacity-100"
+          className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded bg-surface text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
         />
       </div>
 
@@ -52,7 +52,7 @@ export function SidebarPeek() {
         onMouseLeave={() => dispatch({ type: 'leave' })}
         style={{ width: PEEK_WIDTH, transitionDuration: `${PEEK_ANIM_MS}ms` }}
         className={cn(
-          'absolute left-0 top-0 z-40 h-full bg-surface rounded-r-xl border-r border-border shadow-float transition-transform ease-out motion-reduce:transition-none',
+          'absolute left-0 top-0 z-40 h-full bg-surface border-r border-border transition-transform ease-out motion-reduce:transition-none',
           state.open ? 'translate-x-0' : '-translate-x-full',
         )}
       >

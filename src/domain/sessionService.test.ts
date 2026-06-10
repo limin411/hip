@@ -279,6 +279,9 @@ describe('workspace diff', () => {
     svc.requestDiff('s1') // in flight → dropped
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(1)
     expect(useDiffStore.getState().bySession['s1'].status).toBe('loading')
+    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], totalFiles: 0 })
+    svc.requestDiff('s1') // ready again → allowed
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(2)
   })
 
   it('fs:diff:result folds into diffStore', () => {
@@ -314,8 +317,19 @@ describe('workspace diff', () => {
     t.push({ type: 'message:complete', sessionId: 's1', message })
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
     useUiStore.setState({ activeTab: 'diff' })
-    t.push({ type: 'message:complete', sessionId: 's1', message })
-    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(1)
+    t.push({ type: 'message:complete', sessionId: 's2', message })
+    const diffs = t.sent.filter((m) => m.type === 'fs:diff')
+    expect(diffs).toHaveLength(1)
+    expect(diffs[0]).toMatchObject({ sessionId: 's2' })
+  })
+
+  it('ready resets a wedged loading state so requestDiff works again', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.requestDiff('s1') // gets stuck — no reply ever arrives
+    t.push({ type: 'ready', hasApiKey: true })
+    svc.requestDiff('s1')
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(2)
   })
 
   it('setProjectDir clears the stale diff for that session', () => {

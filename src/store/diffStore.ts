@@ -18,6 +18,8 @@ interface DiffStore {
   setResult: (sessionId: string, r: { state: DiffState; files?: DiffFile[]; totalFiles?: number; error?: string }) => void
   setInitPending: (sessionId: string, pending: boolean) => void
   clearSession: (sessionId: string) => void
+  /** Reconnect reconciliation: a (re)connect means any in-flight request is lost — unwedge. */
+  resetTransient: () => void
 }
 
 function patch(bySession: Record<string, SessionDiff>, id: string, fn: (s: SessionDiff) => SessionDiff): Record<string, SessionDiff> {
@@ -34,4 +36,13 @@ export const useDiffStore = create<DiffStore>((set) => ({
     set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, initPending: pending })) })),
   clearSession: (id) =>
     set((st) => ({ bySession: { ...st.bySession, [id]: EMPTY_DIFF } })),
+  resetTransient: () =>
+    set((st) => ({
+      bySession: Object.fromEntries(
+        Object.entries(st.bySession).map(([id, s]) => [
+          id,
+          { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false },
+        ]),
+      ),
+    })),
 }))

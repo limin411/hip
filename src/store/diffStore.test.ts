@@ -34,4 +34,14 @@ describe('diffStore', () => {
     useDiffStore.getState().clearSession('s1')
     expect(useDiffStore.getState().bySession['s1']).toEqual(EMPTY_DIFF)
   })
+
+  it('resetTransient unwedges loading and initPending across sessions', () => {
+    useDiffStore.getState().setLoading('s1')
+    useDiffStore.getState().setInitPending('s2', true)
+    useDiffStore.getState().setResult('s3', { state: 'ok', files: [], totalFiles: 0 })
+    useDiffStore.getState().resetTransient()
+    expect(useDiffStore.getState().bySession['s1'].status).toBe('idle')
+    expect(useDiffStore.getState().bySession['s2'].initPending).toBe(false)
+    expect(useDiffStore.getState().bySession['s3'].status).toBe('ready') // untouched
+  })
 })

@@ -53,6 +53,7 @@ export class SessionService {
   private receive(msg: ServerMessage): void {
     useDomainStore.getState().apply(msg)
     if (msg.type === 'ready') {
+      useDiffStore.getState().resetTransient()
       this.transport.send({ type: 'session:list' })
       this.resyncActiveIfRunning()
     } else if (msg.type === 'fs:ls:result') {

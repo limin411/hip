@@ -87,7 +87,7 @@ All git invocations use `execFile('git', [...], { cwd, timeout: 10_000 })` — t
 
 - **New `src/store/diffStore.ts`** mirroring `fsStore.ts`: per-session `{ status: 'idle' | 'loading' | 'ready', state?: DiffState, files: DiffFile[], totalFiles: number, error?: string, initPending: boolean }`.
 - **`sessionService`:** `requestDiff(sessionId)` (in-flight dedupe — drop the request if one is already loading) and `gitInit(sessionId)`; fold `fs:diff:result` / `fs:gitInit:result` in the `onMessage` chain next to the existing `fs:ls:result` handling (`sessionService.ts:57`). A successful `fs:gitInit:result` immediately issues a fresh `fs:diff`.
-- **Refresh triggers:** Diff tab activation; `message:complete` for the active session *while the Diff tab is visible* (`useUiStore.activeTab === 'diff'`); a manual refresh button in the tab header.
+- **Refresh triggers:** Diff tab activation; `message:complete` for the completing session (any session — diff state is per-session) *while the Diff tab is visible* (`useUiStore.activeTab === 'diff'`); a manual refresh button in the tab header.
 - **`DiffViewer.tsx`:** delete the hardcoded `files: []`; subscribe to `diffStore` + active session. The existing `FileDiff`/`DiffLine` rendering stays as-is. Add: header row (refresh button, changed-file count), per-file `truncated` badge, "and N more files" row, and four empty states:
   - `no_cwd` → "bind a project folder first" (points at the Files-tab folder flow)
   - `not_a_repo` → explainer + **"Initialize git repository"** button (user-triggered `fs:gitInit`)

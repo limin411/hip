@@ -70,8 +70,8 @@ export function Composer({
               onClick={onStop}
               disabled={reconnecting}
               data-testid="composer-stop"
-className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-               title={t('chat.stop')}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('chat.stop')}
             >
               <Square size={15} />
             </button>

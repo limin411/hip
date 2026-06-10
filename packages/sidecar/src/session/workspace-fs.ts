@@ -72,7 +72,7 @@ export async function lsDir(cwd: string, dirAbs: string): Promise<FsEntry[]> {
   return entries
 }
 
-async function readHead(file: string, n: number): Promise<Buffer> {
+export async function readHead(file: string, n: number): Promise<Buffer> {
   const fh = await fs.open(file, 'r')
   try {
     const buf = Buffer.alloc(n)

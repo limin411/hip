@@ -3,6 +3,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import type { DiffFile, DiffLine, DiffState } from '@hip/protocol'
+import { readHead } from './workspace-fs.js'
 
 const execFileP = promisify(execFile)
 
@@ -124,9 +125,7 @@ function parseStatusZ(out: string): StatusEntry[] {
 async function untrackedDiffFile(absPath: string, relPath: string): Promise<DiffFile> {
   const stat = await fs.stat(absPath)
   const readCapped = stat.size > UNTRACKED_READ_CAP
-  const buf = readCapped
-    ? (await fs.readFile(absPath)).subarray(0, UNTRACKED_READ_CAP)
-    : await fs.readFile(absPath)
+  const buf = readCapped ? await readHead(absPath, UNTRACKED_READ_CAP) : await fs.readFile(absPath)
   if (buf.subarray(0, 8000).includes(0)) {
     return { path: relPath, additions: 0, deletions: 0, lines: [], binary: true }
   }
@@ -149,37 +148,53 @@ async function untrackedDiffFile(absPath: string, relPath: string): Promise<Diff
  */
 export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise<WorkspaceDiff> {
   try {
+    // Fix 5: detect a missing/inaccessible cwd before any git call so it doesn't masquerade as git_missing.
+    try { await fs.stat(cwd) } catch { return { state: 'error', error: 'cwd not accessible: ' + cwd } }
+
     try {
       await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'git_missing' }
       return { state: 'not_a_repo' }
     }
+
+    // Fix 1: resolve symlinks in cwd so path.relative() arithmetic is correct (e.g. macOS /tmp → /private/tmp).
+    const realCwd = await fs.realpath(cwd)
     const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
     let hasHead = true
     try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
 
-    const rel = (repoRelative: string) => path.relative(cwd, path.join(repoRoot, repoRelative))
-    const files: DiffFile[] = []
+    const rel = (repoRelative: string) => path.relative(realCwd, path.join(repoRoot, repoRelative))
 
+    // Fix 3: build tracked list and untracked pending list, then materialize disk reads ONLY for entries
+    // inside the cap — bounded work even on huge untracked trees.
+    type Pending = { path: string; abs: string }
+    const tracked: DiffFile[] = []
     if (hasHead) {
       const diffOut = (await runGit(cwd, ['-c', 'core.quotepath=false', 'diff', '--no-color', '--no-renames', 'HEAD', '--', '.'], gitBin)).stdout
-      for (const f of parseUnifiedDiff(diffOut)) files.push({ ...f, path: rel(f.path) })
+      for (const f of parseUnifiedDiff(diffOut)) tracked.push({ ...f, path: rel(f.path) })
     }
-
     const statusOut = (await runGit(cwd, ['status', '--porcelain=v1', '-z', '-uall', '--', '.'], gitBin)).stdout
     // `git diff` never shows untracked files; with no HEAD it can't run at all, so every entry renders as new.
-    const fromDisk = parseStatusZ(statusOut).filter((s) => (hasHead ? s.xy === '??' : true))
-    for (const s of fromDisk) {
+    // Entries ending in '/' are nested git repos (status doesn't recurse into them) — skipped deliberately.
+    const pending: Pending[] = parseStatusZ(statusOut)
+      .filter((s) => (hasHead ? s.xy === '??' : true))
+      .filter((s) => !s.path.endsWith('/'))
+      .map((s) => ({ path: rel(s.path), abs: path.join(repoRoot, s.path) }))
+
+    const byPath = (a: { path: string }, b: { path: string }) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+    const merged: Array<DiffFile | Pending> = [...tracked, ...pending].sort(byPath)
+    const totalFiles = merged.length
+    const files: DiffFile[] = []
+    for (const entry of merged.slice(0, MAX_DIFF_FILES)) {
+      if ('lines' in entry) { files.push(entry); continue }
       try {
-        files.push(await untrackedDiffFile(path.join(repoRoot, s.path), rel(s.path)))
+        files.push(await untrackedDiffFile(entry.abs, entry.path))
       } catch {
         // File vanished between status and read — skip it rather than failing the whole diff.
       }
     }
-
-    files.sort((a, b) => a.path.localeCompare(b.path))
-    return { state: 'ok', files: files.slice(0, MAX_DIFF_FILES), totalFiles: files.length }
+    return { state: 'ok', files, totalFiles }
   } catch (e) {
     return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
   }
@@ -193,7 +208,7 @@ export async function gitInit(cwd: string, gitBin = 'git'): Promise<{ ok: boolea
   try {
     await runGit(cwd, ['init'], gitBin, GIT_INIT_TIMEOUT_MS)
     await runGit(cwd, ['add', '-A'], gitBin, GIT_INIT_TIMEOUT_MS)
-    await runGit(cwd, ['-c', 'user.name=hip', '-c', 'user.email=hip@local', 'commit', '-m', 'hip baseline', '--allow-empty'], gitBin, GIT_INIT_TIMEOUT_MS)
+    await runGit(cwd, ['-c', 'user.name=hip', '-c', 'user.email=hip@local', '-c', 'commit.gpgsign=false', 'commit', '-m', 'hip baseline', '--allow-empty', '--no-verify'], gitBin, GIT_INIT_TIMEOUT_MS)
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }

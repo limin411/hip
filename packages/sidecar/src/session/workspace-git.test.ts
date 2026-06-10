@@ -17,7 +17,6 @@ async function makeRepo(dir: string): Promise<void> {
 let root: string
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-'))
-  root = await fs.realpath(root)
 })
 afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
 
@@ -256,6 +255,25 @@ describe('collectWorkspaceDiff', () => {
     expect(r.files).toHaveLength(MAX_DIFF_FILES)
     expect(r.totalFiles).toBe(MAX_DIFF_FILES + 1)
   })
+
+  it('does not double-count a staged new file in a HEAD repo', async () => {
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'staged.txt'), 's\n')
+    await git(root, 'add', 'staged.txt')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files!.filter((f) => f.path === 'staged.txt')).toHaveLength(1)
+    expect(r.totalFiles).toBe(1)
+  })
+
+  it('caps untracked file lines and flags truncated', async () => {
+    await makeRepo(root)
+    const big = Array.from({ length: MAX_DIFF_LINES_PER_FILE + 500 }, (_, i) => `l${i}`).join('\n') + '\n'
+    await fs.writeFile(path.join(root, 'big.txt'), big)
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files![0].lines).toHaveLength(MAX_DIFF_LINES_PER_FILE)
+    expect(r.files![0].truncated).toBe(true)
+    expect(r.files![0].additions).toBe(MAX_DIFF_LINES_PER_FILE + 500)
+  })
 })
 
 describe('gitInit', () => {
@@ -265,6 +283,7 @@ describe('gitInit', () => {
     expect(await collectWorkspaceDiff(root)).toEqual({ state: 'ok', files: [], totalFiles: 0 })
     const log = await git(root, 'log', '--oneline')
     expect(log.stdout).toContain('hip baseline')
+    expect((await git(root, 'log', '--format=%an')).stdout.trim()).toBe('hip')
   })
 
   it('works in an empty folder (--allow-empty)', async () => {

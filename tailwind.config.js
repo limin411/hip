@@ -34,16 +34,15 @@ export default {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['SF Mono', 'JetBrains Mono', 'Menlo', 'monospace'],
       },
-      // 扁平化：移除所有圆角；保留 full 供圆形头像/状态点
       borderRadius: {
         none: '0',
-        sm: '0',
-        DEFAULT: '0',
-        md: '0',
-        lg: '0',
-        xl: '0',
-        '2xl': '0',
-        '3xl': '0',
+        sm: '4px',
+        DEFAULT: '6px',
+        md: '6px',
+        lg: '8px',
+        xl: '12px',
+        '2xl': '12px',
+        '3xl': '12px',
         full: '9999px',
       },
       // 扁平化：移除所有阴影（浮层改用发丝边框界定）
@@ -62,10 +61,18 @@ export default {
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
         pulse: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.4' } },
+        'message-enter': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
       },
       animation: {
         blink: 'blink 1s step-start infinite',
         pulse: 'pulse 1.2s ease-in-out infinite',
+        'message-enter': 'message-enter 0.3s ease-out',
+      },
+      transitionDuration: {
+        DEFAULT: '150ms',
       },
     },
   },

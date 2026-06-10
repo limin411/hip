@@ -95,6 +95,7 @@ export type ClientMessage =
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
+  | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
@@ -109,11 +110,12 @@ export type ServerMessage =
   | { type: 'tool:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; callId: string; name: string; input: string; seq: number; truncated?: boolean }
   | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
+  | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }
   | { type: 'session:list:result'; sessions: SessionSummary[] }
-  | { type: 'session:loaded'; sessionId: string; messages: Message[] }
+  | { type: 'session:loaded'; sessionId: string; messages: Message[]; config?: SessionConfig }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
   | { type: 'session:deleted'; sessionId: string }
   | { type: 'session:title'; sessionId: string; title: string }

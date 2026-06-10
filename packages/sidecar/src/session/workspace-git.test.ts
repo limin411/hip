@@ -1,5 +1,25 @@
-import { describe, it, expect } from 'vitest'
-import { parseUnifiedDiff, MAX_DIFF_LINES_PER_FILE } from './workspace-git.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { promises as fs } from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { parseUnifiedDiff, collectWorkspaceDiff, gitInit, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+
+const execFileP = promisify(execFile)
+const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
+async function makeRepo(dir: string): Promise<void> {
+  await git(dir, 'init')
+  await git(dir, 'add', '-A')
+  await git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'init', '--allow-empty')
+}
+
+let root: string
+beforeEach(async () => {
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-'))
+  root = await fs.realpath(root)
+})
+afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
 
 const MODIFY = `diff --git a/src/app.ts b/src/app.ts
 index 1234567..89abcde 100644
@@ -136,5 +156,125 @@ new mode 100755
 `
     const [f] = parseUnifiedDiff(MODE_ONLY)
     expect(f).toMatchObject({ path: 'run.sh', additions: 0, deletions: 0, lines: [] })
+  })
+})
+
+describe('collectWorkspaceDiff', () => {
+  it('reports not_a_repo for a plain folder', async () => {
+    expect((await collectWorkspaceDiff(root)).state).toBe('not_a_repo')
+  })
+
+  it('reports git_missing when the git binary is absent', async () => {
+    const r = await collectWorkspaceDiff(root, 'hip-definitely-missing-git')
+    expect(r.state).toBe('git_missing')
+  })
+
+  it('reports ok with no files for a clean repo', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    await makeRepo(root)
+    expect(await collectWorkspaceDiff(root)).toEqual({ state: 'ok', files: [], totalFiles: 0 })
+  })
+
+  it('reports a modified tracked file with cwd-relative path', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.state).toBe('ok')
+    expect(r.files).toHaveLength(1)
+    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 1, deletions: 1 })
+  })
+
+  it('reports a deleted file as all-del', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\ntwo\n')
+    await makeRepo(root)
+    await fs.rm(path.join(root, 'a.txt'))
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 0, deletions: 2 })
+  })
+
+  it('renders an untracked file as all-add with line numbers', async () => {
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'new.txt'), 'x\ny\n')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files![0]).toMatchObject({ path: 'new.txt', additions: 2, deletions: 0 })
+    expect(r.files![0].lines).toEqual([
+      { type: 'add', content: 'x', oldNo: null, newNo: 1 },
+      { type: 'add', content: 'y', oldNo: null, newNo: 2 },
+    ])
+  })
+
+  it('lists files inside an untracked directory individually (-uall)', async () => {
+    await makeRepo(root)
+    await fs.mkdir(path.join(root, 'newdir'))
+    await fs.writeFile(path.join(root, 'newdir', 'f.txt'), 'z\n')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files!.map((f) => f.path)).toEqual([path.join('newdir', 'f.txt')])
+  })
+
+  it('keeps a CJK filename literal (core.quotepath=false)', async () => {
+    await fs.writeFile(path.join(root, '说明.txt'), '甲\n')
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, '说明.txt'), '乙\n')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files![0].path).toBe('说明.txt')
+  })
+
+  it('flags a binary change', async () => {
+    await fs.writeFile(path.join(root, 'b.bin'), Buffer.from([0, 1, 2]))
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'b.bin'), Buffer.from([0, 9, 9, 9]))
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files![0]).toMatchObject({ path: 'b.bin', binary: true })
+  })
+
+  it('treats every file as new in a fresh repo with no HEAD', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    await git(root, 'init')
+    const r = await collectWorkspaceDiff(root)
+    expect(r.state).toBe('ok')
+    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 1 })
+  })
+
+  it('scopes to the cwd subtree when cwd is inside a larger repo', async () => {
+    await fs.mkdir(path.join(root, 'sub'))
+    await fs.writeFile(path.join(root, 'top.txt'), 'top\n')
+    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'in\n')
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'top.txt'), 'TOP\n')
+    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'IN\n')
+    const r = await collectWorkspaceDiff(path.join(root, 'sub'))
+    expect(r.files!.map((f) => f.path)).toEqual(['inner.txt']) // cwd-relative, sibling excluded
+  })
+
+  it('caps the file list and reports the true total', async () => {
+    await makeRepo(root)
+    for (let i = 0; i < MAX_DIFF_FILES + 1; i++) {
+      await fs.writeFile(path.join(root, `f${String(i).padStart(3, '0')}.txt`), 'x\n')
+    }
+    const r = await collectWorkspaceDiff(root)
+    expect(r.files).toHaveLength(MAX_DIFF_FILES)
+    expect(r.totalFiles).toBe(MAX_DIFF_FILES + 1)
+  })
+})
+
+describe('gitInit', () => {
+  it('initializes with a baseline commit so the diff starts clean', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    expect((await gitInit(root)).ok).toBe(true)
+    expect(await collectWorkspaceDiff(root)).toEqual({ state: 'ok', files: [], totalFiles: 0 })
+    const log = await git(root, 'log', '--oneline')
+    expect(log.stdout).toContain('hip baseline')
+  })
+
+  it('works in an empty folder (--allow-empty)', async () => {
+    expect((await gitInit(root)).ok).toBe(true)
+    expect((await collectWorkspaceDiff(root)).state).toBe('ok')
+  })
+
+  it('reports failure with an error message', async () => {
+    const r = await gitInit(root, 'hip-definitely-missing-git')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBeTruthy()
   })
 })

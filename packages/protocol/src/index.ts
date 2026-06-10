@@ -82,6 +82,29 @@ export interface FsEntry {
   size?: number
 }
 
+export type DiffLineType = 'add' | 'del' | 'ctx'
+
+/** One rendered diff line. `oldNo`/`newNo` are 1-based; null on the side the line doesn't exist. */
+export interface DiffLine {
+  type: DiffLineType
+  content: string
+  oldNo: number | null
+  newNo: number | null
+}
+
+/** One changed file in the workspace diff. `path` is cwd-relative for display. */
+export interface DiffFile {
+  path: string
+  additions: number
+  deletions: number
+  lines: DiffLine[]
+  truncated?: boolean   // per-file line cap (or untracked read cap) hit
+  binary?: boolean      // binary change — lines is empty
+}
+
+/** Outcome of a workspace diff request. */
+export type DiffState = 'ok' | 'not_a_repo' | 'git_missing' | 'no_cwd' | 'error'
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
@@ -100,6 +123,8 @@ export type ClientMessage =
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
   | { type: 'fs:readCwd'; cwd: string; path: string }
+  | { type: 'fs:diff'; sessionId: string }
+  | { type: 'fs:gitInit'; sessionId: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -124,3 +149,5 @@ export type ServerMessage =
   | { type: 'fs:read:result'; sessionId: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
   | { type: 'fs:lsCwd:result'; cwd: string; path: string; entries: FsEntry[]; error?: string }
   | { type: 'fs:readCwd:result'; cwd: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
+  | { type: 'fs:diff:result'; sessionId: string; state: DiffState; files?: DiffFile[]; totalFiles?: number; error?: string }
+  | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }

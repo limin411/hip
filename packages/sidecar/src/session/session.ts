@@ -6,6 +6,7 @@ import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { buildSubagents, buildSupervisorPrompt, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
+import * as workspaceGit from './workspace-git.js'
 import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
@@ -250,6 +251,18 @@ export class Session {
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) }
     }
+  }
+
+  /** Worktree-vs-HEAD diff of the bound cwd subtree. Never throws. */
+  async workspaceDiff(): Promise<workspaceGit.WorkspaceDiff> {
+    if (!this._config.cwd) return { state: 'no_cwd' }
+    return workspaceGit.collectWorkspaceDiff(this._config.cwd)
+  }
+
+  /** One-click `git init` + baseline commit in the bound cwd. */
+  async workspaceGitInit(): Promise<{ ok: boolean; error?: string }> {
+    if (!this._config.cwd) return { ok: false, error: 'no_workspace' }
+    return workspaceGit.gitInit(this._config.cwd)
   }
 
   /** Emit NO_API_KEY and return false when the env-keyed model has no key. */

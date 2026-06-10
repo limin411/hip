@@ -14,7 +14,7 @@ describe('dev sidecar wrapper generator', () => {
   )
 
   it("exec's the entry in-process via `node --import tsx` (no child to orphan)", () => {
-    expect(script).toContain('exec node --import tsx packages/sidecar/src/main.ts')
+    expect(script).toContain('exec "$NODE_BIN" --import tsx packages/sidecar/src/main.ts')
   })
 
   it('does not wrap the sidecar in `yarn`, which spawns an orphan-able child tree', () => {

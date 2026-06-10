@@ -30,7 +30,7 @@ function ThinkingDisclosure({
   const label =
     seconds != null ? t('chat.thoughtFor', { seconds }) : t('chat.thinkingMode')
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 transition-colors">
       <AgentBadge role={role} />
       <div className="min-w-0 flex-1">
         <button
@@ -79,7 +79,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
           const task = taskByAgent.get(step.agentId)
           if (task && step.role !== 'supervisor') {
             nodes.push(
-              <div key={`d-${step.agentId}`} className="flex items-center gap-2 text-[12px] text-ink-tertiary" data-testid="delegation-row">
+              <div key={`d-${step.agentId}`} className="flex items-center gap-2 text-[12px] text-ink-tertiary transition-colors" data-testid="delegation-row">
                 <AgentBadge role={step.role} />
                 <span className="truncate">
                   <span className="font-medium text-ink-secondary">{t('chat.delegatedTo', { role: t(ROLE_NAME_KEY[step.role]) })}</span>: {task}
@@ -93,7 +93,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
         } else {
           const tool = byCallId.get(step.callId)
           if (tool) nodes.push(
-            <div key={`t-${step.stepSeq}`} className="flex gap-2">
+            <div key={`t-${step.stepSeq}`} className="flex gap-2 transition-colors">
               <AgentBadge role={step.role} />
               <div className="min-w-0 flex-1"><ToolCallRow tool={tool} /></div>
             </div>,

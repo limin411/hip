@@ -30,7 +30,7 @@ export function FolderPill() {
           onClick={pick}
           data-testid="change-folder"
           title={bound}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 hover:bg-surface-muted"
+          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 transition-colors hover:bg-surface-muted"
         >
           <Folder size={13} className="text-accent" />
           {basename(bound)}
@@ -40,7 +40,7 @@ export function FolderPill() {
           data-testid="clear-folder"
           title={t('chat.clearFolder')}
           aria-label={t('chat.clearFolder')}
-          className="text-ink-tertiary hover:text-ink"
+          className="text-ink-tertiary hover:text-ink transition-colors"
         >
           {t('chat.clearFolder')}
         </button>
@@ -52,7 +52,7 @@ export function FolderPill() {
     <button
       onClick={pick}
       data-testid="pick-folder"
-      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] text-ink-secondary hover:bg-surface-muted"
+      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] text-ink-secondary transition-colors hover:bg-surface-muted"
     >
       <Folder size={13} className="text-ink-tertiary" />
       {t('chat.pickFolder')}

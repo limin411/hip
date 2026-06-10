@@ -62,8 +62,6 @@ export const zhTW = {
       agents: '智能體',
       diff: 'Diff',
       closePanel: '關閉面板',
-      noDiff: '暫無 Diff',
-      noDiffDesc: '智能體修改代碼後，變更將顯示在這裡',
       diffView: {
         noSession: '沒有進行中的對話',
         noSessionDesc: '開啟一個對話以查看其工作區變更',

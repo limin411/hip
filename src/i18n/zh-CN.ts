@@ -62,8 +62,6 @@ export const zhCN = {
       agents: '智能体',
       diff: 'Diff',
       closePanel: '关闭面板',
-      noDiff: '暂无 Diff',
-      noDiffDesc: '智能体修改代码后，变更将显示在这里',
       diffView: {
         noSession: '没有进行中的对话',
         noSessionDesc: '打开一个对话以查看其工作区改动',

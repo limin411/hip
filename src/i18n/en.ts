@@ -62,8 +62,6 @@ export const en = {
       agents: 'Agents',
       diff: 'Diff',
       closePanel: 'Close Panel',
-      noDiff: 'No diff yet',
-      noDiffDesc: 'Changes made by agents will appear here',
       diffView: {
         noSession: 'No active conversation',
         noSessionDesc: 'Open a conversation to see its workspace changes',

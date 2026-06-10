@@ -274,6 +274,20 @@ describe('collectWorkspaceDiff', () => {
     expect(r.files![0].truncated).toBe(true)
     expect(r.files![0].additions).toBe(MAX_DIFF_LINES_PER_FILE + 500)
   })
+
+  it('skips an untracked symlink instead of rendering its target content', async () => {
+    await makeRepo(root)
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-outside-'))
+    try {
+      await fs.writeFile(path.join(outside, 'secret.txt'), 'TOP SECRET\n')
+      await fs.symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'))
+      const r = await collectWorkspaceDiff(root)
+      expect(r.state).toBe('ok')
+      expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('gitInit', () => {

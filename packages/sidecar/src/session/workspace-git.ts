@@ -123,7 +123,11 @@ function parseStatusZ(out: string): StatusEntry[] {
 
 /** Render an on-disk file (untracked, or any file in a no-HEAD repo) as an all-add DiffFile. */
 async function untrackedDiffFile(absPath: string, relPath: string): Promise<DiffFile> {
-  const stat = await fs.stat(absPath)
+  const stat = await fs.lstat(absPath)
+  // Symlinks would leak target content from outside the workspace (cf. workspace-fs
+  // resolveRealWithin) and FIFOs would block the read forever — regular files only.
+  // Git itself never shows a symlink's target content (mode 120000 = the link path).
+  if (!stat.isFile()) throw new Error('not a regular file')
   const readCapped = stat.size > UNTRACKED_READ_CAP
   const buf = readCapped ? await readHead(absPath, UNTRACKED_READ_CAP) : await fs.readFile(absPath)
   if (buf.subarray(0, 8000).includes(0)) {
@@ -148,7 +152,7 @@ async function untrackedDiffFile(absPath: string, relPath: string): Promise<Diff
  */
 export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise<WorkspaceDiff> {
   try {
-    // Fix 5: detect a missing/inaccessible cwd before any git call so it doesn't masquerade as git_missing.
+    // Detect a missing/inaccessible cwd before any git call so it doesn't masquerade as git_missing.
     try { await fs.stat(cwd) } catch { return { state: 'error', error: 'cwd not accessible: ' + cwd } }
 
     try {
@@ -158,7 +162,7 @@ export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise
       return { state: 'not_a_repo' }
     }
 
-    // Fix 1: resolve symlinks in cwd so path.relative() arithmetic is correct (e.g. macOS /tmp → /private/tmp).
+    // Resolve symlinks in cwd so path.relative() arithmetic is correct (e.g. macOS /tmp → /private/tmp).
     const realCwd = await fs.realpath(cwd)
     const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
     let hasHead = true
@@ -166,7 +170,7 @@ export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise
 
     const rel = (repoRelative: string) => path.relative(realCwd, path.join(repoRoot, repoRelative))
 
-    // Fix 3: build tracked list and untracked pending list, then materialize disk reads ONLY for entries
+    // Build tracked list and untracked pending list, then materialize disk reads ONLY for entries
     // inside the cap — bounded work even on huge untracked trees.
     type Pending = { path: string; abs: string }
     const tracked: DiffFile[] = []
@@ -191,7 +195,7 @@ export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise
       try {
         files.push(await untrackedDiffFile(entry.abs, entry.path))
       } catch {
-        // File vanished between status and read — skip it rather than failing the whole diff.
+        // Vanished between status and read, or not a regular file (symlink/FIFO) — skip.
       }
     }
     return { state: 'ok', files, totalFiles }

@@ -71,7 +71,7 @@ All git invocations use `execFile('git', [...], { cwd, timeout: 10_000 })` — t
 - **Tracked changes:** one `git -c core.quotepath=false diff --no-color --no-renames HEAD -- .` call, parsed by a **pure function** `parseUnifiedDiff(text): DiffFile[]` (per-file split, hunk headers → `oldNo`/`newNo`, `Binary files … differ` → `binary: true`). `--no-renames` forces renames to appear as plain delete + add (matching the Non-Goal); `core.quotepath=false` keeps CJK filenames literal instead of octal-escaped; deleted files come out as all-`del` naturally.
 - **No HEAD** (fresh repo, zero commits): `git diff HEAD` fails — treat *every* status entry like an untracked file (full-content additions).
 - **Untracked files** (`??`): read from disk and render as all-add `DiffFile`. Reuse the NUL-byte binary sniff and the 1 MB text cap pattern from `workspace-fs.ts`.
-- **`gitInit(cwd)`:** `git init` → `git add -A` → `git -c user.name=hip -c user.email=hip@local commit -m "hip baseline"`. The inline `-c` identity matters: a baseline commit must not depend on the user's global git config. After init the diff is empty (clean baseline); subsequent changes surface normally.
+- **`gitInit(cwd)`:** `git init` → `git add -A` → `git -c user.name=hip -c user.email=hip@local -c commit.gpgsign=false commit -m "hip baseline" --allow-empty --no-verify`. The inline `-c` identity matters: a baseline commit must not depend on the user's global git config. After init the diff is empty (clean baseline); subsequent changes surface normally. The gpgsign/no-verify flags keep the baseline commit independent of the user's global git config and hooks; init steps run with a 60 s timeout.
 - **Handlers** (`session-manager.ts`): `case 'fs:diff'` / `case 'fs:gitInit'` mirror `fs:ls` — resolve the session's cwd from its config; missing cwd → `state: 'no_cwd'` (defensive; config.cwd is always written at create time, including scratch sessions).
 
 ### Caps
@@ -79,7 +79,7 @@ All git invocations use `execFile('git', [...], { cwd, timeout: 10_000 })` — t
 | Cap | Value | Surfaced as |
 |---|---|---|
 | Lines per file | 2000 | `truncated: true` → badge on the file header |
-| Files in response | 200 (kept in git's path-sorted output order) | `totalFiles` > `files.length` → "and N more files" row |
+| Files in response | 200 (merged tracked+untracked list, codepoint path order) | `totalFiles` > `files.length` → "and N more files" row |
 | Untracked file read | 1 MB | `truncated: true` |
 | git exec timeout | 10 s | `state: 'error'` + message |
 
@@ -93,7 +93,7 @@ All git invocations use `execFile('git', [...], { cwd, timeout: 10_000 })` — t
   - `not_a_repo` → explainer + **"Initialize git repository"** button (user-triggered `fs:gitInit`)
   - `git_missing` → install guidance
   - `error` → message + retry button
-- **i18n:** new `artifact.diff.*` keys in en / zh-CN / zh-TW (full parity, per project convention).
+- **i18n:** new `artifact.diffView.*` keys in en / zh-CN / zh-TW (full parity, per project convention).
 
 ## Error handling
 

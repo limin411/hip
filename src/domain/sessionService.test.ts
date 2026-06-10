@@ -97,6 +97,21 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:setCwd', sessionId: 's1', cwd: '/proj' })
   })
 
+  it('setSystemPrompt optimistically sets config and sends session:setSystemPrompt', () => {
+    const t = new FakeTransport()
+    new SessionService(t).setSystemPrompt('s1', 'Be terse')
+    expect(useDomainStore.getState().sessions[0].config.systemPrompt).toBe('Be terse')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: 'Be terse' })
+  })
+
+  it('setSystemPrompt null clears config and sends null', () => {
+    const t = new FakeTransport()
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], config: { llmProvider: 'deepseek', model: 'm', tools: [], systemPrompt: 'old' } }] })
+    new SessionService(t).setSystemPrompt('s1', null)
+    expect(useDomainStore.getState().sessions[0].config.systemPrompt).toBeUndefined()
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: null })
+  })
+
   it('readFile marks the preview loading and sends fs:read', () => {
     const t = new FakeTransport()
     new SessionService(t).readFile('s1', '/proj/a.md')

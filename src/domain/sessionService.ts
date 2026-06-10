@@ -114,6 +114,11 @@ export class SessionService {
     this.transport.send({ type: 'session:setThinking', sessionId: id, thinking })
   }
 
+  setSystemPrompt(id: string, systemPrompt: string | null): void {
+    useDomainStore.getState().apply({ type: 'session:systemPrompt', sessionId: id, systemPrompt }) // optimistic
+    this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
+  }
+
   lsDir(sessionId: string, path: string): void {
     this.transport.send({ type: 'fs:ls', sessionId, path })
   }

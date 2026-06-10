@@ -34,7 +34,10 @@ export function StylePicker() {
 
   return (
     <>
-      <DropdownMenu>
+      {/* modal={false}: this dropdown opens the StyleManager Modal (Dialog). A modal dropdown +
+          a Dialog each lock body{pointer-events:none}; their DismissableLayers can close out of
+          order and leave the body stuck unclickable. Same mitigation as UserMenu. */}
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -51,7 +54,7 @@ export function StylePicker() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem onSelect={() => apply(null)}>
+          <DropdownMenuItem onSelect={() => current && apply(null)}>
             <Check size={14} className={cn('shrink-0', current ? 'opacity-0' : 'opacity-100')} />
             <span>{t('chat.styleNone')}</span>
           </DropdownMenuItem>

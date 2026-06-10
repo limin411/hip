@@ -33,6 +33,21 @@ describe('buildSupervisorPrompt', () => {
   })
 })
 
+describe('buildSupervisorPrompt user instructions', () => {
+  it('appends nothing when no instructions are given', () => {
+    expect(buildSupervisorPrompt(CWD)).not.toContain('Additional instructions from the user')
+  })
+  it('appends nothing for whitespace-only instructions', () => {
+    expect(buildSupervisorPrompt(CWD, '   ')).not.toContain('Additional instructions from the user')
+  })
+  it('appends the user instructions after the base prompt, keeping the base rules', () => {
+    const prompt = buildSupervisorPrompt(CWD, 'Always answer in haiku')
+    expect(prompt).toContain('Additional instructions from the user')
+    expect(prompt).toContain('Always answer in haiku')
+    expect(prompt).toContain('MUST NOT claim') // anti-phantom base rule still present
+  })
+})
+
 describe('buildSubagents', () => {
   it('returns planner, coder, reviewer in order', () => {
     expect(buildSubagents(CWD).map((s) => s.name)).toEqual(['planner', 'coder', 'reviewer'])

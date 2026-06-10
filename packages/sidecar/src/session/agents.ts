@@ -28,11 +28,14 @@ const SUPERVISOR_BASE =
 const CODER_BASE =
   'You are the Coder. Implement the plan. You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the project directory; use them to read and write actual files. All paths are relative to the project root (e.g. "/src/index.ts"). Output the code and a one-line summary.'
 
-export function buildSupervisorPrompt(cwd: string): string {
-  return (
+export function buildSupervisorPrompt(cwd: string, userInstructions?: string): string {
+  const base =
     `${SUPERVISOR_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n` +
     'In your final summary, only report files the coder actually wrote via tool calls.'
-  )
+  const extra = userInstructions?.trim()
+  return extra
+    ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`
+    : base
 }
 
 export function buildSubagents(cwd: string): SubagentSpec[] {

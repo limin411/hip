@@ -88,6 +88,34 @@ describe('Session.setThinking', () => {
   })
 })
 
+describe('Session.setSystemPrompt', () => {
+  it('returns true and updates config when idle', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-sp-idle', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, model)
+    expect(session.setSystemPrompt('Be terse')).toBe(true)
+    expect(session.config.systemPrompt).toBe('Be terse')
+  })
+  it('normalizes blank instructions to undefined', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-sp-blank', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], systemPrompt: 'old' }, model)
+    expect(session.setSystemPrompt('   ')).toBe(true)
+    expect(session.config.systemPrompt).toBeUndefined()
+  })
+  it('clears on null', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-sp-null', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], systemPrompt: 'old' }, model)
+    expect(session.setSystemPrompt(null)).toBe(true)
+    expect(session.config.systemPrompt).toBeUndefined()
+  })
+  it('returns false and leaves config unchanged while a turn is running', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-sp-running', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], systemPrompt: 'keep' }, model)
+    ;(session as unknown as { running: boolean }).running = true
+    expect(session.setSystemPrompt('new')).toBe(false)
+    expect(session.config.systemPrompt).toBe('keep')
+  })
+})
+
 describe('Session message:complete agentRuns', () => {
   it('message:complete carries per-turn agentRuns stamped with messageId', async () => {
     const model = new FakeListChatModel({ responses: ['hello world'] })

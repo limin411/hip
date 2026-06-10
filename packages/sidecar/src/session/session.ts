@@ -196,7 +196,7 @@ export class Session {
     const promptCwd = this._config.cwd ?? '/'
     this.agent = createDeepAgent({
       model,
-      systemPrompt: this._config.systemPrompt ?? buildSupervisorPrompt(promptCwd),
+      systemPrompt: buildSupervisorPrompt(promptCwd, this._config.systemPrompt),
       subagents: buildSubagents(promptCwd) as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
       ...(backend ? { backend } : {}),
     })
@@ -219,6 +219,15 @@ export class Session {
   setThinking(thinking: boolean): boolean {
     if (this.running) return false
     this._config = { ...this._config, thinking }
+    this.buildAgent()
+    return true
+  }
+
+  /** Set/clear per-conversation instructions and rebuild the agent. NO-OP (returns false) while a turn is running. */
+  setSystemPrompt(systemPrompt: string | null): boolean {
+    if (this.running) return false
+    const next = systemPrompt?.trim() || undefined
+    this._config = { ...this._config, systemPrompt: next }
     this.buildAgent()
     return true
   }

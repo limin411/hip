@@ -26,7 +26,7 @@ export function ChatHeader() {
       <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-[13px] font-medium text-ink">
         {active?.title ?? t('chat.title')}
       </span>
-      <div className="flex items-center gap-1.5" data-tauri-drag-region="false">
+      <div className="flex items-center gap-2" data-tauri-drag-region="false">
         {status === 'connected' && !hasApiKey ? (
           <>
             <span className="h-2 w-2 rounded-full bg-amber-500" />
@@ -34,7 +34,7 @@ export function ChatHeader() {
           </>
         ) : (
           <>
-            <span className={`h-2 w-2 rounded-full ${DOT[status] ?? DOT.disconnected}`} />
+            <span className={`h-2 w-2 rounded-full transition-colors ${DOT[status] ?? DOT.disconnected}`} />
             <span className="text-[11px] text-ink-tertiary">
               {{
                 connecting: t('chat.connectionConnecting'),
@@ -46,7 +46,7 @@ export function ChatHeader() {
             {(status === 'error' || status === 'disconnected') && (
               <button
                 onClick={() => sessionService.reconnect()}
-                className="text-[11px] text-accent hover:underline"
+                className="text-[11px] text-accent hover:underline transition-colors"
               >
                 {t('chat.connectionRetry')}
               </button>

@@ -77,7 +77,7 @@ export function ChatPane() {
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-10 px-5 py-6">
           {messages.map((m, i) => {
             const isLastMessage = i === messages.length - 1
             return (
@@ -87,7 +87,7 @@ export function ChatPane() {
                 // Transition lives on the always-present base classes so the highlight fades on the
                 // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
-                  'transition-[background-color,box-shadow] duration-700',
+                  'animate-message-enter transition-[background-color,box-shadow] duration-700',
                   highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
                 )}
               >
@@ -144,7 +144,7 @@ export function ChatPane() {
           onClick={() => { setAtBottom(true); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-[12px] text-ink-secondary shadow-pop transition-colors hover:bg-surface-muted"
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-[12px] text-ink-secondary transition-colors hover:bg-surface-muted"
         >
           <ChevronDown size={14} />
           {t('chat.jumpToLatest')}

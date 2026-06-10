@@ -14,6 +14,7 @@ export function Composer({
   onToggleThinking,
   thinkingDisabled,
   reconnecting,
+  leftSlot,
 }: {
   value: string
   onChange: (v: string) => void
@@ -25,6 +26,7 @@ export function Composer({
   onToggleThinking?: (next: boolean) => void
   thinkingDisabled?: boolean
   reconnecting?: boolean
+  leftSlot?: React.ReactNode
 }) {
   const { t } = useTranslation()
   const toggleDisabled = thinkingDisabled || !onToggleThinking
@@ -45,18 +47,21 @@ export function Composer({
         className="border-0 px-2 py-1 focus-visible:ring-0"
       />
       <div className="flex items-center justify-between px-1 pt-1">
-        <button
-          type="button"
-          onClick={() => onToggleThinking?.(!thinking)}
-          disabled={toggleDisabled}
-          aria-pressed={thinking}
-          title={t('chat.thinkingModeHint')}
-          data-testid="thinking-toggle"
-          className={cn('flex items-center gap-1.5 px-2 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50', thinking ? 'text-accent' : 'text-ink-tertiary hover:text-ink-secondary')}
-        >
-          <Brain size={13} className="shrink-0" aria-hidden />
-          <span>{t('chat.thinkingMode')}</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onToggleThinking?.(!thinking)}
+            disabled={toggleDisabled}
+            aria-pressed={thinking}
+            title={t('chat.thinkingModeHint')}
+            data-testid="thinking-toggle"
+            className={cn('flex items-center gap-1.5 px-2 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50', thinking ? 'text-accent' : 'text-ink-tertiary hover:text-ink-secondary')}
+          >
+            <Brain size={13} className="shrink-0" aria-hidden />
+            <span>{t('chat.thinkingMode')}</span>
+          </button>
+          {leftSlot}
+        </div>
         {running && onStop ? (
           <div className="flex items-center gap-2">
             {reconnecting && <span className="text-[12px] text-ink-tertiary">{t('chat.reconnecting')}</span>}

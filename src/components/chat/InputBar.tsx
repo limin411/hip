@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Composer } from './Composer'
+import { StylePicker } from './StylePicker'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 
 export function InputBar() {
@@ -32,6 +33,7 @@ export function InputBar() {
           thinking={thinking}
           thinkingDisabled={status === 'running'}
           onToggleThinking={activeSessionId ? (next) => sessionService.setThinking(activeSessionId, next) : undefined}
+          leftSlot={<StylePicker />}
         />
       </div>
     </div>

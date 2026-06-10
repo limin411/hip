@@ -6,6 +6,7 @@ import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
+import { useDiffStore } from '@/store/diffStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -29,7 +30,8 @@ beforeEach(() => {
   useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
-  useUiStore.setState({ scrollTargetMessageId: null })
+  useDiffStore.setState({ bySession: {} })
+  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents' })
 })
 
 describe('SessionService', () => {
@@ -266,5 +268,61 @@ describe('SessionService', () => {
     new SessionService(t).selectSession('s2', 'm1')
     expect(t.sent.some((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's2')).toBe(true)
     expect(useUiStore.getState().scrollTargetMessageId).toBe('m1')
+  })
+})
+
+describe('workspace diff', () => {
+  it('requestDiff sets loading and sends fs:diff, deduping while in flight', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.requestDiff('s1')
+    svc.requestDiff('s1') // in flight → dropped
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(1)
+    expect(useDiffStore.getState().bySession['s1'].status).toBe('loading')
+  })
+
+  it('fs:diff:result folds into diffStore', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], totalFiles: 0 })
+    expect(useDiffStore.getState().bySession['s1']).toMatchObject({ status: 'ready', state: 'ok' })
+  })
+
+  it('gitInitWorkspace sends fs:gitInit; an ok result chains a fresh fs:diff', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.gitInitWorkspace('s1')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:gitInit', sessionId: 's1' })
+    expect(useDiffStore.getState().bySession['s1'].initPending).toBe(true)
+    t.push({ type: 'fs:gitInit:result', sessionId: 's1', ok: true })
+    expect(useDiffStore.getState().bySession['s1'].initPending).toBe(false)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:diff', sessionId: 's1' })
+  })
+
+  it('a failed fs:gitInit:result keeps not_a_repo with the error inline', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'fs:gitInit:result', sessionId: 's1', ok: false, error: 'boom' })
+    expect(useDiffStore.getState().bySession['s1']).toMatchObject({ state: 'not_a_repo', error: 'boom', initPending: false })
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
+  })
+
+  it('message:complete refreshes the diff only while the Diff tab is active', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    const message = { id: 'm1', role: 'assistant' as const, content: 'x', timestamp: 1 }
+    t.push({ type: 'message:complete', sessionId: 's1', message })
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
+    useUiStore.setState({ activeTab: 'diff' })
+    t.push({ type: 'message:complete', sessionId: 's1', message })
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(1)
+  })
+
+  it('setProjectDir clears the stale diff for that session', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [], totalFiles: 0 })
+    svc.setProjectDir('s1', '/tmp/other')
+    expect(useDiffStore.getState().bySession['s1'].status).toBe('idle')
   })
 })

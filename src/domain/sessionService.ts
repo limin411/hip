@@ -7,6 +7,7 @@ import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
+import { useDiffStore } from '@/store/diffStore'
 import i18n from '@/i18n'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
@@ -66,6 +67,12 @@ export class SessionService {
       useFsStore.getState().setPreview(msg.cwd, {
         status: 'ready', path: msg.path, content: msg.content, encoding: msg.encoding, mimeType: msg.mimeType, truncated: msg.truncated, error: msg.error,
       })
+    } else if (msg.type === 'fs:diff:result') {
+      useDiffStore.getState().setResult(msg.sessionId, { state: msg.state, files: msg.files, totalFiles: msg.totalFiles, error: msg.error })
+    } else if (msg.type === 'fs:gitInit:result') {
+      useDiffStore.getState().setInitPending(msg.sessionId, false)
+      if (msg.ok) this.requestDiff(msg.sessionId)
+      else useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', error: msg.error })
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.
       const fsState = useFsStore.getState().bySession[msg.sessionId]
@@ -73,6 +80,7 @@ export class SessionService {
         for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
         if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
       }
+      if (useUiStore.getState().activeTab === 'diff') this.requestDiff(msg.sessionId)
     }
   }
 
@@ -106,6 +114,7 @@ export class SessionService {
   setProjectDir(id: string, cwd: string): void {
     useDomainStore.getState().apply({ type: 'session:cwd', sessionId: id, cwd }) // optimistic
     useFsStore.getState().clearSession(id)
+    useDiffStore.getState().clearSession(id)
     this.transport.send({ type: 'session:setCwd', sessionId: id, cwd })
   }
 
@@ -117,6 +126,19 @@ export class SessionService {
   setSystemPrompt(id: string, systemPrompt: string | null): void {
     useDomainStore.getState().apply({ type: 'session:systemPrompt', sessionId: id, systemPrompt }) // optimistic
     this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
+  }
+
+  /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
+  requestDiff(sessionId: string): void {
+    if (useDiffStore.getState().bySession[sessionId]?.status === 'loading') return
+    useDiffStore.getState().setLoading(sessionId)
+    this.transport.send({ type: 'fs:diff', sessionId })
+  }
+
+  /** One-click `git init` for a non-repo cwd; a successful result chains a fresh diff. */
+  gitInitWorkspace(sessionId: string): void {
+    useDiffStore.getState().setInitPending(sessionId, true)
+    this.transport.send({ type: 'fs:gitInit', sessionId })
   }
 
   lsDir(sessionId: string, path: string): void {

@@ -35,7 +35,7 @@ describe('session-manager diff', () => {
     await mgr.handleAsync({ type: 'fs:gitInit', sessionId: 's1' }, send)
     expect(last(sent, 'fs:gitInit:result')).toMatchObject({ sessionId: 's1', ok: true })
     await mgr.handleAsync({ type: 'fs:diff', sessionId: 's1' }, send)
-    expect(last(sent, 'fs:diff:result')).toMatchObject({ state: 'ok', files: [], totalFiles: 0 })
+    expect(last(sent, 'fs:diff:result')).toMatchObject({ sessionId: 's1', state: 'ok', files: [], totalFiles: 0 })
   })
 
   it('fs:diff surfaces a modification made after init', async () => {

@@ -5,11 +5,13 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 // A disposable NON-repo folder — init must never touch the repo-tracked fixtures.
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-diff-'))
-fs.writeFileSync(path.join(dir, 'hello.txt'), 'hello\n')
+// Created in before() (not at module load) so an E2E_GREP-filtered run never leaks it.
+let dir: string
 
 describe('workspace git diff', () => {
   before(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-diff-'))
+    fs.writeFileSync(path.join(dir, 'hello.txt'), 'hello\n')
     await browser.pause(2500)
     const skip = await browser.$('button=跳过登录')
     if (await skip.isExisting()) {
@@ -21,7 +23,7 @@ describe('workspace git diff', () => {
     }, dir)
   })
 
-  after(() => { fs.rmSync(dir, { recursive: true, force: true }) })
+  after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }) })
 
   it('commits a session bound to the temp folder', async () => {
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 120000 })

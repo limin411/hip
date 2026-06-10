@@ -80,7 +80,7 @@ export const zhCN = {
         retry: '重试',
         changedFiles: '{{count}} 个文件有改动',
         moreFiles: '还有 {{count}} 个文件',
-        binary: '二进制文件已更改',
+        binary: '二进制文件已改动',
       },
       waiting: '等待中…',
       subAgents: '子智能体',

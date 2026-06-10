@@ -80,7 +80,7 @@ export const zhTW = {
         retry: '重試',
         changedFiles: '{{count}} 個檔案有變更',
         moreFiles: '還有 {{count}} 個檔案',
-        binary: '二進位檔案已更改',
+        binary: '二進位檔案已變更',
       },
       waiting: '等待中…',
       subAgents: '子智能體',

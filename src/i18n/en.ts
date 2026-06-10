@@ -69,7 +69,7 @@ export const en = {
         noSessionDesc: 'Open a conversation to see its workspace changes',
         notRepo: 'Not a git repository',
         notRepoDesc: 'Initialize git to start tracking changes in this folder',
-        initButton: 'Initialize git repository',
+        initButton: 'Initialize Git Repository',
         gitMissing: 'git not found',
         gitMissingDesc: 'Install git (e.g. Xcode Command Line Tools) and retry',
         noCwd: 'No project folder',

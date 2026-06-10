@@ -70,7 +70,7 @@ export function SettingsPanel() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={t('settings.apiKeyPlaceholder')}
-            className="flex-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/30"
+            className="flex-1 rounded-md border border-border bg-surface px-2.5 py-1.5 text-[13px] text-ink transition-shadow focus:outline-none focus:ring-2 focus:ring-accent/30"
           />
           <button
             onClick={onSave}

@@ -312,6 +312,35 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:finished', sessionId: 's1', agentId: 'planner-1', turnId: 't1' }, 2600)
     expect(next.sessions[0].messages.at(-1)!.agentRuns![0].finishedAt).toBe(2600)
   })
+
+  it('session:systemPrompt sets config.systemPrompt', () => {
+    const s0 = { sessions: [baseSession({ id: 's1' })] }
+    const next = applyServerMessage(s0, { type: 'session:systemPrompt', sessionId: 's1', systemPrompt: 'Be terse' }, 0)
+    expect(next.sessions[0].config.systemPrompt).toBe('Be terse')
+  })
+
+  it('session:systemPrompt null clears config.systemPrompt', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [], systemPrompt: 'old' } })] }
+    const next = applyServerMessage(s0, { type: 'session:systemPrompt', sessionId: 's1', systemPrompt: null }, 0)
+    expect(next.sessions[0].config.systemPrompt).toBeUndefined()
+  })
+
+  it('session:loaded adopts the server config when present', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', loaded: false })] }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1',
+      messages: [{ id: 'a1', role: 'assistant', content: 'x', timestamp: 1 }],
+      config: { llmProvider: 'deepseek', model: '', tools: [], thinking: false, systemPrompt: 'Z' },
+    }, 0)
+    expect(next.sessions[0].config).toMatchObject({ thinking: false, systemPrompt: 'Z' })
+  })
+
+  it('session:loaded keeps current config when the server omits it', () => {
+    const s0 = { sessions: [baseSession({ id: 's1', loaded: false, config: { llmProvider: 'deepseek', model: 'm', tools: [], thinking: true } })] }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1',
+      messages: [{ id: 'a1', role: 'assistant', content: 'x', timestamp: 1 }],
+    }, 0)
+    expect(next.sessions[0].config.thinking).toBe(true)
+  })
 })
 
 function reset() {

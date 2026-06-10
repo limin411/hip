@@ -218,6 +218,9 @@ export function applyServerMessage(
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 
+    case 'session:systemPrompt':
+      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, systemPrompt: msg.systemPrompt || undefined } }))
+
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
@@ -244,6 +247,7 @@ export function applyServerMessage(
         return {
           ...s,
           loaded: true,
+          config: msg.config ?? s.config,
           messages: msg.messages,
           status: interrupted ? 'error' : 'idle',
           error: interrupted ? { code: 'INTERRUPTED', message: '' } : null,

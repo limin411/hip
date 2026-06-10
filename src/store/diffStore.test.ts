@@ -19,11 +19,14 @@ describe('diffStore', () => {
   it('setResult defaults files to [] and totalFiles to files length', () => {
     useDiffStore.getState().setResult('s1', { state: 'not_a_repo' })
     expect(useDiffStore.getState().bySession['s1']).toMatchObject({ status: 'ready', files: [], totalFiles: 0 })
+    const file = { path: 'a.ts', additions: 1, deletions: 0, lines: [] }
+    useDiffStore.getState().setResult('s2', { state: 'ok', files: [file, file] })
+    expect(useDiffStore.getState().bySession['s2'].totalFiles).toBe(2)
   })
 
   it('setInitPending toggles the flag', () => {
     useDiffStore.getState().setInitPending('s1', true)
-    expect(useDiffStore.getState().bySession['s1'].initPending).toBe(true)
+    expect(useDiffStore.getState().bySession['s1']).toMatchObject({ status: 'idle', files: [], totalFiles: 0, initPending: true })
   })
 
   it('clearSession resets to EMPTY_DIFF', () => {

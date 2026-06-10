@@ -104,4 +104,37 @@ describe('parseUnifiedDiff', () => {
   it('returns [] for empty input', () => {
     expect(parseUnifiedDiff('')).toEqual([])
   })
+
+  it('resets line numbers per hunk within one file', () => {
+    const TWO_HUNKS = `diff --git a/m.ts b/m.ts
+index 1234567..89abcde 100644
+--- a/m.ts
++++ b/m.ts
+@@ -1,2 +1,2 @@
+ top
+-one
++ONE
+@@ -10,2 +10,2 @@
+ middle
+-ten
++TEN
+`
+    const [f] = parseUnifiedDiff(TWO_HUNKS)
+    expect(f.additions).toBe(2)
+    expect(f.deletions).toBe(2)
+    expect(f.lines.slice(3)).toEqual([
+      { type: 'ctx', content: 'middle', oldNo: 10, newNo: 10 },
+      { type: 'del', content: 'ten', oldNo: 11, newNo: null },
+      { type: 'add', content: 'TEN', oldNo: null, newNo: 11 },
+    ])
+  })
+
+  it('emits a mode-change-only file with zero lines (path from the diff --git header)', () => {
+    const MODE_ONLY = `diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755
+`
+    const [f] = parseUnifiedDiff(MODE_ONLY)
+    expect(f).toMatchObject({ path: 'run.sh', additions: 0, deletions: 0, lines: [] })
+  })
 })

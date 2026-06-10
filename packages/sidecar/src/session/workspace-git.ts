@@ -9,7 +9,7 @@ const HUNK_RE = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
  * prints them (repo-root-relative); the caller converts to cwd-relative. Line counts
  * (`additions`/`deletions`) are pre-truncation; `lines` is capped at MAX_DIFF_LINES_PER_FILE.
  */
-const GIT_HEADER_RE = /^a\/.+ b\/(.+)$/
+const GIT_HEADER_RE = /^a\/(.+) b\/\1$/
 
 export function parseUnifiedDiff(text: string): DiffFile[] {
   const files: DiffFile[] = []
@@ -36,6 +36,8 @@ export function parseUnifiedDiff(text: string): DiffFile[] {
         }
         if (line.startsWith('+++ ')) {
           const p = line.slice(4).trim()
+          // Caller passes --no-renames, so a/ and b/ paths are always the same;
+          // unconditionally overwriting filePath with the b/ side is safe.
           if (p !== '/dev/null') filePath = p.replace(/^b\//, '')
           continue
         }

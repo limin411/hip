@@ -15,7 +15,7 @@ export function SettingsPanel() {
     <TabsPrimitive.Root
       orientation="vertical"
       defaultValue="general"
-      className="flex max-h-[70vh] min-h-[400px]"
+      className="flex h-full"
     >
       <TabsPrimitive.List
         aria-label={t('settings.title')}

@@ -96,6 +96,7 @@ export const zhCN = {
       selectFolderDesc: '选择一个文件夹，供智能体读写，并在此浏览',
       changeFolder: '更换文件夹',
       refresh: '刷新',
+      backToChat: '纯对话',
       selectFileToPreview: '选择文件以预览',
       cannotPreview: '无法预览此文件',
       fileTooLarge: '文件过大，无法预览',

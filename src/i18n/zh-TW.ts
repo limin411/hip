@@ -96,6 +96,7 @@ export const zhTW = {
       selectFolderDesc: '選擇一個資料夾，供智能體讀寫，並在此瀏覽',
       changeFolder: '更換資料夾',
       refresh: '重新整理',
+      backToChat: '純對話',
       selectFileToPreview: '選擇檔案以預覽',
       cannotPreview: '無法預覽此檔案',
       fileTooLarge: '檔案過大，無法預覽',

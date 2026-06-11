@@ -96,6 +96,7 @@ export const en = {
       selectFolderDesc: 'Pick a folder for the agent to read and write, and browse it here',
       changeFolder: 'Change Folder',
       refresh: 'Refresh',
+      backToChat: 'Pure chat',
       selectFileToPreview: 'Select a file to preview',
       cannotPreview: 'Cannot preview this file',
       fileTooLarge: 'File is too large to preview',

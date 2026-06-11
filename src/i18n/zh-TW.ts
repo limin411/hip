@@ -106,6 +106,7 @@ export const zhTW = {
     },
     settings: {
       title: '設置',
+      general: '通用設置',
       language: '界面語言',
       languageDesc: '應用界面的顯示語言',
       languages: {

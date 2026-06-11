@@ -1,18 +1,13 @@
 import { cn } from '@/lib/utils'
 
-interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  color?: string
-}
-
-export function Badge({ className, color, style, ...props }: BadgeProps) {
+/** Small inline metadata pill — tool counts, status tags ("stopped"), and the like. */
+export function Badge({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium',
-        'bg-surface-muted text-ink-secondary',
+        'inline-flex items-center gap-1 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary',
         className,
       )}
-      style={color ? { color, ...style } : style}
       {...props}
     />
   )

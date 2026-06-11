@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
 import type { TurnAgent } from '@/lib/turnAgents'
+import { Badge } from '@/components/ui/Badge'
 import { ToolTrace } from './ToolTrace'
 
 function StatusDot({ status, color }: { status: TurnAgent['status']; color: string }) {
@@ -24,7 +25,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
           <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
           <span className="truncate text-body font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
-          {agent.tools.length > 0 && <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">{t('artifact.toolsCount', { count: agent.tools.length })}</span>}
+          {agent.tools.length > 0 && <Badge className="shrink-0">{t('artifact.toolsCount', { count: agent.tools.length })}</Badge>}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <StatusDot status={agent.status} color={color} />

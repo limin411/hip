@@ -35,7 +35,7 @@ export function Sidebar() {
         <NewChatButton />
         <SearchBox />
       </div>
-      <div className="flex-1 overflow-y-auto px-1">
+      <div className="flex-1 overflow-y-auto px-2">
         <SessionList />
       </div>
       <div className="border-t border-border p-2">

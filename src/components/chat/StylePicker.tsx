@@ -14,6 +14,7 @@ import {
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
+import { ComposerChip } from './ComposerChip'
 import { cn } from '@/lib/utils'
 
 export function StylePicker() {
@@ -39,19 +40,15 @@ export function StylePicker() {
           order and leave the body stuck unclickable. Same mitigation as UserMenu. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
+          <ComposerChip
             disabled={disabled}
+            active={label.kind !== 'none'}
             title={t('chat.styleHint')}
             data-testid="style-chip"
-            className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-meta transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              label.kind === 'none' ? 'text-ink-tertiary hover:text-ink-secondary' : 'text-accent-strong',
-            )}
           >
             <SlidersHorizontal size={13} className="shrink-0" aria-hidden />
             <span className="max-w-[120px] truncate">{text}</span>
-          </button>
+          </ComposerChip>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onSelect={() => current && apply(null)}>

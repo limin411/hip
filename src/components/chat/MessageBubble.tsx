@@ -9,6 +9,7 @@ import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { CodeBlock } from './CodeBlock'
 import { TurnTimeline } from './TurnTimeline'
+import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -43,9 +44,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
             </span>
           )}
           {message.stopped && (
-            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-caption font-normal text-ink-tertiary" data-testid="stopped-badge">
-              {t('chat.stopped')}
-            </span>
+            <Badge data-testid="stopped-badge">{t('chat.stopped')}</Badge>
           )}
         </div>
         <div

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { ArrowUp, Brain, Square } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
-import { cn } from '@/lib/utils'
+import { ComposerChip } from './ComposerChip'
 
 export function Composer({
   value,
@@ -48,18 +48,17 @@ export function Composer({
       />
       <div className="flex items-center justify-between px-1 pt-1">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
+          <ComposerChip
             onClick={() => onToggleThinking?.(!thinking)}
             disabled={toggleDisabled}
+            active={thinking}
             aria-pressed={thinking}
             title={t('chat.thinkingModeHint')}
             data-testid="thinking-toggle"
-            className={cn('flex items-center gap-1.5 px-2 py-1 text-meta transition-colors disabled:cursor-not-allowed disabled:opacity-50', thinking ? 'text-accent-strong' : 'text-ink-tertiary hover:text-ink-secondary')}
           >
             <Brain size={13} className="shrink-0" aria-hidden />
             <span>{t('chat.thinkingMode')}</span>
-          </button>
+          </ComposerChip>
           {leftSlot}
         </div>
         {running && onStop ? (

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Session } from './session.js'
 
-const apiKey = process.env.DEEPSEEK_API_KEY
+const apiKey = process.env.HIP_MODEL_DEEPSEEK_API_KEY
 type Ev = { type: string; [k: string]: unknown }
 
 // P0 guard: the default (reasoner) path must delegate, call write_file, write a real file,

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { ChatOpenAI } from '@langchain/openai'
 import { Session } from './session.js'
 
-const apiKey = process.env.DEEPSEEK_API_KEY
+const apiKey = process.env.HIP_MODEL_DEEPSEEK_API_KEY
 const hasKey = !!apiKey
 
 function createModel() {

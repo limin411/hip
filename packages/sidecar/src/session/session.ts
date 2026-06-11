@@ -53,7 +53,7 @@ function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   return async ({ firstUserMessage, firstReply }) => {
     const model = new ChatOpenAI({
       model: TITLE_MODEL,
-      apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
+      apiKey: process.env.HIP_MODEL_DEEPSEEK_API_KEY || 'sk-missing',
       configuration: { baseURL: 'https://api.deepseek.com/v1' },
       maxTokens: 24,
       temperature: 0.3,
@@ -137,7 +137,7 @@ class ReasoningChatOpenAI extends ChatOpenAI {
 function buildModel(config: SessionConfig): ChatOpenAI {
   return new ReasoningChatOpenAI({
     model: resolveModel(config),
-    apiKey: process.env.DEEPSEEK_API_KEY || 'sk-missing',
+    apiKey: process.env.HIP_MODEL_DEEPSEEK_API_KEY || 'sk-missing',
     configuration: {
       baseURL: 'https://api.deepseek.com/v1',
     },
@@ -267,7 +267,7 @@ export class Session {
 
   /** Emit NO_API_KEY and return false when the env-keyed model has no key. */
   private requireApiKey(send: SendFn): boolean {
-    if (this.usesEnvModel && !process.env.DEEPSEEK_API_KEY?.trim()) {
+    if (this.usesEnvModel && !process.env.HIP_MODEL_DEEPSEEK_API_KEY?.trim()) {
       send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
       return false
     }

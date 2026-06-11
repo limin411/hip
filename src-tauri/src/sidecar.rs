@@ -20,11 +20,11 @@ pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     let mut cmd = app.shell().sidecar("sidecar").map_err(|e| e.to_string())?;
     // Inject the keychain key, or an empty value to OVERRIDE any inherited
-    // DEEPSEEK_API_KEY (the child inherits the parent env). Empty → the sidecar's
+    // HIP_MODEL_DEEPSEEK_API_KEY (the child inherits the parent env). Empty → the sidecar's
     // NO_API_KEY guard fires, so a cleared key truly disables the agent.
     cmd = match read_api_key() {
-        Some(key) => cmd.env("DEEPSEEK_API_KEY", key),
-        None => cmd.env("DEEPSEEK_API_KEY", ""),
+        Some(key) => cmd.env("HIP_MODEL_DEEPSEEK_API_KEY", key),
+        None => cmd.env("HIP_MODEL_DEEPSEEK_API_KEY", ""),
     };
     // Tell the sidecar where to persist sessions (the app data dir). Create the dir
     // so the first launch on a fresh machine succeeds; if it's unavailable the
@@ -105,9 +105,9 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
 /// The sidecar's API key comes ONLY from the OS keychain — the single source of
 /// truth the user controls via Settings. We deliberately do NOT fall back to the
 /// process env: the spawned sidecar inherits the parent env, so an inherited (or
-/// dev `.env`) DEEPSEEK_API_KEY would otherwise mask an explicit "clear" in the UI.
+/// dev `.env`) HIP_MODEL_DEEPSEEK_API_KEY would otherwise mask an explicit "clear" in the UI.
 pub fn read_api_key() -> Option<String> {
-    crate::get_secret_value("DEEPSEEK_API_KEY")
+    crate::get_secret_value("HIP_MODEL_DEEPSEEK_API_KEY")
 }
 
 /// The sidecar's SQLite file lives in the app data dir as `hip.db`.

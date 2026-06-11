@@ -47,7 +47,7 @@ export class WsServer {
     }
     // Tell the client whether this sidecar has a usable API key, so the UI can
     // surface "no key configured" without waiting for a failed send.
-    send({ type: 'ready', hasApiKey: !!process.env.DEEPSEEK_API_KEY?.trim() })
+    send({ type: 'ready', hasApiKey: !!process.env.HIP_MODEL_DEEPSEEK_API_KEY?.trim() })
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString()) as ClientMessage

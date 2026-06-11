@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
     environment: 'node',
     include: ['src/**/*.test.ts', 'packages/sidecar/src/**/*.test.ts'],
     // Load .env (and .env.local etc.) into process.env so the real-LLM test
-    // suites can read DEEPSEEK_API_KEY; without it they skipIf-skip. The ''
+    // suites can read HIP_MODEL_DEEPSEEK_API_KEY; without it they skipIf-skip. The ''
     // prefix loads unprefixed vars too. See .env.example.
     env: loadEnv(mode, __dirname, ''),
   },

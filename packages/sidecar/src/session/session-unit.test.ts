@@ -130,8 +130,8 @@ describe('Session message:complete agentRuns', () => {
 
 describe('Session NO_API_KEY guard', () => {
   let saved: string | undefined
-  beforeEach(() => { saved = process.env.DEEPSEEK_API_KEY; delete process.env.DEEPSEEK_API_KEY })
-  afterEach(() => { if (saved !== undefined) process.env.DEEPSEEK_API_KEY = saved })
+  beforeEach(() => { saved = process.env.HIP_MODEL_DEEPSEEK_API_KEY; delete process.env.HIP_MODEL_DEEPSEEK_API_KEY })
+  afterEach(() => { if (saved !== undefined) process.env.HIP_MODEL_DEEPSEEK_API_KEY = saved })
 
   it('emits NO_API_KEY and no agent:started when key is absent and no model is injected', async () => {
     const session = new Session('t-nokey', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] })

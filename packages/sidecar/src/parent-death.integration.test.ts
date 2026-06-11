@@ -13,7 +13,7 @@ function spawnSidecar(extraEnv: Record<string, string>): ChildProcess {
   return spawn('node', ['--import', 'tsx', ENTRY], {
     cwd: process.cwd(),
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, HIP_DB_PATH: ':memory:', DEEPSEEK_API_KEY: '', ...extraEnv },
+    env: { ...process.env, HIP_DB_PATH: ':memory:', HIP_MODEL_DEEPSEEK_API_KEY: '', ...extraEnv },
   })
 }
 

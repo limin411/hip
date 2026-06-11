@@ -1,7 +1,7 @@
 // src/ipc/secrets.ts
 import { invoke } from '@tauri-apps/api/core'
 
-const DEEPSEEK_KEY = 'DEEPSEEK_API_KEY'
+const DEEPSEEK_KEY = 'HIP_MODEL_DEEPSEEK_API_KEY'
 
 export function isApiKeyConfigured(): Promise<boolean> {
   return invoke<boolean>('has_secret', { key: DEEPSEEK_KEY })

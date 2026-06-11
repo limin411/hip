@@ -72,7 +72,7 @@ kill_tree() {
   for p in $pids; do kill -0 "$p" 2>/dev/null && kill -KILL "$p" 2>/dev/null || true; done
 }
 
-# 加载 .env 到环境（供 sidecar / tauri 读取 DEEPSEEK_API_KEY）
+# 加载 .env 到环境（供 sidecar / tauri 读取 HIP_MODEL_DEEPSEEK_API_KEY）
 load_env() {
   [ -f "$ENV_FILE" ] || return 0
   set -a
@@ -82,8 +82,8 @@ load_env() {
 }
 
 warn_missing_key() {
-  [ -n "${DEEPSEEK_API_KEY:-}" ] || \
-    echo "[dev] ⚠ 未找到 DEEPSEEK_API_KEY（请在 .env 设置），仍会启动但真实 LLM 请求会失败。"
+  [ -n "${HIP_MODEL_DEEPSEEK_API_KEY:-}" ] || \
+    echo "[dev] ⚠ 未找到 HIP_MODEL_DEEPSEEK_API_KEY（请在 .env 设置），仍会启动但真实 LLM 请求会失败。"
 }
 
 start_app() {

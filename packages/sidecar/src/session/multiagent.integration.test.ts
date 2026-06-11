@@ -4,7 +4,7 @@ import { Session } from './session.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 
-const apiKey = process.env.DEEPSEEK_API_KEY
+const apiKey = process.env.HIP_MODEL_DEEPSEEK_API_KEY
 
 function createModel() {
   return new ChatOpenAI({

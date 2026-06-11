@@ -259,7 +259,7 @@ scripts/dev.sh start        # 后台启动；scripts/dev.sh logs app 跟踪日�
 `.env` 仅供**测试套件**与**独立 sidecar 调试**使用（桌面应用不再读取它）：
 
 ```bash
-cp .env.example .env           # 编辑 .env，填入 DEEPSEEK_API_KEY=sk-...
+cp .env.example .env           # 编辑 .env，填入 HIP_MODEL_DEEPSEEK_API_KEY=sk-...
 scripts/dev.sh start sidecar   # 仅启 DeepSeek 后端（读 .env）
 yarn test                      # 真实 LLM 测试会从 .env 读取 key，否则自动跳过
 ```

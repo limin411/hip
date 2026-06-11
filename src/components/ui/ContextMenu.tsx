@@ -13,8 +13,8 @@ export const ContextMenuContent = forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[160px] rounded-lg border border-border bg-surface p-1',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out',
+        'z-50 min-w-[160px] rounded-lg border border-border bg-white p-1 shadow-menu',
+        'origin-[var(--radix-context-menu-content-transform-origin)] data-[state=open]:animate-menu-in',
         className,
       )}
       {...props}
@@ -30,7 +30,7 @@ export const ContextMenuItem = forwardRef<
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] text-ink outline-none transition-colors',
+      'flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-ink outline-none transition-colors',
       'focus:bg-surface-muted data-[disabled]:opacity-50',
       className,
     )}

@@ -21,6 +21,16 @@ export function ChatPane() {
   const [atBottom, setAtBottom] = useState(true)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
+  // Only animate genuinely NEW messages (appended after the session loaded) — not the whole
+  // transcript on every session switch. Capture a per-session baseline count at switch time;
+  // messages at index >= baseline are the ones that arrived live and get the enter animation.
+  const animSessionRef = useRef<string | null>(null)
+  const animBaselineRef = useRef(0)
+  if (animSessionRef.current !== (activeSessionId ?? null)) {
+    animSessionRef.current = activeSessionId ?? null
+    animBaselineRef.current = messages.length
+  }
+
   const last = messages[messages.length - 1]
   const lastActivity =
     last?.role === 'assistant'
@@ -80,14 +90,16 @@ export function ChatPane() {
         <div className="mx-auto flex max-w-3xl flex-col gap-10 px-5 py-6">
           {messages.map((m, i) => {
             const isLastMessage = i === messages.length - 1
+            const isNew = i >= animBaselineRef.current
             return (
               <div
-                key={`${activeSessionId ?? 'none'}-${m.id}-${i}`}
+                key={`${activeSessionId ?? 'none'}-${m.id}`}
                 data-message-id={m.id}
                 // Transition lives on the always-present base classes so the highlight fades on the
                 // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
-                  'animate-message-enter transition-[background-color,box-shadow] duration-700',
+                  'transition-[background-color,box-shadow] duration-700',
+                  isNew && 'animate-message-enter',
                   highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
                 )}
               >
@@ -102,9 +114,9 @@ export function ChatPane() {
           {showThinking && <ThinkingBubble />}
           {error && (
             <div
-              className={`border px-4 py-3 text-[13px] ${
+              className={`rounded-lg border px-4 py-3 text-body ${
                 error.code === 'NO_API_KEY'
-                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-700'
+                  ? 'border-warning/30 bg-warning/10 text-warning'
                   : 'border-danger/30 bg-danger/10 text-danger'
               }`}
               data-testid="chat-error"
@@ -121,7 +133,7 @@ export function ChatPane() {
               {error.code === 'NO_API_KEY' ? (
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="mt-2 bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="mt-2 rounded-md bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover"
                 >
                   {t('chat.openSettings')}
                 </button>
@@ -129,7 +141,7 @@ export function ChatPane() {
                 <button
                   onClick={() => sessionService.regenerate()}
                   data-testid="chat-error-retry"
-                  className="mt-2 bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="mt-2 rounded-md bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover"
                 >
                   {t('chat.retry')}
                 </button>
@@ -144,7 +156,7 @@ export function ChatPane() {
           onClick={() => { setAtBottom(true); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
-          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-[12px] text-ink-secondary transition-colors hover:bg-surface-muted"
+          className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"
         >
           <ChevronDown size={14} />
           {t('chat.jumpToLatest')}

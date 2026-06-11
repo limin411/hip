@@ -31,7 +31,7 @@ export function Composer({
   const { t } = useTranslation()
   const toggleDisabled = thinkingDisabled || !onToggleThinking
   return (
-    <div className="rounded-xl border border-border bg-surface p-2 focus-within:ring-2 focus-within:ring-accent/30">
+    <div className="rounded-xl border border-border bg-surface p-2 focus-within:ring-2 focus-within:ring-accent/60">
       <Textarea
         value={value}
         autoFocus={autoFocus}
@@ -55,7 +55,7 @@ export function Composer({
             aria-pressed={thinking}
             title={t('chat.thinkingModeHint')}
             data-testid="thinking-toggle"
-            className={cn('flex items-center gap-1.5 px-2 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50', thinking ? 'text-accent' : 'text-ink-tertiary hover:text-ink-secondary')}
+            className={cn('flex items-center gap-1.5 px-2 py-1 text-meta transition-colors disabled:cursor-not-allowed disabled:opacity-50', thinking ? 'text-accent-strong' : 'text-ink-tertiary hover:text-ink-secondary')}
           >
             <Brain size={13} className="shrink-0" aria-hidden />
             <span>{t('chat.thinkingMode')}</span>
@@ -64,7 +64,7 @@ export function Composer({
         </div>
         {running && onStop ? (
           <div className="flex items-center gap-2">
-            {reconnecting && <span className="text-[12px] text-ink-tertiary">{t('chat.reconnecting')}</span>}
+            {reconnecting && <span className="text-meta text-ink-tertiary">{t('chat.reconnecting')}</span>}
             <button
               type="button"
               onClick={onStop}

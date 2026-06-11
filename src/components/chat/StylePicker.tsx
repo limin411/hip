@@ -45,8 +45,8 @@ export function StylePicker() {
             title={t('chat.styleHint')}
             data-testid="style-chip"
             className={cn(
-              'flex items-center gap-1.5 px-2 py-1 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              label.kind === 'none' ? 'text-ink-tertiary hover:text-ink-secondary' : 'text-accent',
+              'flex items-center gap-1.5 px-2 py-1 text-meta transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              label.kind === 'none' ? 'text-ink-tertiary hover:text-ink-secondary' : 'text-accent-strong',
             )}
           >
             <SlidersHorizontal size={13} className="shrink-0" aria-hidden />
@@ -97,7 +97,7 @@ function StyleManager({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={t('chat.styleDialogTitle')}>
       <div className="flex flex-col gap-4 p-5">
-        {presets.length === 0 && <p className="text-[13px] text-ink-tertiary">{t('chat.styleEmpty')}</p>}
+        {presets.length === 0 && <p className="text-body text-ink-tertiary">{t('chat.styleEmpty')}</p>}
         {presets.map((p) => (
           <div key={p.id} className="flex flex-col gap-1.5 border border-border p-3">
             <div className="flex items-center justify-between gap-2">
@@ -121,7 +121,7 @@ function StyleManager({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
             type="button"
             onClick={create}
             disabled={!name.trim() || !text.trim()}
-            className="flex items-center gap-1.5 self-end bg-accent px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
+            className="flex items-center gap-1.5 self-end bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
           >
             <Plus size={14} />
             {t('chat.styleNew')}

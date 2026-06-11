@@ -6,7 +6,7 @@ import { ToolCallRow } from './ToolCallRow'
 export function ToolTrace({ tools }: { tools: ToolCall[] }) {
   const { t } = useTranslation()
   if (tools.length === 0) {
-    return <div className="text-[11px] text-ink-tertiary">{t('artifact.noTools')}</div>
+    return <div className="text-caption text-ink-tertiary">{t('artifact.noTools')}</div>
   }
   const ordered = [...tools].sort((a, b) => a.seq - b.seq)
   return (

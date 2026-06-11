@@ -30,29 +30,29 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
       {isUser ? (
         <Avatar name={t('chat.user')} size={28} />
       ) : (
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-caption font-semibold text-white">
           AI
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-2 text-[12px] font-medium text-ink-secondary">
+        <div className="mb-1 flex items-center gap-2 text-meta font-medium text-ink-secondary">
           <span>{isUser ? t('chat.you') : 'hip'}</span>
           {message.timestamp > 0 && (
-            <span className="text-[11px] font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
+            <span className="text-caption font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
               {formatClockTime(message.timestamp, locale)}
             </span>
           )}
           {message.stopped && (
-            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] font-normal text-ink-tertiary" data-testid="stopped-badge">
+            <span className="rounded bg-surface-muted px-1.5 py-0.5 text-caption font-normal text-ink-tertiary" data-testid="stopped-badge">
               {t('chat.stopped')}
             </span>
           )}
         </div>
         <div
           className={cn(
-            'max-w-none text-[14px] leading-relaxed text-ink',
-            '[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-[12.5px]',
-            '[&_code]:font-mono [&_code]:text-[12.5px]',
+            'max-w-none text-prose leading-relaxed text-ink',
+            '[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-meta',
+            '[&_code]:font-mono [&_code]:text-meta',
             '[&_table]:my-2 [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
             '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5',
           )}

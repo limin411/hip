@@ -23,19 +23,19 @@ export function ChatHeader() {
       data-tauri-drag-region
       className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface pl-14 pr-3"
     >
-      <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-[13px] font-medium text-ink">
+      <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-body font-medium text-ink">
         {active?.title ?? t('chat.title')}
       </span>
       <div className="flex items-center gap-2" data-tauri-drag-region="false">
         {status === 'connected' && !hasApiKey ? (
           <>
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
-            <span className="text-[11px] text-amber-600">{t('chat.noApiKey')}</span>
+            <span className="h-2 w-2 rounded-full bg-warning" />
+            <span className="text-caption text-warning">{t('chat.noApiKey')}</span>
           </>
         ) : (
           <>
             <span className={`h-2 w-2 rounded-full transition-colors ${DOT[status] ?? DOT.disconnected}`} />
-            <span className="text-[11px] text-ink-tertiary">
+            <span className="text-caption text-ink-tertiary">
               {{
                 connecting: t('chat.connectionConnecting'),
                 connected: t('chat.connectionConnected'),
@@ -46,7 +46,7 @@ export function ChatHeader() {
             {(status === 'error' || status === 'disconnected') && (
               <button
                 onClick={() => sessionService.reconnect()}
-                className="text-[11px] text-accent hover:underline transition-colors"
+                className="text-caption text-accent-strong transition-colors hover:text-accent-hover hover:underline"
               >
                 {t('chat.connectionRetry')}
               </button>

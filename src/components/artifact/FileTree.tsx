@@ -40,8 +40,8 @@ function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: str
         data-path={entry.path}
         onClick={onClick}
         className={cn(
-          'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-[13px] transition-colors',
-          active ? 'bg-accent-subtle text-accent' : 'text-ink hover:bg-surface-muted',
+          'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors',
+          active ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink hover:bg-surface-muted',
         )}
         style={{ paddingLeft: depth * 14 + 6 }}
       >
@@ -49,7 +49,7 @@ function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: str
           ? open ? <ChevronDown size={14} className="text-ink-tertiary" /> : <ChevronRight size={14} className="text-ink-tertiary" />
           : <span className="w-3.5" />}
         {entry.isDir
-          ? open ? <FolderOpen size={15} className="text-accent" /> : <Folder size={15} className="text-accent" />
+          ? open ? <FolderOpen size={15} className="text-accent-strong" /> : <Folder size={15} className="text-accent-strong" />
           : <File size={15} className="text-ink-tertiary" />}
         <span className="truncate">{entry.name}</span>
       </div>
@@ -83,18 +83,18 @@ export function FileTree() {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
           <Folder size={32} className="opacity-40" />
-          <div className="max-w-[220px] text-[13px]">{t('artifact.sandboxPending')}</div>
+          <div className="max-w-[220px] text-body">{t('artifact.sandboxPending')}</div>
         </div>
       )
     }
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
         <Folder size={32} className="opacity-40" />
-        <div className="max-w-[200px] text-[13px]">{t('artifact.selectFolderDesc')}</div>
+        <div className="max-w-[200px] text-body">{t('artifact.selectFolderDesc')}</div>
         <button
           data-testid="select-folder"
           onClick={choose}
-          className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-accent-hover"
+          className="rounded-md bg-accent px-3 py-1.5 text-body font-medium text-white transition-colors hover:bg-accent-hover"
         >
           {t('artifact.selectFolder')}
         </button>
@@ -105,7 +105,7 @@ export function FileTree() {
   return (
     <div className="flex h-full flex-col" data-testid="file-tree">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-2">
-        <span className="flex items-center gap-1.5 truncate text-[12px] font-medium text-ink-secondary" title={cwd}>
+        <span className="flex items-center gap-1.5 truncate text-meta font-medium text-ink-secondary" title={cwd}>
           <FolderGit2 size={13} className="shrink-0 text-ink-tertiary" />
           {basename(cwd)}
         </span>

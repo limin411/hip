@@ -55,7 +55,7 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
           onClick={editing ? undefined : onSelect}
           className={cn(
             'group flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors',
-            active ? 'bg-accent-subtle' : 'hover:bg-surface-muted',
+            active ? 'bg-accent-active' : 'hover:bg-surface-muted',
           )}
         >
           <div className="flex items-center gap-2">
@@ -70,21 +70,21 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
                   else if (e.key === 'Escape') { e.preventDefault(); cancel() }
                 }}
                 onBlur={commit}
-                className="min-w-0 flex-1 rounded border border-accent/40 bg-surface px-1 py-0 text-[13px] text-ink outline-none transition-shadow"
+                className="min-w-0 flex-1 rounded border border-accent/40 bg-surface px-1 py-0 text-body text-ink outline-none transition-shadow"
               />
             ) : (
               <>
-                <span className={cn('min-w-0 flex-1 truncate text-[13px] text-ink', active ? 'font-semibold' : 'font-medium')}>
+                <span className={cn('min-w-0 flex-1 truncate text-body', active ? 'font-semibold text-accent-strong' : 'font-medium text-ink')}>
                   {session.title}
                 </span>
                 {/* Relative time is formatted at render from updatedAtMs (localized; recomputed on each
                     re-render, e.g. on activity/search/language change). No per-minute ticker by design. */}
-                <span className="shrink-0 text-[11px] text-ink-tertiary" title={formatAbsolute(session.updatedAtMs, locale)}>
+                <span className="shrink-0 text-caption text-ink-tertiary" title={formatAbsolute(session.updatedAtMs, locale)}>
                   {formatRelativeTime(session.updatedAtMs, locale)}
                 </span>
                 <button
                   onClick={(e) => { e.stopPropagation(); onDelete() }}
-                  className="hidden shrink-0 text-ink-tertiary hover:text-danger group-hover:block transition-colors"
+                  className="shrink-0 text-ink-tertiary opacity-0 transition-[color,opacity] hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
                   title={t('sidebar.deleteSession')}
                 >
                   <X size={14} />
@@ -93,10 +93,10 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
             )}
           </div>
           {snippet && !editing && (
-            <span className="block truncate text-[12px] text-ink-tertiary">
+            <span className="block truncate text-meta text-ink-tertiary">
               {splitSnippet(snippet).map((seg, i) =>
                 seg.mark ? (
-                  <mark key={i} className="rounded bg-accent-subtle px-0.5 text-ink">
+                  <mark key={i} className="rounded bg-accent-strong px-0.5 text-white">
                     {seg.text}
                   </mark>
                 ) : (

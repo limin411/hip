@@ -1,7 +1,7 @@
 /** 指针离开后，浮层缩回前的宽限时长（ms）—— 防手抖闪烁。 */
 export const PEEK_CLOSE_DELAY_MS = 250
-/** 浮层滑入 / 滑出动画时长（ms）。 */
-export const PEEK_ANIM_MS = 180
+/** 浮层滑入 / 滑出动画时长（ms）。面板级缓动统一 200ms ease-out。 */
+export const PEEK_ANIM_MS = 200
 
 export interface PeekState {
   /** 浮层可见（已滑入）。宽限期内仍为 true。 */

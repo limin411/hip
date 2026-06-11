@@ -25,7 +25,7 @@ export function SessionList() {
     : []
 
   if (local.length === 0 && contentHits.length === 0) {
-    return <div className="px-2.5 py-4 text-[12px] text-ink-tertiary">{t('sidebar.noMatches')}</div>
+    return <div className="px-2.5 py-4 text-meta text-ink-tertiary">{t('sidebar.noMatches')}</div>
   }
 
   return (

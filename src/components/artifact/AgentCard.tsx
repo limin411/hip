@@ -23,12 +23,12 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
         <div className="flex min-w-0 items-center gap-2">
           <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
-          <span className="truncate text-[13px] font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
-          {agent.tools.length > 0 && <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-ink-tertiary">{t('artifact.toolsCount', { count: agent.tools.length })}</span>}
+          <span className="truncate text-body font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
+          {agent.tools.length > 0 && <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">{t('artifact.toolsCount', { count: agent.tools.length })}</span>}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <StatusDot status={agent.status} color={color} />
-          <span className="text-[11px] capitalize text-ink-tertiary">
+          <span className="text-caption capitalize text-ink-tertiary">
             {agent.status === 'done' && agent.elapsedMs > 0
               ? t('chat.thoughtFor', { seconds: Math.round(agent.elapsedMs / 1000) })
               : agent.status}
@@ -38,17 +38,17 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
       {open && (
         <div className="flex flex-col gap-2 border-t border-border p-3 pt-2.5">
           {agent.taskInput && (
-            <div className="rounded-md bg-surface-muted px-2.5 py-1.5 text-[12px] leading-snug text-ink-secondary">
+            <div className="rounded-md bg-surface-muted px-2.5 py-1.5 text-meta leading-snug text-ink-secondary">
               <span className="text-ink-tertiary">{t('artifact.delegatedBy')} {t(ROLE_NAME_KEY.supervisor)} · </span>
               {agent.taskInput}
             </div>
           )}
-          {agent.reasoning && <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-[12px] leading-snug text-ink-secondary">{agent.reasoning}</pre>}
+          {agent.reasoning && <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-meta leading-snug text-ink-secondary">{agent.reasoning}</pre>}
           {agent.tools.length > 0 && <ToolTrace tools={agent.tools} />}
           {agent.role !== 'supervisor' && agent.output && (
             <div>
-              <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.output')}</div>
-              <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-[12px] leading-snug text-ink-secondary">{agent.output}</pre>
+              <div className="mb-1 text-caption font-medium uppercase tracking-wide text-ink-tertiary">{t('artifact.output')}</div>
+              <pre className="whitespace-pre-wrap break-words rounded-md bg-surface-muted px-2.5 py-1.5 font-sans text-meta leading-snug text-ink-secondary">{agent.output}</pre>
             </div>
           )}
         </div>

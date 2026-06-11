@@ -18,8 +18,8 @@ function targetHint(input: string): string {
 function Field({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wide text-ink-tertiary">{label}</div>
-      <pre className={cn('mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-surface px-2 py-1 font-mono text-[11px]', danger ? 'text-danger' : 'text-ink-secondary')}>{value}</pre>
+      <div className="text-caption uppercase tracking-wide text-ink-tertiary">{label}</div>
+      <pre className={cn('mt-0.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-surface px-2 py-1 font-mono text-caption', danger ? 'text-danger' : 'text-ink-secondary')}>{value}</pre>
     </div>
   )
 }
@@ -32,11 +32,11 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
     <div className="rounded-md border border-border bg-surface-muted/40">
       <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors" data-testid="tool-row">
         <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
-        <span className="shrink-0 font-mono text-[12px] text-ink">{tool.name}</span>
-        {hint && <span className="truncate font-mono text-[11px] text-ink-tertiary">{hint}</span>}
+        <span className="shrink-0 font-mono text-meta text-ink">{tool.name}</span>
+        {hint && <span className="truncate font-mono text-caption text-ink-tertiary">{hint}</span>}
         <span className="ml-auto shrink-0">
-          {tool.status === 'running' && <Loader2 size={12} className="animate-spin text-accent" />}
-          {tool.status === 'finished' && <Check size={12} className="text-emerald-500" />}
+          {tool.status === 'running' && <Loader2 size={12} className="animate-spin text-accent-strong" />}
+          {tool.status === 'finished' && <Check size={12} className="text-success" />}
           {tool.status === 'error' && <X size={12} className="text-danger" />}
         </span>
       </button>

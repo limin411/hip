@@ -37,8 +37,8 @@ export function UserMenu() {
           <button className="flex w-full items-center gap-2.5 rounded-md p-2 transition-colors hover:bg-surface-muted">
             <Avatar name={currentUser.name} src={currentUser.avatarUrl} size={28} />
             <div className="flex min-w-0 flex-1 flex-col items-start">
-              <span className="truncate text-[13px] font-medium text-ink">{currentUser.name}</span>
-              <span className="truncate text-[11px] text-ink-tertiary">{currentUser.email}</span>
+              <span className="truncate text-body font-medium text-ink">{currentUser.name}</span>
+              <span className="truncate text-caption text-ink-tertiary">{currentUser.email}</span>
             </div>
             <ChevronsUpDown size={14} className="shrink-0 text-ink-tertiary" />
           </button>

@@ -25,14 +25,14 @@ export function FolderPill() {
 
   if (bound) {
     return (
-      <div className="flex items-center gap-2 text-[12px] text-ink-secondary">
+      <div className="flex items-center gap-2 text-meta text-ink-secondary">
         <button
           onClick={pick}
           data-testid="change-folder"
           title={bound}
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 transition-colors hover:bg-surface-muted"
         >
-          <Folder size={13} className="text-accent" />
+          <Folder size={13} className="text-accent-strong" />
           {basename(bound)}
         </button>
         <button
@@ -52,7 +52,7 @@ export function FolderPill() {
     <button
       onClick={pick}
       data-testid="pick-folder"
-      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[12px] text-ink-secondary transition-colors hover:bg-surface-muted"
+      className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"
     >
       <Folder size={13} className="text-ink-tertiary" />
       {t('chat.pickFolder')}

@@ -25,17 +25,17 @@ function FileDiff({ file }: { file: DiffFile }) {
   return (
     <div className="border-b border-border" data-testid="diff-file">
       <div className="flex items-center justify-between bg-surface-muted px-3 py-2">
-        <span className="truncate font-mono text-[12px] text-ink">{file.path}</span>
-        <span className="flex shrink-0 items-center gap-2 text-[11px]">
+        <span className="truncate font-mono text-meta text-ink">{file.path}</span>
+        <span className="flex shrink-0 items-center gap-2 text-caption">
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
           <span className="text-success">+{file.additions}</span>
           <span className="text-danger">-{file.deletions}</span>
         </span>
       </div>
       {file.binary ? (
-        <div className="px-3 py-2 text-[12px] text-ink-tertiary">{t('artifact.diffView.binary')}</div>
+        <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.binary')}</div>
       ) : (
-        <div className="overflow-x-auto font-mono text-[12.5px] leading-relaxed">
+        <div className="overflow-x-auto font-mono text-meta leading-relaxed">
           {file.lines.map((line, i) => (
             <div key={i} className={cn('flex', lineStyle(line.type))}>
               <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.oldNo ?? ''}</span>
@@ -61,9 +61,9 @@ function FileDiff({ file }: { file: DiffFile }) {
 function Empty({ icon, title, desc, children }: { icon?: ReactNode; title: string; desc?: string; children?: ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 py-12 text-ink-tertiary">
-      <span className="text-[24px] opacity-40">{icon ?? '±'}</span>
-      <div className="text-[13px]">{title}</div>
-      {desc && <div className="max-w-[220px] text-center text-[12px] opacity-70">{desc}</div>}
+      <span className="text-stat opacity-40">{icon ?? '±'}</span>
+      <div className="text-body">{title}</div>
+      {desc && <div className="max-w-[220px] text-center text-meta opacity-70">{desc}</div>}
       {children}
     </div>
   )
@@ -112,7 +112,7 @@ export function DiffViewer() {
           {diff.initPending && <Loader2 size={13} className="mr-1.5 animate-spin" />}
           {t('artifact.diffView.initButton')}
         </Button>
-        {diff.error && <div className="max-w-[220px] text-center text-[12px] text-danger">{diff.error}</div>}
+        {diff.error && <div className="max-w-[220px] text-center text-meta text-danger">{diff.error}</div>}
       </Empty>
     )
   }
@@ -131,7 +131,7 @@ export function DiffViewer() {
   return (
     <div className="flex h-full flex-col" data-testid="diff-view">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-2">
-        <span className="text-[12px] text-ink-secondary">{t('artifact.diffView.changedFiles', { count: diff.totalFiles })}</span>
+        <span className="text-meta text-ink-secondary">{t('artifact.diffView.changedFiles', { count: diff.totalFiles })}</span>
         <button
           title={t('artifact.refresh')}
           data-testid="diff-refresh"
@@ -151,7 +151,7 @@ export function DiffViewer() {
             <FileDiff key={`${file.path}-${i}`} file={file} />
           ))}
           {diff.totalFiles > diff.files.length && (
-            <div className="px-3 py-2 text-[12px] text-ink-tertiary">
+            <div className="px-3 py-2 text-meta text-ink-tertiary">
               {t('artifact.diffView.moreFiles', { count: diff.totalFiles - diff.files.length })}
             </div>
           )}

@@ -30,13 +30,13 @@ function ThinkingDisclosure({
   const label =
     seconds != null ? t('chat.thoughtFor', { seconds }) : t('chat.thinkingMode')
   return (
-    <div className="flex gap-2 transition-colors">
+    <div className="flex gap-2">
       <AgentBadge role={role} />
       <div className="min-w-0 flex-1">
         <button
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex items-center gap-1.5 text-left text-[12px] text-ink-tertiary transition-colors hover:text-ink-secondary"
+          className="flex items-center gap-1.5 text-left text-meta text-ink-tertiary transition-colors hover:text-ink-secondary"
           data-testid="thinking-disclosure"
         >
           <ChevronRight
@@ -47,7 +47,7 @@ function ThinkingDisclosure({
           <span>{label}</span>
         </button>
         {open && (
-          <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-[12.5px] leading-relaxed text-ink-secondary">
+          <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-meta leading-relaxed text-ink-secondary">
             {content}
           </pre>
         )}
@@ -79,7 +79,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
           const task = taskByAgent.get(step.agentId)
           if (task && step.role !== 'supervisor') {
             nodes.push(
-              <div key={`d-${step.agentId}`} className="flex items-center gap-2 text-[12px] text-ink-tertiary transition-colors" data-testid="delegation-row">
+              <div key={`d-${step.agentId}`} className="flex items-center gap-2 text-meta text-ink-tertiary" data-testid="delegation-row">
                 <AgentBadge role={step.role} />
                 <span className="truncate">
                   <span className="font-medium text-ink-secondary">{t('chat.delegatedTo', { role: t(ROLE_NAME_KEY[step.role]) })}</span>: {task}
@@ -93,7 +93,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
         } else {
           const tool = byCallId.get(step.callId)
           if (tool) nodes.push(
-            <div key={`t-${step.stepSeq}`} className="flex gap-2 transition-colors">
+            <div key={`t-${step.stepSeq}`} className="flex gap-2">
               <AgentBadge role={step.role} />
               <div className="min-w-0 flex-1"><ToolCallRow tool={tool} /></div>
             </div>,

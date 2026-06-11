@@ -23,7 +23,7 @@ export function SearchBox() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={t('sidebar.search')}
-        className="h-9 w-full rounded-md border border-border bg-surface pl-8 pr-3 text-[13px] text-ink placeholder:text-ink-tertiary focus-visible:outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="h-9 w-full rounded-md border border-border bg-surface pl-8 pr-3 text-body text-ink placeholder:text-ink-tertiary focus-visible:outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-accent/60"
       />
     </div>
   )

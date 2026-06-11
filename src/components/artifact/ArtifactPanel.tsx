@@ -22,7 +22,7 @@ export function ArtifactPanel() {
   const togglePanel = useUiStore((s) => s.togglePanel)
 
   return (
-    <div className="h-full bg-surface">
+    <div className="h-full animate-panel-in bg-surface">
       <Tabs value={activeTab} onValueChange={(v) => setTab(v as ArtifactTab)} className="flex h-full flex-col">
         <div
           data-tauri-drag-region

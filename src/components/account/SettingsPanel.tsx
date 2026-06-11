@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { SlidersHorizontal } from 'lucide-react'
@@ -9,17 +8,13 @@ const PAGES = [
   { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
 ] as const
 
-type PageId = (typeof PAGES)[number]['id']
-
 export function SettingsPanel() {
   const { t } = useTranslation()
-  const [active, setActive] = useState<PageId>('general')
 
   return (
     <TabsPrimitive.Root
       orientation="vertical"
-      value={active}
-      onValueChange={(v) => setActive(v as PageId)}
+      defaultValue="general"
       className="flex max-h-[70vh] min-h-[400px]"
     >
       <TabsPrimitive.List

@@ -19,6 +19,9 @@ import { useAuthStore } from '@/store/authStore'
 // TODO: replace with real authenticated user once auth flow is implemented
 const currentUser = { name: 'User', email: 'user@example.com', avatarUrl: undefined }
 
+const SETTINGS_DEFAULT_SIZE = { width: 960, height: 700 }
+const SETTINGS_MIN_SIZE = { width: 600, height: 440 }
+
 export function UserMenu() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -63,6 +66,10 @@ export function UserMenu() {
         open={settingsOpen}
         onOpenChange={(open) => !open && setSettingsOpen(false)}
         title={t('settings.title')}
+        resizable
+        defaultSize={SETTINGS_DEFAULT_SIZE}
+        minSize={SETTINGS_MIN_SIZE}
+        storageKey="hip.ui.settingsModalSize"
       >
         <SettingsPanel />
       </Modal>

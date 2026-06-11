@@ -106,6 +106,7 @@ export const en = {
     },
     settings: {
       title: 'Settings',
+      general: 'General Settings',
       language: 'Interface Language',
       languageDesc: 'The display language of the application',
       languages: {

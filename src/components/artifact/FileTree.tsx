@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, FolderGit2, RefreshCw } from 'lucide-react'
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen, FolderGit2, RefreshCw, MessageSquare } from 'lucide-react'
 import type { FsEntry } from '@hip/protocol'
 import { sessionService } from '@/domain'
 import { useFsStore } from '@/store/fsStore'
@@ -110,6 +110,17 @@ export function FileTree() {
           {basename(cwd)}
         </span>
         <div className="flex items-center gap-0.5">
+          {isDraft && (
+            <button
+              title={t('artifact.backToChat')}
+              aria-label={t('artifact.backToChat')}
+              data-testid="tree-back-to-chat"
+              onClick={() => useDraftStore.getState().clearProject()}
+              className="rounded p-1 text-accent-strong transition-colors hover:bg-surface-muted"
+            >
+              <MessageSquare size={13} />
+            </button>
+          )}
           <button
             title={t('artifact.refresh')}
             data-testid="refresh-tree"

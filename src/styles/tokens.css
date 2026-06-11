@@ -10,15 +10,17 @@
   --border: #e4e4e4;
   --text-primary: #111111;
   --text-secondary: #666666;
-  --text-tertiary: #999999;
+  --text-tertiary: #757575; /* AA 4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
   /* 品牌强调色：Teal */
-  --accent: #0d9488;
+  --accent: #0d9488; /* 品牌填充色（按钮底、激活条、focus ring） */
   --accent-hover: #0f766e;
-  --accent-subtle: #e6f7f5;
+  --accent-strong: #0b7a6f; /* Teal 作正文/图标时用（AA 5:1，#0d9488 仅 3.6:1） */
+  --accent-subtle: #e6f7f5; /* 浅 Teal —— hover 底 */
+  --accent-active: #cdebe6; /* 较深浅 Teal —— 选中行底，与 hover 区分 */
   /* 功能状态色 —— 保留语义 */
-  --success: #3d9a50;
-  --danger: #d64545;
-  --warning: #c77a1a;
+  --success: #2f7d40; /* AA on bg-app（旧 #3d9a50 仅 3.4:1） */
+  --danger: #c63b3b; /* AA on bg-app（旧 #d64545 仅 4.2:1） */
+  --warning: #9a5d10; /* AA on bg-app —— 替代硬编码 amber-600 */
   /* 智能体角色色 —— 保留，作为功能性指示 */
   --role-supervisor: #5b5bd6;
   --role-planner: #1a8cd8;
@@ -59,4 +61,16 @@ a {
 
 a:hover {
   color: var(--text-primary);
+}
+
+/* 无障碍：尊重系统「减少动态效果」偏好 —— 统一兜底，覆盖 message-enter 等关键帧动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

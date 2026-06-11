@@ -18,7 +18,9 @@ export default {
         accent: {
           DEFAULT: 'var(--accent)',
           hover: 'var(--accent-hover)',
+          strong: 'var(--accent-strong)',
           subtle: 'var(--accent-subtle)',
+          active: 'var(--accent-active)',
         },
         success: 'var(--success)',
         danger: 'var(--danger)',
@@ -34,6 +36,17 @@ export default {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['SF Mono', 'JetBrains Mono', 'Menlo', 'monospace'],
       },
+      // 字号体系：每级自带行高，密集行（caption/meta/body）用更紧凑的 leading，
+      // 阅读文本（prose）保留宽松行距。替代散落的 text-[Npx] 硬编码。
+      fontSize: {
+        caption: ['11px', { lineHeight: '1.4' }],
+        meta: ['12px', { lineHeight: '1.45' }],
+        body: ['13px', { lineHeight: '1.5' }],
+        prose: ['14px', { lineHeight: '1.7' }],
+        title: ['16px', { lineHeight: '1.4' }],
+        display: ['20px', { lineHeight: '1.3' }],
+        stat: ['24px', { lineHeight: '1.2' }],
+      },
       borderRadius: {
         none: '0',
         sm: '4px',
@@ -45,7 +58,8 @@ export default {
         '3xl': '12px',
         full: '9999px',
       },
-      // 扁平化：移除所有阴影（浮层改用发丝边框界定）
+      // 扁平化：界面主体不用阴影（保持平面外壳）。
+      // 唯一例外：真正的浮层（菜单、弹窗）用克制的柔和阴影，避免与画布同色「贴」在一起。
       boxShadow: {
         none: 'none',
         sm: 'none',
@@ -57,6 +71,8 @@ export default {
         inner: 'none',
         pop: 'none',
         float: 'none',
+        menu: '0 6px 20px -6px rgba(17, 17, 17, 0.14), 0 2px 6px -2px rgba(17, 17, 17, 0.08)',
+        overlay: '0 16px 48px -12px rgba(17, 17, 17, 0.22), 0 6px 16px -8px rgba(17, 17, 17, 0.12)',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
@@ -65,11 +81,21 @@ export default {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'menu-in': {
+          from: { opacity: '0', transform: 'translateY(-4px) scale(0.97)' },
+          to: { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'panel-in': {
+          from: { opacity: '0', transform: 'translateX(8px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
       },
       animation: {
         blink: 'blink 1s step-start infinite',
         pulse: 'pulse 1.2s ease-in-out infinite',
         'message-enter': 'message-enter 0.3s ease-out',
+        'menu-in': 'menu-in 0.12s ease-out',
+        'panel-in': 'panel-in 0.2s ease-out',
       },
       transitionDuration: {
         DEFAULT: '150ms',

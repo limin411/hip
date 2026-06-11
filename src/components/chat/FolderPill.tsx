@@ -1,4 +1,4 @@
-import { Folder } from 'lucide-react'
+import { Folder, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
@@ -25,12 +25,15 @@ export function FolderPill() {
 
   if (bound) {
     return (
-      <div className="flex items-center gap-2 text-meta text-ink-secondary">
+      <div
+        className="flex items-center overflow-hidden rounded-md border border-accent/30 bg-accent-subtle text-meta text-accent-strong"
+        data-testid="folder-chip"
+      >
         <button
           onClick={pick}
           data-testid="change-folder"
           title={bound}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 transition-colors hover:bg-surface-muted"
+          className="flex items-center gap-1.5 py-1 pl-2.5 pr-1.5 transition-colors hover:bg-accent-active"
         >
           <Folder size={13} className="text-accent-strong" />
           {basename(bound)}
@@ -40,9 +43,9 @@ export function FolderPill() {
           data-testid="clear-folder"
           title={t('chat.clearFolder')}
           aria-label={t('chat.clearFolder')}
-          className="text-ink-tertiary hover:text-ink transition-colors"
+          className="flex items-center py-1 pl-1 pr-1.5 transition-colors hover:bg-accent-active"
         >
-          {t('chat.clearFolder')}
+          <X size={13} />
         </button>
       </div>
     )

@@ -13,7 +13,7 @@ export function LoginScreen() {
   return (
     <div className="flex h-screen">
       {/* 左侧大图标块 */}
-      <div className="relative hidden w-1/2 items-center justify-center bg-accent-subtle md:flex">
+      <div className="relative hidden w-1/2 items-center justify-center bg-surface-subtle md:flex">
         <div className="flex flex-col items-center gap-6">
           <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-accent">
             <Bot size={64} className="text-white" strokeWidth={1.5} />

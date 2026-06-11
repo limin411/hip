@@ -63,7 +63,7 @@ export function AppLayout() {
           onExpand={() => setCollapsed(false)}
         >
           {!collapsed && (
-            <div className="h-full bg-surface-subtle">
+            <div className="h-full bg-surface">
               <Sidebar />
             </div>
           )}

@@ -63,6 +63,7 @@ export function UserMenu() {
         open={settingsOpen}
         onOpenChange={(open) => !open && setSettingsOpen(false)}
         title={t('settings.title')}
+        className="max-w-2xl"
       >
         <SettingsPanel />
       </Modal>

@@ -137,3 +137,47 @@ header.
   surface-tinted rail background carry that.
 - Keep `GeneralSettings` a pure presentational/stateful page with no knowledge of
   the rail, so future pages can be added without touching it.
+
+## Addendum (2026-06-11): resizable, larger settings window
+
+After the two-pane shell shipped, the settings window felt too small and static.
+Follow-up: make it open larger and let the user drag-resize it.
+
+### Decisions (from brainstorming)
+- **Centered + resizable** (not a free-floating/movable window). The dialog stays
+  Radix-centered; the user drags edges/corners to grow/shrink it symmetrically
+  about the center. No drag-to-move; no keyboard resize.
+- **Remember size** across reopen and app restart (`localStorage`).
+- **Default size 960×700**, clamped to the viewport on small screens.
+
+### Mechanism (zero dependency)
+A small hook `useResizableBox` holds a controlled `{ width, height }` and renders
+nothing itself; `Modal` renders 8 edge/corner hit-areas wired to it. Because the
+dialog is centered via `-translate-x/y-1/2`, growth is symmetric about center, so
+the pointer math is `next = start + 2 × pointerDelta` per axis (the ×2 makes the
+dragged handle track the pointer 1:1 instead of at half-speed). Size is clamped to
+`[minSize, 96vw × 92vh]`, persisted to `localStorage` on pointer-up, and re-clamped
+to the viewport when the resizable modal mounts.
+
+- **Min size 600×440** (keeps the 168px rail + content from breaking).
+- **Opt-in:** resizability is enabled by new optional `Modal` props
+  (`resizable`, `defaultSize`, `minSize`, `storageKey`). Other modals are
+  unaffected and keep the existing `max-w-lg` / `max-h-[85vh]` static sizing.
+
+### Files (addendum)
+- **Create** `src/components/ui/useResizableBox.ts` — the hook.
+- **Modify** `src/components/ui/Modal.tsx` — opt-in resizable props; when resizable,
+  drop the static size classes, apply inline `width/height`, and render the 8
+  handles. Non-resizable path unchanged.
+- **Modify** `src/components/sidebar/UserMenu.tsx` — pass `resizable`,
+  `defaultSize={960×700}`, `minSize={600×440}`, `storageKey`; remove the now-moot
+  `className="max-w-2xl"`. Define the size objects as module constants (stable refs).
+- **Modify** `src/components/account/SettingsPanel.tsx` — shell root
+  `flex max-h-[70vh] min-h-[400px]` → `flex h-full`, so the rail spans the full
+  (now fixed) window height and the content pane scrolls within it.
+
+### Notes / boundaries (addendum)
+- If the OS window is shrunk below the remembered size, re-clamping happens on the
+  next mount/drag (acceptable minor edge).
+- Edge hit-areas are thin (≈6px) and corners small (≈12px); all interactive content
+  sits inside padding, so handle overlap with the rail/close-button is non-blocking.

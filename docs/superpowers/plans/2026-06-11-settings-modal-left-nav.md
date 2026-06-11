@@ -410,3 +410,308 @@ Narrow the window — the modal still respects the `w-[calc(100vw-2rem)]` cap an
 - **Placeholder scan:** no TBD/TODO; every code step shows complete code.
 - **Type consistency:** `PageId` is derived from `PAGES`; `active` state, `value`, and `onValueChange` cast all use `PageId`; `GeneralSettings` export name matches its import in `SettingsPanel`; i18n key `settings.general` matches `labelKey: 'settings.general'`.
 - **Token check:** `surface-subtle`, `surface-muted`, `ink-secondary`, `accent-active`, `accent-strong`, `accent/60` all exist in `tailwind.config.js`.
+
+---
+
+## Addendum tasks: resizable, larger settings window
+
+Same verification model (typecheck + build + GUI acceptance; no `.tsx` unit harness).
+
+### Task 5: `useResizableBox` hook + resizable `Modal`
+
+These compose as one logical change (the hook only exists to drive `Modal`), so one commit.
+
+**Files:**
+- Create: `src/components/ui/useResizableBox.ts`
+- Rewrite: `src/components/ui/Modal.tsx`
+
+- [ ] **Step 1: Create the hook `src/components/ui/useResizableBox.ts`**
+
+```ts
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+export type Size = { width: number; height: number }
+export type ResizeDir =
+  | 'top' | 'bottom' | 'left' | 'right'
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+const SENSE: Record<ResizeDir, { hx: number; hy: number }> = {
+  right: { hx: 1, hy: 0 },
+  left: { hx: -1, hy: 0 },
+  bottom: { hx: 0, hy: 1 },
+  top: { hx: 0, hy: -1 },
+  'bottom-right': { hx: 1, hy: 1 },
+  'bottom-left': { hx: -1, hy: 1 },
+  'top-right': { hx: 1, hy: -1 },
+  'top-left': { hx: -1, hy: -1 },
+}
+
+function clampToViewport(s: Size, min: Size): Size {
+  const maxW = Math.max(min.width, Math.round(window.innerWidth * 0.96))
+  const maxH = Math.max(min.height, Math.round(window.innerHeight * 0.92))
+  return {
+    width: Math.max(min.width, Math.min(s.width, maxW)),
+    height: Math.max(min.height, Math.min(s.height, maxH)),
+  }
+}
+
+interface Options {
+  enabled: boolean
+  defaultSize: Size
+  minSize: Size
+  storageKey?: string
+}
+
+export function useResizableBox({ enabled, defaultSize, minSize, storageKey }: Options) {
+  const [size, setSize] = useState<Size>(defaultSize)
+  const latest = useRef<Size>(defaultSize)
+  const drag = useRef<{ dir: ResizeDir; x: number; y: number; w: number; h: number } | null>(null)
+
+  const apply = useCallback((s: Size) => {
+    latest.current = s
+    setSize(s)
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) return
+    let initial = defaultSize
+    if (storageKey) {
+      try {
+        const raw = localStorage.getItem(storageKey)
+        const parsed = raw ? JSON.parse(raw) : null
+        if (typeof parsed?.width === 'number' && typeof parsed?.height === 'number') {
+          initial = { width: parsed.width, height: parsed.height }
+        }
+      } catch {
+        /* ignore malformed storage */
+      }
+    }
+    apply(clampToViewport(initial, minSize))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled])
+
+  const onResizeStart = useCallback(
+    (dir: ResizeDir, e: React.PointerEvent) => {
+      if (!enabled) return
+      e.preventDefault()
+      drag.current = { dir, x: e.clientX, y: e.clientY, w: latest.current.width, h: latest.current.height }
+      const onMove = (ev: PointerEvent) => {
+        const d = drag.current
+        if (!d) return
+        const { hx, hy } = SENSE[d.dir]
+        apply(
+          clampToViewport(
+            { width: d.w + 2 * hx * (ev.clientX - d.x), height: d.h + 2 * hy * (ev.clientY - d.y) },
+            minSize,
+          ),
+        )
+      }
+      const onUp = () => {
+        drag.current = null
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        document.body.style.userSelect = ''
+        if (storageKey) {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(latest.current))
+          } catch {
+            /* ignore quota errors */
+          }
+        }
+      }
+      document.body.style.userSelect = 'none'
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    [enabled, minSize, storageKey, apply],
+  )
+
+  return { size, onResizeStart }
+}
+```
+
+- [ ] **Step 2: Rewrite `src/components/ui/Modal.tsx`**
+
+Replace the entire file with:
+
+```tsx
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useResizableBox, type Size, type ResizeDir } from './useResizableBox'
+
+interface ModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  children: React.ReactNode
+  className?: string
+  resizable?: boolean
+  defaultSize?: Size
+  minSize?: Size
+  storageKey?: string
+}
+
+const DEFAULT_SIZE: Size = { width: 960, height: 700 }
+const DEFAULT_MIN: Size = { width: 600, height: 440 }
+
+const RESIZE_HANDLES: { dir: ResizeDir; className: string }[] = [
+  { dir: 'top', className: 'inset-x-0 top-0 h-1.5 cursor-ns-resize' },
+  { dir: 'bottom', className: 'inset-x-0 bottom-0 h-1.5 cursor-ns-resize' },
+  { dir: 'left', className: 'inset-y-0 left-0 w-1.5 cursor-ew-resize' },
+  { dir: 'right', className: 'inset-y-0 right-0 w-1.5 cursor-ew-resize' },
+  { dir: 'top-left', className: 'top-0 left-0 h-3 w-3 cursor-nwse-resize' },
+  { dir: 'top-right', className: 'top-0 right-0 h-3 w-3 cursor-nesw-resize' },
+  { dir: 'bottom-left', className: 'bottom-0 left-0 h-3 w-3 cursor-nesw-resize' },
+  { dir: 'bottom-right', className: 'bottom-0 right-0 h-3 w-3 cursor-nwse-resize' },
+]
+
+export function Modal({
+  open,
+  onOpenChange,
+  title,
+  children,
+  className,
+  resizable,
+  defaultSize,
+  minSize,
+  storageKey,
+}: ModalProps) {
+  const { t } = useTranslation()
+  const { size, onResizeStart } = useResizableBox({
+    enabled: !!resizable,
+    defaultSize: defaultSize ?? DEFAULT_SIZE,
+    minSize: minSize ?? DEFAULT_MIN,
+    storageKey,
+  })
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
+        <DialogPrimitive.Content
+          className={cn(
+            'fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-white shadow-overlay outline-none animate-menu-in',
+            !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
+            className,
+          )}
+          style={resizable ? { width: size.width, height: size.height } : undefined}
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+            <DialogPrimitive.Title className="text-title font-bold tracking-tight text-ink">
+              {title}
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted"
+              title={t('common.close')}
+            >
+              <X size={18} />
+            </DialogPrimitive.Close>
+          </div>
+          <div className="flex-1 overflow-y-auto">{children}</div>
+          {resizable &&
+            RESIZE_HANDLES.map((h) => (
+              <div
+                key={h.dir}
+                onPointerDown={(e) => onResizeStart(h.dir, e)}
+                className={cn('absolute select-none', h.dir.includes('-') ? 'z-20' : 'z-10', h.className)}
+              />
+            ))}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  )
+}
+```
+
+- [ ] **Step 3: Typecheck** — `npx tsc --noEmit` → no errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/ui/useResizableBox.ts src/components/ui/Modal.tsx
+git commit -m "feat(ui): opt-in resizable Modal (centered, symmetric drag-resize)"
+```
+
+### Task 6: Wire the settings modal (UserMenu + SettingsPanel)
+
+**Files:**
+- Modify: `src/components/sidebar/UserMenu.tsx`
+- Modify: `src/components/account/SettingsPanel.tsx`
+
+- [ ] **Step 1: `UserMenu.tsx` — enable resizing on the settings Modal**
+
+At the top of `src/components/sidebar/UserMenu.tsx`, after the imports, add module-level size constants (stable refs):
+
+```tsx
+const SETTINGS_DEFAULT_SIZE = { width: 960, height: 700 }
+const SETTINGS_MIN_SIZE = { width: 600, height: 440 }
+```
+
+Then replace the settings `<Modal>` block:
+
+```tsx
+      <Modal
+        open={settingsOpen}
+        onOpenChange={(open) => !open && setSettingsOpen(false)}
+        title={t('settings.title')}
+        className="max-w-2xl"
+      >
+        <SettingsPanel />
+      </Modal>
+```
+
+with:
+
+```tsx
+      <Modal
+        open={settingsOpen}
+        onOpenChange={(open) => !open && setSettingsOpen(false)}
+        title={t('settings.title')}
+        resizable
+        defaultSize={SETTINGS_DEFAULT_SIZE}
+        minSize={SETTINGS_MIN_SIZE}
+        storageKey="hip.ui.settingsModalSize"
+      >
+        <SettingsPanel />
+      </Modal>
+```
+
+(The `max-w-2xl` is removed — size is now controlled by `resizable`.)
+
+- [ ] **Step 2: `SettingsPanel.tsx` — fill the (now fixed-height) window**
+
+In `src/components/account/SettingsPanel.tsx`, change the `TabsPrimitive.Root` className:
+
+```tsx
+      className="flex max-h-[70vh] min-h-[400px]"
+```
+
+to:
+
+```tsx
+      className="flex h-full"
+```
+
+The shell now fills the modal body, so the rail spans the full window height and the content pane (`flex-1 overflow-y-auto`) scrolls within it.
+
+- [ ] **Step 3: Typecheck** — `npx tsc --noEmit` → no errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/components/sidebar/UserMenu.tsx src/components/account/SettingsPanel.tsx
+git commit -m "feat(settings): open the settings window larger and resizable"
+```
+
+### Task 7: Verification (build + GUI acceptance)
+
+- [ ] **Step 1:** `npm run build` → succeeds.
+- [ ] **Step 2:** Launch the app, open 设置.
+  - Opens noticeably larger (≈960×700), centered.
+  - Drag the right edge / bottom edge / a corner → the window grows/shrinks smoothly, staying centered, and the handle tracks the pointer (no half-speed lag).
+  - It won't shrink below ≈600×440, and won't exceed the viewport.
+  - The left rail spans the full window height; the content pane scrolls if needed.
+  - Close and reopen → the window reopens at the size you left it (also after restarting the app).
+  - The API Key save/clear and language switch still work.

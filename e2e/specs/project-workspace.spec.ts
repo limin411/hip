@@ -33,6 +33,24 @@ describe('new conversation', () => {
     expect((await sessionItems()).length).toBe(before) // still a draft — no row
   })
 
+  it('the composer chip ✕ returns to pure-chat (then re-pick restores the tree)', async () => {
+    await (await browser.$('[data-testid="clear-folder"]')).click()
+    // The default pick affordance reappears → we are back in chat mode.
+    await (await browser.$('[data-testid="pick-folder"]')).waitForExist({ timeout: 10000 })
+    // Restore project mode for the preview tests that follow.
+    await (await browser.$('[data-testid="pick-folder"]')).click()
+    await (await entry('/README.md')).waitForExist({ timeout: 60000 })
+  })
+
+  it('the Files-panel exit returns the tree to sandbox-pending (then re-pick restores it)', async () => {
+    await (await browser.$('[data-testid="tree-back-to-chat"]')).click()
+    // The tree entries are gone (chat-mode draft → "沙箱待创建" placeholder).
+    await browser.waitUntil(async () => !(await (await entry('/README.md')).isExisting()), { timeout: 10000, interval: 200 })
+    // Restore project mode for the preview tests that follow.
+    await (await browser.$('[data-testid="pick-folder"]')).click()
+    await (await entry('/README.md')).waitForExist({ timeout: 60000 })
+  })
+
   it('renders a Markdown preview (rendered, not source)', async () => {
     await (await entry('/README.md')).click()
     const md = await browser.$('[data-testid="preview-markdown"]')

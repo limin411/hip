@@ -74,3 +74,60 @@ a:hover {
     scroll-behavior: auto !important;
   }
 }
+
+/* —— Login logo animations —— */
+
+@keyframes peach-bounce {
+  0%, 100% { transform: translateY(0); }
+  30%  { transform: translateY(-14px); }
+  50%  { transform: translateY(0); }
+  70%  { transform: translateY(-6px); }
+  85%  { transform: translateY(0); }
+}
+
+@keyframes leaf-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(3deg); }
+  80% { transform: rotate(-2deg); }
+}
+
+@keyframes shadow-squash {
+  0%, 100% { transform: scaleX(1); opacity: 0.1; }
+  30%  { transform: scaleX(0.72); opacity: 0.04; }
+  50%  { transform: scaleX(1); opacity: 0.1; }
+  70%  { transform: scaleX(0.82); opacity: 0.06; }
+  85%  { transform: scaleX(1); opacity: 0.1; }
+}
+
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) translateY(0); }
+  30% { opacity: 1; transform: scale(1) translateY(-2px); }
+  60% { opacity: 0.7; transform: scale(0.8) translateY(-6px); }
+}
+
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.08); }
+}
+
+.hip-logo-animated {
+  animation: peach-bounce 2.2s ease-in-out infinite;
+}
+
+.hip-logo-leaf {
+  animation: leaf-wiggle 2.2s ease-in-out infinite;
+  transform-origin: 60px 31px;
+}
+
+.hip-logo-shadow {
+  animation: shadow-squash 2.2s ease-in-out infinite;
+}
+
+.hip-logo-sparkle {
+  animation: sparkle-twinkle 2s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.hip-logo-glow {
+  animation: glow-breathe 3s ease-in-out infinite;
+}

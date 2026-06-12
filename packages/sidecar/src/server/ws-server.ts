@@ -2,10 +2,10 @@ import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage } from 'http'
 import { createServer } from 'net'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
-import { providerKeyEnv } from '@hip/protocol'
 import { SessionManager } from '../session/session-manager.js'
 import type { SessionStore } from '../persistence/store.js'
 import { getActiveModel } from '../config/providers.js'
+import { resolveApiKey } from '../config/auth-file.js'
 
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:1420',
@@ -49,7 +49,7 @@ export class WsServer {
     }
     // Tell the client whether this sidecar has a usable API key, so the UI can
     // surface "no key configured" without waiting for a failed send.
-    send({ type: 'ready', hasApiKey: !!process.env[providerKeyEnv(getActiveModel().providerID)]?.trim() })
+    send({ type: 'ready', hasApiKey: !!resolveApiKey(getActiveModel().providerID) })
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString()) as ClientMessage

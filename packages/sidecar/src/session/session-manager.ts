@@ -1,5 +1,4 @@
 import type { ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
-import { providerKeyEnv } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
 import { Session } from './session.js'
@@ -7,6 +6,7 @@ import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
 import { setActiveModel } from '../config/providers.js'
+import { resolveApiKey } from '../config/auth-file.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -107,7 +107,7 @@ export class SessionManager {
         for (const s of this.sessions.values()) s.applyActiveModel()
         // Re-emit key status for the NEW active provider — `ready` is sent only once per connection,
         // so without this the chat header's "no key" banner would lag until the next reconnect.
-        const hasApiKey = !!process.env[providerKeyEnv(msg.providerID)]?.trim()
+        const hasApiKey = !!resolveApiKey(msg.providerID)
         send({ type: 'config:activeModel', providerID: msg.providerID, modelID: msg.modelID, hasApiKey })
         break
       }

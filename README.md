@@ -36,11 +36,10 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
 ## Development setup
 
 > The DeepSeek API key is entered in the app's **Settings** panel and stored in
-> `~/.hip/config/auth.json` (file mode `0600`) — the desktop app reads it from
-> there only. **`~/.hip/config/` holds plaintext API keys; do not sync it to
-> cloud drives or dotfile repos.** A `.env` file (see `.env.example`) is read
-> solely by the test suite and the standalone sidecar
-> (`scripts/dev.sh start sidecar`), never by the desktop app.
+> `~/.hip/config/auth.json` (file mode `0600`) — the single source of truth. The
+> desktop app, the standalone sidecar (`scripts/dev.sh start sidecar`), and the
+> test suite all read the key from there. **`~/.hip/config/` holds plaintext API
+> keys; do not sync it to cloud drives or dotfile repos.**
 
 ```bash
 # 1. Install workspace dependencies

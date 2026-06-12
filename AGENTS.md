@@ -254,12 +254,12 @@ scripts/dev.sh start        # 后台启动；scripts/dev.sh logs app 跟踪日�
 # 或前台直接： yarn tauri dev
 ```
 
-桌面应用的 DeepSeek API Key 在应用内 **设置** 面板填入，存于系统钥匙串；首次启动需填入一次。
-
-`.env` 仅供**测试套件**与**独立 sidecar 调试**使用（桌面应用不再读取它）：
+API Key 在应用内 **设置** 面板填入，存于 `~/.hip/config/auth.json`（明文，权限 `0600`）——
+**单一真相源**。桌面应用、独立 sidecar、测试套件都从那里读取（不再有 `.env`）：
 
 ```bash
-cp .env.example .env           # 编辑 .env，填入 HIP_MODEL_DEEPSEEK_API_KEY=sk-...
-scripts/dev.sh start sidecar   # 仅启 DeepSeek 后端（读 .env）
-yarn test                      # 真实 LLM 测试会从 .env 读取 key，否则自动跳过
+scripts/dev.sh start sidecar   # 独立 DeepSeek 后端，直接读 ~/.hip/config/auth.json
+yarn test                      # 真实 LLM 测试从 ~/.hip/config/auth.json 读 key，没有则自动跳过
 ```
+
+> ⚠️ `~/.hip/config/` 含明文密钥，勿同步到云盘 / dotfile 仓库。

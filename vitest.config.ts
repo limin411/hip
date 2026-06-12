@@ -1,8 +1,7 @@
 import { defineConfig } from 'vitest/config'
-import { loadEnv } from 'vite'
 import { resolve } from 'path'
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -11,9 +10,9 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'packages/sidecar/src/**/*.test.ts'],
-    // Load .env (and .env.local etc.) into process.env so the real-LLM test
-    // suites can read HIP_MODEL_DEEPSEEK_API_KEY; without it they skipIf-skip. The ''
-    // prefix loads unprefixed vars too. See .env.example.
-    env: loadEnv(mode, __dirname, ''),
+    // Real-LLM suites read HIP_MODEL_<ID>_API_KEY. vitest.setup.ts seeds those from the
+    // single source of truth (~/.hip/config/auth.json — the same file the desktop app
+    // writes); when it's absent (e.g. CI) those suites skipIf-skip.
+    setupFiles: ['./vitest.setup.ts'],
   },
-}))
+})

@@ -11,7 +11,7 @@ import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTrac
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
-import { providerKeyEnv } from '@hip/protocol'
+import { resolveApiKey } from '../config/auth-file.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -139,7 +139,7 @@ class ReasoningChatOpenAI extends ChatOpenAI {
 }
 
 function activeKey(providerID: string): string {
-  return process.env[providerKeyEnv(providerID)] || 'sk-missing'
+  return resolveApiKey(providerID) || 'sk-missing'
 }
 
 function buildModel(_config: SessionConfig): ChatOpenAI {
@@ -303,7 +303,7 @@ export class Session {
   private requireApiKey(send: SendFn): boolean {
     if (this.usesEnvModel) {
       const { providerID } = getActiveModel()
-      if (!process.env[providerKeyEnv(providerID)]?.trim()) {
+      if (!resolveApiKey(providerID)) {
         send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'API key not configured. Set it in Settings.' })
         return false
       }

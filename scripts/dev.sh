@@ -18,14 +18,13 @@
 #   scripts/dev.sh logs    <app|web|sidecar>   # tail -f 实时日志
 #
 # 进程 PID 与日志写入 logs/（已被 .gitignore 忽略）。
-# 桌面 app 的 DeepSeek Key 由应用内「设置」写入系统钥匙串；.env 仅供独立 sidecar（及测试）使用。
+# Key 由应用内「设置」写入 ~/.hip/config/auth.json（单一真相源）；桌面 app、独立 sidecar、测试都从那里读取。
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$ROOT/logs"
 WEB_PORT=1420
-ENV_FILE="$ROOT/.env"
 
 mkdir -p "$LOG_DIR"
 
@@ -72,23 +71,17 @@ kill_tree() {
   for p in $pids; do kill -0 "$p" 2>/dev/null && kill -KILL "$p" 2>/dev/null || true; done
 }
 
-# 加载 .env 到环境（供 sidecar / tauri 读取 HIP_MODEL_DEEPSEEK_API_KEY）
-load_env() {
-  [ -f "$ENV_FILE" ] || return 0
-  set -a
-  # shellcheck disable=SC1090
-  . "$ENV_FILE"
-  set +a
-}
-
+# 独立 sidecar 直接读 ~/.hip/config/auth.json（应用内「设置」写入的单一真相源）。
+# 检查文件里至少有一个非空的 HIP_MODEL_*_API_KEY（`{}` 这种空配置也要告警）。
 warn_missing_key() {
-  [ -n "${HIP_MODEL_DEEPSEEK_API_KEY:-}" ] || \
-    echo "[dev] ⚠ 未找到 HIP_MODEL_DEEPSEEK_API_KEY（请在 .env 设置），仍会启动但真实 LLM 请求会失败。"
+  grep -qE '"HIP_MODEL_[A-Z0-9_]+_API_KEY"[[:space:]]*:[[:space:]]*"[^"]+"' \
+    "$HOME/.hip/config/auth.json" 2>/dev/null || \
+    echo "[dev] ⚠ ~/.hip/config/auth.json 未配置 key（请在应用内「设置」填入），仍会启动但真实 LLM 请求会失败。"
 }
 
 start_app() {
   if is_running app; then echo "[dev] app 已在运行 (pid $(cat "$(pid_file app)"))"; return 0; fi
-  echo "[dev] 桌面应用从「设置」面板(系统钥匙串)读取 DeepSeek Key；首次启动需在应用内填入一次。"
+  echo "[dev] 桌面应用从「设置」面板读取 Key（写入 ~/.hip/config/auth.json）；首次启动需在应用内填入一次。"
   free_port "$WEB_PORT"   # tauri 的 beforeDevCommand 会在该端口起 vite
   echo "[dev] 启动桌面应用 (yarn tauri dev)… 改动过 Rust 时需编译，窗口会稍后弹出。"
   # exec 让记录的 PID 就是真正的进程（而非临时子 shell），停止时 kill_tree 才能命中整棵树
@@ -111,7 +104,7 @@ start_web() {
 
 start_sidecar() {
   if is_running sidecar; then echo "[dev] sidecar 已在运行 (pid $(cat "$(pid_file sidecar)"))"; return 0; fi
-  load_env; warn_missing_key
+  warn_missing_key
   echo "[dev] 启动 sidecar (DeepSeek WebSocket 后端)…"
   ( cd "$ROOT/packages/sidecar" && exec nohup "$ROOT/node_modules/.bin/tsx" src/main.ts ) </dev/null >"$(log_file sidecar)" 2>&1 &
   echo $! >"$(pid_file sidecar)"

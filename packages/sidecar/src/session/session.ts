@@ -10,10 +10,11 @@ import * as workspaceGit from './workspace-git.js'
 import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
+import { getActiveModel } from '../config/providers.js'
+import { providerKeyEnv } from '@hip/protocol'
 
 type SendFn = (msg: ServerMessage) => void
 
-const TITLE_MODEL = 'deepseek-chat'
 const TITLE_LEN = 40
 
 /** A turn with no outbound activity for this long is treated as a stalled provider stream and aborted. */
@@ -48,13 +49,14 @@ const TITLE_SYSTEM_PROMPT =
   'You generate a very short title (at most 6 words, or about 16 Chinese characters) for a chat conversation. ' +
   'Use the same language as the user. Reply with ONLY the title — no quotes, no trailing punctuation.'
 
-/** Production title generator: one cheap DeepSeek completion. Not used when a model is injected (tests). */
+/** Production title generator: one cheap completion. Not used when a model is injected (tests). */
 function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   return async ({ firstUserMessage, firstReply }) => {
+    const { providerID, modelID, baseURL } = getActiveModel()
     const model = new ChatOpenAI({
-      model: TITLE_MODEL,
-      apiKey: process.env.HIP_MODEL_DEEPSEEK_API_KEY || 'sk-missing',
-      configuration: { baseURL: 'https://api.deepseek.com/v1' },
+      model: modelID,
+      apiKey: process.env[providerKeyEnv(providerID)] || 'sk-missing',
+      configuration: { baseURL },
       maxTokens: 24,
       temperature: 0.3,
     })
@@ -134,13 +136,16 @@ class ReasoningChatOpenAI extends ChatOpenAI {
   }
 }
 
-function buildModel(config: SessionConfig): ChatOpenAI {
+function activeKey(providerID: string): string {
+  return process.env[providerKeyEnv(providerID)] || 'sk-missing'
+}
+
+function buildModel(_config: SessionConfig): ChatOpenAI {
+  const { providerID, modelID, baseURL } = getActiveModel()
   return new ReasoningChatOpenAI({
-    model: resolveModel(config),
-    apiKey: process.env.HIP_MODEL_DEEPSEEK_API_KEY || 'sk-missing',
-    configuration: {
-      baseURL: 'https://api.deepseek.com/v1',
-    },
+    model: modelID,
+    apiKey: activeKey(providerID),
+    configuration: { baseURL },
   })
 }
 
@@ -161,6 +166,7 @@ export class Session {
   private abortController: AbortController | null = null
   // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
+  private modelDirty = false
   // Monotonic per-session turn counter — appended to turnId so two turns in the same millisecond cannot collide.
   private turnSeq = 0
   private readonly usesEnvModel: boolean
@@ -224,6 +230,15 @@ export class Session {
     return true
   }
 
+  /** Rebuild against the current global active model. NO-OP (returns false) while a turn is running;
+   *  the next sendMessage rebuilds (see modelDirty). Injected-model sessions (tests) are unaffected. */
+  applyActiveModel(): boolean {
+    if (!this.usesEnvModel) return true
+    if (this.running) { this.modelDirty = true; return false }
+    this.buildAgent()
+    return true
+  }
+
   /** Set/clear per-conversation instructions and rebuild the agent. NO-OP (returns false) while a turn is running. */
   setSystemPrompt(systemPrompt: string | null): boolean {
     if (this.running) return false
@@ -265,17 +280,21 @@ export class Session {
     return workspaceGit.gitInit(this._config.cwd)
   }
 
-  /** Emit NO_API_KEY and return false when the env-keyed model has no key. */
+  /** Emit NO_API_KEY and return false when the env-keyed active provider has no key. */
   private requireApiKey(send: SendFn): boolean {
-    if (this.usesEnvModel && !process.env.HIP_MODEL_DEEPSEEK_API_KEY?.trim()) {
-      send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'DeepSeek API key not configured. Set it in Settings.' })
-      return false
+    if (this.usesEnvModel) {
+      const { providerID } = getActiveModel()
+      if (!process.env[providerKeyEnv(providerID)]?.trim()) {
+        send({ type: 'error', sessionId: this.id, code: 'NO_API_KEY', message: 'API key not configured. Set it in Settings.' })
+        return false
+      }
     }
     return true
   }
 
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
     if (this.running) return
+    if (this.modelDirty) { this.buildAgent(); this.modelDirty = false }
     if (!this.requireApiKey(_send)) return
 
     // Persist the user message + bump/derive session metadata before running.

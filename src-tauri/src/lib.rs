@@ -1,4 +1,5 @@
 mod sidecar;
+mod paths;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;

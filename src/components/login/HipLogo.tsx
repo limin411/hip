@@ -1,11 +1,12 @@
-// hip 品牌标识 —— 一颗「蜜桃 / 屁股」。三种角色共享同一基因：
-//   color   —— 全彩珊瑚桃，登录 hero / 营销主脸
-//   tile    —— 白桃嵌 Blue 圆角砖，dock / favicon / 占位替换
-//   minimal —— 几何两瓣，小尺寸 favicon 兜底
-// 品牌色自带（珊瑚仅在此处出现），不引入全局 token。
+// hip 品牌标识 —— 一对「大眼睛」(参考 Cookie Monster × #0062AD 色卡)。变体共享同一眼睛基因：
+//   tile    —— cream 眼 + navy 瞳，嵌 #0062AD 圆角砖；通吃 app 图标 / favicon / 内联品牌
+//   minimal —— 去高光、瞳放大，16px favicon 兜底
+//   mono    —— 透明底、单色描边眼 + 实心瞳 (currentColor)，菜单栏/单色场景
+//   hero    —— 仅眼放大，叠在登录页蓝色渐变上，带柔光 + 眨眼 + 斜瞄动画
+// 品牌色自带 (cream / navy 仅在此处出现)，不引入全局 token。
 
 interface HipLogoProps {
-  variant?: 'color' | 'tile' | 'minimal' | 'hero'
+  variant?: 'tile' | 'minimal' | 'hero' | 'mono'
   size?: number
   className?: string
   /** 无障碍名称（variant 为语义图标时朗读）。 */
@@ -14,37 +15,30 @@ interface HipLogoProps {
   decorative?: boolean
 }
 
-const PEACH =
-  'M60 33 C 54 19 39 15 29 24 C 17 33 15 52 24 70 C 30 83 45 95 60 105 C 75 95 90 83 96 70 C 105 52 103 33 91 24 C 81 15 66 19 60 33 Z'
-const CLEFT = 'M60 37 C 56 49 56 63 60 77'
-const LEAF = 'M60 31 C 68 16 83 12 95 17 C 89 31 73 37 61 32 Z'
-const VEIN = 'M64 30 C 73 25 83 22 90 20'
-const STEM = 'M60 33 C 60 26 60 22 61 18'
-const HIGHLIGHT = 'M27 44 C 22 58 25 76 39 88 C 30 75 28 59 33 45 Z'
+const BLUE = '#0062ad'
+const CREAM = '#f4ecd8'
+const NAVY = '#003b68'
 
-interface SparkleProps {
-  left: string
-  top: string
-  size: number
-  delay: number
-  duration: number
+// 砖内眼睛 DNA —— 瞳孔朝右下「斜瞄」(瞄一眼老板有没有在看 / agent 盯着你的代码)。
+function TileEyes({ pupilR, highlight }: { pupilR: number; highlight: boolean }) {
+  return (
+    <>
+      <circle cx={42} cy={58} r={24} fill={CREAM} />
+      <circle cx={78} cy={58} r={24} fill={CREAM} />
+      <circle cx={49} cy={65} r={pupilR} fill={NAVY} />
+      <circle cx={85} cy={64} r={pupilR} fill={NAVY} />
+      {highlight && (
+        <>
+          <circle cx={45.5} cy={61.5} r={3} fill="#ffffff" />
+          <circle cx={81.5} cy={60.5} r={3} fill="#ffffff" />
+        </>
+      )}
+    </>
+  )
 }
 
-const SPARKLES: SparkleProps[] = [
-  { left: '20%', top: '15%', size: 5, delay: 0, duration: 2 },
-  { left: '65%', top: '10%', size: 4, delay: 0.5, duration: 2 },
-  { left: '78%', top: '35%', size: 6, delay: 0.3, duration: 2.2 },
-  { left: '42%', top: '8%', size: 3, delay: 0.7, duration: 1.8 },
-  { left: '12%', top: '42%', size: 4, delay: 1, duration: 2.1 },
-  { left: '18%', top: '55%', size: 3, delay: 0.2, duration: 1.9 },
-  { left: '50%', top: '20%', size: 5, delay: 0.9, duration: 2.3 },
-  { left: '75%', top: '48%', size: 2, delay: 0.4, duration: 1.7 },
-  { left: '28%', top: '60%', size: 4, delay: 0.6, duration: 2 },
-  { left: '8%', top: '32%', size: 3, delay: 1.1, duration: 2.4 },
-]
-
 export function HipLogo({
-  variant = 'color',
+  variant = 'tile',
   size = 96,
   className,
   title = 'hip',
@@ -55,6 +49,7 @@ export function HipLogo({
     : ({ role: 'img', 'aria-label': title } as const)
 
   if (variant === 'hero') {
+    // 放大眼 + 柔光；眨眼包整组、斜瞄只动瞳孔。
     return (
       <div
         className={className}
@@ -73,7 +68,7 @@ export function HipLogo({
             height: size * 1.15,
             borderRadius: '50%',
             background:
-              'radial-gradient(circle, rgba(240,154,120,0.18) 0%, rgba(240,154,120,0.05) 40%, transparent 70%)',
+              'radial-gradient(circle, rgba(244,236,216,0.22) 0%, rgba(244,236,216,0.06) 42%, transparent 70%)',
             pointerEvents: 'none',
           }}
         />
@@ -82,56 +77,20 @@ export function HipLogo({
           width={size}
           height={size}
           viewBox="0 0 120 120"
-          className="hip-logo-animated"
           xmlns="http://www.w3.org/2000/svg"
           style={{ position: 'relative', zIndex: 1 }}
         >
-          <path d={PEACH} fill="#f09a78" />
-          <path d={HIGHLIGHT} fill="#f8bda2" opacity={0.5} />
-          <path d={CLEFT} fill="none" stroke="#c95a33" strokeWidth={4.5} strokeLinecap="round" />
-          <path d={STEM} fill="none" stroke="#7a4a2b" strokeWidth={3} strokeLinecap="round" />
-          <g className="hip-logo-leaf">
-            <path d={LEAF} fill="#7cbe35" />
-            <path d={VEIN} fill="none" stroke="#4b7e16" strokeWidth={1.6} strokeLinecap="round" />
+          <g className="hip-eyes-blink">
+            <circle cx={42} cy={60} r={30} fill={CREAM} />
+            <circle cx={78} cy={60} r={30} fill={CREAM} />
+            <g className="hip-eyes-glance">
+              <circle cx={51} cy={69} r={13} fill={NAVY} />
+              <circle cx={87} cy={68} r={13} fill={NAVY} />
+              <circle cx={46.5} cy={64.5} r={3.8} fill="#ffffff" />
+              <circle cx={82.5} cy={63.5} r={3.8} fill="#ffffff" />
+            </g>
           </g>
         </svg>
-
-        <svg
-          width={size}
-          height={size * 0.06}
-          viewBox="0 0 120 7"
-          className="hip-logo-shadow"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{
-            position: 'absolute',
-            bottom: -size * 0.01,
-            left: 0,
-            right: 0,
-            margin: 'auto',
-            pointerEvents: 'none',
-          }}
-        >
-          <ellipse cx={60} cy={3.5} rx={30} ry={3} fill="rgba(255,255,255,0.1)" />
-        </svg>
-
-        {SPARKLES.map((s, i) => (
-          <div
-            key={i}
-            className="hip-logo-sparkle"
-            style={{
-              position: 'absolute',
-              left: s.left,
-              top: s.top,
-              width: s.size,
-              height: s.size,
-              borderRadius: '50%',
-              background: 'white',
-              animationDuration: `${s.duration}s`,
-              animationDelay: `${s.delay}s`,
-              pointerEvents: 'none',
-            }}
-          />
-        ))}
       </div>
     )
   }
@@ -149,37 +108,25 @@ export function HipLogo({
 
       {variant === 'tile' && (
         <>
-          <rect x="6" y="6" width="108" height="108" rx="26" fill="#0062ad" />
-          <g transform="translate(20 19) scale(0.66)">
-            <path d={PEACH} fill="#ffffff" />
-            <path d={LEAF} fill="#ffffff" />
-            <path d={CLEFT} fill="none" stroke="#0062ad" strokeWidth="5" strokeLinecap="round" />
-          </g>
+          <rect x={4} y={4} width={112} height={112} rx={26} fill={BLUE} />
+          <TileEyes pupilR={10.5} highlight />
         </>
       )}
 
       {variant === 'minimal' && (
         <>
-          <path
-            d="M57 28 C 38 16 17 27 17 56 C 17 82 37 100 57 93 C 53 71 53 50 57 28 Z"
-            fill="#0062ad"
-          />
-          <path
-            d="M63 28 C 82 16 103 27 103 56 C 103 82 83 100 63 93 C 67 71 67 50 63 28 Z"
-            fill="#00538f"
-          />
+          <rect x={4} y={4} width={112} height={112} rx={26} fill={BLUE} />
+          <TileEyes pupilR={12} highlight={false} />
         </>
       )}
 
-      {variant === 'color' && (
-        <>
-          <path d={PEACH} fill="#f09a78" />
-          <path d={HIGHLIGHT} fill="#f8bda2" />
-          <path d={CLEFT} fill="none" stroke="#c95a33" strokeWidth="4.5" strokeLinecap="round" />
-          <path d={STEM} fill="none" stroke="#7a4a2b" strokeWidth="3" strokeLinecap="round" />
-          <path d={LEAF} fill="#7cbe35" />
-          <path d={VEIN} fill="none" stroke="#4b7e16" strokeWidth="1.6" strokeLinecap="round" />
-        </>
+      {variant === 'mono' && (
+        <g fill="currentColor">
+          <circle cx={40} cy={58} r={22} fill="none" stroke="currentColor" strokeWidth={7} />
+          <circle cx={80} cy={58} r={22} fill="none" stroke="currentColor" strokeWidth={7} />
+          <circle cx={46} cy={63} r={8.5} />
+          <circle cx={82} cy={63} r={8.5} />
+        </g>
       )}
     </svg>
   )

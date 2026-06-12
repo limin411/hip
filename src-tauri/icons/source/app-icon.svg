@@ -1,15 +1,17 @@
 <svg width="1024" height="1024" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
   <!--
-    hip app-icon master — 'tile' variant.
-    Mirrors the tile branch of src/components/login/HipLogo.tsx (PEACH / LEAF / CLEFT).
-    White peach + leaf, blue cleft, on a #0062ad rounded tile (rx 26), ~5% transparent margin.
-    Regenerate the icon set from this source:
-      yarn tauri icon src-tauri/icons/source/app-icon-1024.png
+    hip app-icon master — 'tile' variant (大眼睛).
+    Mirrors the tile branch of src/components/login/HipLogo.tsx.
+    Cream googly eyes + navy pupils + white catchlights on a #0062ad rounded tile (rx 26),
+    pupils glancing down-right. Outside the tile is transparent.
+    Regenerate the icon set from this source (the command accepts an SVG with transparency):
+      yarn tauri icon src-tauri/icons/source/app-icon.svg
   -->
-  <rect x="6" y="6" width="108" height="108" rx="26" fill="#0062ad"/>
-  <g transform="translate(20 19) scale(0.66)">
-    <path d="M60 33 C 54 19 39 15 29 24 C 17 33 15 52 24 70 C 30 83 45 95 60 105 C 75 95 90 83 96 70 C 105 52 103 33 91 24 C 81 15 66 19 60 33 Z" fill="#ffffff"/>
-    <path d="M60 31 C 68 16 83 12 95 17 C 89 31 73 37 61 32 Z" fill="#ffffff"/>
-    <path d="M60 37 C 56 49 56 63 60 77" fill="none" stroke="#0062ad" stroke-width="5" stroke-linecap="round"/>
-  </g>
+  <rect x="4" y="4" width="112" height="112" rx="26" fill="#0062ad"/>
+  <circle cx="42" cy="58" r="24" fill="#f4ecd8"/>
+  <circle cx="78" cy="58" r="24" fill="#f4ecd8"/>
+  <circle cx="49" cy="65" r="10.5" fill="#003b68"/>
+  <circle cx="85" cy="64" r="10.5" fill="#003b68"/>
+  <circle cx="45.5" cy="61.5" r="3" fill="#ffffff"/>
+  <circle cx="81.5" cy="60.5" r="3" fill="#ffffff"/>
 </svg>

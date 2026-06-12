@@ -13,7 +13,7 @@ export function LoginScreen() {
 
   return (
     <div className="flex h-screen">
-      {/* 左侧品牌区 —— 轰炸级动态蜜桃 hero */}
+      {/* 左侧品牌区 —— 动态大眼睛 hero（眨眼 + 斜瞄） */}
       <div
         className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex"
         style={{ background: 'linear-gradient(150deg, #0a78c6 0%, #0062ad 52%, #02324f 100%)' }}

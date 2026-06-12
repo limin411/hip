@@ -11,21 +11,44 @@ fn read_auth_map(path: &Path) -> Map<String, Value> {
     }
 }
 
-/// Write the auth map atomically (temp file + rename) with `0o600` on Unix.
-/// Perms are set on the temp file BEFORE the rename, so the final file is never
-/// briefly world-readable, and a pre-existing wide `auth.json` is replaced (not widened).
+/// Write the auth map atomically (temp file + rename). On Unix the temp file is
+/// created at `0o600` so a file containing secrets is never briefly world-readable;
+/// the perms are re-asserted in case a stale temp pre-existed, and a failed write
+/// cleans up the temp rather than leaking secrets to disk. Windows relies on the
+/// user-profile ACL of the app-data root.
 fn write_auth_map(path: &Path, map: &Map<String, Value>) -> io::Result<()> {
     let body = serde_json::to_string_pretty(map)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, body.as_bytes())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+
+    let write_and_rename = || -> io::Result<()> {
+        #[cfg(unix)]
+        {
+            use std::io::Write;
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&tmp)?;
+            f.write_all(body.as_bytes())?;
+            // `mode(0o600)` only applies when the file is created; re-assert in case
+            // `tmp` pre-existed (stale from a crash) with wider perms.
+            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&tmp, body.as_bytes())?;
+        }
+        std::fs::rename(&tmp, path)
+    };
+
+    let result = write_and_rename();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
     }
-    std::fs::rename(&tmp, path)?;
-    Ok(())
+    result
 }
 
 /// Get one secret by key (key == the `HIP_MODEL_<ID>_API_KEY` env-var name).
@@ -43,11 +66,13 @@ pub fn auth_set(path: &Path, key: &str, value: &str) -> io::Result<()> {
     write_auth_map(path, &map)
 }
 
-/// Remove one secret and persist (no-op if absent).
+/// Remove one secret and persist. Skips the write entirely when the key was absent.
 pub fn auth_delete(path: &Path, key: &str) -> io::Result<()> {
     let mut map = read_auth_map(path);
-    map.remove(key);
-    write_auth_map(path, &map)
+    if map.remove(key).is_some() {
+        write_auth_map(path, &map)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -82,6 +107,13 @@ mod tests {
     fn missing_file_reads_as_empty() {
         let p = std::env::temp_dir().join("hip-auth-does-not-exist-xyz.json");
         let _ = std::fs::remove_file(&p);
+        assert_eq!(auth_get(&p, "anything"), None);
+    }
+
+    #[test]
+    fn corrupt_file_reads_as_empty() {
+        let p = tmp_path("corrupt");
+        std::fs::write(&p, b"not-json{{{{").unwrap();
         assert_eq!(auth_get(&p, "anything"), None);
     }
 

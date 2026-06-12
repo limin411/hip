@@ -25,7 +25,9 @@ pub fn hip_subdir(app: &AppHandle, sub: &str) -> Option<PathBuf> {
     #[cfg(unix)]
     if sub == "config" {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        if let Err(e) = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)) {
+            eprintln!("[tauri] could not set 0700 on {}: {e}", dir.display());
+        }
     }
     Some(dir)
 }

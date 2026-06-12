@@ -10,6 +10,9 @@ beforeEach(async () => {
   await fs.writeFile(path.join(root, 'README.md'), '# Hello\n\nWorld')
   await fs.mkdir(path.join(root, 'src'))
   await fs.writeFile(path.join(root, 'src', 'a.ts'), 'export const a = 1')
+  // hidden entries that must never surface in the tree
+  await fs.mkdir(path.join(root, '.git'))
+  await fs.writeFile(path.join(root, '.env'), 'SECRET=1')
   // 1x1 PNG
   await fs.writeFile(path.join(root, 'logo.png'),
     Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'))
@@ -34,6 +37,12 @@ describe('lsDir', () => {
     expect(entries[0]).toMatchObject({ name: 'src', isDir: true })
     expect(entries.slice(1).map((e) => e.name).sort()).toEqual(['README.md', 'logo.png'])
     expect(entries.every((e) => path.isAbsolute(e.path))).toBe(true)
+  })
+  it('hides dotfiles and dot-directories (e.g. .git, .env)', async () => {
+    const entries = await lsDir(root, root)
+    expect(entries.map((e) => e.name)).not.toContain('.git')
+    expect(entries.map((e) => e.name)).not.toContain('.env')
+    expect(entries.every((e) => !e.name.startsWith('.'))).toBe(true)
   })
 })
 

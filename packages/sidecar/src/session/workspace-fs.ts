@@ -60,6 +60,7 @@ export async function lsDir(cwd: string, dirAbs: string): Promise<FsEntry[]> {
   const dirents = await fs.readdir(dir, { withFileTypes: true })
   const entries: FsEntry[] = []
   for (const d of dirents) {
+    if (d.name.startsWith('.')) continue // hide dotfiles/dot-dirs (.git, .env, …)
     const isDir = d.isDirectory()
     const full = path.join(dir, d.name)
     let size: number | undefined

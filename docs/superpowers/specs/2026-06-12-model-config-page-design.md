@@ -395,4 +395,24 @@ existing `settings.apiKey*` strings move under the model page's namespace.
 - **CJK + bash:** none of this touches shell scripts, but if any helper scripts are
   added, brace `${var}` before CJK punctuation (system bash is 3.2; see
   `bash32-cjk-var-bracing`).
-```
+
+## Follow-ups (deferred after the post-implementation review, 2026-06-12)
+
+The feature shipped on branch `feat/model-config` (Ship-with-follow-ups). These known
+gaps were deliberately deferred and should be picked up separately:
+
+1. **Per-provider Base URL override for catalog providers is read-only in v1.** The
+   detail pane shows `provider.api` but does not let the user edit it; the store's
+   `setBaseURL` action exists but has no UI caller yet. Custom providers still set
+   their base URL at creation. Wiring an editable Base URL (the escape hatch for
+   models.dev `api` values that omit `/v1`) is a follow-up.
+2. **Incompatible active model isn't guarded sidecar-side.** A hand-edited / stale
+   `hip-providers.json` naming a non-OpenAI provider (e.g. `anthropic`) as the active
+   model would build a `ChatOpenAI` against an incompatible endpoint and fail per-turn
+   with a generic error. The `isCompatible` gate lives only in the renderer; add a
+   defensive check (or clearer error copy) in the sidecar.
+3. **`ready.hasApiKey` goes stale after a live model switch.** `ready` is sent once
+   per connection; switching the global model to a keyless provider doesn't re-emit
+   key status, so the chat header's "no key" banner can lag until reconnect (the
+   send-time `NO_API_KEY` guard still fires correctly). Echo updated key status with
+   `config:activeModel`.

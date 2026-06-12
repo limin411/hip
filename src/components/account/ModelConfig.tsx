@@ -58,7 +58,7 @@ export function ModelConfig() {
               <button
                 key={p.id}
                 disabled={!compat}
-                onClick={() => setSelected(p.id)}
+                onClick={() => { setAdding(false); setSelected(p.id) }}
                 className={cn(
                   'flex w-full items-center justify-between px-2.5 py-2 text-left text-body transition-colors',
                   compat ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-55',
@@ -185,17 +185,19 @@ function AddCustomProvider({ onDone, onCancel }: { onDone: (id: string) => void;
   const [key, setKey] = useState('')
   const [models, setModels] = useState('')
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   async function submit() {
     const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
     if (!id || !baseURL.trim()) return
-    setBusy(true)
+    setBusy(true); setError(null)
     try {
       const ids = models.split(',').map((m) => m.trim()).filter(Boolean)
       await addCustom(id, name.trim(), baseURL.trim(), ids)
       if (key.trim()) await useProvidersStore.getState().saveKey(id, key.trim())
       onDone(id)
-    } finally { setBusy(false) }
+    } catch (e) { console.error('[modelConfig]', e); setError(t('settings.modelConfig.error')) }
+    finally { setBusy(false) }
   }
 
   const field = 'h-8 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -205,9 +207,10 @@ function AddCustomProvider({ onDone, onCancel }: { onDone: (id: string) => void;
       <input className={field} placeholder={t('settings.modelConfig.baseUrl')} value={baseURL} onChange={(e) => setBaseURL(e.target.value)} />
       <input className={field} type="password" placeholder="sk-..." value={key} onChange={(e) => setKey(e.target.value)} />
       <input className={field} placeholder={t('settings.modelConfig.customModels')} value={models} onChange={(e) => setModels(e.target.value)} />
+      {error && <div className="text-meta text-danger">{error}</div>}
       <div className="flex gap-2">
         <button onClick={() => void submit()} disabled={busy || !name.trim() || !baseURL.trim()}
-          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-40">
+          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-50">
           {t('settings.modelConfig.addProvider')}
         </button>
         <button onClick={onCancel} className="h-8 rounded-md border border-border px-3 text-body text-ink-secondary hover:bg-surface-muted">

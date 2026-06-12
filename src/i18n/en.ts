@@ -31,7 +31,6 @@ export const en = {
       retry: 'Retry',
       stopped: 'Stopped',
       thinkingMode: 'Thinking',
-      thinkingModeHint: "Show the model's reasoning (deepseek-reasoner; slower, pricier)",
       thoughtFor: 'Thought for {{seconds}}s',
       delegatedTo: 'Delegated to {{role}}',
       reconnecting: 'Reconnecting…',

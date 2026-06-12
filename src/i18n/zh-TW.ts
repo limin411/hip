@@ -31,7 +31,6 @@ export const zhTW = {
       retry: '重試',
       stopped: '已停止',
       thinkingMode: '思考',
-      thinkingModeHint: '顯示模型的思考過程（deepseek-reasoner；較慢、較貴）',
       thoughtFor: '已思考 {{seconds}} 秒',
       delegatedTo: '委派給 {{role}}',
       reconnecting: '重新連線中…',

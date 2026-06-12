@@ -91,6 +91,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   // provider's HIP_MODEL_<ID>_API_KEY env is injected on the next saveKey() restart. The intended
   // flow is addCustom → saveKey (restart) before that provider is made active.
   addCustom: async (providerID, name, baseURL, modelIDs) => {
+    // Don't let a custom provider clobber a built-in catalog entry (e.g. name "OpenAI" → id "openai").
+    const existing = get().catalog[providerID]
+    if (existing && !existing.custom) throw new Error(`Provider id "${providerID}" already exists`)
     const config = get().config
     const next: ProvidersConfig = {
       ...config,

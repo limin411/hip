@@ -85,11 +85,17 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     }
     await setProvidersConfig(next)
     set({ config: next })
+    // If we just edited the ACTIVE provider's base URL, re-apply it live (a non-secret
+    // config:setActiveModel, no restart) so the running sidecar adopts it immediately — otherwise
+    // its active model keeps the old baseURL until the next re-select/restart.
+    if (config.activeModel?.providerID === providerID) {
+      sessionService.setActiveModel(providerID, config.activeModel.modelID, baseURL)
+    }
   },
 
-  // Note: addCustom/setBaseURL persist config but do NOT restart the sidecar, so the new
-  // provider's HIP_MODEL_<ID>_API_KEY env is injected on the next saveKey() restart. The intended
-  // flow is addCustom → saveKey (restart) before that provider is made active.
+  // Note: addCustom persists config but does NOT restart the sidecar, so the new provider's
+  // HIP_MODEL_<ID>_API_KEY env is injected on the next saveKey() restart. The intended flow is
+  // addCustom → saveKey (restart) before that provider is made active.
   addCustom: async (providerID, name, baseURL, modelIDs) => {
     // Don't let a custom provider clobber a built-in catalog entry (e.g. name "OpenAI" → id "openai").
     const existing = get().catalog[providerID]

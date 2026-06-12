@@ -399,6 +399,17 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().hasApiKey).toBe(true)
   })
 
+  it("apply('config:activeModel') refreshes hasApiKey on a live model switch", () => {
+    reset()
+    useDomainStore.getState().apply({ type: 'ready', hasApiKey: true })
+    // Switching the global model to a keyless provider must flip the banner without a reconnect.
+    useDomainStore.getState().apply({ type: 'config:activeModel', providerID: 'openai', modelID: 'gpt-4o', hasApiKey: false })
+    expect(useDomainStore.getState().hasApiKey).toBe(false)
+    // …and back to a keyed provider re-greens it.
+    useDomainStore.getState().apply({ type: 'config:activeModel', providerID: 'deepseek', modelID: 'deepseek-reasoner', hasApiKey: true })
+    expect(useDomainStore.getState().hasApiKey).toBe(true)
+  })
+
   it('renameSession updates the title optimistically', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })

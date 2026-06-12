@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { getActiveModel, setActiveModel, loadActiveModelFromEnv, DEEPSEEK_DEFAULT } from './providers.js'
+import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT } from './providers.js'
 import { providerKeyEnv } from '@hip/protocol'
 
 describe('sidecar provider config', () => {
@@ -35,5 +35,20 @@ describe('sidecar provider config', () => {
   it('setActiveModel/getActiveModel round-trip', () => {
     setActiveModel({ providerID: 'groq', modelID: 'llama-3.3-70b', baseURL: 'https://api.groq.com/openai/v1' })
     expect(getActiveModel().providerID).toBe('groq')
+  })
+
+  it('isOpenAICompatible blocks native-only providers and admits everything else', () => {
+    // The renderer-disabled (native-SDK) providers — the only ones a stale hip-providers.json can sneak in.
+    expect(isOpenAICompatible('anthropic')).toBe(false)
+    expect(isOpenAICompatible('google')).toBe(false)
+    expect(isOpenAICompatible('google-vertex')).toBe(false)
+    expect(isOpenAICompatible('amazon-bedrock')).toBe(false)
+    expect(isOpenAICompatible('azure')).toBe(false)
+    // OpenAI-compatible providers + unknown/custom ids default to runnable (blocklist, not allowlist,
+    // so npm-tagged openai-compatible providers the UI admits are never wrongly rejected here).
+    expect(isOpenAICompatible('deepseek')).toBe(true)
+    expect(isOpenAICompatible('openai')).toBe(true)
+    expect(isOpenAICompatible('groq')).toBe(true)
+    expect(isOpenAICompatible('some-self-hosted-vendor')).toBe(true)
   })
 })

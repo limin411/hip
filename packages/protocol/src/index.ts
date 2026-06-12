@@ -163,7 +163,7 @@ export type ServerMessage =
   | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
-  | { type: 'config:activeModel'; providerID: string; modelID: string }
+  | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }

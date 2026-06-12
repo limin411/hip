@@ -10,7 +10,7 @@ import * as workspaceGit from './workspace-git.js'
 import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
-import { getActiveModel } from '../config/providers.js'
+import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { providerKeyEnv } from '@hip/protocol'
 
 type SendFn = (msg: ServerMessage) => void
@@ -282,6 +282,23 @@ export class Session {
     return workspaceGit.gitInit(this._config.cwd)
   }
 
+  /** Emit INCOMPATIBLE_MODEL and return false when the active provider is not OpenAI-compatible.
+   *  The renderer's catalog gate normally prevents selecting one, but a stale/hand-edited
+   *  hip-providers.json can name e.g. `anthropic`; without this we'd build a ChatOpenAI against an
+   *  incompatible endpoint and fail every turn with an opaque AGENT_ERROR. Runs before requireApiKey
+   *  so the root cause (incompatibility) is surfaced even when the provider happens to have a key.
+   *  Injected-model sessions (tests) are exempt — they drive arbitrary providers deliberately. */
+  private requireCompatibleModel(send: SendFn): boolean {
+    if (this.usesEnvModel) {
+      const { providerID } = getActiveModel()
+      if (!isOpenAICompatible(providerID)) {
+        send({ type: 'error', sessionId: this.id, code: 'INCOMPATIBLE_MODEL', message: `Provider "${providerID}" is not OpenAI-compatible and can't be used here. Pick an OpenAI-compatible model in Settings.` })
+        return false
+      }
+    }
+    return true
+  }
+
   /** Emit NO_API_KEY and return false when the env-keyed active provider has no key. */
   private requireApiKey(send: SendFn): boolean {
     if (this.usesEnvModel) {
@@ -297,6 +314,7 @@ export class Session {
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
     if (this.running) return
     if (this.modelDirty) { this.buildAgent(); this.modelDirty = false }
+    if (!this.requireCompatibleModel(_send)) return
     if (!this.requireApiKey(_send)) return
 
     // Persist the user message + bump/derive session metadata before running.
@@ -513,6 +531,7 @@ export class Session {
   /** Re-run the last turn: drop the trailing assistant reply (if any) and stream a fresh one. */
   async regenerate(send: SendFn): Promise<void> {
     if (this.running) return
+    if (!this.requireCompatibleModel(send)) return
     if (!this.requireApiKey(send)) return
     const tail = this.messages[this.messages.length - 1]
     if (tail instanceof AIMessage) {

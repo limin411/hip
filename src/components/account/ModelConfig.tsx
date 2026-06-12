@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 
 export function ModelConfig() {
   const { t } = useTranslation()
-  const { catalog, config, keyConfigured, loaded, load, saveKey, clearKey, setActiveModel } = useProvidersStore()
+  const { catalog, config, keyConfigured, loaded, load, saveKey, clearKey, setBaseURL, setActiveModel } = useProvidersStore()
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [adding, setAdding] = useState(false)
@@ -91,9 +91,11 @@ export function ModelConfig() {
             ? <AddCustomProvider onDone={(id) => { setAdding(false); setSelected(id) }} onCancel={() => setAdding(false)} />
             : active ? <ProviderDetail key={active.id} provider={active}
               configured={!!keyConfigured[active.id]}
+              baseURL={config.providers[active.id]?.baseURL ?? active.api ?? ''}
               isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
               onSaveKey={(v) => saveKey(active.id, v)}
               onClearKey={() => clearKey(active.id)}
+              onSaveBaseURL={(v) => setBaseURL(active.id, v)}
               onSetCurrent={(modelID) => setActiveModel(active.id, modelID)} />
             : <div className="text-meta text-ink-tertiary">…</div>}
         </div>
@@ -102,22 +104,33 @@ export function ModelConfig() {
   )
 }
 
-function ProviderDetail({ provider, configured, isActive, onSaveKey, onClearKey, onSetCurrent }: {
+function ProviderDetail({ provider, configured, baseURL, isActive, onSaveKey, onClearKey, onSaveBaseURL, onSetCurrent }: {
   provider: CatalogProvider
   configured: boolean
+  baseURL: string
   isActive: (modelID: string) => boolean
   onSaveKey: (value: string) => Promise<void>
   onClearKey: () => Promise<void>
+  onSaveBaseURL: (value: string) => Promise<void>
   onSetCurrent: (modelID: string) => Promise<void>
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
+  const [baseURLValue, setBaseURLValue] = useState(baseURL)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function run(fn: () => Promise<void>) {
     setBusy(true); setError(null)
     try { await fn(); setValue('') }
+    catch (e) { console.error('[modelConfig]', e); setError(t('settings.modelConfig.error')) }
+    finally { setBusy(false) }
+  }
+
+  // Separate from run(): saving the base URL must NOT clear the API-key draft (`value`).
+  async function saveBaseURL() {
+    setBusy(true); setError(null)
+    try { await onSaveBaseURL(baseURLValue.trim()) }
     catch (e) { console.error('[modelConfig]', e); setError(t('settings.modelConfig.error')) }
     finally { setBusy(false) }
   }
@@ -146,8 +159,17 @@ function ProviderDetail({ provider, configured, isActive, onSaveKey, onClearKey,
       {error && <div className="mt-1 text-meta text-danger">{error}</div>}
 
       <div className="mt-4 mb-1 text-meta text-ink-tertiary">{t('settings.modelConfig.baseUrl')}</div>
-      <div className="flex h-8 items-center rounded-md border border-border bg-surface px-2.5 font-mono text-meta text-ink-secondary">
-        {provider.api ?? '—'}
+      <div className="flex items-center gap-2">
+        <input
+          value={baseURLValue}
+          onChange={(e) => setBaseURLValue(e.target.value)}
+          placeholder={provider.api ?? 'https://...'}
+          className="h-8 flex-1 rounded-md border border-border bg-surface px-2.5 font-mono text-meta text-ink focus:outline-none focus:ring-2 focus:ring-accent/60"
+        />
+        <button onClick={() => void saveBaseURL()} disabled={busy || !baseURLValue.trim() || baseURLValue.trim() === baseURL}
+          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+          {t('settings.modelConfig.save')}
+        </button>
       </div>
 
       <div className="mt-4 mb-1.5 text-meta text-ink-tertiary">{t('settings.modelConfig.models')}</div>

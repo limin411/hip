@@ -305,6 +305,9 @@ export const useDomainStore = create<DomainStore>((set) => ({
   apply: (msg) =>
     set((s) => {
       if (msg.type === 'ready') return { hasApiKey: msg.hasApiKey }
+      // A live model switch carries the new active provider's key status — refresh the banner without
+      // waiting for a reconnect's `ready`. (Top-level field, so handle here like `ready`, not in the reducer.)
+      if (msg.type === 'config:activeModel') return { hasApiKey: msg.hasApiKey }
       if (msg.type === 'session:search:result') return { searchHits: msg.hits }
       return applyServerMessage(s, msg, Date.now())
     }),

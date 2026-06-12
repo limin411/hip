@@ -401,18 +401,20 @@ existing `settings.apiKey*` strings move under the model page's namespace.
 The feature shipped on branch `feat/model-config` (Ship-with-follow-ups). These known
 gaps were deliberately deferred and should be picked up separately:
 
-1. **Per-provider Base URL override for catalog providers is read-only in v1.** The
-   detail pane shows `provider.api` but does not let the user edit it; the store's
-   `setBaseURL` action exists but has no UI caller yet. Custom providers still set
-   their base URL at creation. Wiring an editable Base URL (the escape hatch for
-   models.dev `api` values that omit `/v1`) is a follow-up.
-2. **Incompatible active model isn't guarded sidecar-side.** A hand-edited / stale
-   `hip-providers.json` naming a non-OpenAI provider (e.g. `anthropic`) as the active
-   model would build a `ChatOpenAI` against an incompatible endpoint and fail per-turn
-   with a generic error. The `isCompatible` gate lives only in the renderer; add a
-   defensive check (or clearer error copy) in the sidecar.
-3. **`ready.hasApiKey` goes stale after a live model switch.** `ready` is sent once
-   per connection; switching the global model to a keyless provider doesn't re-emit
-   key status, so the chat header's "no key" banner can lag until reconnect (the
-   send-time `NO_API_KEY` guard still fires correctly). Echo updated key status with
-   `config:activeModel`.
+1. ~~**Per-provider Base URL override for catalog providers is read-only in v1.**~~ **DONE (2026-06-12).**
+   The detail pane's Base URL is now an editable input wired to the store's `setBaseURL`
+   (`ModelConfig.tsx` → `providersStore`); saving it does NOT clear the API-key draft, and editing
+   the *active* provider's URL re-applies it live (`config:setActiveModel`, no restart). Custom
+   providers still set their base URL at creation.
+2. ~~**Incompatible active model isn't guarded sidecar-side.**~~ **DONE (2026-06-12).**
+   The sidecar now blocklists native-only providers (`isOpenAICompatible()` in
+   `packages/sidecar/src/config/providers.ts`) and `Session.requireCompatibleModel()`
+   emits a clear `INCOMPATIBLE_MODEL` error before a turn runs (ahead of the
+   `NO_API_KEY` guard), rather than letting `ChatOpenAI` fail opaquely against an
+   incompatible endpoint. Blocklist (not allowlist) so npm-tagged OpenAI-compatible
+   providers the renderer admits are never wrongly rejected.
+3. ~~**`ready.hasApiKey` goes stale after a live model switch.**~~ **DONE (2026-06-12).**
+   `config:setActiveModel` now re-emits the new active provider's key status: the
+   `config:activeModel` server message carries `hasApiKey`, and `sessionStore.apply`
+   updates the store from it (like `ready`), so the chat header's "no key" banner
+   refreshes on a live switch without waiting for a reconnect.

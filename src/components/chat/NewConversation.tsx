@@ -23,7 +23,7 @@ export function NewConversation() {
     <div className="flex flex-1 flex-col items-center overflow-y-auto px-5" data-testid="new-conversation">
       <div className="mt-[20vh] w-full max-w-3xl">
         <h1 className="mb-4 text-center text-display font-semibold text-ink">{t('chat.newConversationGreeting')}</h1>
-        <Composer value={text} onChange={(v) => useDraftStore.getState().setText(v)} onSubmit={submit} autoFocus thinking thinkingDisabled />
+        <Composer value={text} onChange={(v) => useDraftStore.getState().setText(v)} onSubmit={submit} autoFocus />
         <div className="mt-2 flex justify-center">
           <FolderPill />
         </div>

@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, Brain, Square } from 'lucide-react'
+import { ArrowUp, Square } from 'lucide-react'
 import { Textarea } from '@/components/ui/Textarea'
-import { ComposerChip } from './ComposerChip'
 
 export function Composer({
   value,
@@ -10,9 +9,6 @@ export function Composer({
   autoFocus,
   running,
   onStop,
-  thinking = true,
-  onToggleThinking,
-  thinkingDisabled,
   reconnecting,
   leftSlot,
 }: {
@@ -22,14 +18,10 @@ export function Composer({
   autoFocus?: boolean
   running?: boolean
   onStop?: () => void
-  thinking?: boolean
-  onToggleThinking?: (next: boolean) => void
-  thinkingDisabled?: boolean
   reconnecting?: boolean
   leftSlot?: React.ReactNode
 }) {
   const { t } = useTranslation()
-  const toggleDisabled = thinkingDisabled || !onToggleThinking
   return (
     <div className="rounded-xl border border-border bg-surface p-2 focus-within:ring-2 focus-within:ring-accent/60">
       <Textarea
@@ -48,17 +40,6 @@ export function Composer({
       />
       <div className="flex items-center justify-between px-1 pt-1">
         <div className="flex items-center gap-1">
-          <ComposerChip
-            onClick={() => onToggleThinking?.(!thinking)}
-            disabled={toggleDisabled}
-            active={thinking}
-            aria-pressed={thinking}
-            title={t('chat.thinkingModeHint')}
-            data-testid="thinking-toggle"
-          >
-            <Brain size={13} className="shrink-0" aria-hidden />
-            <span>{t('chat.thinkingMode')}</span>
-          </ComposerChip>
           {leftSlot}
         </div>
         {running && onStop ? (

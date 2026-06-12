@@ -1,15 +1,12 @@
 import { useState } from 'react'
 import { Composer } from './Composer'
 import { StylePicker } from './StylePicker'
-import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 
 export function InputBar() {
   const [value, setValue] = useState('')
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
-  const session = useActiveSession()
-  const activeSessionId = useActiveSessionId()
-  const thinking = session?.config.thinking ?? true
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the ChatHeader reconnect button.
@@ -30,9 +27,6 @@ export function InputBar() {
           running={status === 'running'}
           onStop={() => sessionService.cancel()}
           reconnecting={reconnecting}
-          thinking={thinking}
-          thinkingDisabled={status === 'running'}
-          onToggleThinking={activeSessionId ? (next) => sessionService.setThinking(activeSessionId, next) : undefined}
           leftSlot={<StylePicker />}
         />
       </div>

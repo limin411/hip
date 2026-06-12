@@ -5,6 +5,7 @@ import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
+import { setActiveModel } from '../config/providers.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -99,6 +100,13 @@ export class SessionManager {
         send({ type: 'session:systemPrompt', sessionId: msg.sessionId, systemPrompt: s.config.systemPrompt ?? null })
         break
       }
+      case 'config:setActiveModel': {
+        setActiveModel({ providerID: msg.providerID, modelID: msg.modelID, baseURL: msg.baseURL })
+        // Apply to every in-memory session at its next idle turn (no restart).
+        for (const s of this.sessions.values()) s.applyActiveModel()
+        send({ type: 'config:activeModel', providerID: msg.providerID, modelID: msg.modelID })
+        break
+      }
       case 'fs:ls': {
         const r = await this.ensureSession(msg.sessionId).lsDir(msg.path)
         send({ type: 'fs:ls:result', sessionId: msg.sessionId, path: msg.path, entries: r.entries ?? [], error: r.error })
@@ -156,7 +164,7 @@ export class SessionManager {
     const existing = this.sessions.get(id)
     if (existing) return existing
     const row = this.store?.getSession(id)
-    const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
+    const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
     const session = new Session(id, config, this.modelFactory(config), this.store)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)

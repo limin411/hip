@@ -19,13 +19,20 @@ pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
 
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     let mut cmd = app.shell().sidecar("sidecar").map_err(|e| e.to_string())?;
-    // Inject the keychain key, or an empty value to OVERRIDE any inherited
-    // HIP_MODEL_DEEPSEEK_API_KEY (the child inherits the parent env). Empty → the sidecar's
-    // NO_API_KEY guard fires, so a cleared key truly disables the agent.
-    cmd = match read_api_key() {
-        Some(key) => cmd.env("HIP_MODEL_DEEPSEEK_API_KEY", key),
-        None => cmd.env("HIP_MODEL_DEEPSEEK_API_KEY", ""),
-    };
+    // Inject each configured provider's keychain key as HIP_MODEL_<ID>_API_KEY
+    // (empty string when absent → overrides any inherited env so a cleared key
+    // truly disables that provider). The sidecar picks the active provider's key.
+    for id in configured_provider_ids(app) {
+        let env = provider_key_env(&id);
+        match read_provider_key(&id) {
+            Some(key) => cmd = cmd.env(&env, key),
+            None => cmd = cmd.env(&env, ""),
+        }
+    }
+    // Point the sidecar at the non-secret providers config (active model + base URLs).
+    if let Ok(dir) = app.path().app_data_dir() {
+        cmd = cmd.env("HIP_PROVIDERS_PATH", dir.join("hip-providers.json").to_string_lossy().into_owned());
+    }
     // Tell the sidecar where to persist sessions (the app data dir). Create the dir
     // so the first launch on a fresh machine succeeds; if it's unavailable the
     // sidecar falls back to an in-memory DB rather than failing to start.
@@ -102,12 +109,39 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     Ok(info.port)
 }
 
-/// The sidecar's API key comes ONLY from the OS keychain — the single source of
-/// truth the user controls via Settings. We deliberately do NOT fall back to the
-/// process env: the spawned sidecar inherits the parent env, so an inherited (or
-/// dev `.env`) HIP_MODEL_DEEPSEEK_API_KEY would otherwise mask an explicit "clear" in the UI.
-pub fn read_api_key() -> Option<String> {
-    crate::get_secret_value("HIP_MODEL_DEEPSEEK_API_KEY")
+/// Keychain entry name AND env var name for a provider's API key (mirrors
+/// protocol's `providerKeyEnv`). Keep the three impls (TS protocol, TS sidecar,
+/// this) in sync.
+pub fn provider_key_env(provider_id: &str) -> String {
+    let norm: String = provider_id
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_uppercase() } else { '_' })
+        .collect();
+    format!("HIP_MODEL_{norm}_API_KEY")
+}
+
+/// Read the keychain key for a provider (keychain entry name == env var name).
+pub fn read_provider_key(provider_id: &str) -> Option<String> {
+    crate::get_secret_value(&provider_key_env(provider_id))
+}
+
+/// Provider ids present in hip-providers.json (always includes "deepseek" so the
+/// out-of-box DeepSeek path keeps working before the user opens the new page).
+fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
+    let mut ids = vec!["deepseek".to_string()];
+    if let Ok(dir) = app.path().app_data_dir() {
+        let path = dir.join("hip-providers.json");
+        if let Ok(body) = std::fs::read_to_string(&path) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
+                if let Some(map) = v.get("providers").and_then(|p| p.as_object()) {
+                    for k in map.keys() {
+                        if !ids.contains(k) { ids.push(k.clone()); }
+                    }
+                }
+            }
+        }
+    }
+    ids
 }
 
 /// The sidecar's SQLite file lives in the app data dir as `hip.db`.

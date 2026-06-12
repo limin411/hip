@@ -1,13 +1,39 @@
 export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer'
 
 export interface SessionConfig {
-  llmProvider: 'deepseek'
+  llmProvider: string          // provider id (was the 'deepseek' literal)
   model: string
+  baseURL?: string             // resolved OpenAI-compatible base URL for the provider
   tools: string[]
   systemPrompt?: string
   cwd?: string                 // absolute project root; undefined → virtual FS (no real file tools)
-  thinking?: boolean           // surface reasoning steps; undefined ⇒ treated as true
-  language?: 'en' | 'zh-CN' | 'zh-TW'  // UI / assistant output language
+  thinking?: boolean           // DEPRECATED: retained for back-compat; no longer swaps models
+  language?: 'en' | 'zh-CN' | 'zh-TW'
+}
+
+/** Global current model the whole app uses. */
+export interface ActiveModel {
+  providerID: string
+  modelID: string
+  baseURL: string              // always resolved; sidecar falls back to DEEPSEEK_DEFAULT when unknown
+}
+
+/** One provider's non-secret config (the key lives only in the keychain). */
+export interface ProviderConfigEntry {
+  enabled: boolean
+  baseURL?: string             // catalog default or user override; required for custom
+  custom?: { name: string }    // present iff user-defined (not in the models.dev catalog)
+}
+
+/** Durable, non-secret provider config persisted to app_data_dir/hip-providers.json. */
+export interface ProvidersConfig {
+  providers: Record<string, ProviderConfigEntry>
+  activeModel?: Pick<ActiveModel, 'providerID' | 'modelID'>   // baseURL resolved at read time
+}
+
+/** Keychain entry name AND env var name for a provider's API key. Single source of the rule. */
+export function providerKeyEnv(providerID: string): string {
+  return `HIP_MODEL_${providerID.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`
 }
 
 export interface Message {
@@ -119,6 +145,7 @@ export type ClientMessage =
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
+  | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
@@ -136,6 +163,7 @@ export type ServerMessage =
   | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
+  | { type: 'config:activeModel'; providerID: string; modelID: string }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }

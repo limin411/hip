@@ -146,7 +146,7 @@ fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
     ids
 }
 
-/// The sidecar's SQLite file lives in the app data dir as `hip.db`.
+/// The sidecar's SQLite file is named `hip.db` inside the `db/` dir.
 pub fn db_path_for(data_dir: &Path) -> PathBuf {
     data_dir.join("hip.db")
 }

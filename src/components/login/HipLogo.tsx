@@ -1,6 +1,6 @@
 // hip 品牌标识 —— 一颗「蜜桃 / 屁股」。三种角色共享同一基因：
 //   color   —— 全彩珊瑚桃，登录 hero / 营销主脸
-//   tile    —— 白桃嵌 Teal 圆角砖，dock / favicon / 占位替换
+//   tile    —— 白桃嵌 Blue 圆角砖，dock / favicon / 占位替换
 //   minimal —— 几何两瓣，小尺寸 favicon 兜底
 // 品牌色自带（珊瑚仅在此处出现），不引入全局 token。
 
@@ -149,11 +149,11 @@ export function HipLogo({
 
       {variant === 'tile' && (
         <>
-          <rect x="6" y="6" width="108" height="108" rx="26" fill="#0d9488" />
+          <rect x="6" y="6" width="108" height="108" rx="26" fill="#0062ad" />
           <g transform="translate(20 19) scale(0.66)">
             <path d={PEACH} fill="#ffffff" />
             <path d={LEAF} fill="#ffffff" />
-            <path d={CLEFT} fill="none" stroke="#0d9488" strokeWidth="5" strokeLinecap="round" />
+            <path d={CLEFT} fill="none" stroke="#0062ad" strokeWidth="5" strokeLinecap="round" />
           </g>
         </>
       )}
@@ -162,11 +162,11 @@ export function HipLogo({
         <>
           <path
             d="M57 28 C 38 16 17 27 17 56 C 17 82 37 100 57 93 C 53 71 53 50 57 28 Z"
-            fill="#0d9488"
+            fill="#0062ad"
           />
           <path
             d="M63 28 C 82 16 103 27 103 56 C 103 82 83 100 63 93 C 67 71 67 50 63 28 Z"
-            fill="#0f766e"
+            fill="#00538f"
           />
         </>
       )}

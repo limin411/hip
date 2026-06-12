@@ -16,7 +16,7 @@ export function LoginScreen() {
       {/* 左侧品牌区 —— 轰炸级动态蜜桃 hero */}
       <div
         className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex"
-        style={{ background: 'linear-gradient(150deg, #119c8d 0%, #0c766b 52%, #083f39 100%)' }}
+        style={{ background: 'linear-gradient(150deg, #0a78c6 0%, #0062ad 52%, #02324f 100%)' }}
       >
         <HipLogo variant="hero" size={260} title="hip" />
       </div>

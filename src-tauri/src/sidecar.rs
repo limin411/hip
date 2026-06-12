@@ -151,7 +151,14 @@ pub fn db_path_for(data_dir: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_info_line;
+    use super::{parse_info_line, provider_key_env};
+
+    #[test]
+    fn provider_key_env_matches_ts_normalization() {
+        // Must stay in lockstep with @hip/protocol's providerKeyEnv (see providers.test.ts).
+        assert_eq!(provider_key_env("deepseek"), "HIP_MODEL_DEEPSEEK_API_KEY");
+        assert_eq!(provider_key_env("github-copilot"), "HIP_MODEL_GITHUB_COPILOT_API_KEY");
+    }
 
     #[test]
     fn parses_port_and_token() {

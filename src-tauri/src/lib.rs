@@ -2,6 +2,7 @@ mod sidecar;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
+use std::time::{Duration, SystemTime};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
 
@@ -93,8 +94,6 @@ fn delete_secret(key: String) -> Result<(), String> {
     }
 }
 
-use std::time::{Duration, SystemTime};
-
 const MODELS_URL: &str = "https://models.dev/api.json";
 const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
@@ -137,7 +136,9 @@ async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
     match reqwest::get(&url).await.and_then(|r| r.error_for_status()) {
         Ok(resp) => match resp.text().await {
             Ok(body) => {
-                if let Some(ref c) = cache { let _ = std::fs::write(c, &body); }
+                if let Some(ref c) = cache {
+                    let _ = std::fs::write(c, &body);
+                }
                 Ok(body)
             }
             Err(_) => fallback_catalog(cache.as_deref()),

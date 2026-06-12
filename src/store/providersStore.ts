@@ -6,6 +6,9 @@ import { getProvidersConfig, setProvidersConfig } from '@/ipc/providersConfig'
 import { isProviderKeyConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
 
+/** Coordinates the models.dev catalog, the hip-providers.json config, and per-provider keychain
+ *  keys. Every async action can reject (the underlying tauri `invoke` throws) — callers must
+ *  try/catch and surface `settings.modelConfig.error`; the store does not hold an error field. */
 interface ProvidersStore {
   catalog: Catalog
   config: ProvidersConfig
@@ -84,6 +87,9 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     set({ config: next })
   },
 
+  // Note: addCustom/setBaseURL persist config but do NOT restart the sidecar, so the new
+  // provider's HIP_MODEL_<ID>_API_KEY env is injected on the next saveKey() restart. The intended
+  // flow is addCustom → saveKey (restart) before that provider is made active.
   addCustom: async (providerID, name, baseURL, modelIDs) => {
     const config = get().config
     const next: ProvidersConfig = {
@@ -103,6 +109,10 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   setActiveModel: async (providerID, modelID) => {
     const config = get().config
     const baseURL = resolveBaseURL(get().catalog[providerID], config, providerID)
+    // An empty base URL means the provider is unusable (no catalog `api`, no override). Refuse
+    // rather than ship baseURL:'' to the sidecar's config:setActiveModel handler (which, unlike the
+    // boot path, has no DEEPSEEK_DEFAULT fallback). Callers surface this via modelConfig.error.
+    if (!baseURL) throw new Error(`No base URL configured for provider "${providerID}"`)
     const next: ProvidersConfig = { ...config, activeModel: { providerID, modelID } }
     await setProvidersConfig(next)
     sessionService.setActiveModel(providerID, modelID, baseURL)

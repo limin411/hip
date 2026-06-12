@@ -10,6 +10,7 @@ export function ModelConfig() {
   const { catalog, config, keyConfigured, loaded, load, saveKey, clearKey, setActiveModel } = useProvidersStore()
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => { void load() }, [load])
 
@@ -76,19 +77,24 @@ export function ModelConfig() {
               </button>
             )
           })}
-          <div className="flex items-center gap-1.5 border-t border-border px-2.5 py-2 text-body text-accent-strong">
+          <button
+            onClick={() => setAdding(true)}
+            className="flex w-full items-center gap-1.5 border-t border-border px-2.5 py-2 text-body text-accent-strong hover:bg-surface-muted"
+          >
             <Plus size={14} /> {t('settings.modelConfig.addCustom')}
-          </div>
+          </button>
         </div>
 
         {/* Detail */}
         <div className="min-w-0 flex-1">
-          {active ? <ProviderDetail key={active.id} provider={active}
-            configured={!!keyConfigured[active.id]}
-            isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
-            onSaveKey={(v) => saveKey(active.id, v)}
-            onClearKey={() => clearKey(active.id)}
-            onSetCurrent={(modelID) => setActiveModel(active.id, modelID)} />
+          {adding
+            ? <AddCustomProvider onDone={(id) => { setAdding(false); setSelected(id) }} onCancel={() => setAdding(false)} />
+            : active ? <ProviderDetail key={active.id} provider={active}
+              configured={!!keyConfigured[active.id]}
+              isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
+              onSaveKey={(v) => saveKey(active.id, v)}
+              onClearKey={() => clearKey(active.id)}
+              onSetCurrent={(modelID) => setActiveModel(active.id, modelID)} />
             : <div className="text-meta text-ink-tertiary">…</div>}
         </div>
       </div>
@@ -168,5 +174,46 @@ function ProviderDetail({ provider, configured, isActive, onSaveKey, onClearKey,
         })}
       </div>
     </>
+  )
+}
+
+function AddCustomProvider({ onDone, onCancel }: { onDone: (id: string) => void; onCancel: () => void }) {
+  const { t } = useTranslation()
+  const addCustom = useProvidersStore((s) => s.addCustom)
+  const [name, setName] = useState('')
+  const [baseURL, setBaseURL] = useState('')
+  const [key, setKey] = useState('')
+  const [models, setModels] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    if (!id || !baseURL.trim()) return
+    setBusy(true)
+    try {
+      const ids = models.split(',').map((m) => m.trim()).filter(Boolean)
+      await addCustom(id, name.trim(), baseURL.trim(), ids)
+      if (key.trim()) await useProvidersStore.getState().saveKey(id, key.trim())
+      onDone(id)
+    } finally { setBusy(false) }
+  }
+
+  const field = 'h-8 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  return (
+    <div className="flex flex-col gap-2">
+      <input className={field} placeholder={t('settings.modelConfig.customName')} value={name} onChange={(e) => setName(e.target.value)} />
+      <input className={field} placeholder={t('settings.modelConfig.baseUrl')} value={baseURL} onChange={(e) => setBaseURL(e.target.value)} />
+      <input className={field} type="password" placeholder="sk-..." value={key} onChange={(e) => setKey(e.target.value)} />
+      <input className={field} placeholder={t('settings.modelConfig.customModels')} value={models} onChange={(e) => setModels(e.target.value)} />
+      <div className="flex gap-2">
+        <button onClick={() => void submit()} disabled={busy || !name.trim() || !baseURL.trim()}
+          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-40">
+          {t('settings.modelConfig.addProvider')}
+        </button>
+        <button onClick={onCancel} className="h-8 rounded-md border border-border px-3 text-body text-ink-secondary hover:bg-surface-muted">
+          {t('common.close')}
+        </button>
+      </div>
+    </div>
   )
 }

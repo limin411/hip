@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { scratchDirFor, ensureScratchDir, removeScratchDir } from './scratch.js'
+import { scratchDirFor, ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 
 let root: string
 beforeEach(() => { root = mkdtempSync(path.join(os.tmpdir(), 'hip-scratch-')) })
@@ -26,5 +26,23 @@ describe('scratch', () => {
     expect(() => scratchDirFor('../evil', root)).toThrow()
     expect(() => scratchDirFor('a/b', root)).toThrow()
     expect(() => scratchDirFor('', root)).toThrow()
+  })
+})
+
+describe('defaultScratchRoot', () => {
+  const saved = process.env.HIP_SCRATCH_ROOT
+  afterEach(() => {
+    if (saved === undefined) delete process.env.HIP_SCRATCH_ROOT
+    else process.env.HIP_SCRATCH_ROOT = saved
+  })
+
+  it('honors HIP_SCRATCH_ROOT when set', () => {
+    process.env.HIP_SCRATCH_ROOT = '/custom/scratch/root'
+    expect(defaultScratchRoot()).toBe('/custom/scratch/root')
+  })
+
+  it('falls back to ~/.hip/scratch when unset', () => {
+    delete process.env.HIP_SCRATCH_ROOT
+    expect(defaultScratchRoot()).toBe(path.join(os.homedir(), '.hip', 'scratch'))
   })
 })

@@ -2,8 +2,12 @@ import { mkdirSync, rmSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-/** Default per-user root for pure-chat sandbox workspaces. */
+/** Default per-user root for pure-chat sandbox workspaces.
+ *  Honors HIP_SCRATCH_ROOT (injected by the Tauri shell so the cross-platform
+ *  root is authoritative); falls back to ~/.hip/scratch for standalone runs. */
 export function defaultScratchRoot(): string {
+  const fromEnv = process.env.HIP_SCRATCH_ROOT?.trim()
+  if (fromEnv) return fromEnv
   return path.join(os.homedir(), '.hip', 'scratch')
 }
 

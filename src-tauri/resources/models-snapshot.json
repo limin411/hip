@@ -1,0 +1,24 @@
+{
+  "deepseek": {
+    "id": "deepseek", "name": "DeepSeek", "npm": "@ai-sdk/openai-compatible",
+    "api": "https://api.deepseek.com/v1", "env": ["DEEPSEEK_API_KEY"],
+    "models": {
+      "deepseek-reasoner": { "id": "deepseek-reasoner", "name": "DeepSeek Reasoner", "reasoning": true, "tool_call": true, "attachment": false, "limit": { "context": 128000, "output": 8192 } },
+      "deepseek-chat": { "id": "deepseek-chat", "name": "DeepSeek Chat", "reasoning": false, "tool_call": true, "attachment": false, "limit": { "context": 128000, "output": 8192 } }
+    }
+  },
+  "openai": {
+    "id": "openai", "name": "OpenAI", "npm": "@ai-sdk/openai",
+    "api": "https://api.openai.com/v1", "env": ["OPENAI_API_KEY"],
+    "models": {
+      "gpt-4o": { "id": "gpt-4o", "name": "GPT-4o", "reasoning": false, "tool_call": true, "attachment": true, "limit": { "context": 128000, "output": 16384 } }
+    }
+  },
+  "anthropic": {
+    "id": "anthropic", "name": "Anthropic", "npm": "@ai-sdk/anthropic",
+    "api": "https://api.anthropic.com", "env": ["ANTHROPIC_API_KEY"],
+    "models": {
+      "claude-sonnet-4-6": { "id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "reasoning": true, "tool_call": true, "attachment": true, "limit": { "context": 200000, "output": 64000 } }
+    }
+  }
+}

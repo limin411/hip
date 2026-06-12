@@ -18,20 +18,20 @@ export interface ActiveModel {
   baseURL: string              // always resolved; sidecar falls back to DEEPSEEK_DEFAULT when unknown
 }
 
-/** One provider's non-secret config (the key lives only in the keychain). */
+/** One provider's non-secret config (the key lives only in ~/.hip/config/auth.json). */
 export interface ProviderConfigEntry {
   enabled: boolean
   baseURL?: string             // catalog default or user override; required for custom
   custom?: { name: string }    // present iff user-defined (not in the models.dev catalog)
 }
 
-/** Durable, non-secret provider config persisted to app_data_dir/hip-providers.json. */
+/** Durable, non-secret provider config persisted to ~/.hip/config/hip-providers.json. */
 export interface ProvidersConfig {
   providers: Record<string, ProviderConfigEntry>
   activeModel?: Pick<ActiveModel, 'providerID' | 'modelID'>   // baseURL resolved at read time
 }
 
-/** Keychain entry name AND env var name for a provider's API key. Single source of the rule. */
+/** auth.json key name AND env var name for a provider's API key. Single source of the rule. */
 export function providerKeyEnv(providerID: string): string {
   return `HIP_MODEL_${providerID.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`
 }

@@ -1,18 +1,17 @@
 // src/ipc/secrets.ts
 import { invoke } from '@tauri-apps/api/core'
+import { providerKeyEnv } from '@hip/protocol'
 
-const DEEPSEEK_KEY = 'HIP_MODEL_DEEPSEEK_API_KEY'
-
-export function isApiKeyConfigured(): Promise<boolean> {
-  return invoke<boolean>('has_secret', { key: DEEPSEEK_KEY })
+export function isProviderKeyConfigured(providerID: string): Promise<boolean> {
+  return invoke<boolean>('has_secret', { key: providerKeyEnv(providerID) })
 }
 
-export function saveApiKey(value: string): Promise<void> {
-  return invoke<void>('set_secret', { key: DEEPSEEK_KEY, value })
+export function saveProviderKey(providerID: string, value: string): Promise<void> {
+  return invoke<void>('set_secret', { key: providerKeyEnv(providerID), value })
 }
 
-export function clearApiKey(): Promise<void> {
-  return invoke<void>('delete_secret', { key: DEEPSEEK_KEY })
+export function clearProviderKey(providerID: string): Promise<void> {
+  return invoke<void>('delete_secret', { key: providerKeyEnv(providerID) })
 }
 
 export function restartSidecar(): Promise<number> {

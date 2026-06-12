@@ -20,7 +20,9 @@ const TITLE_LEN = 40
 /** A turn with no outbound activity for this long is treated as a stalled provider stream and aborted. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
 
-/** thinking === false → fast non-reasoning model; otherwise the reasoner (default). A caller-pinned config.model still wins. */
+/** DEPRECATED — superseded by the global active model (config/providers.ts). buildModel no longer
+ *  calls this; it remains only for the legacy DeepSeek thinking-toggle unit tests pending full removal.
+ *  thinking === false → fast non-reasoning model; otherwise the reasoner. A caller-pinned config.model wins. */
 export function resolveModel(config: SessionConfig): string {
   return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
 }
@@ -55,7 +57,7 @@ function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
     const { providerID, modelID, baseURL } = getActiveModel()
     const model = new ChatOpenAI({
       model: modelID,
-      apiKey: process.env[providerKeyEnv(providerID)] || 'sk-missing',
+      apiKey: activeKey(providerID),
       configuration: { baseURL },
       maxTokens: 24,
       temperature: 0.3,

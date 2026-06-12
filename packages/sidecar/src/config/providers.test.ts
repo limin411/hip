@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -7,6 +7,7 @@ import { providerKeyEnv } from '@hip/protocol'
 
 describe('sidecar provider config', () => {
   beforeEach(() => setActiveModel(DEEPSEEK_DEFAULT))
+  afterEach(() => { delete process.env.HIP_PROVIDERS_PATH })
 
   it('providerKeyEnv normalises ids', () => {
     expect(providerKeyEnv('deepseek')).toBe('HIP_MODEL_DEEPSEEK_API_KEY')

@@ -93,6 +93,68 @@ fn delete_secret(key: String) -> Result<(), String> {
     }
 }
 
+use std::time::{Duration, SystemTime};
+
+const MODELS_URL: &str = "https://models.dev/api.json";
+const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
+
+fn providers_config_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let dir = app.path().app_data_dir().ok()?;
+    let _ = std::fs::create_dir_all(&dir);
+    Some(dir.join("hip-providers.json"))
+}
+
+#[tauri::command]
+fn get_providers_config(app: tauri::AppHandle) -> Result<String, String> {
+    match providers_config_path(&app) {
+        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
+        None => Ok(String::new()),
+    }
+}
+
+#[tauri::command]
+fn set_providers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let p = providers_config_path(&app).ok_or("no app data dir")?;
+    std::fs::write(&p, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
+    let cache = app.path().app_data_dir().ok().map(|d| d.join("models.json"));
+    if let Some(ref c) = cache {
+        if let Ok(meta) = std::fs::metadata(c) {
+            if let Ok(modified) = meta.modified() {
+                if SystemTime::now().duration_since(modified).unwrap_or(CATALOG_TTL) < CATALOG_TTL {
+                    if let Ok(body) = std::fs::read_to_string(c) {
+                        return Ok(body);
+                    }
+                }
+            }
+        }
+    }
+    let url = std::env::var("HIP_MODELS_URL").unwrap_or_else(|_| MODELS_URL.to_string());
+    match reqwest::get(&url).await.and_then(|r| r.error_for_status()) {
+        Ok(resp) => match resp.text().await {
+            Ok(body) => {
+                if let Some(ref c) = cache { let _ = std::fs::write(c, &body); }
+                Ok(body)
+            }
+            Err(_) => fallback_catalog(cache.as_deref()),
+        },
+        Err(_) => fallback_catalog(cache.as_deref()),
+    }
+}
+
+fn fallback_catalog(cache: Option<&std::path::Path>) -> Result<String, String> {
+    if let Some(c) = cache {
+        if let Ok(body) = std::fs::read_to_string(c) {
+            return Ok(body);
+        }
+    }
+    Ok(SNAPSHOT.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -120,7 +182,10 @@ pub fn run() {
             set_secret,
             get_secret,
             has_secret,
-            delete_secret
+            delete_secret,
+            models_catalog,
+            get_providers_config,
+            set_providers_config
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

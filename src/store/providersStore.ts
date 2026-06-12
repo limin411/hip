@@ -6,7 +6,7 @@ import { getProvidersConfig, setProvidersConfig } from '@/ipc/providersConfig'
 import { isProviderKeyConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
 
-/** Coordinates the models.dev catalog, the hip-providers.json config, and per-provider keychain
+/** Coordinates the models.dev catalog, the hip-providers.json config, and per-provider API
  *  keys. Every async action can reject (the underlying tauri `invoke` throws) — callers must
  *  try/catch and surface `settings.modelConfig.error`; the store does not hold an error field. */
 interface ProvidersStore {

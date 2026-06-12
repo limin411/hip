@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeneralSettings } from './GeneralSettings'
+import { ModelConfig } from './ModelConfig'
 
 const PAGES = [
   { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
+  { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
 ] as const
 
 export function SettingsPanel() {

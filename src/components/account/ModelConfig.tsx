@@ -83,7 +83,7 @@ export function ModelConfig() {
 
         {/* Detail */}
         <div className="min-w-0 flex-1">
-          {active ? <ProviderDetail provider={active}
+          {active ? <ProviderDetail key={active.id} provider={active}
             configured={!!keyConfigured[active.id]}
             isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
             onSaveKey={(v) => saveKey(active.id, v)}
@@ -128,11 +128,11 @@ function ProviderDetail({ provider, configured, isActive, onSaveKey, onClearKey,
           className="h-8 flex-1 rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60"
         />
         <button onClick={() => run(() => onSaveKey(value.trim()))} disabled={busy || !value.trim()}
-          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-40">
+          className="h-8 rounded-md bg-accent px-3 text-body font-medium text-white hover:bg-accent-hover disabled:opacity-50">
           {configured ? t('settings.modelConfig.change') : t('settings.modelConfig.save')}
         </button>
         <button onClick={() => run(onClearKey)} disabled={busy || !configured}
-          className="h-8 rounded-md border border-border px-3 text-body text-ink-secondary hover:bg-surface-muted disabled:opacity-40">
+          className="h-8 rounded-md border border-border px-3 text-body text-ink-secondary hover:bg-surface-muted disabled:opacity-50">
           {t('settings.modelConfig.clear')}
         </button>
       </div>
@@ -149,8 +149,8 @@ function ProviderDetail({ provider, configured, isActive, onSaveKey, onClearKey,
         {Object.values(provider.models).map((m) => {
           const current = isActive(m.id)
           return (
-            <button key={m.id} onClick={() => void run(() => onSetCurrent(m.id))}
-              className={cn('flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left',
+            <button key={m.id} disabled={busy} onClick={() => void run(() => onSetCurrent(m.id))}
+              className={cn('flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left disabled:opacity-60',
                 current ? 'border-accent bg-accent-active' : 'border-border hover:bg-surface-muted')}>
               <div className="min-w-0 flex-1">
                 <div className={cn('text-body', current && 'font-medium text-accent-strong')}>{m.name}</div>

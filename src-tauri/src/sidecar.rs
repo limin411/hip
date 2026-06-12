@@ -30,15 +30,21 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         }
     }
     // Point the sidecar at the non-secret providers config (active model + base URLs).
-    if let Ok(dir) = app.path().app_data_dir() {
-        cmd = cmd.env("HIP_PROVIDERS_PATH", dir.join("hip-providers.json").to_string_lossy().into_owned());
+    if let Some(dir) = crate::paths::config_dir(app) {
+        cmd = cmd.env(
+            "HIP_PROVIDERS_PATH",
+            dir.join("hip-providers.json").to_string_lossy().into_owned(),
+        );
     }
-    // Tell the sidecar where to persist sessions (the app data dir). Create the dir
-    // so the first launch on a fresh machine succeeds; if it's unavailable the
-    // sidecar falls back to an in-memory DB rather than failing to start.
-    if let Ok(dir) = app.path().app_data_dir() {
-        let _ = std::fs::create_dir_all(&dir);
+    // Tell the sidecar where to persist sessions. paths::db_dir creates the dir; if it's
+    // unavailable the sidecar falls back to an in-memory DB rather than failing to start.
+    if let Some(dir) = crate::paths::db_dir(app) {
         cmd = cmd.env("HIP_DB_PATH", db_path_for(&dir).to_string_lossy().into_owned());
+    }
+    // Make the cross-platform root authoritative for scratch too (Windows consistency).
+    // On macOS/Linux this equals scratch.ts's existing default, so behavior is unchanged.
+    if let Some(dir) = crate::paths::scratch_dir(app) {
+        cmd = cmd.env("HIP_SCRATCH_ROOT", dir.to_string_lossy().into_owned());
     }
     // Tie the sidecar's lifetime to ours. tauri-plugin-shell pipes the child's
     // stdin and holds the write end, so when this app process dies by ANY means —
@@ -125,17 +131,17 @@ pub fn read_provider_key(app: &AppHandle, provider_id: &str) -> Option<String> {
     crate::get_secret_value(app, &provider_key_env(provider_id))
 }
 
-/// Provider ids present in hip-providers.json (always includes "deepseek" so the
-/// out-of-box DeepSeek path keeps working before the user opens the new page).
 fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
     let mut ids = vec!["deepseek".to_string()];
-    if let Ok(dir) = app.path().app_data_dir() {
+    if let Some(dir) = crate::paths::config_dir(app) {
         let path = dir.join("hip-providers.json");
         if let Ok(body) = std::fs::read_to_string(&path) {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
                 if let Some(map) = v.get("providers").and_then(|p| p.as_object()) {
                     for k in map.keys() {
-                        if !ids.contains(k) { ids.push(k.clone()); }
+                        if !ids.contains(k) {
+                            ids.push(k.clone());
+                        }
                     }
                 }
             }

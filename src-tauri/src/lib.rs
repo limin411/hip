@@ -85,9 +85,7 @@ const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
 fn providers_config_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
-    let dir = app.path().app_data_dir().ok()?;
-    let _ = std::fs::create_dir_all(&dir);
-    Some(dir.join("hip-providers.json"))
+    Some(paths::config_dir(app)?.join("hip-providers.json"))
 }
 
 #[tauri::command]
@@ -106,7 +104,7 @@ fn set_providers_config(app: tauri::AppHandle, json: String) -> Result<(), Strin
 
 #[tauri::command]
 async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
-    let cache = app.path().app_data_dir().ok().map(|d| d.join("models.json"));
+    let cache = paths::cache_dir(&app).map(|d| d.join("models.json"));
     if let Some(ref c) = cache {
         if let Ok(meta) = std::fs::metadata(c) {
             if let Ok(modified) = meta.modified() {

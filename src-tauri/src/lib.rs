@@ -50,50 +50,34 @@ async fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
     Ok(port)
 }
 
-const SECRET_SERVICE: &str = "com.ljm.app";
+/// Path to the file-backed secret store (`~/.hip/config/auth.json`).
+fn auth_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(paths::config_dir(app).ok_or("no config dir")?.join("auth.json"))
+}
 
 /// Internal reader used by the sidecar spawn path.
-pub fn get_secret_value(key: &str) -> Option<String> {
-    let entry = keyring::Entry::new(SECRET_SERVICE, key).ok()?;
-    match entry.get_password() {
-        Ok(v) => Some(v),
-        Err(keyring::Error::NoEntry) => None,
-        Err(e) => {
-            eprintln!("[tauri] keychain read error for {key}: {e}");
-            None
-        }
-    }
+pub fn get_secret_value(app: &tauri::AppHandle, key: &str) -> Option<String> {
+    auth::auth_get(&auth_path(app).ok()?, key)
 }
 
 #[tauri::command]
-fn set_secret(key: String, value: String) -> Result<(), String> {
-    let entry = keyring::Entry::new(SECRET_SERVICE, &key).map_err(|e| e.to_string())?;
-    entry.set_password(&value).map_err(|e| e.to_string())
+fn set_secret(app: tauri::AppHandle, key: String, value: String) -> Result<(), String> {
+    auth::auth_set(&auth_path(&app)?, &key, &value).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_secret(key: String) -> Result<Option<String>, String> {
-    let entry = keyring::Entry::new(SECRET_SERVICE, &key).map_err(|e| e.to_string())?;
-    match entry.get_password() {
-        Ok(v) => Ok(Some(v)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
+fn get_secret(app: tauri::AppHandle, key: String) -> Result<Option<String>, String> {
+    Ok(auth::auth_get(&auth_path(&app)?, &key))
 }
 
 #[tauri::command]
-fn has_secret(key: String) -> Result<bool, String> {
-    Ok(get_secret(key)?.is_some())
+fn has_secret(app: tauri::AppHandle, key: String) -> Result<bool, String> {
+    Ok(get_secret(app, key)?.is_some())
 }
 
 #[tauri::command]
-fn delete_secret(key: String) -> Result<(), String> {
-    let entry = keyring::Entry::new(SECRET_SERVICE, &key).map_err(|e| e.to_string())?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+fn delete_secret(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    auth::auth_delete(&auth_path(&app)?, &key).map_err(|e| e.to_string())
 }
 
 const MODELS_URL: &str = "https://models.dev/api.json";

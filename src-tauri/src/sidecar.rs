@@ -24,7 +24,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     // truly disables that provider). The sidecar picks the active provider's key.
     for id in configured_provider_ids(app) {
         let env = provider_key_env(&id);
-        match read_provider_key(&id) {
+        match read_provider_key(app, &id) {
             Some(key) => cmd = cmd.env(&env, key),
             None => cmd = cmd.env(&env, ""),
         }
@@ -120,9 +120,9 @@ pub fn provider_key_env(provider_id: &str) -> String {
     format!("HIP_MODEL_{norm}_API_KEY")
 }
 
-/// Read the keychain key for a provider (keychain entry name == env var name).
-pub fn read_provider_key(provider_id: &str) -> Option<String> {
-    crate::get_secret_value(&provider_key_env(provider_id))
+/// Read a provider's API key from the file store (key name == env var name).
+pub fn read_provider_key(app: &AppHandle, provider_id: &str) -> Option<String> {
+    crate::get_secret_value(app, &provider_key_env(provider_id))
 }
 
 /// Provider ids present in hip-providers.json (always includes "deepseek" so the

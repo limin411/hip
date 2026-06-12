@@ -15,7 +15,12 @@ export function withDefaults(cfg: ProvidersConfig | null): ProvidersConfig {
 
 export async function getProvidersConfig(): Promise<ProvidersConfig> {
   const raw = await invoke<string>('get_providers_config')
-  const parsed = raw.trim() ? (JSON.parse(raw) as ProvidersConfig) : null
+  // Self-heal a corrupt/partially-written file: fall back to defaults rather than throwing
+  // (which would leave the model-config page stuck on its loading state forever).
+  let parsed: ProvidersConfig | null = null
+  if (raw.trim()) {
+    try { parsed = JSON.parse(raw) as ProvidersConfig } catch { parsed = null }
+  }
   return withDefaults(parsed)
 }
 

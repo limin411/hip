@@ -268,7 +268,7 @@ export function applyServerMessage(
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], thinking: true }
+export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null }

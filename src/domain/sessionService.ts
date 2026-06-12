@@ -129,6 +129,11 @@ export class SessionService {
     this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
   }
 
+  /** Switch the global current model live (no sidecar restart). */
+  setActiveModel(providerID: string, modelID: string, baseURL: string): void {
+    this.transport.send({ type: 'config:setActiveModel', providerID, modelID, baseURL })
+  }
+
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
   requestDiff(sessionId: string): void {
     if (useDiffStore.getState().bySession[sessionId]?.status === 'loading') return

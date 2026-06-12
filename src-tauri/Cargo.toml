@@ -26,7 +26,6 @@ tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-wdio-webdriver = "1"
 tokio = { version = "1", features = ["sync"] }
-keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
 # Pinned to 0.12 (rustls-tls): bumping to 0.13 to dedupe the transitive 0.13.4 fails
 # here — 0.13's `rustls` feature requires aws-lc-rs ^1.14, unavailable in this index.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

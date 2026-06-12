@@ -37,6 +37,17 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "config"
 pub fn cache_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "cache") }
 pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratch") }
 
+/// Canonical path of the non-secret provider config inside `config/`.
+/// Single source of truth so the renderer-writer and the sidecar-reader can't drift.
+pub fn providers_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip-providers.json"))
+}
+
+/// Canonical path of the file-backed secret store inside `config/`.
+pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("auth.json"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;

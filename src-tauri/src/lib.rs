@@ -52,7 +52,7 @@ async fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
 
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
 fn auth_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    Ok(paths::config_dir(app).ok_or("no config dir")?.join("auth.json"))
+    paths::auth_json_path(app).ok_or_else(|| "no config dir".to_string())
 }
 
 /// Internal reader used by the sidecar spawn path.
@@ -84,13 +84,9 @@ const MODELS_URL: &str = "https://models.dev/api.json";
 const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
-fn providers_config_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
-    Some(paths::config_dir(app)?.join("hip-providers.json"))
-}
-
 #[tauri::command]
 fn get_providers_config(app: tauri::AppHandle) -> Result<String, String> {
-    match providers_config_path(&app) {
+    match paths::providers_config_path(&app) {
         Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
         None => Ok(String::new()),
     }
@@ -98,7 +94,7 @@ fn get_providers_config(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn set_providers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let p = providers_config_path(&app).ok_or("no app data dir")?;
+    let p = paths::providers_config_path(&app).ok_or("no config dir")?;
     std::fs::write(&p, json).map_err(|e| e.to_string())
 }
 

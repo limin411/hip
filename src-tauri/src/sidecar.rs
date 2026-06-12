@@ -19,7 +19,7 @@ pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
 
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     let mut cmd = app.shell().sidecar("sidecar").map_err(|e| e.to_string())?;
-    // Inject each configured provider's keychain key as HIP_MODEL_<ID>_API_KEY
+    // Inject each configured provider's API key as HIP_MODEL_<ID>_API_KEY
     // (empty string when absent → overrides any inherited env so a cleared key
     // truly disables that provider). The sidecar picks the active provider's key.
     for id in configured_provider_ids(app) {
@@ -30,11 +30,8 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         }
     }
     // Point the sidecar at the non-secret providers config (active model + base URLs).
-    if let Some(dir) = crate::paths::config_dir(app) {
-        cmd = cmd.env(
-            "HIP_PROVIDERS_PATH",
-            dir.join("hip-providers.json").to_string_lossy().into_owned(),
-        );
+    if let Some(p) = crate::paths::providers_config_path(app) {
+        cmd = cmd.env("HIP_PROVIDERS_PATH", p.to_string_lossy().into_owned());
     }
     // Tell the sidecar where to persist sessions. paths::db_dir creates the dir; if it's
     // unavailable the sidecar falls back to an in-memory DB rather than failing to start.
@@ -115,7 +112,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     Ok(info.port)
 }
 
-/// Keychain entry name AND env var name for a provider's API key (mirrors
+/// Env-var name for a provider's API key (mirrors
 /// protocol's `providerKeyEnv`). Keep the three impls (TS protocol, TS sidecar,
 /// this) in sync.
 pub fn provider_key_env(provider_id: &str) -> String {
@@ -133,8 +130,7 @@ pub fn read_provider_key(app: &AppHandle, provider_id: &str) -> Option<String> {
 
 fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
     let mut ids = vec!["deepseek".to_string()];
-    if let Some(dir) = crate::paths::config_dir(app) {
-        let path = dir.join("hip-providers.json");
+    if let Some(path) = crate::paths::providers_config_path(app) {
         if let Ok(body) = std::fs::read_to_string(&path) {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
                 if let Some(map) = v.get("providers").and_then(|p| p.as_object()) {

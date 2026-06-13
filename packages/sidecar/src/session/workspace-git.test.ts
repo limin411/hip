@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -352,5 +352,29 @@ describe('sanitizeRefComponent', () => {
   })
   it('returns a non-empty token for an empty input', () => {
     expect(sanitizeRefComponent('')).toMatch(/^[A-Za-z0-9_-]+$/)
+  })
+})
+
+describe('getCurrentBranch + listCheckpointRefs', () => {
+  it('returns the current branch name for a repo with a HEAD', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    expect(await getCurrentBranch(root)).toBe('main')
+  })
+  it('returns null for a non-repo folder', async () => {
+    expect(await getCurrentBranch(root)).toBeNull()
+  })
+  it('lists hip checkpoint refs under a session prefix', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await git(root, 'update-ref', 'refs/hip/checkpoints/sess1/t1', head)
+    await git(root, 'update-ref', 'refs/hip/checkpoints/sess1/t2', head)
+    await git(root, 'update-ref', 'refs/hip/checkpoints/other/x', head)
+    const refs = await listCheckpointRefs(root, 'sess1')
+    expect(refs.sort()).toEqual(['refs/hip/checkpoints/sess1/t1', 'refs/hip/checkpoints/sess1/t2'])
+  })
+  it('returns [] when there are no refs for the session', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    expect(await listCheckpointRefs(root, 'nope')).toEqual([])
   })
 })

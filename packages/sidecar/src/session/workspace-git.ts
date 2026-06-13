@@ -226,6 +226,24 @@ export async function captureSessionSnapshot(cwd: string, gitBin = 'git'): Promi
   finally { await fs.rm(dir, { recursive: true, force: true }).catch(() => {}) }
 }
 
+/** Current branch name (`git rev-parse --abbrev-ref HEAD`). Returns null for a non-repo or a
+ *  detached/unborn HEAD ('HEAD'). Never throws. */
+export async function getCurrentBranch(cwd: string, gitBin = 'git'): Promise<string | null> {
+  try {
+    const name = (await runGit(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'], gitBin)).stdout.trim()
+    return name && name !== 'HEAD' ? name : null
+  } catch { return null }
+}
+
+/** List hip checkpoint ref names under refs/hip/checkpoints/<sessionId>/. Never throws → []. */
+export async function listCheckpointRefs(cwd: string, sessionId: string, gitBin = 'git'): Promise<string[]> {
+  const prefix = `refs/hip/checkpoints/${sessionId}/`
+  try {
+    const out = (await runGit(cwd, ['for-each-ref', '--format=%(refname)', prefix], gitBin)).stdout
+    return out.split('\n').map((l) => l.trim()).filter(Boolean)
+  } catch { return [] }
+}
+
 /** 单文件 diff，自定义上下文行数（'full' = 看全文）。用于按需展开。 */
 export async function collectWorkspaceDiffFile(
   cwd: string, filePath: string,

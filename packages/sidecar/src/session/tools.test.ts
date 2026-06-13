@@ -2,7 +2,21 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { buildTools } from './tools.js'
+
+const execFileP = promisify(execFile)
+const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
+async function makeRepo(dir: string): Promise<void> {
+  await git(dir, 'init')
+  await git(dir, 'add', '-A')
+  await git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'init', '--allow-empty')
+  await git(dir, 'branch', '-m', 'main')
+}
+function byNameCwd(root: string, name: string) {
+  return buildTools(root, undefined, root).find((t) => t.name === name)!
+}
 
 let root: string
 beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'hip-tools-')) })
@@ -112,5 +126,54 @@ describe('task tool gating (depth-1)', () => {
     const out = String(await task!.invoke({ description: 'investigate the bug' }))
     expect(calls).toEqual(['investigate the bug'])
     expect(out).toBe('done: investigate the bug')
+  })
+})
+
+describe('git tools (cwd-gated)', () => {
+  it('buildTools(root) WITHOUT a cwd has no git tools', () => {
+    const names = buildTools(root).map((t) => t.name)
+    expect(names).not.toContain('git_commit')
+    expect(names).not.toContain('git_create_branch')
+    expect(names).not.toContain('git_switch_branch')
+  })
+
+  it('buildTools(root, undefined, cwd) registers the three git tools', () => {
+    const names = buildTools(root, undefined, root).map((t) => t.name)
+    expect(names).toEqual(expect.arrayContaining(['git_commit', 'git_create_branch', 'git_switch_branch']))
+  })
+
+  it('git_commit stages + commits and returns a short-sha confirmation', async () => {
+    await makeRepo(root)
+    writeFileSync(join(root, 'x.txt'), 'hi')
+    const out = String(await byNameCwd(root, 'git_commit').invoke({ message: 'add x' }))
+    expect(out).toMatch(/committed [0-9a-f]{7}/)
+    expect((await git(root, 'log', '-1', '--format=%s')).stdout.trim()).toBe('add x')
+  })
+
+  it('git_commit returns an Error string when there is nothing to commit', async () => {
+    await makeRepo(root) // clean tree, nothing staged
+    const out = String(await byNameCwd(root, 'git_commit').invoke({ message: 'noop' }))
+    expect(out).toMatch(/^Error:/)
+  })
+
+  it('git_create_branch creates a branch without switching', async () => {
+    await makeRepo(root)
+    const out = String(await byNameCwd(root, 'git_create_branch').invoke({ branchName: 'feature' }))
+    expect(out).toMatch(/feature/)
+    expect((await git(root, 'rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim()).toBe('main')
+  })
+
+  it('git_switch_branch moves HEAD to an existing branch', async () => {
+    await makeRepo(root)
+    await git(root, 'branch', 'feature')
+    const out = String(await byNameCwd(root, 'git_switch_branch').invoke({ branchName: 'feature' }))
+    expect(out).toMatch(/feature/)
+    expect((await git(root, 'rev-parse', '--abbrev-ref', 'HEAD')).stdout.trim()).toBe('feature')
+  })
+
+  it('git_switch_branch returns an Error string for a missing branch', async () => {
+    await makeRepo(root)
+    const out = String(await byNameCwd(root, 'git_switch_branch').invoke({ branchName: 'nope' }))
+    expect(out).toMatch(/^Error:/)
   })
 })

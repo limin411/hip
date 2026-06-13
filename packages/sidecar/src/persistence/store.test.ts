@@ -181,6 +181,36 @@ describe('SessionStore', () => {
     expect(runs.find((r) => r.agentId === 'supervisor')!.toolCalls).toEqual([])
   })
 
+  it('round-trips per-agent usage and reconstructs Message.usage = sum', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 3 },
+      's1',
+      [
+        { agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 3, seq: 0, usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } },
+        { agentId: 'worker-1', role: 'coder', output: 'sub', startedAt: 1, finishedAt: 2, seq: 1, parentAgentId: 'supervisor', taskInput: 'do', usage: { inputTokens: 30, outputTokens: 5, totalTokens: 35 } },
+      ],
+    )
+    const runs = store.loadAgentRuns('s1')
+    expect(runs.find((r) => r.agentId === 'supervisor')!.usage).toEqual({ inputTokens: 100, outputTokens: 20, totalTokens: 120 })
+    expect(runs.find((r) => r.agentId === 'worker-1')!.usage).toEqual({ inputTokens: 30, outputTokens: 5, totalTokens: 35 })
+    const msg = store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!
+    expect(msg.usage).toEqual({ inputTokens: 130, outputTokens: 25, totalTokens: 155 })
+  })
+
+  it('omits usage for a run inserted without it (legacy/no-usage rows stay NULL)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    store.insertTurn(
+      { id: 'a1', sessionId: 's1', agentId: 'supervisor', content: 'done', timestamp: 2 },
+      's1',
+      [{ agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 2, seq: 0 }],
+    )
+    expect(store.loadAgentRuns('s1')[0].usage).toBeUndefined()
+    expect(store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!.usage).toBeUndefined()
+  })
+
   it('deleteLastAssistantMessage cascades tool_calls', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })

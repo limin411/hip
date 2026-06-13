@@ -115,6 +115,21 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 6) {
+    db.exec('BEGIN')
+    try {
+      // Provider-reported token counts per agent run (nullable; old rows stay NULL).
+      // Turn total = sum across the turn's runs; $ cost is computed in the renderer.
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN prompt_tokens INTEGER`)
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN completion_tokens INTEGER`)
+      db.exec(`ALTER TABLE agent_runs ADD COLUMN total_tokens INTEGER`)
+      db.exec('PRAGMA user_version = 6')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

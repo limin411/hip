@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -434,5 +434,30 @@ describe('captureCheckpoint', () => {
   it('returns ok:false for a non-repo folder (never throws)', async () => {
     const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'x', prevCommit: null })
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('collectCommitLog', () => {
+  it('lists commits in session-start..HEAD newest-first with short sha + author', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const start = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    await git(root, 'add', '-A'); await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'second')
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n')
+    await git(root, 'add', '-A'); await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'third')
+    const r = await collectCommitLog(root, start)
+    expect(r.state).toBe('ok')
+    expect(r.commits!.map((c) => c.message)).toEqual(['third', 'second']) // start excluded, newest-first
+    expect(r.commits![0]).toMatchObject({ author: 't' })
+    expect(r.commits![0].shortSha.length).toBeGreaterThanOrEqual(7)
+  })
+  it('lists ALL commits when startCommit is null (whole history)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root) // 'init'
+    const r = await collectCommitLog(root, null)
+    expect(r.state).toBe('ok')
+    expect(r.commits!.map((c) => c.message)).toEqual(['init'])
+  })
+  it('reports not_a_repo for a plain folder', async () => {
+    expect((await collectCommitLog(root, null)).state).toBe('not_a_repo')
   })
 })

@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { createHash } from 'node:crypto'
-import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase } from '@hip/protocol'
+import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry } from '@hip/protocol'
 
 const execFileP = promisify(execFile)
 
@@ -291,6 +291,30 @@ export async function captureCheckpoint(cwd: string, opts: CaptureCheckpointOpti
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
   }
+}
+
+/** Read the commit log `<startCommit>..HEAD` (or the whole history when startCommit is null),
+ *  newest-first. Uses a US/RS-delimited custom format to survive arbitrary CJK/multi-line messages.
+ *  Never throws — folds failure into a DiffState. */
+export async function collectCommitLog(cwd: string, startCommit: string | null, gitBin = 'git'): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
+  try { await fs.stat(cwd) } catch { return { state: 'error', error: 'cwd not accessible: ' + cwd } }
+  try { await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin) }
+  catch (e) { return { state: (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'git_missing' : 'not_a_repo' } }
+  try {
+    // %x1f = unit-sep (field), %x1e = record-sep (commit). %ct = committer unix time.
+    const FMT = '--format=%H%x1f%h%x1f%an%x1f%ct%x1f%s%x1e'
+    const range = startCommit ? `${startCommit}..HEAD` : 'HEAD'
+    const out = (await runGit(cwd, ['log', FMT, range], gitBin)).stdout
+    const commits: CommitLogEntry[] = []
+    for (const rec of out.split('\x1e')) {
+      const r = rec.replace(/^\n+/, '')
+      if (!r.trim()) continue
+      const [sha, shortSha, author, ct, message] = r.split('\x1f')
+      if (!sha) continue
+      commits.push({ sha, shortSha, author, message: message ?? '', timestamp: parseInt(ct, 10) * 1000 })
+    }
+    return { state: 'ok', commits }
+  } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
 /** 单文件 diff，自定义上下文行数（'full' = 看全文）。用于按需展开。 */

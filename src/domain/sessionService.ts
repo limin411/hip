@@ -86,6 +86,24 @@ export class SessionService {
       useDiffStore.getState().setCheckpointDiffResult(msg.sessionId, `${msg.checkpointId}|${msg.mode}`, { state: msg.state, files: msg.files, summary: msg.summary, error: msg.error })
     } else if (msg.type === 'git:commitLog:result') {
       useDiffStore.getState().setCommitLogResult(msg.sessionId, { state: msg.state, commits: msg.commits, error: msg.error })
+    } else if (msg.type === 'git:branch:list:result') {
+      useDiffStore.getState().setBranches(msg.sessionId, msg.branches, msg.currentBranch)
+    } else if (msg.type === 'git:branch:switch:result') {
+      if (msg.ok) {
+        useDiffStore.getState().setBranches(msg.sessionId, useDiffStore.getState().bySession[msg.sessionId]?.branches ?? [], msg.currentBranch)
+        // Branch changed → re-pull branches (current flag) + checkpoints (branch labels) + diff summary.
+        this.transport.send({ type: 'git:branch:list', sessionId: msg.sessionId })
+        this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
+        const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+        this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      }
+    } else if (msg.type === 'git:revert:result') {
+      if (msg.ok) {
+        // Worktree changed → refresh the checkpoint list (safety checkpoint was added) + diff badge.
+        this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
+        const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+        this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      }
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.
       const fsState = useFsStore.getState().bySession[msg.sessionId]
@@ -193,6 +211,21 @@ export class SessionService {
   requestCommitLog(sessionId: string): void {
     useDiffStore.getState().setCommitLogLoading(sessionId)
     this.transport.send({ type: 'git:commitLog', sessionId })
+  }
+
+  /** Pull the branch list (+ current) for the BranchSwitcher. */
+  requestBranches(sessionId: string): void {
+    this.transport.send({ type: 'git:branch:list', sessionId })
+  }
+
+  /** Switch the checkout to a branch. The :result re-pulls branches + checkpoints + diff. */
+  switchBranch(sessionId: string, branch: string): void {
+    this.transport.send({ type: 'git:branch:switch', sessionId, branch })
+  }
+
+  /** Revert the worktree to a checkpoint (worktree-only; a safety checkpoint is written first). */
+  revertCheckpoint(sessionId: string, checkpointId: string): void {
+    this.transport.send({ type: 'git:revert', sessionId, checkpointId })
   }
 
   lsDir(sessionId: string, path: string): void {

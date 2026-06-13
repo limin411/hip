@@ -442,3 +442,46 @@ describe('checkpoints + commit log', () => {
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
   })
 })
+
+describe('branches + revert', () => {
+  it('requestBranches sends git:branch:list', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.requestBranches('s1')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:branch:list', sessionId: 's1' })
+  })
+
+  it('git:branch:list:result folds branches + currentBranch into diffStore', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'git:branch:list:result', sessionId: 's1', branches: [{ name: 'main', current: true }, { name: 'feature', current: false }], currentBranch: 'main' })
+    const s = useDiffStore.getState().bySession['s1']
+    expect(s.branches).toHaveLength(2)
+    expect(s.currentBranch).toBe('main')
+  })
+
+  it('switchBranch sends git:branch:switch', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.switchBranch('s1', 'feature')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:branch:switch', sessionId: 's1', branch: 'feature' })
+  })
+
+  it('git:branch:switch:result on ok updates currentBranch and re-requests branches + checkpoints', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'git:branch:switch:result', sessionId: 's1', branch: 'feature', ok: true, currentBranch: 'feature' })
+    expect(useDiffStore.getState().bySession['s1'].currentBranch).toBe('feature')
+    expect(t.sent.some((m) => m.type === 'git:branch:list' && m.sessionId === 's1')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
+  })
+
+  it('revertCheckpoint sends git:revert', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.revertCheckpoint('s1', 's1:t1')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:revert', sessionId: 's1', checkpointId: 's1:t1' })
+  })
+
+  it('git:revert:result on ok re-requests the checkpoint list + diff summary', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: true, safetyCheckpointId: 's1:pre-revert-1' })
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+  })
+})

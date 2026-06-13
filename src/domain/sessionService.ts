@@ -69,11 +69,13 @@ export class SessionService {
         status: 'ready', path: msg.path, content: msg.content, encoding: msg.encoding, mimeType: msg.mimeType, truncated: msg.truncated, error: msg.error,
       })
     } else if (msg.type === 'fs:diff:result') {
-      useDiffStore.getState().setResult(msg.sessionId, { state: msg.state, files: msg.files, totalFiles: msg.totalFiles, error: msg.error })
+      useDiffStore.getState().setResult(msg.sessionId, { state: msg.state, files: msg.files, summary: msg.summary, base: msg.base, hasSessionStart: msg.hasSessionStart, error: msg.error })
+    } else if (msg.type === 'fs:diffSummary:result') {
+      if (msg.summary) useDiffStore.getState().setSummary(msg.sessionId, msg.summary, msg.base, msg.hasSessionStart)
     } else if (msg.type === 'fs:gitInit:result') {
       useDiffStore.getState().setInitPending(msg.sessionId, false)
       if (msg.ok) this.requestDiff(msg.sessionId)
-      else useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', error: msg.error })
+      else useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', base: 'head', hasSessionStart: false, error: msg.error })
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.
       const fsState = useFsStore.getState().bySession[msg.sessionId]
@@ -81,6 +83,8 @@ export class SessionService {
         for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
         if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
       }
+      // 改完文件 → 总是刷新角标(便宜)；diff 标签激活时再拉全量
+      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId })
       if (useUiStore.getState().activeTab === 'diff') this.requestDiff(msg.sessionId)
     }
   }

@@ -298,7 +298,7 @@ describe('workspace diff', () => {
     svc.requestDiff('s1') // in flight → dropped
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(1)
     expect(useDiffStore.getState().bySession['s1'].status).toBe('loading')
-    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], totalFiles: 0 })
+    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], base: 'head', hasSessionStart: false })
     svc.requestDiff('s1') // ready again → allowed
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(2)
   })
@@ -306,7 +306,7 @@ describe('workspace diff', () => {
   it('fs:diff:result folds into diffStore', () => {
     const t = new FakeTransport()
     new SessionService(t)
-    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], totalFiles: 0 })
+    t.push({ type: 'fs:diff:result', sessionId: 's1', state: 'ok', files: [], base: 'head', hasSessionStart: false })
     expect(useDiffStore.getState().bySession['s1']).toMatchObject({ status: 'ready', state: 'ok' })
   })
 
@@ -354,8 +354,21 @@ describe('workspace diff', () => {
   it('setProjectDir clears the stale diff for that session', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    useDiffStore.getState().setResult('s1', { state: 'ok', files: [], totalFiles: 0 })
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [], base: 'head', hasSessionStart: false })
     svc.setProjectDir('s1', '/tmp/other')
     expect(useDiffStore.getState().bySession['s1'].status).toBe('idle')
+  })
+
+  it('routes fs:diffSummary:result into the diff store summary', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'fs:diffSummary:result', sessionId: 's1', state: 'ok', base: 'head', hasSessionStart: false, summary: { totalFiles: 2, totalAdditions: 5, totalDeletions: 1 } })
+    expect(useDiffStore.getState().bySession['s1'].summary).toEqual({ totalFiles: 2, totalAdditions: 5, totalDeletions: 1 })
+  })
+
+  it('on message:complete always requests a diff summary even when the diff tab is inactive', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    useUiStore.setState({ activeTab: 'files' })
+    t.push({ type: 'message:complete', sessionId: 's1', message: { id: 'm', role: 'assistant', content: '', timestamp: 0 } as any })
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
   })
 })

@@ -16,6 +16,8 @@ const GIT_MAX_BUFFER = 32 * 1024 * 1024
 
 export interface WorkspaceDiff { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
 export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string; headSha?: string }
+export interface CaptureCheckpointOptions { sessionId: string; turnId: string; label: string | null; prevCommit: string | null; gitBin?: string }
+export interface CaptureResult { ok: boolean; skipped?: boolean; treeSha?: string; commitSha?: string; branch?: string | null; error?: string }
 
 const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++ 缺失时兜底（mode-only）
@@ -242,6 +244,53 @@ export async function listCheckpointRefs(cwd: string, sessionId: string, gitBin 
     const out = (await runGit(cwd, ['for-each-ref', '--format=%(refname)', prefix], gitBin)).stdout
     return out.split('\n').map((l) => l.trim()).filter(Boolean)
   } catch { return [] }
+}
+
+/** Capture the working tree as a detached checkpoint commit and ref-protect it immediately.
+ *  Borrows Zed's model: write-tree under a temp index (real index untouched), commit-tree -p prev
+ *  with a synthetic hip author (so it never looks like a real commit), then update-ref. Skips the
+ *  capture if the working tree is byte-identical to prevCommit's tree (empty turn). Never throws. */
+export async function captureCheckpoint(cwd: string, opts: CaptureCheckpointOptions): Promise<CaptureResult> {
+  const gitBin = opts.gitBin ?? 'git'
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch { return { ok: false, error: 'not_a_repo' } }
+  let hasHead = true
+  try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-ckpt-'))
+  const idx = path.join(dir, 'index')
+  try {
+    const treeSha = await writeWorkingTree(cwd, gitBin, hasHead, idx)
+
+    // Empty-turn skip: identical to prevCommit's tree → no checkpoint.
+    if (opts.prevCommit) {
+      const prevTree = (await runGit(cwd, ['rev-parse', `${opts.prevCommit}^{tree}`], gitBin)).stdout.trim()
+      if (prevTree === treeSha) return { ok: true, skipped: true, treeSha }
+    }
+
+    const message = opts.label ?? 'hip checkpoint'
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'hip', GIT_AUTHOR_EMAIL: 'hip@local',
+      GIT_COMMITTER_NAME: 'hip', GIT_COMMITTER_EMAIL: 'hip@local',
+    }
+    const ctArgs = ['commit-tree', treeSha, ...(opts.prevCommit ? ['-p', opts.prevCommit] : []), '-m', message]
+    const commitSha = (await execFileP(gitBin, ctArgs, { cwd, env, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER })).stdout.trim()
+
+    const refSession = sanitizeRefComponent(opts.sessionId)
+    const refTurn = sanitizeRefComponent(opts.turnId)
+    const ref = `refs/hip/checkpoints/${refSession}/${refTurn}`
+    await runGit(cwd, ['update-ref', ref, commitSha], gitBin)   // immediate → GC-safe
+
+    const branch = await getCurrentBranch(cwd, gitBin)
+    return { ok: true, treeSha, commitSha, branch }
+  } catch (e) {
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
 }
 
 /** 单文件 diff，自定义上下文行数（'full' = 看全文）。用于按需展开。 */

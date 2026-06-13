@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -376,5 +376,63 @@ describe('getCurrentBranch + listCheckpointRefs', () => {
   it('returns [] when there are no refs for the session', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
     expect(await listCheckpointRefs(root, 'nope')).toEqual([])
+  })
+})
+
+describe('captureCheckpoint', () => {
+  it('captures a tree+commit, ref-protects it, and parents to prevCommit', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const headCommit = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'edit a', prevCommit: headCommit })
+    expect(r.ok).toBe(true)
+    expect(r.treeSha).toBeTruthy()
+    expect(r.commitSha).toBeTruthy()
+    // ref exists and points at the commit
+    const refTarget = (await git(root, 'rev-parse', 'refs/hip/checkpoints/s1/t1')).stdout.trim()
+    expect(refTarget).toBe(r.commitSha)
+    // parent is prevCommit
+    const parent = (await git(root, 'rev-parse', `${r.commitSha}^`)).stdout.trim()
+    expect(parent).toBe(headCommit)
+    // author is the synthetic hip identity (never a real commit)
+    expect((await git(root, 'show', '-s', '--format=%an', r.commitSha!)).stdout.trim()).toBe('hip')
+  })
+
+  it('skips an empty turn (working tree identical to prevCommit tree)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const headCommit = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'noop', prevCommit: headCommit })
+    expect(r.ok).toBe(true)
+    expect(r.skipped).toBe(true)
+    expect(r.commitSha).toBeUndefined()
+    expect(await listCheckpointRefs(root, 's1')).toEqual([]) // no ref created
+  })
+
+  it('captures with no parent on an unborn HEAD (fresh git init)', async () => {
+    await git(root, 'init')
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'first', prevCommit: null })
+    expect(r.ok).toBe(true)
+    expect(r.skipped).toBeFalsy()
+    expect(r.commitSha).toBeTruthy()
+    // a root commit has no parent
+    const parents = (await git(root, 'rev-list', '--parents', '-n', '1', r.commitSha!)).stdout.trim().split(' ')
+    expect(parents).toHaveLength(1) // just the commit sha, no parents
+  })
+
+  it('sanitizes an unsafe turnId into a valid ref', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const headCommit = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 'a/b .c', label: 'x', prevCommit: headCommit })
+    expect(r.ok).toBe(true)
+    const refs = await listCheckpointRefs(root, 's1')
+    expect(refs).toHaveLength(1)
+    expect(refs[0]).toMatch(/^refs\/hip\/checkpoints\/s1\/h[a-f0-9]{16}$/)
+  })
+
+  it('returns ok:false for a non-repo folder (never throws)', async () => {
+    const r = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'x', prevCommit: null })
+    expect(r.ok).toBe(false)
   })
 })

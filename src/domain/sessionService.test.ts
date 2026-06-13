@@ -378,4 +378,10 @@ describe('workspace diff', () => {
     svc.requestDiff('s1')
     expect(t.sent).toContainEqual({ type: 'fs:diff', sessionId: 's1', base: 'head' })
   })
+
+  it('selectSession refreshes the Diff badge via fs:diffSummary', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.selectSession('s1')
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+  })
 })

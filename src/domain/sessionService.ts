@@ -105,6 +105,10 @@ export class SessionService {
     // Lazily fetch history the first time a summary-only session is opened.
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
     if (s && !s.loaded) this.transport.send({ type: 'session:load', sessionId: id })
+    // Refresh the Diff-tab change badge on open (cheap numstat) so pending changes are
+    // advertised without the user first opening the Diff tab. No-cwd/non-repo → no summary → no badge.
+    const base = useDiffStore.getState().bySession[id]?.base ?? 'session-start'
+    this.transport.send({ type: 'fs:diffSummary', sessionId: id, base })
     // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
     useUiStore.getState().setScrollTarget(messageId ?? null)
   }

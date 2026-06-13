@@ -85,6 +85,9 @@ export class SessionManager {
         const s = this.ensureSession(msg.sessionId)
         s.setCwd(msg.cwd)
         this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        // Re-anchor the "since session start" snapshot to the newly-bound cwd so session-start
+        // diff works for the common "new chat → bind project dir → agent edits" flow.
+        void s.captureSnapshot().catch(() => {})
         send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
         break
       }

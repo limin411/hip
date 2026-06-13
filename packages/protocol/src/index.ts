@@ -157,6 +157,31 @@ export type DiffState = 'ok' | 'not_a_repo' | 'git_missing' | 'no_cwd' | 'error'
 export type DiffBase = 'session-start' | 'head'
 export interface DiffSummary { totalFiles: number; totalAdditions: number; totalDeletions: number }
 
+/** One per-turn (or session-start) checkpoint on the private ref chain. */
+export interface Checkpoint {
+  id: string                                  // "<sessionId>:<turnId>" ("<sessionId>:start" for #0)
+  sessionId: string
+  turnId: string | null                       // null for checkpoint #0 (session start)
+  kind: 'start' | 'turn' | 'pre-revert'
+  label: string | null                        // denormalized turn label for the timeline
+  treeSha: string                             // drives diffs + restore
+  commitSha: string                           // GC-protected ref target
+  branch: string | null                       // branch at capture (for cross-branch warnings, A2)
+  createdAt: number
+}
+
+/** One row of the session-start..HEAD commit log (更改 tab). */
+export interface CommitLogEntry {
+  sha: string
+  shortSha: string
+  message: string
+  author: string
+  timestamp: number                           // committer time, ms
+}
+
+/** The three timeline diff modes — each maps to a base→head tree pair. */
+export type CheckpointMode = 'this-turn' | 'since-then' | 'since-start'
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
@@ -181,6 +206,9 @@ export type ClientMessage =
   | { type: 'fs:diffSummary'; sessionId: string; base?: DiffBase }
   | { type: 'fs:diffFile'; sessionId: string; path: string; base?: DiffBase; context?: number | 'full' }
   | { type: 'fs:gitInit'; sessionId: string }
+  | { type: 'git:checkpoint:list'; sessionId: string }
+  | { type: 'git:checkpoint:diff'; sessionId: string; checkpointId: string; mode: CheckpointMode }
+  | { type: 'git:commitLog'; sessionId: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -211,3 +239,7 @@ export type ServerMessage =
   | { type: 'fs:diffSummary:result'; sessionId: string; base: DiffBase; hasSessionStart: boolean; state: DiffState; summary?: DiffSummary; error?: string }
   | { type: 'fs:diffFile:result'; sessionId: string; path: string; base: DiffBase; state: DiffState; file?: DiffFile; error?: string }
   | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }
+  | { type: 'git:checkpoint:list:result'; sessionId: string; checkpoints: Checkpoint[]; isGitRepo: boolean; currentBranch: string | null }
+  | { type: 'git:checkpoint:diff:result'; sessionId: string; checkpointId: string; mode: CheckpointMode; state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
+  | { type: 'git:commitLog:result'; sessionId: string; commits: CommitLogEntry[]; state: DiffState; error?: string }
+  | { type: 'checkpoint:created'; sessionId: string; checkpoint: Checkpoint }

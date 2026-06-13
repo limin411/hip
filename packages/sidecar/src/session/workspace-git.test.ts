@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -459,5 +459,35 @@ describe('collectCommitLog', () => {
   })
   it('reports not_a_repo for a plain folder', async () => {
     expect((await collectCommitLog(root, null)).state).toBe('not_a_repo')
+  })
+})
+
+describe('listBranches + switchBranch', () => {
+  it('lists branches with the current one flagged', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    await git(root, 'branch', 'feature')
+    const r = await listBranches(root)
+    expect(r.ok).toBe(true)
+    expect(r.branches!.map((b) => b.name).sort()).toEqual(['feature', 'main'])
+    expect(r.branches!.find((b) => b.name === 'main')!.current).toBe(true)
+    expect(r.branches!.find((b) => b.name === 'feature')!.current).toBe(false)
+  })
+  it('switches to an existing branch (HEAD moves, never throws)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    await git(root, 'branch', 'feature')
+    const r = await switchBranch(root, 'feature')
+    expect(r.ok).toBe(true)
+    expect(await getCurrentBranch(root)).toBe('feature')
+  })
+  it('returns ok:false with an error switching to a missing branch', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const r = await switchBranch(root, 'does-not-exist')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBeTruthy()
+  })
+  it('listBranches returns ok:false for a non-repo folder', async () => {
+    expect((await listBranches(root)).ok).toBe(false)
   })
 })

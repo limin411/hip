@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { createHash } from 'node:crypto'
-import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry } from '@hip/protocol'
+import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch } from '@hip/protocol'
 
 const execFileP = promisify(execFile)
 
@@ -347,5 +347,35 @@ export async function gitInit(cwd: string, gitBin = 'git'): Promise<{ ok: boolea
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
+}
+
+/** List local branches with the current one flagged. Never throws → { ok:false } on a non-repo. */
+export async function listBranches(cwd: string, gitBin = 'git'): Promise<{ ok: boolean; branches?: Branch[]; error?: string }> {
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch { return { ok: false, error: 'not_a_repo' } }
+  try {
+    // %(HEAD) = '*' for the checked-out branch, ' ' otherwise. %(refname:short) = bare branch name.
+    const out = (await runGit(cwd, ['for-each-ref', '--format=%(HEAD)%09%(refname:short)', 'refs/heads/'], gitBin)).stdout
+    const branches: Branch[] = []
+    for (const ln of out.split('\n')) {
+      if (!ln.trim()) continue
+      const [flag, name] = ln.split('\t')
+      if (!name) continue
+      branches.push({ name, current: flag === '*' })
+    }
+    return { ok: true, branches }
+  } catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
+/** Switch the checkout to an existing branch. `git switch` with a `checkout` fallback for old git.
+ *  Never throws → { ok:false, error } (e.g. a dirty tree that would be overwritten, or a missing branch). */
+export async function switchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  try { await runGit(cwd, ['switch', name], gitBin); return { ok: true } }
+  catch {
+    try { await runGit(cwd, ['checkout', name], gitBin); return { ok: true } }
+    catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
   }
 }

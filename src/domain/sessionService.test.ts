@@ -233,6 +233,15 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
   })
 
+  it('regenerate is a no-op while an interrupt is pending (avoids a stuck running state)', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], interrupt: { turnId: 't1', question: 'q' } }] })
+    svc.regenerate()
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
+    expect(useDomainStore.getState().sessions[0].status).toBe('idle')
+  })
+
   it('on ready, resyncs the active session when its turn was running', () => {
     useDomainStore.setState({
       sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'running', error: null }],

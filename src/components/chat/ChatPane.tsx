@@ -107,7 +107,7 @@ export function ChatPane() {
                 <MessageBubble
                   message={m}
                   streaming={status === 'running' && m.role === 'assistant' && isLastMessage}
-                  isLastAssistant={m.role === 'assistant' && isLastMessage && status !== 'running'}
+                  isLastAssistant={m.role === 'assistant' && isLastMessage && status !== 'running' && !interrupt}
                 />
               </div>
             )

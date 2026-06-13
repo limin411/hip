@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -299,9 +299,17 @@ export class Session {
   }
 
   /** Worktree-vs-HEAD diff of the bound cwd subtree. Never throws. */
-  async workspaceDiff(): Promise<workspaceGit.WorkspaceDiff> {
-    if (!this._config.cwd) return { state: 'no_cwd' }
-    return workspaceGit.collectWorkspaceDiff(this._config.cwd)
+  async workspaceDiff(base: DiffBase = 'head'): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
+    if (!this._config.cwd) return { state: 'no_cwd', base: 'head', hasSessionStart: false }
+    const r = await workspaceGit.collectWorkspaceDiff(this._config.cwd, { base })
+    return { ...r, base: 'head', hasSessionStart: false } // Tier 2 will override with real snapshot
+  }
+
+  /** Summary-only diff (feeds the badge). Never throws. */
+  async workspaceDiffSummary(base: DiffBase = 'head'): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
+    if (!this._config.cwd) return { state: 'no_cwd', base: 'head', hasSessionStart: false }
+    const r = await workspaceGit.collectWorkspaceDiffSummary(this._config.cwd, { base })
+    return { ...r, base: 'head', hasSessionStart: false }
   }
 
   /** One-click `git init` + baseline commit in the bound cwd. */

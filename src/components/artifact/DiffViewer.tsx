@@ -1,31 +1,58 @@
 import { useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, Loader2, RefreshCw } from 'lucide-react'
-import type { DiffFile, DiffLineType } from '@hip/protocol'
+import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { Button } from '@/components/ui/Button'
 
-function lineStyle(type: DiffLineType): string {
-  if (type === 'add') return 'bg-success/10'
-  if (type === 'del') return 'bg-danger/10'
-  return ''
-}
+const STATUS_CHIP = {
+  added: { cls: 'bg-success/15 text-success', key: 'artifact.diffView.statusAdded' },
+  modified: { cls: 'bg-warning/15 text-warning', key: 'artifact.diffView.statusModified' },
+  deleted: { cls: 'bg-danger/15 text-danger', key: 'artifact.diffView.statusDeleted' },
+  renamed: { cls: 'bg-accent/15 text-accent', key: 'artifact.diffView.statusRenamed' },
+} as const satisfies Record<DiffFileStatus, { cls: string; key: string }>
 
-function sign(type: DiffLineType): string {
-  if (type === 'add') return '+'
-  if (type === 'del') return '-'
-  return ' '
+function lineStyle(t: DiffLineType): string { return t === 'add' ? 'bg-success/10' : t === 'del' ? 'bg-danger/10' : '' }
+function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' ? '-' : ' ' }
+
+function HunkLines({ hunk }: { hunk: DiffHunk }) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex bg-surface-muted/60 text-caption text-ink-tertiary">
+        <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
+        {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
+      </div>
+      {hunk.lines.map((line: DiffLine, i) => (
+        <div key={i} className={cn('flex', lineStyle(line.type))}>
+          <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.oldNo ?? ''}</span>
+          <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.newNo ?? ''}</span>
+          <span className={cn('w-4 shrink-0 select-none text-center', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
+          <span className="whitespace-pre px-1 text-ink">{line.content}</span>
+          {line.noNewline && <span className="select-none px-1 text-ink-tertiary" title={t('artifact.diffView.noNewline')}>&#8626;&#824;</span>}
+        </div>
+      ))}
+    </>
+  )
 }
 
 function FileDiff({ file }: { file: DiffFile }) {
   const { t } = useTranslation()
+  const chip = STATUS_CHIP[file.status]
   return (
     <div className="border-b border-border" data-testid="diff-file">
-      <div className="flex items-center justify-between bg-surface-muted px-3 py-2">
-        <span className="truncate font-mono text-meta text-ink">{file.path}</span>
+      <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 bg-surface-muted px-3 py-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cn('shrink-0 rounded px-1 font-medium', chip.cls)} data-testid="diff-status">
+            <span className="text-caption">{t(chip.key)}</span>
+          </span>
+          <span className="truncate font-mono text-meta text-ink">
+            {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
+          </span>
+        </span>
         <span className="flex shrink-0 items-center gap-2 text-caption">
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
           <span className="text-success">+{file.additions}</span>
@@ -34,24 +61,11 @@ function FileDiff({ file }: { file: DiffFile }) {
       </div>
       {file.binary ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.binary')}</div>
+      ) : file.hunks.length === 0 ? (
+        <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.modeOnly')}</div>
       ) : (
         <div className="overflow-x-auto font-mono text-meta leading-relaxed">
-          {file.lines.map((line, i) => (
-            <div key={i} className={cn('flex', lineStyle(line.type))}>
-              <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.oldNo ?? ''}</span>
-              <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.newNo ?? ''}</span>
-              <span
-                className={cn(
-                  'w-4 shrink-0 select-none text-center',
-                  line.type === 'add' && 'text-success',
-                  line.type === 'del' && 'text-danger',
-                )}
-              >
-                {sign(line.type)}
-              </span>
-              <span className="whitespace-pre px-1 text-ink">{line.content}</span>
-            </div>
-          ))}
+          {file.hunks.map((h, i) => <HunkLines key={i} hunk={h} />)}
         </div>
       )}
     </div>
@@ -131,7 +145,12 @@ export function DiffViewer() {
   return (
     <div className="flex h-full flex-col" data-testid="diff-view">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-2">
-        <span className="text-meta text-ink-secondary">{t('artifact.diffView.changedFiles', { count: diff.totalFiles })}</span>
+        <div className="flex items-center gap-3 text-meta text-ink-secondary">
+          <span>{t('artifact.diffView.changedFiles', { count: diff.summary?.totalFiles ?? diff.files.length })}</span>
+          {diff.summary && (diff.summary.totalAdditions > 0 || diff.summary.totalDeletions > 0) && (
+            <span className="font-mono text-caption"><span className="text-success">+{diff.summary.totalAdditions}</span> <span className="text-danger">-{diff.summary.totalDeletions}</span></span>
+          )}
+        </div>
         <button
           title={t('artifact.refresh')}
           data-testid="diff-refresh"
@@ -150,9 +169,9 @@ export function DiffViewer() {
           {diff.files.map((file, i) => (
             <FileDiff key={`${file.path}-${i}`} file={file} />
           ))}
-          {diff.totalFiles > diff.files.length && (
+          {(diff.summary?.totalFiles ?? 0) > diff.files.length && (
             <div className="px-3 py-2 text-meta text-ink-tertiary">
-              {t('artifact.diffView.moreFiles', { count: diff.totalFiles - diff.files.length })}
+              {t('artifact.diffView.moreFiles', { count: (diff.summary!.totalFiles) - diff.files.length })}
             </div>
           )}
         </div>

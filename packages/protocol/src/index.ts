@@ -46,6 +46,15 @@ export interface Message {
   timeline?: TimelineStep[]  // ordered reasoning+tool steps for this turn (assistant only)
   toolCalls?: ToolCall[]     // flat tool calls for this turn, referenced by timeline tool steps via callId
   agentRuns?: AgentRun[]     // per-agent run metadata for THIS turn (taskInput/output/timing/parent)
+  usage?: TurnUsage          // turn total = sum of agentRuns' usage; present once usage was reported
+}
+
+/** Provider-reported token counts for a turn or a single agent's slice of it.
+ *  Counts only — $ cost is computed in the renderer from the models.dev catalog price. */
+export interface TurnUsage {
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
 }
 
 export interface AgentRun {
@@ -59,14 +68,15 @@ export interface AgentRun {
   parentAgentId?: string    // who delegated (always 'supervisor' for our 2-level tree)
   toolCalls?: ToolCall[]     // ordered by seq; hydrated from the tool_calls table
   messageId?: string         // turn this run belongs to (maps agent_runs.message_id; NULL → no assistant message)
+  usage?: TurnUsage          // this agent's token counts for the turn (hydrated from agent_runs.*_tokens)
 }
 
 export type ToolStatus = 'running' | 'finished' | 'error'
 
 export interface ToolCall {
   callId: string
-  agentId: string          // who called it: supervisor | planner | coder | reviewer
-  name: string             // 'read_file' | 'write_file' | 'edit_file' | … (never 'task')
+  agentId: string          // who called it: supervisor | a sub-agent (e.g. worker-1)
+  name: string             // 'read_file' | 'write_file' | 'edit_file' | 'task' | …
   input: string            // JSON-stringified args; clipped to ~4 KB if huge
   output?: string          // JSON-stringified result; absent while running
   status: ToolStatus

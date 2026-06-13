@@ -5,10 +5,26 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import { resolveWithin } from './workspace-fs.js'
 
-/** Map a model-supplied "/abs-relative-to-root" path to a real fs path inside `root` (throws on escape). */
-function real(root: string, p: string): string {
+const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
+const MAX_SCAN_FILE_BYTES = 256 * 1024
+
+/** Map "/abs-relative-to-root" → real fs path inside `root`. Lexical jail PLUS a symlink check on the
+ *  deepest existing ancestor (so writing through a symlinked parent that escapes the root is rejected). */
+async function real(root: string, p: string): Promise<string> {
   const rel = p.replace(/^\/+/, '')
-  return resolveWithin(root, path.join(root, rel))
+  const lexical = resolveWithin(root, path.join(root, rel)) // throws on lexical (..) escape
+  const realRoot = await fs.realpath(root)
+  let probe = lexical
+  // find the deepest existing ancestor (the leaf may not exist yet for writes)
+  for (;;) {
+    try { await fs.access(probe); break } catch { const parent = path.dirname(probe); if (parent === probe) break; probe = parent }
+  }
+  let realProbe: string
+  try { realProbe = await fs.realpath(probe) } catch { return lexical }
+  if (realProbe !== realRoot && !realProbe.startsWith(realRoot + path.sep)) {
+    throw new Error(`path escapes project root via symlink: ${p}`)
+  }
+  return lexical
 }
 
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
@@ -16,7 +32,7 @@ export function buildTools(root: string): StructuredToolInterface[] {
   const writeFile = tool(
     async ({ path: p, content }) => {
       try {
-        const abs = real(root, p)
+        const abs = await real(root, p)
         await fs.mkdir(path.dirname(abs), { recursive: true })
         await fs.writeFile(abs, content, 'utf8')
         return `wrote ${p} (${content.length} bytes)`
@@ -35,7 +51,7 @@ export function buildTools(root: string): StructuredToolInterface[] {
   const readFile = tool(
     async ({ path: p }) => {
       try {
-        const abs = real(root, p)
+        const abs = await real(root, p)
         return await fs.readFile(abs, 'utf8')
       } catch (err) {
         const msg = (err as Error).message
@@ -53,7 +69,7 @@ export function buildTools(root: string): StructuredToolInterface[] {
   const editFile = tool(
     async ({ path: p, oldString, newString, replaceAll }) => {
       try {
-        const abs = real(root, p)
+        const abs = await real(root, p)
         const cur = await fs.readFile(abs, 'utf8')
         if (!cur.includes(oldString)) return `Error: oldString not found in ${p}`
         const next = replaceAll ? cur.split(oldString).join(newString) : cur.replace(oldString, newString)
@@ -78,7 +94,7 @@ export function buildTools(root: string): StructuredToolInterface[] {
   const ls = tool(
     async ({ path: p }) => {
       try {
-        const abs = real(root, p ?? '/')
+        const abs = await real(root, p ?? '/')
         const ents = await fs.readdir(abs, { withFileTypes: true })
         return ents.map((e) => (e.isDirectory() ? `${e.name}/` : e.name)).sort().join('\n') || '(empty)'
       } catch (err) {
@@ -94,15 +110,23 @@ export function buildTools(root: string): StructuredToolInterface[] {
 
   const glob = tool(
     async ({ pattern }) => {
+      let rx: RegExp
+      try {
+        rx = toGlobRegex(pattern)
+      } catch (err) {
+        return `Error: invalid pattern: ${(err as Error).message}`
+      }
       const out: string[] = []
       async function walk(dir: string): Promise<void> {
+        if (out.length >= 200) return
         for (const e of await fs.readdir(dir, { withFileTypes: true })) {
           if (e.name.startsWith('.')) continue
+          if (EXCLUDE_DIRS.has(e.name)) continue
           const full = path.join(dir, e.name)
           if (e.isDirectory()) await walk(full)
           else {
             const rel = '/' + path.relative(root, full)
-            if (simpleMatch(pattern, rel)) out.push(rel)
+            if (rx.test(rel)) out.push(rel)
           }
         }
       }
@@ -118,23 +142,34 @@ export function buildTools(root: string): StructuredToolInterface[] {
 
   const grep = tool(
     async ({ pattern, path: p }) => {
-      const re = new RegExp(pattern)
+      let re: RegExp
+      try {
+        re = new RegExp(pattern)
+      } catch (err) {
+        return `Error: invalid regex: ${(err as Error).message}`
+      }
       const hits: string[] = []
       async function walk(dir: string): Promise<void> {
+        if (hits.length >= 200) return
         for (const e of await fs.readdir(dir, { withFileTypes: true })) {
+          if (hits.length >= 200) return
           if (e.name.startsWith('.')) continue
+          if (EXCLUDE_DIRS.has(e.name)) continue
           const full = path.join(dir, e.name)
-          if (e.isDirectory()) await walk(full)
-          else {
-            const rel = '/' + path.relative(root, full)
+          if (e.isDirectory()) {
+            await walk(full)
+          } else {
+            const st = await fs.stat(full)
+            if (st.size > MAX_SCAN_FILE_BYTES) continue
             const text = await fs.readFile(full, 'utf8').catch(() => '')
+            if (text.slice(0, 8000).includes('\0')) continue
             text.split('\n').forEach((line, i) => {
-              if (re.test(line)) hits.push(`${rel}:${i + 1}: ${line.trim().slice(0, 200)}`)
+              if (hits.length < 200 && re.test(line)) hits.push(`/${path.relative(root, full)}:${i + 1}: ${line.trim().slice(0, 200)}`)
             })
           }
         }
       }
-      await walk(real(root, p ?? '/'))
+      await walk(await real(root, p ?? '/'))
       return hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
     },
     {
@@ -148,11 +183,11 @@ export function buildTools(root: string): StructuredToolInterface[] {
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */
-function simpleMatch(pattern: string, p: string): boolean {
+function toGlobRegex(pattern: string): RegExp {
   const rx = pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, ' ')
     .replace(/\*/g, '[^/]*')
     .replace(/ /g, '.*')
-  return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`).test(p)
+  return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`)
 }

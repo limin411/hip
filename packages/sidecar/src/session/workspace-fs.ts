@@ -37,7 +37,7 @@ export function resolveWithin(cwd: string, abs: string): string {
  * its real (symlink-followed) location must also stay within the real project root.
  * Closes the read-path leak where an in-cwd symlink points outside the workspace.
  */
-async function resolveRealWithin(cwd: string, abs: string): Promise<string> {
+export async function resolveRealWithin(cwd: string, abs: string): Promise<string> {
   const target = resolveWithin(cwd, abs)
   let realRoot: string
   let realTarget: string

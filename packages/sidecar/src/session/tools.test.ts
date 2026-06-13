@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildTools } from './tools.js'
@@ -38,5 +38,34 @@ describe('file tools', () => {
   it('rejects a path that escapes the root', async () => {
     await expect(byName(root, 'write_file').invoke({ path: '/../escape.txt', content: 'x' }))
       .resolves.toMatch(/escape|outside|root/i)
+  })
+
+  it('rejects reading through a symlink that escapes the root', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
+    writeFileSync(join(outside, 'secret.txt'), 'TOP SECRET')
+    try {
+      symlinkSync(outside, join(root, 'link')) // root/link -> outside
+      const r = String(await byName(root, 'read_file').invoke({ path: '/link/secret.txt' }))
+      expect(r).toMatch(/escapes|not found|error/i)
+      expect(r).not.toContain('TOP SECRET')
+    } finally { rmSync(outside, { recursive: true, force: true }) }
+  })
+
+  it('rejects writing through a symlinked parent that escapes the root', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
+    try {
+      symlinkSync(outside, join(root, 'link'))
+      const w = String(await byName(root, 'write_file').invoke({ path: '/link/evil.txt', content: 'x' }))
+      expect(w).toMatch(/escapes|error/i)
+    } finally { rmSync(outside, { recursive: true, force: true }) }
+  })
+
+  it('grep skips node_modules', async () => {
+    mkdirSync(join(root, 'node_modules', 'pkg'), { recursive: true })
+    writeFileSync(join(root, 'node_modules', 'pkg', 'a.js'), 'NEEDLE here')
+    writeFileSync(join(root, 'app.js'), 'NEEDLE in app')
+    const out = String(await byName(root, 'grep').invoke({ pattern: 'NEEDLE' }))
+    expect(out).toContain('/app.js')
+    expect(out).not.toContain('node_modules')
   })
 })

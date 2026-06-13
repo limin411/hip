@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -184,6 +184,9 @@ export class Session {
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
   private _diffBaseSha: string | null = null
+  // Latest checkpoint commit (the parent for the next per-turn checkpoint). Seeded by captureSnapshot
+  // (checkpoint #0 / session-start commit), advanced by each successful per-turn captureCheckpoint.
+  private _lastCheckpointCommit: string | null = null
   // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
   private awaitingResume = false
@@ -304,12 +307,31 @@ export class Session {
     return this._diffBaseSha ?? this.store?.getSession(this.id)?.diff_base_sha ?? null
   }
 
-  /** 会话创建时抓一次工作区快照并持久化（fire-and-forget 调用）。 */
+  /** 会话创建时抓一次工作区快照并持久化（fire-and-forget 调用）。同时记录会话起点 commit 与
+   *  checkpoint #0（起点至今 diff 的 base / 第一轮 checkpoint 的 parent）。 */
   async captureSnapshot(): Promise<void> {
     if (!this._config.cwd) return
-    const sha = await workspaceGit.captureSessionSnapshot(this._config.cwd)
+    const cwd = this._config.cwd
+    const sha = await workspaceGit.captureSessionSnapshot(cwd)
     this._diffBaseSha = sha
     this.store?.setDiffBaseSha(this.id, sha)
+
+    // Session-start commit (commit-log lower bound; null on unborn HEAD / non-repo) + branch.
+    const branch = await workspaceGit.getCurrentBranch(cwd)
+    this.store?.setSessionBranch(this.id, branch)
+    let startCommit: string | null = null
+    try { startCommit = (await workspaceGit.collectCommitLog(cwd, null)).commits?.[0]?.sha ?? null } catch { startCommit = null }
+    this.store?.setSessionStartCommit(this.id, startCommit)
+
+    // Checkpoint #0 (session start). prevCommit = session-start branch HEAD (or null on unborn HEAD).
+    const r = await workspaceGit.captureCheckpoint(cwd, { sessionId: this.id, turnId: 'start', label: null, prevCommit: startCommit })
+    if (r.ok && !r.skipped && r.commitSha) {
+      this._lastCheckpointCommit = r.commitSha
+      this.store?.insertCheckpoint({ id: `${this.id}:start`, sessionId: this.id, turnId: null, kind: 'start', label: null, treeSha: r.treeSha!, commitSha: r.commitSha, branch: r.branch ?? branch, createdAt: Date.now() })
+    } else {
+      // Empty/clean start (no change vs HEAD) → no checkpoint commit; the next turn parents to startCommit.
+      this._lastCheckpointCommit = startCommit
+    }
   }
 
   private resolveBase(base: DiffBase): { base: DiffBase; baseSha: string | null; hasSessionStart: boolean } {
@@ -346,6 +368,59 @@ export class Session {
   async workspaceGitInit(): Promise<{ ok: boolean; error?: string }> {
     if (!this._config.cwd) return { ok: false, error: 'no_workspace' }
     return workspaceGit.gitInit(this._config.cwd)
+  }
+
+  /** Capture a per-turn checkpoint (fire-and-forget after finalize). Persists the row and emits
+   *  checkpoint:created on a non-skipped capture. Advances _lastCheckpointCommit. Never throws. */
+  async captureCheckpoint(turnId: string, label: string | null, send: SendFn): Promise<void> {
+    if (!this._config.cwd) return
+    const prev = this._lastCheckpointCommit
+    const r = await workspaceGit.captureCheckpoint(this._config.cwd, { sessionId: this.id, turnId, label, prevCommit: prev })
+    if (!r.ok || r.skipped || !r.commitSha) return
+    this._lastCheckpointCommit = r.commitSha
+    const checkpoint = { id: `${this.id}:${turnId}`, sessionId: this.id, turnId, kind: 'turn' as const, label, treeSha: r.treeSha!, commitSha: r.commitSha, branch: r.branch ?? null, createdAt: Date.now() }
+    this.store?.insertCheckpoint(checkpoint)
+    if (r.branch) this.store?.setSessionBranch(this.id, r.branch)
+    send({ type: 'checkpoint:created', sessionId: this.id, checkpoint })
+  }
+
+  /** List checkpoints (newest-first) + live repo state for the timeline tab. */
+  async listCheckpoints(): Promise<{ checkpoints: Checkpoint[]; isGitRepo: boolean; currentBranch: string | null }> {
+    const checkpoints = this.store?.listCheckpoints(this.id) ?? []
+    const isGitRepo = this._config.cwd ? (await workspaceGit.getCurrentBranch(this._config.cwd)) !== null || (await workspaceGit.collectCommitLog(this._config.cwd, null)).state === 'ok' : false
+    const currentBranch = this._config.cwd ? await workspaceGit.getCurrentBranch(this._config.cwd) : null
+    return { checkpoints, isGitRepo, currentBranch }
+  }
+
+  /** Diff for a timeline checkpoint in one of the three modes. Tree pairs:
+   *  this-turn = prev.tree → this.tree | since-then = this.tree → working | since-start = #0.tree → working. */
+  async checkpointDiff(checkpointId: string, mode: CheckpointMode): Promise<workspaceGit.WorkspaceDiff> {
+    if (!this._config.cwd) return { state: 'no_cwd' }
+    const all = this.store?.listCheckpoints(this.id) ?? []
+    const cp = all.find((c) => c.id === checkpointId)
+    if (!cp) return { state: 'error', error: 'checkpoint not found' }
+    // 'start' checkpoint = the session-start tree; everything is computed off tree shas.
+    const startCp = all.find((c) => c.kind === 'start')
+    if (mode === 'since-then') {
+      // this.tree → live working tree
+      return workspaceGit.collectWorkspaceDiff(this._config.cwd, { base: 'session-start', baseSha: cp.treeSha })
+    }
+    if (mode === 'since-start') {
+      const baseSha = startCp?.treeSha ?? this._diffBaseSha
+      return workspaceGit.collectWorkspaceDiff(this._config.cwd, { base: 'session-start', baseSha })
+    }
+    // 'this-turn': prev.tree → this.tree. prev = the checkpoint right before cp by created_at.
+    const idx = all.findIndex((c) => c.id === cp.id)
+    const prev = all[idx + 1] // all is newest-first → next index is the older neighbor
+    const baseSha = prev?.treeSha ?? startCp?.treeSha ?? this._diffBaseSha
+    return workspaceGit.collectWorkspaceDiff(this._config.cwd, { base: 'session-start', baseSha, headSha: cp.treeSha })
+  }
+
+  /** Commit log session-start..HEAD for the 更改 tab. */
+  async commitLog(): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
+    if (!this._config.cwd) return { state: 'no_cwd' }
+    const start = this.store?.getSessionGitMeta(this.id).sessionStartCommit ?? null
+    return workspaceGit.collectCommitLog(this._config.cwd, start)
   }
 
   /** Emit INCOMPATIBLE_MODEL and return false when the active provider is not OpenAI-compatible.
@@ -580,7 +655,12 @@ export class Session {
       this.abortController = null
     }
 
-    return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)
+    const finalText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)
+    // Per-turn checkpoint AFTER persistence (writes are done). Fire-and-forget — never block the
+    // send path or let a git failure surface as a turn error. Label = a short slice of the reply.
+    const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
+    void this.captureCheckpoint(turnId, ckptLabel, send).catch(() => {})
+    return finalText
   }
 
   /** Run the phantom-write safety net, push the assistant message into context, persist the turn

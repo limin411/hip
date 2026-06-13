@@ -7,6 +7,7 @@ describe('buildSystemPrompt', () => {
     expect(s).toContain('/tmp/proj')
     expect(s).toContain('write_file')
     expect(s).toContain('write_todos')
+    expect(s).toMatch(/delegate it to/i)
     expect(s).toMatch(/MUST NOT claim/i)
   })
 

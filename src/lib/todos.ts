@@ -35,12 +35,14 @@ export interface LivePlan {
   todos: Todo[]
 }
 
-/** The latest (highest-seq) write_todos call in a turn's tool calls — the live plan. Null if none. */
+/** The latest (highest-seq) write_todos call by the SUPERVISOR in a turn's tool calls — the live
+ *  plan. Scoped to the supervisor so a sub-agent's own write_todos can't mask the main plan (a
+ *  turn's Message.toolCalls flattens child runs' calls too). Null if none. */
 export function latestTodos(toolCalls?: ToolCall[]): LivePlan | null {
   if (!toolCalls || toolCalls.length === 0) return null
   let latest: ToolCall | null = null
   for (const tc of toolCalls) {
-    if (tc.name === 'write_todos' && (latest === null || tc.seq > latest.seq)) latest = tc
+    if (tc.name === 'write_todos' && tc.agentId === 'supervisor' && (latest === null || tc.seq > latest.seq)) latest = tc
   }
   if (!latest) return null
   return { callId: latest.callId, todos: parseTodos(latest.input) }

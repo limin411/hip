@@ -12,6 +12,8 @@ const BASE =
   'When the task is done, finish with a short plain-text summary of what you changed. ' +
   'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
   'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
+  'For a large, self-contained chunk of work or isolated research, you may call task to delegate it to ' +
+  'a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
   'For a simple, single-step request, just do it directly — do not over-plan or call write_todos.'
 
 function cwdBlock(cwd: string): string {

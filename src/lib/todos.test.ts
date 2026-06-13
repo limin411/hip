@@ -47,6 +47,16 @@ describe('latestTodos', () => {
     expect(live!.todos).toEqual<Todo[]>([{ content: 'new', status: 'in_progress' }])
   })
 
+  it('ignores a sub-agent (non-supervisor) write_todos call so it cannot mask the main plan', () => {
+    const calls: ToolCall[] = [
+      tc({ callId: 's1', seq: 1, input: JSON.stringify({ todos: [{ content: 'supervisor plan', status: 'in_progress' }] }) }),
+      tc({ callId: 'w1', seq: 9, agentId: 'worker-1', input: JSON.stringify({ todos: [{ content: 'child plan', status: 'pending' }] }) }),
+    ]
+    const live = latestTodos(calls)
+    expect(live!.callId).toBe('s1')
+    expect(live!.todos).toEqual<Todo[]>([{ content: 'supervisor plan', status: 'in_progress' }])
+  })
+
   it('returns null when there is no write_todos call', () => {
     expect(latestTodos([tc({ name: 'read_file', input: '{}' })])).toBeNull()
   })

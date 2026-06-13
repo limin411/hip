@@ -189,7 +189,7 @@ describe('SessionStore', () => {
       's1',
       [
         { agentId: 'supervisor', role: 'supervisor', output: 'done', startedAt: 1, finishedAt: 3, seq: 0, usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } },
-        { agentId: 'worker-1', role: 'coder', output: 'sub', startedAt: 1, finishedAt: 2, seq: 1, parentAgentId: 'supervisor', taskInput: 'do', usage: { inputTokens: 30, outputTokens: 5, totalTokens: 35 } },
+        { agentId: 'worker-1', role: 'worker', output: 'sub', startedAt: 1, finishedAt: 2, seq: 1, parentAgentId: 'supervisor', taskInput: 'do', usage: { inputTokens: 30, outputTokens: 5, totalTokens: 35 } },
       ],
     )
     const runs = store.loadAgentRuns('s1')

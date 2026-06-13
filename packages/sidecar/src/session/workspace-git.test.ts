@@ -256,6 +256,20 @@ describe('collectWorkspaceDiff', () => {
       expect(r.state).toBe('ok'); expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
     } finally { await fs.rm(outside, { recursive: true, force: true }) }
   })
+  it('diffs base tree → an explicit headSha tree (tree↔tree), ignoring the live working tree', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    // capture a tree with a.txt edited; this becomes the fixed head
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const headTree = await captureSessionSnapshot(root)
+    expect(headTree).toBeTruthy()
+    // now dirty the working tree differently — it must NOT appear because headSha pins the head
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n')
+    await fs.writeFile(path.join(root, 'b.txt'), 'noise\n')
+    const r = await collectWorkspaceDiff(root, { base: 'head', headSha: headTree! })
+    expect(r.state).toBe('ok')
+    expect(r.files!.map((f) => f.path)).toEqual(['a.txt'])      // only the pinned head's change
+    expect(r.files![0]).toMatchObject({ additions: 1, deletions: 1 })
+  })
 })
 
 describe('collectWorkspaceDiffSummary', () => {

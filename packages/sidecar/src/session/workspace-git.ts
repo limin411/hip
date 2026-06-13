@@ -15,7 +15,7 @@ const GIT_INIT_TIMEOUT_MS = 60_000 // user-triggered baseline commit may walk a 
 const GIT_MAX_BUFFER = 32 * 1024 * 1024
 
 export interface WorkspaceDiff { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
-export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string }
+export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string; headSha?: string }
 
 const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++ 缺失时兜底（mode-only）
@@ -153,12 +153,17 @@ async function prepareTrees(cwd: string, opts: WorkspaceDiffOptions): Promise<{ 
   let hasHead = true
   try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
 
-  const ownIndex = !opts.indexFile
-  const indexDir = ownIndex ? await fs.mkdtemp(path.join(os.tmpdir(), 'hip-idx-')) : ''
-  const indexFile = opts.indexFile ?? path.join(indexDir, 'index')
+  // Head side: an explicit pinned tree (tree↔tree mode), else the live working tree (default).
   let nowTree: string
-  try { nowTree = await writeWorkingTree(cwd, gitBin, hasHead, indexFile) }
-  finally { if (ownIndex) await fs.rm(indexDir, { recursive: true, force: true }).catch(() => {}) }
+  if (opts.headSha) {
+    nowTree = opts.headSha
+  } else {
+    const ownIndex = !opts.indexFile
+    const indexDir = ownIndex ? await fs.mkdtemp(path.join(os.tmpdir(), 'hip-idx-')) : ''
+    const indexFile = opts.indexFile ?? path.join(indexDir, 'index')
+    try { nowTree = await writeWorkingTree(cwd, gitBin, hasHead, indexFile) }
+    finally { if (ownIndex) await fs.rm(indexDir, { recursive: true, force: true }).catch(() => {}) }
+  }
 
   const useSnapshot = opts.base === 'session-start' && !!opts.baseSha
   const baseTree = useSnapshot ? (opts.baseSha as string) : (hasHead ? 'HEAD' : await emptyTreeSha(cwd, gitBin))

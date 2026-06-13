@@ -52,8 +52,8 @@ describe('uiStore - panel state management', () => {
     useUiStore.getState().setTab('files')
     expect(useUiStore.getState().activeTab).toBe('files')
 
-    useUiStore.getState().setTab('diff')
-    expect(useUiStore.getState().activeTab).toBe('diff')
+    useUiStore.getState().setTab('timeline')
+    expect(useUiStore.getState().activeTab).toBe('timeline')
   })
 })
 

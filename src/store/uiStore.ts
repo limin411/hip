@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import type { CheckpointMode } from '@hip/protocol'
 
-export type ArtifactTab = 'files' | 'agents' | 'diff'
+export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
 interface UiState {
   collapsed: boolean
@@ -30,6 +31,10 @@ interface UiState {
   // resets on refresh — no persist middleware, intentionally matches activeTab style.
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
+
+  // Timeline checkpoint diff mode (本轮/自此至今/起点至今). In-memory only, like diffViewMode.
+  checkpointMode: CheckpointMode
+  setCheckpointMode: (m: CheckpointMode) => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -58,4 +63,7 @@ export const useUiStore = create<UiState>((set) => ({
 
   diffViewMode: 'unified',
   setDiffViewMode: (m) => set({ diffViewMode: m }),
+
+  checkpointMode: 'this-turn',
+  setCheckpointMode: (m) => set({ checkpointMode: m }),
 }))

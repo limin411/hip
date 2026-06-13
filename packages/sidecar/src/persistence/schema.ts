@@ -143,6 +143,37 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 8) {
+    db.exec('BEGIN')
+    try {
+      // Per-turn checkpoint chain (Zed-style detached commit-tree on a private ref). commit_sha
+      // is the GC-protected ref target; tree_sha drives diffs + restore. No agent_commits table —
+      // the 更改 tab reads the commit log live from `git log`.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS checkpoints (
+          id         TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          turn_id    TEXT,
+          kind       TEXT NOT NULL DEFAULT 'turn',
+          label      TEXT,
+          tree_sha   TEXT NOT NULL,
+          commit_sha TEXT NOT NULL,
+          branch     TEXT,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints(session_id, created_at);
+      `)
+      // current_branch: last-seen branch. session_start_commit: branch HEAD at session create
+      // (commit-log lower bound; NULL on an unborn HEAD).
+      db.exec(`ALTER TABLE sessions ADD COLUMN current_branch TEXT`)
+      db.exec(`ALTER TABLE sessions ADD COLUMN session_start_commit TEXT`)
+      db.exec('PRAGMA user_version = 8')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

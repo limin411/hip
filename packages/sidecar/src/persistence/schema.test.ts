@@ -21,7 +21,7 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(7)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(8)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {
@@ -31,5 +31,15 @@ describe('migrate', () => {
     expect(columns(db, 'sessions').filter((c) => c === 'title_custom')).toHaveLength(1)
     expect(columns(db, 'messages').filter((c) => c === 'stopped')).toHaveLength(1)
     expect(columns(db, 'agent_runs').filter((c) => c === 'task_input')).toHaveLength(1)
+  })
+
+  it('v8 adds the checkpoints table + sessions.current_branch/session_start_commit and reaches user_version 8', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    expect(columns(db, 'sessions')).toEqual(expect.arrayContaining(['current_branch', 'session_start_commit']))
+    expect(columns(db, 'checkpoints')).toEqual(
+      expect.arrayContaining(['id', 'session_id', 'turn_id', 'kind', 'label', 'tree_sha', 'commit_sha', 'branch', 'created_at']),
+    )
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(8)
   })
 })

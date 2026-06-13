@@ -138,6 +138,9 @@ export const zhTW = {
       modelConfig: {
         currentModel: '當前模型',
         searchProviders: '搜尋提供商',
+        searchModels: '搜尋模型',
+        modelsUnit: '個',
+        vision: '視覺',
         addCustom: '新增自訂提供商',
         notConfigured: '未設定',
         configured: '已設定',

@@ -138,6 +138,9 @@ export const zhCN = {
       modelConfig: {
         currentModel: '当前模型',
         searchProviders: '搜索提供商',
+        searchModels: '搜索模型',
+        modelsUnit: '个',
+        vision: '视觉',
         addCustom: '添加自定义提供商',
         notConfigured: '未配置',
         configured: '已配置',

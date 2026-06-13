@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Plus, Ban, Check, ChevronRight } from 'lucide-react'
 import { useProvidersStore } from '@/store/providersStore'
-import { isCompatible, type CatalogProvider } from '@/ipc/catalog'
+import { isCompatible, type CatalogProvider, type CatalogModel } from '@/ipc/catalog'
 import { groupProviders } from '@/lib/providerGroups'
+import { filterModels, NO_CAPS, type ModelCaps } from '@/lib/modelFilter'
 import { cn } from '@/lib/utils'
+
+/** The capability toggles shown above the model list; each maps to a ModelCaps key + an i18n label. */
+const CAP_FILTERS = [
+  { key: 'reasoning', i18n: 'reasoning' },
+  { key: 'tool_call', i18n: 'tools' },
+  { key: 'attachment', i18n: 'vision' },
+] as const
 
 export function ModelConfig() {
   const { t } = useTranslation()
@@ -152,6 +160,8 @@ function ProviderDetail({ provider, configured, baseURL, isActive, onSaveKey, on
   const [baseURLValue, setBaseURLValue] = useState(baseURL)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [modelQuery, setModelQuery] = useState('')
+  const [caps, setCaps] = useState<ModelCaps>(NO_CAPS)
 
   async function run(fn: () => Promise<void>) {
     setBusy(true); setError(null)
@@ -167,6 +177,30 @@ function ProviderDetail({ provider, configured, baseURL, isActive, onSaveKey, on
     catch (e) { console.error('[modelConfig]', e); setError(t('settings.modelConfig.error')) }
     finally { setBusy(false) }
   }
+
+  const allModels = Object.values(provider.models)
+  const current = allModels.find((m) => isActive(m.id))
+  const rest = current ? allModels.filter((m) => m.id !== current.id) : allModels
+  const filtered = filterModels(rest, modelQuery, caps)
+
+  const renderModelCard = (m: CatalogModel, isCurrent: boolean) => (
+    <button key={m.id} disabled={busy} onClick={() => void run(() => onSetCurrent(m.id))}
+      className={cn('flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left disabled:opacity-60',
+        isCurrent ? 'border-accent bg-accent-active' : 'border-border hover:bg-surface-muted')}>
+      <div className="min-w-0 flex-1">
+        <div className={cn('text-body', isCurrent && 'font-medium text-accent-strong')}>{m.name}</div>
+        <div className="mt-0.5 flex gap-1.5">
+          {m.limit?.context && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{Math.round(m.limit.context / 1000)}K</span>}
+          {m.reasoning && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{t('settings.modelConfig.reasoning')}</span>}
+          {m.tool_call && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{t('settings.modelConfig.tools')}</span>}
+          {m.attachment && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{t('settings.modelConfig.vision')}</span>}
+        </div>
+      </div>
+      <span className="shrink-0 text-caption text-accent-strong">
+        {isCurrent ? t('settings.modelConfig.current') : t('settings.modelConfig.setCurrent')}
+      </span>
+    </button>
+  )
 
   return (
     <>
@@ -205,28 +239,44 @@ function ProviderDetail({ provider, configured, baseURL, isActive, onSaveKey, on
         </button>
       </div>
 
-      <div className="mt-4 mb-1.5 text-meta text-ink-tertiary">{t('settings.modelConfig.models')}</div>
-      <div className="flex flex-col gap-1.5">
-        {Object.values(provider.models).map((m) => {
-          const current = isActive(m.id)
-          return (
-            <button key={m.id} disabled={busy} onClick={() => void run(() => onSetCurrent(m.id))}
-              className={cn('flex items-center gap-2.5 rounded-md border px-2.5 py-2 text-left disabled:opacity-60',
-                current ? 'border-accent bg-accent-active' : 'border-border hover:bg-surface-muted')}>
-              <div className="min-w-0 flex-1">
-                <div className={cn('text-body', current && 'font-medium text-accent-strong')}>{m.name}</div>
-                <div className="mt-0.5 flex gap-1.5">
-                  {m.limit?.context && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{Math.round(m.limit.context / 1000)}K</span>}
-                  {m.reasoning && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{t('settings.modelConfig.reasoning')}</span>}
-                  {m.tool_call && <span className="rounded bg-surface px-1.5 text-caption text-ink-secondary">{t('settings.modelConfig.tools')}</span>}
-                </div>
-              </div>
-              <span className="shrink-0 text-caption text-accent-strong">
-                {current ? t('settings.modelConfig.current') : t('settings.modelConfig.setCurrent')}
-              </span>
-            </button>
-          )
-        })}
+      <div className="mt-4 mb-1.5 flex items-center justify-between">
+        <span className="text-meta text-ink-tertiary">{t('settings.modelConfig.models')}</span>
+        {allModels.length > 0 && <span className="text-caption text-ink-tertiary">{allModels.length} {t('settings.modelConfig.modelsUnit')}</span>}
+      </div>
+
+      <div className="mb-2 flex items-center gap-2">
+        <div className="flex h-8 flex-1 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5">
+          <Search size={13} className="shrink-0 text-ink-tertiary" />
+          <input
+            value={modelQuery}
+            onChange={(e) => setModelQuery(e.target.value)}
+            placeholder={t('settings.modelConfig.searchModels')}
+            className="w-full bg-transparent text-body text-ink placeholder:text-ink-tertiary focus:outline-none"
+          />
+        </div>
+        {CAP_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setCaps((c) => ({ ...c, [f.key]: !c[f.key] }))}
+            className={cn('h-8 shrink-0 rounded-md px-2.5 text-caption transition-colors',
+              caps[f.key] ? 'bg-accent text-white' : 'border border-border text-ink-secondary hover:bg-surface-muted')}
+          >
+            {t(`settings.modelConfig.${f.i18n}`)}
+          </button>
+        ))}
+      </div>
+
+      {current && (
+        <div className="mb-2">
+          <div className="mb-1 text-caption text-ink-tertiary">{t('settings.modelConfig.current')}</div>
+          {renderModelCard(current, true)}
+        </div>
+      )}
+
+      <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto">
+        {filtered.length > 0
+          ? filtered.map((m) => renderModelCard(m, false))
+          : <div className="px-2.5 py-3 text-center text-meta text-ink-tertiary">{t('settings.modelConfig.noMatches')}</div>}
       </div>
     </>
   )

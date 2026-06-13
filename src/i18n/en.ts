@@ -138,6 +138,9 @@ export const en = {
       modelConfig: {
         currentModel: 'Current model',
         searchProviders: 'Search providers',
+        searchModels: 'Search models',
+        modelsUnit: 'models',
+        vision: 'Vision',
         addCustom: 'Add custom provider',
         notConfigured: 'Not configured',
         configured: 'Configured',

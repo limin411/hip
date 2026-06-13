@@ -180,6 +180,21 @@ export class SessionManager {
         send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
         break
       }
+      case 'git:branch:list': {
+        const r = await this.ensureSession(msg.sessionId).listBranches()
+        send({ type: 'git:branch:list:result', sessionId: msg.sessionId, branches: r.branches, currentBranch: r.currentBranch })
+        break
+      }
+      case 'git:branch:switch': {
+        const r = await this.ensureSession(msg.sessionId).switchBranch(msg.branch)
+        send({ type: 'git:branch:switch:result', sessionId: msg.sessionId, branch: msg.branch, ok: r.ok, currentBranch: r.currentBranch, ...(r.error ? { error: r.error } : {}) })
+        break
+      }
+      case 'git:revert': {
+        const r = await this.ensureSession(msg.sessionId).revertCheckpoint(msg.checkpointId, send)
+        send({ type: 'git:revert:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, ok: r.ok, ...(r.safetyCheckpointId ? { safetyCheckpointId: r.safetyCheckpointId } : {}), ...(r.error ? { error: r.error } : {}) })
+        break
+      }
     }
   }
 

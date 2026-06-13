@@ -140,7 +140,7 @@ export function HipLogo({
             rx={60}
             ry={66}
             fill={CREAM}
-            opacity={0.16}
+            opacity={0.13}
           />
           <HugMascot animated />
         </svg>

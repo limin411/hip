@@ -9,6 +9,8 @@ import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
 import { AgentDashboard } from './AgentDashboard'
 import { DiffViewer } from './DiffViewer'
+import { useDomainStore } from '@/domain/sessionStore'
+import { useDiffStore } from '@/store/diffStore'
 
 export function ArtifactPanel() {
   const { t } = useTranslation()
@@ -20,6 +22,8 @@ export function ArtifactPanel() {
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
   const togglePanel = useUiStore((s) => s.togglePanel)
+  const sid = useDomainStore((s) => s.activeSessionId)
+  const diffCount = useDiffStore((s) => (sid ? s.bySession[sid]?.summary?.totalFiles : 0)) ?? 0
 
   return (
     <div className="h-full animate-panel-in bg-surface">
@@ -32,6 +36,9 @@ export function ArtifactPanel() {
             {TABS.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
                 {tab.label}
+                {tab.value === 'diff' && diffCount > 0 && (
+                  <span data-testid="diff-badge" className="ml-1.5 rounded-full bg-accent/15 px-1.5 text-caption text-accent">{diffCount}</span>
+                )}
               </TabsTrigger>
             ))}
           </TabsList>

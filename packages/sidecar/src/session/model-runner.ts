@@ -4,6 +4,7 @@ import { concat } from '@langchain/core/utils/stream'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ChatOpenAI } from '@langchain/openai'
 import { MAX_STEPS_NOTE } from './loop-control.js'
+import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 
 /** Per-step run options: the streaming sinks + whether tools are bound (off on the final, capped step). */
 export interface ModelRunOptions {
@@ -48,16 +49,22 @@ export class RealModelRunner implements ModelRunner {
   async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
     const bound = opts.bindTools ? this.model.bindTools(opts.tools) : this.model
     const input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
-    const stream = await bound.stream(input, { signal: opts.signal })
-    let gathered: AIMessageChunk | undefined
-    for await (const chunk of stream) {
-      gathered = gathered ? (concat(gathered, chunk) as AIMessageChunk) : chunk
-      const t = textDelta(chunk)
-      if (t) opts.onText(t)
-      const r = reasoningDelta(chunk)
-      if (r) opts.onReasoning(r)
+    let emitted = false
+    const attempt = async (): Promise<AIMessage> => {
+      const stream = await bound.stream(input, { signal: opts.signal })
+      let gathered: AIMessageChunk | undefined
+      for await (const chunk of stream) {
+        gathered = gathered ? (concat(gathered, chunk) as AIMessageChunk) : chunk
+        const t = textDelta(chunk)
+        if (t) { emitted = true; opts.onText(t) }
+        const r = reasoningDelta(chunk)
+        if (r) { emitted = true; opts.onReasoning(r) }
+      }
+      if (!gathered) throw new Error('model produced no output')
+      return gathered as AIMessage
     }
-    if (!gathered) throw new Error('model produced no output')
-    return gathered as AIMessage
+    // Retry only transient failures thrown BEFORE the first delta — retrying mid-stream would
+    // duplicate already-emitted tokens. Once `emitted` is true, shouldRetry returns false → rethrow.
+    return withRetry(attempt, { maxRetries: MAX_RETRIES, signal: opts.signal, shouldRetry: (e) => !emitted && isRetryable(e) })
   }
 }

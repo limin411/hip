@@ -311,4 +311,22 @@ describe('SessionStore', () => {
     expect(runs.map((r) => r.agentId)).toEqual(['supervisor', 'planner-1'])
     expect(runs[1]).toMatchObject({ taskInput: 'make a plan', parentAgentId: 'supervisor', output: 'the plan', messageId: 'turn1' })
   })
+
+  it('inserts and lists checkpoints newest-first within a session', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertCheckpoint({ id: 's1:start', sessionId: 's1', turnId: null, kind: 'start', label: null, treeSha: 'tree0', commitSha: 'c0', branch: 'main', createdAt: 10 })
+    store.insertCheckpoint({ id: 's1:t1', sessionId: 's1', turnId: 't1', kind: 'turn', label: 'add feature', treeSha: 'tree1', commitSha: 'c1', branch: 'main', createdAt: 20 })
+    const list = store.listCheckpoints('s1')
+    expect(list.map((c) => c.id)).toEqual(['s1:t1', 's1:start']) // newest-first
+    expect(list[0]).toMatchObject({ turnId: 't1', kind: 'turn', label: 'add feature', treeSha: 'tree1', commitSha: 'c1', branch: 'main', createdAt: 20 })
+    expect(list[1]).toMatchObject({ turnId: null, kind: 'start', label: null })
+  })
+
+  it('round-trips session git meta (branch + start commit, null by default)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    expect(store.getSessionGitMeta('s1')).toEqual({ currentBranch: null, sessionStartCommit: null })
+    store.setSessionBranch('s1', 'feature')
+    store.setSessionStartCommit('s1', 'deadbeef')
+    expect(store.getSessionGitMeta('s1')).toEqual({ currentBranch: 'feature', sessionStartCommit: 'deadbeef' })
+  })
 })

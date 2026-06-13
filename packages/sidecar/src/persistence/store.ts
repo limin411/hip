@@ -1,5 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Message, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
+import type { AgentRole, AgentRun, Checkpoint, Message, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
 import { sumUsage } from '../session/usage.js'
 
 const PREVIEW_LEN = 80
@@ -27,6 +27,40 @@ export class SessionStore {
   /** 写入会话起点快照树 SHA（null = 清除）。 */
   setDiffBaseSha(id: string, sha: string | null): void {
     this.db.prepare(`UPDATE sessions SET diff_base_sha=? WHERE id=?`).run(sha, id)
+  }
+
+  /** Insert a checkpoint row. `id` is unique (e.g. "<sid>:<turnId>"); INSERT OR REPLACE so a
+   *  recapture of the same turn overwrites cleanly. */
+  insertCheckpoint(c: Checkpoint): void {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO checkpoints(id,session_id,turn_id,kind,label,tree_sha,commit_sha,branch,created_at) VALUES(?,?,?,?,?,?,?,?,?)`,
+    ).run(c.id, c.sessionId, c.turnId, c.kind, c.label, c.treeSha, c.commitSha, c.branch, c.createdAt)
+  }
+
+  /** All checkpoints for a session, newest-first (created_at DESC). */
+  listCheckpoints(sessionId: string): Checkpoint[] {
+    const rows = this.db.prepare(
+      `SELECT id,session_id,turn_id,kind,label,tree_sha,commit_sha,branch,created_at FROM checkpoints WHERE session_id=? ORDER BY created_at DESC, rowid DESC`,
+    ).all(sessionId) as { id: string; session_id: string; turn_id: string | null; kind: Checkpoint['kind']; label: string | null; tree_sha: string; commit_sha: string; branch: string | null; created_at: number }[]
+    return rows.map((r) => ({ id: r.id, sessionId: r.session_id, turnId: r.turn_id, kind: r.kind, label: r.label, treeSha: r.tree_sha, commitSha: r.commit_sha, branch: r.branch, createdAt: r.created_at }))
+  }
+
+  /** Record the session's last-seen branch (NULL clears). */
+  setSessionBranch(id: string, branch: string | null): void {
+    this.db.prepare(`UPDATE sessions SET current_branch=? WHERE id=?`).run(branch, id)
+  }
+
+  /** Record the session-start commit (commit-log lower bound; NULL on unborn HEAD). */
+  setSessionStartCommit(id: string, sha: string | null): void {
+    this.db.prepare(`UPDATE sessions SET session_start_commit=? WHERE id=?`).run(sha, id)
+  }
+
+  /** Read the session's git meta (both NULL for a missing/legacy session). */
+  getSessionGitMeta(id: string): { currentBranch: string | null; sessionStartCommit: string | null } {
+    const row = this.db.prepare(`SELECT current_branch, session_start_commit FROM sessions WHERE id=?`).get(id) as
+      | { current_branch: string | null; session_start_commit: string | null }
+      | undefined
+    return { currentBranch: row?.current_branch ?? null, sessionStartCommit: row?.session_start_commit ?? null }
   }
 
   touchSession(id: string, updatedAt: number): void {

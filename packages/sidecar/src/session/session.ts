@@ -1,17 +1,20 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry } from '@hip/protocol'
-import { createDeepAgent, FilesystemBackend } from 'deepagents'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
-import { buildSubagents, buildSupervisorPrompt, roleForName } from './agents.js'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
 import * as workspaceGit from './workspace-git.js'
-import { consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
+import { buildTools } from './tools.js'
+import { buildSystemPrompt } from './system-prompt.js'
+import { RealModelRunner, type ModelRunner } from './model-runner.js'
+import { recursionLimit } from './loop-control.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -151,17 +154,9 @@ function buildModel(_config: SessionConfig): ChatOpenAI {
   })
 }
 
-/** Resolve a sub-agent's delegation instruction defensively (it is known at delegation time). */
-async function safeTaskInput(sub: { taskInput: Promise<string> }): Promise<string | undefined> {
-  try {
-    return await sub.taskInput
-  } catch {
-    return undefined
-  }
-}
-
 export class Session {
-  private agent!: ReturnType<typeof createDeepAgent>
+  private app!: ReturnType<typeof buildGraph>
+  private readonly injectedRunner?: ModelRunner
   private _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
@@ -181,10 +176,12 @@ export class Session {
     private readonly store?: SessionStore,
     titleGenerator?: TitleGenerator,
     private readonly idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS,
+    runner?: ModelRunner,
   ) {
     this._config = config
     this.injectedModel = model
-    this.usesEnvModel = !model
+    this.injectedRunner = runner
+    this.usesEnvModel = !model && !runner
     // Inject a generator (tests), else build the real one only for the env-keyed
     // production model. Injected-model sessions get no generator → no LLM title.
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
@@ -196,19 +193,16 @@ export class Session {
     return this._config
   }
 
-  /** (Re)build the deep agent — with a sandboxed FilesystemBackend when a cwd is bound. */
+  /** (Re)build the compiled agent-loop graph (reused across turns; per-turn state is passed via configurable.ctx). */
   private buildAgent(): void {
-    const model = this.injectedModel ?? buildModel(this._config)
-    const backend = this._config.cwd
-      ? new FilesystemBackend({ rootDir: this._config.cwd, virtualMode: true, maxFileSizeMb: 10 })
-      : undefined
-    const promptCwd = this._config.cwd ?? '/'
-    this.agent = createDeepAgent({
-      model,
-      systemPrompt: buildSupervisorPrompt(promptCwd, this._config.systemPrompt),
-      subagents: buildSubagents(promptCwd) as unknown as NonNullable<Parameters<typeof createDeepAgent>[0]>['subagents'],
-      ...(backend ? { backend } : {}),
-    })
+    this.app = buildGraph()
+  }
+
+  /** The ModelRunner for this turn: injected (tests) or a RealModelRunner over the built ChatOpenAI. */
+  private modelRunner(): ModelRunner {
+    if (this.injectedRunner) return this.injectedRunner
+    const model = (this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config)
+    return new RealModelRunner(model)
   }
 
   /** Seed prior conversation so the agent resumes with full context. */
@@ -355,17 +349,13 @@ export class Session {
     this.running = true
     let timedOut = false
     const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
-    // Every outbound activity kicks the watchdog; a stall (no sends for idleTimeoutMs) aborts the turn.
     const send: SendFn = (msg) => { watchdog.kick(); rawSend(msg) }
 
     const turnId = `asst-supervisor-${Date.now()}-${this.turnSeq++}`
     const trajectory = new Map<string, TraceRun>()
     let agentSeq = 0
-    // ONE turn-global step counter shared by tool calls AND reasoning bursts, so the timeline
-    // interleaves them in true wall-clock order.
     let stepSeq = 0
     const nextSeq = () => stepSeq++
-    const pending: Promise<void>[] = []
     const started = new Set<string>()
     const recorder: TraceRecorder = {
       start: (agentId, callId, name, input, seq, truncated) => {
@@ -378,30 +368,18 @@ export class Session {
         tc.status = status
         if (output !== undefined) tc.output = output
         if (error !== undefined) tc.error = error
-        if (truncated || tc.truncated) tc.truncated = true   // sticky-OR
+        if (truncated || tc.truncated) tc.truncated = true
       },
     }
-    // An open reasoning burst per agent: the first reasoning delta opens it (claiming a stepSeq);
-    // subsequent deltas append at that same stepSeq; a tool-start or agent-finish closes it.
     const reasoning = new ReasoningTracker(nextSeq)
     const reasoningDelta = (agentId: string, role: AgentRole, delta: string) => {
       if (!delta) return
-      const stepSeq = reasoning.push(agentId, delta)
-      send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId, role, stepSeq, delta })
+      const burstSeq = reasoning.push(agentId, delta)
+      send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId, role, stepSeq: burstSeq, delta })
     }
     const closeReasoning = (agentId: string) => {
       const burst = reasoning.close(agentId)
       if (burst) { const r = trajectory.get(agentId); if (r) r.reasoningBursts.push(burst) }
-    }
-    const traceCtx = {
-      sessionId: this.id,
-      turnId,
-      send,
-      nextSeq,
-      roleOf: (agentId: string) => trajectory.get(agentId)?.role ?? 'supervisor',
-      onToolStart: (agentId: string) => closeReasoning(agentId),
-      pending,
-      record: recorder,
     }
     const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
       if (started.has(agentId)) return
@@ -420,69 +398,45 @@ export class Session {
 
     let supervisorText = ''
     ensureStarted('supervisor', 'supervisor')
+
+    const cwd = this._config.cwd ?? process.cwd()
+    const tools = buildTools(cwd)
+    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt })
+    const emit: GraphEmit = {
+      token: (delta) => {
+        if (!delta) return
+        supervisorText += delta
+        const r = trajectory.get('supervisor'); if (r) r.output += delta
+        send({ type: 'token:stream', sessionId: this.id, turnId, agentId: 'supervisor', delta })
+      },
+      reasoning: (delta) => reasoningDelta('supervisor', 'supervisor', delta),
+      toolStarted: (name, callId, input) => {
+        closeReasoning('supervisor')
+        const seq = nextSeq()
+        const inClip = clip(stringify(input))
+        recorder.start('supervisor', callId, name, inClip.text, seq, inClip.truncated)
+        send({ type: 'tool:started', sessionId: this.id, turnId, agentId: 'supervisor', role: 'supervisor', callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
+      },
+      toolFinished: (callId, status, output, error) => {
+        const outClip = output !== undefined ? clip(stringify(output)) : undefined
+        recorder.finish('supervisor', callId, status, outClip?.text, error, outClip?.truncated ?? false)
+        send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: 'supervisor', callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
+      },
+    }
+    const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit }
+
     try {
-      const run = await this.agent.streamEvents(
-        { messages: this.messages },
-        { version: 'v3', signal: this.abortController.signal },
+      await this.app.invoke(
+        { messages: [new SystemMessage(system), ...this.messages], steps: 0 },
+        { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
       )
-      // Supervisor and subagent message streams are the same ChatModelStream shape at runtime
-      // (streaming `.text` + `.reasoning`), but the subagents projection's static type collapses
-      // to AIMessage (whose `.text` is a plain string and has no `.reasoning`) because the
-      // subagent specs are passed through an `as unknown` cast in buildAgent. Re-project the
-      // subagent message to the supervisor stream's element type so both pumps read tokens.
-      type StreamedMessage = typeof run.messages extends AsyncIterable<infer M> ? M : never
-      const pumpSupervisor = async () => {
-        for await (const msg of run.messages) {
-          await Promise.all([
-            (async () => { for await (const delta of msg.text) {
-              if (!delta) continue
-              supervisorText += delta
-              const r = trajectory.get('supervisor'); if (r) r.output += delta
-              send({ type: 'token:stream', sessionId: this.id, turnId, agentId: 'supervisor', delta })
-            } })(),
-            (async () => { for await (const delta of msg.reasoning) { reasoningDelta('supervisor', 'supervisor', delta) } })(),
-          ])
-        }
-      }
-      const pumpSubagents = async () => {
-        for await (const sub of run.subagents) {
-          const agentId = sub.name
-          const taskInput = await safeTaskInput(sub)
-          ensureStarted(agentId, roleForName(sub.name), 'supervisor', taskInput)
-          await Promise.all([
-            (async () => {
-              for await (const rawMsg of sub.messages) {
-                const msg = rawMsg as unknown as StreamedMessage
-                await Promise.all([
-                  (async () => { for await (const delta of msg.text) {
-                    if (!delta) continue
-                    const r = trajectory.get(agentId); if (r) r.output += delta
-                    send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta })
-                  } })(),
-                  (async () => { for await (const delta of msg.reasoning) { reasoningDelta(agentId, roleForName(sub.name), delta) } })(),
-                ])
-              }
-            })(),
-            consumeToolCalls(agentId, sub.toolCalls, traceCtx),
-          ])
-          if (started.delete(agentId)) {
-            closeReasoning(agentId)
-            const r = trajectory.get(agentId); if (r) r.finishedAt = Date.now()
-            send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
-          }
-        }
-      }
-      await Promise.all([pumpSupervisor(), pumpSubagents(), consumeToolCalls('supervisor', run.toolCalls, traceCtx)])
-      await Promise.allSettled(pending)
+      closeReasoning('supervisor')
       finishRemaining()
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
       finishRemaining()
-      await Promise.allSettled(pending)
       if (isAbort && supervisorText) {
-        // Keep the partial: finalize + persist with stopped=true (also enters next-turn context).
         const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true)
-        // A stall is terminal: emit TIMEOUT *after* the finalize so the client ends in `error`, not `idle`.
         if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
         return text
       }

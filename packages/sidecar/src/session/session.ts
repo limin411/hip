@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -15,6 +15,7 @@ import { buildTools } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { recursionLimit } from './loop-control.js'
+import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 
@@ -405,6 +406,7 @@ export class Session {
     let stepSeq = 0
     const nextSeq = () => stepSeq++
     const started = new Set<string>()
+    const usageByAgent = new Map<string, TurnUsage>()
     const recorder: TraceRecorder = {
       start: (agentId, callId, name, input, seq, truncated) => {
         const r = trajectory.get(agentId)
@@ -450,28 +452,29 @@ export class Session {
     const cwd = this._config.cwd ?? process.cwd()
     const tools = buildTools(cwd)
     const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt })
-    const emit: GraphEmit = {
+    const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => {
         if (!delta) return
-        supervisorText += delta
-        const r = trajectory.get('supervisor'); if (r) r.output += delta
-        send({ type: 'token:stream', sessionId: this.id, turnId, agentId: 'supervisor', delta })
+        if (agentId === 'supervisor') supervisorText += delta
+        const r = trajectory.get(agentId); if (r) r.output += delta
+        send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta })
       },
-      reasoning: (delta) => reasoningDelta('supervisor', 'supervisor', delta),
+      reasoning: (delta) => reasoningDelta(agentId, role, delta),
       toolStarted: (name, callId, input) => {
-        closeReasoning('supervisor')
+        closeReasoning(agentId)
         const seq = nextSeq()
         const inClip = clip(stringify(input))
-        recorder.start('supervisor', callId, name, inClip.text, seq, inClip.truncated)
-        send({ type: 'tool:started', sessionId: this.id, turnId, agentId: 'supervisor', role: 'supervisor', callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
+        recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated)
+        send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
       },
       toolFinished: (callId, status, output, error) => {
         const outClip = output !== undefined ? clip(stringify(output)) : undefined
-        recorder.finish('supervisor', callId, status, outClip?.text, error, outClip?.truncated ?? false)
-        send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: 'supervisor', callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
+        recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false)
+        send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
       },
-      usage: () => {},
-    }
+      usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
+    })
+    const emit = makeEmit('supervisor', 'supervisor')
     const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit, summarizer: this.summarizer() }
 
     try {
@@ -487,7 +490,7 @@ export class Session {
         // watchdog and clears `running`; `awaitingResume` makes the next user message a resume.
         this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }
         this.awaitingResume = true
-        const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
+        const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
         send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
         return stoppedText
       }
@@ -495,7 +498,7 @@ export class Session {
       const isAbort = err instanceof Error && err.name === 'AbortError'
       finishRemaining()
       if (isAbort && supervisorText) {
-        const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true)
+        const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
         if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
         return text
       }
@@ -512,17 +515,21 @@ export class Session {
       this.abortController = null
     }
 
-    return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false)
+    return this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)
   }
 
   /** Run the phantom-write safety net, push the assistant message into context, persist the turn
    *  (with its timeline), and emit message:complete. Returns the final (possibly corrected) text. */
-  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean): string {
+  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>): string {
     const { correction } = verifyWrites(trajectory, supervisorText, this._config.language ?? 'en')
     const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
     if (finalText) this.messages.push(new AIMessage(finalText))
     const ts = Date.now()
-    const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => ({ ...r, messageId: turnId }))
+    const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => {
+      const u = usageByAgent?.get(r.agentId)
+      return { ...r, messageId: turnId, ...(u ? { usage: u } : {}) }
+    })
+    const turnUsage = sumUsage(runs.map((r) => r.usage))
     const timeline = trajectoryToTimeline(trajectory)
     const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
     if (this.store) {
@@ -536,7 +543,7 @@ export class Session {
     send({
       type: 'message:complete',
       sessionId: this.id,
-      message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(stopped ? { stopped: true } : {}) },
+      message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}), ...(stopped ? { stopped: true } : {}) },
     })
     return finalText
   }

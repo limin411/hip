@@ -229,6 +229,7 @@ export const zhCN = {
       skip: '跳过登录',
     },
     common: {
+      cancel: '取消',
       close: '关闭',
       logout: '退出登录',
     },

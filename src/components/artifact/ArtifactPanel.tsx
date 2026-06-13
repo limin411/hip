@@ -11,6 +11,7 @@ import { AgentDashboard } from './AgentDashboard'
 import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
+import { BranchSwitcher } from './BranchSwitcher'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 
@@ -48,9 +49,12 @@ export function ArtifactPanel() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <Button variant="ghost" size="icon" onClick={togglePanel} title={t('artifact.closePanel')} data-tauri-drag-region="false">
-            <X size={16} />
-          </Button>
+          <div className="flex items-center gap-2" data-tauri-drag-region="false">
+            {isGitRepo && <BranchSwitcher />}
+            <Button variant="ghost" size="icon" onClick={togglePanel} title={t('artifact.closePanel')}>
+              <X size={16} />
+            </Button>
+          </div>
         </div>
 
         <TabsContent value="files" className="overflow-hidden p-0">

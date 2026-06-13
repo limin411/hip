@@ -229,6 +229,7 @@ export const en = {
       skip: 'Skip Login',
     },
     common: {
+      cancel: 'Cancel',
       close: 'Close',
       logout: 'Log Out',
     },

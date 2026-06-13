@@ -229,6 +229,7 @@ export const zhTW = {
       skip: '跳過登錄',
     },
     common: {
+      cancel: '取消',
       close: '關閉',
       logout: '登出',
     },

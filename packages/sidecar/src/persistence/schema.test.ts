@@ -7,17 +7,20 @@ function columns(db: DatabaseSync, table: string): string[] {
 }
 
 describe('migrate', () => {
-  it('adds tool_calls + agent_runs delegation columns + messages.timeline and reaches user_version 5', () => {
+  it('adds tool_calls + agent_runs delegation + token columns + messages.timeline and reaches user_version 6', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('title_custom')
     expect(columns(db, 'messages')).toContain('stopped')
     expect(columns(db, 'messages')).toContain('timeline')
     expect(columns(db, 'agent_runs')).toEqual(expect.arrayContaining(['task_input', 'parent_agent_id']))
+    expect(columns(db, 'agent_runs')).toEqual(
+      expect.arrayContaining(['prompt_tokens', 'completion_tokens', 'total_tokens']),
+    )
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(5)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(6)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {

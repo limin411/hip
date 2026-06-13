@@ -2,6 +2,7 @@ import { StateGraph, Annotation, START, END, messagesStateReducer } from '@langc
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { TurnUsage } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
@@ -13,6 +14,7 @@ export interface GraphEmit {
   reasoning(delta: string): void
   toolStarted(name: string, callId: string, input: unknown): void
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
+  usage(u: TurnUsage): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -60,6 +62,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       onText: (d) => emit.token(d),
       onReasoning: (d) => emit.reasoning(d),
     })
+    const u = msg.usage_metadata
+    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
     return { messages: [msg], steps: state.steps + 1 }
   }
 

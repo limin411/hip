@@ -7,6 +7,7 @@ import { buildTools } from './tools.js'
 import { buildGraph, type GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
+import type { TurnUsage } from '@hip/protocol'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -19,7 +20,7 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-graph-'))
@@ -37,6 +38,33 @@ describe('agent loop graph', () => {
       )
       expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('你好，我是助手')
       expect(out.steps).toBe(1)
+    })
+  })
+
+  it('emits usage from the gathered message usage_metadata', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const msg = new AIMessage('done')
+      msg.usage_metadata = { input_tokens: 12, output_tokens: 5, total_tokens: 17 }
+      const runner = fakeRunner([msg])
+      const seen: Array<{ inputTokens: number; outputTokens: number; totalTokens: number }> = []
+      await app.invoke(
+        { messages: [new HumanMessage('hi')], steps: 0 },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
+      )
+      expect(seen).toEqual([{ inputTokens: 12, outputTokens: 5, totalTokens: 17 }])
+    })
+  })
+
+  it('does not emit usage when the message has no usage_metadata', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const seen: unknown[] = []
+      await app.invoke(
+        { messages: [new HumanMessage('hi')], steps: 0 },
+        { configurable: { ctx: { runner: fakeRunner([new AIMessage('done')]), tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
+      )
+      expect(seen).toEqual([])
     })
   })
 

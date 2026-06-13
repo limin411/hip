@@ -153,6 +153,7 @@ function buildModel(_config: SessionConfig): ChatOpenAI {
     model: modelID,
     apiKey: activeKey(providerID),
     configuration: { baseURL },
+    streamUsage: true,
   })
 }
 
@@ -469,6 +470,7 @@ export class Session {
         recorder.finish('supervisor', callId, status, outClip?.text, error, outClip?.truncated ?? false)
         send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: 'supervisor', callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
       },
+      usage: () => {},
     }
     const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit, summarizer: this.summarizer() }
 

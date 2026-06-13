@@ -182,6 +182,9 @@ export interface CommitLogEntry {
 /** The three timeline diff modes — each maps to a base→head tree pair. */
 export type CheckpointMode = 'this-turn' | 'since-then' | 'since-start'
 
+/** One branch in the repo, with a flag for the checked-out one. */
+export interface Branch { name: string; current: boolean }
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
@@ -209,6 +212,9 @@ export type ClientMessage =
   | { type: 'git:checkpoint:list'; sessionId: string }
   | { type: 'git:checkpoint:diff'; sessionId: string; checkpointId: string; mode: CheckpointMode }
   | { type: 'git:commitLog'; sessionId: string }
+  | { type: 'git:branch:list'; sessionId: string }
+  | { type: 'git:branch:switch'; sessionId: string; branch: string }
+  | { type: 'git:revert'; sessionId: string; checkpointId: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -243,3 +249,6 @@ export type ServerMessage =
   | { type: 'git:checkpoint:diff:result'; sessionId: string; checkpointId: string; mode: CheckpointMode; state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
   | { type: 'git:commitLog:result'; sessionId: string; commits: CommitLogEntry[]; state: DiffState; error?: string }
   | { type: 'checkpoint:created'; sessionId: string; checkpoint: Checkpoint }
+  | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
+  | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
+  | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }

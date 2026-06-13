@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
-import type { DiffFile, DiffLine, DiffState } from '@hip/protocol'
+import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase } from '@hip/protocol'
 import { readHead } from './workspace-fs.js'
 
 const execFileP = promisify(execFile)
@@ -21,81 +21,91 @@ export interface WorkspaceDiff {
   error?: string
 }
 
-const HUNK_RE = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
+const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
+const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++ 缺失时兜底（mode-only）
+const BINARY_RE = /^Binary files a\/(.+) and b\/(.+) differ$/
+
+function stripPrefix(p: string): string { return p.replace(/^[ab]\//, '') }
 
 /**
- * Parse `git diff` unified output into per-file DiffFiles. Paths come out exactly as git
- * prints them (repo-root-relative); the caller converts to cwd-relative. Line counts
- * (`additions`/`deletions`) are pre-truncation; `lines` is capped at MAX_DIFF_LINES_PER_FILE.
+ * 把 `git diff` 统一输出解析为 hunk-first 的 DiffFile[]。路径按 git 原样（repo-root 相对），
+ * 调用方负责转 cwd 相对。`additions`/`deletions` 为 pre-truncation；每文件行数共享一个预算
+ * MAX_DIFF_LINES_PER_FILE，超出则丢行并置 truncated。
  */
-const GIT_HEADER_RE = /^a\/(.+) b\/\1$/
-
 export function parseUnifiedDiff(text: string): DiffFile[] {
   const files: DiffFile[] = []
   for (const chunk of text.split(/^diff --git /m).slice(1)) {
     const rawLines = chunk.split('\n')
-    // Extract fallback path from `a/<path> b/<path>` header (first line of chunk).
-    const headerMatch = GIT_HEADER_RE.exec(rawLines[0] ?? '')
     let filePath = ''
+    let oldPath: string | undefined
+    let status: DiffFileStatus = 'modified'
     let binary = false
-    let inHunk = false
-    let oldNo = 0
-    let newNo = 0
-    let additions = 0
-    let deletions = 0
+    const hunks: DiffHunk[] = []
+    let cur: DiffHunk | null = null
+    let oldNo = 0, newNo = 0
+    let additions = 0, deletions = 0
+    let budget = MAX_DIFF_LINES_PER_FILE
     let truncated = false
-    const out: DiffLine[] = []
     for (const line of rawLines) {
-      if (!inHunk) {
-        // Header zone. `---` precedes `+++`; the b/ side wins unless it's /dev/null (deletion).
+      if (!cur) {
+        if (line.startsWith('rename from ')) { oldPath = line.slice('rename from '.length); status = 'renamed'; continue }
+        if (line.startsWith('rename to ')) { filePath = line.slice('rename to '.length); status = 'renamed'; continue }
+        if (line.startsWith('new file mode')) { status = 'added'; continue }
+        if (line.startsWith('deleted file mode')) { status = 'deleted'; continue }
         if (line.startsWith('--- ')) {
           const p = line.slice(4).trim()
-          if (!filePath && p !== '/dev/null') filePath = p.replace(/^a\//, '')
+          if (p === '/dev/null') status = 'added'
+          else if (!filePath) filePath = stripPrefix(p)
           continue
         }
         if (line.startsWith('+++ ')) {
           const p = line.slice(4).trim()
-          // Caller passes --no-renames, so a/ and b/ paths are always the same;
-          // unconditionally overwriting filePath with the b/ side is safe.
-          if (p !== '/dev/null') filePath = p.replace(/^b\//, '')
+          if (p === '/dev/null') status = 'deleted'
+          else filePath = stripPrefix(p)        // b/ 侧胜出
           continue
         }
-        if (/^Binary files .* differ$/.test(line)) { binary = true; continue }
+        const bm = BINARY_RE.exec(line)
+        if (bm) { binary = true; if (!filePath) filePath = bm[2]; continue }
       }
-      const hunk = HUNK_RE.exec(line)
-      if (hunk) {
-        inHunk = true
-        oldNo = parseInt(hunk[1], 10)
-        newNo = parseInt(hunk[2], 10)
+      const h = HUNK_RE.exec(line)
+      if (h) {
+        cur = {
+          oldStart: parseInt(h[1], 10), oldLines: h[2] === undefined ? 1 : parseInt(h[2], 10),
+          newStart: parseInt(h[3], 10), newLines: h[4] === undefined ? 1 : parseInt(h[4], 10),
+          ...(h[5].trim() ? { header: h[5].trim() } : {}),
+          lines: [],
+        }
+        hunks.push(cur)
+        oldNo = cur.oldStart; newNo = cur.newStart
         continue
       }
-      if (!inHunk) continue
+      if (!cur) continue
+      if (line.startsWith('\\')) {                 // "\ No newline at end of file"
+        const prev = cur.lines[cur.lines.length - 1]
+        if (prev) prev.noNewline = true
+        continue
+      }
       if (line.startsWith('+')) {
         additions++
-        if (out.length < MAX_DIFF_LINES_PER_FILE) out.push({ type: 'add', content: line.slice(1), oldNo: null, newNo })
-        else truncated = true
+        if (budget > 0) { cur.lines.push({ type: 'add', content: line.slice(1), oldNo: null, newNo }); budget-- } else { truncated = true; cur.truncated = true }
         newNo++
       } else if (line.startsWith('-')) {
         deletions++
-        if (out.length < MAX_DIFF_LINES_PER_FILE) out.push({ type: 'del', content: line.slice(1), oldNo, newNo: null })
-        else truncated = true
+        if (budget > 0) { cur.lines.push({ type: 'del', content: line.slice(1), oldNo, newNo: null }); budget-- } else { truncated = true; cur.truncated = true }
         oldNo++
       } else if (line.startsWith(' ')) {
-        if (out.length < MAX_DIFF_LINES_PER_FILE) out.push({ type: 'ctx', content: line.slice(1), oldNo, newNo })
-        else truncated = true
-        oldNo++
-        newNo++
+        if (budget > 0) { cur.lines.push({ type: 'ctx', content: line.slice(1), oldNo, newNo }); budget-- } else { truncated = true; cur.truncated = true }
+        oldNo++; newNo++
       }
-      // '\ No newline at end of file' and any other marker lines: skipped.
     }
-    // Fall back to b/ path extracted from the `diff --git` header line.
-    if (!filePath && headerMatch) filePath = headerMatch[1]
+    if (!filePath) { const hm = HEADER_PATH_RE.exec(rawLines[0] ?? ''); if (hm) filePath = hm[1] }
+    if (!filePath && oldPath) filePath = oldPath
     if (!filePath) continue
     files.push({
       path: filePath,
-      additions,
-      deletions,
-      lines: out,
+      ...(oldPath && oldPath !== filePath ? { oldPath } : {}),
+      status,
+      additions, deletions, hunks,
       ...(truncated ? { truncated: true } : {}),
       ...(binary ? { binary: true } : {}),
     })

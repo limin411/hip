@@ -68,13 +68,26 @@ index 1234567..89abcde 100644
 \\ No newline at end of file
 `
 
+const RENAME = `diff --git a/old.txt b/new.txt
+similarity index 80%
+rename from old.txt
+rename to new.txt
+index 1234567..89abcde 100644
+--- a/old.txt
++++ b/new.txt
+@@ -1,2 +1,2 @@
+ keep
+-x
++y
+`
+
 describe('parseUnifiedDiff', () => {
-  it('parses a modified file with correct line numbers and counts', () => {
+  it('parses a modified file into hunks with per-hunk line numbers', () => {
     const [f] = parseUnifiedDiff(MODIFY)
-    expect(f.path).toBe('src/app.ts')
-    expect(f.additions).toBe(2)
-    expect(f.deletions).toBe(1)
-    expect(f.lines).toEqual([
+    expect(f).toMatchObject({ path: 'src/app.ts', status: 'modified', additions: 2, deletions: 1 })
+    expect(f.hunks).toHaveLength(1)
+    expect(f.hunks[0]).toMatchObject({ oldStart: 1, oldLines: 3, newStart: 1, newLines: 4 })
+    expect(f.hunks[0].lines).toEqual([
       { type: 'ctx', content: 'const a = 1', oldNo: 1, newNo: 1 },
       { type: 'del', content: 'const b = 2', oldNo: 2, newNo: null },
       { type: 'add', content: 'const b = 3', oldNo: null, newNo: 2 },
@@ -83,50 +96,8 @@ describe('parseUnifiedDiff', () => {
     ])
   })
 
-  it('splits multiple files', () => {
-    const files = parseUnifiedDiff(MODIFY + NEW_FILE)
-    expect(files.map((f) => f.path)).toEqual(['src/app.ts', 'notes.md'])
-  })
-
-  it('parses a new file as all-add', () => {
-    const [f] = parseUnifiedDiff(NEW_FILE)
-    expect(f).toMatchObject({ path: 'notes.md', additions: 2, deletions: 0 })
-    expect(f.lines.every((l) => l.type === 'add')).toBe(true)
-  })
-
-  it('parses a deleted file as all-del (path from the a/ side)', () => {
-    const [f] = parseUnifiedDiff(DELETED)
-    expect(f).toMatchObject({ path: 'gone.txt', additions: 0, deletions: 2 })
-    expect(f.lines.every((l) => l.type === 'del')).toBe(true)
-  })
-
-  it('flags a binary change with no lines', () => {
-    const [f] = parseUnifiedDiff(BINARY)
-    expect(f).toMatchObject({ path: 'logo.png', binary: true, lines: [] })
-  })
-
-  it('skips "no newline at end of file" markers', () => {
-    const [f] = parseUnifiedDiff(NO_NEWLINE)
-    expect(f.lines).toHaveLength(2)
-    expect(f.lines.map((l) => l.type)).toEqual(['del', 'add'])
-  })
-
-  it('caps lines per file and flags truncated', () => {
-    const adds = Array.from({ length: MAX_DIFF_LINES_PER_FILE + 100 }, (_, i) => `+line ${i}`).join('\n')
-    const big = `diff --git a/big.txt b/big.txt\n--- /dev/null\n+++ b/big.txt\n@@ -0,0 +1,${MAX_DIFF_LINES_PER_FILE + 100} @@\n${adds}\n`
-    const [f] = parseUnifiedDiff(big)
-    expect(f.lines).toHaveLength(MAX_DIFF_LINES_PER_FILE)
-    expect(f.truncated).toBe(true)
-    expect(f.additions).toBe(MAX_DIFF_LINES_PER_FILE + 100) // counts are pre-truncation
-  })
-
-  it('returns [] for empty input', () => {
-    expect(parseUnifiedDiff('')).toEqual([])
-  })
-
-  it('resets line numbers per hunk within one file', () => {
+  it('keeps each hunk separate (no flattening across @@ boundaries)', () => {
     const TWO_HUNKS = `diff --git a/m.ts b/m.ts
-index 1234567..89abcde 100644
 --- a/m.ts
 +++ b/m.ts
 @@ -1,2 +1,2 @@
@@ -139,22 +110,64 @@ index 1234567..89abcde 100644
 +TEN
 `
     const [f] = parseUnifiedDiff(TWO_HUNKS)
-    expect(f.additions).toBe(2)
-    expect(f.deletions).toBe(2)
-    expect(f.lines.slice(3)).toEqual([
-      { type: 'ctx', content: 'middle', oldNo: 10, newNo: 10 },
-      { type: 'del', content: 'ten', oldNo: 11, newNo: null },
-      { type: 'add', content: 'TEN', oldNo: null, newNo: 11 },
-    ])
+    expect(f.hunks).toHaveLength(2)
+    expect(f.hunks[1]).toMatchObject({ oldStart: 10, newStart: 10 })
+    expect(f.hunks[1].lines[0]).toEqual({ type: 'ctx', content: 'middle', oldNo: 10, newNo: 10 })
   })
 
-  it('emits a mode-change-only file with zero lines (path from the diff --git header)', () => {
+  it('splits multiple files', () => {
+    const files = parseUnifiedDiff(MODIFY + NEW_FILE)
+    expect(files.map((f) => f.path)).toEqual(['src/app.ts', 'notes.md'])
+  })
+
+  it('marks a new file added', () => {
+    const [f] = parseUnifiedDiff(NEW_FILE)
+    expect(f).toMatchObject({ path: 'notes.md', status: 'added', additions: 2, deletions: 0 })
+    expect(f.hunks[0].lines.every((l) => l.type === 'add')).toBe(true)
+  })
+
+  it('marks a deleted file deleted (path from a/ side)', () => {
+    const [f] = parseUnifiedDiff(DELETED)
+    expect(f).toMatchObject({ path: 'gone.txt', status: 'deleted', additions: 0, deletions: 2 })
+  })
+
+  it('detects a rename with oldPath and counts only content changes', () => {
+    const [f] = parseUnifiedDiff(RENAME)
+    expect(f).toMatchObject({ path: 'new.txt', oldPath: 'old.txt', status: 'renamed', additions: 1, deletions: 1 })
+  })
+
+  it('flags a binary change with no hunks', () => {
+    const [f] = parseUnifiedDiff(BINARY)
+    expect(f).toMatchObject({ path: 'logo.png', status: 'modified', binary: true, hunks: [] })
+  })
+
+  it('marks noNewline on the affected lines', () => {
+    const [f] = parseUnifiedDiff(NO_NEWLINE)
+    const lines = f.hunks[0].lines
+    expect(lines.map((l) => l.type)).toEqual(['del', 'add'])
+    expect(lines.every((l) => l.noNewline === true)).toBe(true)
+  })
+
+  it('caps lines per file across hunks and flags truncated', () => {
+    const adds = Array.from({ length: MAX_DIFF_LINES_PER_FILE + 100 }, (_, i) => `+line ${i}`).join('\n')
+    const big = `diff --git a/big.txt b/big.txt\n--- /dev/null\n+++ b/big.txt\n@@ -0,0 +1,${MAX_DIFF_LINES_PER_FILE + 100} @@\n${adds}\n`
+    const [f] = parseUnifiedDiff(big)
+    expect(f.hunks.reduce((n, h) => n + h.lines.length, 0)).toBe(MAX_DIFF_LINES_PER_FILE)
+    expect(f.truncated).toBe(true)
+    expect(f.additions).toBe(MAX_DIFF_LINES_PER_FILE + 100) // 计数 pre-truncation
+  })
+
+  it('emits a mode-change-only file with zero hunks (path from the header)', () => {
     const MODE_ONLY = `diff --git a/run.sh b/run.sh
 old mode 100644
 new mode 100755
 `
     const [f] = parseUnifiedDiff(MODE_ONLY)
-    expect(f).toMatchObject({ path: 'run.sh', additions: 0, deletions: 0, lines: [] })
+    expect(f).toMatchObject({ path: 'run.sh', status: 'modified', additions: 0, deletions: 0, hunks: [] })
+  })
+
+  it('returns [] for empty input', () => {
+    expect(parseUnifiedDiff('')).toEqual([])
   })
 })
 

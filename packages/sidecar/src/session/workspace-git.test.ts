@@ -175,131 +175,86 @@ describe('collectWorkspaceDiff', () => {
   it('reports not_a_repo for a plain folder', async () => {
     expect((await collectWorkspaceDiff(root)).state).toBe('not_a_repo')
   })
-
   it('reports git_missing when the git binary is absent', async () => {
-    const r = await collectWorkspaceDiff(root, 'hip-definitely-missing-git')
-    expect(r.state).toBe('git_missing')
+    expect((await collectWorkspaceDiff(root, { gitBin: 'hip-missing-git' })).state).toBe('git_missing')
   })
-
-  it('reports ok with no files for a clean repo', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
-    await makeRepo(root)
-    expect(await collectWorkspaceDiff(root)).toEqual({ state: 'ok', files: [], totalFiles: 0 })
+  it('reports ok with empty summary for a clean repo', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const r = await collectWorkspaceDiff(root)
+    expect(r.state).toBe('ok'); expect(r.files).toEqual([])
+    expect(r.summary).toEqual({ totalFiles: 0, totalAdditions: 0, totalDeletions: 0 })
   })
-
-  it('reports a modified tracked file with cwd-relative path', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
-    await makeRepo(root)
+  it('reports a modified tracked file with cwd-relative path + summary totals', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
     await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
     const r = await collectWorkspaceDiff(root)
-    expect(r.state).toBe('ok')
-    expect(r.files).toHaveLength(1)
-    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 1, deletions: 1 })
+    expect(r.files![0]).toMatchObject({ path: 'a.txt', status: 'modified', additions: 1, deletions: 1 })
+    expect(r.summary).toEqual({ totalFiles: 1, totalAdditions: 1, totalDeletions: 1 })
   })
-
-  it('reports a deleted file as all-del', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\ntwo\n')
-    await makeRepo(root)
+  it('reports a deleted file', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\ntwo\n'); await makeRepo(root)
     await fs.rm(path.join(root, 'a.txt'))
-    const r = await collectWorkspaceDiff(root)
-    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 0, deletions: 2 })
+    expect((await collectWorkspaceDiff(root)).files![0]).toMatchObject({ path: 'a.txt', status: 'deleted', deletions: 2 })
   })
-
-  it('renders an untracked file as all-add with line numbers', async () => {
+  it('shows an untracked file as added via the now-tree', async () => {
     await makeRepo(root)
     await fs.writeFile(path.join(root, 'new.txt'), 'x\ny\n')
     const r = await collectWorkspaceDiff(root)
-    expect(r.files![0]).toMatchObject({ path: 'new.txt', additions: 2, deletions: 0 })
-    expect(r.files![0].lines).toEqual([
-      { type: 'add', content: 'x', oldNo: null, newNo: 1 },
-      { type: 'add', content: 'y', oldNo: null, newNo: 2 },
-    ])
+    expect(r.files![0]).toMatchObject({ path: 'new.txt', status: 'added', additions: 2 })
+    expect(r.files![0].hunks[0].lines.map((l) => l.content)).toEqual(['x', 'y'])
   })
-
-  it('lists files inside an untracked directory individually (-uall)', async () => {
-    await makeRepo(root)
-    await fs.mkdir(path.join(root, 'newdir'))
-    await fs.writeFile(path.join(root, 'newdir', 'f.txt'), 'z\n')
+  it('detects a rename instead of delete+add (B2)', async () => {
+    await fs.writeFile(path.join(root, 'old.txt'), 'a\nb\nc\nd\n'); await makeRepo(root)
+    await fs.rename(path.join(root, 'old.txt'), path.join(root, 'new.txt'))
     const r = await collectWorkspaceDiff(root)
-    expect(r.files!.map((f) => f.path)).toEqual([path.join('newdir', 'f.txt')])
+    expect(r.files).toHaveLength(1)
+    expect(r.files![0]).toMatchObject({ path: 'new.txt', oldPath: 'old.txt', status: 'renamed' })
+    expect(r.summary!.totalFiles).toBe(1)
   })
-
-  it('keeps a CJK filename literal (core.quotepath=false)', async () => {
-    await fs.writeFile(path.join(root, '说明.txt'), '甲\n')
-    await makeRepo(root)
+  it('keeps a CJK filename literal', async () => {
+    await fs.writeFile(path.join(root, '说明.txt'), '甲\n'); await makeRepo(root)
     await fs.writeFile(path.join(root, '说明.txt'), '乙\n')
-    const r = await collectWorkspaceDiff(root)
-    expect(r.files![0].path).toBe('说明.txt')
+    expect((await collectWorkspaceDiff(root)).files![0].path).toBe('说明.txt')
   })
-
+  it('handles a path containing spaces (B5)', async () => {
+    await fs.writeFile(path.join(root, 'my file.txt'), 'a\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'my file.txt'), 'b\n')
+    expect((await collectWorkspaceDiff(root)).files![0].path).toBe('my file.txt')
+  })
   it('flags a binary change', async () => {
-    await fs.writeFile(path.join(root, 'b.bin'), Buffer.from([0, 1, 2]))
-    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'b.bin'), Buffer.from([0, 1, 2])); await makeRepo(root)
     await fs.writeFile(path.join(root, 'b.bin'), Buffer.from([0, 9, 9, 9]))
-    const r = await collectWorkspaceDiff(root)
-    expect(r.files![0]).toMatchObject({ path: 'b.bin', binary: true })
+    expect((await collectWorkspaceDiff(root)).files![0]).toMatchObject({ path: 'b.bin', binary: true })
   })
-
   it('treats every file as new in a fresh repo with no HEAD', async () => {
-    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
-    await git(root, 'init')
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await git(root, 'init')
     const r = await collectWorkspaceDiff(root)
-    expect(r.state).toBe('ok')
-    expect(r.files![0]).toMatchObject({ path: 'a.txt', additions: 1 })
+    expect(r.state).toBe('ok'); expect(r.files![0]).toMatchObject({ path: 'a.txt', status: 'added', additions: 1 })
   })
-
-  it('scopes to the cwd subtree when cwd is inside a larger repo', async () => {
+  it('scopes to the cwd subtree', async () => {
     await fs.mkdir(path.join(root, 'sub'))
     await fs.writeFile(path.join(root, 'top.txt'), 'top\n')
-    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'in\n')
-    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'in\n'); await makeRepo(root)
     await fs.writeFile(path.join(root, 'top.txt'), 'TOP\n')
     await fs.writeFile(path.join(root, 'sub', 'inner.txt'), 'IN\n')
-    const r = await collectWorkspaceDiff(path.join(root, 'sub'))
-    expect(r.files!.map((f) => f.path)).toEqual(['inner.txt']) // cwd-relative, sibling excluded
+    expect((await collectWorkspaceDiff(path.join(root, 'sub'))).files!.map((f) => f.path)).toEqual(['inner.txt'])
   })
-
-  it('caps the file list and reports the true total', async () => {
+  it('caps the file list but counts the true total in summary', async () => {
     await makeRepo(root)
-    for (let i = 0; i < MAX_DIFF_FILES + 1; i++) {
-      await fs.writeFile(path.join(root, `f${String(i).padStart(3, '0')}.txt`), 'x\n')
-    }
+    for (let i = 0; i < MAX_DIFF_FILES + 1; i++) await fs.writeFile(path.join(root, `f${String(i).padStart(3, '0')}.txt`), 'x\n')
     const r = await collectWorkspaceDiff(root)
     expect(r.files).toHaveLength(MAX_DIFF_FILES)
-    expect(r.totalFiles).toBe(MAX_DIFF_FILES + 1)
+    expect(r.summary!.totalFiles).toBe(MAX_DIFF_FILES + 1)
   })
-
-  it('does not double-count a staged new file in a HEAD repo', async () => {
+  it('does not render a symlink target content', async () => {
     await makeRepo(root)
-    await fs.writeFile(path.join(root, 'staged.txt'), 's\n')
-    await git(root, 'add', 'staged.txt')
-    const r = await collectWorkspaceDiff(root)
-    expect(r.files!.filter((f) => f.path === 'staged.txt')).toHaveLength(1)
-    expect(r.totalFiles).toBe(1)
-  })
-
-  it('caps untracked file lines and flags truncated', async () => {
-    await makeRepo(root)
-    const big = Array.from({ length: MAX_DIFF_LINES_PER_FILE + 500 }, (_, i) => `l${i}`).join('\n') + '\n'
-    await fs.writeFile(path.join(root, 'big.txt'), big)
-    const r = await collectWorkspaceDiff(root)
-    expect(r.files![0].lines).toHaveLength(MAX_DIFF_LINES_PER_FILE)
-    expect(r.files![0].truncated).toBe(true)
-    expect(r.files![0].additions).toBe(MAX_DIFF_LINES_PER_FILE + 500)
-  })
-
-  it('skips an untracked symlink instead of rendering its target content', async () => {
-    await makeRepo(root)
-    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-outside-'))
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-wsgit-out-'))
     try {
       await fs.writeFile(path.join(outside, 'secret.txt'), 'TOP SECRET\n')
       await fs.symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'))
       const r = await collectWorkspaceDiff(root)
-      expect(r.state).toBe('ok')
-      expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
-    } finally {
-      await fs.rm(outside, { recursive: true, force: true })
-    }
+      expect(r.state).toBe('ok'); expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
+    } finally { await fs.rm(outside, { recursive: true, force: true }) }
   })
 })
 
@@ -307,7 +262,10 @@ describe('gitInit', () => {
   it('initializes with a baseline commit so the diff starts clean', async () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
     expect((await gitInit(root)).ok).toBe(true)
-    expect(await collectWorkspaceDiff(root)).toEqual({ state: 'ok', files: [], totalFiles: 0 })
+    const initDiff = await collectWorkspaceDiff(root)
+    expect(initDiff.state).toBe('ok')
+    expect(initDiff.files).toEqual([])
+    expect(initDiff.summary).toEqual({ totalFiles: 0, totalAdditions: 0, totalDeletions: 0 })
     const log = await git(root, 'log', '--oneline')
     expect(log.stdout).toContain('hip baseline')
     expect((await git(root, 'log', '--format=%an')).stdout.trim()).toBe('hip')

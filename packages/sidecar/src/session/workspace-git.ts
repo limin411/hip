@@ -2,24 +2,19 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
+import * as os from 'node:os'
 import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase } from '@hip/protocol'
-import { readHead } from './workspace-fs.js'
 
 const execFileP = promisify(execFile)
 
 export const MAX_DIFF_LINES_PER_FILE = 2000
 export const MAX_DIFF_FILES = 200
-export const UNTRACKED_READ_CAP = 1024 * 1024 // 1 MB, mirrors workspace-fs TEXT_CAP
 const GIT_TIMEOUT_MS = 10_000
 const GIT_INIT_TIMEOUT_MS = 60_000 // user-triggered baseline commit may walk a big tree
 const GIT_MAX_BUFFER = 32 * 1024 * 1024
 
-export interface WorkspaceDiff {
-  state: DiffState
-  files?: DiffFile[]
-  totalFiles?: number
-  error?: string
-}
+export interface WorkspaceDiff { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
+export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string }
 
 const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++ 缺失时兜底（mode-only）
@@ -117,101 +112,69 @@ function runGit(cwd: string, args: string[], gitBin: string, timeout = GIT_TIMEO
   return execFileP(gitBin, args, { cwd, timeout, maxBuffer: GIT_MAX_BUFFER })
 }
 
-/** One `git status --porcelain=v1 -z` record. `path` is repo-root-relative. */
-interface StatusEntry { xy: string; path: string }
-
-function parseStatusZ(out: string): StatusEntry[] {
-  const fields = out.split('\0').filter((f) => f.length > 0)
-  const entries: StatusEntry[] = []
-  for (let i = 0; i < fields.length; i++) {
-    const xy = fields[i].slice(0, 2)
-    entries.push({ xy, path: fields[i].slice(3) })
-    if (xy[0] === 'R' || xy[0] === 'C') i++ // rename/copy carries a second "from" field — consume it
-  }
-  return entries
+/** 把工作区（含 untracked，遵守 .gitignore）写成一棵树，复用传入的 indexFile（不污染真实 index）。 */
+async function writeWorkingTree(cwd: string, gitBin: string, hasHead: boolean, indexFile: string): Promise<string> {
+  const env = { ...process.env, GIT_INDEX_FILE: indexFile }
+  const run = (args: string[]) => execFileP(gitBin, args, { cwd, env, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER })
+  await run(hasHead ? ['read-tree', 'HEAD'] : ['read-tree', '--empty'])
+  await run(['add', '-A', '--', '.'])
+  return (await run(['write-tree'])).stdout.trim()
 }
 
-/** Render an on-disk file (untracked, or any file in a no-HEAD repo) as an all-add DiffFile. */
-async function untrackedDiffFile(absPath: string, relPath: string): Promise<DiffFile> {
-  const stat = await fs.lstat(absPath)
-  // Symlinks would leak target content from outside the workspace (cf. workspace-fs
-  // resolveRealWithin) and FIFOs would block the read forever — regular files only.
-  // Git itself never shows a symlink's target content (mode 120000 = the link path).
-  if (!stat.isFile()) throw new Error('not a regular file')
-  const readCapped = stat.size > UNTRACKED_READ_CAP
-  const buf = readCapped ? await readHead(absPath, UNTRACKED_READ_CAP) : await fs.readFile(absPath)
-  if (buf.subarray(0, 8000).includes(0)) {
-    return { path: relPath, additions: 0, deletions: 0, lines: [], binary: true }
-  }
-  const textLines = buf.toString('utf8').split('\n')
-  if (textLines.at(-1) === '') textLines.pop() // trailing newline → no phantom empty line
-  const capped = textLines.slice(0, MAX_DIFF_LINES_PER_FILE)
-  return {
-    path: relPath,
-    additions: textLines.length,
-    deletions: 0,
-    lines: capped.map((content, i): DiffLine => ({ type: 'add', content, oldNo: null, newNo: i + 1 })),
-    ...(readCapped || textLines.length > capped.length ? { truncated: true } : {}),
-  }
-}
-
-/**
- * Collect the worktree-vs-HEAD diff of the cwd subtree. Never throws — every failure
- * folds into a DiffState. Tracked changes come from one `git diff HEAD -- .` call;
- * untracked files are read from disk; a no-HEAD repo renders everything as new.
- */
-export async function collectWorkspaceDiff(cwd: string, gitBin = 'git'): Promise<WorkspaceDiff> {
+/** 空树对象（无 HEAD 仓库的 base）。 */
+async function emptyTreeSha(cwd: string, gitBin: string): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-idx-')); const idx = path.join(dir, 'index')
   try {
-    // Detect a missing/inaccessible cwd before any git call so it doesn't masquerade as git_missing.
-    try { await fs.stat(cwd) } catch { return { state: 'error', error: 'cwd not accessible: ' + cwd } }
+    const env = { ...process.env, GIT_INDEX_FILE: idx }
+    await execFileP(gitBin, ['read-tree', '--empty'], { cwd, env, timeout: GIT_TIMEOUT_MS })
+    return (await execFileP(gitBin, ['write-tree'], { cwd, env, timeout: GIT_TIMEOUT_MS })).stdout.trim()
+  } finally { await fs.rm(dir, { recursive: true, force: true }).catch(() => {}) }
+}
 
-    try {
-      await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'git_missing' }
-      return { state: 'not_a_repo' }
+interface Prepared { realCwd: string; repoRoot: string; nowTree: string; baseTree: string; base: DiffBase; hasSessionStart: boolean }
+
+/** 公共前置：校验仓库、建 now 树、解析 base 树。失败折叠成 WorkspaceDiff。 */
+async function prepareTrees(cwd: string, opts: WorkspaceDiffOptions): Promise<{ ok: true; v: Prepared } | { ok: false; r: WorkspaceDiff }> {
+  const gitBin = opts.gitBin ?? 'git'
+  try { await fs.stat(cwd) } catch { return { ok: false, r: { state: 'error', error: 'cwd not accessible: ' + cwd } } }
+  try { await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin) }
+  catch (e) { return { ok: false, r: { state: (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'git_missing' : 'not_a_repo' } } }
+  const realCwd = await fs.realpath(cwd)
+  const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
+  let hasHead = true
+  try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
+
+  const ownIndex = !opts.indexFile
+  const indexDir = ownIndex ? await fs.mkdtemp(path.join(os.tmpdir(), 'hip-idx-')) : ''
+  const indexFile = opts.indexFile ?? path.join(indexDir, 'index')
+  let nowTree: string
+  try { nowTree = await writeWorkingTree(cwd, gitBin, hasHead, indexFile) }
+  finally { if (ownIndex) await fs.rm(indexDir, { recursive: true, force: true }).catch(() => {}) }
+
+  const useSnapshot = opts.base === 'session-start' && !!opts.baseSha
+  const baseTree = useSnapshot ? (opts.baseSha as string) : (hasHead ? 'HEAD' : await emptyTreeSha(cwd, gitBin))
+  return { ok: true, v: { realCwd, repoRoot, nowTree, baseTree, base: useSnapshot ? 'session-start' : 'head', hasSessionStart: !!opts.baseSha } }
+}
+
+/** 工作区 diff（base 默认 HEAD）。Never throws —— 一切失败折叠为 DiffState。 */
+export async function collectWorkspaceDiff(cwd: string, opts: WorkspaceDiffOptions = {}): Promise<WorkspaceDiff> {
+  const gitBin = opts.gitBin ?? 'git'
+  try {
+    const p = await prepareTrees(cwd, opts)
+    if (!p.ok) return p.r
+    const { realCwd, repoRoot, nowTree, baseTree } = p.v
+    const out = (await runGit(cwd, ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames', baseTree, nowTree, '--', '.'], gitBin)).stdout
+    const rel = (q: string) => path.relative(realCwd, path.join(repoRoot, q))
+    const files = parseUnifiedDiff(out)
+      .map((f) => ({ ...f, path: rel(f.path), ...(f.oldPath ? { oldPath: rel(f.oldPath) } : {}) }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    const summary: DiffSummary = {
+      totalFiles: files.length,
+      totalAdditions: files.reduce((s, f) => s + f.additions, 0),
+      totalDeletions: files.reduce((s, f) => s + f.deletions, 0),
     }
-
-    // Resolve symlinks in cwd so path.relative() arithmetic is correct (e.g. macOS /tmp → /private/tmp).
-    const realCwd = await fs.realpath(cwd)
-    const repoRoot = (await runGit(cwd, ['rev-parse', '--show-toplevel'], gitBin)).stdout.trim()
-    let hasHead = true
-    try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
-
-    const rel = (repoRelative: string) => path.relative(realCwd, path.join(repoRoot, repoRelative))
-
-    // Build tracked list and untracked pending list, then materialize disk reads ONLY for entries
-    // inside the cap — bounded work even on huge untracked trees.
-    type Pending = { path: string; abs: string }
-    const tracked: DiffFile[] = []
-    if (hasHead) {
-      const diffOut = (await runGit(cwd, ['-c', 'core.quotepath=false', 'diff', '--no-color', '--no-renames', 'HEAD', '--', '.'], gitBin)).stdout
-      for (const f of parseUnifiedDiff(diffOut)) tracked.push({ ...f, path: rel(f.path) })
-    }
-    const statusOut = (await runGit(cwd, ['status', '--porcelain=v1', '-z', '-uall', '--', '.'], gitBin)).stdout
-    // `git diff` never shows untracked files; with no HEAD it can't run at all, so every entry renders as new.
-    // Entries ending in '/' are nested git repos (status doesn't recurse into them) — skipped deliberately.
-    const pending: Pending[] = parseStatusZ(statusOut)
-      .filter((s) => (hasHead ? s.xy === '??' : true))
-      .filter((s) => !s.path.endsWith('/'))
-      .map((s) => ({ path: rel(s.path), abs: path.join(repoRoot, s.path) }))
-
-    const byPath = (a: { path: string }, b: { path: string }) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
-    const merged: Array<DiffFile | Pending> = [...tracked, ...pending].sort(byPath)
-    const totalFiles = merged.length
-    const files: DiffFile[] = []
-    for (const entry of merged.slice(0, MAX_DIFF_FILES)) {
-      if ('lines' in entry) { files.push(entry); continue }
-      try {
-        files.push(await untrackedDiffFile(entry.abs, entry.path))
-      } catch {
-        // Vanished between status and read, or not a regular file (symlink/FIFO) — skip.
-      }
-    }
-    return { state: 'ok', files, totalFiles }
-  } catch (e) {
-    return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
-  }
+    return { state: 'ok', files: files.slice(0, MAX_DIFF_FILES), summary }
+  } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
 /**

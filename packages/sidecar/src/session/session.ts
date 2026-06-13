@@ -8,13 +8,15 @@ import * as workspaceGit from './workspace-git.js'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
-import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
+import { getActiveModel, isOpenAICompatible, cheapModelFor } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { recursionLimit } from './loop-control.js'
+import type { Summarizer } from './compaction.js'
+import { PAUSE_QUESTION } from './doom-loop.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -154,6 +156,23 @@ function buildModel(_config: SessionConfig): ChatOpenAI {
   })
 }
 
+const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
+
+const SUMMARY_SYSTEM_PROMPT =
+  '你是对话压缩器。把给定的较早对话片段压成一段简洁中文摘要，保留：任务目标、关键决策、约束、' +
+  '已写入或修改的文件、近期工具结果与未决事项；丢弃：中间推理、被否方案、冗长输出。只输出摘要正文。'
+
+/** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
+class RealSummarizer implements Summarizer {
+  async summarize(messages: BaseMessage[]): Promise<string> {
+    const { providerID, modelID, baseURL } = getActiveModel()
+    const model = new ChatOpenAI({ model: cheapModelFor(providerID, modelID), apiKey: activeKey(providerID), configuration: { baseURL }, maxTokens: 512, temperature: 0.2 })
+    const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
+    const res = await model.invoke([new SystemMessage(SUMMARY_SYSTEM_PROMPT), new HumanMessage(transcript)])
+    return typeof res.content === 'string' ? res.content : ''
+  }
+}
+
 export class Session {
   private app!: ReturnType<typeof buildGraph>
   private readonly injectedRunner?: ModelRunner
@@ -163,6 +182,9 @@ export class Session {
   private abortController: AbortController | null = null
   // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
+  private awaitingResume = false
+  private paused: { messages: BaseMessage[]; steps: number } | null = null
+  private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
   // Monotonic per-session turn counter — appended to turnId so two turns in the same millisecond cannot collide.
   private turnSeq = 0
@@ -177,10 +199,12 @@ export class Session {
     titleGenerator?: TitleGenerator,
     private readonly idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS,
     runner?: ModelRunner,
+    summarizer?: Summarizer,
   ) {
     this._config = config
     this.injectedModel = model
     this.injectedRunner = runner
+    this.injectedSummarizer = summarizer
     this.usesEnvModel = !model && !runner
     // Inject a generator (tests), else build the real one only for the env-keyed
     // production model. Injected-model sessions get no generator → no LLM title.
@@ -203,6 +227,13 @@ export class Session {
     if (this.injectedRunner) return this.injectedRunner
     const model = (this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config)
     return new RealModelRunner(model)
+  }
+
+  /** The Summarizer for compaction: injected (tests), else a cheap-model summarizer for the env model,
+   *  else a no-op (injected-model/runner sessions never hit the paid path). */
+  private summarizer(): Summarizer {
+    if (this.injectedSummarizer) return this.injectedSummarizer
+    return this.usesEnvModel ? new RealSummarizer() : NOOP_SUMMARIZER
   }
 
   /** Seed prior conversation so the agent resumes with full context. */
@@ -306,7 +337,7 @@ export class Session {
   }
 
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
-    if (this.running) return
+    if (this.running || this.awaitingResume) return
     if (this.modelDirty) { this.buildAgent(); this.modelDirty = false }
     if (!this.requireCompatibleModel(_send)) return
     if (!this.requireApiKey(_send)) return
@@ -342,9 +373,25 @@ export class Session {
     }
   }
 
+  /** Continue a turn that paused for user input (Option Z): append the answer to the stashed rich
+   *  message list and re-invoke as a fresh turn carrying the prior step count. No-op unless awaiting. */
+  async resume(content: string, send: SendFn): Promise<void> {
+    if (!this.awaitingResume || !this.paused || this.running) return
+    const base = { messages: [...this.paused.messages, new HumanMessage(content)], steps: this.paused.steps }
+    this.awaitingResume = false
+    this.paused = null
+    const ts = Date.now()
+    if (this.store) {
+      this.store.insertMessage({ id: `u-${ts}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: ts })
+      this.store.touchSession(this.id, ts)
+    }
+    this.messages.push(new HumanMessage(content))
+    await this.runTurn(send, base)
+  }
+
   /** Stream one turn for the HumanMessage already at the tail of this.messages.
    *  Returns the supervisor text on clean completion, or '' on abort/error. */
-  private async runTurn(rawSend: SendFn): Promise<string> {
+  private async runTurn(rawSend: SendFn, base?: { messages: BaseMessage[]; steps: number }): Promise<string> {
     this.abortController = new AbortController()
     this.running = true
     let timedOut = false
@@ -423,15 +470,25 @@ export class Session {
         send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: 'supervisor', callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
       },
     }
-    const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit }
+    const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit, summarizer: this.summarizer() }
 
     try {
-      await this.app.invoke(
-        { messages: [new SystemMessage(system), ...this.messages], steps: 0 },
+      const finalState = await this.app.invoke(
+        { messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)], steps: base?.steps ?? 0, recentSigs: [], nudgedSig: undefined, status: 'running' },
         { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
       )
       closeReasoning('supervisor')
       finishRemaining()
+      if (finalState.status === 'awaiting_user') {
+        // Stash the rich graph history (minus the leading system msg) so resume re-plans with full
+        // context, finalize this turn as stopped, and ask the user. The finally below stops the
+        // watchdog and clears `running`; `awaitingResume` makes the next user message a resume.
+        this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }
+        this.awaitingResume = true
+        const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true)
+        send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
+        return stoppedText
+      }
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
       finishRemaining()
@@ -484,7 +541,7 @@ export class Session {
 
   /** Re-run the last turn: drop the trailing assistant reply (if any) and stream a fresh one. */
   async regenerate(send: SendFn): Promise<void> {
-    if (this.running) return
+    if (this.running || this.awaitingResume) return
     if (!this.requireCompatibleModel(send)) return
     if (!this.requireApiKey(send)) return
     const tail = this.messages[this.messages.length - 1]
@@ -498,6 +555,7 @@ export class Session {
   }
 
   cancel(): void {
+    if (this.awaitingResume) { this.awaitingResume = false; this.paused = null; return }
     this.abortController?.abort()
   }
 

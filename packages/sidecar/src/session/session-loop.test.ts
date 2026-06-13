@@ -39,4 +39,35 @@ describe('Session agent loop', () => {
     expect(complete.message.content).toContain('intro.html')
     expect(sent.some((m) => m.type === 'tool:started' && (m as any).name === 'write_file')).toBe(true)
   })
+
+  it('pauses on a doom loop, emits agent:interrupt, then resumes to completion', async () => {
+    const tc = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+    const runner = fakeRunner([tc(), tc(), tc(), tc(), new AIMessage('好的，我换个方法完成了任务。')])
+    const session = new Session('s2', { llmProvider: 'deepseek', model: '', tools: [], cwd: root } as any, undefined, undefined, undefined, undefined, runner)
+
+    const sent: ServerMessage[] = []
+    await session.sendMessage('一直 ls 根目录', (m) => sent.push(m))
+
+    const interrupt = sent.find((m) => m.type === 'agent:interrupt') as Extract<ServerMessage, { type: 'agent:interrupt' }>
+    expect(interrupt).toBeTruthy()
+    expect(interrupt.question).toBeTruthy()
+    const firstComplete = sent.find((m) => m.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(firstComplete.message.stopped).toBe(true)
+
+    const sent2: ServerMessage[] = []
+    await session.resume('改用直接写文件', (m) => sent2.push(m))
+    const done = sent2.find((m) => m.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(done.message.content).toContain('换个方法完成了')
+  })
+
+  it('cancel while awaiting resume clears the pause (next send is a fresh turn)', async () => {
+    const tc = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+    const runner = fakeRunner([tc(), tc(), tc(), tc(), new AIMessage('已直接回答。')])
+    const session = new Session('s3', { llmProvider: 'deepseek', model: '', tools: [], cwd: root } as any, undefined, undefined, undefined, undefined, runner)
+    await session.sendMessage('一直 ls', () => {})
+    session.cancel()
+    const sent: ServerMessage[] = []
+    await session.sendMessage('换个问题', (m) => sent.push(m))
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+  })
 })

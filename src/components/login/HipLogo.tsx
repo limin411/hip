@@ -63,15 +63,17 @@ function HugMascot({ animated }: { animated: boolean }) {
   const wiggle = animated ? 'hip-fish-wiggle' : undefined
   return (
     <>
-      {/* 脚 */}
-      <ellipse cx={62} cy={153} rx={13} ry={8} fill={BLUE} />
-      <ellipse cx={98} cy={153} rx={13} ry={8} fill={BLUE} />
-      {/* 身体 */}
-      <ellipse cx={80} cy={98} rx={46} ry={54} fill={BLUE} />
+      {/* 脚（奶油描边：蓝身在蓝底脱离） */}
+      <ellipse cx={62} cy={153} rx={13} ry={8} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+      <ellipse cx={98} cy={153} rx={13} ry={8} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+      {/* 身体（奶油描边） */}
+      <ellipse cx={80} cy={98} rx={46} ry={54} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
       {/* 腮红 */}
       <ellipse cx={49} cy={64} rx={6} ry={3.4} fill={CORAL} opacity={0.5} />
       <ellipse cx={111} cy={64} rx={6} ry={3.4} fill={CORAL} opacity={0.5} />
-      {/* 抱臂（鱼后） */}
+      {/* 抱臂（鱼后；奶油描边 = 先铺一层略宽的 cream 垫底再压蓝） */}
+      <path d="M44 98 Q38 128 60 142" stroke={CREAM} strokeWidth={22} strokeLinecap="round" fill="none" />
+      <path d="M116 98 Q122 128 100 142" stroke={CREAM} strokeWidth={22} strokeLinecap="round" fill="none" />
       <path d="M44 98 Q38 128 60 142" stroke={BLUE} strokeWidth={17} strokeLinecap="round" fill="none" />
       <path d="M116 98 Q122 128 100 142" stroke={BLUE} strokeWidth={17} strokeLinecap="round" fill="none" />
       {/* 鱼（含开心摆动） */}
@@ -86,10 +88,10 @@ function HugMascot({ animated }: { animated: boolean }) {
         <circle cx={91} cy={117} r={3.4} fill={NAVY} />
         <path d="M72 131 q8 6 16 0" stroke={CORAL_DEEP} strokeWidth={2.4} strokeLinecap="round" fill="none" />
       </g>
-      {/* 抱爪（鱼前，轻揉抚摸） */}
+      {/* 抱爪（鱼前，轻揉抚摸；奶油描边） */}
       <g className={pet}>
-        <ellipse cx={60} cy={142} rx={9} ry={7} fill={BLUE} />
-        <ellipse cx={100} cy={142} rx={9} ry={7} fill={BLUE} />
+        <ellipse cx={60} cy={142} rx={9} ry={7} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+        <ellipse cx={100} cy={142} rx={9} ry={7} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
       </g>
       {/* 小人大眼睛（眨眼包整组、斜瞄只动瞳孔） */}
       <g className={blink}>

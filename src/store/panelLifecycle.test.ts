@@ -24,8 +24,8 @@ describe('ArtifactPanel — lifecycle state transitions', () => {
     s.setTab('files')
     expect(useUiStore.getState().activeTab).toBe('files')
 
-    s.setTab('diff')
-    expect(useUiStore.getState().activeTab).toBe('diff')
+    s.setTab('timeline')
+    expect(useUiStore.getState().activeTab).toBe('timeline')
 
     s.setTab('agents')
     expect(useUiStore.getState().activeTab).toBe('agents')

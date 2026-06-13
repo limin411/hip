@@ -1,5 +1,6 @@
 // src/domain/hooks.ts
 import type { Message, SearchHit, TurnUsage } from '@hip/protocol'
+import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type SessionError, type SessionVM } from './sessionStore'
 
 const EMPTY_MESSAGES: Message[] = []
@@ -62,7 +63,11 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
   return any ? total : null
 }
 
-/** Session-total token usage for the active session (derived, never stored). */
+/** Session-total token usage for the active session (derived, never stored). `useShallow` is
+ *  REQUIRED, not cosmetic: selectUsageTotal builds a FRESH object whenever usage exists, and a
+ *  Zustand v5 selector that returns a new reference every call makes useSyncExternalStore re-render
+ *  without end ("Maximum update depth exceeded") the instant the first turn reports usage.
+ *  useShallow caches by value, so the snapshot stays referentially stable until the totals change. */
 export function useActiveUsageTotal(): TurnUsage | null {
-  return useDomainStore((s) => selectUsageTotal(s))
+  return useDomainStore(useShallow(selectUsageTotal))
 }

@@ -1,5 +1,5 @@
 // src/domain/hooks.ts
-import type { Message, SearchHit } from '@hip/protocol'
+import type { Message, SearchHit, TurnUsage } from '@hip/protocol'
 import { useDomainStore, type SessionError, type SessionVM } from './sessionStore'
 
 const EMPTY_MESSAGES: Message[] = []
@@ -42,4 +42,27 @@ export function useSearchHits(): SearchHit[] {
 
 export function useActiveInterrupt(): { turnId: string; question: string; context?: string } | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.interrupt ?? null)
+}
+
+/** Pure: sum `usage` across the active session's messages. Returns null when the active
+ *  session is absent or no message carries usage. Exported for unit testing; the hook below
+ *  is the thin reactive wrapper. */
+export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId: string | null }): TurnUsage | null {
+  const active = state.sessions.find((x) => x.id === state.activeSessionId)
+  if (!active) return null
+  let any = false
+  const total: TurnUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  for (const m of active.messages) {
+    if (!m.usage) continue
+    any = true
+    total.inputTokens += m.usage.inputTokens
+    total.outputTokens += m.usage.outputTokens
+    total.totalTokens += m.usage.totalTokens
+  }
+  return any ? total : null
+}
+
+/** Session-total token usage for the active session (derived, never stored). */
+export function useActiveUsageTotal(): TurnUsage | null {
+  return useDomainStore((s) => selectUsageTotal(s))
 }

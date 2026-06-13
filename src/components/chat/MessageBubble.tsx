@@ -11,6 +11,8 @@ import { CodeBlock } from './CodeBlock'
 import { TurnTimeline } from './TurnTimeline'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
+import { useProvidersStore } from '@/store/providersStore'
+import { computeCost, formatUsd } from '@/lib/usageCost'
 
 const REMARK_PLUGINS = [remarkGfm]
 const MD_COMPONENTS: Components = { pre: CodeBlock }
@@ -25,6 +27,10 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const isUser = message.role === 'user'
+  const activeRate = useProvidersStore((s) => {
+    const am = s.config.activeModel
+    return am ? s.catalog[am.providerID]?.models[am.modelID]?.cost : undefined
+  })
 
   return (
     <div className="group flex gap-3">
@@ -62,7 +68,24 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>
-        {!streaming && <MessageActions message={message} isLastAssistant={!!isLastAssistant} />}
+        {!streaming && (
+          <div className="mt-1 flex items-center gap-2">
+            <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
+            {message.role === 'assistant' && message.usage && (
+              <span
+                data-testid="message-usage"
+                title={t('chat.usage.io', { input: message.usage.inputTokens, output: message.usage.outputTokens })}
+                className="text-caption text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                {t('chat.usage.tokens', { total: message.usage.totalTokens })}
+                {(() => {
+                  const cost = computeCost(message.usage, activeRate)
+                  return cost === null ? null : ` · ${t('chat.usage.cost', { cost: formatUsd(cost) })}`
+                })()}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

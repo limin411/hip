@@ -27,6 +27,24 @@ describe('buildSystemPrompt', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj', userInstructions: '   ' })
     expect(s).not.toMatch(/Additional instructions/i)
   })
+
+  it('includes proactive-commit + branch guidance for the git tools', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    expect(s).toMatch(/git_commit/)
+    expect(s).toMatch(/git_create_branch/)
+    expect(s).toMatch(/git_switch_branch/)
+    expect(s).toMatch(/proactively|after a coherent unit/i)
+  })
+
+  it('orders git guidance after the cwd block and before the anti-phantom rule', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    const cwdIdx = s.indexOf('working directory')
+    const gitIdx = s.indexOf('git_commit')
+    const antiIdx = s.indexOf('MUST NOT claim')
+    expect(cwdIdx).toBeGreaterThanOrEqual(0)
+    expect(gitIdx).toBeGreaterThan(cwdIdx)
+    expect(antiIdx).toBeGreaterThan(gitIdx)
+  })
 })
 
 describe('childSystemPrompt', () => {

@@ -3,6 +3,14 @@ const ANTI_PHANTOM =
   'unless you actually called write_file/edit_file for that exact path this turn and it succeeded. ' +
   'If you did not call a write tool, say plainly that no file was created.'
 
+const GIT_GUIDANCE =
+  'When the project is a git repository you also have git tools — git_commit, git_create_branch, ' +
+  'git_switch_branch. Commit proactively after a coherent unit of work with a concise one-line ' +
+  'message (under 72 characters, imperative mood). Group related edits into a single commit — do not ' +
+  'commit after every individual file write. Use git_create_branch / git_switch_branch only when the ' +
+  'work warrants a separate line of history (e.g. an experimental or large refactor). These tools ' +
+  'commit on the user\'s behalf, so keep messages clear and the history clean.'
+
 const IDENTITY =
   'You are hip, a desktop coding assistant that works directly in the user\'s project. ' +
   'When asked who or what you are, identify yourself as hip. ' +
@@ -38,7 +46,7 @@ export interface SystemPromptInput {
 
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional user instructions). */
 export function buildSystemPrompt({ cwd, userInstructions }: SystemPromptInput): string {
-  const base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}`
+  const base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
   const extra = userInstructions?.trim()
   return extra
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`

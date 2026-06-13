@@ -5,6 +5,7 @@ import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
+import { isSuppressedToolStep } from '@/lib/timelineFilter'
 import { latestTodos, type Todo } from '@/lib/todos'
 
 function AgentBadge({ role }: { role: AgentRole }) {
@@ -139,7 +140,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
         }
         if (step.kind === 'reasoning') {
           nodes.push(<ThinkingDisclosure key={`r-${step.stepSeq}`} role={step.role} content={step.content} />)
-        } else {
+        } else if (!isSuppressedToolStep(step, byCallId)) {
           const tool = byCallId.get(step.callId)
           if (tool && tool.name !== 'write_todos') nodes.push(
             <div key={`t-${step.stepSeq}`} className="flex gap-2">

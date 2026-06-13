@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, gitInit, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, gitInit, captureSessionSnapshot, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -294,5 +294,22 @@ describe('gitInit', () => {
     const r = await gitInit(root, 'hip-definitely-missing-git')
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
+  })
+})
+
+describe('captureSessionSnapshot + session-start base', () => {
+  it('snapshot then diff session-start shows only post-snapshot changes', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'pre.txt'), 'pre-existing\n') // 会话前已存在的未提交改动
+    const snap = await captureSessionSnapshot(root)
+    expect(snap).toBeTruthy()
+    await fs.writeFile(path.join(root, 'agent.txt'), 'by agent\n')   // 会话内 agent 新建
+    const r = await collectWorkspaceDiff(root, { base: 'session-start', baseSha: snap })
+    expect(r.files!.map((f) => f.path)).toEqual(['agent.txt'])        // pre.txt 不计入
+    const head = await collectWorkspaceDiff(root, { base: 'head' })
+    expect(head.files!.map((f) => f.path).sort()).toEqual(['agent.txt', 'pre.txt']) // HEAD 仍显示两者
+  })
+  it('returns null for a non-repo folder', async () => {
+    expect(await captureSessionSnapshot(root)).toBeNull()
   })
 })

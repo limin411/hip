@@ -197,6 +197,21 @@ export async function collectWorkspaceDiffSummary(cwd: string, opts: WorkspaceDi
   } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
+/** 抓工作区快照树（含 untracked，遵守 .gitignore），用于「自会话起点」base。
+ *  非 git 工作区 / 失败返回 null。用一次性临时 index，不碰真实 index。 */
+export async function captureSessionSnapshot(cwd: string, gitBin = 'git'): Promise<string | null> {
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch { return null }
+  let hasHead = true
+  try { await runGit(cwd, ['rev-parse', '--verify', 'HEAD'], gitBin) } catch { hasHead = false }
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-snap-')); const idx = path.join(dir, 'index')
+  try { return await writeWorkingTree(cwd, gitBin, hasHead, idx) }
+  catch { return null }
+  finally { await fs.rm(dir, { recursive: true, force: true }).catch(() => {}) }
+}
+
 /**
  * Initialize a repo with a baseline commit so subsequent changes surface as diffs.
  * Inline identity: must not depend on the user's global git config.

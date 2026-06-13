@@ -183,6 +183,7 @@ export class Session {
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
+  private _diffBaseSha: string | null = null
   // Re-entrancy guard: a second send/regenerate while a turn is in flight is dropped (the WS layer dispatches fire-and-forget, so it does not serialize).
   private running = false
   private awaitingResume = false
@@ -298,18 +299,40 @@ export class Session {
     }
   }
 
+  /** 解析会话起点快照 SHA：优先内存缓存，回退 DB。 */
+  private resolvedDiffBaseSha(): string | null {
+    return this._diffBaseSha ?? this.store?.getSession(this.id)?.diff_base_sha ?? null
+  }
+
+  /** 会话创建时抓一次工作区快照并持久化（fire-and-forget 调用）。 */
+  async captureSnapshot(): Promise<void> {
+    if (!this._config.cwd) return
+    const sha = await workspaceGit.captureSessionSnapshot(this._config.cwd)
+    this._diffBaseSha = sha
+    this.store?.setDiffBaseSha(this.id, sha)
+  }
+
+  private resolveBase(base: DiffBase): { base: DiffBase; baseSha: string | null; hasSessionStart: boolean } {
+    const snap = this.resolvedDiffBaseSha()
+    const hasSessionStart = snap != null
+    const effective: DiffBase = base === 'session-start' && hasSessionStart ? 'session-start' : 'head'
+    return { base: effective, baseSha: effective === 'session-start' ? snap : null, hasSessionStart }
+  }
+
   /** Worktree-vs-HEAD diff of the bound cwd subtree. Never throws. */
   async workspaceDiff(base: DiffBase = 'head'): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
     if (!this._config.cwd) return { state: 'no_cwd', base: 'head', hasSessionStart: false }
-    const r = await workspaceGit.collectWorkspaceDiff(this._config.cwd, { base })
-    return { ...r, base: 'head', hasSessionStart: false } // Tier 2 will override with real snapshot
+    const b = this.resolveBase(base)
+    const r = await workspaceGit.collectWorkspaceDiff(this._config.cwd, { base: b.base, baseSha: b.baseSha })
+    return { ...r, base: b.base, hasSessionStart: b.hasSessionStart }
   }
 
   /** Summary-only diff (feeds the badge). Never throws. */
   async workspaceDiffSummary(base: DiffBase = 'head'): Promise<workspaceGit.WorkspaceDiff & { base: DiffBase; hasSessionStart: boolean }> {
     if (!this._config.cwd) return { state: 'no_cwd', base: 'head', hasSessionStart: false }
-    const r = await workspaceGit.collectWorkspaceDiffSummary(this._config.cwd, { base })
-    return { ...r, base: 'head', hasSessionStart: false }
+    const b = this.resolveBase(base)
+    const r = await workspaceGit.collectWorkspaceDiffSummary(this._config.cwd, { base: b.base, baseSha: b.baseSha })
+    return { ...r, base: b.base, hasSessionStart: b.hasSessionStart }
   }
 
   /** One-click `git init` + baseline commit in the bound cwd. */

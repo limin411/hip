@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import type { ServerMessage } from '@hip/protocol'
 import { SessionManager } from './session-manager.js'
+
+const execFileP = promisify(execFile)
+const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
 
 let root: string
 beforeEach(async () => {
@@ -68,5 +73,29 @@ describe('session-manager diff', () => {
     expect(msg).toMatchObject({ state: 'ok', base: 'head', hasSessionStart: false })
     expect(msg.summary).toBeDefined()
     expect((msg as Record<string, unknown>)['files']).toBeUndefined()
+  })
+
+  it('fs:diff base=session-start reports hasSessionStart and scopes to post-create changes', async () => {
+    // Set up a git repo before creating the session
+    await git(root, 'init')
+    await git(root, 'add', '-A')
+    await git(root, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'init', '--allow-empty')
+
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => sent.push(m)
+    const mgr = new SessionManager(undefined, () => new FakeListChatModel({ responses: ['ok'] }), path.join(root, '.scratch'))
+    mgr.handle({ type: 'session:create', id: 's2', config: { llmProvider: 'deepseek', model: 'm', tools: [], cwd: root } }, send)
+
+    // Explicitly await captureSnapshot so the test is deterministic (fire-and-forget in production is racy)
+    await mgr.getSessionForTest('s2')!.captureSnapshot()
+
+    // Make a post-create change
+    await fs.writeFile(path.join(root, 'agent.txt'), 'by agent\n')
+
+    await mgr.handleAsync({ type: 'fs:diff', sessionId: 's2', base: 'session-start' }, send)
+    const msg = last(sent, 'fs:diff:result')
+    expect(msg).toMatchObject({ base: 'session-start', hasSessionStart: true, state: 'ok' })
+    // Only the post-create file should appear
+    expect(msg.files!.map((f: { path: string }) => f.path)).toEqual(['agent.txt'])
   })
 })

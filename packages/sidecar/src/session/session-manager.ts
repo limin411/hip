@@ -166,6 +166,7 @@ export class SessionManager {
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
     this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store))
+    void this.sessions.get(id)!.captureSnapshot()
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
     if (!config.cwd) send({ type: 'session:cwd', sessionId: id, cwd: cfg.cwd! })
@@ -192,6 +193,11 @@ export class SessionManager {
    *  Safe no-op for idle sessions (Session.cancel() aborts only if a turn is running). */
   cancelAllRunning(): void {
     for (const s of this.sessions.values()) s.cancel()
+  }
+
+  /** Exposed for tests only: returns the in-memory session instance (or undefined if not created). */
+  getSessionForTest(id: string): Session | undefined {
+    return this.sessions.get(id)
   }
 
   /** List a directory keyed by a raw cwd (for un-committed drafts — no session needed). */

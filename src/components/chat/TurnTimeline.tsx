@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Brain } from 'lucide-react'
+import { ChevronRight, Brain, Circle, CircleDot, CheckCircle2 } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
+import { latestTodos, type Todo } from '@/lib/todos'
 
 function AgentBadge({ role }: { role: AgentRole }) {
   return (
@@ -56,6 +57,52 @@ function ThinkingDisclosure({
   )
 }
 
+const TODO_ICON = {
+  pending: Circle,
+  in_progress: CircleDot,
+  completed: CheckCircle2,
+} as const
+
+const TODO_ICON_CLASS = {
+  pending: 'text-ink-tertiary',
+  in_progress: 'text-accent-strong',
+  completed: 'text-success',
+} as const
+
+function TodoChecklist({ todos }: { todos: Todo[] }) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className="rounded-md border border-border bg-surface-muted/40 px-2 py-1.5"
+      data-testid="todo-checklist"
+    >
+      <div className="mb-1 text-caption uppercase tracking-wide text-ink-tertiary">{t('chat.todos.plan')}</div>
+      <ul className="flex flex-col gap-1">
+        {todos.map((todo, i) => {
+          const Icon = TODO_ICON[todo.status]
+          return (
+            <li key={i} className="flex items-start gap-1.5" data-status={todo.status}>
+              <Icon
+                size={13}
+                className={cn('mt-0.5 shrink-0', TODO_ICON_CLASS[todo.status])}
+                aria-label={t(`chat.todos.${todo.status}`)}
+              />
+              <span
+                className={cn(
+                  'min-w-0 flex-1 text-meta',
+                  todo.status === 'completed' ? 'text-ink-tertiary line-through' : 'text-ink-secondary',
+                )}
+              >
+                {todo.content}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 interface TurnTimelineProps {
   steps?: TimelineStep[]
   toolCalls?: ToolCall[]
@@ -70,8 +117,10 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
   const byCallId = new Map((toolCalls ?? []).map((tc) => [tc.callId, tc]))
   const taskByAgent = new Map((agentRuns ?? []).filter((r) => r.taskInput).map((r) => [r.agentId, r.taskInput!]))
   const seen = new Set<string>()
+  const plan = latestTodos(toolCalls)
   return (
     <div className="mb-2 flex flex-col gap-1.5" data-testid="turn-timeline">
+      {plan && plan.todos.length > 0 && <TodoChecklist todos={plan.todos} />}
       {ordered.flatMap((step) => {
         const nodes: JSX.Element[] = []
         if (!seen.has(step.agentId)) {
@@ -92,7 +141,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
           nodes.push(<ThinkingDisclosure key={`r-${step.stepSeq}`} role={step.role} content={step.content} />)
         } else {
           const tool = byCallId.get(step.callId)
-          if (tool) nodes.push(
+          if (tool && tool.name !== 'write_todos') nodes.push(
             <div key={`t-${step.stepSeq}`} className="flex gap-2">
               <AgentBadge role={step.role} />
               <div className="min-w-0 flex-1"><ToolCallRow tool={tool} /></div>

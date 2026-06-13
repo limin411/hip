@@ -49,6 +49,12 @@ export const zhCN = {
       styleNew: '新建风格',
       styleDelete: '删除风格',
       styleEmpty: '还没有保存的风格，请在下方新建。',
+      todos: {
+        plan: '计划',
+        pending: '待办',
+        in_progress: '进行中',
+        completed: '已完成',
+      },
     },
     sidebar: {
       collapse: '折叠侧边栏',

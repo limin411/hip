@@ -49,6 +49,12 @@ export const en = {
       styleNew: 'New style',
       styleDelete: 'Delete style',
       styleEmpty: 'No saved styles yet. Create one below.',
+      todos: {
+        plan: 'Plan',
+        pending: 'To do',
+        in_progress: 'In progress',
+        completed: 'Done',
+      },
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

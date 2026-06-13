@@ -49,6 +49,12 @@ export const zhTW = {
       styleNew: '新增風格',
       styleDelete: '刪除風格',
       styleEmpty: '還沒有儲存的風格，請在下方新增。',
+      todos: {
+        plan: '計畫',
+        pending: '待辦',
+        in_progress: '進行中',
+        completed: '已完成',
+      },
     },
     sidebar: {
       collapse: '折疊側邊欄',

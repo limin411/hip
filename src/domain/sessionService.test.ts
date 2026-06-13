@@ -484,4 +484,29 @@ describe('branches + revert', () => {
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
   })
+
+  it('git:branch:switch:result on FAILURE records switchError so the confirm modal can recover', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    // dropdown was populated first (on 'main')
+    t.push({ type: 'git:branch:list:result', sessionId: 's1', branches: [{ name: 'main', current: true }, { name: 'feature', current: false }], currentBranch: 'main' })
+    t.push({ type: 'git:branch:switch:result', sessionId: 's1', branch: 'feature', ok: false, currentBranch: 'main', error: 'dirty tree' })
+    expect(useDiffStore.getState().bySession['s1'].switchError).toBe('dirty tree')
+    // currentBranch stays put (the switch did not happen)
+    expect(useDiffStore.getState().bySession['s1'].currentBranch).toBe('main')
+  })
+
+  it('a successful branch list clears a prior switchError', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'git:branch:switch:result', sessionId: 's1', branch: 'feature', ok: false, currentBranch: 'main', error: 'dirty tree' })
+    t.push({ type: 'git:branch:list:result', sessionId: 's1', branches: [{ name: 'main', current: true }], currentBranch: 'main' })
+    expect(useDiffStore.getState().bySession['s1'].switchError).toBeNull()
+  })
+
+  it('git:revert:result on FAILURE records revertError so the confirm modal can recover', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: false, error: 'safety checkpoint failed' })
+    expect(useDiffStore.getState().bySession['s1'].revertError).toBe('safety checkpoint failed')
+    // no refresh requests fire on a failed revert
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
+  })
 })

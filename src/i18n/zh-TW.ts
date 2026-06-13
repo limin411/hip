@@ -125,6 +125,7 @@ export const zhTW = {
         revertConfirmAction: '回退',
         reverting: '回退中…',
         revertFailed: '回退失敗',
+        revertRetry: '重試',
         crossBranchWarn: '此檢查點是在分支「{{branch}}」上建立的，與目前分支不同。',
       },
       branch: {
@@ -136,6 +137,7 @@ export const zhTW = {
         switchConfirmAction: '切換',
         switching: '切換中…',
         switchFailed: '切換分支失敗',
+        switchRetry: '重試',
       },
       changesView: {
         uncommitted: '未提交的變更',

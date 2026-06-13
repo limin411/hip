@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitCommit, Loader2, RotateCcw, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,17 @@ export function TimelineView() {
   const [reverting, setReverting] = useState(false)
   // Clear the modal once a revert round-trips (the checkpoint list refreshes with a new safety checkpoint).
   useEffect(() => { if (reverting) { setReverting(false); setRevertTarget(null) } }, [diff.checkpoints.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  // On a FAILED revert the service records revertError → clear the spinner so the modal is no longer
+  // stuck; the error stays visible until the user dismisses or retries.
+  useEffect(() => { if (reverting && diff.revertError) setReverting(false) }, [reverting, diff.revertError])
+
+  // Reset all transient confirm state. ALWAYS reachable (Cancel / ESC / overlay / X) so a failed or
+  // hung revert can never brick the modal.
+  const closeRevert = useCallback(() => {
+    setRevertTarget(null)
+    setReverting(false)
+    if (sessionId) useDiffStore.getState().setRevertError(sessionId, null)
+  }, [sessionId])
 
   // Mount === tab activation (Radix unmounts inactive tabs). Pull the list.
   useEffect(() => { if (sessionId) sessionService.requestCheckpoints(sessionId) }, [sessionId])
@@ -110,7 +121,7 @@ export function TimelineView() {
         const target = diff.checkpoints.find((c) => c.id === revertTarget)
         const crossBranch = !!target && !!target.branch && !!diff.currentBranch && target.branch !== diff.currentBranch
         return (
-          <Modal open={!!revertTarget} onOpenChange={(o) => { if (!o && !reverting) setRevertTarget(null) }} title={t('artifact.timelineView.revertConfirmTitle')}>
+          <Modal open={!!revertTarget} onOpenChange={(o) => { if (!o) closeRevert() }} title={t('artifact.timelineView.revertConfirmTitle')}>
             <div className="flex flex-col gap-4 p-5">
               <p className="text-body text-ink-secondary">{t('artifact.timelineView.revertConfirmBody')}</p>
               {crossBranch && (
@@ -119,16 +130,23 @@ export function TimelineView() {
                   <span>{t('artifact.timelineView.crossBranchWarn', { branch: target!.branch ?? '' })}</span>
                 </div>
               )}
+              {diff.revertError && (
+                <div data-testid="timeline-revert-error" className="flex items-start gap-2 rounded border border-danger/40 bg-danger/10 p-2 text-meta text-ink">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+                  <span className="min-w-0 break-words">{t('artifact.timelineView.revertFailed')}{diff.revertError ? `: ${diff.revertError}` : ''}</span>
+                </div>
+              )}
               <div className="flex justify-end gap-2">
-                <Button variant="secondary" size="sm" disabled={reverting} onClick={() => setRevertTarget(null)}>{t('common.cancel')}</Button>
+                {/* Cancel is ALWAYS enabled so a failed/hung revert can be backed out of. */}
+                <Button variant="secondary" size="sm" onClick={closeRevert}>{t('common.cancel')}</Button>
                 <Button
                   size="sm"
                   disabled={reverting}
                   data-testid="timeline-revert-confirm"
-                  onClick={() => { if (revertTarget) { setReverting(true); sessionService.revertCheckpoint(sessionId, revertTarget) } }}
+                  onClick={() => { if (revertTarget) { useDiffStore.getState().setRevertError(sessionId, null); setReverting(true); sessionService.revertCheckpoint(sessionId, revertTarget) } }}
                 >
                   {reverting && <Loader2 size={13} className="mr-1.5 animate-spin" />}
-                  {reverting ? t('artifact.timelineView.reverting') : t('artifact.timelineView.revertConfirmAction')}
+                  {reverting ? t('artifact.timelineView.reverting') : (diff.revertError ? t('artifact.timelineView.revertRetry') : t('artifact.timelineView.revertConfirmAction'))}
                 </Button>
               </div>
             </div>

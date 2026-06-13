@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GitBranch, Check, ChevronDown, Loader2 } from 'lucide-react'
+import { GitBranch, Check, ChevronDown, Loader2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
@@ -24,6 +24,18 @@ export function BranchSwitcher() {
   useEffect(() => {
     if (switching && pending && diff.currentBranch === pending) { setSwitching(false); setPending(null) }
   }, [switching, pending, diff.currentBranch])
+
+  // On a FAILED switch (e.g. dirty tree) the service records switchError → clear the spinner so the
+  // modal is no longer stuck; the error stays visible until the user dismisses or retries.
+  useEffect(() => { if (switching && diff.switchError) setSwitching(false) }, [switching, diff.switchError])
+
+  // Reset all transient confirm state. ALWAYS reachable (Cancel / ESC / overlay / X) so a failed or
+  // hung switch can never brick the modal.
+  const closeConfirm = useCallback(() => {
+    setPending(null)
+    setSwitching(false)
+    if (sessionId) useDiffStore.getState().setSwitchError(sessionId, null)
+  }, [sessionId])
 
   if (!sessionId) return null
   const current = diff.currentBranch
@@ -59,19 +71,26 @@ export function BranchSwitcher() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Modal open={!!pending} onOpenChange={(o) => { if (!o && !switching) setPending(null) }} title={t('artifact.branch.switchConfirmTitle', { branch: pending ?? '' })}>
+      <Modal open={!!pending} onOpenChange={(o) => { if (!o) closeConfirm() }} title={t('artifact.branch.switchConfirmTitle', { branch: pending ?? '' })}>
         <div className="flex flex-col gap-4 p-5">
           <p className="text-body text-ink-secondary">{t('artifact.branch.switchConfirmBody')}</p>
+          {diff.switchError && (
+            <div data-testid="branch-switch-error" className="flex items-start gap-2 rounded border border-danger/40 bg-danger/10 p-2 text-meta text-ink">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+              <span className="min-w-0 break-words">{t('artifact.branch.switchFailed')}{diff.switchError ? `: ${diff.switchError}` : ''}</span>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" disabled={switching} onClick={() => setPending(null)}>{t('common.cancel')}</Button>
+            {/* Cancel is ALWAYS enabled so a failed/hung switch can be backed out of. */}
+            <Button variant="secondary" size="sm" onClick={closeConfirm}>{t('common.cancel')}</Button>
             <Button
               size="sm"
               disabled={switching}
               data-testid="branch-switch-confirm"
-              onClick={() => { if (pending) { setSwitching(true); sessionService.switchBranch(sessionId, pending) } }}
+              onClick={() => { if (pending) { useDiffStore.getState().setSwitchError(sessionId, null); setSwitching(true); sessionService.switchBranch(sessionId, pending) } }}
             >
               {switching && <Loader2 size={13} className={cn('mr-1.5 animate-spin')} />}
-              {switching ? t('artifact.branch.switching') : t('artifact.branch.switchConfirmAction')}
+              {switching ? t('artifact.branch.switching') : (diff.switchError ? t('artifact.branch.switchRetry') : t('artifact.branch.switchConfirmAction'))}
             </Button>
           </div>
         </div>

@@ -125,6 +125,7 @@ export const en = {
         revertConfirmAction: 'Revert',
         reverting: 'Reverting…',
         revertFailed: 'Revert failed',
+        revertRetry: 'Retry',
         crossBranchWarn: 'This checkpoint was created on branch "{{branch}}", which differs from the current branch.',
       },
       branch: {
@@ -136,6 +137,7 @@ export const en = {
         switchConfirmAction: 'Switch',
         switching: 'Switching…',
         switchFailed: 'Could not switch branch',
+        switchRetry: 'Retry',
       },
       changesView: {
         uncommitted: 'Uncommitted changes',

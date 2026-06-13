@@ -96,6 +96,10 @@ export class SessionService {
         this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
         const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
         this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      } else {
+        // Failure (e.g. a dirty tree) → record the error so the confirm modal can clear its spinner
+        // and surface it, instead of bricking the modal on a stuck 'switching' state.
+        useDiffStore.getState().setSwitchError(msg.sessionId, msg.error ?? 'switch_failed')
       }
     } else if (msg.type === 'git:revert:result') {
       if (msg.ok) {
@@ -103,6 +107,9 @@ export class SessionService {
         this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
         const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
         this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      } else {
+        // Failure → record the error so the confirm modal can clear its 'reverting' spinner + surface it.
+        useDiffStore.getState().setRevertError(msg.sessionId, msg.error ?? 'revert_failed')
       }
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.

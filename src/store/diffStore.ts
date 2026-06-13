@@ -16,6 +16,10 @@ export interface SessionDiff {
   isGitRepo: boolean
   currentBranch: string | null
   branches: Branch[]
+  // Transient write-op failures (A2) — surfaced + cleared by the BranchSwitcher / TimelineView
+  // confirm modals so a FAILED switch/revert resets the spinner instead of bricking the modal.
+  switchError: string | null
+  revertError: string | null
   checkpoints: Checkpoint[]
   activeCheckpointId: string | null
   // per (checkpointId|mode) cached diff result; key = `${checkpointId}|${mode}`
@@ -25,7 +29,7 @@ export interface SessionDiff {
 
 export const EMPTY_DIFF: SessionDiff = {
   status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {}, collapsed: {},
-  isGitRepo: false, currentBranch: null, branches: [], checkpoints: [], activeCheckpointId: null, checkpointDiff: {}, commitLog: { status: 'idle', commits: [] },
+  isGitRepo: false, currentBranch: null, branches: [], switchError: null, revertError: null, checkpoints: [], activeCheckpointId: null, checkpointDiff: {}, commitLog: { status: 'idle', commits: [] },
 }
 
 interface SetResultArg { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; base: DiffBase; hasSessionStart: boolean; error?: string }
@@ -43,6 +47,8 @@ interface DiffStore {
   clearSession: (sessionId: string) => void
   setCheckpoints: (sessionId: string, checkpoints: Checkpoint[], isGitRepo: boolean, currentBranch: string | null) => void
   setBranches: (sessionId: string, branches: Branch[], currentBranch: string | null) => void
+  setSwitchError: (sessionId: string, error: string | null) => void
+  setRevertError: (sessionId: string, error: string | null) => void
   addCheckpoint: (sessionId: string, checkpoint: Checkpoint) => void
   setActiveCheckpoint: (sessionId: string, checkpointId: string | null) => void
   setCheckpointDiffLoading: (sessionId: string, key: string) => void
@@ -70,7 +76,9 @@ export const useDiffStore = create<DiffStore>((set) => ({
   toggleCollapsed: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, collapsed: { ...s.collapsed, [p]: !s.collapsed[p] } })) })),
   clearSession: (id) => set((st) => ({ bySession: { ...st.bySession, [id]: EMPTY_DIFF } })),
   setCheckpoints: (id, checkpoints, isGitRepo, currentBranch) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpoints, isGitRepo, currentBranch })) })),
-  setBranches: (id, branches, currentBranch) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, branches, currentBranch })) })),
+  setBranches: (id, branches, currentBranch) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, branches, currentBranch, switchError: null })) })),
+  setSwitchError: (id, error) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, switchError: error })) })),
+  setRevertError: (id, error) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, revertError: error })) })),
   addCheckpoint: (id, checkpoint) => set((st) => ({ bySession: patch(st.bySession, id, (s) => (s.checkpoints.some((c) => c.id === checkpoint.id) ? s : { ...s, checkpoints: [checkpoint, ...s.checkpoints] })) })),
   setActiveCheckpoint: (id, checkpointId) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, activeCheckpointId: checkpointId })) })),
   setCheckpointDiffLoading: (id, key) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: { ...s.checkpointDiff, [key]: { status: 'loading' } } })) })),

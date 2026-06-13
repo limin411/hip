@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -323,5 +323,20 @@ describe('captureSessionSnapshot + session-start base', () => {
   })
   it('returns null for a non-repo folder', async () => {
     expect(await captureSessionSnapshot(root)).toBeNull()
+  })
+})
+
+describe('sanitizeRefComponent', () => {
+  it('passes alnum / dash / underscore through unchanged', () => {
+    expect(sanitizeRefComponent('asst-supervisor-123_4')).toBe('asst-supervisor-123_4')
+  })
+  it('replaces unsafe chars with a stable hash (no slashes, dots, spaces, CJK)', () => {
+    const a = sanitizeRefComponent('a/b .c~说明')
+    expect(a).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(a).toBe(sanitizeRefComponent('a/b .c~说明')) // deterministic
+    expect(a).not.toBe(sanitizeRefComponent('different'))
+  })
+  it('returns a non-empty token for an empty input', () => {
+    expect(sanitizeRefComponent('')).toMatch(/^[A-Za-z0-9_-]+$/)
   })
 })

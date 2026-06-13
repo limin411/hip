@@ -2,8 +2,17 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT } from './providers.js'
+import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT, cheapModelFor } from './providers.js'
 import { providerKeyEnv } from '@hip/protocol'
+
+describe('cheapModelFor', () => {
+  it('maps deepseek to its cheap chat model', () => {
+    expect(cheapModelFor('deepseek', 'deepseek-reasoner')).toBe('deepseek-chat')
+  })
+  it('falls back to the active model for unknown providers', () => {
+    expect(cheapModelFor('acme', 'acme-large')).toBe('acme-large')
+  })
+})
 
 describe('sidecar provider config', () => {
   beforeEach(() => setActiveModel(DEEPSEEK_DEFAULT))

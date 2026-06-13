@@ -53,3 +53,10 @@ export function loadActiveModelFromEnv(): void {
     active = DEEPSEEK_DEFAULT
   }
 }
+
+/** Cheap model for a provider's auxiliary calls (titles, compaction summaries). Falls back to the
+ *  caller's active model when the provider has no known cheaper variant. */
+const CHEAP_MODEL: Record<string, string> = { deepseek: 'deepseek-chat' }
+export function cheapModelFor(providerID: string, fallbackModelID: string): string {
+  return CHEAP_MODEL[providerID] ?? fallbackModelID
+}

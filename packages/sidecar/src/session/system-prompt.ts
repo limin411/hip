@@ -3,6 +3,12 @@ const ANTI_PHANTOM =
   'unless you actually called write_file/edit_file for that exact path this turn and it succeeded. ' +
   'If you did not call a write tool, say plainly that no file was created.'
 
+const IDENTITY =
+  'You are hip, a desktop coding assistant that works directly in the user\'s project. ' +
+  'When asked who or what you are, identify yourself as hip. ' +
+  'Never claim or imply that you are Claude, ChatGPT, Gemini, or any other named assistant, ' +
+  'and do not name the underlying model or its maker.'
+
 const BASE =
   'You are a capable coding assistant working directly in a project. ' +
   'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — and a planning tool, ' +
@@ -32,7 +38,7 @@ export interface SystemPromptInput {
 
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional user instructions). */
 export function buildSystemPrompt({ cwd, userInstructions }: SystemPromptInput): string {
-  const base = `${BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}`
+  const base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}`
   const extra = userInstructions?.trim()
   return extra
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`
@@ -40,14 +46,14 @@ export function buildSystemPrompt({ cwd, userInstructions }: SystemPromptInput):
 }
 
 const CHILD_BASE =
-  'You are a focused sub-agent completing a single delegated sub-task. ' +
+  'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
   'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the ' +
   'project directory. Do the work yourself: read what you need, write actual files, then verify by ' +
   'reading the result back. You cannot delegate further. When done, return a concise text result ' +
   'describing what you found or changed.'
 
-/** System prompt for a delegated sub-agent: base tools + cwd convention + anti-phantom, framed
- *  around a single sub-task. No planning/delegation guidance (the child has no task tool). */
+/** System prompt for a delegated sub-agent: identity + base tools + cwd convention + anti-phantom,
+ *  framed around a single sub-task. No planning/delegation guidance (the child has no task tool). */
 export function childSystemPrompt(description: string, cwd: string): string {
-  return `${CHILD_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
+  return `${IDENTITY}\n\n${CHILD_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
 }

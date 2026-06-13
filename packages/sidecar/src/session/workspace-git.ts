@@ -18,6 +18,8 @@ export interface WorkspaceDiff { state: DiffState; files?: DiffFile[]; summary?:
 export interface WorkspaceDiffOptions { gitBin?: string; base?: DiffBase; baseSha?: string | null; indexFile?: string; headSha?: string }
 export interface CaptureCheckpointOptions { sessionId: string; turnId: string; label: string | null; prevCommit: string | null; gitBin?: string }
 export interface CaptureResult { ok: boolean; skipped?: boolean; treeSha?: string; commitSha?: string; branch?: string | null; error?: string }
+export interface RevertOptions { sessionId: string; targetTree: string; prevCommit: string | null; gitBin?: string }
+export interface RevertResult { ok: boolean; safetyCheckpointId?: string; error?: string }
 
 const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
 const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++ 缺失时兜底（mode-only）
@@ -424,4 +426,50 @@ export async function gitCreateBranch(cwd: string, name: string, gitBin = 'git')
  *  the panel share one implementation. */
 export async function gitSwitchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
   return switchBranch(cwd, name, gitBin)
+}
+
+/** Exact worktree restore to a checkpoint's tree, Zed-style and hardened. NEVER touches HEAD/index/
+ *  branches. Steps: (1) MANDATORY pre-revert safety checkpoint via captureCheckpoint — must succeed
+ *  (or be a clean empty-turn skip) or we abort before deleting anything; (2) read-tree targetTree into
+ *  a temp index; (3) checkout-index -f -a writes the tracked content; (4) delete worktree files absent
+ *  from `git ls-tree -r --name-only targetTree` (the set-difference — the only data-loss surface).
+ *  Never `reset --hard`. Never throws → { ok:false, error }. */
+export async function revertToCheckpoint(cwd: string, opts: RevertOptions): Promise<RevertResult> {
+  const gitBin = opts.gitBin ?? 'git'
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch { return { ok: false, error: 'not_a_repo' } }
+
+  // (1) Mandatory pre-revert safety checkpoint. A monotonic turnId keeps refs unique across reverts.
+  const safetyTurnId = `pre-revert-${Date.now()}`
+  const safety = await captureCheckpoint(cwd, { sessionId: opts.sessionId, turnId: safetyTurnId, label: 'pre-revert safety', prevCommit: opts.prevCommit, gitBin })
+  if (!safety.ok) return { ok: false, error: 'safety checkpoint failed: ' + (safety.error ?? 'unknown') }
+  const safetyCheckpointId = `${opts.sessionId}:${safetyTurnId}`
+
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-revert-'))
+  const idx = path.join(dir, 'index')
+  try {
+    // (2) read the target tree into a temp index (real index untouched).
+    const env = { ...process.env, GIT_INDEX_FILE: idx }
+    const runIdx = (args: string[]) => execFileP(gitBin, args, { cwd, env, timeout: GIT_TIMEOUT_MS, maxBuffer: GIT_MAX_BUFFER })
+    await runIdx(['read-tree', opts.targetTree])
+    // (3) write the tracked content from that index into the worktree.
+    await runIdx(['checkout-index', '-f', '-a'])
+
+    // (4) delete worktree files absent from the target tree (set-difference).
+    const wantOut = (await runGit(cwd, ['ls-tree', '-r', '--name-only', opts.targetTree], gitBin)).stdout
+    const want = new Set(wantOut.split('\n').map((l) => l.trim()).filter(Boolean))
+    // Enumerate the worktree's tracked + untracked files (respecting .gitignore: ignored files stay).
+    const haveOut = (await runGit(cwd, ['ls-files', '--cached', '--others', '--exclude-standard'], gitBin)).stdout
+    const have = haveOut.split('\n').map((l) => l.trim()).filter(Boolean)
+    for (const rel of have) {
+      if (!want.has(rel)) await fs.rm(path.join(cwd, rel), { force: true }).catch(() => {})
+    }
+    return { ok: true, safetyCheckpointId }
+  } catch (e) {
+    return { ok: false, safetyCheckpointId, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
+  }
 }

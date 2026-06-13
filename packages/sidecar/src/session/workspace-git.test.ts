@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -561,5 +561,62 @@ describe('gitCreateBranch + gitSwitchBranch (tool helpers)', () => {
     const r = await gitCreateBranch(root, 'feature')
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
+  })
+})
+
+describe('revertToCheckpoint', () => {
+  it('restores the exact tree of a checkpoint (overwrites edits, deletes files added after)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    // checkpoint captures the state "a.txt = two"
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const cap = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'edit', prevCommit: head })
+    expect(cap.ok && cap.treeSha).toBeTruthy()
+    // drift AFTER the checkpoint: change a.txt + add a brand-new file
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n')
+    await fs.writeFile(path.join(root, 'extra.txt'), 'added later\n')
+    const r = await revertToCheckpoint(root, { sessionId: 's1', targetTree: cap.treeSha!, prevCommit: cap.commitSha! })
+    expect(r.ok).toBe(true)
+    expect(r.safetyCheckpointId).toBeTruthy()
+    expect(await fs.readFile(path.join(root, 'a.txt'), 'utf8')).toBe('two\n') // restored
+    await expect(fs.access(path.join(root, 'extra.txt'))).rejects.toThrow() // deleted (absent in target tree)
+  })
+  it('writes a mandatory pre-revert safety checkpoint ref before restoring', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const cap = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'edit', prevCommit: head })
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n') // dirty so the safety checkpoint is non-empty
+    const r = await revertToCheckpoint(root, { sessionId: 's1', targetTree: cap.treeSha!, prevCommit: cap.commitSha! })
+    expect(r.ok).toBe(true)
+    // the safety checkpoint id is "<sessionId>:<turnId>"; its ref must exist
+    const turnId = r.safetyCheckpointId!.split(':').slice(1).join(':')
+    const refs = await listCheckpointRefs(root, 's1')
+    expect(refs.some((ref) => ref.endsWith('/' + sanitizeRefComponent(turnId)))).toBe(true)
+  })
+  it('NEVER moves HEAD (revert is worktree-only)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const cap = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'edit', prevCommit: head })
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n')
+    await revertToCheckpoint(root, { sessionId: 's1', targetTree: cap.treeSha!, prevCommit: cap.commitSha! })
+    expect((await git(root, 'rev-parse', 'HEAD')).stdout.trim()).toBe(head) // HEAD unchanged
+  })
+  it('works on an unborn-HEAD repo (fresh git init, checkpoint #0 has no commit ancestry)', async () => {
+    await git(root, 'init')
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    const cap = await captureCheckpoint(root, { sessionId: 's1', turnId: 'start', label: null, prevCommit: null })
+    expect(cap.ok && cap.treeSha).toBeTruthy()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    await fs.writeFile(path.join(root, 'b.txt'), 'extra\n')
+    const r = await revertToCheckpoint(root, { sessionId: 's1', targetTree: cap.treeSha!, prevCommit: cap.commitSha! })
+    expect(r.ok).toBe(true)
+    expect(await fs.readFile(path.join(root, 'a.txt'), 'utf8')).toBe('one\n')
+    await expect(fs.access(path.join(root, 'b.txt'))).rejects.toThrow()
+  })
+  it('returns ok:false for a non-repo folder', async () => {
+    const r = await revertToCheckpoint(root, { sessionId: 's1', targetTree: 'deadbeef', prevCommit: null })
+    expect(r.ok).toBe(false)
   })
 })

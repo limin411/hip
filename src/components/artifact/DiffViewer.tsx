@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, GitBranch, Loader2, RefreshCw } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus } from '@hip/protocol'
 import { cn } from '@/lib/utils'
+import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
@@ -20,6 +21,7 @@ function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' 
 
 function HunkLines({ hunk }: { hunk: DiffHunk }) {
   const { t } = useTranslation()
+  const spans = computeHunkWordDiffs(hunk.lines)
   return (
     <>
       <div className="flex bg-surface-muted/60 text-caption text-ink-tertiary">
@@ -31,7 +33,9 @@ function HunkLines({ hunk }: { hunk: DiffHunk }) {
           <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.oldNo ?? ''}</span>
           <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.newNo ?? ''}</span>
           <span className={cn('w-4 shrink-0 select-none text-center', line.type === 'add' && 'text-success', line.type === 'del' && 'text-danger')}>{sign(line.type)}</span>
-          <span className="whitespace-pre px-1 text-ink">{line.content}</span>
+          {spans[i]
+            ? <span className="whitespace-pre px-1 text-ink">{spans[i]!.map((sp, k) => <span key={k} className={cn(sp.changed && (line.type === 'add' ? 'bg-success/30' : 'bg-danger/30'))}>{sp.text}</span>)}</span>
+            : <span className="whitespace-pre px-1 text-ink">{line.content}</span>}
           {line.noNewline && <span className="select-none px-1 text-ink-tertiary" title={t('artifact.diffView.noNewline')}>&#8626;&#824;</span>}
         </div>
       ))}

@@ -49,4 +49,18 @@ describe('diffStore', () => {
     useDiffStore.getState().setBase('s1', 'head')
     expect(useDiffStore.getState().bySession['s1']).toMatchObject({ base: 'head', files: [file] })
   })
+  it('setFileExpanded and collapseFile round-trip', () => {
+    const expandedFile = { ...file, hunks: [{ oldStart: 1, oldLines: 30, newStart: 1, newLines: 30, lines: [] }] }
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [file], summary, base: 'head', hasSessionStart: false })
+    useDiffStore.getState().setFileExpanded('s1', 'a.ts', expandedFile)
+    expect(useDiffStore.getState().bySession['s1'].expanded['a.ts']).toEqual(expandedFile)
+    useDiffStore.getState().collapseFile('s1', 'a.ts')
+    expect(useDiffStore.getState().bySession['s1'].expanded['a.ts']).toBeUndefined()
+  })
+  it('setResult resets expanded to {}', () => {
+    const expandedFile = { ...file, hunks: [] }
+    useDiffStore.getState().setFileExpanded('s1', 'a.ts', expandedFile)
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [file], summary, base: 'head', hasSessionStart: false })
+    expect(useDiffStore.getState().bySession['s1'].expanded).toEqual({})
+  })
 })

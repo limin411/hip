@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, gitInit, captureSessionSnapshot, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -294,6 +294,18 @@ describe('gitInit', () => {
     const r = await gitInit(root, 'hip-definitely-missing-git')
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
+  })
+})
+
+describe('collectWorkspaceDiffFile', () => {
+  it('returns one file with full context', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), Array.from({ length: 30 }, (_, i) => `l${i}`).join('\n') + '\n')
+    await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), Array.from({ length: 30 }, (_, i) => (i === 15 ? 'CHANGED' : `l${i}`)).join('\n') + '\n')
+    const r = await collectWorkspaceDiffFile(root, 'a.txt', { context: 'full' })
+    expect(r.state).toBe('ok')
+    const ctxLines = r.file!.hunks.reduce((n, h) => n + h.lines.filter((l) => l.type === 'ctx').length, 0)
+    expect(ctxLines).toBeGreaterThan(20) // 全文上下文
   })
 })
 

@@ -152,6 +152,11 @@ export class SessionManager {
         send({ type: 'fs:diffSummary:result', sessionId: msg.sessionId, ...r })
         break
       }
+      case 'fs:diffFile': {
+        const r = await this.ensureSession(msg.sessionId).workspaceDiffFile(msg.path, msg.base ?? 'session-start', msg.context)
+        send({ type: 'fs:diffFile:result', sessionId: msg.sessionId, path: msg.path, base: msg.base ?? 'session-start', state: r.state, file: r.file, error: r.error })
+        break
+      }
       case 'fs:gitInit': {
         const r = await this.ensureSession(msg.sessionId).workspaceGitInit()
         send({ type: 'fs:gitInit:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })

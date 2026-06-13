@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -333,6 +333,13 @@ export class Session {
     const b = this.resolveBase(base)
     const r = await workspaceGit.collectWorkspaceDiffSummary(this._config.cwd, { base: b.base, baseSha: b.baseSha })
     return { ...r, base: b.base, hasSessionStart: b.hasSessionStart }
+  }
+
+  /** Single-file diff with custom context (for on-demand show-full). */
+  async workspaceDiffFile(filePath: string, base: DiffBase = 'head', context?: number | 'full'): Promise<{ state: DiffState; file?: DiffFile; error?: string }> {
+    if (!this._config.cwd) return { state: 'no_cwd' }
+    const b = this.resolveBase(base)
+    return workspaceGit.collectWorkspaceDiffFile(this._config.cwd, filePath, { base: b.base, baseSha: b.baseSha, context })
   }
 
   /** One-click `git init` + baseline commit in the bound cwd. */

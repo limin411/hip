@@ -179,6 +179,7 @@ export type ClientMessage =
   | { type: 'fs:readCwd'; cwd: string; path: string }
   | { type: 'fs:diff'; sessionId: string; base?: DiffBase }
   | { type: 'fs:diffSummary'; sessionId: string; base?: DiffBase }
+  | { type: 'fs:diffFile'; sessionId: string; path: string; base?: DiffBase; context?: number | 'full' }
   | { type: 'fs:gitInit'; sessionId: string }
 
 export type ServerMessage =
@@ -208,4 +209,5 @@ export type ServerMessage =
   | { type: 'fs:readCwd:result'; cwd: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
   | { type: 'fs:diff:result'; sessionId: string; base: DiffBase; hasSessionStart: boolean; state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
   | { type: 'fs:diffSummary:result'; sessionId: string; base: DiffBase; hasSessionStart: boolean; state: DiffState; summary?: DiffSummary; error?: string }
+  | { type: 'fs:diffFile:result'; sessionId: string; path: string; base: DiffBase; state: DiffState; file?: DiffFile; error?: string }
   | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }

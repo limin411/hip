@@ -39,9 +39,11 @@ function HunkLines({ hunk }: { hunk: DiffHunk }) {
   )
 }
 
-function FileDiff({ file }: { file: DiffFile }) {
+function FileDiff({ file, sessionId, expanded }: { file: DiffFile; sessionId: string; expanded?: DiffFile }) {
   const { t } = useTranslation()
   const chip = STATUS_CHIP[file.status]
+  const shown = expanded ?? file
+  const isExpanded = !!expanded
   return (
     <div className="border-b border-border" data-testid="diff-file">
       <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 bg-surface-muted px-3 py-2">
@@ -59,14 +61,21 @@ function FileDiff({ file }: { file: DiffFile }) {
           <span className="text-danger">-{file.deletions}</span>
         </span>
       </div>
-      {file.binary ? (
+      {shown.binary ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.binary')}</div>
-      ) : file.hunks.length === 0 ? (
+      ) : shown.hunks.length === 0 ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.modeOnly')}</div>
       ) : (
-        <div className="overflow-x-auto font-mono text-meta leading-relaxed">
-          {file.hunks.map((h, i) => <HunkLines key={i} hunk={h} />)}
-        </div>
+        <>
+          <div className="overflow-x-auto font-mono text-meta leading-relaxed">
+            {shown.hunks.map((h, i) => <HunkLines key={i} hunk={h} />)}
+          </div>
+          <div className="flex justify-center gap-3 border-t border-border py-1 text-caption text-ink-tertiary">
+            {!isExpanded
+              ? <button data-testid="diff-show-full" onClick={() => sessionService.requestDiffFile(sessionId, file.path, 'full')}>{t('artifact.diffView.showFull')}</button>
+              : <button data-testid="diff-collapse-full" onClick={() => useDiffStore.getState().collapseFile(sessionId, file.path)}>{t('artifact.diffView.collapseFull')}</button>}
+          </div>
+        </>
       )}
     </div>
   )
@@ -184,7 +193,7 @@ export function DiffViewer() {
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto">
           {diff.files.map((file, i) => (
-            <FileDiff key={`${file.path}-${i}`} file={file} />
+            <FileDiff key={`${file.path}-${i}`} file={file} sessionId={sessionId} expanded={diff.expanded[file.path]} />
           ))}
           {(diff.summary?.totalFiles ?? 0) > diff.files.length && (
             <div className="px-3 py-2 text-meta text-ink-tertiary">

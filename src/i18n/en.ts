@@ -101,6 +101,8 @@ export const en = {
         noNewline: 'No newline at end of file',
         baseSession: 'Since session start',
         baseHead: 'vs HEAD',
+        showFull: 'Show full file',
+        collapseFull: 'Collapse',
       },
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',

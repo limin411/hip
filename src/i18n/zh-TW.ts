@@ -101,6 +101,8 @@ export const zhTW = {
         noNewline: '檔案結尾無換行',
         baseSession: '自工作階段起點',
         baseHead: '對比 HEAD',
+        showFull: '檢視全文',
+        collapseFull: '收合',
       },
       waiting: '等待中…',
       subAgents: '子智能體',

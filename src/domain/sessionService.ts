@@ -72,6 +72,8 @@ export class SessionService {
       useDiffStore.getState().setResult(msg.sessionId, { state: msg.state, files: msg.files, summary: msg.summary, base: msg.base, hasSessionStart: msg.hasSessionStart, error: msg.error })
     } else if (msg.type === 'fs:diffSummary:result') {
       if (msg.summary) useDiffStore.getState().setSummary(msg.sessionId, msg.summary, msg.base, msg.hasSessionStart)
+    } else if (msg.type === 'fs:diffFile:result') {
+      if (msg.file) useDiffStore.getState().setFileExpanded(msg.sessionId, msg.path, msg.file)
     } else if (msg.type === 'fs:gitInit:result') {
       useDiffStore.getState().setInitPending(msg.sessionId, false)
       if (msg.ok) this.requestDiff(msg.sessionId)
@@ -146,6 +148,12 @@ export class SessionService {
     const b = base ?? cur?.base ?? 'session-start'
     useDiffStore.getState().setLoading(sessionId)
     this.transport.send({ type: 'fs:diff', sessionId, base: b })
+  }
+
+  /** Request a single file's full diff (for on-demand show-full). */
+  requestDiffFile(sessionId: string, p: string, context: number | 'full' = 'full'): void {
+    const base = useDiffStore.getState().bySession[sessionId]?.base ?? 'session-start'
+    this.transport.send({ type: 'fs:diffFile', sessionId, path: p, base, context })
   }
 
   /** One-click `git init` for a non-repo cwd; a successful result chains a fresh diff. */

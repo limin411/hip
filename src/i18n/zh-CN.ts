@@ -101,6 +101,8 @@ export const zhCN = {
         noNewline: '文件末尾无换行',
         baseSession: '自会话起点',
         baseHead: '对比 HEAD',
+        showFull: '查看全文',
+        collapseFull: '收起',
       },
       waiting: '等待中…',
       subAgents: '子智能体',

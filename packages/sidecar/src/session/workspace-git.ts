@@ -212,6 +212,24 @@ export async function captureSessionSnapshot(cwd: string, gitBin = 'git'): Promi
   finally { await fs.rm(dir, { recursive: true, force: true }).catch(() => {}) }
 }
 
+/** 单文件 diff，自定义上下文行数（'full' = 看全文）。用于按需展开。 */
+export async function collectWorkspaceDiffFile(
+  cwd: string, filePath: string,
+  opts: WorkspaceDiffOptions & { context?: number | 'full' } = {},
+): Promise<{ state: DiffState; file?: DiffFile; error?: string }> {
+  const gitBin = opts.gitBin ?? 'git'
+  try {
+    const p = await prepareTrees(cwd, opts)
+    if (!p.ok) return { state: p.r.state, error: p.r.error }
+    const { realCwd, repoRoot, nowTree, baseTree } = p.v
+    const ctx = opts.context === 'full' ? '1000000' : String(opts.context ?? 3)
+    const out = (await runGit(cwd, ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames', `-U${ctx}`, baseTree, nowTree, '--', filePath], gitBin)).stdout
+    const rel = (q: string) => path.relative(realCwd, path.join(repoRoot, q))
+    const file = parseUnifiedDiff(out).map((f) => ({ ...f, path: rel(f.path), ...(f.oldPath ? { oldPath: rel(f.oldPath) } : {}) }))[0]
+    return { state: 'ok', file }
+  } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
 /**
  * Initialize a repo with a baseline commit so subsequent changes surface as diffs.
  * Inline identity: must not depend on the user's global git config.

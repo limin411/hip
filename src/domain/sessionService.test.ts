@@ -329,13 +329,13 @@ describe('workspace diff', () => {
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
   })
 
-  it('message:complete refreshes the diff only while the Diff tab is active', () => {
+  it('message:complete refreshes the diff only while the 更改 tab is active', () => {
     const t = new FakeTransport()
     new SessionService(t)
     const message = { id: 'm1', role: 'assistant' as const, content: 'x', timestamp: 1 }
     t.push({ type: 'message:complete', sessionId: 's1', message })
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
-    useUiStore.setState({ activeTab: 'diff' })
+    useUiStore.setState({ activeTab: 'changes' })
     t.push({ type: 'message:complete', sessionId: 's2', message })
     const diffs = t.sent.filter((m) => m.type === 'fs:diff')
     expect(diffs).toHaveLength(1)
@@ -383,5 +383,62 @@ describe('workspace diff', () => {
     const t = new FakeTransport(); const svc = new SessionService(t)
     svc.selectSession('s1')
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+  })
+})
+
+describe('checkpoints + commit log', () => {
+  it('requestCheckpoints sends git:checkpoint:list', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.requestCheckpoints('s1')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:checkpoint:list', sessionId: 's1' })
+  })
+
+  it('git:checkpoint:list:result folds checkpoints + isGitRepo into diffStore', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    const checkpoint = { id: 's1:t1', sessionId: 's1', turnId: 't1', kind: 'turn' as const, label: 'x', treeSha: 'tr', commitSha: 'c', branch: 'main', createdAt: 1 }
+    t.push({ type: 'git:checkpoint:list:result', sessionId: 's1', checkpoints: [checkpoint], isGitRepo: true, currentBranch: 'main' })
+    const s = useDiffStore.getState().bySession['s1']
+    expect(s.isGitRepo).toBe(true)
+    expect(s.currentBranch).toBe('main')
+    expect(s.checkpoints).toHaveLength(1)
+  })
+
+  it('checkpoint:created prepends a checkpoint (dedupe by id)', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    const checkpoint = { id: 's1:t1', sessionId: 's1', turnId: 't1', kind: 'turn' as const, label: 'x', treeSha: 'tr', commitSha: 'c', branch: 'main', createdAt: 1 }
+    t.push({ type: 'checkpoint:created', sessionId: 's1', checkpoint })
+    t.push({ type: 'checkpoint:created', sessionId: 's1', checkpoint }) // duplicate id
+    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(1)
+  })
+
+  it('requestCheckpointDiff sets loading and sends git:checkpoint:diff; result caches by key', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.requestCheckpointDiff('s1', 's1:t1', 'this-turn')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:checkpoint:diff', sessionId: 's1', checkpointId: 's1:t1', mode: 'this-turn' })
+    expect(useDiffStore.getState().bySession['s1'].checkpointDiff['s1:t1|this-turn'].status).toBe('loading')
+    t.push({ type: 'git:checkpoint:diff:result', sessionId: 's1', checkpointId: 's1:t1', mode: 'this-turn', state: 'ok', files: [] })
+    expect(useDiffStore.getState().bySession['s1'].checkpointDiff['s1:t1|this-turn']).toMatchObject({ status: 'ready', state: 'ok' })
+  })
+
+  it('requestCommitLog sends git:commitLog; result folds into the store', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.requestCommitLog('s1')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'git:commitLog', sessionId: 's1' })
+    expect(useDiffStore.getState().bySession['s1'].commitLog.status).toBe('loading')
+    t.push({ type: 'git:commitLog:result', sessionId: 's1', state: 'ok', commits: [{ sha: 'a', shortSha: 'a', message: 'm', author: 'me', timestamp: 1 }] })
+    expect(useDiffStore.getState().bySession['s1'].commitLog).toMatchObject({ status: 'ready', state: 'ok' })
+    expect(useDiffStore.getState().bySession['s1'].commitLog.commits).toHaveLength(1)
+  })
+
+  it('selectSession requests the checkpoint list', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    svc.selectSession('s1')
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
+  })
+
+  it('message:complete refreshes the checkpoint list', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'message:complete', sessionId: 's1', message: { id: 'm', role: 'assistant', content: '', timestamp: 0 } as any })
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
   })
 })

@@ -1,5 +1,5 @@
 // src/domain/sessionService.ts
-import type { ServerMessage, SessionConfig, DiffBase } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -78,6 +78,14 @@ export class SessionService {
       useDiffStore.getState().setInitPending(msg.sessionId, false)
       if (msg.ok) this.requestDiff(msg.sessionId)
       else useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', base: 'head', hasSessionStart: false, error: msg.error })
+    } else if (msg.type === 'git:checkpoint:list:result') {
+      useDiffStore.getState().setCheckpoints(msg.sessionId, msg.checkpoints, msg.isGitRepo, msg.currentBranch)
+    } else if (msg.type === 'checkpoint:created') {
+      useDiffStore.getState().addCheckpoint(msg.sessionId, msg.checkpoint)
+    } else if (msg.type === 'git:checkpoint:diff:result') {
+      useDiffStore.getState().setCheckpointDiffResult(msg.sessionId, `${msg.checkpointId}|${msg.mode}`, { state: msg.state, files: msg.files, summary: msg.summary, error: msg.error })
+    } else if (msg.type === 'git:commitLog:result') {
+      useDiffStore.getState().setCommitLogResult(msg.sessionId, { state: msg.state, commits: msg.commits, error: msg.error })
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.
       const fsState = useFsStore.getState().bySession[msg.sessionId]
@@ -85,10 +93,12 @@ export class SessionService {
         for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
         if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
       }
-      // 改完文件 → 总是刷新角标(便宜)；diff 标签激活时再拉全量
+      // 改完文件 → 总是刷新角标(便宜) + 检查点列表(新一轮可能新建了 checkpoint)。
       const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
       this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      if (useUiStore.getState().activeTab === 'diff') this.requestDiff(msg.sessionId)
+      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
+      const tab = useUiStore.getState().activeTab
+      if (tab === 'changes') { this.requestDiff(msg.sessionId); this.requestCommitLog(msg.sessionId) }
     }
   }
 
@@ -109,6 +119,8 @@ export class SessionService {
     // advertised without the user first opening the Diff tab. No-cwd/non-repo → no summary → no badge.
     const base = useDiffStore.getState().bySession[id]?.base ?? 'session-start'
     this.transport.send({ type: 'fs:diffSummary', sessionId: id, base })
+    // Pull the checkpoint list (cheap; also tells the panel whether the cwd is a git repo → tab gating).
+    this.transport.send({ type: 'git:checkpoint:list', sessionId: id })
     // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
     useUiStore.getState().setScrollTarget(messageId ?? null)
   }
@@ -164,6 +176,23 @@ export class SessionService {
   gitInitWorkspace(sessionId: string): void {
     useDiffStore.getState().setInitPending(sessionId, true)
     this.transport.send({ type: 'fs:gitInit', sessionId })
+  }
+
+  /** Pull the checkpoint list (+ isGitRepo / current branch) for the timeline tab + tab gating. */
+  requestCheckpoints(sessionId: string): void {
+    this.transport.send({ type: 'git:checkpoint:list', sessionId })
+  }
+
+  /** Pull a checkpoint's diff in a given mode. Caches by `${id}|${mode}`; re-request always allowed. */
+  requestCheckpointDiff(sessionId: string, checkpointId: string, mode: CheckpointMode): void {
+    useDiffStore.getState().setCheckpointDiffLoading(sessionId, `${checkpointId}|${mode}`)
+    this.transport.send({ type: 'git:checkpoint:diff', sessionId, checkpointId, mode })
+  }
+
+  /** Pull the session-start..HEAD commit log for the 更改 tab. */
+  requestCommitLog(sessionId: string): void {
+    useDiffStore.getState().setCommitLogLoading(sessionId)
+    this.transport.send({ type: 'git:commitLog', sessionId })
   }
 
   lsDir(sessionId: string, path: string): void {

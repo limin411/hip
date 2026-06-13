@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -489,5 +489,77 @@ describe('listBranches + switchBranch', () => {
   })
   it('listBranches returns ok:false for a non-repo folder', async () => {
     expect((await listBranches(root)).ok).toBe(false)
+  })
+})
+
+describe('gitCommit', () => {
+  it('stages everything and commits, returning the new HEAD sha', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    await fs.writeFile(path.join(root, 'b.txt'), 'new\n')
+    const r = await gitCommit(root, 'do a thing')
+    expect(r.ok).toBe(true)
+    expect(r.sha).toMatch(/^[0-9a-f]{40}$/)
+    expect((await git(root, 'rev-parse', 'HEAD')).stdout.trim()).toBe(r.sha)
+    expect((await git(root, 'log', '-1', '--format=%s')).stdout.trim()).toBe('do a thing')
+    // working tree is now clean (everything was staged + committed)
+    expect((await git(root, 'status', '--porcelain')).stdout.trim()).toBe('')
+  })
+  it('uses the user git identity + a Co-authored-by: hip trailer when user identity is configured', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'config', 'user.name', 'Ada')
+    await git(root, 'config', 'user.email', 'ada@example.com')
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const r = await gitCommit(root, 'real work')
+    expect(r.ok).toBe(true)
+    expect((await git(root, 'log', '-1', '--format=%an')).stdout.trim()).toBe('Ada')
+    expect((await git(root, 'log', '-1', '--format=%ae')).stdout.trim()).toBe('ada@example.com')
+    expect((await git(root, 'log', '-1', '--format=%b')).stdout).toContain('Co-authored-by: hip <hip@local>')
+  })
+  it('falls back to the synthetic hip identity when no user identity is configured', async () => {
+    // a repo with NO user.name/user.email set locally
+    await git(root, 'init')
+    await git(root, 'config', '--unset-all', 'user.name').catch(() => {})
+    await git(root, 'config', '--unset-all', 'user.email').catch(() => {})
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
+    const r = await gitCommit(root, 'first')
+    expect(r.ok).toBe(true)
+    expect((await git(root, 'log', '-1', '--format=%an')).stdout.trim()).toBe('hip')
+    expect((await git(root, 'log', '-1', '--format=%ae')).stdout.trim()).toBe('hip@local')
+    // no Co-authored-by trailer in the synthetic-identity path
+    expect((await git(root, 'log', '-1', '--format=%b')).stdout).not.toContain('Co-authored-by')
+  })
+  it('returns ok:false with an error for a non-repo folder', async () => {
+    const r = await gitCommit(root, 'x')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBeTruthy()
+  })
+})
+
+describe('gitCreateBranch + gitSwitchBranch (tool helpers)', () => {
+  it('creates a branch without switching to it', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    const r = await gitCreateBranch(root, 'feature')
+    expect(r.ok).toBe(true)
+    expect(await getCurrentBranch(root)).toBe('main') // still on main
+    const list = await listBranches(root)
+    expect(list.branches!.map((b) => b.name).sort()).toEqual(['feature', 'main'])
+  })
+  it('gitSwitchBranch moves HEAD to an existing branch', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    await git(root, 'branch', 'feature')
+    const r = await gitSwitchBranch(root, 'feature')
+    expect(r.ok).toBe(true)
+    expect(await getCurrentBranch(root)).toBe('feature')
+  })
+  it('gitCreateBranch returns ok:false for a duplicate branch name', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    await git(root, 'branch', 'feature')
+    const r = await gitCreateBranch(root, 'feature')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBeTruthy()
   })
 })

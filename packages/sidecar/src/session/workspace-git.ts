@@ -379,3 +379,49 @@ export async function switchBranch(cwd: string, name: string, gitBin = 'git'): P
     catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
   }
 }
+
+/** Read a repo-local git config value (e.g. user.name). Returns '' when unset. Never throws.
+ *  Scoped to `--local` deliberately: the synthetic `hip` identity should kick in when *this repo*
+ *  has no user identity, independent of any machine-wide --global identity (otherwise the global
+ *  config leaks in and the synthetic fallback never fires). */
+async function gitConfigGet(cwd: string, gitBin: string, key: string): Promise<string> {
+  try { return (await runGit(cwd, ['config', '--local', '--get', key], gitBin)).stdout.trim() }
+  catch { return '' }
+}
+
+/** Stage everything (`git add -A`) and commit. Identity: use the user's git config (user.name +
+ *  user.email) plus a `Co-authored-by: hip <hip@local>` trailer when both are present; otherwise
+ *  commit with the synthetic `hip <hip@local>` identity (no trailer). Always commit.gpgsign=false
+ *  + --no-verify so a user's hooks/signing never block an agent commit. Reads back HEAD for the sha.
+ *  Never throws → { ok:false, error }. */
+export async function gitCommit(cwd: string, message: string, gitBin = 'git'): Promise<{ ok: boolean; sha?: string; error?: string }> {
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch { return { ok: false, error: 'not_a_repo' } }
+  try {
+    await runGit(cwd, ['add', '-A'], gitBin)
+    const name = await gitConfigGet(cwd, gitBin, 'user.name')
+    const email = await gitConfigGet(cwd, gitBin, 'user.email')
+    const hasUser = !!name && !!email
+    const fullMessage = hasUser ? `${message}\n\nCo-authored-by: hip <hip@local>` : message
+    const identityArgs = hasUser
+      ? ['-c', 'commit.gpgsign=false']
+      : ['-c', 'user.name=hip', '-c', 'user.email=hip@local', '-c', 'commit.gpgsign=false']
+    await runGit(cwd, [...identityArgs, 'commit', '-m', fullMessage, '--no-verify'], gitBin)
+    const sha = (await runGit(cwd, ['rev-parse', 'HEAD'], gitBin)).stdout.trim()
+    return { ok: true, sha }
+  } catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
+/** Create a branch at HEAD without switching to it. Never throws → { ok:false, error }. */
+export async function gitCreateBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  try { await runGit(cwd, ['branch', name], gitBin); return { ok: true } }
+  catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
+/** Switch to an existing branch (agent tool path). Thin alias over switchBranch so the tool and
+ *  the panel share one implementation. */
+export async function gitSwitchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  return switchBranch(cwd, name, gitBin)
+}

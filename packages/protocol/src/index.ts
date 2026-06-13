@@ -126,20 +126,36 @@ export interface DiffLine {
   content: string
   oldNo: number | null
   newNo: number | null
+  noNewline?: boolean            // 该侧文件末尾无换行
 }
+
+/** One hunk (@@ block) within a changed file. */
+export interface DiffHunk {
+  oldStart: number; oldLines: number
+  newStart: number; newLines: number
+  header?: string                // @@ 第二段后的 section 文本（如所在函数），可空
+  lines: DiffLine[]
+  truncated?: boolean            // 本文件行预算耗尽后该 hunk 被截断
+}
+
+export type DiffFileStatus = 'added' | 'modified' | 'deleted' | 'renamed'
 
 /** One changed file in the workspace diff. `path` is cwd-relative for display. */
 export interface DiffFile {
-  path: string
+  path: string                   // renamed 时为新路径
+  oldPath?: string               // renamed 旧路径（cwd 相对）
+  status: DiffFileStatus
   additions: number
   deletions: number
-  lines: DiffLine[]
-  truncated?: boolean   // per-file line cap (or untracked read cap) hit
-  binary?: boolean      // binary change — lines is empty
+  hunks: DiffHunk[]
+  truncated?: boolean            // 文件级截断
+  binary?: boolean               // 二进制变更，hunks 为空
 }
 
 /** Outcome of a workspace diff request. */
 export type DiffState = 'ok' | 'not_a_repo' | 'git_missing' | 'no_cwd' | 'error'
+export type DiffBase = 'session-start' | 'head'
+export interface DiffSummary { totalFiles: number; totalAdditions: number; totalDeletions: number }
 
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
@@ -161,7 +177,8 @@ export type ClientMessage =
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
   | { type: 'fs:readCwd'; cwd: string; path: string }
-  | { type: 'fs:diff'; sessionId: string }
+  | { type: 'fs:diff'; sessionId: string; base?: DiffBase }
+  | { type: 'fs:diffSummary'; sessionId: string; base?: DiffBase }
   | { type: 'fs:gitInit'; sessionId: string }
 
 export type ServerMessage =
@@ -189,5 +206,6 @@ export type ServerMessage =
   | { type: 'fs:read:result'; sessionId: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
   | { type: 'fs:lsCwd:result'; cwd: string; path: string; entries: FsEntry[]; error?: string }
   | { type: 'fs:readCwd:result'; cwd: string; path: string; content?: string; encoding?: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean; error?: string }
-  | { type: 'fs:diff:result'; sessionId: string; state: DiffState; files?: DiffFile[]; totalFiles?: number; error?: string }
+  | { type: 'fs:diff:result'; sessionId: string; base: DiffBase; hasSessionStart: boolean; state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }
+  | { type: 'fs:diffSummary:result'; sessionId: string; base: DiffBase; hasSessionStart: boolean; state: DiffState; summary?: DiffSummary; error?: string }
   | { type: 'fs:gitInit:result'; sessionId: string; ok: boolean; error?: string }

@@ -175,7 +175,7 @@ interface SessionDiff {
 
 ### 3.2 `sessionService` + 自动刷新(修 B3)
 
-`message:complete` 时:**总是** `fs:diffSummary`(便宜)刷新角标;仅当 Diff 标签激活时再 `fs:diff` 拉全量。路由 `fs:diffSummary:result` / `fs:diffFile:result`。`unified|split` 视图存 `uiStore`(持久)。
+`message:complete` 时:**总是** `fs:diffSummary`(便宜)刷新角标;仅当 Diff 标签激活时再 `fs:diff` 拉全量。路由 `fs:diffSummary:result` / `fs:diffFile:result`。`unified|split` 视图存 `uiStore`(内存态——uiStore 当前无 persist 中间件,刷新重置;如需持久化另起任务)。
 
 ### 3.3 会话持久化
 
@@ -206,8 +206,9 @@ interface SessionDiff {
 - `workspace-git.test.ts`(重写):hunk-first 解析、双树 diff、rename(`renamed`+oldPath)、added/deleted/modified/binary、mode-only、no-newline、session-start 基准、numstat summary、`-U<n>` 展开、含空格路径、`.gitignore` 遵守、no-HEAD 仓库。临时 git 仓库,逐场景。
 - `diffStore.test.ts`:base/summary/collapsed/expanded/setSummary/resetTransient。
 - `session-manager-diff.test.ts`:新动词路由、base 透传、快照抓取与回退、persistence round-trip。
-- `wordDiff` 单测;`DiffViewer` 组件测(hunk 分隔、chip、折叠、跳转、word 高亮、base/split 开关、空/clean/各 DiffState)。
-- 扩展 `e2e/specs/diff-workspace.spec.ts`(遵守 e2e GUI 启动 gotchas)。
+- **UI 逻辑抽成纯函数做单测**:`wordDiff(a,b)`、split 行构造、按状态分组——node 环境可测。
+- **渲染验证走 e2e + 手动 GUI 验收**(项目无组件测试栈:零 `.test.tsx`、无 `@testing-library`/jsdom,vitest env=node;**本次不新引入**组件测试栈)。扩展 `e2e/specs/diff-workspace.spec.ts`(遵守 e2e GUI 启动 gotchas)+ 每步 GUI 验收清单。
+- 命令:`yarn test`(全量);单文件 `vitest run <精确路径>`(**严禁** `vitest run src` —— 会触发付费实测)。
 
 ## 7. 迁移 / 兼容
 

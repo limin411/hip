@@ -165,6 +165,21 @@ export class SessionManager {
         send({ type: 'fs:gitInit:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
         break
       }
+      case 'git:checkpoint:list': {
+        const r = await this.ensureSession(msg.sessionId).listCheckpoints()
+        send({ type: 'git:checkpoint:list:result', sessionId: msg.sessionId, checkpoints: r.checkpoints, isGitRepo: r.isGitRepo, currentBranch: r.currentBranch })
+        break
+      }
+      case 'git:checkpoint:diff': {
+        const r = await this.ensureSession(msg.sessionId).checkpointDiff(msg.checkpointId, msg.mode)
+        send({ type: 'git:checkpoint:diff:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, mode: msg.mode, state: r.state, files: r.files, summary: r.summary, error: r.error })
+        break
+      }
+      case 'git:commitLog': {
+        const r = await this.ensureSession(msg.sessionId).commitLog()
+        send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
+        break
+      }
     }
   }
 

@@ -171,6 +171,8 @@ export const en = {
       previewTruncated: 'Showing the first 1 MB',
       loading: 'Loading…',
       sandboxPending: 'A sandbox workspace is created when you send the first message',
+      turnOutputs: '{{count}} outputs this turn',
+      turnOutputs_one: '{{count}} output this turn',
     },
     settings: {
       title: 'Settings',

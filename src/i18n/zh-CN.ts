@@ -171,6 +171,8 @@ export const zhCN = {
       previewTruncated: '仅显示前 1 MB',
       loading: '加载中…',
       sandboxPending: '发送第一条消息后将创建沙箱工作区',
+      turnOutputs: '本轮产物 ({{count}})',
+      turnOutputs_one: '本轮产物 ({{count}})',
     },
     settings: {
       title: '设置',

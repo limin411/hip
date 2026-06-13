@@ -171,6 +171,8 @@ export const zhTW = {
       previewTruncated: '僅顯示前 1 MB',
       loading: '載入中…',
       sandboxPending: '傳送第一則訊息後將建立沙箱工作區',
+      turnOutputs: '本輪產物 ({{count}})',
+      turnOutputs_one: '本輪產物 ({{count}})',
     },
     settings: {
       title: '設置',

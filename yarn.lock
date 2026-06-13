@@ -963,6 +963,11 @@
   dependencies:
     uuid "^14.0.0"
 
+"@langchain/langgraph-checkpoint@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.npmmirror.com/@langchain/langgraph-checkpoint/-/langgraph-checkpoint-1.1.1.tgz#335c47b67904da94104cdc214ca997dcca2eda2d"
+  integrity sha512-gHqhO6e2dyZ7TTfyaFy25yjcRsavURc9XMGT4q+LUBTc0hT4JxKe3qvrMX2OFTzW8W/0kjV59haHmSRFZIGkvg==
+
 "@langchain/langgraph-sdk@^1.9.1", "@langchain/langgraph-sdk@~1.9.17":
   version "1.9.17"
   resolved "https://registry.npmmirror.com/@langchain/langgraph-sdk/-/langgraph-sdk-1.9.17.tgz#3c66997649a56d323118df521de899592d0be780"
@@ -974,27 +979,15 @@
     p-retry "^7.1.1"
     uuid "^14.0.0"
 
-"@langchain/langgraph-sdk@~1.9.12":
-  version "1.9.15"
-  resolved "https://registry.npmmirror.com/@langchain/langgraph-sdk/-/langgraph-sdk-1.9.15.tgz#41b65c8714d1bc9e536694e4d5d553bb0a97151b"
-  integrity sha512-QUW9c7ikycmTkpr/eQYkKA4gpriqizG1OJ6H2YLbDOVkEYLSFnJeTO4MG6pBBO8EqHHa8m1zavKi5ug259VSQQ==
+"@langchain/langgraph-sdk@~1.9.22":
+  version "1.9.22"
+  resolved "https://registry.npmmirror.com/@langchain/langgraph-sdk/-/langgraph-sdk-1.9.22.tgz#6739f915aac517ca331edf8e802775219b9df354"
+  integrity sha512-DBKs9R2SGivlGqK/ZRTOUu39Q7Z+yRrG4PoTYLIWn7pqrLNhyZ4yZI/tEEEi/J0inpCuKfg/eydSwnRmPV/q3w==
   dependencies:
     "@langchain/protocol" "^0.0.16"
     "@types/json-schema" "^7.0.15"
     p-queue "^9.0.1"
     p-retry "^7.1.1"
-    uuid "^14.0.0"
-
-"@langchain/langgraph@^1.3":
-  version "1.3.4"
-  resolved "https://registry.npmmirror.com/@langchain/langgraph/-/langgraph-1.3.4.tgz#29f75e8259c9069cd47dd28a251bb40680d8b1af"
-  integrity sha512-i5nlhy2INcX326sTJ+dAkvSe+sYO8DoGHn4OwxcI7U6OSm/n8xek24yvL5ahX09M1PES9hfooKz1lYn+cyPULw==
-  dependencies:
-    "@langchain/langgraph-checkpoint" "^1.0.4"
-    "@langchain/langgraph-sdk" "~1.9.12"
-    "@langchain/protocol" "^0.0.16"
-    "@standard-schema/spec" "1.1.0"
-    uuid "^14.0.0"
 
 "@langchain/langgraph@^1.3.0", "@langchain/langgraph@^1.3.2":
   version "1.3.6"
@@ -1006,6 +999,16 @@
     "@langchain/protocol" "^0.0.16"
     "@standard-schema/spec" "1.1.0"
     uuid "^14.0.0"
+
+"@langchain/langgraph@^1.3.6":
+  version "1.4.2"
+  resolved "https://registry.npmmirror.com/@langchain/langgraph/-/langgraph-1.4.2.tgz#f156976c159ca0e331b1a1110ee35d88810e562c"
+  integrity sha512-ivhYwbEKW4i/x2JfHcrTrToEE9EXZnwr4dPj7GC5974xEYeLgHYzii3GAYo1kgU5A0ZAd7rIxTpMOfcbycxliQ==
+  dependencies:
+    "@langchain/langgraph-checkpoint" "^1.1.1"
+    "@langchain/langgraph-sdk" "~1.9.22"
+    "@langchain/protocol" "^0.0.16"
+    "@standard-schema/spec" "1.1.0"
 
 "@langchain/openai@^1.4":
   version "1.4.7"

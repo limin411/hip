@@ -18,6 +18,7 @@ export interface SessionVM {
   messages: Message[]
   status: 'idle' | 'running' | 'error'
   error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
+  interrupt?: { turnId: string; question: string; context?: string } | null  // pending HITL question; null/absent = none
 }
 
 /** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
@@ -120,7 +121,7 @@ function finalizeAssistant(messages: Message[], message: Message): Message[] {
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null }
+  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -215,6 +216,9 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, finalized) }))
     }
 
+    case 'agent:interrupt':
+      return update(msg.sessionId, (s) => ({ ...s, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context } }))
+
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 
@@ -271,7 +275,7 @@ export function applyServerMessage(
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -337,7 +341,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sess.id !== sessionId
           ? sess
           // Clear any prior error: appending a user message means a retry is underway.
-          : { ...sess, status: 'running' as const, error: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+          : { ...sess, status: 'running' as const, error: null, interrupt: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
       ),
     })),
 

@@ -35,6 +35,7 @@ export const zhTW = {
       delegatedTo: '委派給 {{role}}',
       reconnecting: '重新連線中…',
       errorInterrupted: '連線中斷，回覆未完成。',
+      interruptHint: '在下方回覆，告訴 hip 接下來怎麼做。',
       errorTimeout: '回應逾時，已停止。',
       jumpToLatest: '回到最新',
       style: '風格',

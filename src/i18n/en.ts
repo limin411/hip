@@ -35,6 +35,7 @@ export const en = {
       delegatedTo: 'Delegated to {{role}}',
       reconnecting: 'Reconnecting…',
       errorInterrupted: 'Connection lost — the reply didn\'t finish.',
+      interruptHint: 'Reply below to tell hip how to proceed.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
       style: 'Style',

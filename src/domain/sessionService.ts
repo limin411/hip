@@ -182,6 +182,9 @@ export class SessionService {
   sendMessage(content: string): void {
     const text = content.trim()
     if (!text) return
+    const st = useDomainStore.getState()
+    const active = st.sessions.find((s) => s.id === st.activeSessionId)
+    if (active?.interrupt) { this.resume(text); return }
     let { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
@@ -195,6 +198,18 @@ export class SessionService {
     const id = nanoid()
     useDomainStore.getState().appendUserMessage(activeSessionId, id, text)
     this.transport.send({ type: 'message:send', sessionId: activeSessionId, id, content: text, role: 'user' })
+  }
+
+  /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and
+   *  send it as message:resume so the sidecar continues the loop. */
+  resume(content: string): void {
+    const text = content.trim()
+    if (!text) return
+    const { activeSessionId } = useDomainStore.getState()
+    if (!activeSessionId) return
+    const id = nanoid()
+    useDomainStore.getState().appendUserMessage(activeSessionId, id, text)
+    this.transport.send({ type: 'message:resume', sessionId: activeSessionId, content: text })
   }
 
   cancel(): void {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
-import { sessionService, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus } from '@/domain'
+import { sessionService, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { MessageBubble } from './MessageBubble'
@@ -13,6 +13,7 @@ export function ChatPane() {
   const messages = useActiveMessages()
   const error = useActiveSessionError()
   const status = useActiveSessionStatus()
+  const interrupt = useActiveInterrupt()
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
   const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
@@ -112,6 +113,12 @@ export function ChatPane() {
             )
           })}
           {showThinking && <ThinkingBubble />}
+          {interrupt && (
+            <div className="rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 text-body text-ink" data-testid="chat-interrupt">
+              <p className="flex items-start gap-2"><span aria-hidden>⏸</span><span>{interrupt.question}</span></p>
+              <p className="mt-1 text-meta text-ink-secondary">{t('chat.interruptHint')}</p>
+            </div>
+          )}
           {error && (
             <div
               className={`rounded-lg border px-4 py-3 text-body ${

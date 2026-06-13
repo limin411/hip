@@ -35,6 +35,7 @@ export const zhCN = {
       delegatedTo: '委派给 {{role}}',
       reconnecting: '重新连接中…',
       errorInterrupted: '连接中断，回复未完成。',
+      interruptHint: '在下方回复，告诉 hip 接下来怎么做。',
       errorTimeout: '响应超时，已停止。',
       jumpToLatest: '回到最新',
       style: '风格',

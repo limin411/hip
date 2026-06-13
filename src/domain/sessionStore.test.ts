@@ -341,6 +341,12 @@ describe('applyServerMessage', () => {
     }, 0)
     expect(next.sessions[0].config.thinking).toBe(true)
   })
+
+  it('agent:interrupt records the pending interrupt on the session', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:interrupt', sessionId: 's1', turnId: 't1', agentId: 'supervisor', question: '我该怎么做？' }, 1)
+    expect(next.sessions[0].interrupt).toEqual({ turnId: 't1', question: '我该怎么做？', context: undefined })
+  })
 })
 
 function reset() {

@@ -223,6 +223,16 @@ describe('SessionService', () => {
     expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
   })
 
+  it('routes a send to message:resume when an interrupt is pending, and clears it', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], interrupt: { turnId: 't1', question: 'q' } }] })
+    svc.sendMessage('do this instead')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:resume', sessionId: 's1', content: 'do this instead' })
+    expect(useDomainStore.getState().sessions[0].messages.at(-1)).toMatchObject({ role: 'user', content: 'do this instead' })
+    expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
+  })
+
   it('on ready, resyncs the active session when its turn was running', () => {
     useDomainStore.setState({
       sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'running', error: null }],

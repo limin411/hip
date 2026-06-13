@@ -95,3 +95,22 @@ describe('file tools', () => {
     ).rejects.toThrow()
   })
 })
+
+describe('task tool gating (depth-1)', () => {
+  it('buildTools(root) has no task tool', () => {
+    const names = buildTools(root).map((t) => t.name)
+    expect(names).not.toContain('task')
+    expect(names).toEqual(expect.arrayContaining(['read_file', 'write_file', 'edit_file', 'ls', 'glob', 'grep']))
+  })
+
+  it('buildTools(root, spawn) appends a task tool that invokes spawn', async () => {
+    const calls: string[] = []
+    const spawn = async (description: string) => { calls.push(description); return `done: ${description}` }
+    const tools = buildTools(root, spawn)
+    const task = tools.find((t) => t.name === 'task')
+    expect(task).toBeDefined()
+    const out = String(await task!.invoke({ description: 'investigate the bug' }))
+    expect(calls).toEqual(['investigate the bug'])
+    expect(out).toBe('done: investigate the bug')
+  })
+})

@@ -28,7 +28,10 @@ async function real(root: string, p: string): Promise<string> {
 }
 
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
-export function buildTools(root: string): StructuredToolInterface[] {
+export function buildTools(
+  root: string,
+  spawnSubagent?: (description: string) => Promise<string>,
+): StructuredToolInterface[] {
   const writeFile = tool(
     async ({ path: p, content }) => {
       try {
@@ -202,7 +205,20 @@ export function buildTools(root: string): StructuredToolInterface[] {
     },
   )
 
-  return [writeFile, readFile, editFile, ls, glob, grep, writeTodos]
+  const base = [writeFile, readFile, editFile, ls, glob, grep, writeTodos]
+  if (!spawnSubagent) return base
+  const task = tool(
+    async ({ description }) => spawnSubagent(description),
+    {
+      name: 'task',
+      description:
+        'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
+        'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
+        'The sub-agent cannot itself delegate.',
+      schema: z.object({ description: z.string() }),
+    },
+  )
+  return [...base, task]
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

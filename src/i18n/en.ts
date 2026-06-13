@@ -55,6 +55,12 @@ export const en = {
         in_progress: 'In progress',
         completed: 'Done',
       },
+      usage: {
+        tokens: '{{total}} tokens',
+        io: '{{input}} in · {{output}} out',
+        sessionTotal: 'Session total',
+        cost: '~{{cost}}',
+      },
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

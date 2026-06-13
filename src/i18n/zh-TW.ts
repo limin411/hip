@@ -55,6 +55,12 @@ export const zhTW = {
         in_progress: '進行中',
         completed: '已完成',
       },
+      usage: {
+        tokens: '{{total}} tokens',
+        io: '{{input}} 輸入 · {{output}} 輸出',
+        sessionTotal: '本對話累計',
+        cost: '約 {{cost}}',
+      },
     },
     sidebar: {
       collapse: '折疊側邊欄',

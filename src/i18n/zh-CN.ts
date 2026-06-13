@@ -55,6 +55,12 @@ export const zhCN = {
         in_progress: '进行中',
         completed: '已完成',
       },
+      usage: {
+        tokens: '{{total}} tokens',
+        io: '{{input}} 输入 · {{output}} 输出',
+        sessionTotal: '本对话累计',
+        cost: '约 {{cost}}',
+      },
     },
     sidebar: {
       collapse: '折叠侧边栏',

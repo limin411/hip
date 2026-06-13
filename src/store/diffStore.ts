@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DiffFile, DiffState, DiffBase, DiffSummary } from '@hip/protocol'
+import type { DiffFile, DiffState, DiffBase, DiffSummary, Checkpoint, CommitLogEntry } from '@hip/protocol'
 
 export interface SessionDiff {
   status: 'idle' | 'loading' | 'ready'
@@ -12,9 +12,20 @@ export interface SessionDiff {
   initPending: boolean
   expanded: Record<string, DiffFile>
   collapsed: Record<string, boolean>
+  // --- checkpoint / git-panel additions (A1) ---
+  isGitRepo: boolean
+  currentBranch: string | null
+  checkpoints: Checkpoint[]
+  activeCheckpointId: string | null
+  // per (checkpointId|mode) cached diff result; key = `${checkpointId}|${mode}`
+  checkpointDiff: Record<string, { status: 'loading' | 'ready'; state?: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }>
+  commitLog: { status: 'idle' | 'loading' | 'ready'; state?: DiffState; commits: CommitLogEntry[]; error?: string }
 }
 
-export const EMPTY_DIFF: SessionDiff = { status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {}, collapsed: {} }
+export const EMPTY_DIFF: SessionDiff = {
+  status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {}, collapsed: {},
+  isGitRepo: false, currentBranch: null, checkpoints: [], activeCheckpointId: null, checkpointDiff: {}, commitLog: { status: 'idle', commits: [] },
+}
 
 interface SetResultArg { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; base: DiffBase; hasSessionStart: boolean; error?: string }
 
@@ -29,6 +40,13 @@ interface DiffStore {
   collapseFile: (sessionId: string, path: string) => void
   toggleCollapsed: (sessionId: string, path: string) => void
   clearSession: (sessionId: string) => void
+  setCheckpoints: (sessionId: string, checkpoints: Checkpoint[], isGitRepo: boolean, currentBranch: string | null) => void
+  addCheckpoint: (sessionId: string, checkpoint: Checkpoint) => void
+  setActiveCheckpoint: (sessionId: string, checkpointId: string | null) => void
+  setCheckpointDiffLoading: (sessionId: string, key: string) => void
+  setCheckpointDiffResult: (sessionId: string, key: string, r: { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }) => void
+  setCommitLogLoading: (sessionId: string) => void
+  setCommitLogResult: (sessionId: string, r: { state: DiffState; commits: CommitLogEntry[]; error?: string }) => void
   resetTransient: () => void
 }
 
@@ -49,6 +67,13 @@ export const useDiffStore = create<DiffStore>((set) => ({
   collapseFile: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => { const e = { ...s.expanded }; delete e[p]; return { ...s, expanded: e } }) })),
   toggleCollapsed: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, collapsed: { ...s.collapsed, [p]: !s.collapsed[p] } })) })),
   clearSession: (id) => set((st) => ({ bySession: { ...st.bySession, [id]: EMPTY_DIFF } })),
+  setCheckpoints: (id, checkpoints, isGitRepo, currentBranch) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpoints, isGitRepo, currentBranch })) })),
+  addCheckpoint: (id, checkpoint) => set((st) => ({ bySession: patch(st.bySession, id, (s) => (s.checkpoints.some((c) => c.id === checkpoint.id) ? s : { ...s, checkpoints: [checkpoint, ...s.checkpoints] })) })),
+  setActiveCheckpoint: (id, checkpointId) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, activeCheckpointId: checkpointId })) })),
+  setCheckpointDiffLoading: (id, key) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: { ...s.checkpointDiff, [key]: { status: 'loading' } } })) })),
+  setCheckpointDiffResult: (id, key, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: { ...s.checkpointDiff, [key]: { status: 'ready', state: r.state, files: r.files, summary: r.summary, error: r.error } } })) })),
+  setCommitLogLoading: (id) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, commitLog: { ...s.commitLog, status: 'loading' } })) })),
+  setCommitLogResult: (id, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, commitLog: { status: 'ready', state: r.state, commits: r.commits, error: r.error } })) })),
   resetTransient: () => set((st) => ({
     bySession: Object.fromEntries(Object.entries(st.bySession).map(([id, s]) => [id, { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false }])),
   })),

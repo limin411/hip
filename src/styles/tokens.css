@@ -76,7 +76,7 @@ a:hover {
   }
 }
 
-/* —— Login logo animations（大眼睛：眨眼 + 斜瞄 + 柔光呼吸）—— */
+/* —— Login logo animations（摸鱼小人：眨眼 + 斜瞄 + 抚摸 + 聚光呼吸）—— */
 
 @keyframes hip-blink {
   0%, 92%, 100% { transform: scaleY(1); }
@@ -90,9 +90,20 @@ a:hover {
   70%, 100% { transform: translate(4px, -1px); }
 }
 
-@keyframes hip-glow-breathe {
-  0%, 100% { opacity: 0.35; transform: scale(1); }
-  50% { opacity: 0.55; transform: scale(1.08); }
+@keyframes hip-spotlight {
+  0%, 100% { opacity: 0.13; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.05); }
+}
+
+@keyframes hip-pet {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(1.6px); }
+}
+
+@keyframes hip-fish-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(1.6deg); }
+  75% { transform: rotate(-1.6deg); }
 }
 
 /* 眨眼：整组沿自身中心纵向压扁再弹回 */
@@ -110,6 +121,23 @@ a:hover {
   will-change: transform;
 }
 
-.hip-logo-glow {
-  animation: hip-glow-breathe 3s ease-in-out infinite;
+/* 奶油聚光：登录 hero 衬底，柔和呼吸 */
+.hip-mascot-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hip-spotlight 3.4s ease-in-out infinite;
+}
+
+/* 抚摸：抱爪轻揉 */
+.hip-pet {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hip-pet 3.2s ease-in-out infinite;
+}
+
+/* 鱼被摸得很享受：小幅摆动 */
+.hip-fish-wiggle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hip-fish-wiggle 2.6s ease-in-out infinite;
 }

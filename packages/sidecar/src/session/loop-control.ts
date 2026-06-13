@@ -6,8 +6,9 @@ export const MAX_STEPS_NOTE =
   'MAXIMUM STEPS REACHED. Tools are now disabled. Do not attempt any tool call. ' +
   'Respond with a short plain-text summary of what you have done so far and what remains.'
 
-/** LangGraph recursion limit. Each model turn is ~2 node visits (agent + tools), so reserve headroom
- *  above 2*MAX_STEPS; our own step cap (not this limit) is the real stop condition. */
+/** LangGraph recursion limit. Each model turn now visits ~3 nodes (compact + agent + tools), plus
+ *  occasional nudge/pause detours, so reserve headroom above 3*MAX_STEPS; our own step cap (not this
+ *  limit) is the real stop condition. */
 export function recursionLimit(): number {
-  return MAX_STEPS * 2 + 5
+  return MAX_STEPS * 3 + 10
 }

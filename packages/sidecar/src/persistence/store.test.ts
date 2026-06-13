@@ -287,6 +287,13 @@ describe('SessionStore', () => {
     expect(store.countToolCalls('s1')).toBe(0)
   })
 
+  it('round-trips diff_base_sha (null by default)', () => {
+    store.insertSession({ id: 'sd', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+    expect(store.getSession('sd')!.diff_base_sha).toBeNull()
+    store.setDiffBaseSha('sd', 'deadbeef')
+    expect(store.getSession('sd')!.diff_base_sha).toBe('deadbeef')
+  })
+
   it('loadMessagesWithRuns attaches each turn\'s agent runs to its message by message_id', () => {
     const store2 = freshStore()
     store2.insertSession({ id: 's1', title: 'T', config: '{}', createdAt: 1, updatedAt: 1 })

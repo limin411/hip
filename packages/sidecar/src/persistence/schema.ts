@@ -130,6 +130,19 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 7) {
+    db.exec('BEGIN')
+    try {
+      // diff_base_sha: 会话起点工作区快照树 SHA（用于「自会话起点」diff base）。
+      // NULL = 无快照（老会话 / 非 git 工作区）→ 客户端回退 HEAD。
+      db.exec(`ALTER TABLE sessions ADD COLUMN diff_base_sha TEXT`)
+      db.exec('PRAGMA user_version = 7')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

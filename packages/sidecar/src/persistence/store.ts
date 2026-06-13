@@ -14,14 +14,19 @@ export class SessionStore {
   }
 
   getSession(id: string) {
-    return this.db.prepare(`SELECT id,title,config,created_at,updated_at FROM sessions WHERE id=?`).get(id) as
-      | { id: string; title: string; config: string; created_at: number; updated_at: number }
+    return this.db.prepare(`SELECT id,title,config,created_at,updated_at,diff_base_sha FROM sessions WHERE id=?`).get(id) as
+      | { id: string; title: string; config: string; created_at: number; updated_at: number; diff_base_sha: string | null }
       | undefined
   }
 
   /** Replace the persisted config blob (e.g. when cwd changes). */
   updateConfig(id: string, config: string): void {
     this.db.prepare(`UPDATE sessions SET config=? WHERE id=?`).run(config, id)
+  }
+
+  /** 写入会话起点快照树 SHA（null = 清除）。 */
+  setDiffBaseSha(id: string, sha: string | null): void {
+    this.db.prepare(`UPDATE sessions SET diff_base_sha=? WHERE id=?`).run(sha, id)
   }
 
   touchSession(id: string, updatedAt: number): void {

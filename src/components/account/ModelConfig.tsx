@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Plus, Ban, Check } from 'lucide-react'
+import { Search, Plus, Ban, Check, ChevronRight } from 'lucide-react'
 import { useProvidersStore } from '@/store/providersStore'
 import { isCompatible, type CatalogProvider } from '@/ipc/catalog'
+import { groupProviders } from '@/lib/providerGroups'
 import { cn } from '@/lib/utils'
 
 export function ModelConfig() {
@@ -11,19 +12,47 @@ export function ModelConfig() {
   const [selected, setSelected] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [adding, setAdding] = useState(false)
+  const [showIncompatible, setShowIncompatible] = useState(false)
 
   useEffect(() => { void load() }, [load])
 
-  const providers = Object.values(catalog)
-    .filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()))
-    .sort((a, b) => Number(isCompatible(b)) - Number(isCompatible(a)) || a.name.localeCompare(b.name))
+  const groups = groupProviders(catalog, filter, keyConfigured)
+  const hasMatches = groups.configured.length + groups.available.length + groups.incompatible.length > 0
+  // A filter search should reach incompatible matches too, even while the group is collapsed.
+  const incompatibleOpen = showIncompatible || filter.trim() !== ''
 
-  const activeId = selected ?? config.activeModel?.providerID ?? providers.find((p) => isCompatible(p))?.id ?? null
+  const activeId = selected ?? config.activeModel?.providerID ?? groups.configured[0]?.id ?? groups.available[0]?.id ?? null
   const active = activeId ? catalog[activeId] : undefined
   const am = config.activeModel
   const activeModelMeta = am ? catalog[am.providerID]?.models[am.modelID] : undefined
 
   if (!loaded) return <div className="px-6 py-5 text-meta text-ink-tertiary">…</div>
+
+  const renderRow = (p: CatalogProvider) => {
+    const compat = isCompatible(p)
+    return (
+      <button
+        key={p.id}
+        disabled={!compat}
+        onClick={() => { setAdding(false); setSelected(p.id) }}
+        className={cn(
+          'flex w-full items-center justify-between px-2.5 py-1.5 text-left text-body transition-colors',
+          compat ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-55',
+          p.id === activeId && 'bg-accent-active',
+        )}
+      >
+        <span className={cn('flex items-center gap-2 truncate', p.id === activeId ? 'font-medium text-accent-strong' : 'text-ink-secondary')}>
+          <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded bg-surface-muted text-caption text-ink-secondary">
+            {p.name.charAt(0)}
+          </span>
+          <span className="truncate">{p.name}</span>
+        </span>
+        {!compat ? <Ban size={13} className="shrink-0 text-ink-tertiary" />
+          : keyConfigured[p.id] ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+          : <span className="shrink-0 text-caption text-ink-tertiary">{t('settings.modelConfig.notConfigured')}</span>}
+      </button>
+    )
+  }
 
   return (
     <div className="flex flex-col px-5 py-4">
@@ -42,7 +71,7 @@ export function ModelConfig() {
 
       <div className="flex min-h-[270px] gap-3.5">
         {/* Provider list */}
-        <div className="w-[158px] shrink-0 overflow-hidden rounded-md border border-border">
+        <div className="w-[192px] shrink-0 self-start overflow-hidden rounded-md border border-border">
           <div className="flex items-center gap-1.5 border-b border-border px-2.5 py-2">
             <Search size={13} className="text-ink-tertiary" />
             <input
@@ -52,31 +81,35 @@ export function ModelConfig() {
               className="w-full bg-transparent text-meta text-ink placeholder:text-ink-tertiary focus:outline-none"
             />
           </div>
-          {providers.map((p) => {
-            const compat = isCompatible(p)
-            return (
-              <button
-                key={p.id}
-                disabled={!compat}
-                onClick={() => { setAdding(false); setSelected(p.id) }}
-                className={cn(
-                  'flex w-full items-center justify-between px-2.5 py-2 text-left text-body transition-colors',
-                  compat ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-55',
-                  p.id === activeId && 'bg-accent-active',
-                )}
-              >
-                <span className={cn('flex items-center gap-2 truncate', p.id === activeId ? 'font-medium text-accent-strong' : 'text-ink-secondary')}>
-                  <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded bg-surface-muted text-caption text-ink-secondary">
-                    {p.name.charAt(0)}
-                  </span>
-                  <span className="truncate">{p.name}</span>
-                </span>
-                {!compat ? <Ban size={13} className="shrink-0 text-ink-tertiary" />
-                  : keyConfigured[p.id] ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                  : <span className="shrink-0 text-caption text-ink-tertiary">{t('settings.modelConfig.notConfigured')}</span>}
-              </button>
-            )
-          })}
+          <div className="max-h-[320px] overflow-y-auto">
+            {groups.configured.length > 0 && (
+              <>
+                <div className="px-2.5 pb-0.5 pt-2 text-caption text-ink-tertiary">{t('settings.modelConfig.configured')} · {groups.configured.length}</div>
+                {groups.configured.map(renderRow)}
+              </>
+            )}
+            {groups.available.length > 0 && (
+              <>
+                <div className="px-2.5 pb-0.5 pt-2 text-caption text-ink-tertiary">{t('settings.modelConfig.available')} · {groups.available.length}</div>
+                {groups.available.map(renderRow)}
+              </>
+            )}
+            {groups.incompatible.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowIncompatible((v) => !v)}
+                  className="flex w-full items-center gap-1 px-2.5 pb-0.5 pt-2 text-left text-caption text-ink-tertiary transition-colors hover:text-ink-secondary"
+                >
+                  <ChevronRight size={11} className={cn('shrink-0 transition-transform', incompatibleOpen && 'rotate-90')} />
+                  {t('settings.modelConfig.incompatibleGroup')} · {groups.incompatible.length}
+                </button>
+                {incompatibleOpen && groups.incompatible.map(renderRow)}
+              </>
+            )}
+            {!hasMatches && (
+              <div className="px-2.5 py-3 text-center text-meta text-ink-tertiary">{t('settings.modelConfig.noMatches')}</div>
+            )}
+          </div>
           <button
             onClick={() => setAdding(true)}
             className="flex w-full items-center gap-1.5 border-t border-border px-2.5 py-2 text-body text-accent-strong hover:bg-surface-muted"

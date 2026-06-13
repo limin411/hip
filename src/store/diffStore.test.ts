@@ -63,4 +63,10 @@ describe('diffStore', () => {
     useDiffStore.getState().setResult('s1', { state: 'ok', files: [file], summary, base: 'head', hasSessionStart: false })
     expect(useDiffStore.getState().bySession['s1'].expanded).toEqual({})
   })
+  it('toggleCollapsed flips per-file collapse', () => {
+    useDiffStore.getState().toggleCollapsed('s1', 'a.ts')
+    expect(useDiffStore.getState().bySession['s1'].collapsed['a.ts']).toBe(true)
+    useDiffStore.getState().toggleCollapsed('s1', 'a.ts')
+    expect(useDiffStore.getState().bySession['s1'].collapsed['a.ts']).toBe(false)
+  })
 })

@@ -103,6 +103,8 @@ export const en = {
         baseHead: 'vs HEAD',
         showFull: 'Show full file',
         collapseFull: 'Collapse',
+        expand: 'Expand file',
+        collapse: 'Collapse file',
       },
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',

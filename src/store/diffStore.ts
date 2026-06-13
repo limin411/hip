@@ -11,9 +11,10 @@ export interface SessionDiff {
   error?: string
   initPending: boolean
   expanded: Record<string, DiffFile>
+  collapsed: Record<string, boolean>
 }
 
-export const EMPTY_DIFF: SessionDiff = { status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {} }
+export const EMPTY_DIFF: SessionDiff = { status: 'idle', base: 'session-start', hasSessionStart: false, files: [], initPending: false, expanded: {}, collapsed: {} }
 
 interface SetResultArg { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; base: DiffBase; hasSessionStart: boolean; error?: string }
 
@@ -26,6 +27,7 @@ interface DiffStore {
   setBase: (sessionId: string, base: DiffBase) => void
   setFileExpanded: (sessionId: string, path: string, file: DiffFile) => void
   collapseFile: (sessionId: string, path: string) => void
+  toggleCollapsed: (sessionId: string, path: string) => void
   clearSession: (sessionId: string) => void
   resetTransient: () => void
 }
@@ -38,13 +40,14 @@ export const useDiffStore = create<DiffStore>((set) => ({
   bySession: {},
   setLoading: (id) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, status: 'loading' })) })),
   setResult: (id, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({
-    ...s, status: 'ready', state: r.state, files: r.files ?? [], summary: r.summary, base: r.base, hasSessionStart: r.hasSessionStart, error: r.error, expanded: {},
+    ...s, status: 'ready', state: r.state, files: r.files ?? [], summary: r.summary, base: r.base, hasSessionStart: r.hasSessionStart, error: r.error, expanded: {}, collapsed: {},
   })) })),
   setSummary: (id, summary, base, hasSessionStart) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, summary, base, hasSessionStart })) })),
   setInitPending: (id, pending) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, initPending: pending })) })),
   setBase: (id, base) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, base })) })),
   setFileExpanded: (id, p, file) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, expanded: { ...s.expanded, [p]: file } })) })),
   collapseFile: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => { const e = { ...s.expanded }; delete e[p]; return { ...s, expanded: e } }) })),
+  toggleCollapsed: (id, p) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, collapsed: { ...s.collapsed, [p]: !s.collapsed[p] } })) })),
   clearSession: (id) => set((st) => ({ bySession: { ...st.bySession, [id]: EMPTY_DIFF } })),
   resetTransient: () => set((st) => ({
     bySession: Object.fromEntries(Object.entries(st.bySession).map(([id, s]) => [id, { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false }])),

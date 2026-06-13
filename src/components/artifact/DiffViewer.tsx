@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GitBranch, Loader2, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, GitBranch, Loader2, RefreshCw } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -39,15 +39,24 @@ function HunkLines({ hunk }: { hunk: DiffHunk }) {
   )
 }
 
-function FileDiff({ file, sessionId, expanded }: { file: DiffFile; sessionId: string; expanded?: DiffFile }) {
+function FileDiff({ file, sessionId, expanded, collapsed }: { file: DiffFile; sessionId: string; expanded?: DiffFile; collapsed?: boolean }) {
   const { t } = useTranslation()
   const chip = STATUS_CHIP[file.status]
   const shown = expanded ?? file
   const isExpanded = !!expanded
+  const isCollapsed = !!collapsed
   return (
-    <div className="border-b border-border" data-testid="diff-file">
+    <div id={`diff-file-${file.path}`} className="border-b border-border" data-testid="diff-file">
       <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 bg-surface-muted px-3 py-2">
         <span className="flex min-w-0 items-center gap-2">
+          <button
+            aria-label={isCollapsed ? t('artifact.diffView.expand') : t('artifact.diffView.collapse')}
+            onClick={() => useDiffStore.getState().toggleCollapsed(sessionId, file.path)}
+            className="shrink-0 text-ink-tertiary hover:text-ink"
+            data-testid="diff-file-collapse-toggle"
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          </button>
           <span className={cn('shrink-0 rounded px-1 font-medium', chip.cls)} data-testid="diff-status">
             <span className="text-caption">{t(chip.key)}</span>
           </span>
@@ -61,7 +70,7 @@ function FileDiff({ file, sessionId, expanded }: { file: DiffFile; sessionId: st
           <span className="text-danger">-{file.deletions}</span>
         </span>
       </div>
-      {shown.binary ? (
+      {!isCollapsed && (shown.binary ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.binary')}</div>
       ) : shown.hunks.length === 0 ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.modeOnly')}</div>
@@ -76,7 +85,7 @@ function FileDiff({ file, sessionId, expanded }: { file: DiffFile; sessionId: st
               : <button data-testid="diff-collapse-full" onClick={() => useDiffStore.getState().collapseFile(sessionId, file.path)}>{t('artifact.diffView.collapseFull')}</button>}
           </div>
         </>
-      )}
+      ))}
     </div>
   )
 }
@@ -191,16 +200,36 @@ export function DiffViewer() {
           <Empty title={t('artifact.diffView.clean')} desc={t('artifact.diffView.cleanDesc')} />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {diff.files.map((file, i) => (
-            <FileDiff key={`${file.path}-${i}`} file={file} sessionId={sessionId} expanded={diff.expanded[file.path]} />
-          ))}
-          {(diff.summary?.totalFiles ?? 0) > diff.files.length && (
-            <div className="px-3 py-2 text-meta text-ink-tertiary">
-              {t('artifact.diffView.moreFiles', { count: (diff.summary!.totalFiles) - diff.files.length })}
+        <>
+          {diff.files.length > 1 && (
+            <div className="shrink-0 border-b border-border bg-surface" data-testid="diff-file-list">
+              {diff.files.map((file) => (
+                <button
+                  key={file.path}
+                  data-testid="diff-file-jump"
+                  onClick={() => document.getElementById(`diff-file-${file.path}`)?.scrollIntoView({ block: 'start' })}
+                  className="flex w-full items-center justify-between px-3 py-0.5 text-meta hover:bg-surface-muted"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={cn('shrink-0 rounded px-1 text-caption font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
+                    <span className="truncate font-mono text-ink-secondary">{file.path}</span>
+                  </span>
+                  <span className="shrink-0 font-mono text-caption"><span className="text-success">+{file.additions}</span> <span className="text-danger">-{file.deletions}</span></span>
+                </button>
+              ))}
             </div>
           )}
-        </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {diff.files.map((file, i) => (
+              <FileDiff key={`${file.path}-${i}`} file={file} sessionId={sessionId} expanded={diff.expanded[file.path]} collapsed={diff.collapsed[file.path]} />
+            ))}
+            {(diff.summary?.totalFiles ?? 0) > diff.files.length && (
+              <div className="px-3 py-2 text-meta text-ink-tertiary">
+                {t('artifact.diffView.moreFiles', { count: (diff.summary!.totalFiles) - diff.files.length })}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

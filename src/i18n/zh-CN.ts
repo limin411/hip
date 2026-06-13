@@ -103,6 +103,8 @@ export const zhCN = {
         baseHead: '对比 HEAD',
         showFull: '查看全文',
         collapseFull: '收起',
+        expand: '展开文件',
+        collapse: '折叠文件',
       },
       waiting: '等待中…',
       subAgents: '子智能体',

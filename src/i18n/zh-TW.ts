@@ -103,6 +103,8 @@ export const zhTW = {
         baseHead: '對比 HEAD',
         showFull: '檢視全文',
         collapseFull: '收合',
+        expand: '展開檔案',
+        collapse: '折疊檔案',
       },
       waiting: '等待中…',
       subAgents: '子智能體',

@@ -25,6 +25,11 @@ interface UiState {
   // notice) can open Settings — not just the user menu that hosts the modal.
   settingsOpen: boolean
   setSettingsOpen: (v: boolean) => void
+
+  // Diff view mode: unified (default) or split (side-by-side). In-memory only,
+  // resets on refresh — no persist middleware, intentionally matches activeTab style.
+  diffViewMode: 'unified' | 'split'
+  setDiffViewMode: (m: 'unified' | 'split') => void
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -50,4 +55,7 @@ export const useUiStore = create<UiState>((set) => ({
 
   settingsOpen: false,
   setSettingsOpen: (v) => set((s) => (s.settingsOpen === v ? s : { settingsOpen: v })),
+
+  diffViewMode: 'unified',
+  setDiffViewMode: (m) => set({ diffViewMode: m }),
 }))

@@ -105,6 +105,8 @@ export const zhCN = {
         collapseFull: '收起',
         expand: '展开文件',
         collapse: '折叠文件',
+        viewUnified: '统一视图',
+        viewSplit: '并排视图',
       },
       waiting: '等待中…',
       subAgents: '子智能体',

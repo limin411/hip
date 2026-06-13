@@ -105,6 +105,8 @@ export const en = {
         collapseFull: 'Collapse',
         expand: 'Expand file',
         collapse: 'Collapse file',
+        viewUnified: 'Unified',
+        viewSplit: 'Split',
       },
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',

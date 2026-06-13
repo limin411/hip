@@ -70,3 +70,17 @@ describe('uiStore - scroll target', () => {
     expect(useUiStore.getState().scrollTargetMessageId).toBeNull()
   })
 })
+
+describe('uiStore - diffViewMode', () => {
+  it('defaults to unified', () => {
+    expect(useUiStore.getState().diffViewMode).toBe('unified')
+  })
+
+  it('setDiffViewMode switches between unified and split', () => {
+    useUiStore.getState().setDiffViewMode('split')
+    expect(useUiStore.getState().diffViewMode).toBe('split')
+
+    useUiStore.getState().setDiffViewMode('unified')
+    expect(useUiStore.getState().diffViewMode).toBe('unified')
+  })
+})

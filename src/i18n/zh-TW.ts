@@ -105,6 +105,8 @@ export const zhTW = {
         collapseFull: '收合',
         expand: '展開檔案',
         collapse: '折疊檔案',
+        viewUnified: '統一視圖',
+        viewSplit: '並排視圖',
       },
       waiting: '等待中…',
       subAgents: '子智能體',

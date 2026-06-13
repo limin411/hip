@@ -4,9 +4,11 @@ import { ChevronDown, ChevronRight, GitBranch, Loader2, RefreshCw } from 'lucide
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
+import { buildSplitRows } from '@/lib/diffSplit'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
+import { useUiStore } from '@/store/uiStore'
 import { Button } from '@/components/ui/Button'
 
 const STATUS_CHIP = {
@@ -19,8 +21,52 @@ const STATUS_CHIP = {
 function lineStyle(t: DiffLineType): string { return t === 'add' ? 'bg-success/10' : t === 'del' ? 'bg-danger/10' : '' }
 function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' ? '-' : ' ' }
 
-function HunkLines({ hunk }: { hunk: DiffHunk }) {
+function HunkLines({ hunk, viewMode }: { hunk: DiffHunk; viewMode: 'unified' | 'split' }) {
   const { t } = useTranslation()
+
+  if (viewMode === 'split') {
+    const splitRows = buildSplitRows(hunk.lines)
+    return (
+      <>
+        <div className="flex bg-surface-muted/60 text-caption text-ink-tertiary">
+          <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
+          {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
+        </div>
+        {splitRows.map((row, i) => (
+          <div key={i} className="flex">
+            {/* Left column (del / ctx) */}
+            <div className={cn('flex flex-1 min-w-0', row.left ? lineStyle(row.left.type) : 'bg-surface-muted/30')}>
+              {row.left ? (
+                <>
+                  <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{row.left.oldNo ?? ''}</span>
+                  <span className={cn('w-4 shrink-0 select-none text-center', row.left.type === 'del' && 'text-danger')}>{sign(row.left.type)}</span>
+                  <span className="whitespace-pre px-1 text-ink">{row.left.content}</span>
+                </>
+              ) : (
+                <span className="w-full" />
+              )}
+            </div>
+            {/* Divider */}
+            <div className="w-px shrink-0 bg-border" />
+            {/* Right column (add / ctx) */}
+            <div className={cn('flex flex-1 min-w-0', row.right ? lineStyle(row.right.type) : 'bg-surface-muted/30')}>
+              {row.right ? (
+                <>
+                  <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{row.right.newNo ?? ''}</span>
+                  <span className={cn('w-4 shrink-0 select-none text-center', row.right.type === 'add' && 'text-success')}>{sign(row.right.type)}</span>
+                  <span className="whitespace-pre px-1 text-ink">{row.right.content}</span>
+                </>
+              ) : (
+                <span className="w-full" />
+              )}
+            </div>
+          </div>
+        ))}
+      </>
+    )
+  }
+
+  // unified mode (with word-level highlights)
   const spans = computeHunkWordDiffs(hunk.lines)
   return (
     <>
@@ -43,7 +89,7 @@ function HunkLines({ hunk }: { hunk: DiffHunk }) {
   )
 }
 
-function FileDiff({ file, sessionId, expanded, collapsed }: { file: DiffFile; sessionId: string; expanded?: DiffFile; collapsed?: boolean }) {
+function FileDiff({ file, sessionId, expanded, collapsed, viewMode }: { file: DiffFile; sessionId: string; expanded?: DiffFile; collapsed?: boolean; viewMode: 'unified' | 'split' }) {
   const { t } = useTranslation()
   const chip = STATUS_CHIP[file.status]
   const shown = expanded ?? file
@@ -81,7 +127,7 @@ function FileDiff({ file, sessionId, expanded, collapsed }: { file: DiffFile; se
       ) : (
         <>
           <div className="overflow-x-auto font-mono text-meta leading-relaxed">
-            {shown.hunks.map((h, i) => <HunkLines key={i} hunk={h} />)}
+            {shown.hunks.map((h, i) => <HunkLines key={i} hunk={h} viewMode={viewMode} />)}
           </div>
           <div className="flex justify-center gap-3 border-t border-border py-1 text-caption text-ink-tertiary">
             {!isExpanded
@@ -109,6 +155,8 @@ export function DiffViewer() {
   const { t } = useTranslation()
   const sessionId = useDomainStore((s) => s.activeSessionId)
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
+  const diffViewMode = useUiStore((s) => s.diffViewMode)
+  const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
 
   // Radix unmounts inactive TabsContent, so mount === tab activation (and session switches re-run it).
   useEffect(() => {
@@ -189,6 +237,17 @@ export function DiffViewer() {
               )
             })}
           </div>
+          <div className="inline-flex overflow-hidden rounded border border-border text-caption" data-testid="diff-view-toggle">
+            {(['unified', 'split'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setDiffViewMode(m)}
+                className={cn('px-2 py-0.5', diffViewMode === m ? 'bg-accent/15 text-accent' : 'text-ink-tertiary hover:text-ink')}
+              >
+                {t(m === 'unified' ? 'artifact.diffView.viewUnified' : 'artifact.diffView.viewSplit')}
+              </button>
+            ))}
+          </div>
           <button
             title={t('artifact.refresh')}
             data-testid="diff-refresh"
@@ -225,7 +284,7 @@ export function DiffViewer() {
           )}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {diff.files.map((file, i) => (
-              <FileDiff key={`${file.path}-${i}`} file={file} sessionId={sessionId} expanded={diff.expanded[file.path]} collapsed={diff.collapsed[file.path]} />
+              <FileDiff key={`${file.path}-${i}`} file={file} sessionId={sessionId} expanded={diff.expanded[file.path]} collapsed={diff.collapsed[file.path]} viewMode={diffViewMode} />
             ))}
             {(diff.summary?.totalFiles ?? 0) > diff.files.length && (
               <div className="px-3 py-2 text-meta text-ink-tertiary">

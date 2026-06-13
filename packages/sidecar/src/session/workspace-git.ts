@@ -35,6 +35,21 @@ export function sanitizeRefComponent(s: string): string {
   return 'h' + createHash('sha1').update(s).digest('hex').slice(0, 16)
 }
 
+/** Conservative branch-name guard for agent-supplied names. Rejects anything that could be read by
+ *  git as a flag or a pathspec rather than a branch — empty, leading '-', '.'/'..', whitespace, and
+ *  anything outside [A-Za-z0-9_-./]. This guards against `git checkout .`/`git checkout -f`/relative
+ *  paths SILENTLY discarding uncommitted work. Pure + sync (no shell). */
+export function isSafeBranchName(name: string): boolean {
+  if (!name || name.startsWith('-')) return false
+  if (name === '.' || name === '..') return false
+  if (/\s/.test(name)) return false
+  if (!/^[A-Za-z0-9_./-]+$/.test(name)) return false
+  // Reject path-like forms: no leading/trailing/repeated slash, and no component that is '.'/'..'
+  // or starts with a dot ('./a.txt', '../x', 'a/.b' — git also forbids dot-leading components).
+  if (name.startsWith('/') || name.endsWith('/') || name.includes('//')) return false
+  return name.split('/').every((c) => c.length > 0 && c !== '.' && c !== '..' && !c.startsWith('.'))
+}
+
 /**
  * 把 `git diff` 统一输出解析为 hunk-first 的 DiffFile[]。路径按 git 原样（repo-root 相对），
  * 调用方负责转 cwd 相对。`additions`/`deletions` 为 pre-truncation；每文件行数共享一个预算
@@ -241,7 +256,7 @@ export async function getCurrentBranch(cwd: string, gitBin = 'git'): Promise<str
 
 /** List hip checkpoint ref names under refs/hip/checkpoints/<sessionId>/. Never throws → []. */
 export async function listCheckpointRefs(cwd: string, sessionId: string, gitBin = 'git'): Promise<string[]> {
-  const prefix = `refs/hip/checkpoints/${sessionId}/`
+  const prefix = `refs/hip/checkpoints/${sanitizeRefComponent(sessionId)}/`
   try {
     const out = (await runGit(cwd, ['for-each-ref', '--format=%(refname)', prefix], gitBin)).stdout
     return out.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -313,7 +328,9 @@ export async function collectCommitLog(cwd: string, startCommit: string | null, 
       if (!r.trim()) continue
       const [sha, shortSha, author, ct, message] = r.split('\x1f')
       if (!sha) continue
-      commits.push({ sha, shortSha, author, message: message ?? '', timestamp: parseInt(ct, 10) * 1000 })
+      const t = Number.parseInt(ct ?? '', 10)
+      const timestamp = Number.isFinite(t) ? t * 1000 : 0
+      commits.push({ sha, shortSha, author: author ?? '', message: message ?? '', timestamp })
     }
     return { state: 'ok', commits }
   } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
@@ -372,14 +389,14 @@ export async function listBranches(cwd: string, gitBin = 'git'): Promise<{ ok: b
   } catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
-/** Switch the checkout to an existing branch. `git switch` with a `checkout` fallback for old git.
- *  Never throws → { ok:false, error } (e.g. a dirty tree that would be overwritten, or a missing branch). */
+/** Switch the checkout to an existing branch via `git switch` (no `checkout` fallback — that would
+ *  let an unvalidated name like '.'/'-f'/a relative path be read as a pathspec and SILENTLY discard
+ *  uncommitted work). Rejects unsafe names up front. Never throws → { ok:false, error } (e.g. a dirty
+ *  tree that would be overwritten, an invalid name, or a missing branch). */
 export async function switchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  if (!isSafeBranchName(name)) return { ok: false, error: 'invalid branch name' }
   try { await runGit(cwd, ['switch', name], gitBin); return { ok: true } }
-  catch {
-    try { await runGit(cwd, ['checkout', name], gitBin); return { ok: true } }
-    catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
-  }
+  catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
 /** Read the user's *effective* git identity value (e.g. user.name), merging system/global/local
@@ -404,7 +421,7 @@ export async function gitCommit(cwd: string, message: string, gitBin = 'git'): P
     await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
   } catch { return { ok: false, error: 'not_a_repo' } }
   try {
-    await runGit(cwd, ['add', '-A'], gitBin)
+    await runGit(cwd, ['add', '-A', '--', '.'], gitBin)
     const name = await gitConfigGet(cwd, gitBin, 'user.name')
     const email = await gitConfigGet(cwd, gitBin, 'user.email')
     const hasUser = !!name && !!email
@@ -418,14 +435,16 @@ export async function gitCommit(cwd: string, message: string, gitBin = 'git'): P
   } catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
-/** Create a branch at HEAD without switching to it. Never throws → { ok:false, error }. */
+/** Create a branch at HEAD without switching to it. Rejects unsafe names up front.
+ *  Never throws → { ok:false, error }. */
 export async function gitCreateBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  if (!isSafeBranchName(name)) return { ok: false, error: 'invalid branch name' }
   try { await runGit(cwd, ['branch', name], gitBin); return { ok: true } }
   catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
-/** Switch to an existing branch (agent tool path). Thin alias over switchBranch so the tool and
- *  the panel share one implementation. */
+/** Switch to an existing branch (agent tool path). Thin alias over switchBranch (which guards the
+ *  name) so the tool and the panel share one implementation. */
 export async function gitSwitchBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
   return switchBranch(cwd, name, gitBin)
 }

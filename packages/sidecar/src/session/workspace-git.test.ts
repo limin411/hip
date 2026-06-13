@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -377,6 +377,15 @@ describe('getCurrentBranch + listCheckpointRefs', () => {
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
     expect(await listCheckpointRefs(root, 'nope')).toEqual([])
   })
+  it('lists refs for an unsafe sessionId (list/write share sanitizeRefComponent)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    const unsafe = 'sess/说明 1' // sanitized to a hash component by captureCheckpoint
+    await git(root, 'update-ref', `refs/hip/checkpoints/${sanitizeRefComponent(unsafe)}/t1`, head)
+    const refs = await listCheckpointRefs(root, unsafe)
+    expect(refs).toHaveLength(1)
+    expect(refs[0]).toBe(`refs/hip/checkpoints/${sanitizeRefComponent(unsafe)}/t1`)
+  })
 })
 
 describe('captureCheckpoint', () => {
@@ -487,8 +496,31 @@ describe('listBranches + switchBranch', () => {
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
   })
+  // DATA-LOSS guard: an unvalidated name must never be read by git as a pathspec/flag that would
+  // discard uncommitted work. Each case must return ok:false AND leave the dirty file untouched.
+  for (const bad of ['.', '-f', './a.txt']) {
+    it(`refuses an unsafe name ${JSON.stringify(bad)} and does NOT touch a dirty tree`, async () => {
+      await fs.writeFile(path.join(root, 'a.txt'), 'committed\n'); await makeRepo(root)
+      await fs.writeFile(path.join(root, 'a.txt'), 'DIRTY UNCOMMITTED\n') // would be lost by `git checkout .`
+      const r = await switchBranch(root, bad)
+      expect(r.ok).toBe(false)
+      expect(r.error).toBe('invalid branch name')
+      expect(await fs.readFile(path.join(root, 'a.txt'), 'utf8')).toBe('DIRTY UNCOMMITTED\n')
+    })
+  }
   it('listBranches returns ok:false for a non-repo folder', async () => {
     expect((await listBranches(root)).ok).toBe(false)
+  })
+})
+
+describe('isSafeBranchName', () => {
+  it('accepts ordinary branch names', () => {
+    for (const n of ['main', 'feature', 'feat/x', 'release-1.2.3', 'a_b-c.d']) expect(isSafeBranchName(n)).toBe(true)
+  })
+  it('rejects empty, flag-like, dot, whitespace, and out-of-charset names', () => {
+    for (const n of ['', '-f', '-', '.', '..', 'a b', 'a\tb', 'a~b', 'a^b', 'a:b', 'feat;rm', '说明']) {
+      expect(isSafeBranchName(n)).toBe(false)
+    }
   })
 })
 
@@ -571,6 +603,22 @@ describe('gitCreateBranch + gitSwitchBranch (tool helpers)', () => {
     const r = await gitCreateBranch(root, 'feature')
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
+  })
+  it('gitCreateBranch refuses an unsafe name without creating a branch', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await git(root, 'branch', '-m', 'main')
+    const r = await gitCreateBranch(root, '-f')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBe('invalid branch name')
+    expect((await listBranches(root)).branches!.map((b) => b.name)).toEqual(['main'])
+  })
+  it('gitSwitchBranch refuses an unsafe name and keeps a dirty tree intact', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'committed\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'DIRTY\n')
+    const r = await gitSwitchBranch(root, '.')
+    expect(r.ok).toBe(false)
+    expect(r.error).toBe('invalid branch name')
+    expect(await fs.readFile(path.join(root, 'a.txt'), 'utf8')).toBe('DIRTY\n')
   })
 })
 

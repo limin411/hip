@@ -99,6 +99,8 @@ export const zhTW = {
         statusRenamed: '重新命名',
         modeOnly: '僅檔案權限/模式變更',
         noNewline: '檔案結尾無換行',
+        baseSession: '自工作階段起點',
+        baseHead: '對比 HEAD',
       },
       waiting: '等待中…',
       subAgents: '子智能體',

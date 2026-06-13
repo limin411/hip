@@ -151,14 +151,31 @@ export function DiffViewer() {
             <span className="font-mono text-caption"><span className="text-success">+{diff.summary.totalAdditions}</span> <span className="text-danger">-{diff.summary.totalDeletions}</span></span>
           )}
         </div>
-        <button
-          title={t('artifact.refresh')}
-          data-testid="diff-refresh"
-          onClick={() => sessionService.requestDiff(sessionId)}
-          className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
-        >
-          <RefreshCw size={13} className={cn(diff.status === 'loading' && 'animate-spin')} />
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded border border-border text-caption" data-testid="diff-base-toggle">
+            {(['session-start', 'head'] as const).map((b) => {
+              const disabled = b === 'session-start' && !diff.hasSessionStart
+              return (
+                <button
+                  key={b}
+                  disabled={disabled}
+                  onClick={() => { if (diff.base !== b) { useDiffStore.getState().setBase(sessionId, b); sessionService.requestDiff(sessionId, b) } }}
+                  className={cn('px-2 py-0.5', diff.base === b ? 'bg-accent/15 text-accent' : 'text-ink-tertiary hover:text-ink', disabled && 'cursor-not-allowed opacity-40')}
+                >
+                  {t(b === 'session-start' ? 'artifact.diffView.baseSession' : 'artifact.diffView.baseHead')}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            title={t('artifact.refresh')}
+            data-testid="diff-refresh"
+            onClick={() => sessionService.requestDiff(sessionId)}
+            className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <RefreshCw size={13} className={cn(diff.status === 'loading' && 'animate-spin')} />
+          </button>
+        </div>
       </div>
       {diff.files.length === 0 ? (
         <div data-testid="diff-clean" className="flex-1">

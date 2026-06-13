@@ -371,4 +371,11 @@ describe('workspace diff', () => {
     t.push({ type: 'message:complete', sessionId: 's1', message: { id: 'm', role: 'assistant', content: '', timestamp: 0 } as any })
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
   })
+
+  it('requestDiff sends the current store base', () => {
+    const t = new FakeTransport(); const svc = new SessionService(t)
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [], base: 'head', hasSessionStart: true })
+    svc.requestDiff('s1')
+    expect(t.sent).toContainEqual({ type: 'fs:diff', sessionId: 's1', base: 'head' })
+  })
 })

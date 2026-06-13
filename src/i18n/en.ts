@@ -99,6 +99,8 @@ export const en = {
         statusRenamed: 'Renamed',
         modeOnly: 'File mode changed only',
         noNewline: 'No newline at end of file',
+        baseSession: 'Since session start',
+        baseHead: 'vs HEAD',
       },
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',

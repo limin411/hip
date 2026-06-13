@@ -22,6 +22,7 @@ interface DiffStore {
   setResult: (sessionId: string, r: SetResultArg) => void
   setSummary: (sessionId: string, summary: DiffSummary, base: DiffBase, hasSessionStart: boolean) => void
   setInitPending: (sessionId: string, pending: boolean) => void
+  setBase: (sessionId: string, base: DiffBase) => void
   clearSession: (sessionId: string) => void
   resetTransient: () => void
 }
@@ -38,6 +39,7 @@ export const useDiffStore = create<DiffStore>((set) => ({
   })) })),
   setSummary: (id, summary, base, hasSessionStart) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, summary, base, hasSessionStart })) })),
   setInitPending: (id, pending) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, initPending: pending })) })),
+  setBase: (id, base) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, base })) })),
   clearSession: (id) => set((st) => ({ bySession: { ...st.bySession, [id]: EMPTY_DIFF } })),
   resetTransient: () => set((st) => ({
     bySession: Object.fromEntries(Object.entries(st.bySession).map(([id, s]) => [id, { ...s, status: s.status === 'loading' ? 'idle' : s.status, initPending: false }])),

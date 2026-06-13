@@ -44,4 +44,9 @@ describe('diffStore', () => {
     expect(useDiffStore.getState().bySession['s1'].status).toBe('idle')
     expect(useDiffStore.getState().bySession['s2'].initPending).toBe(false)
   })
+  it('setBase switches the requested base without clearing data', () => {
+    useDiffStore.getState().setResult('s1', { state: 'ok', files: [file], summary, base: 'session-start', hasSessionStart: true })
+    useDiffStore.getState().setBase('s1', 'head')
+    expect(useDiffStore.getState().bySession['s1']).toMatchObject({ base: 'head', files: [file] })
+  })
 })

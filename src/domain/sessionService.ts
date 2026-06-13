@@ -1,5 +1,5 @@
 // src/domain/sessionService.ts
-import type { ServerMessage, SessionConfig } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, DiffBase } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -84,7 +84,8 @@ export class SessionService {
         if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
       }
       // 改完文件 → 总是刷新角标(便宜)；diff 标签激活时再拉全量
-      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId })
+      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
       if (useUiStore.getState().activeTab === 'diff') this.requestDiff(msg.sessionId)
     }
   }
@@ -139,10 +140,12 @@ export class SessionService {
   }
 
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
-  requestDiff(sessionId: string): void {
-    if (useDiffStore.getState().bySession[sessionId]?.status === 'loading') return
+  requestDiff(sessionId: string, base?: DiffBase): void {
+    const cur = useDiffStore.getState().bySession[sessionId]
+    if (cur?.status === 'loading') return
+    const b = base ?? cur?.base ?? 'session-start'
     useDiffStore.getState().setLoading(sessionId)
-    this.transport.send({ type: 'fs:diff', sessionId })
+    this.transport.send({ type: 'fs:diff', sessionId, base: b })
   }
 
   /** One-click `git init` for a non-repo cwd; a successful result chains a fresh diff. */

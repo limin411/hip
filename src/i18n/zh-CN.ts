@@ -99,6 +99,8 @@ export const zhCN = {
         statusRenamed: '重命名',
         modeOnly: '仅文件权限/模式变更',
         noNewline: '文件末尾无换行',
+        baseSession: '自会话起点',
+        baseHead: '对比 HEAD',
       },
       waiting: '等待中…',
       subAgents: '子智能体',

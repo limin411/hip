@@ -177,6 +177,26 @@ export async function collectWorkspaceDiff(cwd: string, opts: WorkspaceDiffOptio
   } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
 }
 
+/** 仅返回 +/- 总计与文件数（numstat），不生成 patch body。喂 Diff 角标。 */
+export async function collectWorkspaceDiffSummary(cwd: string, opts: WorkspaceDiffOptions = {}): Promise<WorkspaceDiff> {
+  const gitBin = opts.gitBin ?? 'git'
+  try {
+    const p = await prepareTrees(cwd, opts)
+    if (!p.ok) return p.r
+    const { nowTree, baseTree } = p.v
+    const out = (await runGit(cwd, ['diff', '--numstat', '--find-renames', baseTree, nowTree, '--', '.'], gitBin)).stdout
+    let totalFiles = 0, totalAdditions = 0, totalDeletions = 0
+    for (const ln of out.split('\n')) {
+      const m = /^(\d+|-)\t(\d+|-)\t/.exec(ln)
+      if (!m) continue
+      totalFiles++
+      if (m[1] !== '-') totalAdditions += parseInt(m[1], 10)
+      if (m[2] !== '-') totalDeletions += parseInt(m[2], 10)
+    }
+    return { state: 'ok', summary: { totalFiles, totalAdditions, totalDeletions } }
+  } catch (e) { return { state: 'error', error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
 /**
  * Initialize a repo with a baseline commit so subsequent changes surface as diffs.
  * Inline identity: must not depend on the user's global git config.

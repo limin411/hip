@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, gitInit, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, gitInit, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -255,6 +255,20 @@ describe('collectWorkspaceDiff', () => {
       const r = await collectWorkspaceDiff(root)
       expect(r.state).toBe('ok'); expect(JSON.stringify(r.files)).not.toContain('TOP SECRET')
     } finally { await fs.rm(outside, { recursive: true, force: true }) }
+  })
+})
+
+describe('collectWorkspaceDiffSummary', () => {
+  it('returns only totals, no files', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\nthree\n')
+    await fs.writeFile(path.join(root, 'new.txt'), 'x\n')
+    const r = await collectWorkspaceDiffSummary(root)
+    expect(r.state).toBe('ok'); expect(r.files).toBeUndefined()
+    expect(r.summary).toEqual({ totalFiles: 2, totalAdditions: 3, totalDeletions: 1 })
+  })
+  it('reports not_a_repo for a plain folder', async () => {
+    expect((await collectWorkspaceDiffSummary(root)).state).toBe('not_a_repo')
   })
 })
 

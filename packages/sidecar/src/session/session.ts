@@ -424,8 +424,9 @@ export class Session {
   }
 
   /** Revert the worktree to a checkpoint's tree (worktree-only; HEAD untouched). Writes a mandatory
-   *  pre-revert safety checkpoint first, persists it + a post-revert checkpoint, and re-emits the
-   *  checkpoint list so the timeline reflects both. Never throws. */
+   *  pre-revert safety checkpoint first, persists it, then captures + persists a post-revert checkpoint
+   *  of the restored worktree, emitting checkpoint:created for each so the timeline reflects both.
+   *  Never throws. */
   async revertCheckpoint(checkpointId: string, send: SendFn): Promise<{ ok: boolean; safetyCheckpointId?: string; error?: string }> {
     if (!this._config.cwd) return { ok: false, error: 'no_workspace' }
     const all = this.store?.listCheckpoints(this.id) ?? []
@@ -447,6 +448,11 @@ export class Session {
         send({ type: 'checkpoint:created', sessionId: this.id, checkpoint: safety })
       }
     }
+    // Capture a post-revert checkpoint of the now-restored worktree so the timeline shows the
+    // post-revert state (chained onto the safety commit via _lastCheckpointCommit). A clean restore
+    // may skip (nothing changed vs the safety commit) — that's fine; captureCheckpoint no-ops then.
+    const postTurnId = `post-revert-${Date.now()}`
+    await this.captureCheckpoint(postTurnId, 'post-revert', send)
     return r
   }
 

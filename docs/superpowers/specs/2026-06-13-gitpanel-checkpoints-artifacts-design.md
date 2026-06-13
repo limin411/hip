@@ -6,7 +6,7 @@
 
 **Architecture:** Borrow Zed's agent-checkpoint *model* (detached `commit-tree` on a private ref, never moving HEAD; tree-based exact restore) but implement it natively on hip's existing `git` CLI plumbing (`runGit` + `GIT_INDEX_FILE` index isolation in `workspace-git.ts`). The UI restructures the single **Diff** tab into two git-gated tabs — **时间线** (timeline) and **更改** (changes) — and the chat renders an aggregate artifact card.
 
-**Tech Stack:** TypeScript monorepo — `@hip/protocol` (shared IPC types) ⇄ `@hip/sidecar` (Node, shells to git CLI; LangGraph ReAct agent) ⇄ React/TS frontend (zustand stores, react-i18next, typed i18n). SQLite via `better-sqlite3` with `PRAGMA user_version` incremental migrations.
+**Tech Stack:** TypeScript monorepo — `@hip/protocol` (shared IPC types) ⇄ `@hip/sidecar` (Node, shells to git CLI; LangGraph ReAct agent) ⇄ React/TS frontend (zustand stores, react-i18next, typed i18n). SQLite via `node:sqlite` (`DatabaseSync`, wrapped in `persistence/sqlite.ts`) with `PRAGMA user_version` incremental migrations.
 
 ---
 

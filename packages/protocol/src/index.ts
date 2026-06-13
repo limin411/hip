@@ -137,6 +137,7 @@ export type ClientMessage =
   | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
   | { type: 'message:cancel'; sessionId: string }
   | { type: 'message:regenerate'; sessionId: string }
+  | { type: 'message:resume'; sessionId: string; content: string }
   | { type: 'session:list' }
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }
@@ -165,6 +166,7 @@ export type ServerMessage =
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
+  | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }
   | { type: 'error'; sessionId?: string; code: string; message: string }
   | { type: 'ready'; hasApiKey: boolean }
   | { type: 'session:list:result'; sessions: SessionSummary[] }

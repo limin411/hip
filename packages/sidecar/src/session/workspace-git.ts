@@ -382,12 +382,14 @@ export async function switchBranch(cwd: string, name: string, gitBin = 'git'): P
   }
 }
 
-/** Read a repo-local git config value (e.g. user.name). Returns '' when unset. Never throws.
- *  Scoped to `--local` deliberately: the synthetic `hip` identity should kick in when *this repo*
- *  has no user identity, independent of any machine-wide --global identity (otherwise the global
- *  config leaks in and the synthetic fallback never fires). */
+/** Read the user's *effective* git identity value (e.g. user.name), merging system/global/local
+ *  scopes — i.e. who the developer actually is, which is normally a --global identity. Returns ''
+ *  only when the key is unset in every scope, in which case gitCommit falls back to the synthetic
+ *  `hip` identity. Never throws. (Tests that exercise the synthetic fallback neutralize the machine
+ *  global/system config via GIT_CONFIG_GLOBAL=/dev/null + GIT_CONFIG_NOSYSTEM=1 so they stay
+ *  deterministic regardless of the dev's ~/.gitconfig.) */
 async function gitConfigGet(cwd: string, gitBin: string, key: string): Promise<string> {
-  try { return (await runGit(cwd, ['config', '--local', '--get', key], gitBin)).stdout.trim() }
+  try { return (await runGit(cwd, ['config', '--get', key], gitBin)).stdout.trim() }
   catch { return '' }
 }
 

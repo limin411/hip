@@ -517,17 +517,27 @@ describe('gitCommit', () => {
     expect((await git(root, 'log', '-1', '--format=%b')).stdout).toContain('Co-authored-by: hip <hip@local>')
   })
   it('falls back to the synthetic hip identity when no user identity is configured', async () => {
-    // a repo with NO user.name/user.email set locally
+    // A repo with NO user identity in ANY scope. Neutralize the machine's global/system git config
+    // for this commit so the test is deterministic regardless of the dev's ~/.gitconfig (gitCommit
+    // reads the *merged* identity in production, so a real --global identity would otherwise leak in).
     await git(root, 'init')
     await git(root, 'config', '--unset-all', 'user.name').catch(() => {})
     await git(root, 'config', '--unset-all', 'user.email').catch(() => {})
     await fs.writeFile(path.join(root, 'a.txt'), 'one\n')
-    const r = await gitCommit(root, 'first')
-    expect(r.ok).toBe(true)
-    expect((await git(root, 'log', '-1', '--format=%an')).stdout.trim()).toBe('hip')
-    expect((await git(root, 'log', '-1', '--format=%ae')).stdout.trim()).toBe('hip@local')
-    // no Co-authored-by trailer in the synthetic-identity path
-    expect((await git(root, 'log', '-1', '--format=%b')).stdout).not.toContain('Co-authored-by')
+    const saved = { g: process.env.GIT_CONFIG_GLOBAL, n: process.env.GIT_CONFIG_NOSYSTEM }
+    process.env.GIT_CONFIG_GLOBAL = '/dev/null'
+    process.env.GIT_CONFIG_NOSYSTEM = '1'
+    try {
+      const r = await gitCommit(root, 'first')
+      expect(r.ok).toBe(true)
+      expect((await git(root, 'log', '-1', '--format=%an')).stdout.trim()).toBe('hip')
+      expect((await git(root, 'log', '-1', '--format=%ae')).stdout.trim()).toBe('hip@local')
+      // no Co-authored-by trailer in the synthetic-identity path
+      expect((await git(root, 'log', '-1', '--format=%b')).stdout).not.toContain('Co-authored-by')
+    } finally {
+      if (saved.g === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = saved.g
+      if (saved.n === undefined) delete process.env.GIT_CONFIG_NOSYSTEM; else process.env.GIT_CONFIG_NOSYSTEM = saved.n
+    }
   })
   it('returns ok:false with an error for a non-repo folder', async () => {
     const r = await gitCommit(root, 'x')

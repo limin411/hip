@@ -68,4 +68,30 @@ describe('file tools', () => {
     expect(out).toContain('/app.js')
     expect(out).not.toContain('node_modules')
   })
+
+  it('write_todos returns a one-line confirmation with the count', async () => {
+    const out = String(
+      await byName(root, 'write_todos').invoke({
+        todos: [
+          { content: 'read the spec', status: 'completed' },
+          { content: 'implement the tool', status: 'in_progress' },
+          { content: 'write tests', status: 'pending' },
+        ],
+      }),
+    )
+    expect(out).toMatch(/3/)
+    expect(out).toMatch(/todo/i)
+    expect(out.split('\n')).toHaveLength(1)
+  })
+
+  it('write_todos accepts an empty list (clears the plan)', async () => {
+    const out = String(await byName(root, 'write_todos').invoke({ todos: [] }))
+    expect(out).toMatch(/0/)
+  })
+
+  it('write_todos rejects an invalid status', async () => {
+    await expect(
+      byName(root, 'write_todos').invoke({ todos: [{ content: 'x', status: 'blocked' }] }),
+    ).rejects.toThrow()
+  })
 })

@@ -6,6 +6,7 @@ describe('buildSystemPrompt', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
     expect(s).toContain('/tmp/proj')
     expect(s).toContain('write_file')
+    expect(s).toContain('write_todos')
     expect(s).toMatch(/MUST NOT claim/i)
   })
 

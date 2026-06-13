@@ -5,11 +5,14 @@ const ANTI_PHANTOM =
 
 const BASE =
   'You are a capable coding assistant working directly in a project. ' +
-  'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the ' +
+  'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — and a planning tool, ' +
+  'write_todos — operating on the ' +
   'project directory. Use them to do the work yourself: read what you need, write actual files, then ' +
   'verify by reading the result back. Do not ask the user to do steps you can do with your tools. ' +
   'When the task is done, finish with a short plain-text summary of what you changed. ' +
-  'For a simple request, just do it directly — do not over-plan.'
+  'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
+  'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
+  'For a simple, single-step request, just do it directly — do not over-plan or call write_todos.'
 
 function cwdBlock(cwd: string): string {
   return (

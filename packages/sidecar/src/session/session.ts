@@ -14,7 +14,8 @@ import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
-import { recursionLimit } from './loop-control.js'
+import { runSubagent } from './subagent.js'
+import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
 import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
@@ -437,6 +438,14 @@ export class Session {
       trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
       send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
     }
+    const ensureFinished = (agentId: string, output: string) => {
+      if (!started.has(agentId)) return
+      closeReasoning(agentId)
+      const r = trajectory.get(agentId)
+      if (r) { r.output = output; r.finishedAt = Date.now() }
+      started.delete(agentId)
+      send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+    }
     const finishRemaining = () => {
       for (const id of started) {
         closeReasoning(id)
@@ -450,7 +459,8 @@ export class Session {
     ensureStarted('supervisor', 'supervisor')
 
     const cwd = this._config.cwd ?? process.cwd()
-    const tools = buildTools(cwd)
+    const runner = this.modelRunner()
+    const summarizer = this.summarizer()
     const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt })
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => {
@@ -475,7 +485,24 @@ export class Session {
       usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
     })
     const emit = makeEmit('supervisor', 'supervisor')
-    const ctx: GraphCtx = { runner: this.modelRunner(), tools, emit, summarizer: this.summarizer() }
+    let subagentSeq = 0
+    const spawnSubagent = async (description: string): Promise<string> => {
+      const childId = `worker-${++subagentSeq}`
+      ensureStarted(childId, 'worker', 'supervisor', description)
+      const text = await runSubagent({
+        runner,
+        root: cwd,
+        summarizer,
+        emit: makeEmit(childId, 'worker'),
+        signal: this.abortController!.signal,
+        description,
+        childMaxSteps: CHILD_MAX_STEPS,
+      })
+      ensureFinished(childId, text)
+      return text
+    }
+    const tools = buildTools(cwd, spawnSubagent)
+    const ctx: GraphCtx = { runner, tools, emit, summarizer }
 
     try {
       const finalState = await this.app.invoke(

@@ -36,3 +36,16 @@ export function buildSystemPrompt({ cwd, userInstructions }: SystemPromptInput):
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`
     : base
 }
+
+const CHILD_BASE =
+  'You are a focused sub-agent completing a single delegated sub-task. ' +
+  'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the ' +
+  'project directory. Do the work yourself: read what you need, write actual files, then verify by ' +
+  'reading the result back. You cannot delegate further. When done, return a concise text result ' +
+  'describing what you found or changed.'
+
+/** System prompt for a delegated sub-agent: base tools + cwd convention + anti-phantom, framed
+ *  around a single sub-task. No planning/delegation guidance (the child has no task tool). */
+export function childSystemPrompt(description: string, cwd: string): string {
+  return `${CHILD_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
+}

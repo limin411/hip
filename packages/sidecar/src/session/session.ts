@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode, Branch } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -423,6 +423,50 @@ export class Session {
     return workspaceGit.collectCommitLog(this._config.cwd, start)
   }
 
+  /** Revert the worktree to a checkpoint's tree (worktree-only; HEAD untouched). Writes a mandatory
+   *  pre-revert safety checkpoint first, persists it + a post-revert checkpoint, and re-emits the
+   *  checkpoint list so the timeline reflects both. Never throws. */
+  async revertCheckpoint(checkpointId: string, send: SendFn): Promise<{ ok: boolean; safetyCheckpointId?: string; error?: string }> {
+    if (!this._config.cwd) return { ok: false, error: 'no_workspace' }
+    const all = this.store?.listCheckpoints(this.id) ?? []
+    const cp = all.find((c) => c.id === checkpointId)
+    if (!cp) return { ok: false, error: 'checkpoint not found' }
+    const r = await workspaceGit.revertToCheckpoint(this._config.cwd, {
+      sessionId: this.id, targetTree: cp.treeSha, prevCommit: this._lastCheckpointCommit ?? cp.commitSha,
+    })
+    if (!r.ok) return r
+    // Persist the pre-revert safety checkpoint that revertToCheckpoint just wrote on the ref chain.
+    if (r.safetyCheckpointId) {
+      const turnId = r.safetyCheckpointId.split(':').slice(1).join(':')
+      // Resolve the safety ref's commit + tree directly so we store accurate shas.
+      const meta = await workspaceGit.checkpointRefMeta(this._config.cwd, this.id, turnId)
+      if (meta) {
+        const safety = { id: r.safetyCheckpointId, sessionId: this.id, turnId, kind: 'pre-revert' as const, label: 'pre-revert safety', treeSha: meta.treeSha, commitSha: meta.commitSha, branch: meta.branch, createdAt: Date.now() }
+        this.store?.insertCheckpoint(safety)
+        this._lastCheckpointCommit = meta.commitSha
+        send({ type: 'checkpoint:created', sessionId: this.id, checkpoint: safety })
+      }
+    }
+    return r
+  }
+
+  /** List branches (+ current). For the panel's BranchSwitcher. Never throws. */
+  async listBranches(): Promise<{ branches: Branch[]; currentBranch: string | null }> {
+    if (!this._config.cwd) return { branches: [], currentBranch: null }
+    const r = await workspaceGit.listBranches(this._config.cwd)
+    const currentBranch = await workspaceGit.getCurrentBranch(this._config.cwd)
+    return { branches: r.branches ?? [], currentBranch }
+  }
+
+  /** Switch the checkout to a branch (panel path). Records the new branch on the session. Never throws. */
+  async switchBranch(branch: string): Promise<{ ok: boolean; currentBranch: string | null; error?: string }> {
+    if (!this._config.cwd) return { ok: false, currentBranch: null, error: 'no_workspace' }
+    const r = await workspaceGit.switchBranch(this._config.cwd, branch)
+    const currentBranch = await workspaceGit.getCurrentBranch(this._config.cwd)
+    if (r.ok) this.store?.setSessionBranch(this.id, currentBranch)
+    return { ok: r.ok, currentBranch, error: r.error }
+  }
+
   /** Emit INCOMPATIBLE_MODEL and return false when the active provider is not OpenAI-compatible.
    *  The renderer's catalog gate normally prevents selecting one, but a stale/hand-edited
    *  hip-providers.json can name e.g. `anthropic`; without this we'd build a ChatOpenAI against an
@@ -614,7 +658,7 @@ export class Session {
       ensureFinished(childId, text)
       return text
     }
-    const tools = buildTools(cwd, spawnSubagent)
+    const tools = buildTools(cwd, spawnSubagent, this._config.cwd)
     const ctx: GraphCtx = { runner, tools, emit, summarizer }
 
     try {

@@ -473,3 +473,15 @@ export async function revertToCheckpoint(cwd: string, opts: RevertOptions): Prom
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {})
   }
 }
+
+/** Resolve a checkpoint ref's commit sha, tree sha, and branch (at the ref commit). Used to persist the
+ *  pre-revert safety checkpoint after revertToCheckpoint wrote it. Returns null if the ref is missing. */
+export async function checkpointRefMeta(cwd: string, sessionId: string, turnId: string, gitBin = 'git'): Promise<{ commitSha: string; treeSha: string; branch: string | null } | null> {
+  const ref = `refs/hip/checkpoints/${sanitizeRefComponent(sessionId)}/${sanitizeRefComponent(turnId)}`
+  try {
+    const commitSha = (await runGit(cwd, ['rev-parse', ref], gitBin)).stdout.trim()
+    const treeSha = (await runGit(cwd, ['rev-parse', `${ref}^{tree}`], gitBin)).stdout.trim()
+    const branch = await getCurrentBranch(cwd, gitBin)
+    return { commitSha, treeSha, branch }
+  } catch { return null }
+}

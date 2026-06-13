@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -618,5 +618,22 @@ describe('revertToCheckpoint', () => {
   it('returns ok:false for a non-repo folder', async () => {
     const r = await revertToCheckpoint(root, { sessionId: 's1', targetTree: 'deadbeef', prevCommit: null })
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('checkpointRefMeta', () => {
+  it('resolves a checkpoint ref to its commit + tree shas', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const cap = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'x', prevCommit: head })
+    const meta = await checkpointRefMeta(root, 's1', 't1')
+    expect(meta).not.toBeNull()
+    expect(meta!.commitSha).toBe(cap.commitSha)
+    expect(meta!.treeSha).toBe(cap.treeSha)
+  })
+  it('returns null for a missing ref', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    expect(await checkpointRefMeta(root, 's1', 'nope')).toBeNull()
   })
 })

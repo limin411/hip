@@ -7,6 +7,7 @@ import { formatClockTime, formatAbsolute } from '@/lib/datetime'
 import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
+import { ArtifactCard } from '@/components/artifact/ArtifactCard'
 import { CodeBlock } from './CodeBlock'
 import { TurnTimeline } from './TurnTimeline'
 import { Badge } from '@/components/ui/Badge'
@@ -68,6 +69,9 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>
+        {!streaming && message.role === 'assistant' && (
+          <ArtifactCard toolCalls={message.toolCalls} />
+        )}
         {!streaming && (
           <div className="mt-1 flex items-center gap-2">
             <MessageActions message={message} isLastAssistant={!!isLastAssistant} />

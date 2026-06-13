@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript (ESM, `.js` import suffixes), `@langchain/langgraph` 1.3.6, `@langchain/openai` (`ReasoningChatOpenAI`), `@langchain/core` messages, `vitest`, node:sqlite. This is Phase 1 of the design in `docs/superpowers/specs/2026-06-13-agent-loop-design.md`. **Out of scope (later phases):** HITL interrupt/resume, doom-loop detection, retry/backoff, auto-compaction (P2); `write_todos` UI, `task` subagents (P3).
 
+> **⚠️ Running tests (read first):** there is NO sidecar-local vitest config. The root `vitest.config.ts` includes `packages/sidecar/src/**/*.test.ts` and its `setupFiles: ['./vitest.setup.ts']` resolves at the repo root. So **run every vitest command from the repo root with the full path**, e.g. `npx vitest run packages/sidecar/src/session/tools.test.ts` — NOT `cd packages/sidecar && npx vitest run src/...` (that fails to find `vitest.setup.ts`). Always pass explicit test-file paths (never a bare `vitest run src` — it substring-matches and fires paid real-LLM suites). The `tsc --noEmit` type-check IS run from `packages/sidecar` (it uses the sidecar tsconfig). The per-task commands below that say `cd packages/sidecar && npx vitest …` are superseded by this note.
+
 ---
 
 ## File structure

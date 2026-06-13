@@ -26,6 +26,7 @@
   --role-planner: #1a8cd8;
   --role-coder: #3d9a50;
   --role-reviewer: #c77a1a;
+  --role-worker: #0d8a8a;
   /* Titlebar overlay: pushes sidebar content below macOS traffic lights */
   --traffic-lights-offset: 40px;
 }

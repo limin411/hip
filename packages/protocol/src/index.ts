@@ -1,4 +1,4 @@
-export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer'
+export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer' | 'worker'
 
 export interface SessionConfig {
   llmProvider: string          // provider id (was the 'deepseek' literal)
@@ -76,7 +76,7 @@ export type ToolStatus = 'running' | 'finished' | 'error'
 export interface ToolCall {
   callId: string
   agentId: string          // who called it: supervisor | a sub-agent (e.g. worker-1)
-  name: string             // 'read_file' | 'write_file' | 'edit_file' | 'task' | …
+  name: string             // 'read_file' | 'write_file' | 'edit_file' | 'task' | … ('task' delegations are valid here)
   input: string            // JSON-stringified args; clipped to ~4 KB if huge
   output?: string          // JSON-stringified result; absent while running
   status: ToolStatus

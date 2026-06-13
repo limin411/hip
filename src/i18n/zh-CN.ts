@@ -96,7 +96,7 @@ export const zhCN = {
       },
       waiting: '等待中…',
       subAgents: '子智能体',
-      roles: { supervisor: '主管', planner: '规划员', coder: '编码员', reviewer: '审查员' },
+      roles: { supervisor: '主管', planner: '规划员', coder: '编码员', reviewer: '审查员', worker: '工作员' },
       toolsCount: '{{count}} 次工具调用',
       delegatedBy: '委派自',
       arguments: '参数',

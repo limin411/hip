@@ -96,7 +96,7 @@ export const en = {
       },
       waiting: 'Waiting…',
       subAgents: 'Sub-agents',
-      roles: { supervisor: 'Supervisor', planner: 'Planner', coder: 'Coder', reviewer: 'Reviewer' },
+      roles: { supervisor: 'Supervisor', planner: 'Planner', coder: 'Coder', reviewer: 'Reviewer', worker: 'Worker' },
       toolsCount: '{{count}} tools',
       delegatedBy: 'delegated by',
       arguments: 'Arguments',

@@ -27,8 +27,10 @@
   --role-coder: #3d9a50;
   --role-reviewer: #c77a1a;
   --role-worker: #0d8a8a;
-  /* 全宽标题栏承载红绿灯；各列不再单独偏移。菜单栏宽度 = 标题栏左侧红绿灯让位区宽度。 */
+  /* 全宽标题栏承载红绿灯；各列不再单独偏移。 */
   --rail-width: 72px;
+  /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
+  --titlebar-lights-inset: 90px;
 }
 
 html,

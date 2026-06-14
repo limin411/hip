@@ -17,8 +17,8 @@ export function TitleBar() {
       data-tauri-drag-region
       className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface"
     >
-      {/* 为 macOS 红绿灯让位，并与菜单栏同宽对齐 */}
-      <div className="shrink-0" style={{ width: 'var(--rail-width, 72px)' }} aria-hidden />
+      {/* 为 macOS 红绿灯整簇让位（约 x19→77），留足间距后再放折叠按钮，避免与绿灯相撞 */}
+      <div className="shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
       <SidebarToggle />
 
       {activeView === 'chat' ? (

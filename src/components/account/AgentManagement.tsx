@@ -38,11 +38,11 @@ export function AgentManagement() {
             <div className="min-w-0 flex-1">
               <div className="text-body font-medium text-ink">
                 {a.name}
-                {!a.enabled && <span className="ml-2 text-meta text-ink-tertiary">(off)</span>}
+                {!a.enabled && <span className="ml-2 text-meta text-ink-tertiary">({t('settings.agents.off')})</span>}
               </div>
               <div className="truncate text-meta text-ink-tertiary">
                 {a.command}{a.args.length > 0 ? ` ${a.args.join(' ')}` : ''} · {a.transport}
-                {a.boundModel ? ` · ${a.boundModel.modelID}` : ''}
+                {a.boundModel ? ` · ${a.boundModel.providerID}/${a.boundModel.modelID}` : ''}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 pl-3">
@@ -159,7 +159,7 @@ function AgentEditor({
     <Modal
       open
       onOpenChange={(o) => { if (!o) onCancel() }}
-      title={t('settings.agents.addCustom')}
+      title={initial ? t('settings.agents.editTitle') : t('settings.agents.addCustom')}
       resizable
       defaultSize={{ width: 560, height: 560 }}
       minSize={{ width: 480, height: 440 }}

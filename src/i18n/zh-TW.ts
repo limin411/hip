@@ -247,6 +247,8 @@ export const zhTW = {
         cancel: '取消',
         delete: '刪除',
         edit: '編輯',
+        editTitle: '編輯智能體',
+        off: '已停用',
         error: '操作失敗，請重試。',
       },
     },

@@ -247,6 +247,8 @@ export const en = {
         cancel: 'Cancel',
         delete: 'Delete',
         edit: 'Edit',
+        editTitle: 'Edit agent',
+        off: 'off',
         error: 'Action failed. Please try again.',
       },
     },

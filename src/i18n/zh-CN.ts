@@ -247,6 +247,8 @@ export const zhCN = {
         cancel: '取消',
         delete: '删除',
         edit: '编辑',
+        editTitle: '编辑智能体',
+        off: '已停用',
         error: '操作失败，请重试。',
       },
     },

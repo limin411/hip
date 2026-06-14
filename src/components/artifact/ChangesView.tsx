@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, GitCommit, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
@@ -14,6 +15,7 @@ export function ChangesView() {
   const sessionId = useDomainStore((s) => s.activeSessionId)
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
+  const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
 
   useEffect(() => {
     if (!sessionId) return
@@ -42,7 +44,17 @@ export function ChangesView() {
     <div className="flex h-full flex-col" data-testid="changes-view">
       {/* uncommitted (top) */}
       <div className="flex min-h-0 flex-[3] flex-col border-b border-border">
-        <div className="flex h-8 shrink-0 items-center px-3 text-meta text-ink-secondary">{t('artifact.changesView.uncommitted')}</div>
+        <div className="flex h-8 shrink-0 items-center justify-between px-3 text-meta text-ink-secondary">
+          <span>{t('artifact.changesView.uncommitted')}</span>
+          <div className="inline-flex overflow-hidden rounded border border-border text-caption" data-testid="diff-view-toggle">
+            {(['unified', 'split'] as const).map((m) => (
+              <button key={m} onClick={() => setDiffViewMode(m)}
+                className={cn('px-2 py-0.5', diffViewMode === m ? 'bg-accent/15 text-accent' : 'text-ink-tertiary hover:text-ink')}>
+                {t(m === 'unified' ? 'artifact.diffView.viewUnified' : 'artifact.diffView.viewSplit')}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {diff.status !== 'ready' && !diff.state ? (
             <div className="flex h-full items-center justify-center text-ink-tertiary"><Loader2 size={16} className="animate-spin" /></div>

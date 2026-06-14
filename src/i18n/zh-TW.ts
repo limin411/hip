@@ -72,7 +72,6 @@ export const zhTW = {
     artifact: {
       files: '文件',
       agents: '智能體',
-      diff: 'Diff',
       closePanel: '關閉面板',
       diffView: {
         noSession: '沒有進行中的對話',

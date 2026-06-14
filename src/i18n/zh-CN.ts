@@ -72,7 +72,6 @@ export const zhCN = {
     artifact: {
       files: '文件',
       agents: '智能体',
-      diff: 'Diff',
       closePanel: '关闭面板',
       diffView: {
         noSession: '没有进行中的对话',

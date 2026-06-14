@@ -72,7 +72,6 @@ export const en = {
     artifact: {
       files: 'Files',
       agents: 'Agents',
-      diff: 'Diff',
       closePanel: 'Close Panel',
       diffView: {
         noSession: 'No active conversation',

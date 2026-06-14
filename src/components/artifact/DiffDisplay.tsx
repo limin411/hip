@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSummary } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
@@ -195,6 +195,3 @@ export function DiffDisplay({ files, summary, viewMode, expanded, collapsed, onT
     </>
   )
 }
-
-// Re-export to keep the toolbar refresh icon import co-located for callers that compose their own header.
-export { RefreshCw }

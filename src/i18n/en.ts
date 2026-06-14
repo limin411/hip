@@ -262,10 +262,16 @@ export const en = {
       google: 'Continue with Google',
       skip: 'Skip Login',
     },
+    nav: {
+      chat: 'Chat',
+      settings: 'Settings',
+    },
     common: {
       cancel: 'Cancel',
       close: 'Close',
       logout: 'Log Out',
+      logoutConfirmTitle: 'Log out?',
+      logoutConfirmDesc: 'You will need to log in again to continue.',
     },
   },
 } as const

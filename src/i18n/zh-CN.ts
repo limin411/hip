@@ -262,10 +262,16 @@ export const zhCN = {
       google: '使用 Google 登录',
       skip: '跳过登录',
     },
+    nav: {
+      chat: '对话',
+      settings: '设置',
+    },
     common: {
       cancel: '取消',
       close: '关闭',
       logout: '退出登录',
+      logoutConfirmTitle: '退出登录？',
+      logoutConfirmDesc: '退出后需要重新登录才能继续。',
     },
   },
 } as const

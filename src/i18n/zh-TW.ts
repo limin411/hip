@@ -262,10 +262,16 @@ export const zhTW = {
       google: '使用 Google 登錄',
       skip: '跳過登錄',
     },
+    nav: {
+      chat: '對話',
+      settings: '設定',
+    },
     common: {
       cancel: '取消',
       close: '關閉',
       logout: '登出',
+      logoutConfirmTitle: '登出？',
+      logoutConfirmDesc: '登出後需要重新登入才能繼續。',
     },
   },
 } as const

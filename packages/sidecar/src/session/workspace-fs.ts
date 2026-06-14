@@ -13,6 +13,7 @@ const TEXT_EXT = new Set([
 ])
 const TEXT_CAP = 1024 * 1024 // 1 MB
 const IMG_CAP = 5 * 1024 * 1024 // 5 MB
+const PDF_CAP = 5 * 1024 * 1024 // 5 MB
 
 export type PreviewResult =
   | { content: string; encoding: 'utf8' | 'base64'; mimeType?: string; truncated?: boolean }
@@ -84,7 +85,7 @@ export async function readHead(file: string, n: number): Promise<Buffer> {
   }
 }
 
-/** Read a file for UI preview. Text → utf8 (capped+truncated); images → base64; else error. */
+/** Read a file for UI preview. Text → utf8 (capped+truncated); images/PDFs → base64; else error. */
 export async function readForPreview(cwd: string, abs: string): Promise<PreviewResult> {
   const file = await resolveRealWithin(cwd, abs)
   const ext = path.extname(file).toLowerCase()
@@ -95,6 +96,12 @@ export async function readForPreview(cwd: string, abs: string): Promise<PreviewR
     if (stat.size > IMG_CAP) return { error: 'too_large' }
     const buf = await fs.readFile(file)
     return { content: buf.toString('base64'), encoding: 'base64', mimeType: IMAGE_MIME[ext] }
+  }
+
+  if (ext === '.pdf') {
+    if (stat.size > PDF_CAP) return { error: 'too_large' }
+    const buf = await fs.readFile(file)
+    return { content: buf.toString('base64'), encoding: 'base64', mimeType: 'application/pdf' }
   }
 
   if (TEXT_EXT.has(ext) || ext === '') {

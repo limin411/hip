@@ -16,6 +16,8 @@ beforeEach(async () => {
   // 1x1 PNG
   await fs.writeFile(path.join(root, 'logo.png'),
     Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'))
+  // minimal PDF (binary header)
+  await fs.writeFile(path.join(root, 'doc.pdf'), Buffer.from('%PDF-1.4\n%\xFF\xFF\nendobj\n', 'binary'))
 })
 afterEach(async () => { await fs.rm(root, { recursive: true, force: true }) })
 
@@ -35,7 +37,7 @@ describe('lsDir', () => {
   it('lists immediate children, dirs first, with absolute paths', async () => {
     const entries = await lsDir(root, root)
     expect(entries[0]).toMatchObject({ name: 'src', isDir: true })
-    expect(entries.slice(1).map((e) => e.name).sort()).toEqual(['README.md', 'logo.png'])
+    expect(entries.slice(1).map((e) => e.name).sort()).toEqual(['README.md', 'doc.pdf', 'logo.png'])
     expect(entries.every((e) => path.isAbsolute(e.path))).toBe(true)
   })
   it('hides dotfiles and dot-directories (e.g. .git, .env)', async () => {
@@ -55,6 +57,11 @@ describe('readForPreview', () => {
   it('reads images as base64 with an image mimeType', async () => {
     const r = await readForPreview(root, path.join(root, 'logo.png'))
     expect(r).toMatchObject({ encoding: 'base64', mimeType: 'image/png' })
+  })
+  it('reads PDFs as base64 with application/pdf mimeType', async () => {
+    const r = await readForPreview(root, path.join(root, 'doc.pdf'))
+    expect(r).toMatchObject({ encoding: 'base64', mimeType: 'application/pdf' })
+    expect(Buffer.from((r as { content: string }).content, 'base64').toString('binary')).toContain('%PDF-1.4')
   })
   it('throws when the path escapes root', async () => {
     await expect(readForPreview(root, '/etc/passwd')).rejects.toThrow()

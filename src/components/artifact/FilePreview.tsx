@@ -54,6 +54,10 @@ export function FilePreview() {
     )
   }
 
+  if (kind === 'pdf' && preview.encoding === 'base64') {
+    return <iframe data-testid="preview-pdf" title="preview" className="h-full w-full border-0 bg-white" src={`data:${preview.mimeType};base64,${preview.content}`} />
+  }
+
   if (kind === 'html') {
     return <iframe data-testid="preview-html" title="preview" sandbox="" className="h-full w-full border-0 bg-white" srcDoc={preview.content} />
   }

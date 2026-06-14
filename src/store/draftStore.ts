@@ -7,6 +7,7 @@ export interface Draft {
   mode: 'project' | 'chat'
   cwd?: string
   text: string
+  agentId?: string             // 'builtin' / undefined => built-in agent; else an AgentConfig.id
 }
 
 interface DraftStore {
@@ -15,6 +16,7 @@ interface DraftStore {
   setText: (text: string) => void
   pickProject: (cwd: string) => void
   clearProject: () => void
+  setAgentId: (agentId: string) => void
   reset: () => void
 }
 
@@ -50,6 +52,11 @@ export const useDraftStore = create<DraftStore>()(
           return { draft: { ...base, mode: 'project', cwd } }
         }),
       clearProject: () => set((s) => (s.draft ? { draft: { ...s.draft, mode: 'chat', cwd: undefined } } : s)),
+      setAgentId: (agentId) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          return { draft: { ...base, agentId } }
+        }),
       reset: () => set({ draft: null }),
     }),
     { name: 'hip-draft', storage, partialize: (s) => ({ draft: s.draft }) },

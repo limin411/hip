@@ -30,3 +30,23 @@ describe('draftStore', () => {
     expect(useDraftStore.getState().draft).toBeNull()
   })
 })
+
+describe('draftStore agentId', () => {
+  it('setAgentId creates a draft if none and records the agent', () => {
+    useDraftStore.getState().setAgentId('agent-1')
+    expect(useDraftStore.getState().draft?.agentId).toBe('agent-1')
+  })
+  it('setAgentId preserves existing draft fields', () => {
+    useDraftStore.getState().pickProject('/tmp/x')
+    useDraftStore.getState().setAgentId('agent-2')
+    const d = useDraftStore.getState().draft!
+    expect(d.cwd).toBe('/tmp/x')
+    expect(d.mode).toBe('project')
+    expect(d.agentId).toBe('agent-2')
+  })
+  it('reset clears agentId', () => {
+    useDraftStore.getState().setAgentId('agent-3')
+    useDraftStore.getState().reset()
+    expect(useDraftStore.getState().draft).toBeNull()
+  })
+})

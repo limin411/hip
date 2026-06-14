@@ -6,6 +6,7 @@ import { WsTransport } from './wsTransport'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
+import type { Draft } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import i18n from '@/i18n'
@@ -283,8 +284,7 @@ export class SessionService {
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
       const draft = useDraftStore.getState().draft
-      const config: SessionConfig =
-        draft?.mode === 'project' && draft.cwd ? { ...DEFAULT_CONFIG, cwd: draft.cwd } : DEFAULT_CONFIG
+      const config: SessionConfig = configFromDraft(draft)
       activeSessionId = this.createSession(config)
       if (draft?.cwd) useFsStore.getState().clearSession(draft.cwd)
       useDraftStore.getState().reset()
@@ -333,6 +333,13 @@ export class SessionService {
     const s = sessions.find((x) => x.id === activeSessionId)
     if (s?.status === 'running') this.transport.send({ type: 'session:load', sessionId: activeSessionId })
   }
+}
+
+/** Build the committed SessionConfig from the current draft, folding in a chosen external agent. */
+export function configFromDraft(draft: Draft | null): SessionConfig {
+  const base: SessionConfig =
+    draft?.mode === 'project' && draft.cwd ? { ...DEFAULT_CONFIG, cwd: draft.cwd } : DEFAULT_CONFIG
+  return draft?.agentId && draft.agentId !== 'builtin' ? { ...base, agentId: draft.agentId } : base
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

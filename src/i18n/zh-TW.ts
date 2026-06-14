@@ -53,6 +53,7 @@ export const zhTW = {
       agentBuiltin: 'hip',
       agentLocked: '本次對話的智能體已鎖定',
       agentRestarted: '外部智能體已重啟 —— 先前的上下文未保留。',
+      agentNeedsModel: '請先在設定中設定模型',
       todos: {
         plan: '計畫',
         pending: '待辦',

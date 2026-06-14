@@ -53,6 +53,7 @@ export const zhCN = {
       agentBuiltin: 'hip',
       agentLocked: '本次对话的智能体已锁定',
       agentRestarted: '外部智能体已重启 —— 之前的上下文未保留。',
+      agentNeedsModel: '请先在设置中配置模型',
       todos: {
         plan: '计划',
         pending: '待办',

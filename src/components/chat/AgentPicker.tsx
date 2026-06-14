@@ -4,6 +4,7 @@ import { Bot, Check, Lock } from 'lucide-react'
 import { useActiveSession, useActiveSessionId } from '@/domain'
 import { useDraftStore } from '@/store/draftStore'
 import { useAgentsStore } from '@/store/agentsStore'
+import { useProvidersStore } from '@/store/providersStore'
 import { cn } from '@/lib/utils'
 import { ComposerChip } from './ComposerChip'
 import {
@@ -22,6 +23,7 @@ export function AgentPicker() {
   const load = useAgentsStore((s) => s.load)
   const draft = useDraftStore((s) => s.draft)
   const setAgentId = useDraftStore((s) => s.setAgentId)
+  const config = useProvidersStore((s) => s.config)
 
   useEffect(() => { if (!loaded) void load() }, [loaded, load])
 
@@ -60,13 +62,20 @@ export function AgentPicker() {
           <Check size={14} className={cn('shrink-0', currentId === 'builtin' ? 'opacity-100' : 'opacity-0')} />
           <span>{t('chat.agentBuiltin')}</span>
         </DropdownMenuItem>
-        {enabled.map((a) => (
-          <DropdownMenuItem key={a.id} onSelect={() => setAgentId(a.id)}>
-            <Check size={14} className={cn('shrink-0', currentId === a.id ? 'opacity-100' : 'opacity-0')} />
-            <span className="truncate">{a.name}</span>
-            {a.boundModel && <span className="ml-2 text-meta text-ink-tertiary">{a.boundModel.modelID}</span>}
-          </DropdownMenuItem>
-        ))}
+        {enabled.map((a) => {
+          const ready =
+            !a.acceptsModelConfig ||
+            (!!a.boundModel && !!config.providers[a.boundModel.providerID]?.enabled)
+          return (
+            <DropdownMenuItem key={a.id} disabled={!ready} onSelect={() => { if (ready) setAgentId(a.id) }}>
+              <Check size={14} className={cn('shrink-0', currentId === a.id ? 'opacity-100' : 'opacity-0')} />
+              <span className="truncate">{a.name}</span>
+              {ready
+                ? (a.boundModel && <span className="ml-2 text-meta text-ink-tertiary">{a.boundModel.modelID}</span>)
+                : <span className="ml-2 text-meta text-ink-tertiary">{t('chat.agentNeedsModel')}</span>}
+            </DropdownMenuItem>
+          )
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   )

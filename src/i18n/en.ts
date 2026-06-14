@@ -53,6 +53,7 @@ export const en = {
       agentBuiltin: 'hip',
       agentLocked: 'Agent is locked for this conversation',
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
+      agentNeedsModel: 'Set a model in Settings first',
       todos: {
         plan: 'Plan',
         pending: 'To do',

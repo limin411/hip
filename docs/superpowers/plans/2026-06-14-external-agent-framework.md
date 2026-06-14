@@ -1322,7 +1322,7 @@ In `en.ts` add to `settings` (after `model`/`modelConfig`):
   agentsLabel: 'Agent Management',
   agents: {
     title: 'Agent Management',
-    intro: 'Register external CLI agents. The built-in hip agent is always the default.',
+    intro: 'Register external agents. The built-in hip agent is always the default.',
     builtinName: 'hip (built-in)',
     builtinDesc: 'The default agent. Cannot be edited.',
     add: 'Add agent',
@@ -1360,7 +1360,7 @@ In `zh-CN.ts` (Simplified Chinese):
   agentsLabel: '智能体管理',
   agents: {
     title: '智能体管理',
-    intro: '接入外部命令行智能体。内置 hip 智能体始终为默认。',
+    intro: '接入外部智能体',
     builtinName: 'hip（内置）',
     builtinDesc: '默认智能体，不可编辑。',
     add: '添加智能体',

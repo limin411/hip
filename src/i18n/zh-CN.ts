@@ -229,7 +229,7 @@ export const zhCN = {
       agentsLabel: '智能体管理',
       agents: {
         title: '智能体管理',
-        intro: '接入外部命令行智能体。内置 hip 智能体始终为默认。',
+        intro: '接入外部智能体',
         builtinName: 'hip（内置）',
         builtinDesc: '默认智能体，不可编辑。',
         add: '添加智能体',

@@ -229,7 +229,7 @@ export const en = {
       agentsLabel: 'Agent Management',
       agents: {
         title: 'Agent Management',
-        intro: 'Register external CLI agents. The built-in hip agent is always the default.',
+        intro: 'Register external agents. The built-in hip agent is always the default.',
         builtinName: 'hip (built-in)',
         builtinDesc: 'The default agent. Cannot be edited.',
         add: 'Add agent',

@@ -229,7 +229,7 @@ export const zhTW = {
       agentsLabel: '智能體管理',
       agents: {
         title: '智能體管理',
-        intro: '接入外部命令列智能體。內建 hip 智能體始終為預設。',
+        intro: '接入外部智能體。內建 hip 智能體始終為預設。',
         builtinName: 'hip（內建）',
         builtinDesc: '預設智能體，不可編輯。',
         add: '新增智能體',

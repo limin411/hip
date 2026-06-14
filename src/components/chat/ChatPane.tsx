@@ -15,7 +15,7 @@ export function ChatPane() {
   const error = useActiveSessionError()
   const status = useActiveSessionStatus()
   const interrupt = useActiveInterrupt()
-  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen)
+  const setActiveView = useUiStore((s) => s.setActiveView)
   const scrollTargetMessageId = useUiStore((s) => s.scrollTargetMessageId)
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -151,7 +151,7 @@ export function ChatPane() {
               </p>
               {error.code === 'NO_API_KEY' ? (
                 <button
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => setActiveView('settings')}
                   className="mt-2 rounded-md bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover"
                 >
                   {t('chat.openSettings')}

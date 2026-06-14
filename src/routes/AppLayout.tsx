@@ -9,6 +9,8 @@ import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
+import { MenuRail } from '@/components/rail/MenuRail'
+import { SettingsPage } from '@/components/account/SettingsPage'
 
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
@@ -16,6 +18,7 @@ export function AppLayout() {
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
+  const activeView = useUiStore((s) => s.activeView)
   const activeSessionId = useActiveSessionId()
 
   useEffect(() => {
@@ -34,8 +37,10 @@ export function AppLayout() {
   }, [collapsed])
 
   return (
-    <div className="relative h-dvh w-screen overflow-hidden bg-surface">
-      <PanelGroup direction="horizontal" className="h-full w-full">
+    <div className="relative flex h-dvh w-screen overflow-hidden bg-surface">
+      <MenuRail />
+      <div className="relative min-w-0 flex-1">
+        <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={sidebarRef}
           defaultSize={14}
@@ -90,9 +95,16 @@ export function AppLayout() {
             </Panel>
           </>
         )}
-      </PanelGroup>
+        </PanelGroup>
 
-      <SidebarPeek />
+        {activeView === 'chat' && <SidebarPeek />}
+
+        {activeView === 'settings' && (
+          <div className="absolute inset-0 z-20 bg-surface">
+            <SettingsPage />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

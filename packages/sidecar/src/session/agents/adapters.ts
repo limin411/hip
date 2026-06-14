@@ -3,6 +3,7 @@ import type { ResolvedModel } from './registry.js'
 /** The standard env contract a custom external agent reads. A per-agent adapter (Plan B) may remap these. */
 export function buildModelEnv(m: ResolvedModel): Record<string, string> {
   return {
+    HIP_PROVIDER: m.providerID,
     HIP_MODEL: m.modelID,
     HIP_BASE_URL: m.baseURL,
     ...(m.apiKey ? { HIP_API_KEY: m.apiKey } : {}),

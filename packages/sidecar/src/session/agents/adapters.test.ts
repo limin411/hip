@@ -4,10 +4,10 @@ import { buildModelEnv, parseRichLine } from './adapters.js'
 describe('buildModelEnv', () => {
   it('maps a resolved model to the HIP_* env contract', () => {
     expect(buildModelEnv({ providerID: 'acme', modelID: 'acme-large', baseURL: 'https://acme.test/v1', apiKey: 'sk' }))
-      .toEqual({ HIP_MODEL: 'acme-large', HIP_BASE_URL: 'https://acme.test/v1', HIP_API_KEY: 'sk' })
+      .toEqual({ HIP_PROVIDER: 'acme', HIP_MODEL: 'acme-large', HIP_BASE_URL: 'https://acme.test/v1', HIP_API_KEY: 'sk' })
   })
   it('omits HIP_API_KEY when there is no key', () => {
-    expect(buildModelEnv({ providerID: 'acme', modelID: 'm', baseURL: 'u' })).toEqual({ HIP_MODEL: 'm', HIP_BASE_URL: 'u' })
+    expect(buildModelEnv({ providerID: 'acme', modelID: 'm', baseURL: 'u' })).toEqual({ HIP_PROVIDER: 'acme', HIP_MODEL: 'm', HIP_BASE_URL: 'u' })
   })
 })
 

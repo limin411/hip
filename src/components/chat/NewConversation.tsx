@@ -4,6 +4,7 @@ import { useDraftStore } from '@/store/draftStore'
 import { sessionService } from '@/domain'
 import { Composer } from './Composer'
 import { FolderPill } from './FolderPill'
+import { AgentPicker } from './AgentPicker'
 
 export function NewConversation() {
   const { t } = useTranslation()
@@ -23,7 +24,7 @@ export function NewConversation() {
     <div className="flex flex-1 flex-col items-center overflow-y-auto px-5" data-testid="new-conversation">
       <div className="mt-[20vh] w-full max-w-3xl">
         <h1 className="mb-4 text-center text-display font-semibold text-ink">{t('chat.newConversationGreeting')}</h1>
-        <Composer value={text} onChange={(v) => useDraftStore.getState().setText(v)} onSubmit={submit} autoFocus />
+        <Composer value={text} onChange={(v) => useDraftStore.getState().setText(v)} onSubmit={submit} autoFocus leftSlot={<AgentPicker />} />
         <div className="mt-2 flex justify-center">
           <FolderPill />
         </div>

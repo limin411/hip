@@ -71,13 +71,14 @@ export class SessionManager {
         send({ type: 'session:search:result', query: msg.query, hits: this.store?.search(msg.query) ?? [] })
         break
       case 'session:delete': {
-        // Best-effort clean of the checkpoint shadow refs BEFORE the row goes (resolve cwd from the
-        // in-memory session, else the persisted config). Never block deletion on a git failure.
+        // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
+        // store delete + session:deleted being immediate — no await before them). The shadow-ref
+        // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
         const delCwd = this.resolveSessionCwd(msg.sessionId)
-        if (delCwd) await workspaceGit.deleteCheckpointRefs(delCwd, msg.sessionId).catch(() => {})
         this.store?.deleteSession(msg.sessionId)
         this.sessions.delete(msg.sessionId)
         removeScratchDir(msg.sessionId, this.scratchRoot)
+        if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, msg.sessionId).catch(() => {})
         send({ type: 'session:deleted', sessionId: msg.sessionId })
         break
       }

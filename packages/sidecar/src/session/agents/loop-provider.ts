@@ -43,11 +43,23 @@ export class LoopAgentProvider implements AgentProvider {
       const payload = this.agent.transport === 'rich'
         ? JSON.stringify({ type: 'user', text }) + '\n'
         : text + RS
-      this.child!.stdin.write(payload)
+      // If the child died without its exit handler having cleared this.child yet, the write throws
+      // synchronously (EPIPE / ERR_STREAM_DESTROYED). Route it through settle so the abort listener
+      // is removed (no leak) and the turn rejects with a descriptive error.
+      try {
+        this.child!.stdin.write(payload)
+      } catch (err) {
+        this.settle('reject', new Error(`failed to write to agent: ${err instanceof Error ? err.message : String(err)}`))
+      }
     })
   }
 
-  dispose(): void { this.kill() }
+  dispose(): void {
+    // Reject any in-flight turn immediately rather than waiting up to KILL_GRACE_MS for the child's
+    // exit to fire. settle is a no-op when this.active is null.
+    this.settle('reject', abortError())
+    this.kill()
+  }
 
   private spawnChild(): ChildProcessWithoutNullStreams {
     const env: NodeJS.ProcessEnv = { ...process.env }
@@ -56,10 +68,14 @@ export class LoopAgentProvider implements AgentProvider {
     const child = spawn(this.agent.command, this.agent.args, { cwd: this.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => this.onStdout(chunk))
-    child.stderr.on('data', (chunk: string) => { this.stderrTail = (this.stderrTail + chunk).slice(-2000) })
-    child.on('error', (err) => this.settle('reject', new Error(`agent process error: ${err.message}`)))
+    // Guard every handler against a stale child: after an abort, the old child is SIGINT'd but
+    // exits asynchronously, by which point a new child may already be current. A stale handler
+    // must not clobber this.child / settle / append to buffers for the new turn.
+    child.stdout.on('data', (chunk: string) => { if (child !== this.child) return; this.onStdout(chunk) })
+    child.stderr.on('data', (chunk: string) => { if (child !== this.child) return; this.stderrTail = (this.stderrTail + chunk).slice(-2000) })
+    child.on('error', (err) => { if (child !== this.child) return; this.settle('reject', new Error(`agent process error: ${err.message}`)) })
     child.on('exit', (code) => {
+      if (child !== this.child) return
       this.child = null
       const tail = this.stderrTail.trim().slice(-500)
       this.settle('reject', new Error(`agent exited (code ${code ?? 'null'})${tail ? `: ${tail}` : ''}`))
@@ -117,6 +133,10 @@ export class LoopAgentProvider implements AgentProvider {
     const c = this.child
     if (!c) return
     this.child = null
+    // Detach all listeners so this (now dying) child can no longer fire any handler — belt-and-
+    // suspenders with the per-handler `child !== this.child` guard, since handlers are also bound
+    // to the local child const.
+    c.removeAllListeners()
     try { c.kill('SIGINT') } catch { /* already gone */ }
     const t = setTimeout(() => { try { c.kill('SIGKILL') } catch { /* gone */ } }, KILL_GRACE_MS)
     t.unref?.()

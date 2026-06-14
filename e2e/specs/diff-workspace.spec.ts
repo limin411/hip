@@ -37,19 +37,31 @@ describe('workspace git diff', () => {
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ reverse: true, timeout: 30000 })
   })
 
-  it('shows the not-a-repo state with an init button on the Diff tab', async () => {
-    await (await browser.$('[data-testid="tab-diff"]')).click()
-    await (await browser.$('[data-testid="diff-init"]')).waitForExist({ timeout: 30000 })
+  it('shows the not-a-repo state with an init button on the Changes tab', async () => {
+    await (await browser.$('[data-testid="tab-changes"]')).click()
+    // ChangesView renders the not-a-repo Empty state with a one-click init Button.
+    // The init Button carries no dedicated testid; match it by its localized label
+    // (partial match — the button may also render a leading spinner icon).
+    // TODO(manual): add a data-testid to the init Button to harden this selector.
+    await (await browser.$('button*=初始化 git 仓库')).waitForExist({ timeout: 30000 })
   })
 
   it('one-click init produces a clean baseline', async () => {
-    await (await browser.$('[data-testid="diff-init"]')).click()
-    await (await browser.$('[data-testid="diff-clean"]')).waitForExist({ timeout: 30000 })
+    await (await browser.$('button*=初始化 git 仓库')).click()
+    // Once the workspace is a repo, ChangesView swaps the Empty state for its
+    // changes-view container (uncommitted diff on top, commit log below).
+    await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 30000 })
   })
 
-  it('an out-of-band file change appears after manual refresh', async () => {
+  it('an out-of-band file change appears in the changes view', async () => {
     fs.writeFileSync(path.join(dir, 'hello.txt'), 'changed\n')
-    await (await browser.$('[data-testid="diff-refresh"]')).click()
+    // The Changes tab has no manual refresh control anymore — ChangesView re-requests
+    // the diff on (re)mount, and the sidecar pushes diff updates. Re-activate the tab
+    // to force a fresh requestDiff, then wait for the file block to appear.
+    // TODO(manual): the removed diff-refresh button has no successor; if the out-of-band
+    // change does not surface promptly, verify the sidecar diff-watch / push path manually.
+    await (await browser.$('[data-testid="tab-files"]')).click()
+    await (await browser.$('[data-testid="tab-changes"]')).click()
     const file = await browser.$('[data-testid="diff-file"]')
     await file.waitForExist({ timeout: 30000 })
     await browser.waitUntil(async () => (await file.getText()).includes('hello.txt'), { timeout: 10000, interval: 500 })
@@ -57,27 +69,10 @@ describe('workspace git diff', () => {
 
   // ── Tier-2 UX assertions ────────────────────────────────────────────────
 
-  it('base toggle is present in the toolbar', async () => {
-    // diff-view must already be showing (prior test left us on the Diff tab with a changed file)
-    const toggle = await browser.$('[data-testid="diff-base-toggle"]')
-    await toggle.waitForExist({ timeout: 10000 })
-    expect(await toggle.isExisting()).toBe(true)
-  })
-
-  it('base toggle defaults to session-start when hasSessionStart is true (or vs HEAD when snapshot unavailable)', async () => {
-    // The active button inside diff-base-toggle should be highlighted (bg-accent/15).
-    // We cannot assert which exact base is active without knowing sidecar snapshot state,
-    // but we can assert that exactly one button is active.
-    const toggle = await browser.$('[data-testid="diff-base-toggle"]')
-    await toggle.waitForExist({ timeout: 10000 })
-    const buttons = await toggle.$$('button')
-    const activeCount = (
-      await Promise.all(buttons.map((b: WebdriverIO.Element) => b.getAttribute('class')))
-    ).filter((cls: string | null) => cls && cls.includes('bg-accent')).length
-    expect(activeCount).toBe(1)
-    // TODO(manual): verify the default active segment is "Since session start" when
-    // the sidecar successfully captures a snapshot for a git-repo session.
-  })
+  // TODO(manual): the per-diff base toggle (formerly diff-base-toggle) was removed from
+  // the Changes view. Base selection now lives in the Timeline tab as the checkpoint
+  // mode toggle (timeline-mode-toggle: this-turn / since-then / since-start). Verify
+  // that mode toggle and its default-active segment manually in the Timeline tab.
 
   it('split view toggle is present and switches to two-column layout', async () => {
     const viewToggle = await browser.$('[data-testid="diff-view-toggle"]')
@@ -85,12 +80,12 @@ describe('workspace git diff', () => {
     // Click the Split button (second button in the toggle)
     const splitBtn = await viewToggle.$('button:nth-child(2)')
     await splitBtn.click()
-    // After switching to split mode, the diff-view should still exist
-    const diffView = await browser.$('[data-testid="diff-view"]')
-    await diffView.waitForExist({ timeout: 5000 })
+    // After switching to split mode, the changes-view container should still exist
+    const changesView = await browser.$('[data-testid="changes-view"]')
+    await changesView.waitForExist({ timeout: 5000 })
     // The hunk area renders two columns separated by a divider; assert the view element is present
     // (structural column verification requires DOM inspection — left as TODO(manual) below)
-    expect(await diffView.isExisting()).toBe(true)
+    expect(await changesView.isExisting()).toBe(true)
     // TODO(manual): visually verify that the split view renders old content on the left and
     // new content on the right with a vertical divider between them.
     // Restore unified mode so subsequent tests are not affected

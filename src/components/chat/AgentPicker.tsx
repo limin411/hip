@@ -27,13 +27,16 @@ export function AgentPicker() {
 
   useEffect(() => { if (!loaded) void load() }, [loaded, load])
 
-  // Committed session: locked read-only badge, only for external agents.
+  // Committed session: read-only locked badge that always shows the agent in use
+  // (built-in included) — switching mid-conversation is not allowed.
   if (activeId && session) {
     const aid = session.config.agentId
-    if (!aid || aid === 'builtin') return null
-    const name = agents.find((a) => a.id === aid)?.name ?? aid
+    const isExternal = !!aid && aid !== 'builtin'
+    const name = isExternal
+      ? (agents.find((a) => a.id === aid)?.name ?? aid)
+      : t('chat.agentBuiltin')
     return (
-      <ComposerChip disabled active title={t('chat.agentLocked')} data-testid="agent-chip-locked">
+      <ComposerChip disabled active={isExternal} title={t('chat.agentLocked')} data-testid="agent-chip-locked">
         <Bot size={13} className="shrink-0" aria-hidden />
         <span className="max-w-[120px] truncate">{name}</span>
         <Lock size={11} className="shrink-0 opacity-60" aria-hidden />

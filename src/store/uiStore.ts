@@ -3,6 +3,8 @@ import type { CheckpointMode } from '@hip/protocol'
 
 export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
+export type ActiveView = 'chat' | 'settings'
+
 interface UiState {
   collapsed: boolean
   setCollapsed: (v: boolean) => void
@@ -26,6 +28,10 @@ interface UiState {
   // notice) can open Settings — not just the user menu that hosts the modal.
   settingsOpen: boolean
   setSettingsOpen: (v: boolean) => void
+
+  // 主视图：对话区（三栏）或设置独立页。视图状态驱动，不走路由。
+  activeView: ActiveView
+  setActiveView: (v: ActiveView) => void
 
   // Diff view mode: unified (default) or split (side-by-side). In-memory only,
   // resets on refresh — no persist middleware, intentionally matches activeTab style.
@@ -60,6 +66,9 @@ export const useUiStore = create<UiState>((set) => ({
 
   settingsOpen: false,
   setSettingsOpen: (v) => set((s) => (s.settingsOpen === v ? s : { settingsOpen: v })),
+
+  activeView: 'chat',
+  setActiveView: (v) => set((s) => (s.activeView === v ? s : { activeView: v })),
 
   diffViewMode: 'unified',
   setDiffViewMode: (m) => set({ diffViewMode: m }),

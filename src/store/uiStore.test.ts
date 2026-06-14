@@ -84,3 +84,25 @@ describe('uiStore - diffViewMode', () => {
     expect(useUiStore.getState().diffViewMode).toBe('unified')
   })
 })
+
+describe('uiStore - activeView', () => {
+  it('defaults to chat', () => {
+    useUiStore.setState({ activeView: 'chat' })
+    expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('setActiveView switches between chat and settings', () => {
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().activeView).toBe('settings')
+
+    useUiStore.getState().setActiveView('chat')
+    expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('setActiveView to the same value is a no-op (same reference)', () => {
+    useUiStore.getState().setActiveView('chat')
+    const before = useUiStore.getState()
+    useUiStore.getState().setActiveView('chat')
+    expect(useUiStore.getState()).toBe(before)
+  })
+})

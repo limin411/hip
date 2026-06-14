@@ -53,6 +53,7 @@ interface DiffStore {
   setActiveCheckpoint: (sessionId: string, checkpointId: string | null) => void
   setCheckpointDiffLoading: (sessionId: string, key: string) => void
   setCheckpointDiffResult: (sessionId: string, key: string, r: { state: DiffState; files?: DiffFile[]; summary?: DiffSummary; error?: string }) => void
+  clearCheckpointDiffCache: (sessionId: string) => void
   setCommitLogLoading: (sessionId: string) => void
   setCommitLogResult: (sessionId: string, r: { state: DiffState; commits: CommitLogEntry[]; error?: string }) => void
   resetTransient: () => void
@@ -83,6 +84,8 @@ export const useDiffStore = create<DiffStore>((set) => ({
   setActiveCheckpoint: (id, checkpointId) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, activeCheckpointId: checkpointId })) })),
   setCheckpointDiffLoading: (id, key) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: { ...s.checkpointDiff, [key]: { status: 'loading' } } })) })),
   setCheckpointDiffResult: (id, key, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: { ...s.checkpointDiff, [key]: { status: 'ready', state: r.state, files: r.files, summary: r.summary, error: r.error } } })) })),
+  // Drop only the live-tree-relative entries; '|this-turn' is tree↔tree and immutable, so keep it.
+  clearCheckpointDiffCache: (id) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, checkpointDiff: Object.fromEntries(Object.entries(s.checkpointDiff).filter(([k]) => !k.endsWith('|since-then') && !k.endsWith('|since-start'))) })) })),
   setCommitLogLoading: (id) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, commitLog: { ...s.commitLog, status: 'loading' } })) })),
   setCommitLogResult: (id, r) => set((st) => ({ bySession: patch(st.bySession, id, (s) => ({ ...s, commitLog: { status: 'ready', state: r.state, commits: r.commits, error: r.error } })) })),
   resetTransient: () => set((st) => ({

@@ -91,6 +91,8 @@ export class SessionService {
     } else if (msg.type === 'git:branch:switch:result') {
       if (msg.ok) {
         useDiffStore.getState().setBranches(msg.sessionId, useDiffStore.getState().bySession[msg.sessionId]?.branches ?? [], msg.currentBranch)
+        // Working tree changed → the live-tree-relative checkpoint diffs are now stale.
+        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
         // Branch changed → re-pull branches (current flag) + checkpoints (branch labels) + diff summary.
         this.transport.send({ type: 'git:branch:list', sessionId: msg.sessionId })
         this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
@@ -103,6 +105,8 @@ export class SessionService {
       }
     } else if (msg.type === 'git:revert:result') {
       if (msg.ok) {
+        // Worktree changed → the live-tree-relative checkpoint diffs are now stale.
+        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
         // Worktree changed → refresh the checkpoint list (safety checkpoint was added) + diff badge.
         this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
         const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
@@ -118,6 +122,8 @@ export class SessionService {
         for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
         if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
       }
+      // 改完文件 → 工作区变了,相对实时工作树的检查点 diff 缓存失效。
+      useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
       // 改完文件 → 总是刷新角标(便宜) + 检查点列表(新一轮可能新建了 checkpoint)。
       const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
       this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })

@@ -133,6 +133,17 @@ describe('diffStore', () => {
     useDiffStore.getState().setCheckpointDiffResult('s1', key, { state: 'error', error: 'boom' })
     expect(useDiffStore.getState().bySession['s1'].checkpointDiff[key]).toEqual({ status: 'ready', state: 'error', files: undefined, summary: undefined, error: 'boom' })
   })
+  it('clearCheckpointDiffCache drops only the live-tree (since-then/since-start) entries', () => {
+    useDiffStore.getState().setCheckpointDiffResult('s1', 's1:t1|this-turn', { state: 'ok', files: [file], summary })
+    useDiffStore.getState().setCheckpointDiffResult('s1', 's1:t1|since-then', { state: 'ok', files: [file], summary })
+    useDiffStore.getState().setCheckpointDiffResult('s1', 's1:t1|since-start', { state: 'ok', files: [file], summary })
+    useDiffStore.getState().clearCheckpointDiffCache('s1')
+    const cd = useDiffStore.getState().bySession['s1'].checkpointDiff
+    expect(Object.keys(cd)).toEqual(['s1:t1|this-turn'])
+    expect(cd['s1:t1|this-turn']).toMatchObject({ status: 'ready', state: 'ok' })
+    expect(cd['s1:t1|since-then']).toBeUndefined()
+    expect(cd['s1:t1|since-start']).toBeUndefined()
+  })
   it('commitLog loading→ready transitions and stores commits', () => {
     useDiffStore.getState().setCommitLogLoading('s1')
     expect(useDiffStore.getState().bySession['s1'].commitLog).toMatchObject({ status: 'loading', commits: [] })

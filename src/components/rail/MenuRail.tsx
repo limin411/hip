@@ -32,21 +32,12 @@ export function MenuRail() {
   return (
     <div
       data-tauri-drag-region
-      className="relative z-50 flex h-full w-[72px] shrink-0 flex-col items-center bg-surface-subtle"
+      style={{ width: 'var(--rail-width, 72px)' }}
+      // z-50：盖住 SidebarPeek 关闭态因 rail 偏移而残留的缝隙（浮层锚在 chat 容器而非窗口左缘）
+      className="relative z-50 flex h-full shrink-0 flex-col items-center border-r border-border bg-surface-subtle"
     >
-      {/* 右侧分隔线只从标题栏带下方开始 —— 红绿灯所在的顶部带保持连续无边框，
-          按钮无论落点都不会“撞线”冲进侧栏（借鉴 Claude/Codex 的连续 chrome）。 */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 right-0 w-px bg-border"
-        style={{ top: 'var(--traffic-lights-offset, 40px)' }}
-      />
-
-      {/* 红绿灯偏移 + 品牌标志（drag region）。macOS 窗口按钮停靠在本栏顶部，logo 在其下方。 */}
-      <div
-        className="flex w-full flex-col items-center"
-        style={{ paddingTop: 'var(--traffic-lights-offset, 40px)' }}
-      >
+      {/* 品牌标志（红绿灯已移至全宽标题栏，本栏顶部不再预留偏移） */}
+      <div className="flex w-full flex-col items-center pt-3">
         <HipLogo variant="minimal" size={26} decorative />
       </div>
 

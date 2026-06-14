@@ -6,9 +6,15 @@ export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 export type ActiveView = 'chat' | 'settings'
 
 interface UiState {
+  // 对话列表（会话侧栏）折叠态
   collapsed: boolean
   setCollapsed: (v: boolean) => void
   toggleCollapsed: () => void
+
+  // 设置页分类侧栏折叠态 —— 与 collapsed 同构，便于标题栏的统一折叠按钮按当前视图分派
+  settingsNavCollapsed: boolean
+  setSettingsNavCollapsed: (v: boolean) => void
+  toggleSettingsNav: () => void
 
   search: string
   setSearch: (q: string) => void
@@ -42,6 +48,11 @@ export const useUiStore = create<UiState>((set) => ({
   collapsed: false,
   setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
   toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
+
+  settingsNavCollapsed: false,
+  setSettingsNavCollapsed: (v) =>
+    set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
+  toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
 
   search: '',
   setSearch: (q) => set({ search: q }),

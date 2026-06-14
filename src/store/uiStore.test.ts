@@ -5,6 +5,7 @@ import { useUiStore } from './uiStore'
 beforeEach(() => {
   useUiStore.setState({
     collapsed: false,
+    settingsNavCollapsed: false,
     search: '',
     panelOpen: false,
     activeTab: 'agents',
@@ -82,6 +83,33 @@ describe('uiStore - diffViewMode', () => {
 
     useUiStore.getState().setDiffViewMode('unified')
     expect(useUiStore.getState().diffViewMode).toBe('unified')
+  })
+})
+
+describe('uiStore - settingsNavCollapsed', () => {
+  it('defaults to expanded (false)', () => {
+    expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
+  })
+
+  it('toggleSettingsNav flips the collapsed flag', () => {
+    useUiStore.getState().toggleSettingsNav()
+    expect(useUiStore.getState().settingsNavCollapsed).toBe(true)
+
+    useUiStore.getState().toggleSettingsNav()
+    expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
+  })
+
+  it('setSettingsNavCollapsed to the same value is a no-op (same reference)', () => {
+    useUiStore.getState().setSettingsNavCollapsed(false)
+    const before = useUiStore.getState()
+    useUiStore.getState().setSettingsNavCollapsed(false)
+    expect(useUiStore.getState()).toBe(before)
+  })
+
+  it('chat collapsed and settings nav collapse are independent', () => {
+    useUiStore.getState().setSettingsNavCollapsed(true)
+    expect(useUiStore.getState().collapsed).toBe(false)
+    expect(useUiStore.getState().settingsNavCollapsed).toBe(true)
   })
 })
 

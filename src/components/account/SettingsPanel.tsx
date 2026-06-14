@@ -1,9 +1,10 @@
-import type { RefObject } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { SlidersHorizontal, Cpu, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useUiStore } from '@/store/uiStore'
 import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
@@ -14,16 +15,26 @@ const PAGES = [
   { id: 'agents', icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
 ] as const
 
-interface SettingsPanelProps {
-  navRef: RefObject<ImperativePanelHandle>
-  onNavCollapsedChange: (collapsed: boolean) => void
-}
-
-export function SettingsPanel({ navRef, onNavCollapsedChange }: SettingsPanelProps) {
+export function SettingsPanel() {
   const { t } = useTranslation()
+  const navRef = useRef<ImperativePanelHandle>(null)
+  const navCollapsed = useUiStore((s) => s.settingsNavCollapsed)
+  const setNavCollapsed = useUiStore((s) => s.setSettingsNavCollapsed)
+
+  // 折叠态由 store 驱动（标题栏统一按钮 → settingsNavCollapsed），命令式同步到 Panel，
+  // 与对话侧栏（AppLayout 同款 effect）完全一致。
+  useEffect(() => {
+    const p = navRef.current
+    if (!p) return
+    const id = setTimeout(() => {
+      if (navCollapsed && !p.isCollapsed()) p.collapse()
+      if (!navCollapsed && p.isCollapsed()) p.expand()
+    }, 0)
+    return () => clearTimeout(id)
+  }, [navCollapsed])
 
   // 左侧分类栏完全参照「对话列表」侧栏：同色（bg-surface）、可拖拽缩放（同款 PanelResizeHandle）、
-  // 且可最小化（折叠到 0，由标题栏的折叠按钮控制）。
+  // 且可最小化（折叠到 0，由标题栏的统一折叠按钮控制）。
   return (
     <TabsPrimitive.Root orientation="vertical" defaultValue="general" className="h-full">
       <PanelGroup direction="horizontal" className="h-full w-full">
@@ -34,8 +45,8 @@ export function SettingsPanel({ navRef, onNavCollapsedChange }: SettingsPanelPro
           maxSize={34}
           collapsible
           collapsedSize={0}
-          onCollapse={() => onNavCollapsedChange(true)}
-          onExpand={() => onNavCollapsedChange(false)}
+          onCollapse={() => setNavCollapsed(true)}
+          onExpand={() => setNavCollapsed(false)}
         >
           <TabsPrimitive.List
             aria-label={t('settings.title')}

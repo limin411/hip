@@ -28,7 +28,7 @@ export function ChatHeader() {
   return (
     <div
       data-tauri-drag-region
-      className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface pl-14 pr-3"
+      className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface px-3"
     >
       <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-body font-medium text-ink">
         {active?.title ?? t('chat.title')}

@@ -1,7 +1,13 @@
-import { PanelRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { PanelRight } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
-import { useActiveSession, useConnectionStatus, useHasApiKey, useActiveUsageTotal, sessionService } from '@/domain'
+import {
+  useActiveSession,
+  useConnectionStatus,
+  useHasApiKey,
+  useActiveUsageTotal,
+  sessionService,
+} from '@/domain'
 import { Button } from '@/components/ui/Button'
 import { useProvidersStore } from '@/store/providersStore'
 import { computeCost, formatUsd } from '@/lib/usageCost'
@@ -13,7 +19,11 @@ const DOT: Record<string, string> = {
   error: 'bg-red-500',
 }
 
-export function ChatHeader() {
+/**
+ * 对话视图对标题栏的贡献：左侧连接状态 + token 用量、居中会话标题、右侧产物面板切换。
+ * 不再渲染单独的 h-11 头行 —— 直接作为 TitleBar 的子内容嵌入到全宽标题栏。
+ */
+export function ChatTitleBar() {
   const { t } = useTranslation()
   const togglePanel = useUiStore((s) => s.togglePanel)
   const active = useActiveSession()
@@ -26,14 +36,8 @@ export function ChatHeader() {
   })
 
   return (
-    <div
-      data-tauri-drag-region
-      className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface px-3"
-    >
-      <span className="pointer-events-none absolute left-1/2 max-w-[50%] -translate-x-1/2 truncate text-body font-medium text-ink">
-        {active?.title ?? t('chat.title')}
-      </span>
-      <div className="flex items-center gap-2" data-tauri-drag-region="false">
+    <>
+      <div className="flex items-center gap-2 pl-2" data-tauri-drag-region="false">
         {status === 'connected' && !hasApiKey ? (
           <>
             <span className="h-2 w-2 rounded-full bg-warning" />
@@ -41,7 +45,9 @@ export function ChatHeader() {
           </>
         ) : (
           <>
-            <span className={`h-2 w-2 rounded-full transition-colors ${DOT[status] ?? DOT.disconnected}`} />
+            <span
+              className={`h-2 w-2 rounded-full transition-colors ${DOT[status] ?? DOT.disconnected}`}
+            />
             <span className="text-caption text-ink-tertiary">
               {{
                 connecting: t('chat.connectionConnecting'),
@@ -75,6 +81,11 @@ export function ChatHeader() {
           })()}
         </span>
       )}
+
+      <span className="pointer-events-none absolute left-1/2 max-w-[40%] -translate-x-1/2 truncate text-body font-medium text-ink">
+        {active?.title ?? t('chat.title')}
+      </span>
+
       <div className="flex-1" />
       <Button
         variant="ghost"
@@ -83,9 +94,10 @@ export function ChatHeader() {
         title={t('chat.togglePanel')}
         data-tauri-drag-region="false"
         data-testid="toggle-panel"
+        className="mr-2"
       >
         <PanelRight size={17} />
       </Button>
-    </div>
+    </>
   )
 }

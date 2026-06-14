@@ -1,19 +1,12 @@
-import { useTranslation } from 'react-i18next'
 import { SettingsPanel } from './SettingsPanel'
 
+/**
+ * 设置页内容容器 —— 标题已上移到全宽 TitleBar，本组件不再渲染单独的头行。
+ */
 export function SettingsPage() {
-  const { t } = useTranslation()
   return (
-    <div className="flex h-full flex-col bg-surface">
-      <div
-        data-tauri-drag-region
-        className="flex h-11 shrink-0 items-center border-b border-border px-5"
-      >
-        <span className="text-body font-medium text-ink">{t('settings.title')}</span>
-      </div>
-      <div className="min-h-0 flex-1">
-        <SettingsPanel />
-      </div>
+    <div className="h-full bg-surface">
+      <SettingsPanel />
     </div>
   )
 }

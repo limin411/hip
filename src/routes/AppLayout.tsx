@@ -4,7 +4,6 @@ import { useUiStore } from '@/store/uiStore'
 import { sessionService, useActiveSessionId } from '@/domain'
 import { NewConversation } from '@/components/chat/NewConversation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
-import { ChatHeader } from '@/components/chat/ChatHeader'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
@@ -68,7 +67,6 @@ export function AppLayout() {
 
         <Panel minSize={34}>
           <div className="flex h-full flex-col bg-surface">
-            <ChatHeader />
             {activeSessionId == null ? (
               <NewConversation />
             ) : (

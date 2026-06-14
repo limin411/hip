@@ -9,7 +9,7 @@ export function InputBar() {
   const connection = useConnectionStatus()
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
-  // continuously, and the real recourse for a hard disconnect is the ChatHeader reconnect button.
+  // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
   const reconnecting = status === 'running' && connection !== 'connected'
   const submit = () => {
     const text = value.trim()

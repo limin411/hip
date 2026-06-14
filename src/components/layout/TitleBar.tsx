@@ -1,19 +1,33 @@
+import { useTranslation } from 'react-i18next'
+import { useUiStore } from '@/store/uiStore'
 import { SidebarToggle } from './SidebarToggle'
+import { ChatTitleBar } from './ChatTitleBar'
 
 /**
- * 贯穿整个应用顶部的标题栏（macOS Overlay 无原生标题栏，由它统一承载窗口 chrome）。
- * 红绿灯落在最左的留白区（宽度与菜单栏对齐），其右紧接全局唯一的折叠按钮。
- * 整条可拖动窗口；下方各列（菜单栏 / 侧栏 / 对话 / 产物）不再各自预留红绿灯偏移。
+ * 全宽标题栏 —— 应用唯一的横向 chrome 行：
+ *   红绿灯让位区 | 折叠侧栏按钮（统一） | 视图特定内容（状态/标题/操作）
+ * 各列（菜单栏、侧栏、对话、产物）一律渲染在本行之下，不再单独叠头。
  */
 export function TitleBar() {
+  const { t } = useTranslation()
+  const activeView = useUiStore((s) => s.activeView)
+
   return (
     <header
       data-tauri-drag-region
-      className="flex h-9 shrink-0 items-center border-b border-border bg-surface"
+      className="relative flex h-11 shrink-0 items-center border-b border-border bg-surface"
     >
       {/* 为 macOS 红绿灯让位，并与菜单栏同宽对齐 */}
       <div className="shrink-0" style={{ width: 'var(--rail-width, 72px)' }} aria-hidden />
       <SidebarToggle />
+
+      {activeView === 'chat' ? (
+        <ChatTitleBar />
+      ) : (
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 truncate text-body font-medium text-ink">
+          {t('settings.title')}
+        </span>
+      )}
     </header>
   )
 }

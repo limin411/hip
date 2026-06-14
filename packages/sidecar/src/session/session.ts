@@ -19,6 +19,7 @@ import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
 import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
+import { createAgentProvider, readAgentsConfig, resolveAgentModel, type AgentProvider } from './agents/index.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -32,6 +33,15 @@ export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
  *  thinking === false → fast non-reasoning model; otherwise the reasoner. A caller-pinned config.model wins. */
 export function resolveModel(config: SessionConfig): string {
   return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
+}
+
+/** Text of the latest human message in a turn's message list (what an external agent should answer). */
+function lastUserText(messages: BaseMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.getType() === 'human') return typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+  }
+  return ''
 }
 
 function deriveTitle(content: string): string {
@@ -197,6 +207,7 @@ export class Session {
   private turnSeq = 0
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
+  private externalProvider: AgentProvider | null = null
 
   constructor(
     readonly id: string,
@@ -234,6 +245,23 @@ export class Session {
     if (this.injectedRunner) return this.injectedRunner
     const model = (this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config)
     return new RealModelRunner(model)
+  }
+
+  /** True when this session routes turns to an external agent rather than the built-in graph. */
+  private isExternalAgent(): boolean {
+    const a = this._config.agentId
+    return !!a && a !== 'builtin'
+  }
+
+  /** Lazily build (and cache) the provider for this session's external agent. Throws on an unknown id. */
+  private ensureExternalProvider(): AgentProvider {
+    if (!this.externalProvider) {
+      const agent = readAgentsConfig().find((x) => x.id === this._config.agentId)
+      if (!agent) throw new Error(`Unknown agent: ${this._config.agentId}`)
+      const model = agent.acceptsModelConfig ? resolveAgentModel(agent) : null
+      this.externalProvider = createAgentProvider(agent, this._config.cwd ?? process.cwd(), model)
+    }
+    return this.externalProvider
   }
 
   /** The Summarizer for compaction: injected (tests), else a cheap-model summarizer for the env model,
@@ -493,6 +521,7 @@ export class Session {
    *  so the root cause (incompatibility) is surfaced even when the provider happens to have a key.
    *  Injected-model sessions (tests) are exempt — they drive arbitrary providers deliberately. */
   private requireCompatibleModel(send: SendFn): boolean {
+    if (this.isExternalAgent()) return true
     if (this.usesEnvModel) {
       const { providerID } = getActiveModel()
       if (!isOpenAICompatible(providerID)) {
@@ -505,6 +534,7 @@ export class Session {
 
   /** Emit NO_API_KEY and return false when the env-keyed active provider has no key. */
   private requireApiKey(send: SendFn): boolean {
+    if (this.isExternalAgent()) return true
     if (this.usesEnvModel) {
       const { providerID } = getActiveModel()
       if (!resolveApiKey(providerID)) {
@@ -681,21 +711,31 @@ export class Session {
     const ctx: GraphCtx = { runner, tools, emit, summarizer }
 
     try {
-      const finalState = await this.app.invoke(
-        { messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)], steps: base?.steps ?? 0, recentSigs: [], nudgedSig: undefined, status: 'running' },
-        { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
-      )
-      closeReasoning('supervisor')
-      finishRemaining()
-      if (finalState.status === 'awaiting_user') {
-        // Stash the rich graph history (minus the leading system msg) so resume re-plans with full
-        // context, finalize this turn as stopped, and ask the user. The finally below stops the
-        // watchdog and clears `running`; `awaitingResume` makes the next user message a resume.
-        this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }
-        this.awaitingResume = true
-        const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
-        send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
-        return stoppedText
+      if (this.isExternalAgent()) {
+        // External-agent turn: dispatch to the provider, which streams tokens/reasoning/tool events
+        // back through the SAME `emit` (so supervisorText accumulates) and resolves on end-of-turn.
+        // No awaiting_user path — external agents don't surface the graph's HITL pause.
+        const userText = lastUserText(base?.messages ?? this.messages)
+        await this.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal)
+        closeReasoning('supervisor')
+        finishRemaining()
+      } else {
+        const finalState = await this.app.invoke(
+          { messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)], steps: base?.steps ?? 0, recentSigs: [], nudgedSig: undefined, status: 'running' },
+          { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
+        )
+        closeReasoning('supervisor')
+        finishRemaining()
+        if (finalState.status === 'awaiting_user') {
+          // Stash the rich graph history (minus the leading system msg) so resume re-plans with full
+          // context, finalize this turn as stopped, and ask the user. The finally below stops the
+          // watchdog and clears `running`; `awaitingResume` makes the next user message a resume.
+          this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }
+          this.awaitingResume = true
+          const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
+          send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
+          return stoppedText
+        }
       }
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'
@@ -778,5 +818,7 @@ export class Session {
 
   destroy(): void {
     this.cancel()
+    this.externalProvider?.dispose()
+    this.externalProvider = null
   }
 }

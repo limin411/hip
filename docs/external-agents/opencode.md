@@ -17,17 +17,32 @@ exit), so it cannot be pointed at directly. A tiny bridge translates between the
 
 ## Register it (form values)
 
+**Recommended — full stream (thinking, tool calls, sub-agent scheduling):**
+
 | Field (中文) | Value |
 | --- | --- |
 | 名称 (Name) | `OpenCode` |
 | 命令 (Command) | `node` |
-| 参数 (Arguments) | `/ABSOLUTE/PATH/TO/hip/scripts/opencode-bridge.mjs --pure` |
-| 协议 (Protocol) | **精简 / Thin** |
+| 参数 (Arguments) | `/ABSOLUTE/PATH/TO/hip/scripts/opencode-bridge.mjs --pure --rich` |
+| 协议 (Protocol) | **丰富 / Rich** |
 | 推送我配置的模型与密钥 (Push model+key) | **off** (recommended — see below) |
 | 启用 (Enabled) | on |
 
+**Minimal — final answer only:** drop `--rich` from 参数 and set 协议 to **精简 / Thin**.
+
 Use the **absolute** path to `opencode-bridge.mjs`. Then start a **new conversation**,
 pick **OpenCode** in the input-box agent switcher, and send a message.
+
+## Two modes
+
+- **Rich (`--rich`, 协议 Rich):** the bridge runs `opencode run --format json` and
+  translates OpenCode's streamed *parts* into hip's rich events, so you see everything:
+  `reasoning` → the thinking panel; the `task` tool and other tools → tool cards (this is
+  how OpenCode's **sub-agent scheduling** shows up); `text` → the answer. (`step-start`/
+  `step-finish`/file/patch parts are not surfaced — file changes still show in hip's diff
+  pane via the per-turn git checkpoint.)
+- **Thin (default, 协议 Thin):** the bridge runs plain `opencode run` and streams only the
+  final text as one assistant bubble.
 
 ### Why `--pure`
 
@@ -80,20 +95,23 @@ against your OpenCode providers; if in doubt, leave it off.
 
 ## Notes & limitations
 
-- **Thin only:** output is shown as a plain assistant bubble. There are no per-tool cards /
-  reasoning panels for OpenCode (that's the rich `--format json` adapter, a future
-  enhancement). hip's git checkpoints still wrap each turn, so the diff/changes pane and
-  revert-to-turn work at the file level.
+- **Rich-mode fidelity:** reasoning, text, and tool/sub-agent (`task`) cards are surfaced.
+  Tool-card field mapping is based on OpenCode 1.17.6's `--format json` part shape and is
+  best-effort across versions; unrecognised parts are skipped (text + reasoning always come
+  through). File edits OpenCode makes are captured by hip's per-turn git checkpoint, so the
+  diff/changes pane and revert-to-turn work regardless of mode.
 - **Working directory:** OpenCode runs in the hip session's project directory and can read
   and edit files there (it's a coding agent). Use it on a project you intend it to act on.
 - **Cancel:** stopping a turn kills the bridge process; the next turn respawns it.
 
 ## How it was tested
 
-- Paid-free unit/integration tests drive the real bridge through hip's real
-  `LoopAgentProvider` against a mock `opencode`
+- Paid-free integration tests drive the real bridge through hip's real `LoopAgentProvider`
+  against a mock `opencode`
   ([`opencode-bridge.test.ts`](../../packages/sidecar/src/session/agents/opencode-bridge.test.ts)):
-  thin framing, stateless default, opt-in `--continue`, args passthrough (`--pure`), and
-  `-m provider/model` model push.
-- A real end-to-end smoke test ran the bridge against the installed `opencode run --pure`
-  and confirmed the reply is produced and correctly terminated with the `\x1e` sentinel.
+  thin framing, stateless default, opt-in `--continue`, args passthrough (`--pure`),
+  `-m provider/model` model push, and **rich** mapping of real-shape `--format json` parts
+  (reasoning + the `task` sub-agent tool + text) to hip rich events.
+- Real end-to-end smoke tests ran the bridge against the installed `opencode`: a thin
+  `--pure` reply correctly framed with `\x1e`, and a rich `--pure --rich` turn (the
+  `--format json` schema was captured from the real binary to build the mapping).

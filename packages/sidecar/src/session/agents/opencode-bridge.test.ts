@@ -12,17 +12,19 @@ import type { ResolvedModel } from './registry.js'
 // agent → bridge → opencode wiring satisfies hip's thin turn-loop contract.
 const here = dirname(fileURLToPath(import.meta.url))
 const MOCK = join(here, '__fixtures__', 'mock-opencode.mjs')
+const MOCK_JSON = join(here, '__fixtures__', 'mock-opencode-json.mjs')
 const BRIDGE = resolve(process.cwd(), 'scripts/opencode-bridge.mjs')
 
-beforeAll(() => { chmodSync(MOCK, 0o755) })
+beforeAll(() => { chmodSync(MOCK, 0o755); chmodSync(MOCK_JSON, 0o755) })
 
-function cap(): { emit: GraphEmit; out: { text: string } } {
-  const out = { text: '' }
+interface Cap { text: string; reasoning: string; tools: Array<[string, string]>; toolEnds: Array<[string, string]> }
+function cap(): { emit: GraphEmit; out: Cap } {
+  const out: Cap = { text: '', reasoning: '', tools: [], toolEnds: [] }
   const emit: GraphEmit = {
     token: (d) => { out.text += d },
-    reasoning: () => {},
-    toolStarted: () => {},
-    toolFinished: () => {},
+    reasoning: (d) => { out.reasoning += d },
+    toolStarted: (name, callId) => { out.tools.push([callId, name]) },
+    toolFinished: (callId, status) => { out.toolEnds.push([callId, status]) },
     usage: () => {},
   }
   return { emit, out }
@@ -98,5 +100,33 @@ describe('opencode bridge (via hip LoopAgentProvider, mock opencode)', () => {
     const a = cap()
     await p.runTurn('hi', a.emit, new AbortController().signal)
     expect(a.out.text).toContain('[model=deepseek/deepseek-chat]')
+  })
+})
+
+describe('opencode bridge --rich (maps opencode --format json parts to hip rich events)', () => {
+  function richAgent(): AgentConfig {
+    return {
+      id: 'oc', name: 'OpenCode', kind: 'custom', command: 'node', args: [BRIDGE, '--rich'],
+      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { OPENCODE_BIN: MOCK_JSON },
+    }
+  }
+
+  it('surfaces reasoning, the task (subagent) tool, and the final text', async () => {
+    const p = new LoopAgentProvider(richAgent(), process.cwd(), null); providers.push(p)
+    const a = cap()
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    expect(a.out.reasoning).toBe('thinking about hi')      // part.type "reasoning" → reasoning panel
+    expect(a.out.text).toBe('reply to: hi')                // part.type "text" → answer
+    expect(a.out.tools).toEqual([['call_1', 'task']])      // subagent scheduling shows as a tool card
+    expect(a.out.toolEnds).toEqual([['call_1', 'finished']])
+  })
+
+  it('keeps the same process across rich turns', async () => {
+    const p = new LoopAgentProvider(richAgent(), process.cwd(), null); providers.push(p)
+    const a = cap(); await p.runTurn('one', a.emit, new AbortController().signal)
+    expect(a.out.text).toBe('reply to: one')
+    const b = cap(); await p.runTurn('two', b.emit, new AbortController().signal)
+    expect(b.out.text).toBe('reply to: two')
+    expect(b.out.reasoning).toBe('thinking about two')
   })
 })

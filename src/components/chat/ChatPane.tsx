@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
-import { sessionService, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { MessageBubble } from './MessageBubble'
@@ -9,6 +9,7 @@ import { ThinkingBubble } from './ThinkingBubble'
 
 export function ChatPane() {
   const { t } = useTranslation()
+  const session = useActiveSession()
   const activeSessionId = useActiveSessionId()
   const messages = useActiveMessages()
   const error = useActiveSessionError()
@@ -31,6 +32,12 @@ export function ChatPane() {
     animSessionRef.current = activeSessionId ?? null
     animBaselineRef.current = messages.length
   }
+
+  const showAgentRestart =
+    !!session &&
+    !!session.config.agentId &&
+    session.config.agentId !== 'builtin' &&
+    messages.some((m) => m.role === 'assistant')
 
   const last = messages[messages.length - 1]
   const lastActivity =
@@ -89,6 +96,11 @@ export function ChatPane() {
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
         <div className="mx-auto flex max-w-3xl flex-col gap-10 px-5 py-6">
+          {showAgentRestart && (
+            <div className="mx-auto my-2 w-fit rounded-full bg-surface-muted px-3 py-1 text-meta text-ink-tertiary">
+              {t('chat.agentRestarted')}
+            </div>
+          )}
           {messages.map((m, i) => {
             const isLastMessage = i === messages.length - 1
             const isNew = i >= animBaselineRef.current

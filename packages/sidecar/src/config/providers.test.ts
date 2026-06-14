@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { writeFileSync, mkdtempSync } from 'node:fs'
+import { writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT, cheapModelFor } from './providers.js'
+import { getActiveModel, setActiveModel, loadActiveModelFromEnv, isOpenAICompatible, DEEPSEEK_DEFAULT, cheapModelFor, resolveProviderBaseURL } from './providers.js'
 import { providerKeyEnv } from '@hip/protocol'
 
 describe('cheapModelFor', () => {
@@ -59,5 +59,26 @@ describe('sidecar provider config', () => {
     expect(isOpenAICompatible('openai')).toBe(true)
     expect(isOpenAICompatible('groq')).toBe(true)
     expect(isOpenAICompatible('some-self-hosted-vendor')).toBe(true)
+  })
+})
+
+describe('resolveProviderBaseURL', () => {
+  const tmps: string[] = []
+  function writeProviders(obj: unknown): string {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-prov-'))
+    tmps.push(dir)
+    const p = join(dir, 'hip-providers.json')
+    writeFileSync(p, JSON.stringify(obj))
+    return p
+  }
+  afterEach(() => { for (const d of tmps.splice(0)) rmSync(d, { recursive: true, force: true }); delete process.env.HIP_PROVIDERS_PATH })
+
+  it('reads the providers baseURL from HIP_PROVIDERS_PATH', () => {
+    process.env.HIP_PROVIDERS_PATH = writeProviders({ providers: { acme: { enabled: true, baseURL: 'https://acme.test/v1' } } })
+    expect(resolveProviderBaseURL('acme')).toBe('https://acme.test/v1')
+  })
+  it('falls back to the deepseek default when the provider/file is missing', () => {
+    delete process.env.HIP_PROVIDERS_PATH
+    expect(resolveProviderBaseURL('whatever')).toBe('https://api.deepseek.com/v1')
   })
 })

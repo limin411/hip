@@ -54,6 +54,19 @@ export function loadActiveModelFromEnv(): void {
   }
 }
 
+/** Resolve a provider's OpenAI-compatible base URL from HIP_PROVIDERS_PATH; deepseek default otherwise. */
+export function resolveProviderBaseURL(providerID: string): string {
+  const file = process.env.HIP_PROVIDERS_PATH?.trim()
+  if (file) {
+    try {
+      const cfg = JSON.parse(readFileSync(file, 'utf8')) as ProvidersConfig
+      const url = cfg.providers?.[providerID]?.baseURL
+      if (url) return url
+    } catch { /* fall through */ }
+  }
+  return DEEPSEEK_DEFAULT.baseURL
+}
+
 /** Cheap model for a provider's auxiliary calls (titles, compaction summaries). Falls back to the
  *  caller's active model when the provider has no known cheaper variant. */
 const CHEAP_MODEL: Record<string, string> = { deepseek: 'deepseek-chat' }

@@ -9,6 +9,7 @@ export interface SessionConfig {
   cwd?: string                 // absolute project root; undefined → virtual FS (no real file tools)
   thinking?: boolean           // DEPRECATED: retained for back-compat; no longer swaps models
   language?: 'en' | 'zh-CN' | 'zh-TW'
+  agentId?: string             // undefined / 'builtin' => built-in hip agent; else an AgentConfig.id
 }
 
 /** Global current model the whole app uses. */
@@ -30,6 +31,26 @@ export interface ProvidersConfig {
   providers: Record<string, ProviderConfigEntry>
   activeModel?: Pick<ActiveModel, 'providerID' | 'modelID'>   // baseURL resolved at read time
 }
+
+export type AgentTransport = 'thin' | 'rich'
+
+/** Which configured model an external agent should use. References hip-providers.json. */
+export interface BoundModel { providerID: string; modelID: string }
+
+export interface AgentConfig {
+  id: string                          // nanoid
+  name: string                        // display name
+  kind: 'custom' | 'opencode'         // selects the provider/adapter; 'opencode' arrives in Plan B
+  command: string                     // executable (PATH name or absolute path)
+  args: string[]                      // static launch args
+  transport: AgentTransport
+  acceptsModelConfig: boolean
+  boundModel?: BoundModel             // required iff acceptsModelConfig and the user picked a model
+  env?: Record<string, string>        // advanced manual env overrides
+  enabled: boolean
+}
+
+export interface AgentsConfig { agents: AgentConfig[] }
 
 /** auth.json key name AND env var name for a provider's API key. Single source of the rule. */
 export function providerKeyEnv(providerID: string): string {

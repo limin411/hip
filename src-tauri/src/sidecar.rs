@@ -33,6 +33,10 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     if let Some(p) = crate::paths::providers_config_path(app) {
         cmd = cmd.env("HIP_PROVIDERS_PATH", p.to_string_lossy().into_owned());
     }
+    // Point the sidecar at the external-agent registry (read fresh per external spawn).
+    if let Some(p) = crate::paths::agents_config_path(app) {
+        cmd = cmd.env("HIP_AGENTS_PATH", p.to_string_lossy().into_owned());
+    }
     // Tell the sidecar where to persist sessions. paths::db_dir creates the dir; if it's
     // unavailable the sidecar falls back to an in-memory DB rather than failing to start.
     if let Some(dir) = crate::paths::db_dir(app) {

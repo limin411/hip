@@ -43,6 +43,11 @@ pub fn providers_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip-providers.json"))
 }
 
+/// Canonical path of the external-agent registry inside `config/`.
+pub fn agents_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip-agents.json"))
+}
+
 /// Canonical path of the file-backed secret store inside `config/`.
 pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))

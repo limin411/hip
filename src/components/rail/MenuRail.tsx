@@ -32,7 +32,7 @@ export function MenuRail() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-full w-[58px] shrink-0 flex-col items-center border-r border-border bg-surface-subtle"
+      className="flex h-full w-[66px] shrink-0 flex-col items-center border-r border-border bg-surface-subtle"
     >
       {/* 红绿灯偏移 + 品牌标志（drag region）。macOS 窗口按钮停靠在本栏顶部，logo 在其下方。 */}
       <div

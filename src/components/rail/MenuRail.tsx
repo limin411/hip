@@ -32,8 +32,16 @@ export function MenuRail() {
   return (
     <div
       data-tauri-drag-region
-      className="flex h-full w-[66px] shrink-0 flex-col items-center border-r border-border bg-surface-subtle"
+      className="relative z-50 flex h-full w-[72px] shrink-0 flex-col items-center bg-surface-subtle"
     >
+      {/* 右侧分隔线只从标题栏带下方开始 —— 红绿灯所在的顶部带保持连续无边框，
+          按钮无论落点都不会“撞线”冲进侧栏（借鉴 Claude/Codex 的连续 chrome）。 */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bottom-0 right-0 w-px bg-border"
+        style={{ top: 'var(--traffic-lights-offset, 40px)' }}
+      />
+
       {/* 红绿灯偏移 + 品牌标志（drag region）。macOS 窗口按钮停靠在本栏顶部，logo 在其下方。 */}
       <div
         className="flex w-full flex-col items-center"

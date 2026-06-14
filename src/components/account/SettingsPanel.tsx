@@ -1,6 +1,7 @@
+import type { RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { SlidersHorizontal, Cpu, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { GeneralSettings } from './GeneralSettings'
@@ -13,14 +14,29 @@ const PAGES = [
   { id: 'agents', icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
 ] as const
 
-export function SettingsPanel() {
+interface SettingsPanelProps {
+  navRef: RefObject<ImperativePanelHandle>
+  onNavCollapsedChange: (collapsed: boolean) => void
+}
+
+export function SettingsPanel({ navRef, onNavCollapsedChange }: SettingsPanelProps) {
   const { t } = useTranslation()
 
-  // 左侧分类栏完全参照「对话列表」侧栏：同色（bg-surface）、可拖拽缩放（同款 PanelResizeHandle）。
+  // 左侧分类栏完全参照「对话列表」侧栏：同色（bg-surface）、可拖拽缩放（同款 PanelResizeHandle）、
+  // 且可最小化（折叠到 0，由标题栏的折叠按钮控制）。
   return (
     <TabsPrimitive.Root orientation="vertical" defaultValue="general" className="h-full">
       <PanelGroup direction="horizontal" className="h-full w-full">
-        <Panel defaultSize={18} minSize={13} maxSize={34}>
+        <Panel
+          ref={navRef}
+          defaultSize={18}
+          minSize={13}
+          maxSize={34}
+          collapsible
+          collapsedSize={0}
+          onCollapse={() => onNavCollapsedChange(true)}
+          onExpand={() => onNavCollapsedChange(false)}
+        >
           <TabsPrimitive.List
             aria-label={t('settings.title')}
             className="flex h-full flex-col gap-1 overflow-y-auto bg-surface p-2"

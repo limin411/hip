@@ -69,6 +69,7 @@ export const en = {
     },
     sidebar: {
       collapse: 'Collapse Sidebar',
+      expand: 'Expand Sidebar',
       search: 'Search sessions',
       noMatches: 'No matching sessions',
       deleteSession: 'Delete Session',

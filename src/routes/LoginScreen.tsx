@@ -12,7 +12,8 @@ export function LoginScreen() {
   const enter = () => { login(); navigate('/app') }
 
   return (
-    <div className="flex h-screen">
+    // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
+    <div data-tauri-drag-region className="flex h-screen">
       {/* 左侧品牌区 —— 摸鱼小人 hero（抱鱼抚摸 + 眨眼 + 斜瞄） */}
       <div
         className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex"
@@ -23,7 +24,7 @@ export function LoginScreen() {
 
       {/* 右侧登录方式 */}
       <div className="flex flex-1 items-center justify-center px-8">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm" data-tauri-drag-region="false">
           <h1 className="text-2xl font-bold tracking-tight text-ink">{t('login.title')}</h1>
           <p className="mt-1.5 text-sm text-ink-secondary">{t('login.subtitle')}</p>
 

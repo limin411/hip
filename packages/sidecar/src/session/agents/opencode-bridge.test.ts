@@ -12,10 +12,10 @@ import type { ResolvedModel } from './registry.js'
 // agent → bridge → opencode wiring satisfies hip's thin turn-loop contract.
 const here = dirname(fileURLToPath(import.meta.url))
 const MOCK = join(here, '__fixtures__', 'mock-opencode.mjs')
-const MOCK_JSON = join(here, '__fixtures__', 'mock-opencode-json.mjs')
+const MOCK_SERVER = join(here, '__fixtures__', 'mock-opencode-server.mjs')
 const BRIDGE = resolve(process.cwd(), 'scripts/opencode-bridge.mjs')
 
-beforeAll(() => { chmodSync(MOCK, 0o755); chmodSync(MOCK_JSON, 0o755) })
+beforeAll(() => { chmodSync(MOCK, 0o755); chmodSync(MOCK_SERVER, 0o755) })
 
 interface Cap { text: string; reasoning: string; tools: Array<[string, string]>; toolEnds: Array<[string, string]> }
 function cap(): { emit: GraphEmit; out: Cap } {
@@ -103,30 +103,57 @@ describe('opencode bridge (via hip LoopAgentProvider, mock opencode)', () => {
   })
 })
 
-describe('opencode bridge --rich (maps opencode --format json parts to hip rich events)', () => {
-  function richAgent(): AgentConfig {
+describe('opencode bridge --rich (drives `opencode serve` HTTP+SSE → hip rich events)', () => {
+  // OPENCODE_BIN points at a mock that answers `serve` with a tiny HTTP server
+  // speaking OpenCode's real SSE event shape — no paid LLM call.
+  function richAgent(extra: Partial<AgentConfig> = {}): AgentConfig {
+    const { env, ...rest } = extra
     return {
       id: 'oc', name: 'OpenCode', kind: 'custom', command: 'node', args: [BRIDGE, '--rich'],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { OPENCODE_BIN: MOCK_JSON },
+      transport: 'rich', acceptsModelConfig: false, enabled: true,
+      env: { OPENCODE_BIN: MOCK_SERVER, ...(env ?? {}) }, ...rest,
     }
   }
 
-  it('surfaces reasoning, the task (subagent) tool, and the final text', async () => {
+  it('streams reasoning, the task (subagent) tool, and the final answer', async () => {
     const p = new LoopAgentProvider(richAgent(), process.cwd(), null); providers.push(p)
     const a = cap()
     await p.runTurn('hi', a.emit, new AbortController().signal)
-    expect(a.out.reasoning).toBe('thinking about hi')      // part.type "reasoning" → reasoning panel
-    expect(a.out.text).toBe('reply to: hi')                // part.type "text" → answer
-    expect(a.out.tools).toEqual([['call_1', 'task']])      // subagent scheduling shows as a tool card
+    expect(a.out.reasoning).toBe('thinking about hi')      // reasoning part / delta → thinking panel
+    expect(a.out.text).toBe('reply to: hi')                // assistant text → answer
+    expect(a.out.tools).toEqual([['call_1', 'task']])      // sub-agent scheduling shows as a tool card
     expect(a.out.toolEnds).toEqual([['call_1', 'finished']])
   })
 
-  it('keeps the same process across rich turns', async () => {
+  it('does not echo the user prompt back as assistant text (role-gated)', async () => {
+    const p = new LoopAgentProvider(richAgent(), process.cwd(), null); providers.push(p)
+    const a = cap()
+    await p.runTurn('please-do-not-echo-me', a.emit, new AbortController().signal)
+    expect(a.out.text).toBe('reply to: please-do-not-echo-me')
+    // the user message text part (role:user) must not leak into the answer
+    expect(a.out.text).not.toContain('please-do-not-echo-me [')
+    expect(a.out.text.indexOf('please-do-not-echo-me')).toBe('reply to: '.length)
+  })
+
+  it('reuses one opencode session/server across turns (real continuity)', async () => {
     const p = new LoopAgentProvider(richAgent(), process.cwd(), null); providers.push(p)
     const a = cap(); await p.runTurn('one', a.emit, new AbortController().signal)
     expect(a.out.text).toBe('reply to: one')
     const b = cap(); await p.runTurn('two', b.emit, new AbortController().signal)
     expect(b.out.text).toBe('reply to: two')
     expect(b.out.reasoning).toBe('thinking about two')
+  })
+
+  it('pushes the bound model into the prompt body when acceptsModelConfig', async () => {
+    const model: ResolvedModel = { providerID: 'deepseek', modelID: 'deepseek-reasoner', baseURL: 'https://api.deepseek.com/v1', apiKey: 'sk' }
+    const p = new LoopAgentProvider(
+      richAgent({ acceptsModelConfig: true, boundModel: { providerID: 'deepseek', modelID: 'deepseek-reasoner' } }),
+      process.cwd(),
+      model,
+    )
+    providers.push(p)
+    const a = cap()
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    expect(a.out.text).toBe('reply to: hi [model=deepseek/deepseek-reasoner]')
   })
 })

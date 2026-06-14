@@ -1,13 +1,15 @@
 # Connecting OpenCode as an external agent
 
 hip's **Custom CLI agent** (设置 → 智能体管理 → 添加智能体 → 自定义命令行智能体) speaks a
-long-lived *turn-loop* over stdin/stdout: it sends one prompt terminated by the `\x1e`
-byte and reads the reply up to the next `\x1e`, keeping one process alive for the whole
-conversation. OpenCode's `opencode run` is **one-shot** (prompt as an argument, run once,
-exit), so it cannot be pointed at directly. A tiny bridge translates between the two:
+long-lived *turn-loop* over stdin/stdout. A tiny bridge adapts OpenCode to it:
 
-- **Bridge:** [`scripts/opencode-bridge.mjs`](../../scripts/opencode-bridge.mjs) — loops on
-  hip's protocol and drives a fresh `opencode run` per turn.
+- **Bridge:** [`scripts/opencode-bridge.mjs`](../../scripts/opencode-bridge.mjs)
+  - **Rich mode** (recommended) drives a long-lived **`opencode serve`** and
+    translates its HTTP + Server-Sent-Events bus — the same interface OpenCode's
+    own TUI uses — into hip's rich events, so you see the **thinking, tool calls,
+    and sub-agent scheduling** as they happen.
+  - **Thin mode** drives a one-shot `opencode run` per turn and returns only the
+    final answer text.
 
 ## Prerequisites
 
@@ -33,55 +35,73 @@ exit), so it cannot be pointed at directly. A tiny bridge translates between the
 Use the **absolute** path to `opencode-bridge.mjs`. Then start a **new conversation**,
 pick **OpenCode** in the input-box agent switcher, and send a message.
 
+> **Want to see thinking?** Reasoning only exists if OpenCode's model is a *reasoning*
+> model (e.g. `deepseek-reasoner`, `kimi-k2-thinking`). A plain chat model (e.g.
+> `deepseek-chat`) produces no thinking to stream — you'll still get tools and the
+> answer, just no 💭 panel. Select a reasoning model in OpenCode (or push one — see
+> "Model" below).
+
 ## Two modes
 
-- **Rich (`--rich`, 协议 Rich):** the bridge runs `opencode run --format json` and
-  translates OpenCode's streamed *parts* into hip's rich events, so you see everything:
-  `reasoning` → the thinking panel; the `task` tool and other tools → tool cards (this is
-  how OpenCode's **sub-agent scheduling** shows up); `text` → the answer. (`step-start`/
-  `step-finish`/file/patch parts are not surfaced — file changes still show in hip's diff
-  pane via the per-turn git checkpoint.)
-- **Thin (default, 协议 Thin):** the bridge runs plain `opencode run` and streams only the
-  final text as one assistant bubble.
+- **Rich (`--rich`, 协议 Rich):** the bridge starts `opencode serve`, opens one
+  session, subscribes to the `/event` SSE bus, and sends each turn with
+  `prompt_async`. It maps OpenCode's streamed events to hip's rich events:
+  - `message.part.updated` / `message.part.delta` on a **reasoning** part → the 💭
+    thinking panel (streamed token-by-token);
+  - **text** parts → the answer;
+  - **tool** parts (incl. the `task` tool) → tool cards — this is how OpenCode's
+    **sub-agent execution** shows up;
+  - **subtask** parts → a `subagent:<name>` card announcing the **scheduling**;
+  - `session.idle` → end of turn.
+
+  (`step-start`/`step-finish`/file/patch parts are not surfaced — file changes still
+  show in hip's diff pane via the per-turn git checkpoint.)
+- **Thin (default, 协议 Thin):** the bridge runs plain `opencode run` and streams only
+  the final text as one assistant bubble.
+
+### Why rich mode does NOT use `opencode run --format json`
+
+The obvious one-shot path (`opencode run --format json`) **cannot** deliver the thinking
+stream, by design:
+
+- it does **not** serialize reasoning/thinking content (OpenCode issue #7202 — reasoning
+  shows in the TUI but is dropped from the JSON);
+- it emits tool events only once a tool **completes** (no running/streaming state, and
+  sub-agent internals aren't visible);
+- it **buffers** its whole output and prints it at the end (no live streaming).
+
+So rich mode talks to `opencode serve` instead, which streams everything the TUI gets.
 
 ### Why `--pure`
 
-On a machine with OpenCode plugins, a remote MCP, and a large session DB, a plain
-`opencode run` can take a long time to start. `--pure` runs OpenCode without external
-plugins, which makes each turn fast and keeps stdout clean. Drop it if you specifically
-need your plugins/MCP inside hip. (Verified: with `--pure`, `opencode run "…PINGPONG…"`
-returns promptly; without it, startup can stall on plugin/MCP/DB load.)
-
-Any flag you put after the script in 参数 is forwarded to `opencode run` verbatim, e.g.
-`… opencode-bridge.mjs --pure --agent build`. The one special flag is `--continue`
-(below), which the bridge interprets itself.
+`--pure` runs OpenCode without external plugins/MCP. On a machine with plugins, a remote
+MCP, and a large session DB, startup can otherwise stall badly (verified: a non-`--pure`
+`opencode run` hung indefinitely). `--pure` keeps the server fast and the stream clean.
+Drop it only if you specifically need your plugins/MCP inside hip.
 
 ## Conversation continuity
 
-By default the bridge is **stateless** — every hip turn is an independent `opencode run`,
-so OpenCode does not remember earlier turns in the conversation. This is the safe default.
-
-To keep context across turns, add `--continue` to 参数:
-
-```
-/ABSOLUTE/PATH/TO/hip/scripts/opencode-bridge.mjs --pure --continue
-```
-
-⚠️ **Caveat:** `opencode run --continue` resumes OpenCode's *global last session*. If you
-also run OpenCode elsewhere (another terminal, the TUI), those turns can cross into the
-same session. Only enable `--continue` if hip is your only OpenCode usage. (A per-session
-isolated continuity mode is a future enhancement — it needs OpenCode's `--format json`
-session id, which is the "Plan B" rich adapter.)
+- **Rich mode is continuous *and* isolated by default.** The bridge keeps one
+  `opencode serve` session alive for the whole hip conversation, so OpenCode remembers
+  earlier turns — and because it's a *private* session, it never crosses into OpenCode
+  usage you have running elsewhere. (Cancelling a turn restarts the bridge, which starts
+  a fresh session; continuity resets at that point.)
+- **Thin mode is stateless by default.** Add `--continue` to 参数 to carry context
+  across turns, but ⚠️ thin `opencode run --continue` resumes OpenCode's *global last
+  session*, so it can cross-contaminate with OpenCode you run in another terminal/TUI.
+  Prefer rich mode if you want reliable, isolated continuity.
 
 ## Model: let OpenCode manage it (recommended)
 
 Leave **推送模型 off**. OpenCode uses whatever model you configured with
 `opencode auth login` / `~/.config/opencode/opencode.jsonc`. This is the most reliable path.
+(Pick a reasoning model there if you want the thinking panel.)
 
 ### Pushing hip's model (advanced / experimental)
 
 If you turn **推送模型 on** and bind a model, hip injects `HIP_PROVIDER`, `HIP_MODEL`,
-`HIP_BASE_URL`, `HIP_API_KEY` into the bridge, and the bridge adds
+`HIP_BASE_URL`, `HIP_API_KEY` into the bridge. In **rich** mode the bridge sends
+`{ model: { providerID, modelID } }` with each prompt; in **thin** mode it adds
 `-m "$HIP_PROVIDER/$HIP_MODEL"` to `opencode run`. For this to work:
 
 - OpenCode must recognise that `provider/model` (the provider must be configured/authed in
@@ -95,23 +115,28 @@ against your OpenCode providers; if in doubt, leave it off.
 
 ## Notes & limitations
 
-- **Rich-mode fidelity:** reasoning, text, and tool/sub-agent (`task`) cards are surfaced.
-  Tool-card field mapping is based on OpenCode 1.17.6's `--format json` part shape and is
-  best-effort across versions; unrecognised parts are skipped (text + reasoning always come
-  through). File edits OpenCode makes are captured by hip's per-turn git checkpoint, so the
+- **Rich-mode fidelity:** reasoning, text, tool, and sub-agent (`task`/`subtask`) cards are
+  surfaced. The mapping is based on OpenCode 1.17.6's event/part shape and is best-effort
+  across versions; unrecognised parts are skipped (text + reasoning always come through).
+  File edits OpenCode makes are captured by hip's per-turn git checkpoint, so the
   diff/changes pane and revert-to-turn work regardless of mode.
 - **Working directory:** OpenCode runs in the hip session's project directory and can read
   and edit files there (it's a coding agent). Use it on a project you intend it to act on.
-- **Cancel:** stopping a turn kills the bridge process; the next turn respawns it.
+- **Cancel:** stopping a turn kills the bridge (and the `opencode serve` it spawned); the
+  next turn respawns it.
 
 ## How it was tested
 
 - Paid-free integration tests drive the real bridge through hip's real `LoopAgentProvider`
-  against a mock `opencode`
   ([`opencode-bridge.test.ts`](../../packages/sidecar/src/session/agents/opencode-bridge.test.ts)):
-  thin framing, stateless default, opt-in `--continue`, args passthrough (`--pure`),
-  `-m provider/model` model push, and **rich** mapping of real-shape `--format json` parts
-  (reasoning + the `task` sub-agent tool + text) to hip rich events.
-- Real end-to-end smoke tests ran the bridge against the installed `opencode`: a thin
-  `--pure` reply correctly framed with `\x1e`, and a rich `--pure --rich` turn (the
-  `--format json` schema was captured from the real binary to build the mapping).
+  - thin: framing, stateless default, opt-in `--continue`, args passthrough (`--pure`),
+    `-m provider/model` model push;
+  - rich: against a mock `opencode serve`
+    ([`mock-opencode-server.mjs`](../../packages/sidecar/src/session/agents/__fixtures__/mock-opencode-server.mjs))
+    emitting OpenCode's real SSE shape — asserts reasoning streams, the `task` sub-agent
+    tool shows as a card, the answer is correct, the user prompt is **not** echoed back
+    (role-gated), one session is reused across turns, and model-push lands in the body.
+- Real end-to-end: the bridge against the installed `opencode serve` with
+  `deepseek-reasoner` streamed **91 reasoning events** plus the correct answer — i.e. the
+  thinking process now reaches hip. (The server event schema was captured from the real
+  binary's OpenAPI `/doc` to build the mapping.)

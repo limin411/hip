@@ -10,16 +10,35 @@ export interface RenderedArtifact {
 
 const RENDERABLE: ReadonlySet<PreviewKind> = new Set(['image', 'markdown', 'html', 'pdf'])
 
-/** Parse a write_file ToolCall.input (JSON) and return its `.path`, or null; never throws. */
-function pathOf(input: string): string | null {
-  let parsed: unknown
+/**
+ * Recover a `"path"` value from possibly-truncated JSON via regex. The sidecar clips ToolCall.input
+ * to ~4 KB, so a large write_file's content overflows and JSON.parse throws — but `path` precedes
+ * `content` in practice, so the leading `"path":"…"` literal usually survives the clip. Matches a
+ * JSON string literal (handling escapes) and decodes it. Null if no recoverable path.
+ */
+function recoverPath(input: string): string | null {
+  const m = /"path"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(input)
+  if (!m) return null
   try {
-    parsed = JSON.parse(input)
+    return JSON.parse('"' + m[1] + '"') as string
   } catch {
     return null
   }
-  const p = (parsed as { path?: unknown }).path
-  return typeof p === 'string' ? p : null
+}
+
+/** Parse a write_file ToolCall.input (JSON) and return its `.path`, or null; never throws. When the
+ *  input was clipped (`truncated`) or JSON.parse fails, fall back to a leading-`path` regex so the
+ *  large HTML/MD/SVG/PDF artifacts the card targets aren't silently dropped. */
+function pathOf(input: string, truncated?: boolean): string | null {
+  if (!truncated) {
+    try {
+      const p = (JSON.parse(input) as { path?: unknown }).path
+      return typeof p === 'string' ? p : null
+    } catch {
+      return recoverPath(input)
+    }
+  }
+  return recoverPath(input)
 }
 
 function basename(p: string): string {
@@ -43,7 +62,7 @@ export function extractRenderedArtifacts(toolCalls?: ToolCall[]): RenderedArtifa
   const sorted = [...toolCalls].sort((a, b) => a.seq - b.seq)
   for (const tc of sorted) {
     if (tc.name !== 'write_file' || tc.status !== 'finished') continue
-    const path = pathOf(tc.input)
+    const path = pathOf(tc.input, tc.truncated)
     if (!path) continue
     const kind = previewKind(path)
     if (!RENDERABLE.has(kind)) continue

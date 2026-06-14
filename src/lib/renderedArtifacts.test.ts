@@ -70,6 +70,34 @@ describe('extractRenderedArtifacts', () => {
     ])
   })
 
+  it('recovers the path from a >4KB write_file input truncated mid-content', () => {
+    // Mirror the sidecar clip: real JSON whose `content` overflows ~4 KB, then chopped → invalid JSON.
+    const full = JSON.stringify({ path: '/p/big.html', content: '<div>' + 'x'.repeat(8000) + '</div>' })
+    const clipped = full.slice(0, 4096)
+    expect(() => JSON.parse(clipped)).toThrow() // sanity: the clipped input is unparseable
+    const calls: ToolCall[] = [tc({ callId: 'c1', seq: 1, input: clipped, truncated: true })]
+    expect(extractRenderedArtifacts(calls)).toEqual<RenderedArtifact[]>([
+      { path: '/p/big.html', name: 'big.html', kind: 'html' },
+    ])
+  })
+
+  it('decodes JSON escapes in a recovered path', () => {
+    const full = JSON.stringify({ path: '/p/a "b".md', content: 'y'.repeat(8000) })
+    const clipped = full.slice(0, 4096)
+    const calls: ToolCall[] = [tc({ callId: 'c1', seq: 1, input: clipped, truncated: true })]
+    expect(extractRenderedArtifacts(calls)).toEqual<RenderedArtifact[]>([
+      { path: '/p/a "b".md', name: 'a "b".md', kind: 'markdown' },
+    ])
+  })
+
+  it('drops a truncated input with no recoverable path', () => {
+    // content-first ordering: the `path` key was clipped off entirely → nothing to recover.
+    const full = JSON.stringify({ content: 'z'.repeat(8000), path: '/p/late.html' })
+    const clipped = full.slice(0, 4096)
+    const calls: ToolCall[] = [tc({ callId: 'c1', seq: 1, input: clipped, truncated: true })]
+    expect(extractRenderedArtifacts(calls)).toEqual([])
+  })
+
   it('returns [] for undefined or empty input', () => {
     expect(extractRenderedArtifacts(undefined)).toEqual([])
     expect(extractRenderedArtifacts([])).toEqual([])

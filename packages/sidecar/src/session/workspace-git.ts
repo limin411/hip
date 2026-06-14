@@ -263,6 +263,14 @@ export async function listCheckpointRefs(cwd: string, sessionId: string, gitBin 
   } catch { return [] }
 }
 
+/** Best-effort delete of every checkpoint shadow ref for a session (`git update-ref -d`). Called on
+ *  session delete; orphaned refs are harmless so a failed delete is swallowed per-ref. Never throws. */
+export async function deleteCheckpointRefs(cwd: string, sessionId: string, gitBin = 'git'): Promise<void> {
+  for (const ref of await listCheckpointRefs(cwd, sessionId, gitBin)) {
+    try { await runGit(cwd, ['update-ref', '-d', ref], gitBin) } catch { /* harmless: leave the orphan */ }
+  }
+}
+
 /** Capture the working tree as a detached checkpoint commit and ref-protect it immediately.
  *  Borrows Zed's model: write-tree under a temp index (real index untouched), commit-tree -p prev
  *  with a synthetic hip author (so it never looks like a real commit), then update-ref. Skips the

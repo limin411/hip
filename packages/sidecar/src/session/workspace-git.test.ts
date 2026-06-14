@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -385,6 +385,34 @@ describe('getCurrentBranch + listCheckpointRefs', () => {
     const refs = await listCheckpointRefs(root, unsafe)
     expect(refs).toHaveLength(1)
     expect(refs[0]).toBe(`refs/hip/checkpoints/${sanitizeRefComponent(unsafe)}/t1`)
+  })
+})
+
+describe('deleteCheckpointRefs', () => {
+  it('removes all checkpoint refs for a session (listCheckpointRefs → [] after)', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    // two checkpoints (distinct trees so neither is an empty-turn skip)
+    await fs.writeFile(path.join(root, 'a.txt'), 'two\n')
+    const c1 = await captureCheckpoint(root, { sessionId: 's1', turnId: 't1', label: 'a', prevCommit: head })
+    await fs.writeFile(path.join(root, 'a.txt'), 'three\n')
+    const c2 = await captureCheckpoint(root, { sessionId: 's1', turnId: 't2', label: 'b', prevCommit: c1.commitSha! })
+    expect(c1.ok && c2.ok).toBe(true)
+    expect((await listCheckpointRefs(root, 's1')).length).toBe(2)
+    await deleteCheckpointRefs(root, 's1')
+    expect(await listCheckpointRefs(root, 's1')).toEqual([])
+  })
+  it('only deletes the targeted session\'s refs', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const head = (await git(root, 'rev-parse', 'HEAD')).stdout.trim()
+    await git(root, 'update-ref', 'refs/hip/checkpoints/s1/t1', head)
+    await git(root, 'update-ref', 'refs/hip/checkpoints/other/x', head)
+    await deleteCheckpointRefs(root, 's1')
+    expect(await listCheckpointRefs(root, 's1')).toEqual([])
+    expect(await listCheckpointRefs(root, 'other')).toEqual(['refs/hip/checkpoints/other/x'])
+  })
+  it('never throws on a non-repo folder', async () => {
+    await expect(deleteCheckpointRefs(root, 's1')).resolves.toBeUndefined()
   })
 })
 

@@ -248,6 +248,19 @@ export class Session {
     for (const m of messages) {
       this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
     }
+    this.reseedLastCheckpoint()
+  }
+
+  /** Re-seed _lastCheckpointCommit from the store on lazy resume (captureSnapshot only runs on CREATE,
+   *  so without this the first post-resume captureCheckpoint would pass prevCommit=null — defeating the
+   *  empty-turn skip and orphaning the new checkpoint with no parent). Mirrors resolvedDiffBaseSha's
+   *  fallback: latest checkpoint commit, else the session-start commit, else null. */
+  private reseedLastCheckpoint(): void {
+    if (this._lastCheckpointCommit) return
+    this._lastCheckpointCommit =
+      this.store?.listCheckpoints(this.id)[0]?.commitSha ??
+      this.store?.getSessionGitMeta(this.id).sessionStartCommit ??
+      null
   }
 
   /** Bind/replace the project directory and rebuild the agent. Conversation history is preserved. */

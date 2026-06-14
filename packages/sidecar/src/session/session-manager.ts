@@ -5,6 +5,7 @@ import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
+import * as workspaceGit from './workspace-git.js'
 import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 
@@ -69,12 +70,17 @@ export class SessionManager {
       case 'session:search':
         send({ type: 'session:search:result', query: msg.query, hits: this.store?.search(msg.query) ?? [] })
         break
-      case 'session:delete':
+      case 'session:delete': {
+        // Best-effort clean of the checkpoint shadow refs BEFORE the row goes (resolve cwd from the
+        // in-memory session, else the persisted config). Never block deletion on a git failure.
+        const delCwd = this.resolveSessionCwd(msg.sessionId)
+        if (delCwd) await workspaceGit.deleteCheckpointRefs(delCwd, msg.sessionId).catch(() => {})
         this.store?.deleteSession(msg.sessionId)
         this.sessions.delete(msg.sessionId)
         removeScratchDir(msg.sessionId, this.scratchRoot)
         send({ type: 'session:deleted', sessionId: msg.sessionId })
         break
+      }
       case 'session:rename': {
         const title = sanitizeRename(msg.title)
         this.store?.setCustomTitle(msg.sessionId, title)
@@ -220,6 +226,16 @@ export class SessionManager {
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)
     return session
+  }
+
+  /** Resolve a session's bound cwd without forcing a rehydrate: prefer the in-memory session, else
+   *  parse the persisted config blob. Returns undefined when there is no cwd / no row. */
+  private resolveSessionCwd(id: string): string | undefined {
+    const inMemory = this.sessions.get(id)?.config.cwd
+    if (inMemory) return inMemory
+    const raw = this.store?.getSession(id)?.config
+    if (!raw) return undefined
+    try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
   }
 
   private destroySession(id: string): void {

@@ -83,6 +83,30 @@ export interface TurnUsage {
   totalTokens: number
 }
 
+/** One agent-advertised session config selector (model/mode/reasoning level). */
+export interface AcpConfigOption {
+  id: string
+  name: string
+  category?: 'model' | 'mode' | 'thought_level' | string
+  currentValue: string
+  options: Array<{ value: string; name: string; description?: string }>
+}
+
+/** The tool a permission request is gating, rendered in the HITL modal. */
+export interface PermissionRequestPayload {
+  title: string
+  kind: string                      // read|edit|delete|execute|fetch|other
+  diff?: { path: string; oldText: string; newText: string }
+  content?: string
+}
+
+/** A choice the agent offers for a permission request. */
+export interface PermissionOption {
+  optionId: string
+  name: string
+  kind: string                      // allow_once|allow_always|reject_once|reject_always
+}
+
 export interface AgentRun {
   agentId: string
   role: AgentRole
@@ -241,6 +265,8 @@ export type ClientMessage =
   | { type: 'git:branch:list'; sessionId: string }
   | { type: 'git:branch:switch'; sessionId: string; branch: string }
   | { type: 'git:revert'; sessionId: string; checkpointId: string }
+  | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
+  | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -278,3 +304,5 @@ export type ServerMessage =
   | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
   | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }
+  | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[] }
+  | { type: 'agent:configOptions'; sessionId: string; options: AcpConfigOption[] }

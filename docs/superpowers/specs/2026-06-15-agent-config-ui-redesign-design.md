@@ -161,14 +161,13 @@ Provide `en` + `zh-TW` equivalents. Keep `i18next.d.ts` happy (same shape across
 
 ## 13. Testing
 
-- **Unit/RTL** (`yarn test`, paid-free): render `AgentManagement` with a mocked `useAgentsStore` —
-  - cards render for built-in + externals; built-in has no toggle/kebab;
-  - inline toggle calls `updateAgent` with flipped `enabled`;
-  - kebab → 删除 opens dialog; confirm calls `removeAgent`; 取消 does not;
-  - editor add/edit submit calls `addAgent`/`updateAgent` with the expected payload;
-  - `acceptsModelConfig` off hides the model picker and clears `boundModel`.
-- **Type-check + lint** green.
-- **Manual GUI acceptance** (`yarn tauri dev`) per project norm — verify look, toggle, radio cards, delete dialog, empty state. (Browser-preview of the React tree is also acceptable for the visual pass.)
+This repo has **no component-test harness** (`vitest` runs in `environment: 'node'`, include is `src/**/*.test.ts`; no jsdom/Testing-Library). It deliberately unit-tests **pure logic** and verifies UI by **manual GUI / browser preview**. We follow that convention — do **not** add an RTL/jsdom stack for this redesign (out of scope).
+
+- **Extract + TDD pure logic** (`src/**/*.test.ts`, `yarn test`, paid-free):
+  - `groupModelOptions(catalog, config)` — groups enabled providers' models for the picker.
+  - `buildAgentDraft(form)` + `isAgentDraftValid(form)` — builds the `Omit<AgentConfig,'id'>` save payload and validity; covers args whitespace-splitting and **clearing `boundModel` when `acceptsModelConfig` is off / no model chosen**.
+- **Type-check + lint** green (`yarn tsc --noEmit`, `yarn lint`).
+- **Manual GUI acceptance** (`yarn tauri dev`) per project norm — verify look, inline toggle, kebab edit/delete, radio cards, model-toggle reveal, delete dialog, empty state, disabled dim. Browser-preview of the React tree is acceptable for the visual pass.
 
 ## 14. Out of scope / future
 

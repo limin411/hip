@@ -41,7 +41,6 @@ export const en = {
       permission: {
         title: 'Permission required',
         intro: 'The agent is requesting to perform this action:',
-        cancel: 'Deny',
       },
       style: 'Style',
       styleNone: 'None',

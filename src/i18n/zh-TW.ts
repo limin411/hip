@@ -41,7 +41,6 @@ export const zhTW = {
       permission: {
         title: '需要授權',
         intro: '智能體請求執行以下操作：',
-        cancel: '拒絕',
       },
       style: '風格',
       styleNone: '無',

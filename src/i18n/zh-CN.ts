@@ -41,7 +41,6 @@ export const zhCN = {
       permission: {
         title: '需要授权',
         intro: '智能体请求执行以下操作：',
-        cancel: '拒绝',
       },
       style: '风格',
       styleNone: '无',

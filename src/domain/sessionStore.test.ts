@@ -347,6 +347,23 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:interrupt', sessionId: 's1', turnId: 't1', agentId: 'supervisor', question: '我该怎么做？' }, 1)
     expect(next.sessions[0].interrupt).toEqual({ turnId: 't1', question: '我该怎么做？', context: undefined })
   })
+
+  it('agent:configOptions stores the agent-advertised config options on the session', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:configOptions', sessionId: 's1', options: [
+      { id: 'model', name: 'Model', category: 'model', currentValue: 'a', options: [{ value: 'a', name: 'A' }, { value: 'b', name: 'B' }] },
+    ] }, 0)
+    expect(next.sessions[0].configOptions![0].currentValue).toBe('a')
+    expect(next.sessions[0].configOptions![0].options).toHaveLength(2)
+  })
+
+  it('agent:configOptions for an unknown session is a no-op', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:configOptions', sessionId: 'nope', options: [
+      { id: 'model', name: 'Model', category: 'model', currentValue: 'a', options: [{ value: 'a', name: 'A' }] },
+    ] }, 0)
+    expect(next).toBe(s0)
+  })
 })
 
 function reset() {

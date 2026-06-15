@@ -189,6 +189,11 @@ export class SessionService {
     this.transport.send({ type: 'config:setActiveModel', providerID, modelID, baseURL })
   }
 
+  /** Switch a live ACP-agent config selector (model/mode); the agent re-advertises via agent:configOptions. */
+  setAgentConfigOption(sessionId: string, configId: string, value: string): void {
+    this.transport.send({ type: 'agent:setConfigOption', sessionId, configId, value })
+  }
+
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
   requestDiff(sessionId: string, base?: DiffBase): void {
     const cur = useDiffStore.getState().bySession[sessionId]

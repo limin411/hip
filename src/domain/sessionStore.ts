@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import type { AcpConfigOption, AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
@@ -19,6 +19,7 @@ export interface SessionVM {
   status: 'idle' | 'running' | 'error'
   error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
   interrupt?: { turnId: string; question: string; context?: string } | null  // pending HITL question; null/absent = none
+  configOptions?: AcpConfigOption[]  // agent-advertised model/mode selectors (ACP agents only); absent = none
 }
 
 /** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
@@ -218,6 +219,9 @@ export function applyServerMessage(
 
     case 'agent:interrupt':
       return update(msg.sessionId, (s) => ({ ...s, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context } }))
+
+    case 'agent:configOptions':
+      return update(msg.sessionId, (s) => ({ ...s, configOptions: msg.options }))
 
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))

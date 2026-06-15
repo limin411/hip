@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Composer } from './Composer'
 import { AgentPicker } from './AgentPicker'
+import { ComposerConfigSelectors } from './ComposerConfigSelectors'
 import { sessionService, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 
 export function InputBar() {
@@ -27,7 +28,7 @@ export function InputBar() {
           running={status === 'running'}
           onStop={() => sessionService.cancel()}
           reconnecting={reconnecting}
-          leftSlot={<AgentPicker />}
+          leftSlot={<><AgentPicker /><ComposerConfigSelectors /></>}
         />
       </div>
     </div>

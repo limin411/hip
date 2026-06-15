@@ -21,7 +21,7 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(8)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(9)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {
@@ -33,13 +33,19 @@ describe('migrate', () => {
     expect(columns(db, 'agent_runs').filter((c) => c === 'task_input')).toHaveLength(1)
   })
 
-  it('v8 adds the checkpoints table + sessions.current_branch/session_start_commit and reaches user_version 8', () => {
+  it('v8 adds the checkpoints table + sessions.current_branch/session_start_commit', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toEqual(expect.arrayContaining(['current_branch', 'session_start_commit']))
     expect(columns(db, 'checkpoints')).toEqual(
       expect.arrayContaining(['id', 'session_id', 'turn_id', 'kind', 'label', 'tree_sha', 'commit_sha', 'branch', 'created_at']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(8)
+  })
+
+  it('v9 adds sessions.acp_session_id and reaches user_version 9', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    expect(columns(db, 'sessions')).toContain('acp_session_id')
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(9)
   })
 })

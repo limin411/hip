@@ -63,6 +63,17 @@ export class SessionStore {
     return { currentBranch: row?.current_branch ?? null, sessionStartCommit: row?.session_start_commit ?? null }
   }
 
+  /** Record the external ACP agent's session handle so a reopened session can resume it. */
+  setAcpSessionId(id: string, acpSessionId: string): void {
+    this.db.prepare('UPDATE sessions SET acp_session_id = ? WHERE id = ?').run(acpSessionId, id)
+  }
+
+  /** Read the persisted ACP session handle (NULL for non-ACP / never-run sessions). */
+  getAcpSessionId(id: string): string | null {
+    const row = this.db.prepare('SELECT acp_session_id FROM sessions WHERE id = ?').get(id) as { acp_session_id: string | null } | undefined
+    return row?.acp_session_id ?? null
+  }
+
   touchSession(id: string, updatedAt: number): void {
     this.db.prepare(`UPDATE sessions SET updated_at=? WHERE id=?`).run(updatedAt, id)
   }

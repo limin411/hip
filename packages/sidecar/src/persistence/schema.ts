@@ -174,6 +174,20 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 9) {
+    db.exec('BEGIN')
+    try {
+      // acp_session_id: the external ACP agent's own session handle (e.g. OpenCode's
+      // `ses_…`), captured after the first turn so a reopened hip session can resume the
+      // agent-side conversation via loadSession. NULL for non-ACP / never-run sessions.
+      db.exec('ALTER TABLE sessions ADD COLUMN acp_session_id TEXT')
+      db.exec('PRAGMA user_version = 9')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

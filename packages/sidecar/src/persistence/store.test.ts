@@ -329,4 +329,13 @@ describe('SessionStore', () => {
     store.setSessionStartCommit('s1', 'deadbeef')
     expect(store.getSessionGitMeta('s1')).toEqual({ currentBranch: 'feature', sessionStartCommit: 'deadbeef' })
   })
+
+  describe('acp_session_id persistence', () => {
+    it('stores and reads the acp session id', () => {
+      store.insertSession({ id: 's1', title: 'title', config: JSON.stringify({ agentId: 'opencode' }), createdAt: 1, updatedAt: 1 })
+      expect(store.getAcpSessionId('s1')).toBeNull()
+      store.setAcpSessionId('s1', 'ses_abc')
+      expect(store.getAcpSessionId('s1')).toBe('ses_abc')
+    })
+  })
 })

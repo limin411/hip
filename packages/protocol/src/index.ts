@@ -34,18 +34,23 @@ export interface ProvidersConfig {
 
 export type AgentTransport = 'thin' | 'rich'
 
+/** acp only: who supplies the model + API key to the external agent. */
+export type AgentAuthMode = 'hip-managed' | 'opencode-self'
+
 /** Which configured model an external agent should use. References hip-providers.json. */
 export interface BoundModel { providerID: string; modelID: string }
 
 export interface AgentConfig {
   id: string                          // nanoid
   name: string                        // display name
-  kind: 'custom' | 'opencode'         // selects the provider/adapter; 'opencode' arrives in Plan B
+  kind: 'custom' | 'opencode' | 'acp' // selects the provider/adapter
   command: string                     // executable (PATH name or absolute path)
   args: string[]                      // static launch args
   transport: AgentTransport
   acceptsModelConfig: boolean
   boundModel?: BoundModel             // required iff acceptsModelConfig and the user picked a model
+  authMode?: AgentAuthMode            // acp only: who supplies the model+key (default 'opencode-self')
+  quirks?: string                     // acp only: per-agent quirk-profile key (e.g. 'opencode')
   env?: Record<string, string>        // advanced manual env overrides
   enabled: boolean
 }

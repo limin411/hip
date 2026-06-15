@@ -28,4 +28,17 @@ describe('AcpAgentProvider', () => {
     expect(a.out.text).toContain('hello world')
     p.dispose()
   })
+
+  it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished', async () => {
+    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const a = cap()
+    // drive the mock to emit a thought + a tool by spawning it with env via a dedicated agent cfg
+    process.env.MOCK_ACP_THINK = '1'; process.env.MOCK_ACP_TOOL = '1'
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    delete process.env.MOCK_ACP_THINK; delete process.env.MOCK_ACP_TOOL
+    expect(a.out.reasoning).toContain('thinking')
+    expect(a.out.tools).toEqual([['t1', 'edit hello.txt']])
+    expect(a.out.toolEnds).toEqual([['t1', 'finished']])
+    p.dispose()
+  })
 })

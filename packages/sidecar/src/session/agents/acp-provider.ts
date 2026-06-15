@@ -75,7 +75,18 @@ export class AcpAgentProvider implements AgentProvider {
     switch (u?.sessionUpdate) {
       case 'agent_message_chunk': { const t = textOf(u.content); if (t) emit.token(t); break }
       case 'agent_thought_chunk': { const t = textOf(u.content); if (t) emit.reasoning(t); break }
-      // tool + configOptions handled in Slice 2/4
+      case 'tool_call':
+        emit.toolStarted(u.title ?? u.kind ?? 'tool', u.toolCallId, u.rawInput ?? u.kind ?? '')
+        break
+      case 'tool_call_update':
+        if (u.status === 'completed' || u.status === 'failed') {
+          const out = toolText(u.content) ?? (u.rawOutput !== undefined ? JSON.stringify(u.rawOutput) : undefined)
+          emit.toolFinished(u.toolCallId, u.status === 'completed' ? 'finished' : 'error', out, u.status === 'failed' ? (out ?? 'error') : undefined)
+        }
+        break
+      case 'config_option_update':
+        this.currentHooks?.configOptions(normalizeConfigOptions(u.configOptions ?? []))
+        break
     }
   }
 
@@ -96,6 +107,11 @@ function textOf(content: any): string {
   if (!content) return ''
   if (typeof content === 'string') return content
   return content.type === 'text' ? (content.text ?? '') : ''
+}
+function toolText(content: any): string | undefined {
+  if (!Array.isArray(content)) return undefined
+  const parts = content.map((c) => (c?.type === 'content' ? textOf(c.content) : c?.type === 'diff' ? `--- ${c.path}\n${c.newText ?? ''}` : '')).filter(Boolean)
+  return parts.length ? parts.join('\n') : undefined
 }
 function mapTool(tc: any) {
   return { title: tc?.title ?? tc?.kind ?? 'tool', kind: tc?.kind ?? 'other' }

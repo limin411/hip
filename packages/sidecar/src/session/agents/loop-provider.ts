@@ -3,15 +3,11 @@ import type { AgentConfig } from '@hip/protocol'
 import type { GraphEmit } from '../graph.js'
 import type { ResolvedModel } from './registry.js'
 import { buildModelEnv, parseRichLine, type RichEvent } from './adapters.js'
+import type { AgentProvider } from './types.js'
+export type { AgentProvider } from './types.js'
 
 const RS = '\x1e'              // end-of-turn sentinel (ASCII record separator)
 const KILL_GRACE_MS = 2000
-
-/** A turn-level agent. The built-in agent stays inline in Session; this is the external seam. */
-export interface AgentProvider {
-  runTurn(text: string, emit: GraphEmit, signal: AbortSignal): Promise<void>
-  dispose(): void
-}
 
 function abortError(): Error {
   const e = new Error('aborted')

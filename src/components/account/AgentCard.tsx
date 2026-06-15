@@ -69,7 +69,10 @@ export function AgentCard({
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />
-        <DropdownMenu>
+        {/* modal={false}: a modal menu + the dialog its items open both lock `body { pointer-events: none }`;
+            stacking them leaves the lock stuck after the dialog closes (whole app unclickable). A kebab needs
+            no scroll/focus trapping, so non-modal avoids the race for both 编辑 and 删除. */}
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <button
               className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"

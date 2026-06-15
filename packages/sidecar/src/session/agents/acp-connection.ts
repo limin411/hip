@@ -1,0 +1,137 @@
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { Readable, Writable } from 'node:stream'
+import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
+import type { AgentConfig } from '@hip/protocol'
+import type { ResolvedModel } from './registry.js'
+import { buildAcpSpawn } from './acp-config.js'
+
+/** Per-ACP-session handlers, registered by the provider for the duration of a turn. */
+export interface AcpSessionSink {
+  onUpdate(update: any): void
+  onPermission(req: any): Promise<{ outcome: { outcome: 'selected'; optionId: string } | { outcome: 'cancelled' } }>
+}
+
+/** One warm `<agent> acp` child + JSON-RPC connection, multiplexing many ACP sessions. */
+export class AcpConnection {
+  private child: ChildProcessWithoutNullStreams
+  private conn: ClientSideConnection
+  private initPromise: Promise<void> | null = null
+  /** ACP sessions currently held open over this child (open/close lifecycle). */
+  private readonly openSessions = new Set<string>()
+  /** Turn-scoped routing sinks keyed by acp session id. */
+  private readonly sinks = new Map<string, AcpSessionSink>()
+  private refs = 0
+
+  constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
+    const { command, args, env } = buildAcpSpawn(agent, model)
+    this.child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
+    this.child.stderr.setEncoding('utf8')
+    this.conn = new ClientSideConnection(
+      () => ({
+        sessionUpdate: async (p: any) => { this.sinks.get(p.sessionId)?.onUpdate(p.update) },
+        requestPermission: async (p: any) => {
+          const sink = this.sinks.get(p.sessionId)
+          if (!sink) return { outcome: { outcome: 'cancelled' } }
+          return sink.onPermission(p)
+        },
+        readTextFile: async () => ({ content: '' }),
+        writeTextFile: async () => ({}),
+      }),
+      ndJsonStream(Writable.toWeb(this.child.stdin), Readable.toWeb(this.child.stdout) as ReadableStream<Uint8Array>),
+    )
+  }
+
+  get childPid(): number { return this.child.pid ?? -1 }
+  /** Number of ACP sessions currently held open over this warm child. */
+  get sessionCount(): number { return this.openSessions.size }
+
+  private ensureInit(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = this.conn
+        .initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } } })
+        .then(() => undefined)
+    }
+    return this.initPromise
+  }
+
+  /** Create a new ACP session (cwd-scoped). Authenticates on demand if the agent demands it. */
+  async newSession(cwd: string): Promise<string> {
+    await this.ensureInit()
+    try {
+      const r = await this.conn.newSession({ cwd, mcpServers: [] })
+      this.openSessions.add(r.sessionId)
+      return r.sessionId
+    } catch (e: any) {
+      if (this.isAuthRequired(e)) {
+        await this.conn.authenticate({ methodId: await this.firstAuthMethod() })
+        const r = await this.conn.newSession({ cwd, mcpServers: [] })
+        this.openSessions.add(r.sessionId)
+        return r.sessionId
+      }
+      throw e
+    }
+  }
+
+  async loadSession(acpSessionId: string, cwd: string): Promise<void> {
+    await this.ensureInit()
+    await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers: [] })
+    this.openSessions.add(acpSessionId)
+  }
+
+  async newSessionWithOptions(cwd: string): Promise<{ sessionId: string; configOptions: any[] }> {
+    await this.ensureInit()
+    const r = await this.conn.newSession({ cwd, mcpServers: [] }) as { sessionId: string; configOptions?: any[] }
+    this.openSessions.add(r.sessionId)
+    return { sessionId: r.sessionId, configOptions: r.configOptions ?? [] }
+  }
+
+  registerSink(acpSessionId: string, sink: AcpSessionSink): void {
+    if (!this.sinks.has(acpSessionId)) this.refs++
+    this.sinks.set(acpSessionId, sink)
+  }
+  releaseSession(acpSessionId: string): void {
+    if (this.sinks.delete(acpSessionId)) this.refs = Math.max(0, this.refs - 1)
+    this.openSessions.delete(acpSessionId)
+  }
+
+  prompt(acpSessionId: string, text: string): Promise<{ stopReason: string }> {
+    return this.conn.prompt({ sessionId: acpSessionId, prompt: [{ type: 'text', text }] }) as Promise<{ stopReason: string }>
+  }
+  cancel(acpSessionId: string): Promise<void> { return this.conn.cancel({ sessionId: acpSessionId }) as Promise<void> }
+  setConfigOption(acpSessionId: string, configId: string, value: string): Promise<any> {
+    return this.conn.setSessionConfigOption({ sessionId: acpSessionId, configId, value })
+  }
+
+  get isIdle(): boolean { return this.refs === 0 }
+  dispose(): void { try { this.child.kill('SIGTERM') } catch { /* already dead */ } }
+
+  private isAuthRequired(e: any): boolean {
+    return !!(e && (e.data?.authRequired || /auth_required|authentication required/i.test(String(e.message ?? ''))))
+  }
+  private async firstAuthMethod(): Promise<string> {
+    // initialize() result isn't retained here; OpenCode advertises 'opencode-login'. Re-init is cheap.
+    const r = await this.conn.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
+    return r.authMethods?.[0]?.id ?? 'login'
+  }
+}
+
+/** Module-singleton pool: one AcpConnection per agent-config key, shared across hip Sessions. */
+export class AcpConnectionManager {
+  private readonly conns = new Map<string, AcpConnection>()
+
+  private key(agent: AgentConfig, model: ResolvedModel | null): string {
+    return JSON.stringify([agent.id, agent.authMode ?? 'opencode-self', agent.boundModel ?? null, model ?? null, agent.command, agent.args, agent.env ?? null])
+  }
+
+  async acquire(agent: AgentConfig, model: ResolvedModel | null): Promise<AcpConnection> {
+    const k = this.key(agent, model)
+    let c = this.conns.get(k)
+    if (!c) { c = new AcpConnection(agent, model); this.conns.set(k, c) }
+    return c
+  }
+
+  disposeAll(): void { for (const c of this.conns.values()) c.dispose(); this.conns.clear() }
+}
+
+/** Process-wide pool. Disposed on sidecar shutdown (see main.ts). */
+export const acpConnections = new AcpConnectionManager()

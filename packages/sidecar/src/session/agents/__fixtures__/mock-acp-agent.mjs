@@ -12,6 +12,7 @@ import { Readable, Writable } from 'node:stream'
 const env = process.env
 let authed = !env.MOCK_ACP_AUTH_REQUIRED
 let model = 'mock/base'
+let sessionSeq = 0 // distinct id per newSession (first is 'mock-sess-1')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const agent = {
@@ -26,7 +27,7 @@ const agent = {
   async newSession() {
     if (!authed) { const e = new Error('auth_required'); e.code = -32000; e.data = { authRequired: true }; throw e }
     return {
-      sessionId: 'mock-sess-1',
+      sessionId: `mock-sess-${++sessionSeq}`,
       configOptions: [{ type: 'select', id: 'model', name: 'Model', category: 'model', currentValue: model,
         options: [{ value: 'mock/base', name: 'Base' }, { value: 'mock/other', name: 'Other' }] }],
     }

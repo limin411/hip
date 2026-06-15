@@ -38,6 +38,11 @@ export const zhTW = {
       interruptHint: '在下方回覆，告訴 hip 接下來怎麼做。',
       errorTimeout: '回應逾時，已停止。',
       jumpToLatest: '回到最新',
+      permission: {
+        title: '需要授權',
+        intro: '智能體請求執行以下操作：',
+        cancel: '拒絕',
+      },
       style: '風格',
       styleNone: '無',
       styleCustom: '自訂',

@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
+import { PermissionModal } from './PermissionModal'
 
 export function ChatPane() {
   const { t } = useTranslation()
@@ -181,6 +182,7 @@ export function ChatPane() {
           {t('chat.jumpToLatest')}
         </button>
       )}
+      <PermissionModal />
     </div>
   )
 }

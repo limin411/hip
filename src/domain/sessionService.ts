@@ -194,6 +194,12 @@ export class SessionService {
     this.transport.send({ type: 'agent:setConfigOption', sessionId, configId, value })
   }
 
+  /** Answer a pending HITL tool-permission request: forward the user's choice (a chosen optionId, or
+   *  a cancellation) so the blocked tool proceeds or is denied. The caller clears the local queue. */
+  respondPermission(sessionId: string, requestId: string, choice: { optionId: string } | { cancelled: true }): void {
+    this.transport.send({ type: 'permission:respond', sessionId, requestId, ...('optionId' in choice ? { optionId: choice.optionId } : { cancelled: true }) })
+  }
+
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
   requestDiff(sessionId: string, base?: DiffBase): void {
     const cur = useDiffStore.getState().bySession[sessionId]

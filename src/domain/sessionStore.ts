@@ -1,11 +1,19 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AcpConfigOption, AgentRole, AgentRun, Message, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import type { AcpConfigOption, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
   code: string
   message: string
+}
+
+/** A pending HITL tool-permission request awaiting the user's choice (ACP agents only). */
+export interface PendingPermission {
+  turnId: string
+  requestId: string
+  tool: PermissionRequestPayload
+  options: PermissionOption[]
 }
 
 export interface SessionVM {
@@ -20,6 +28,7 @@ export interface SessionVM {
   error: SessionError | null  // 最近一次服务端错误（供 UI 内联提示），无则 null
   interrupt?: { turnId: string; question: string; context?: string } | null  // pending HITL question; null/absent = none
   configOptions?: AcpConfigOption[]  // agent-advertised model/mode selectors (ACP agents only); absent = none
+  pendingPermission?: PendingPermission | null  // pending HITL tool-permission request (ACP agents only); null/absent = none
 }
 
 /** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
@@ -223,6 +232,12 @@ export function applyServerMessage(
     case 'agent:configOptions':
       return update(msg.sessionId, (s) => ({ ...s, configOptions: msg.options }))
 
+    case 'permission:request':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        pendingPermission: { turnId: msg.turnId, requestId: msg.requestId, tool: msg.tool, options: msg.options },
+      }))
+
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 
@@ -276,6 +291,17 @@ export function applyServerMessage(
   }
 }
 
+/** Clear a session's pending permission request once the user has responded. Matches by
+ *  requestId so a stale/already-replaced request can't clobber a newer one. No-op if none match. */
+export function clearPermission(state: { sessions: SessionVM[] }, requestId: string): { sessions: SessionVM[] } {
+  if (!state.sessions.some((s) => s.pendingPermission?.requestId === requestId)) return state
+  return {
+    sessions: state.sessions.map((s) =>
+      s.pendingPermission?.requestId === requestId ? { ...s, pendingPermission: null } : s,
+    ),
+  }
+}
+
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
 
 export function emptySession(id: string): SessionVM {
@@ -299,6 +325,7 @@ interface DomainStore {
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string) => void
   regenerateLastTurn: (sessionId: string) => void
+  clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
 }
 
@@ -358,6 +385,8 @@ export const useDomainStore = create<DomainStore>((set) => ({
         return { ...sess, messages, status: 'running' as const, error: null }
       }),
     })),
+
+  clearPermission: (requestId) => set((s) => clearPermission(s, requestId)),
 
   setConnection: (connection) => set({ connection }),
 }))

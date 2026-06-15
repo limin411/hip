@@ -1,6 +1,6 @@
 // src/domain/sessionStore.test.ts
 import { describe, it, expect } from 'vitest'
-import { applyServerMessage, emptySession, useDomainStore, type SessionVM } from './sessionStore'
+import { applyServerMessage, clearPermission, emptySession, useDomainStore, type SessionVM } from './sessionStore'
 
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
@@ -363,6 +363,21 @@ describe('applyServerMessage', () => {
       { id: 'model', name: 'Model', category: 'model', currentValue: 'a', options: [{ value: 'a', name: 'A' }] },
     ] }, 0)
     expect(next).toBe(s0)
+  })
+
+  it('queues a permission request and clears it on respond', () => {
+    let s = applyServerMessage({ sessions: [baseSession({ id: 's' })] }, { type: 'permission:request', sessionId: 's', turnId: 't', requestId: 'r',
+      tool: { title: 'edit hello.txt', kind: 'edit' }, options: [{ optionId: 'once', name: 'Allow once', kind: 'allow_once' }] }, 0)
+    expect(s.sessions[0].pendingPermission?.requestId).toBe('r')
+    s = clearPermission(s, 'r')
+    expect(s.sessions[0].pendingPermission).toBeNull()
+  })
+
+  it('clearPermission only clears the matching requestId', () => {
+    const s0 = applyServerMessage({ sessions: [baseSession({ id: 's' })] }, { type: 'permission:request', sessionId: 's', turnId: 't', requestId: 'r',
+      tool: { title: 'edit hello.txt', kind: 'edit' }, options: [{ optionId: 'once', name: 'Allow once', kind: 'allow_once' }] }, 0)
+    const s1 = clearPermission(s0, 'other')
+    expect(s1.sessions[0].pendingPermission?.requestId).toBe('r')
   })
 })
 

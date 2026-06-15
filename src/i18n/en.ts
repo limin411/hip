@@ -38,6 +38,11 @@ export const en = {
       interruptHint: 'Reply below to tell hip how to proceed.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
+      permission: {
+        title: 'Permission required',
+        intro: 'The agent is requesting to perform this action:',
+        cancel: 'Deny',
+      },
       style: 'Style',
       styleNone: 'None',
       styleCustom: 'Custom',

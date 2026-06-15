@@ -1,7 +1,7 @@
 // src/domain/hooks.ts
 import type { AcpConfigOption, Message, SearchHit, TurnUsage } from '@hip/protocol'
 import { useShallow } from 'zustand/react/shallow'
-import { useDomainStore, type SessionError, type SessionVM } from './sessionStore'
+import { useDomainStore, type PendingPermission, type SessionError, type SessionVM } from './sessionStore'
 
 const EMPTY_MESSAGES: Message[] = []
 const EMPTY_CONFIG_OPTIONS: AcpConfigOption[] = []
@@ -49,6 +49,11 @@ export function useActiveInterrupt(): { turnId: string; question: string; contex
 /** ACP-agent model/mode selectors for the active session (empty when none advertised). */
 export function useActiveConfigOptions(): AcpConfigOption[] {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.configOptions ?? EMPTY_CONFIG_OPTIONS)
+}
+
+/** Pending HITL tool-permission request for the active session (null when none awaiting). */
+export function useActivePendingPermission(): PendingPermission | null {
+  return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.pendingPermission ?? null)
 }
 
 /** Pure: sum `usage` across the active session's messages. Returns null when the active

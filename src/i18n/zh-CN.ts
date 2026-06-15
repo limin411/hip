@@ -38,6 +38,11 @@ export const zhCN = {
       interruptHint: '在下方回复，告诉 hip 接下来怎么做。',
       errorTimeout: '响应超时，已停止。',
       jumpToLatest: '回到最新',
+      permission: {
+        title: '需要授权',
+        intro: '智能体请求执行以下操作：',
+        cancel: '拒绝',
+      },
       style: '风格',
       styleNone: '无',
       styleCustom: '自定义',

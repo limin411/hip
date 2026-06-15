@@ -43,7 +43,10 @@ export function BranchSwitcher() {
 
   return (
     <>
-      <DropdownMenu>
+      {/* modal={false}: this modal dropdown + the switch-confirm Modal its item opens both lock
+          `body { pointer-events: none }`; stacking them leaves the lock stuck after the dialog
+          closes (whole app unclickable). Same fix/pattern as MenuRail.tsx and AgentCard.tsx. */}
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <button
             data-testid="branch-chip"

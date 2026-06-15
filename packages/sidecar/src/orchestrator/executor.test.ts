@@ -148,6 +148,34 @@ describe('runWorkflow — 失败 fail-fast', () => {
     expect(failed[0].nodeId).toBe('b')
     expect(failed[0].error).toBe('boom')
   })
+
+  it('并发失败:扇出 a→b, a→c 且 b、c 都抛 → 终态无节点滞留 running', async () => {
+    // 回归:首个失败把 run.status 置 'failed';第二个在飞节点的拒绝若被吞,
+    // 其 NodeRunState 会永久停在 'running' —— 终态快照(status='failed' 却有 running 节点)自相矛盾。
+    const def = wf({
+      nodes: [node('a'), node('b'), node('c')],
+      edges: [
+        { from: 'a', to: 'b' } as WorkflowEdge,
+        { from: 'a', to: 'c' } as WorkflowEdge,
+      ],
+      entry: ['a'],
+    })
+    const { sink, ports } = harness({ b: { throws: 'boom-b' }, c: { throws: 'boom-c' } })
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'r8', signal: ac.signal })
+
+    expect(state.status).toBe('failed')
+    // 关键不变量:终态快照里没有任何节点仍停在 'running'。
+    const lingering = Object.entries(state.nodes).filter(([, s]) => s.status === 'running')
+    expect(lingering).toEqual([])
+    // 两个并发失败的兄弟节点都落定为 failed(而非一个被吞)。
+    expect(state.nodes.b.status).toBe('failed')
+    expect(state.nodes.c.status).toBe('failed')
+    // 两条 node:failed 事件都进了事件流,下游(WS 透传)可据此离开 running。
+    const failed = sink.ofType('node:failed').map((e) => e.nodeId)
+    expect(failed).toContain('b')
+    expect(failed).toContain('c')
+  })
 })
 
 describe('runWorkflow — 取消', () => {

@@ -51,7 +51,16 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
       const before = state
       apply({ type: 'node:succeeded', nodeId: settled.id, output: settled.out! })
       emitNewlySkipped(before) // propagate 级联出的 skip 也要进事件流
-    } else if (state.status === 'running') apply({ type: 'node:failed', nodeId: settled.id, error: settled.err! })
+    } else if (state.status !== 'cancelled') {
+      // 该节点的拒绝必须落定为 node:failed,使其 NodeRunState 离开 'running'。
+      // 关键的并发 fail-fast:扇出 a→b,a→c 且 b、c 都抛错时,b 的 node:failed 已把
+      // run.status 置 'failed';若此处仍只在 status==='running' 时发射,c 的拒绝会被吞,
+      // c 的节点态永久停在 'running' —— 终态快照自相矛盾(status='failed' 却有节点仍 running)。
+      // node:failed 的 reduce 幂等地把节点置 failed + run.status 置 failed,重复无害。
+      // 仅在已 'cancelled' 时跳过:run:cancelled 已把在飞节点归一为 'cancelled',
+      // 取消下的拒绝(AbortError)不应被改写成 failed。
+      apply({ type: 'node:failed', nodeId: settled.id, error: settled.err! })
+    }
     if (state.status === 'running') launch() // 终态(failed/cancelled)则停止派发,排空在飞
   }
 

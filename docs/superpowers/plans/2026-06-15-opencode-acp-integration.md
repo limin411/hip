@@ -14,9 +14,9 @@
 
 ## Conventions (read once)
 
-- **Sidecar tests are paid-trap-prone.** NEVER run `vitest run src …` (substring-matches `packages/sidecar/src` and fires PAID real-LLM suites; `vitest.setup.ts` re-seeds the key from `~/.hip/config/auth.json`). To run a single sidecar test paid-free, run it from the sidecar package with an explicit file path: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts`. All tests in this plan use a **mock ACP agent** (no LLM), so they are paid-free, but keep the filter rule in mind.
+- **Tests run from the REPO ROOT with an explicit file path.** vitest config + `setupFiles` live only at the repo root, so `yarn workspace @hip/sidecar vitest run …` fails (wrong CWD / missing setup file). Use: `yarn vitest run <full/path/from/root/to/file.test.ts>` — e.g. `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts` or `yarn vitest run src/store/agentsStore.test.ts`. **NEVER run `vitest run src` (a bare directory token)** — it substring-matches `packages/sidecar/src` and fires PAID real-LLM suites (`vitest.setup.ts` re-seeds the key from `~/.hip/config/auth.json`). An explicit single-file path runs only that file and is paid-free. All tests in this plan use a **mock ACP agent** (no LLM).
 - **ESM import suffix:** intra-package imports use `.js` (e.g. `from './registry.js'`), even from `.ts` files.
-- **Type-check:** `yarn workspace @hip/protocol build` after protocol edits; `yarn workspace @hip/sidecar exec tsc --noEmit` for the sidecar.
+- **Type-check:** sidecar → `yarn workspace @hip/sidecar exec tsc --noEmit`; protocol/frontend → `yarn type-check` (root `tsc --noEmit`). `@hip/protocol` is raw TS (`main: src/index.ts`, no build script, no own tsconfig) — it is validated transitively by the sidecar and root type-checks. There is **no** `@hip/protocol build`.
 - **Commit** after each task's tests pass. Conventional-commit style: `feat(acp): …`.
 - **Branch:** work on `feat/opencode-acp-integration` (already created; the spec commit `fcb2548` is its first commit).
 
@@ -186,12 +186,12 @@ describe('mock-acp-agent fixture', () => {
 
 - [ ] **Step 3: Run — expect FAIL** (fixture not yet executable / wiring)
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/__fixtures__/mock-acp-agent.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/__fixtures__/mock-acp-agent.test.ts`
 Expected: FAIL initially if any wiring is off; iterate the fixture until green.
 
 - [ ] **Step 4: Make executable + run — expect PASS**
 
-Run: `chmod +x packages/sidecar/src/session/agents/__fixtures__/mock-acp-agent.mjs && yarn workspace @hip/sidecar vitest run src/session/agents/__fixtures__/mock-acp-agent.test.ts`
+Run: `chmod +x packages/sidecar/src/session/agents/__fixtures__/mock-acp-agent.mjs && yarn vitest run packages/sidecar/src/session/agents/__fixtures__/mock-acp-agent.test.ts`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -231,7 +231,7 @@ describe('AgentConfig acp kind', () => {
 
 - [ ] **Step 2: Run — expect FAIL** (type error: `'acp'` not assignable, `authMode`/`quirks` unknown)
 
-Run: `yarn workspace @hip/protocol vitest run src/agent-config.test.ts`
+Run: `yarn vitest run packages/protocol/src/agent-config.test.ts`
 Expected: FAIL (TS2322 / excess property)
 
 - [ ] **Step 3: Edit the type**
@@ -259,7 +259,7 @@ export interface AgentConfig {
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/protocol vitest run src/agent-config.test.ts && yarn workspace @hip/protocol build`
+Run: `yarn vitest run packages/protocol/src/agent-config.test.ts && yarn type-check`
 Expected: PASS + clean build
 
 - [ ] **Step 5: Commit**
@@ -297,7 +297,7 @@ describe('acp control-plane messages', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/protocol vitest run src/acp-messages.test.ts`
+Run: `yarn vitest run packages/protocol/src/acp-messages.test.ts`
 Expected: FAIL (unknown types / members)
 
 - [ ] **Step 3: Add the payload types** (near `TurnUsage`, ~line 75)
@@ -344,7 +344,7 @@ export interface PermissionOption {
 
 - [ ] **Step 6: Run — expect PASS**
 
-Run: `yarn workspace @hip/protocol vitest run src/acp-messages.test.ts && yarn workspace @hip/protocol build`
+Run: `yarn vitest run packages/protocol/src/acp-messages.test.ts && yarn type-check`
 Expected: PASS + clean build
 
 - [ ] **Step 7: Commit**
@@ -385,7 +385,7 @@ describe('AgentProvider widened contract', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/types.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/types.test.ts`
 Expected: FAIL (module not found)
 
 - [ ] **Step 3: Create `types.ts`**
@@ -428,7 +428,7 @@ Update the class declaration to `export class LoopAgentProvider implements Agent
 
 - [ ] **Step 5: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/types.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
+Run: `yarn vitest run packages/sidecar/src/session/agents/types.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
 Expected: PASS + clean type-check (LoopAgentProvider still compiles)
 
 - [ ] **Step 6: Commit**
@@ -465,7 +465,7 @@ describe('acp quirks', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-quirks.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-quirks.test.ts`
 Expected: FAIL (module not found)
 
 - [ ] **Step 3: Implement**
@@ -491,7 +491,7 @@ export function quirksFor(key: string | undefined): AcpQuirks {
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-quirks.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-quirks.test.ts`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -543,7 +543,7 @@ describe('AcpConnectionManager', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-connection.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-connection.test.ts`
 Expected: FAIL (module not found)
 
 - [ ] **Step 3: Implement `acp-connection.ts`**
@@ -676,7 +676,7 @@ export const acpConnections = new AcpConnectionManager()
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-connection.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-connection.test.ts`
 Expected: PASS (note: this depends on Task 3.1's `acp-config.ts`; if not yet created, add a temporary stub `export function buildAcpSpawn(agent, _m){ return { command: agent.command, args: agent.args, env: { ...process.env } } }` and replace it in Task 3.1)
 
 - [ ] **Step 5: Commit**
@@ -731,7 +731,7 @@ describe('AcpAgentProvider', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts`
 Expected: FAIL (module not found)
 
 - [ ] **Step 3: Implement `acp-provider.ts`** (skeleton — streaming map filled in Slice 2/4/5; this version handles text + done)
@@ -874,7 +874,7 @@ export function createAgentProvider(agent: AgentConfig, cwd: string, model: Reso
 
 - [ ] **Step 5: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
 Expected: PASS + clean type-check
 
 - [ ] **Step 6: Commit**
@@ -907,7 +907,7 @@ it('evicts a dead connection so the next acquire spawns a fresh child', async ()
 
 - [ ] **Step 2: Run — expect FAIL** (manager returns the same dead connection)
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-connection.test.ts -t 'evicts'`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-connection.test.ts -t 'evicts'`
 Expected: FAIL
 
 - [ ] **Step 3: Add `onClosed` + child listeners to `AcpConnection`** (in the constructor, after `this.child = spawn(...)`):
@@ -951,7 +951,7 @@ In `AcpConnectionManager.acquire`, evict closed connections and register the evi
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-connection.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-connection.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
 Expected: PASS + clean type-check
 
 - [ ] **Step 5: Commit**
@@ -992,7 +992,7 @@ it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished'
 
 - [ ] **Step 2: Run — expect FAIL** (tools/reasoning empty)
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts -t 'tool calls'`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts -t 'tool calls'`
 Expected: FAIL
 
 - [ ] **Step 3: Extend `applyUpdate`**
@@ -1030,7 +1030,7 @@ function toolText(content: any): string | undefined {
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
@@ -1063,7 +1063,7 @@ it('cancel mid-stream rejects with AbortError even though the agent reports end_
 
 - [ ] **Step 2: Run — expect PASS** (logic already present)
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts -t 'cancel mid-stream'`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts -t 'cancel mid-stream'`
 Expected: PASS. If FAIL, verify `runTurn` re-throws `abortError()` when `aborted` is true after `conn.prompt` resolves.
 
 - [ ] **Step 3: Commit**
@@ -1162,12 +1162,12 @@ describe('external ACP agent through SessionManager', () => {
 
 - [ ] **Step 2b: Run — expect FAIL** then iterate
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/external-acp.integration.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/external-acp.integration.test.ts`
 Expected: FAIL until the hooks wiring + factory route are correct, then PASS.
 
 - [ ] **Step 3: Type-check + run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn workspace @hip/sidecar vitest run src/session/external-acp.integration.test.ts`
+Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn vitest run packages/sidecar/src/session/external-acp.integration.test.ts`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -1219,7 +1219,7 @@ describe('buildAcpSpawn', () => {
 
 - [ ] **Step 2: Run — expect FAIL**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-config.test.ts`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-config.test.ts`
 Expected: FAIL
 
 - [ ] **Step 3: Implement `acp-config.ts`**
@@ -1265,7 +1265,7 @@ export function buildAcpSpawn(agent: AgentConfig, model: ResolvedModel | null): 
 
 - [ ] **Step 5: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-config.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-config.test.ts && yarn workspace @hip/sidecar exec tsc --noEmit`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
@@ -1370,7 +1370,7 @@ it('switches the live model via setConfigOption and the backend uses it', async 
 
 - [ ] **Step 2: Run — expect FAIL/PASS** — `setConfigOption` exists from Task 1.6; this asserts the mock honors it.
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts -t 'switches the live model'`
+Run: `yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts -t 'switches the live model'`
 Expected: PASS (the mock's `setSessionConfigOption` updates `model`, which `prompt` echoes). If FAIL, confirm `AcpConnection.setConfigOption` calls `conn.setSessionConfigOption`.
 
 - [ ] **Step 3: Add the SessionManager route** — in `handleAsync`'s switch (after `message:resume`):
@@ -1386,7 +1386,7 @@ Expected: PASS (the mock's `setSessionConfigOption` updates `model`, which `prom
 
 - [ ] **Step 4: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn workspace @hip/sidecar vitest run src/session/agents/acp-provider.test.ts`
+Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn vitest run packages/sidecar/src/session/agents/acp-provider.test.ts`
 Expected: PASS + clean type-check
 
 - [ ] **Step 5: Commit**
@@ -1487,14 +1487,14 @@ it('emits permission:request and proceeds when the client responds', async () =>
 
 - [ ] **Step 2: Run — expect FAIL then iterate**
 
-Run: `yarn workspace @hip/sidecar vitest run src/session/external-acp.integration.test.ts -t 'permission:request'`
+Run: `yarn vitest run packages/sidecar/src/session/external-acp.integration.test.ts -t 'permission:request'`
 Expected: FAIL until `onPermission` correctly uses `hooks.requestPermission` and Session resolves the pending map; then PASS.
 
 > The provider's `onPermission` simply `await hooks.requestPermission({...})`. That hook (built in `Session`, Task 2.3) registers the resolver in `Session.pendingPermissions` and emits `permission:request`; `SessionManager` routes `permission:respond` → `Session.respondPermission` → resolves the pending promise → the provider returns the ACP outcome → the agent's blocked tool proceeds. The provider holds NO pending-permission state.
 
 - [ ] **Step 3: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn workspace @hip/sidecar vitest run src/session/external-acp.integration.test.ts`
+Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn vitest run packages/sidecar/src/session/external-acp.integration.test.ts`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -1580,7 +1580,7 @@ describe('acp_session_id persistence', () => {
 
 - [ ] **Step 2: Run — expect FAIL** (paid-free: pure SQLite)
 
-Run: `yarn workspace @hip/sidecar vitest run src/persistence/store.test.ts -t 'acp_session_id'`
+Run: `yarn vitest run packages/sidecar/src/persistence/store.test.ts -t 'acp_session_id'`
 Expected: FAIL
 
 - [ ] **Step 3: Append the migration** — at the END of `migrate(db)` in `schema.ts`:
@@ -1612,7 +1612,7 @@ Expected: FAIL
 
 - [ ] **Step 5: Run — expect PASS**
 
-Run: `yarn workspace @hip/sidecar vitest run src/persistence/store.test.ts`
+Run: `yarn vitest run packages/sidecar/src/persistence/store.test.ts`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
@@ -1681,7 +1681,7 @@ it('reopens a prior ACP session via loadSession and replays history', async () =
 
 - [ ] **Step 3: Run — expect FAIL then iterate to PASS**
 
-Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn workspace @hip/sidecar vitest run src/session/external-acp.integration.test.ts -t 'reopens'`
+Run: `yarn workspace @hip/sidecar exec tsc --noEmit && yarn vitest run packages/sidecar/src/session/external-acp.integration.test.ts -t 'reopens'`
 Expected: PASS (the provider calls `loadSession('mock-sess-1')` then prompts)
 
 - [ ] **Step 4: Commit**
@@ -1712,7 +1712,7 @@ process.on('SIGTERM', () => { acpConnections.disposeAll(); process.exit(0) })
 
 ```bash
 mv ~/.hip/config/auth.json ~/.hip/config/auth.json.bak 2>/dev/null || true
-yarn workspace @hip/sidecar exec tsc --noEmit && yarn workspace @hip/sidecar vitest run src/session/agents src/session/external-acp.integration.test.ts src/persistence
+yarn workspace @hip/sidecar exec tsc --noEmit && yarn vitest run packages/sidecar/src/session/agents src/session/external-acp.integration.test.ts src/persistence
 mv ~/.hip/config/auth.json.bak ~/.hip/config/auth.json 2>/dev/null || true
 ```
 
@@ -1729,8 +1729,8 @@ git commit -m "feat(acp): dispose warm ACP connections on sidecar shutdown"
 
 ## Final verification
 
-- [ ] **Full type-check:** `yarn workspace @hip/protocol build && yarn workspace @hip/sidecar exec tsc --noEmit && yarn tsc --noEmit` (frontend)
-- [ ] **Paid-free test sweep** (auth.json moved aside): `yarn workspace @hip/sidecar vitest run src/session src/persistence && yarn vitest run src/store src/domain`
+- [ ] **Full type-check:** `yarn type-check && yarn workspace @hip/sidecar exec tsc --noEmit && yarn tsc --noEmit` (frontend)
+- [ ] **Paid-free test sweep** (auth.json moved aside): `yarn vitest run packages/sidecar/src/session src/persistence && yarn vitest run src/store src/domain`
 - [ ] **Frontend build:** `yarn build`
 - [ ] **Manual `yarn tauri dev` acceptance** (real reasoning model; GUI > real-LLM automation): enable OpenCode (Mode B first), start a conversation, confirm: thinking streams; tool cards render; a permission prompt round-trips; cancel mid-turn stops the turn and you can immediately re-prompt; switching the model in the composer changes the answering model; closing + reopening the conversation rehydrates. Then test Mode A (hip-managed key + bound DeepSeek model) and confirm it does NOT fall back to `opencode/big-pickle`.
 - [ ] **Per-slice GUI checks** were done inline; this is the end-to-end pass.

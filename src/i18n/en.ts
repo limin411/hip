@@ -257,6 +257,7 @@ export const en = {
         sectionCommand: 'Launch command',
         sectionTransport: 'Protocol',
         sectionModel: 'Model',
+        selectModel: 'Select a model…',
         menuMore: 'More actions',
         deleteConfirmTitle: 'Delete agent "{{name}}"?',
         deleteConfirmBody: 'This action cannot be undone.',

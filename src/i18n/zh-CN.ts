@@ -257,6 +257,7 @@ export const zhCN = {
         sectionCommand: '启动命令',
         sectionTransport: '协议',
         sectionModel: '模型',
+        selectModel: '选择模型…',
         menuMore: '更多操作',
         deleteConfirmTitle: '删除智能体"{{name}}"？',
         deleteConfirmBody: '此操作无法撤销。',

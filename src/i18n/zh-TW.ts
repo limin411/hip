@@ -257,6 +257,7 @@ export const zhTW = {
         sectionCommand: '啟動命令',
         sectionTransport: '協議',
         sectionModel: '模型',
+        selectModel: '選擇模型…',
         menuMore: '更多操作',
         deleteConfirmTitle: '刪除智能體「{{name}}」？',
         deleteConfirmBody: '此操作無法復原。',

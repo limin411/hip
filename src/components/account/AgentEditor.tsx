@@ -137,7 +137,7 @@ export function AgentEditor({
                 value={form.boundModelKey}
                 onChange={(e) => patch({ boundModelKey: e.target.value })}
               >
-                <option value="">—</option>
+                <option value="">{t('settings.agents.selectModel')}</option>
                 {groups.map((g) => (
                   <optgroup key={g.providerID} label={g.providerName}>
                     {g.models.map((m) => (

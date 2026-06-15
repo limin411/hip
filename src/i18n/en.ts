@@ -213,7 +213,6 @@ export const en = {
         notConfigured: 'Not configured',
         configured: 'Configured',
         available: 'Available',
-        incompatible: 'Not OpenAI-compatible — unsupported',
         incompatibleGroup: 'Incompatible',
         noMatches: 'No matches',
         apiKey: 'API Key',

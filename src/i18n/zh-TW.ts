@@ -213,7 +213,6 @@ export const zhTW = {
         notConfigured: '未設定',
         configured: '已設定',
         available: '可用',
-        incompatible: '非 OpenAI 相容，暫不支援',
         incompatibleGroup: '不相容',
         noMatches: '無相符項目',
         apiKey: 'API Key',

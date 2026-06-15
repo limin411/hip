@@ -213,7 +213,6 @@ export const zhCN = {
         notConfigured: '未配置',
         configured: '已配置',
         available: '可用',
-        incompatible: '非 OpenAI 兼容，暂不支持',
         incompatibleGroup: '不兼容',
         noMatches: '无匹配项',
         apiKey: 'API Key',

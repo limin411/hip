@@ -33,4 +33,27 @@ describe('external ACP agent through SessionManager', () => {
     expect(out.some((m) => m.type === 'tool:started')).toBe(true)
     expect(out.some((m) => m.type === 'message:complete')).toBe(true)
   }, 20000)
+
+  it('emits permission:request and proceeds when the client responds', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    const agentsPath = join(dir, 'hip-agents.json')
+    writeFileSync(agentsPath, JSON.stringify({ agents: [{
+      id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
+      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
+    }] }))
+    process.env.HIP_AGENTS_PATH = agentsPath
+    const mgr = new SessionManager(undefined, () => undefined, dir)
+    const out: ServerMessage[] = []
+    const send = (m: ServerMessage) => {
+      out.push(m)
+      if (m.type === 'permission:request') mgr.handle({ type: 'permission:respond', sessionId: m.sessionId, requestId: m.requestId, optionId: 'once' } as any, send)
+    }
+    mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
+    await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'edit', role: 'user' } as any, send)
+    await new Promise((r) => setTimeout(r, 800))
+    acpConnections.disposeAll()
+    expect(out.some((m) => m.type === 'permission:request')).toBe(true)
+    expect(out.some((m) => m.type === 'tool:finished' && m.status === 'finished')).toBe(true)
+    expect(out.some((m) => m.type === 'message:complete')).toBe(true)
+  }, 20000)
 })

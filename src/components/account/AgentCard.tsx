@@ -62,9 +62,9 @@ export function AgentCard({
             </Badge>
           )}
         </div>
-        <div className="mt-1 flex items-center gap-1 truncate font-mono text-caption text-ink-tertiary">
+        <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
           <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
-          <span className="truncate">{cmdline}</span>
+          <span className="min-w-0 truncate">{cmdline}</span>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">

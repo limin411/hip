@@ -6,5 +6,5 @@ import type { ResolvedModel } from './registry.js'
 export interface AcpSpawn { command: string; args: string[]; env: NodeJS.ProcessEnv }
 
 export function buildAcpSpawn(agent: AgentConfig, _model: ResolvedModel | null): AcpSpawn {
-  return { command: agent.command, args: agent.args, env: { ...process.env } }
+  return { command: agent.command, args: agent.args, env: { ...process.env, ...agent.env } }
 }

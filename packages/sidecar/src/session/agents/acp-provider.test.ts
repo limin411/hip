@@ -41,4 +41,14 @@ describe('AcpAgentProvider', () => {
     expect(a.out.toolEnds).toEqual([['t1', 'finished']])
     p.dispose()
   })
+
+  it('cancel mid-stream rejects with AbortError even though the agent reports end_turn', async () => {
+    const p = new AcpAgentProvider(cfg({ env: { MOCK_ACP_SLOW_MS: '200' } }), process.cwd(), null)
+    const ac = new AbortController()
+    const a = cap()
+    const turn = p.runTurn('hi', a.emit, ac.signal)
+    setTimeout(() => ac.abort(), 120) // abort after the first chunk
+    await expect(turn).rejects.toThrowError(/abort/i)
+    p.dispose()
+  })
 })

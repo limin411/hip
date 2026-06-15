@@ -62,4 +62,19 @@ describe('AcpAgentProvider', () => {
     expect(b.out.text).toContain('mock/other')  // backend actually switched (mock echoes model)
     p.dispose()
   })
+
+  it('recovers from a warm-child death — the next turn re-acquires a fresh child and succeeds (C1)', async () => {
+    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const a = cap()
+    await p.runTurn('first', a.emit, new AbortController().signal)
+    expect(a.out.text).toContain('hello world')
+    // Simulate the warm child dying + the pool evicting it.
+    acpConnections.disposeAll()
+    await new Promise((r) => setTimeout(r, 200)) // let the child 'exit' fire → connection marked closed
+    // The SAME provider must not be bricked: ensureSession re-acquires and reattaches/recreates.
+    const b = cap()
+    await p.runTurn('second', b.emit, new AbortController().signal)
+    expect(b.out.text).toContain('hello world')
+    p.dispose()
+  })
 })

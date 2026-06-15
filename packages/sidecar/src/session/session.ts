@@ -784,6 +784,12 @@ export class Session {
       watchdog.stop()
       this.running = false
       this.abortController = null
+      // Settle any HITL permission requests still outstanding at turn end / abort: resolve each with
+      // {cancelled} so the external agent's blocked tool unblocks and the pending map never leaks.
+      if (this.pendingPermissions.size) {
+        for (const resolve of this.pendingPermissions.values()) resolve({ cancelled: true })
+        this.pendingPermissions.clear()
+      }
     }
 
     const finalText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)

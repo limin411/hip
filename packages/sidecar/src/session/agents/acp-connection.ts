@@ -21,11 +21,18 @@ export class AcpConnection {
   /** Turn-scoped routing sinks keyed by acp session id. */
   private readonly sinks = new Map<string, AcpSessionSink>()
   private refs = 0
+  /** auth methods advertised at initialize(), reused for authenticate-on-demand (no re-init). */
+  private authMethods: Array<{ id: string }> = []
+  /** Tail of the child's stderr, kept for diagnostics on death. */
+  private stderrTail = ''
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
     const { command, args, env } = buildAcpSpawn(agent, model)
     this.child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stderr.setEncoding('utf8')
+    // Drain stderr — `setEncoding` alone does NOT put the stream in flowing mode, and an
+    // unconsumed ~64KB pipe buffer would block the (verbose) child's stdout responses → deadlock.
+    this.child.stderr.on('data', (chunk: string) => { this.stderrTail = (this.stderrTail + chunk).slice(-4000) })
     this.child.on('exit', () => this.handleClosed(new Error('acp agent process exited')))
     this.child.on('error', (err) => this.handleClosed(new Error(`acp agent process error: ${err.message}`)))
     this.conn = new ClientSideConnection(
@@ -51,7 +58,7 @@ export class AcpConnection {
     if (!this.initPromise) {
       this.initPromise = this.conn
         .initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } } })
-        .then(() => undefined)
+        .then((r) => { this.authMethods = (r as { authMethods?: Array<{ id: string }> }).authMethods ?? [] })
     }
     return this.initPromise
   }
@@ -65,7 +72,7 @@ export class AcpConnection {
       return r.sessionId
     } catch (e: any) {
       if (this.isAuthRequired(e)) {
-        await this.conn.authenticate({ methodId: await this.firstAuthMethod() })
+        await this.conn.authenticate({ methodId: this.firstAuthMethod() })
         const r = await this.conn.newSession({ cwd, mcpServers: [] })
         this.openSessions.add(r.sessionId)
         return r.sessionId
@@ -122,10 +129,9 @@ export class AcpConnection {
   private isAuthRequired(e: any): boolean {
     return !!(e && (e.data?.authRequired || /auth_required|authentication required/i.test(String(e.message ?? ''))))
   }
-  private async firstAuthMethod(): Promise<string> {
-    // initialize() result isn't retained here; OpenCode advertises 'opencode-login'. Re-init is cheap.
-    const r = await this.conn.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
-    return r.authMethods?.[0]?.id ?? 'login'
+  private firstAuthMethod(): string {
+    // Reuse the methods captured by ensureInit() (always called before newSession) — no re-initialize.
+    return this.authMethods[0]?.id ?? 'login'
   }
 }
 

@@ -1,4 +1,4 @@
-import type { AgentConfig } from '@hip/protocol'
+import type { AgentConfig, PermissionRequestPayload } from '@hip/protocol'
 import type { GraphEmit } from '../graph.js'
 import type { AgentProvider, ExternalAgentHooks, PermissionChoice } from './types.js'
 import type { ResolvedModel } from './registry.js'
@@ -30,47 +30,72 @@ export class AcpAgentProvider implements AgentProvider {
   setResumeSessionId(id: string | null): void { if (!this.acpSessionId) this.resumeAcpSessionId = id }
 
   private async ensureSession(): Promise<{ conn: AcpConnection; sid: string }> {
-    if (!this.conn) this.conn = await acpConnections.acquire(this.agent, this.model)
+    // Recover from a warm-child death: if our connection died (and was evicted from the pool),
+    // re-acquire a fresh one and drop the stale ACP session id so we recreate/reattach below.
+    // Remember the prior session id as a resume target — OpenCode persists sessions, so a fresh
+    // child can often loadSession() to reattach; if it can't, we fall back to a new session.
+    if (!this.conn || this.conn.isClosed) {
+      this.resumeAcpSessionId = this.acpSessionId ?? this.resumeAcpSessionId
+      this.acpSessionId = null
+      this.conn = await acpConnections.acquire(this.agent, this.model)
+    }
     if (!this.acpSessionId) {
       if (this.resumeAcpSessionId) {
-        await this.conn.loadSession(this.resumeAcpSessionId, this.cwd)
-        this.acpSessionId = this.resumeAcpSessionId
+        try {
+          await this.conn.loadSession(this.resumeAcpSessionId, this.cwd)
+          this.acpSessionId = this.resumeAcpSessionId
+        } catch {
+          // Prior session not loadable on this child (never persisted / agent lacks resume) → start fresh.
+          this.resumeAcpSessionId = null
+          await this.openFreshSession()
+        }
       } else {
-        const { sessionId, configOptions } = await this.conn.newSessionWithOptions(this.cwd)
-        this.acpSessionId = sessionId
-        this.currentHooks?.configOptions(normalizeConfigOptions(configOptions))
+        await this.openFreshSession()
       }
     }
-    return { conn: this.conn, sid: this.acpSessionId }
+    return { conn: this.conn, sid: this.acpSessionId! }
+  }
+
+  private async openFreshSession(): Promise<void> {
+    const { sessionId, configOptions } = await this.conn!.newSessionWithOptions(this.cwd)
+    this.acpSessionId = sessionId
+    this.currentHooks?.configOptions(normalizeConfigOptions(configOptions))
   }
 
   async runTurn(text: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks): Promise<void> {
     if (signal.aborted) throw abortError()
     this.currentHooks = hooks ?? null
-    const { conn, sid } = await this.ensureSession()
-
-    conn.registerSink(sid, {
-      onUpdate: (u) => this.applyUpdate(u, emit),
-      onPermission: async (p) => {
-        const choice = hooks
-          ? await hooks.requestPermission({ requestId: p.toolCall?.toolCallId ?? `perm-${Date.now()}`, tool: mapTool(p.toolCall), options: p.options ?? [] })
-          : ({ cancelled: true } as PermissionChoice)
-        return 'optionId' in choice
-          ? { outcome: { outcome: 'selected', optionId: choice.optionId } }
-          : { outcome: { outcome: 'cancelled' } }
-      },
-    })
 
     let aborted = false
-    const onAbort = () => { aborted = true; void conn.cancel(sid) }
+    let conn: AcpConnection | null = null
+    let sid: string | null = null
+    // Register the abort handler BEFORE the (variable-latency) session setup — a warm child can be
+    // mid-spawn/initialize, and an abort that fires during that window must not be lost.
+    const onAbort = () => { aborted = true; if (conn && sid) void conn.cancel(sid) }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
+      const session = await this.ensureSession()
+      conn = session.conn; sid = session.sid
+      if (aborted) throw abortError() // aborted during session setup, before the prompt started
+
+      conn.registerSink(sid, {
+        onUpdate: (u) => this.applyUpdate(u, emit),
+        onPermission: async (p) => {
+          const choice = hooks
+            ? await hooks.requestPermission({ requestId: p.toolCall?.toolCallId ?? `perm-${Date.now()}`, tool: mapTool(p.toolCall), options: p.options ?? [] })
+            : ({ cancelled: true } as PermissionChoice)
+          return 'optionId' in choice
+            ? { outcome: { outcome: 'selected', optionId: choice.optionId } }
+            : { outcome: { outcome: 'cancelled' } }
+        },
+      })
+
       await conn.prompt(sid, text)
       // Do NOT trust stopReason for cancellation (quirks.cancelReportsEndTurn): rely on our own flag.
       if (aborted) throw abortError()
     } finally {
       signal.removeEventListener('abort', onAbort)
-      conn.releaseSession(sid)
+      if (conn && sid) conn.releaseSession(sid)
     }
   }
 
@@ -116,8 +141,17 @@ function toolText(content: any): string | undefined {
   const parts = content.map((c) => (c?.type === 'content' ? textOf(c.content) : c?.type === 'diff' ? `--- ${c.path}\n${c.newText ?? ''}` : '')).filter(Boolean)
   return parts.length ? parts.join('\n') : undefined
 }
-function mapTool(tc: any) {
-  return { title: tc?.title ?? tc?.kind ?? 'tool', kind: tc?.kind ?? 'other' }
+function mapTool(tc: any): PermissionRequestPayload {
+  const base = { title: tc?.title ?? tc?.kind ?? 'tool', kind: tc?.kind ?? 'other' }
+  const content = tc?.content
+  if (Array.isArray(content)) {
+    const diffPart = content.find((c: any) => c?.type === 'diff')
+    if (diffPart) return { ...base, diff: { path: diffPart.path, oldText: diffPart.oldText ?? '', newText: diffPart.newText ?? '' } }
+    const text = toolText(content)
+    if (text) return { ...base, content: text }
+  }
+  if (tc?.rawInput !== undefined) return { ...base, content: typeof tc.rawInput === 'string' ? tc.rawInput : JSON.stringify(tc.rawInput) }
+  return base
 }
 function normalizeConfigOptions(opts: any[]): any[] {
   return (opts ?? []).filter((o) => o?.type === 'select').map((o) => ({

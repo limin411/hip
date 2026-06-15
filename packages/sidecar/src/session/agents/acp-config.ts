@@ -14,7 +14,12 @@ export interface AcpSpawn { command: string; args: string[]; env: NodeJS.Process
 export function buildAcpSpawn(agent: AgentConfig, model: ResolvedModel | null): AcpSpawn {
   const env: NodeJS.ProcessEnv = { ...process.env, ...(agent.env ?? {}) }
 
-  if (agent.authMode === 'hip-managed' && model) {
+  if (agent.authMode === 'hip-managed') {
+    // G1: hip-managed means hip OWNS the model+key. Without a resolved model OpenCode would fall
+    // back to its billed default (opencode/big-pickle) — fail loudly instead of silently billing.
+    if (!model) {
+      throw new Error(`Agent "${agent.id}" is in hip-managed auth mode but has no resolved model — bind a model (boundModel + acceptsModelConfig) so OpenCode does not fall back to a billed default.`)
+    }
     // G3: {env:} substitution does NOT run for OPENCODE_CONFIG_CONTENT — use a written file via OPENCODE_CONFIG.
     const keyEnv = providerEnvVar(model.providerID)
     const cfg: Record<string, unknown> = {

@@ -26,6 +26,7 @@ export function AgentEditor({
   const { config, catalog } = useProvidersStore()
   const [form, setForm] = useState<AgentForm>({
     name: initial?.name ?? '',
+    kind: initial?.kind ?? 'custom',
     command: initial?.command ?? '',
     args: (initial?.args ?? []).join(' '),
     transport: initial?.transport ?? 'thin',
@@ -33,11 +34,14 @@ export function AgentEditor({
     boundModelKey: initial?.boundModel
       ? `${initial.boundModel.providerID}/${initial.boundModel.modelID}`
       : '',
+    authMode: initial?.authMode ?? 'opencode-self',
+    quirks: initial?.quirks,
     enabled: initial?.enabled ?? true,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const isAcp = form.kind === 'acp'
   const groups = groupModelOptions(catalog, config)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
 
@@ -70,21 +74,76 @@ export function AgentEditor({
           <Section label={t('settings.agents.sectionCommand')}>
             <Field label={t('settings.agents.command')}>
               <input
-                className={cn(inputCls, 'font-mono')}
+                className={cn(inputCls, 'font-mono', isAcp && 'opacity-60')}
                 value={form.command}
                 onChange={(e) => patch({ command: e.target.value })}
                 placeholder="/usr/local/bin/my-agent"
+                readOnly={isAcp}
               />
             </Field>
             <Field label={t('settings.agents.args')}>
               <input
-                className={cn(inputCls, 'font-mono')}
+                className={cn(inputCls, 'font-mono', isAcp && 'opacity-60')}
                 value={form.args}
                 onChange={(e) => patch({ args: e.target.value })}
                 placeholder="--loop --json"
+                readOnly={isAcp}
               />
             </Field>
           </Section>
+
+          {isAcp && (
+            <Section label={t('settings.agents.sectionAuth')}>
+              <div
+                role="radiogroup"
+                aria-label={t('settings.agents.sectionAuth')}
+                className="flex gap-2"
+                onKeyDown={(e) => {
+                  const next =
+                    e.key === 'ArrowRight' || e.key === 'ArrowDown'
+                      ? 'hip-managed'
+                      : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                        ? 'opencode-self'
+                        : null
+                  if (!next) return
+                  e.preventDefault()
+                  patch({ authMode: next })
+                  e.currentTarget.querySelectorAll('button')[next === 'opencode-self' ? 0 : 1]?.focus()
+                }}
+              >
+                <ChoiceCard
+                  selected={form.authMode === 'opencode-self'}
+                  title={t('settings.agents.authSelf')}
+                  desc={t('settings.agents.authSelfDesc')}
+                  onClick={() => patch({ authMode: 'opencode-self' })}
+                />
+                <ChoiceCard
+                  selected={form.authMode === 'hip-managed'}
+                  title={t('settings.agents.authManaged')}
+                  desc={t('settings.agents.authManagedDesc')}
+                  onClick={() => patch({ authMode: 'hip-managed' })}
+                />
+              </div>
+              {form.authMode === 'hip-managed' && (
+                <select
+                  className={cn(inputCls, 'mt-2')}
+                  value={form.boundModelKey}
+                  onChange={(e) => patch({ boundModelKey: e.target.value })}
+                >
+                  <option value="">{t('settings.agents.selectModel')}</option>
+                  {groups.map((g) => (
+                    <optgroup key={g.providerID} label={g.providerName}>
+                      {g.models.map((m) => (
+                        <option key={m.key} value={m.key}>
+                          {m.modelID}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
+            </Section>
+          )}
 
           <Section label={t('settings.agents.sectionTransport')}>
             <div
@@ -104,13 +163,13 @@ export function AgentEditor({
                 e.currentTarget.querySelectorAll('button')[next === 'thin' ? 0 : 1]?.focus()
               }}
             >
-              <TransportCard
+              <ChoiceCard
                 selected={form.transport === 'thin'}
                 title={t('settings.agents.transportThin')}
                 desc={t('settings.agents.transportThinDesc')}
                 onClick={() => patch({ transport: 'thin' })}
               />
-              <TransportCard
+              <ChoiceCard
                 selected={form.transport === 'rich'}
                 title={t('settings.agents.transportRich')}
                 desc={t('settings.agents.transportRichDesc')}
@@ -119,6 +178,7 @@ export function AgentEditor({
             </div>
           </Section>
 
+          {!isAcp && (
           <Section label={t('settings.agents.sectionModel')}>
             <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
               <div className="flex-1">
@@ -150,6 +210,7 @@ export function AgentEditor({
               </select>
             )}
           </Section>
+          )}
 
           {error && <div className="text-meta text-danger">{error}</div>}
         </div>
@@ -193,7 +254,7 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-function TransportCard({
+function ChoiceCard({
   selected,
   title,
   desc,

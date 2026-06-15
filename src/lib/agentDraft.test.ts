@@ -3,11 +3,13 @@ import { buildAgentDraft, isAgentDraftValid, type AgentForm } from './agentDraft
 
 const base: AgentForm = {
   name: 'Claude Code',
+  kind: 'custom',
   command: 'claude',
   args: '--loop --json',
   transport: 'rich',
   acceptsModelConfig: false,
   boundModelKey: '',
+  authMode: 'opencode-self',
   enabled: true,
 }
 
@@ -20,6 +22,11 @@ describe('isAgentDraftValid', () => {
   it('requires a model when acceptsModelConfig is on', () => {
     expect(isAgentDraftValid({ ...base, acceptsModelConfig: true, boundModelKey: '' })).toBe(false)
     expect(isAgentDraftValid({ ...base, acceptsModelConfig: true, boundModelKey: 'anthropic/claude-opus-4' })).toBe(true)
+  })
+  it('acp + hip-managed requires a model; opencode-self does not', () => {
+    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'hip-managed', boundModelKey: '' })).toBe(false)
+    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'hip-managed', boundModelKey: 'anthropic/x' })).toBe(true)
+    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'opencode-self', boundModelKey: '' })).toBe(true)
   })
 })
 
@@ -37,5 +44,18 @@ describe('buildAgentDraft', () => {
   it('splits boundModel on the FIRST slash (modelID may contain slashes)', () => {
     const d = buildAgentDraft({ ...base, acceptsModelConfig: true, boundModelKey: 'openrouter/meta/llama-3' })
     expect(d.boundModel).toEqual({ providerID: 'openrouter', modelID: 'meta/llama-3' })
+  })
+  it('acp + opencode-self: authMode carried, no model, acceptsModelConfig false', () => {
+    const d = buildAgentDraft({ ...base, kind: 'acp', authMode: 'opencode-self', quirks: 'opencode', boundModelKey: 'anthropic/x' })
+    expect(d).toMatchObject({ kind: 'acp', authMode: 'opencode-self', quirks: 'opencode', acceptsModelConfig: false })
+    expect(d.boundModel).toBeUndefined()
+  })
+  it('acp + hip-managed: acceptsModelConfig true with the chosen model', () => {
+    const d = buildAgentDraft({ ...base, kind: 'acp', authMode: 'hip-managed', quirks: 'opencode', boundModelKey: 'anthropic/claude-opus-4' })
+    expect(d).toMatchObject({ kind: 'acp', authMode: 'hip-managed', acceptsModelConfig: true })
+    expect(d.boundModel).toEqual({ providerID: 'anthropic', modelID: 'claude-opus-4' })
+  })
+  it('non-acp forms do not emit an authMode field', () => {
+    expect('authMode' in buildAgentDraft({ ...base, kind: 'custom' })).toBe(false)
   })
 })

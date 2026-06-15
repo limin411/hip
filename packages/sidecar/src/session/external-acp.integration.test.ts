@@ -55,8 +55,61 @@ describe('external ACP agent through SessionManager', () => {
     await new Promise((r) => setTimeout(r, 800))
     acpConnections.disposeAll()
     expect(out.some((m) => m.type === 'permission:request')).toBe(true)
+    // I3: the modal payload must carry the tool's diff so the user sees what they're approving.
+    const perm = out.find((m) => m.type === 'permission:request') as Extract<ServerMessage, { type: 'permission:request' }> | undefined
+    expect(perm?.tool.diff?.path).toBe('hello.txt')
+    expect(perm?.tool.diff?.newText).toBe('hi')
     expect(out.some((m) => m.type === 'tool:finished' && m.status === 'finished')).toBe(true)
     expect(out.some((m) => m.type === 'message:complete')).toBe(true)
+  }, 20000)
+
+  it('rejecting a permission stops the tool and still completes the turn cleanly', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    const agentsPath = join(dir, 'hip-agents.json')
+    writeFileSync(agentsPath, JSON.stringify({ agents: [{
+      id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
+      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
+    }] }))
+    process.env.HIP_AGENTS_PATH = agentsPath
+    const mgr = new SessionManager(undefined, () => undefined, dir)
+    const out: ServerMessage[] = []
+    const send = (m: ServerMessage) => {
+      out.push(m)
+      if (m.type === 'permission:request') mgr.handle({ type: 'permission:respond', sessionId: m.sessionId, requestId: m.requestId, cancelled: true } as any, send)
+    }
+    mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
+    await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'edit', role: 'user' } as any, send)
+    await new Promise((r) => setTimeout(r, 800))
+    acpConnections.disposeAll()
+    expect(out.some((m) => m.type === 'permission:request')).toBe(true)
+    // Rejected → the gated tool must NOT report a successful finish, and the turn still completes.
+    expect(out.some((m) => m.type === 'tool:finished' && m.status === 'finished')).toBe(false)
+    expect(out.some((m) => m.type === 'message:complete')).toBe(true)
+    expect(out.some((m) => m.type === 'error' && m.code === 'AGENT_ERROR')).toBe(false)
+  }, 20000)
+
+  it('cancelling mid-stream stops the turn without an AGENT_ERROR (cancel-via-own-flag)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    const agentsPath = join(dir, 'hip-agents.json')
+    writeFileSync(agentsPath, JSON.stringify({ agents: [{
+      id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
+      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_SLOW_MS: '200' },
+    }] }))
+    process.env.HIP_AGENTS_PATH = agentsPath
+    const mgr = new SessionManager(undefined, () => undefined, dir)
+    const out: ServerMessage[] = []
+    const send = (m: ServerMessage) => out.push(m)
+    mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
+    const turn = mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, send)
+    await new Promise((r) => setTimeout(r, 150)) // after the first chunk, before the stream finishes
+    mgr.handle({ type: 'message:cancel', sessionId: 's1' } as any, send)
+    await turn
+    await new Promise((r) => setTimeout(r, 200))
+    acpConnections.disposeAll()
+    // Cancel must NOT surface as AGENT_ERROR (OpenCode returns end_turn on cancel — we rely on our own
+    // abort flag). The turn ends as a stopped completion or an explicit CANCELLED.
+    expect(out.some((m) => m.type === 'error' && m.code === 'AGENT_ERROR')).toBe(false)
+    expect(out.some((m) => m.type === 'message:complete' || (m.type === 'error' && m.code === 'CANCELLED'))).toBe(true)
   }, 20000)
 
   it('reopens a prior ACP session via loadSession and replays history', async () => {
@@ -73,7 +126,28 @@ describe('external ACP agent through SessionManager', () => {
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'continue', role: 'user' } as any, (m) => out.push(m))
     await new Promise((r) => setTimeout(r, 800))
     acpConnections.disposeAll()
-    // the mock's loadSession replays 'prior answer'; then the new turn answers
-    expect(out.some((m) => m.type === 'token:stream' && m.delta.includes('hello'))).toBe(true)
+    // The mock prefixes its answer 'resumed(...)' ONLY when loadSession ran — proving the reopen
+    // branch was taken (a fresh newSession would prefix 'answer(...)'; see the negative control below).
+    const text = out.filter((m) => m.type === 'token:stream').map((m) => (m as Extract<ServerMessage, { type: 'token:stream' }>).delta).join('')
+    expect(text).toContain('resumed(')
+    expect(text).not.toContain('answer(')
+  }, 20000)
+
+  it('negative control: a session with NO acp_session_id starts fresh (newSession, not loadSession)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    const { db } = openDatabase(':memory:'); const store = new SessionStore(db, false)
+    const now = Date.now()
+    store.insertSession({ id: 's1', title: 't', config: JSON.stringify({ agentId: 'mock', cwd: dir }), createdAt: now, updatedAt: now })
+    // NOTE: no setAcpSessionId — this is a brand-new conversation.
+    writeFileSync(join(dir, 'hip-agents.json'), JSON.stringify({ agents: [{ id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], transport: 'rich', acceptsModelConfig: false, enabled: true }] }))
+    process.env.HIP_AGENTS_PATH = join(dir, 'hip-agents.json')
+    const mgr = new SessionManager(store, () => undefined, dir)
+    const out: ServerMessage[] = []
+    await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, (m) => out.push(m))
+    await new Promise((r) => setTimeout(r, 800))
+    acpConnections.disposeAll()
+    const text = out.filter((m) => m.type === 'token:stream').map((m) => (m as Extract<ServerMessage, { type: 'token:stream' }>).delta).join('')
+    expect(text).toContain('answer(')
+    expect(text).not.toContain('resumed(')
   }, 20000)
 })

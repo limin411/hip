@@ -33,6 +33,7 @@ const agent = {
     }
   },
   async loadSession(p) {
+    resumed.add(p.sessionId) // mark so a later prompt's answer is prefixed 'resumed(...)' — proves load ran
     // replay one prior turn
     await conn.sessionUpdate({ sessionId: p.sessionId, update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'prior question' } } })
     await conn.sessionUpdate({ sessionId: p.sessionId, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'prior answer' } } })
@@ -50,7 +51,7 @@ const agent = {
     cancelled.delete(sid)
     if (env.MOCK_ACP_THINK) await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'thinking… ' } } })
     if (env.MOCK_ACP_PERMISSION) {
-      const res = await conn.requestPermission({ sessionId: sid, toolCall: { toolCallId: 't1', title: 'edit hello.txt', kind: 'edit' },
+      const res = await conn.requestPermission({ sessionId: sid, toolCall: { toolCallId: 't1', title: 'edit hello.txt', kind: 'edit', content: [{ type: 'diff', path: 'hello.txt', oldText: '', newText: 'hi' }] },
         options: [{ optionId: 'once', name: 'Allow once', kind: 'allow_once' }, { optionId: 'reject', name: 'Reject', kind: 'reject_once' }] })
       if (res.outcome?.outcome !== 'selected') return { stopReason: 'cancelled' }
     }
@@ -58,7 +59,7 @@ const agent = {
       await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'tool_call', toolCallId: 't1', title: 'edit hello.txt', kind: 'edit', status: 'in_progress' } })
       await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'tool_call_update', toolCallId: 't1', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'wrote file' } }] } })
     }
-    const words = [`answer(${model}): `, 'hello', ' ', 'world']
+    const words = [`${resumed.has(sid) ? 'resumed' : 'answer'}(${model}): `, 'hello', ' ', 'world']
     for (const w of words) {
       if (cancelled.has(sid)) return { stopReason: 'cancelled' }
       await conn.sessionUpdate({ sessionId: sid, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: w } } })
@@ -68,4 +69,5 @@ const agent = {
   },
 }
 const cancelled = new Set()
+const resumed = new Set()
 const conn = new AgentSideConnection(() => agent, ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin)))

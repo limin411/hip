@@ -20,6 +20,19 @@ describe('buildAcpSpawn', () => {
     const cfg = JSON.parse(readFileSync(env.OPENCODE_CONFIG!, 'utf8'))
     expect(cfg.model).toBe('deepseek/deepseek-chat')        // G1: model MUST be set
     expect(cfg.provider.deepseek.options.apiKey).toBe('{env:DEEPSEEK_API_KEY}') // G3: substitution via file, not CONTENT
+    expect(cfg.provider.deepseek.options.baseURL).toBe('https://api.deepseek.com/v1')
     expect(env.DEEPSEEK_API_KEY).toBe('sk-test')
+    // The raw key must NOT be written to disk — it stays in the spawn env, referenced via {env:}.
+    expect(readFileSync(env.OPENCODE_CONFIG!, 'utf8')).not.toContain('sk-test')
+  })
+
+  it('hip-managed mode with NO resolved model throws (G1 — never silently bill the default model)', () => {
+    expect(() => buildAcpSpawn({ ...baseAgent, authMode: 'hip-managed', acceptsModelConfig: true }, null))
+      .toThrowError(/hip-managed/i)
+  })
+
+  it('passes agent.env through to the spawn env (both modes)', () => {
+    const { env } = buildAcpSpawn({ ...baseAgent, authMode: 'opencode-self', acceptsModelConfig: false, env: { MOCK_ACP_THINK: '1' } }, null)
+    expect(env.MOCK_ACP_THINK).toBe('1')
   })
 })

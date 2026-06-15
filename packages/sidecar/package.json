@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "0.25.1",
     "@hip/protocol": "*",
     "@langchain/core": "^1.1",
     "@langchain/langgraph": "^1.3.6",
@@ -18,8 +19,8 @@
   "devDependencies": {
     "@types/node": "^22",
     "@types/ws": "^8",
+    "@vercel/ncc": "^0.38",
     "tsx": "^4",
-    "typescript": "~5.8.2",
-    "@vercel/ncc": "^0.38"
+    "typescript": "~5.8.2"
   }
 }

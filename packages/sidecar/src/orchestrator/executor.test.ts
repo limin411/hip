@@ -102,6 +102,31 @@ describe('runWorkflow — 条件跳过 a→b when contains "go"', () => {
     expect(state.nodes.b.status).toBe('skipped')
     expect(runner.calls.map((c) => c.nodeId)).not.toContain('b')
   })
+
+  it('propagate 级联出的 skip 也进事件流(node:skipped 被发射,供 WS 透传)', async () => {
+    // a 不满足条件 → b skip;b→c 无条件,b 既已 skip,c 也级联 skip。
+    const def = wf({
+      nodes: [node('a'), node('b'), node('c')],
+      edges: [
+        { from: 'a', to: 'b', when: { kind: 'contains', value: 'go' } } as WorkflowEdge,
+        { from: 'b', to: 'c' } as WorkflowEdge,
+      ],
+      entry: ['a'],
+    })
+    const { runner, sink, ports } = harness({ a: { text: 'stop' } })
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'r6', signal: ac.signal })
+
+    expect(state.status).toBe('succeeded')
+    expect(state.nodes.b.status).toBe('skipped')
+    expect(state.nodes.c.status).toBe('skipped')
+    expect(runner.calls.map((c) => c.nodeId)).not.toContain('b')
+    expect(runner.calls.map((c) => c.nodeId)).not.toContain('c')
+    // 仅凭事件流重建状态的下游也能看到这两处 skip 转移
+    const skipped = sink.ofType('node:skipped').map((e) => e.nodeId)
+    expect(skipped).toContain('b')
+    expect(skipped).toContain('c')
+  })
 })
 
 describe('runWorkflow — 失败 fail-fast', () => {
@@ -140,6 +165,25 @@ describe('runWorkflow — 取消', () => {
     // 没有任何 run:finished 携带 'succeeded'
     expect(sink.ofType('run:finished').some((e) => e.status === 'succeeded')).toBe(false)
     // 收到了取消事件
+    expect(sink.ofType('run:cancelled').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('启动即被取消(launch 前 signal 已 aborted)→ run cancelled,无 succeeded,有 run:cancelled', async () => {
+    const def = wf({
+      nodes: [node('a')],
+      entry: ['a'],
+    })
+    const { runner, sink, ports } = harness({ a: { text: 'X' } })
+    const ac = new AbortController()
+    ac.abort() // launch() 之前就已取消:inFlight 永远为空,while 整体不进入
+    const state = await runWorkflow(def, ports, { runId: 'r7', signal: ac.signal })
+
+    expect(state.status).toBe('cancelled')
+    // 早返回的 launch 没派发任何节点
+    expect(runner.calls).toHaveLength(0)
+    // 绝不误报成功
+    expect(sink.ofType('run:finished').some((e) => e.status === 'succeeded')).toBe(false)
+    // 取消契约:必有 run:cancelled
     expect(sink.ofType('run:cancelled').length).toBeGreaterThanOrEqual(1)
   })
 })

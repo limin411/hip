@@ -4,6 +4,7 @@ interface AvatarProps {
   name: string
   src?: string
   size?: number
+  shape?: 'circle' | 'square'
   className?: string
 }
 
@@ -13,11 +14,12 @@ function initials(name: string): string {
   return chars.toUpperCase()
 }
 
-export function Avatar({ name, src, size = 32, className }: AvatarProps) {
+export function Avatar({ name, src, size = 32, shape = 'circle', className }: AvatarProps) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-subtle text-meta font-semibold text-accent-strong',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden bg-accent-subtle text-meta font-semibold text-accent-strong',
+        shape === 'circle' ? 'rounded-full' : 'rounded-lg',
         className,
       )}
       style={{ width: size, height: size }}

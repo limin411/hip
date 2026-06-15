@@ -87,7 +87,23 @@ export function AgentEditor({
           </Section>
 
           <Section label={t('settings.agents.sectionTransport')}>
-            <div role="radiogroup" aria-label={t('settings.agents.sectionTransport')} className="flex gap-2">
+            <div
+              role="radiogroup"
+              aria-label={t('settings.agents.sectionTransport')}
+              className="flex gap-2"
+              onKeyDown={(e) => {
+                const next =
+                  e.key === 'ArrowRight' || e.key === 'ArrowDown'
+                    ? 'rich'
+                    : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                      ? 'thin'
+                      : null
+                if (!next) return
+                e.preventDefault()
+                patch({ transport: next })
+                e.currentTarget.querySelectorAll('button')[next === 'thin' ? 0 : 1]?.focus()
+              }}
+            >
               <TransportCard
                 selected={form.transport === 'thin'}
                 title={t('settings.agents.transportThin')}
@@ -193,6 +209,7 @@ function TransportCard({
       type="button"
       role="radio"
       aria-checked={selected}
+      tabIndex={selected ? 0 : -1}
       onClick={onClick}
       className={cn(
         'flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',

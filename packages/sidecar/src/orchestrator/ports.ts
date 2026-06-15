@@ -22,6 +22,10 @@ export class FakeAgentRunner implements AgentRunner {
   constructor(private readonly script: FakeScript = {}) {}
   async run(req: AgentRunRequest, signal: AbortSignal): Promise<NodeOutput> {
     this.calls.push(req)
+    // 尊重一个 *已经* aborted 的 signal:addEventListener('abort') 只在未来 abort 时触发,
+    // 若调用方在 run 之前就 abort 了(ac.abort(); run(...)),delayMs 路径会空等到期再正常 resolve,
+    // 静默吞掉取消。这里在顶部直接拒绝,覆盖延迟与非延迟两条路径。
+    if (signal.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e }
     const s = this.script[req.nodeId] ?? {}
     if (s.delayMs) {
       await new Promise<void>((resolve, reject) => {

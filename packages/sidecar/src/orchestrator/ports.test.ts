@@ -44,6 +44,20 @@ describe('FakeAgentRunner', () => {
     const out = await runner.run(reqFor('n1', 'delayed'), new AbortController().signal)
     expect(out.text).toBe('delayed')
   })
+
+  it('③ 调用前已 abort(delayMs 路径)→ 立即 reject AbortError,不空等', async () => {
+    const runner = new FakeAgentRunner({ n1: { delayMs: 1000 } })
+    const ac = new AbortController()
+    ac.abort()
+    await expect(runner.run(reqFor('n1'), ac.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('③ 调用前已 abort(无 delayMs 路径)→ 立即 reject AbortError', async () => {
+    const runner = new FakeAgentRunner({ n1: { text: 'should-not-return' } })
+    const ac = new AbortController()
+    ac.abort()
+    await expect(runner.run(reqFor('n1'), ac.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  })
 })
 
 describe('InMemoryWorkflowStore', () => {

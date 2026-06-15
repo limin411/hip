@@ -6,10 +6,11 @@ interface SwitchProps {
   disabled?: boolean
   id?: string
   ariaLabel?: string
+  className?: string
 }
 
 /** Controlled on/off toggle. Native <button role="switch"> → Space/Enter toggle for free. */
-export function Switch({ checked, onCheckedChange, disabled, id, ariaLabel }: SwitchProps) {
+export function Switch({ checked, onCheckedChange, disabled, id, ariaLabel, className }: SwitchProps) {
   return (
     <button
       type="button"
@@ -24,9 +25,11 @@ export function Switch({ checked, onCheckedChange, disabled, id, ariaLabel }: Sw
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
         'disabled:cursor-not-allowed disabled:opacity-50',
         checked ? 'bg-accent' : 'bg-border',
+        className,
       )}
     >
       <span
+        aria-hidden="true"
         className={cn(
           'inline-block h-4 w-4 rounded-full bg-white transition-transform',
           checked ? 'translate-x-[18px]' : 'translate-x-0.5',

@@ -124,7 +124,9 @@ judgment. The composer is locked to hip, and its agent picker is replaced by a
   baseURL}`. Committed sessions show a read-only model badge (reusing the read-only
   pattern `AgentPicker` already has).
 - `ComposerConfigSelectors` (ACP live model/mode) no longer applies at top level
-  (hip isn't ACP). Those selectors move into the nested sub-agent card, or defer.
+  (hip isn't ACP). **Decision: deferred** — removed from the composer this iteration;
+  re-homing the live model/mode selectors into the nested sub-agent card is a
+  follow-up once that card exists.
 - **Transcript**: hip's `dispatch_agent` tool call renders as a collapsible card
   containing the sub-agent's live transcript (reasoning + tool cards). HITL modal as
   today, labeled with the sub-agent.
@@ -148,11 +150,11 @@ judgment. The composer is locked to hip, and its agent picker is replaced by a
     prefer-GUI-over-real-LLM-tests rule). Keep test runs paid-free (move
     `~/.hip/config/auth.json` aside before `yarn test`).
 
-## Open thread
+## Resolved threads
 
-- `ComposerConfigSelectors` fate: move the live model/mode selectors into the nested
-  sub-agent card, or drop them from this iteration. Leaning toward deferring until the
-  nested card exists.
+- `ComposerConfigSelectors` fate: **deferred**. The live model/mode selectors are
+  removed from the composer this iteration; re-homing them into the nested sub-agent
+  card is a follow-up once that card exists.
 
 ## Components & boundaries
 

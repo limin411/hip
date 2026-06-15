@@ -20,6 +20,7 @@ import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import { createAgentProvider, readAgentsConfig, resolveAgentModel, type AgentProvider } from './agents/index.js'
+import type { ExternalAgentHooks } from './agents/types.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -208,6 +209,9 @@ export class Session {
   private readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
   private externalProvider: AgentProvider | null = null
+  // Pending HITL permission requests from the external agent, keyed by requestId. The hooks in the
+  // external branch register a resolver here; the UI's permission:respond completes it (Slice 5).
+  private readonly pendingPermissions = new Map<string, (c: { optionId: string } | { cancelled: true }) => void>()
 
   constructor(
     readonly id: string,
@@ -262,6 +266,17 @@ export class Session {
       this.externalProvider = createAgentProvider(agent, this._config.cwd ?? process.cwd(), model)
     }
     return this.externalProvider
+  }
+
+  /** Complete a pending external-agent permission request with the user's choice (HITL round-trip). */
+  respondPermission(requestId: string, choice: { optionId: string } | { cancelled: true }): void {
+    const resolve = this.pendingPermissions.get(requestId)
+    if (resolve) { this.pendingPermissions.delete(requestId); resolve(choice) }
+  }
+
+  /** Drive the external agent's live model/mode selector (ACP control-plane). No-op for inline/custom agents. */
+  async setAgentConfigOption(configId: string, value: string): Promise<void> {
+    await this.externalProvider?.setConfigOption?.(configId, value)
   }
 
   /** The Summarizer for compaction: injected (tests), else a cheap-model summarizer for the env model,
@@ -714,9 +729,16 @@ export class Session {
       if (this.isExternalAgent()) {
         // External-agent turn: dispatch to the provider, which streams tokens/reasoning/tool events
         // back through the SAME `emit` (so supervisorText accumulates) and resolves on end-of-turn.
-        // No awaiting_user path — external agents don't surface the graph's HITL pause.
+        // No awaiting_user path — external agents drive HITL via the hooks below.
         const userText = lastUserText(base?.messages ?? this.messages)
-        await this.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal)
+        const hooks: ExternalAgentHooks = {
+          requestPermission: (req) => new Promise((resolve) => {
+            this.pendingPermissions.set(req.requestId, resolve)
+            send({ type: 'permission:request', sessionId: this.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options })
+          }),
+          configOptions: (options) => send({ type: 'agent:configOptions', sessionId: this.id, options }),
+        }
+        await this.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal, hooks)
         closeReasoning('supervisor')
         finishRemaining()
       } else {

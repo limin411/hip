@@ -1,0 +1,36 @@
+import { describe, it, expect } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { chmodSync, writeFileSync, mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import type { ServerMessage } from '@hip/protocol'
+import { SessionManager } from './session-manager.js'
+import { acpConnections } from './agents/acp-connection.js'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const AGENT = join(here, 'agents', '__fixtures__', 'mock-acp-agent.mjs'); chmodSync(AGENT, 0o755)
+
+describe('external ACP agent through SessionManager', () => {
+  it('routes a turn to the acp agent and streams reasoning + text + tools', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
+    const agentsPath = join(dir, 'hip-agents.json')
+    writeFileSync(agentsPath, JSON.stringify({ agents: [{
+      id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
+      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_THINK: '1', MOCK_ACP_TOOL: '1' },
+    }] }))
+    process.env.HIP_AGENTS_PATH = agentsPath
+
+    const mgr = new SessionManager(undefined, () => undefined, dir)
+    const out: ServerMessage[] = []
+    mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, (m) => out.push(m))
+    await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, (m) => out.push(m))
+    // settle
+    await new Promise((r) => setTimeout(r, 500))
+    acpConnections.disposeAll()
+
+    expect(out.some((m) => m.type === 'reasoning:delta')).toBe(true)
+    expect(out.some((m) => m.type === 'token:stream' && m.delta.includes('hello'))).toBe(true)
+    expect(out.some((m) => m.type === 'tool:started')).toBe(true)
+    expect(out.some((m) => m.type === 'message:complete')).toBe(true)
+  }, 20000)
+})

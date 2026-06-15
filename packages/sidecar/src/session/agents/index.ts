@@ -1,18 +1,20 @@
 import type { AgentConfig } from '@hip/protocol'
-import { LoopAgentProvider, type AgentProvider } from './loop-provider.js'
+import { LoopAgentProvider } from './loop-provider.js'
+import { AcpAgentProvider } from './acp-provider.js'
 import type { ResolvedModel } from './registry.js'
+import type { AgentProvider } from './types.js'
 
 export { readAgentsConfig, resolveAgentModel, type ResolvedModel } from './registry.js'
-export type { AgentProvider } from './loop-provider.js'
+export type { AgentProvider } from './types.js'
 
-/** Build the provider for an external agent. Plan A supports 'custom'; 'opencode' arrives in Plan B. */
 export function createAgentProvider(agent: AgentConfig, cwd: string, model: ResolvedModel | null): AgentProvider {
   switch (agent.kind) {
     case 'custom':
       return new LoopAgentProvider(agent, cwd, model)
-    case 'opencode':
-      throw new Error('OpenCode agent support is not available in this build (Plan B).')
+    case 'acp':
+    case 'opencode': // legacy alias → ACP
+      return new AcpAgentProvider(agent, cwd, model)
     default:
-      throw new Error(`Unknown agent kind: ${(agent as AgentConfig).kind}`)
+      throw new Error(`Unknown agent kind: ${(agent as { kind?: string }).kind}`)
   }
 }

@@ -14,7 +14,7 @@ describe('mock-acp-agent fixture', () => {
     const updates: any[] = []
     const conn = new ClientSideConnection(
       () => ({ async sessionUpdate(p) { updates.push(p) }, async requestPermission() { return { outcome: { outcome: 'cancelled' } } } }),
-      ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout)),
+      ndJsonStream(Writable.toWeb(child.stdin), Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>),
     )
     await conn.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const s = await conn.newSession({ cwd: process.cwd(), mcpServers: [] })

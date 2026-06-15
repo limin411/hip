@@ -4,6 +4,7 @@ import { openDatabase } from './persistence/open.js'
 import { SessionStore } from './persistence/store.js'
 import { watchParentViaStdin } from './parent-watch.js'
 import { loadActiveModelFromEnv } from './config/providers.js'
+import { acpConnections } from './session/agents/acp-connection.js'
 
 async function main(): Promise<void> {
   // Persist sessions to the path Tauri injects (app data dir); fall back to an
@@ -20,6 +21,13 @@ async function main(): Promise<void> {
   await server.start()
   // Tauri reads this line from stdout to discover the WebSocket port + auth token
   process.stdout.write(JSON.stringify({ port, token }) + '\n')
+
+  // Tear down the warm ACP child processes (one per agent-config) when the
+  // sidecar goes away, so we don't orphan `<agent> acp` children. 'exit' covers
+  // the parent-watch EOF path (which calls process.exit(0)) and the fatal exit;
+  // SIGTERM covers a direct signal kill of the sidecar itself.
+  process.on('exit', () => acpConnections.disposeAll())
+  process.on('SIGTERM', () => { acpConnections.disposeAll(); process.exit(0) })
 
   // When spawned by the Tauri shell (which sets HIP_PARENT_WATCH), tie our
   // lifetime to the app: exit if the parent's stdin pipe closes, i.e. the app

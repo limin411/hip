@@ -26,6 +26,9 @@ export class AcpAgentProvider implements AgentProvider {
   /** Exposed so Session can persist the ACP session id after the first turn. */
   get sessionId(): string | null { return this.acpSessionId }
 
+  /** Reopen a prior ACP session on the next turn (loadSession). No-op once a session is live. */
+  setResumeSessionId(id: string | null): void { if (!this.acpSessionId) this.resumeAcpSessionId = id }
+
   private async ensureSession(): Promise<{ conn: AcpConnection; sid: string }> {
     if (!this.conn) this.conn = await acpConnections.acquire(this.agent, this.model)
     if (!this.acpSessionId) {

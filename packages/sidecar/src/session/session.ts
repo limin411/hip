@@ -263,7 +263,10 @@ export class Session {
       const agent = readAgentsConfig().find((x) => x.id === this._config.agentId)
       if (!agent) throw new Error(`Unknown agent: ${this._config.agentId}`)
       const model = agent.acceptsModelConfig ? resolveAgentModel(agent) : null
+      const resume = this.store?.getAcpSessionId(this.id) ?? null
       this.externalProvider = createAgentProvider(agent, this._config.cwd ?? process.cwd(), model)
+      // createAgentProvider doesn't take resume; pass it via an optional setter to avoid widening the factory.
+      ;(this.externalProvider as { setResumeSessionId?: (id: string | null) => void }).setResumeSessionId?.(resume)
     }
     return this.externalProvider
   }
@@ -741,6 +744,9 @@ export class Session {
         await this.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal, hooks)
         closeReasoning('supervisor')
         finishRemaining()
+        // Persist the ACP session handle (assigned on the first turn) so a reopened session resumes it.
+        const acpId = (this.externalProvider as { sessionId?: string | null }).sessionId
+        if (acpId && this.store) this.store.setAcpSessionId(this.id, acpId)
       } else {
         const finalState = await this.app.invoke(
           { messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)], steps: base?.steps ?? 0, recentSigs: [], nudgedSig: undefined, status: 'running' },

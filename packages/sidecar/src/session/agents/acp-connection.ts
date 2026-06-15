@@ -26,6 +26,8 @@ export class AcpConnection {
     const { command, args, env } = buildAcpSpawn(agent, model)
     this.child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stderr.setEncoding('utf8')
+    this.child.on('exit', () => this.handleClosed(new Error('acp agent process exited')))
+    this.child.on('error', (err) => this.handleClosed(new Error(`acp agent process error: ${err.message}`)))
     this.conn = new ClientSideConnection(
       () => ({
         sessionUpdate: async (p: any) => { this.sinks.get(p.sessionId)?.onUpdate(p.update) },
@@ -105,6 +107,18 @@ export class AcpConnection {
   get isIdle(): boolean { return this.refs === 0 }
   dispose(): void { try { this.child.kill('SIGTERM') } catch { /* already dead */ } }
 
+  private closed = false
+  /** Set by the manager so a dead child evicts itself from the pool. */
+  onClosed: (() => void) | null = null
+  private handleClosed(_err: Error): void {
+    if (this.closed) return
+    this.closed = true
+    this.sinks.clear()
+    this.onClosed?.()
+    // In-flight conn.prompt(...) promises reject on their own when the ndJson stream closes.
+  }
+  get isClosed(): boolean { return this.closed }
+
   private isAuthRequired(e: any): boolean {
     return !!(e && (e.data?.authRequired || /auth_required|authentication required/i.test(String(e.message ?? ''))))
   }
@@ -126,7 +140,12 @@ export class AcpConnectionManager {
   async acquire(agent: AgentConfig, model: ResolvedModel | null): Promise<AcpConnection> {
     const k = this.key(agent, model)
     let c = this.conns.get(k)
-    if (!c) { c = new AcpConnection(agent, model); this.conns.set(k, c) }
+    if (c?.isClosed) { this.conns.delete(k); c = undefined }
+    if (!c) {
+      c = new AcpConnection(agent, model)
+      c.onClosed = () => { if (this.conns.get(k) === c) this.conns.delete(k) }
+      this.conns.set(k, c)
+    }
     return c
   }
 

@@ -57,6 +57,12 @@ export class SessionManager {
       case 'message:resume':
         await this.ensureSession(msg.sessionId).resume(msg.content, send)
         break
+      case 'agent:setConfigOption':
+        await this.ensureSession(msg.sessionId).setAgentConfigOption(msg.configId, msg.value)
+        break
+      case 'permission:respond':
+        this.sessions.get(msg.sessionId)?.respondPermission(msg.requestId, msg.cancelled ? { cancelled: true } : { optionId: msg.optionId! })
+        break
       case 'session:list':
         send({ type: 'session:list:result', sessions: this.store?.listSessions() ?? [] })
         break

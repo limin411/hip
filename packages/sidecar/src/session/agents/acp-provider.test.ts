@@ -51,4 +51,15 @@ describe('AcpAgentProvider', () => {
     await expect(turn).rejects.toThrowError(/abort/i)
     p.dispose()
   })
+
+  it('switches the live model via setConfigOption and the backend uses it', async () => {
+    const p = new AcpAgentProvider(cfg(), process.cwd(), null)
+    const a = cap()
+    await p.runTurn('first', a.emit, new AbortController().signal) // answer(mock/base): ...
+    await p.setConfigOption('model', 'mock/other')
+    const b = cap()
+    await p.runTurn('second', b.emit, new AbortController().signal)
+    expect(b.out.text).toContain('mock/other')  // backend actually switched (mock echoes model)
+    p.dispose()
+  })
 })

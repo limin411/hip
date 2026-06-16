@@ -1,13 +1,18 @@
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
+import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
+import type { SkillMeta } from '@hip/protocol'
 import { resolveWithin } from './workspace-fs.js'
 import { gitCommit, gitCreateBranch, gitSwitchBranch } from './workspace-git.js'
+import { readSkillBody, listSkillFiles } from './skills/registry.js'
 
 const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
 const MAX_SCAN_FILE_BYTES = 256 * 1024
+const SCRIPT_TIMEOUT_MS = 120_000
+const SCRIPT_OUTPUT_CAP = 64 * 1024
 
 /** Map "/abs-relative-to-root" → real fs path inside `root`. Lexical jail PLUS a symlink check on the
  *  deepest existing ancestor (so writing through a symlinked parent that escapes the root is rejected). */
@@ -33,12 +38,31 @@ export interface DispatchSpec {
   run: (agentId: string, task: string) => Promise<string>
 }
 
+/** HITL approval seam for run_script. session.ts supplies a closure that registers a pending
+ *  permission and resolves on the user's choice; tests supply a fake. */
+export type ApprovalFn = (req: { title: string; kind: string; content?: string }) => Promise<{ optionId: string } | { cancelled: true }>
+
+export interface BuildToolsOpts {
+  /** Namespaced MCP tools (mcp__<server>__<tool>) merged onto hip's own loop. */
+  mcpTools?: StructuredToolInterface[]
+  /** Enabled skills — when non-empty, adds the use_skill tool. */
+  skills?: SkillMeta[]
+  /** When present, adds the HITL-gated run_script tool. */
+  requestApproval?: ApprovalFn
+}
+
+/** True for an allow decision (run_script may execute). Reject/cancel ⇒ false. */
+function isApproved(d: { optionId: string } | { cancelled: true }): boolean {
+  return 'optionId' in d && (d.optionId === 'allow_once' || d.optionId === 'allow_always')
+}
+
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
 export function buildTools(
   root: string,
   spawnSubagent?: (description: string) => Promise<string>,
   cwd?: string,
   dispatch?: DispatchSpec,
+  opts: BuildToolsOpts = {},
 ): StructuredToolInterface[] {
   const writeFile = tool(
     async ({ path: p, content }) => {
@@ -257,7 +281,91 @@ export function buildTools(
     base.push(gitCommitTool, gitCreateBranchTool, gitSwitchBranchTool)
   }
 
-  if (!spawnSubagent) return base
+  // ── Skill / script / MCP extras (apply on hip's own loop, every assembly path) ──────────────
+  const extras: StructuredToolInterface[] = []
+
+  if (opts.skills && opts.skills.length > 0) {
+    const skills = opts.skills
+    const useSkill = tool(
+      async ({ name }) => {
+        const s = skills.find((sk) => sk.name === name || sk.id === name)
+        if (!s) return `Error: skill not found: ${name}`
+        try {
+          const body = readSkillBody(s.dir)
+          const files = listSkillFiles(s.dir)
+          const manifest = files.length
+            ? `\n\n## Files in this skill (read with read_file relative to this skill dir):\n${files.map((f) => `- ${f}`).join('\n')}`
+            : ''
+          return `${body}${manifest}`
+        } catch (err) {
+          return `Error: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'use_skill',
+        description:
+          'Load a skill into context by `name`. Returns the skill\'s full SKILL.md instructions plus a ' +
+          'manifest of its bundled files. Call this when a task matches an advertised skill, then follow ' +
+          'the loaded instructions (use read_file for reference files, run_script for bundled scripts).',
+        schema: z.object({ name: z.string() }),
+      },
+    )
+    extras.push(useSkill)
+  }
+
+  if (opts.requestApproval) {
+    const requestApproval = opts.requestApproval
+    const scriptCwd = cwd ?? root
+    const runScript = tool(
+      async ({ command, reason }) => {
+        const decision = await requestApproval({ title: 'Run script', kind: 'execute', content: command })
+        if (!isApproved(decision)) return '用户拒绝执行该脚本（command was rejected by the user; nothing ran）。'
+        const isWin = process.platform === 'win32'
+        const shell = isWin ? 'cmd' : 'sh'
+        const shellArgs = isWin ? ['/c', command] : ['-c', command]
+        void reason
+        return await new Promise<string>((resolve) => {
+          const child = spawn(shell, shellArgs, { cwd: scriptCwd, env: process.env })
+          let out = ''
+          let capped = false
+          const onChunk = (b: Buffer) => {
+            if (capped) return
+            out += b.toString('utf8')
+            if (out.length > SCRIPT_OUTPUT_CAP) { out = out.slice(0, SCRIPT_OUTPUT_CAP); capped = true }
+          }
+          child.stdout.on('data', onChunk)
+          child.stderr.on('data', onChunk)
+          let timedOut = false
+          const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, SCRIPT_TIMEOUT_MS)
+          timer.unref?.()
+          child.on('error', (err) => {
+            clearTimeout(timer)
+            resolve(`Error: failed to spawn shell: ${err.message}`)
+          })
+          child.on('close', (code) => {
+            clearTimeout(timer)
+            const tail = capped ? '\n…(output truncated to 64KB)' : ''
+            const note = timedOut ? '\n(timed out after 120s; process killed)' : ''
+            resolve(`exitCode: ${code ?? 'null'}${note}\n${out}${tail}`)
+          })
+        })
+      },
+      {
+        name: 'run_script',
+        description:
+          'Run a shell command in the project directory. EVERY call is gated by an explicit user ' +
+          'approval prompt — explain WHY in `reason`. Use for skill-bundled scripts and build/test ' +
+          'commands. Returns the exit code and combined stdout/stderr (truncated to 64KB, 120s timeout). ' +
+          'If the user rejects, the command does not run.',
+        schema: z.object({ command: z.string(), reason: z.string().optional() }),
+      },
+    )
+    extras.push(runScript)
+  }
+
+  if (opts.mcpTools && opts.mcpTools.length > 0) extras.push(...opts.mcpTools)
+
+  if (!spawnSubagent) return [...base, ...extras]
   const task = tool(
     async ({ description }) => spawnSubagent(description),
     {
@@ -271,7 +379,7 @@ export function buildTools(
   )
   const out = [...base, task]
 
-  if (!dispatch || dispatch.agents.length === 0) return out
+  if (!dispatch || dispatch.agents.length === 0) return [...out, ...extras]
 
   const roster = dispatch.agents
     .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
@@ -291,7 +399,7 @@ export function buildTools(
       }),
     },
   )
-  return [...out, dispatchAgent]
+  return [...out, dispatchAgent, ...extras]
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

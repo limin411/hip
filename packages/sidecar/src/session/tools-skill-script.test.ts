@@ -22,8 +22,10 @@ function makeSkill(id: string, name: string, body: string): SkillMeta {
   return { id, name, description: 'd', dir, hasScripts: true }
 }
 
-const allowApproval: ApprovalFn = async () => ({ optionId: 'allow_once' })
-const rejectApproval: ApprovalFn = async () => ({ optionId: 'reject_once' })
+// Decisions carry the SEMANTIC kind (mirrors PermissionOption.kind / PermissionModal), not an
+// opaque optionId — so the allow-vs-reject seam can't be fooled by an agent/UI optionId like 'once'.
+const allowApproval: ApprovalFn = async () => ({ kind: 'allow_once' })
+const rejectApproval: ApprovalFn = async () => ({ kind: 'reject_once' })
 
 describe('use_skill tool', () => {
   it('is absent when no skills are given', () => {
@@ -56,6 +58,17 @@ describe('run_script tool', () => {
 
   it('executes after approval and returns exit code + stdout', async () => {
     const tools = buildTools(root, undefined, root, undefined, { requestApproval: allowApproval })
+    const out = String(await byName(tools, 'run_script').invoke({ command: 'echo hi' }))
+    expect(out).toContain('hi')
+    expect(out).toMatch(/exit(Code)?\D*0/i)
+  })
+
+  it('executes for any allow_* kind regardless of the opaque optionId', async () => {
+    // Regression: the agent/UI optionId is opaque (e.g. the mock ACP agent advertises 'once');
+    // the allow-vs-reject semantic lives in kind. A real Allow click must still run the script —
+    // keying off optionId literals ('allow_once') would silently treat this as a rejection.
+    const realRoundTrip: ApprovalFn = async () => ({ kind: 'allow_always' })
+    const tools = buildTools(root, undefined, root, undefined, { requestApproval: realRoundTrip })
     const out = String(await byName(tools, 'run_script').invoke({ command: 'echo hi' }))
     expect(out).toContain('hi')
     expect(out).toMatch(/exit(Code)?\D*0/i)

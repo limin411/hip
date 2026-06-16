@@ -38,9 +38,16 @@ export interface DispatchSpec {
   run: (agentId: string, task: string) => Promise<string>
 }
 
+/** A resolved HITL decision for run_script. `kind` is the SEMANTIC of the chosen option
+ *  (allow_once|allow_always|reject_once|reject_always) — NOT the opaque agent/UI optionId.
+ *  This mirrors the codebase convention (PermissionOption.kind, PermissionModal): optionId is an
+ *  opaque advertised identifier; the allow-vs-reject meaning lives in `kind`. The future session.ts
+ *  wiring MUST map the UI's returned optionId back to its PermissionOption.kind before resolving. */
+export type ApprovalDecision = { kind: string } | { cancelled: true }
+
 /** HITL approval seam for run_script. session.ts supplies a closure that registers a pending
- *  permission and resolves on the user's choice; tests supply a fake. */
-export type ApprovalFn = (req: { title: string; kind: string; content?: string }) => Promise<{ optionId: string } | { cancelled: true }>
+ *  permission and resolves on the user's choice (as an ApprovalDecision); tests supply a fake. */
+export type ApprovalFn = (req: { title: string; kind: string; content?: string }) => Promise<ApprovalDecision>
 
 export interface BuildToolsOpts {
   /** Namespaced MCP tools (mcp__<server>__<tool>) merged onto hip's own loop. */
@@ -51,9 +58,11 @@ export interface BuildToolsOpts {
   requestApproval?: ApprovalFn
 }
 
-/** True for an allow decision (run_script may execute). Reject/cancel ⇒ false. */
-function isApproved(d: { optionId: string } | { cancelled: true }): boolean {
-  return 'optionId' in d && (d.optionId === 'allow_once' || d.optionId === 'allow_always')
+/** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
+ *  (allow_*), consistent with PermissionModal/PermissionOption.kind — NOT the opaque optionId.
+ *  Anything that is not an explicit allow_* (reject_*, cancel, or an unknown kind) ⇒ false. */
+function isApproved(d: ApprovalDecision): boolean {
+  return 'kind' in d && d.kind.startsWith('allow')
 }
 
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */

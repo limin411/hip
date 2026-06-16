@@ -55,4 +55,9 @@ describe('configFromDraft', () => {
     expect(cfg.llmProvider).toBe('openai')
     expect(cfg.model).toBe('gpt-4o')
   })
+  it('never sets agentId — direct external-agent sessions are retired', () => {
+    expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' })).toBe(false)
+    // even a legacy draft that still carries an agentId must not produce one
+    expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'opencode' } as never)).toBe(false)
+  })
 })

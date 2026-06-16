@@ -59,6 +59,10 @@ export const en = {
       agentLocked: 'Agent is locked for this conversation',
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
       agentNeedsModel: 'Set a model in Settings first',
+      modelHint: 'Choose the model (before the conversation starts)',
+      modelLocked: 'Model is locked for this conversation',
+      modelUnknown: 'Unknown model',
+      noModelSelected: 'Select a model',
       todos: {
         plan: 'Plan',
         pending: 'To do',

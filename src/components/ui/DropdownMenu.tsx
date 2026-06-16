@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils'
 
 export const DropdownMenu = DropdownPrimitive.Root
 export const DropdownMenuTrigger = DropdownPrimitive.Trigger
+/** Groups label+items so Radix roving-focus keeps keyboard nav within/between groups. */
+export const DropdownMenuGroup = DropdownPrimitive.Group
 
 export const DropdownMenuContent = forwardRef<
   React.ElementRef<typeof DropdownPrimitive.Content>,

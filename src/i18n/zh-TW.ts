@@ -59,6 +59,10 @@ export const zhTW = {
       agentLocked: '本次對話的智能體已鎖定',
       agentRestarted: '外部智能體已重啟 —— 先前的上下文未保留。',
       agentNeedsModel: '請先在設定中設定模型',
+      modelHint: '選擇模型（對話開始前）',
+      modelLocked: '本次對話的模型已鎖定',
+      modelUnknown: '未知模型',
+      noModelSelected: '選擇模型',
       todos: {
         plan: '計畫',
         pending: '待辦',

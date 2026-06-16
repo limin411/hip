@@ -268,7 +268,7 @@ export const en = {
         acceptsModelDesc: 'Push the selected model and API key to this agent',
         description: 'When to use',
         descriptionPlaceholder: 'Describe when hip should delegate to this agent…',
-        enableThis: 'Enable this agent',
+        enableThis: 'Available as sub-agent',
         sectionCommand: 'Launch command',
         sectionTransport: 'Protocol',
         sectionModel: 'Model',

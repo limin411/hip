@@ -34,7 +34,12 @@ export interface ProvidersConfig {
 
 export type AgentTransport = 'thin' | 'rich'
 
-/** acp only: who supplies the model + API key to the external agent. */
+/**
+ * @deprecated Historical field only. ACP and CLI agents now self-manage their model
+ * and API key; hip no longer pushes model config to external agents. Kept so old
+ * hip-agents.json configs still parse — the value is ignored at runtime.
+ * acp only (historically): who supplied the model + API key to the external agent.
+ */
 export type AgentAuthMode = 'hip-managed' | 'opencode-self'
 
 /** Which configured model an external agent should use. References hip-providers.json. */
@@ -48,9 +53,11 @@ export interface AgentConfig {
   command: string                     // executable (PATH name or absolute path); '' for internal
   args: string[]                      // static launch args; [] for internal
   transport: AgentTransport
+  /** @deprecated Historical field; ignored at runtime. ACP/CLI agents self-manage their model. Kept for back-compat with old configs. */
   acceptsModelConfig: boolean
-  boundModel?: BoundModel             // required iff acceptsModelConfig and the user picked a model; internal: the agent's model (unset ⇒ global active)
-  authMode?: AgentAuthMode            // acp only: who supplies the model+key (default 'opencode-self')
+  boundModel?: BoundModel             // internal agents only: the agent's model (unset ⇒ global active); ignored for acp/custom
+  /** @deprecated Historical field; ignored at runtime. ACP/CLI agents self-manage model + auth. Kept for back-compat with old configs. */
+  authMode?: AgentAuthMode            // acp only (historically): who supplied the model+key
   quirks?: string                     // acp only: per-agent quirk-profile key (e.g. 'opencode')
   env?: Record<string, string>        // advanced manual env overrides
   prompt?: string                     // internal only: the persona system prompt (required for kind 'internal')

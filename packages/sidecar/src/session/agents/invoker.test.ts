@@ -92,4 +92,39 @@ describe('createAgentInvoker', () => {
     await expect(invoker.invoke('echo', 'hi', collectingEmit().emit, new AbortController().signal)).rejects.toThrow('boom')
     expect(provider.disposed).toBe(true)
   })
+
+  it('routes an internal agent to runInternal with the resolved model + allowlist, returns its text', async () => {
+    const seen: { agentId?: string; task?: string; resolved?: unknown; allowedTools?: string[]; prompt?: string } = {}
+    const internalAgent: AgentConfig = {
+      id: 'rev', name: 'Reviewer', kind: 'internal', command: '', args: [], transport: 'thin',
+      acceptsModelConfig: false, enabled: true, prompt: 'review carefully', allowedTools: ['read_file'],
+      boundModel: { providerID: 'p', modelID: 'm' },
+    }
+    const invoker = createAgentInvoker('/work', {
+      readAgents: () => [internalAgent],
+      resolveModel: () => ({ providerID: 'p', modelID: 'm', baseURL: 'u' }),
+      createProvider: () => { throw new Error('internal must NOT build a provider') },
+      runInternal: async (a) => { seen.agentId = a.agentId; seen.task = a.task; seen.resolved = a.resolved; seen.allowedTools = a.allowedTools; seen.prompt = a.prompt; a.emit.token('R'); return 'reviewed' },
+    })
+    const { emit, tokens } = collectingEmit()
+    const text = await invoker.invoke('rev', 'do review', emit, new AbortController().signal)
+    expect(text).toBe('reviewed')
+    expect(tokens.join('')).toBe('R')
+    expect(seen).toMatchObject({ agentId: 'rev', task: 'do review', resolved: { providerID: 'p', modelID: 'm', baseURL: 'u' }, allowedTools: ['read_file'], prompt: 'review carefully' })
+  })
+
+  it('passes resolved=null for an internal agent with no bound model', async () => {
+    let seenResolved: unknown = 'unset'
+    const internalAgent: AgentConfig = {
+      id: 'sum', name: 'Summarizer', kind: 'internal', command: '', args: [], transport: 'thin',
+      acceptsModelConfig: false, enabled: true, prompt: 'summarize',
+    }
+    const invoker = createAgentInvoker('/work', {
+      readAgents: () => [internalAgent],
+      resolveModel: () => null,
+      runInternal: async (a) => { seenResolved = a.resolved; return 'ok' },
+    })
+    await invoker.invoke('sum', 't', collectingEmit().emit, new AbortController().signal)
+    expect(seenResolved).toBeNull()
+  })
 })

@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { readEnabledSkills } from './registry.js'
+import { readEnabledSkills, readSkillBody, listSkillFiles } from './registry.js'
 
 const dirs: string[] = []
 
@@ -133,5 +133,57 @@ describe('readEnabledSkills', () => {
     addSkill(root, 'alpha', fm('Alpha', 'da'))
     process.env.HIP_SKILLS_DIR = root
     expect(readEnabledSkills().map((s) => s.id)).toEqual(['alpha', 'zebra'])
+  })
+})
+
+describe('readSkillBody', () => {
+  it('returns the SKILL.md body with frontmatter stripped', () => {
+    const root = makeSkillsRoot()
+    const dir = addSkill(
+      root,
+      'doc',
+      ['---', 'name: Doc', 'description: d', '---', '', '# Heading', 'paragraph'].join('\n'),
+    )
+    expect(readSkillBody(dir)).toBe('# Heading\nparagraph')
+  })
+
+  it('returns the whole file when there is no frontmatter', () => {
+    const root = makeSkillsRoot()
+    const dir = join(root, 'plain')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'SKILL.md'), '# Just a heading\nno frontmatter')
+    expect(readSkillBody(dir)).toBe('# Just a heading\nno frontmatter')
+  })
+
+  it('returns "" when SKILL.md is missing', () => {
+    const root = makeSkillsRoot()
+    const dir = join(root, 'ghost')
+    mkdirSync(dir, { recursive: true })
+    expect(readSkillBody(dir)).toBe('')
+  })
+})
+
+describe('listSkillFiles', () => {
+  it('lists files relative to the skill dir, recursively, with forward slashes', () => {
+    const root = makeSkillsRoot()
+    const dir = join(root, 'multi')
+    mkdirSync(join(dir, 'scripts'), { recursive: true })
+    mkdirSync(join(dir, 'references'), { recursive: true })
+    writeFileSync(join(dir, 'SKILL.md'), 'body')
+    writeFileSync(join(dir, 'scripts', 'run.sh'), 'echo')
+    writeFileSync(join(dir, 'references', 'guide.md'), 'g')
+    const files = listSkillFiles(dir).sort()
+    expect(files).toEqual(['SKILL.md', 'references/guide.md', 'scripts/run.sh'])
+  })
+
+  it('returns [] when the dir does not exist', () => {
+    expect(listSkillFiles(join(tmpdir(), 'hip-skills-no-such-dir-zzz'))).toEqual([])
+  })
+
+  it('returns [] for an empty dir', () => {
+    const root = makeSkillsRoot()
+    const dir = join(root, 'empty')
+    mkdirSync(dir, { recursive: true })
+    expect(listSkillFiles(dir)).toEqual([])
   })
 })

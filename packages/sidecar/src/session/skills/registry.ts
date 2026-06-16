@@ -80,3 +80,43 @@ export function readEnabledSkills(): SkillMeta[] {
   out.sort((a, b) => a.id.localeCompare(b.id))
   return out
 }
+
+/** Read the Markdown body of <dir>/SKILL.md (frontmatter stripped). Missing/unreadable → "". */
+export function readSkillBody(dir: string): string {
+  try {
+    const raw = readFileSync(join(dir, 'SKILL.md'), 'utf8')
+    return parseFrontmatter(raw).body
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Relative paths (forward-slashed) of every file under a skill dir, recursively —
+ * the file manifest handed to the model by use_skill. Missing/unreadable dir → [].
+ */
+export function listSkillFiles(dir: string): string[] {
+  const out: string[] = []
+  const walk = (current: string, prefix: string): void => {
+    let entries: string[]
+    try {
+      entries = readdirSync(current)
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const abs = join(current, entry)
+      const rel = prefix ? `${prefix}/${entry}` : entry
+      let isDir = false
+      try {
+        isDir = statSync(abs).isDirectory()
+      } catch {
+        continue
+      }
+      if (isDir) walk(abs, rel)
+      else out.push(rel)
+    }
+  }
+  walk(dir, '')
+  return out
+}

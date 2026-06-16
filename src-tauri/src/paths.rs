@@ -58,9 +58,25 @@ pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))
 }
 
+/// Pure core for skill-related paths: `<base>/<sub>`. Split out so the join
+/// logic is unit-testable without a Tauri AppHandle (mirrors `hip_base_from`).
+pub fn skills_subpath_from(base: &std::path::Path, sub: &str) -> PathBuf {
+    base.join(sub)
+}
+
+/// Directory holding installed Claude-format skills (`<dir>/<skill-id>/SKILL.md`).
+pub fn skills_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "skills")
+}
+
+/// Canonical path of the skill enable/disable table inside `config/`.
+pub fn skills_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip-skills.json"))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::hip_base_from;
+    use super::{hip_base_from, skills_subpath_from};
     use std::path::PathBuf;
 
     #[test]
@@ -74,6 +90,20 @@ mod tests {
     #[cfg(not(windows))]
     fn unix_none_home_is_none() {
         assert_eq!(hip_base_from(None, Some(PathBuf::from("/x"))), None);
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn skills_subpath_joins_under_base() {
+        let base = PathBuf::from("/Users/x/.hip");
+        assert_eq!(
+            skills_subpath_from(&base, "skills"),
+            PathBuf::from("/Users/x/.hip/skills"),
+        );
+        assert_eq!(
+            skills_subpath_from(&base, "config/hip-skills.json"),
+            PathBuf::from("/Users/x/.hip/config/hip-skills.json"),
+        );
     }
 
     #[test]

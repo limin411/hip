@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import type { AgentConfig, ServerMessage } from '@hip/protocol'
 import { Session } from '../session.js'
 import type { AgentInvoker } from '../agents/invoker.js'
+import { RealModelRunner, type ModelRunner } from '../model-runner.js'
 
 /** Supervisor model: 1st call emits a dispatch_agent tool call, 2nd call emits final text.
  *  Mirrors session-unit.test.ts's HangingChatModel: bindTools returns `this` so the streaming
@@ -90,4 +91,40 @@ export function collect(session: Session, text: string, onMessage?: (m: ServerMe
       })
       .catch(() => resolve(out)) // never hang the test if the turn rejects unexpectedly
   })
+}
+
+/** A fake chat model that always answers with `text` (no tool calls); tool-binding is a no-op.
+ *  Mirrors ToolThenTextModel's bindTools/_streamResponseChunks override so RealModelRunner can stream it. */
+export class TextOnlyModel extends FakeListChatModel {
+  constructor(private readonly text: string) { super({ responses: [text] }) }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  bindTools(): any { return this }
+  async *_streamResponseChunks(): AsyncGenerator<ChatGenerationChunk> {
+    yield new ChatGenerationChunk({ text: this.text, message: new AIMessageChunk({ content: this.text }) })
+  }
+}
+
+/** A ModelRunner over a TextOnlyModel — used as the internal child's runner so no API is hit. */
+export function makeTextRunner(text: string): ModelRunner {
+  return new RealModelRunner(new TextOnlyModel(text) as never)
+}
+
+/** Session that uses a REAL AgentInvoker (built by invokerFactory) so the internal-agent loop runs.
+ *  invokerFactory is the LAST Session constructor param. */
+export function makeSessionWithInvokerFactory(
+  id: string,
+  model: ReturnType<typeof makeToolCallingModel>,
+  invokerFactory: (cwd: string) => AgentInvoker,
+): Session {
+  return new Session(
+    id,
+    { llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd() },
+    model as never,
+    undefined, // store
+    undefined, // titleGenerator
+    undefined, // idleTimeoutMs
+    undefined, // runner
+    undefined, // summarizer
+    invokerFactory,
+  )
 }

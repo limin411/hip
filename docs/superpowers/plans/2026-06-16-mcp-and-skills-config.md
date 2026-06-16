@@ -1467,7 +1467,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   ```bash
   cd /Users/lijiamin/data/my-github/hip && yarn vitest run src/ipc/mcpServersConfig.test.ts src/lib/mcpServerDraft.test.ts src/store/mcpServersStore.test.ts
   ```
-  Expected: `Test Files  3 passed (3)`, `Tests  16 passed (16)` (4 + 8 + 4).
+  Expected: `Test Files  3 passed (3)`, `Tests  14 passed (14)` (4 ipc + 6 mcpServerDraft + 4 store).
 
 - [ ] **Step 2: Full paid-free suite.** Per memory, move `auth.json` aside so no real-LLM suite fires (vitest.setup.ts re-seeds keys from `~/.hip/config/auth.json`, so `env -u` alone is insufficient), run the full suite, then restore.
 

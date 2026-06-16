@@ -48,6 +48,11 @@ pub fn agents_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip-agents.json"))
 }
 
+/// Canonical path of the MCP-servers registry inside `config/`.
+pub fn mcp_servers_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip-mcp-servers.json"))
+}
+
 /// Canonical path of the file-backed secret store inside `config/`.
 pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))

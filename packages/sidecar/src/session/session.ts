@@ -20,6 +20,7 @@ import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import { createAgentProvider, readAgentsConfig, resolveAgentModel, type AgentProvider } from './agents/index.js'
+import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { ExternalAgentHooks } from './agents/types.js'
 
 type SendFn = (msg: ServerMessage) => void
@@ -212,6 +213,9 @@ export class Session {
   // Pending HITL permission requests from the external agent, keyed by requestId. The hooks in the
   // external branch register a resolver here; the UI's permission:respond completes it (Slice 5).
   private readonly pendingPermissions = new Map<string, (c: { optionId: string } | { cancelled: true }) => void>()
+  // Factory for the per-turn AgentInvoker that runs a dispatched configured agent as a nested sub-agent
+  // turn. Injectable so tests stub the sub-agent (no real provider process); defaults to the real one.
+  private readonly invokerFactory: (cwd: string) => AgentInvoker
 
   constructor(
     readonly id: string,
@@ -222,11 +226,13 @@ export class Session {
     private readonly idleTimeoutMs: number = DEFAULT_IDLE_TIMEOUT_MS,
     runner?: ModelRunner,
     summarizer?: Summarizer,
+    invokerFactory?: (cwd: string) => AgentInvoker,
   ) {
     this._config = config
     this.injectedModel = model
     this.injectedRunner = runner
     this.injectedSummarizer = summarizer
+    this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd))
     this.usesEnvModel = !model && !runner
     // Inject a generator (tests), else build the real one only for the env-keyed
     // production model. Injected-model sessions get no generator → no LLM title.
@@ -725,7 +731,51 @@ export class Session {
       ensureFinished(childId, text)
       return text
     }
-    const tools = buildTools(cwd, spawnSubagent, this._config.cwd)
+
+    // dispatch_agent: run a configured external agent as a nested sub-agent (role 'subagent',
+    // parent 'supervisor'), streaming its events through makeEmit and surfacing its HITL requests.
+    const enabledAgents = readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin')
+    const invoker = this.invokerFactory(cwd)
+    const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
+      const cfg = enabledAgents.find((a) => a.id === agentId)
+      if (!cfg) return `Error: unknown or disabled agent ${agentId}`
+      const childId = `subagent-${++subagentSeq}`
+      ensureStarted(childId, 'subagent', 'supervisor', task)
+      const hooks: ExternalAgentHooks = {
+        requestPermission: (req) =>
+          new Promise((resolve) => {
+            this.pendingPermissions.set(req.requestId, resolve)
+            send({
+              type: 'permission:request', sessionId: this.id, turnId,
+              requestId: req.requestId, tool: req.tool, options: req.options,
+              agentFrame: { agentId: childId, parentAgentId: 'supervisor', name: cfg.name },
+            })
+          }),
+        // The supervisor owns the model picker; a transient delegate's config selectors are dropped.
+        configOptions: () => {},
+      }
+      try {
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks)
+        ensureFinished(childId, text)
+        return text || '(sub-agent produced no output)'
+      } catch (err) {
+        // Let cancellation/timeout abort the whole turn (matches the non-catching worker path) —
+        // do NOT launder an AbortError into a tool result, or the supervisor would resume instead of stopping.
+        if (err instanceof Error && err.name === 'AbortError') throw err
+        const msg = err instanceof Error ? err.message : String(err)
+        ensureFinished(childId, `Error: ${msg}`)
+        return `Error: ${msg}`
+      }
+    }
+
+    const tools = buildTools(
+      cwd,
+      spawnSubagent,
+      this._config.cwd,
+      enabledAgents.length
+        ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent }
+        : undefined,
+    )
     const ctx: GraphCtx = { runner, tools, emit, summarizer }
 
     try {

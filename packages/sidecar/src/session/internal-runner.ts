@@ -11,6 +11,8 @@ import { buildChatModel, createSummarizer } from './model-factory.js'
 import { getActiveModel } from '../config/providers.js'
 import type { Summarizer } from './compaction.js'
 import type { ResolvedModel } from './agents/registry.js'
+import type { SkillMeta } from '@hip/protocol'
+import type { ApprovalFn } from './tools.js'
 
 /** Keep only the tools whose name is in `allowed`. undefined ⇒ keep all (legacy-safe). */
 export function filterTools(tools: StructuredToolInterface[], allowed?: string[]): StructuredToolInterface[] {
@@ -30,6 +32,9 @@ export interface RunManagedAgentArgs {
   childMaxSteps: number
   runner?: ModelRunner                // injectable for tests; default builds the real model
   summarizer?: Summarizer             // injectable for tests; default = real summarizer
+  mcpTools?: StructuredToolInterface[]  // namespaced MCP tools threaded from the parent session
+  skills?: SkillMeta[]                  // enabled skills (use_skill candidate)
+  requestApproval?: ApprovalFn          // HITL closure threaded from the parent session (run_script)
 }
 
 /**
@@ -38,17 +43,17 @@ export interface RunManagedAgentArgs {
  * Streams every event through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, allowedTools, task, emit, signal, childMaxSteps } = args
+  const { resolved, cwd, prompt, allowedTools, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
-  // base + git tools (no task/dispatch closures → depth-1), then narrow to the allow-list.
-  const tools = filterTools(buildTools(cwd, undefined, cwd), allowedTools)
+  // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1), then narrow to the allow-list.
+  const tools = filterTools(buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval }), allowedTools)
   const toolNames = tools.map((t) => t.name)
   const ctx: GraphCtx = { runner, tools, emit, summarizer }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames })), new HumanMessage(task)],
+      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills })), new HumanMessage(task)],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

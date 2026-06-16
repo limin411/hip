@@ -70,3 +70,50 @@ describe('runManagedAgent', () => {
     expect(seenToolNames).toContain('read_file')
   })
 })
+
+describe('runManagedAgent skills + run_script wiring', () => {
+  it('grants use_skill when allowed and skills are supplied', async () => {
+    const cwd = tmp()
+    let seen: string[] = []
+    const runner: ModelRunner = {
+      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
+    }
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p', allowedTools: ['read_file', 'use_skill'],
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+      skills: [{ id: 'fmt', name: 'formatter', description: 'd', dir: cwd, hasScripts: false }],
+    })
+    expect(seen).toContain('use_skill')
+  })
+
+  it('does not grant run_script when not in the allow-list even with requestApproval', async () => {
+    const cwd = tmp()
+    let seen: string[] = []
+    const runner: ModelRunner = {
+      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
+    }
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p', allowedTools: ['read_file'],
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    })
+    expect(seen).not.toContain('run_script')
+  })
+
+  it('grants run_script when allowed and requestApproval is supplied', async () => {
+    const cwd = tmp()
+    let seen: string[] = []
+    const runner: ModelRunner = {
+      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
+    }
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p', allowedTools: ['run_script'],
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    })
+    expect(seen).toContain('run_script')
+  })
+})

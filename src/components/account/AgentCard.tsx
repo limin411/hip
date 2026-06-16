@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Bot, Lock, Cpu, Terminal, Pencil, Trash2, MoreVertical } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
+import { agentCategory } from '@/lib/agentCategory'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
@@ -45,6 +46,8 @@ export function AgentCard({
   onDelete: () => void
 }) {
   const { t } = useTranslation()
+  const cat = agentCategory(agent)
+  const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : cat === 'internal' ? t('settings.agents.badgeInternal') : t('settings.agents.catCli')
   const cmdline = [agent.command, ...agent.args].join(' ')
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
@@ -52,22 +55,29 @@ export function AgentCard({
       <div className={cn('min-w-0 flex-1', !agent.enabled && 'opacity-60')}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-body font-medium text-ink">{agent.name}</span>
-          <Badge className={agent.transport === 'rich' ? 'bg-accent-subtle text-accent-strong' : undefined}>
-            {t(agent.transport === 'rich' ? 'settings.agents.transportRich' : 'settings.agents.transportThin')}
-          </Badge>
-          {agent.boundModel && (
+          <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
+          {cat !== 'internal' && (
+            <Badge className={agent.transport === 'rich' ? 'bg-accent-subtle text-accent-strong' : undefined}>
+              {t(agent.transport === 'rich' ? 'settings.agents.transportRich' : 'settings.agents.transportThin')}
+            </Badge>
+          )}
+          {(agent.boundModel || cat === 'internal') && (
             <Badge>
               <Cpu size={11} />
-              {agent.boundModel.modelID}
+              {agent.boundModel ? agent.boundModel.modelID : t('settings.agents.badgeGlobalModel')}
             </Badge>
           )}
         </div>
-        <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
-          <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
-          <span className="min-w-0 truncate">{cmdline}</span>
-        </div>
-        {agent.description && (
-          <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>
+        {cat === 'internal' ? (
+          agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>
+        ) : (
+          <>
+            <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
+              <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
+              <span className="min-w-0 truncate">{cmdline}</span>
+            </div>
+            {agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>}
+          </>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2.5">

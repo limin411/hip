@@ -44,15 +44,17 @@ export interface AgentConfig {
   id: string                          // nanoid
   name: string                        // display name
   description?: string                // when-to-use text shown to hip's dispatch tool + the agent card
-  kind: 'custom' | 'opencode' | 'acp' // selects the provider/adapter
-  command: string                     // executable (PATH name or absolute path)
-  args: string[]                      // static launch args
+  kind: 'custom' | 'opencode' | 'acp' | 'internal' // selects the provider/runtime
+  command: string                     // executable (PATH name or absolute path); '' for internal
+  args: string[]                      // static launch args; [] for internal
   transport: AgentTransport
   acceptsModelConfig: boolean
-  boundModel?: BoundModel             // required iff acceptsModelConfig and the user picked a model
+  boundModel?: BoundModel             // required iff acceptsModelConfig and the user picked a model; internal: the agent's model (unset ⇒ global active)
   authMode?: AgentAuthMode            // acp only: who supplies the model+key (default 'opencode-self')
   quirks?: string                     // acp only: per-agent quirk-profile key (e.g. 'opencode')
   env?: Record<string, string>        // advanced manual env overrides
+  prompt?: string                     // internal only: the persona system prompt (required for kind 'internal')
+  allowedTools?: string[]             // internal only: tool-name allow-list; undefined ⇒ full default set
   enabled: boolean
 }
 

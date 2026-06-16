@@ -41,6 +41,14 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     if let Some(p) = crate::paths::mcp_servers_config_path(app) {
         cmd = cmd.env("HIP_MCP_SERVERS_PATH", p.to_string_lossy().into_owned());
     }
+    // Point the sidecar at the installed skills directory + the enable/disable table.
+    // The sidecar scans <HIP_SKILLS_DIR>/*/SKILL.md and cross-refs HIP_SKILLS_PATH.
+    if let Some(p) = crate::paths::skills_dir(app) {
+        cmd = cmd.env("HIP_SKILLS_DIR", p.to_string_lossy().into_owned());
+    }
+    if let Some(p) = crate::paths::skills_config_path(app) {
+        cmd = cmd.env("HIP_SKILLS_PATH", p.to_string_lossy().into_owned());
+    }
     // Tell the sidecar where to persist sessions. paths::db_dir creates the dir; if it's
     // unavailable the sidecar falls back to an in-memory DB rather than failing to start.
     if let Some(dir) = crate::paths::db_dir(app) {

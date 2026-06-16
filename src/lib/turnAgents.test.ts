@@ -42,4 +42,15 @@ describe('groupByAgent', () => {
     expect(groupByAgent(m, true)[0].status).toBe('running')
     expect(groupByAgent(m, false)[0].status).toBe('done') // not live → done even if unfinished
   })
+
+  it('threads a dispatched subagent run with its parentAgentId and role (SubAgentCard contract)', () => {
+    const m = msg({
+      timeline: [{ kind: 'reasoning', stepSeq: 0, agentId: 'subagent-1', role: 'subagent', content: 'thinking' }],
+      agentRuns: [{ agentId: 'subagent-1', role: 'subagent', output: 'done', startedAt: 0, finishedAt: 1, seq: 0, taskInput: 'do it', parentAgentId: 'supervisor', messageId: 't1' }],
+      toolCalls: [],
+    })
+    const sub = groupByAgent(m, false).find((a) => a.agentId === 'subagent-1')
+    expect(sub?.parentAgentId).toBe('supervisor')
+    expect(sub?.role).toBe('subagent')
+  })
 })

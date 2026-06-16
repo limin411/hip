@@ -161,8 +161,25 @@ function activeKey(providerID: string): string {
   return resolveApiKey(providerID) || 'sk-missing'
 }
 
-function buildModel(_config: SessionConfig): ChatOpenAI {
-  const { providerID, modelID, baseURL } = getActiveModel()
+/** Pure helper: prefer the session config's model (when non-empty) over the global active model.
+ *  Falls back field-by-field: providerID from config.llmProvider, modelID from config.model,
+ *  baseURL from config.baseURL (falls back to fallback.baseURL when absent). */
+export function resolveModelChoice(
+  config: Pick<SessionConfig, 'llmProvider' | 'model' | 'baseURL'>,
+  fallback: { providerID: string; modelID: string; baseURL: string },
+): { providerID: string; modelID: string; baseURL: string } {
+  if (config.model) {
+    return {
+      providerID: config.llmProvider || fallback.providerID,
+      modelID: config.model,
+      baseURL: config.baseURL || fallback.baseURL,
+    }
+  }
+  return fallback
+}
+
+function buildModel(config: SessionConfig): ChatOpenAI {
+  const { providerID, modelID, baseURL } = resolveModelChoice(config, getActiveModel())
   return new ReasoningChatOpenAI({
     model: modelID,
     apiKey: activeKey(providerID),

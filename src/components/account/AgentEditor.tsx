@@ -11,6 +11,8 @@ import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
 import { agentCategory } from '@/lib/agentCategory'
 import { toolNamesToGroups, DEFAULT_TOOL_GROUPS } from '@/lib/agentTools'
+import { AcpProviderPicker } from './AcpProviderPicker'
+import type { AcpPreset } from '@/lib/acpPresets'
 
 const inputCls =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -20,11 +22,13 @@ export function AgentEditor({
   initialKind,
   onSave,
   onCancel,
+  onOpenHelp,
 }: {
   initial: AgentConfig | null
   initialKind?: AgentConfig['kind']
   onSave: (draft: Omit<AgentConfig, 'id'>) => Promise<void>
   onCancel: () => void
+  onOpenHelp?: (sectionId: string) => void
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
@@ -51,14 +55,28 @@ export function AgentEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const isNewAcp = !initial && initialKind === 'acp'
+  const [acpStep, setAcpStep] = useState<'pick' | 'form'>(isNewAcp ? 'pick' : 'form')
+
   const category = agentCategory({ kind: form.kind })
   const isAcp = category === 'acp'
   const isInternal = category === 'internal'
   const title = initial
     ? t('settings.agents.editTitle')
-    : t(isAcp ? 'settings.agents.addAcp' : isInternal ? 'settings.agents.addInternal' : 'settings.agents.addCli')
+    : isAcp && acpStep === 'pick'
+      ? t('settings.agents.acpPickTitle')
+      : t(isAcp ? 'settings.agents.addAcp' : isInternal ? 'settings.agents.addInternal' : 'settings.agents.addCli')
   const groups = groupModelOptions(catalog, config)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
+
+  const pickPreset = (preset: AcpPreset) => {
+    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self', transport: 'rich' })
+    setAcpStep('form')
+  }
+  const pickCustom = () => {
+    patch({ command: '', args: '', quirks: undefined, authMode: 'opencode-self', transport: 'rich' })
+    setAcpStep('form')
+  }
 
   const submit = async () => {
     setBusy(true)
@@ -81,7 +99,25 @@ export function AgentEditor({
       title={title}
     >
       <div className="flex flex-col">
+        {isAcp && acpStep === 'pick' ? (
+          <>
+            <div className="p-5">
+              <AcpProviderPicker onPick={pickPreset} onPickCustom={pickCustom} onOpenDocs={(id) => onOpenHelp?.(id)} />
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
+              <Button variant="outline" size="sm" onClick={onCancel}>
+                {t('settings.agents.cancel')}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
         <div className="space-y-5 p-5">
+          {isNewAcp && (
+            <button type="button" onClick={() => setAcpStep('pick')} className="text-meta text-accent-strong transition-colors hover:underline">
+              {t('settings.agents.backToProviders')}
+            </button>
+          )}
           <Field label={t('settings.agents.name')}>
             <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
           </Field>
@@ -301,6 +337,8 @@ export function AgentEditor({
             {t('settings.agents.save')}
           </Button>
         </div>
+          </>
+        )}
       </div>
     </Modal>
   )

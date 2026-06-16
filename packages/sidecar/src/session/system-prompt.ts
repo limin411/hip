@@ -65,3 +65,27 @@ const CHILD_BASE =
 export function childSystemPrompt(description: string, cwd: string): string {
   return `${IDENTITY}\n\n${CHILD_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
 }
+
+export interface ManagedAgentPromptInput {
+  cwd: string
+  persona: string
+  toolNames: string[]
+}
+
+/** System prompt for an internal managed sub-agent: identity guard + an operating preamble that
+ *  enumerates the agent's ACTUAL granted tools + cwd convention + anti-phantom + the persona, framed
+ *  as a focused, non-delegating sub-agent. Git guidance only when a git tool is granted. */
+export function buildManagedAgentPrompt({ cwd, persona, toolNames }: ManagedAgentPromptInput): string {
+  const toolList = toolNames.length ? toolNames.join(', ') : '(no tools — answer from reasoning only)'
+  const base =
+    'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
+    `Your available tools are: ${toolList}. ` +
+    'Use them to do the work yourself — read what you need, make changes only with the tools you have, ' +
+    'and verify your results. You cannot delegate further. When done, return a concise text result ' +
+    'describing what you found or changed.'
+  const hasGit = toolNames.some((n) => n.startsWith('git_'))
+  const parts = [IDENTITY, base, cwdBlock(cwd)]
+  if (hasGit) parts.push(GIT_GUIDANCE)
+  parts.push(ANTI_PHANTOM, `## Your role and instructions\n${persona.trim()}`)
+  return parts.join('\n\n')
+}

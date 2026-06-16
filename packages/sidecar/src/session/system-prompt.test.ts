@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSystemPrompt, childSystemPrompt } from './system-prompt.js'
+import { buildSystemPrompt, childSystemPrompt, buildManagedAgentPrompt } from './system-prompt.js'
 
 describe('buildSystemPrompt', () => {
   it('includes the cwd, the path convention, and the anti-phantom rule', () => {
@@ -53,5 +53,31 @@ describe('childSystemPrompt', () => {
     expect(s).toMatch(/you are hip/i)
     expect(s).toMatch(/never claim/i)
     expect(s).toContain('refactor the parser')
+  })
+})
+
+describe('buildManagedAgentPrompt', () => {
+  it('embeds the persona, the cwd, and the granted tool names', () => {
+    const p = buildManagedAgentPrompt({
+      cwd: '/proj',
+      persona: 'You are a meticulous code reviewer.',
+      toolNames: ['read_file', 'grep'],
+    })
+    expect(p).toContain('You are a meticulous code reviewer.')
+    expect(p).toContain('/proj')
+    expect(p).toContain('read_file')
+    expect(p).toContain('grep')
+  })
+  it('omits git guidance when no git tool is granted', () => {
+    const p = buildManagedAgentPrompt({ cwd: '/proj', persona: 'x', toolNames: ['read_file'] })
+    expect(p).not.toContain('git_commit')
+  })
+  it('includes git guidance when a git tool is granted', () => {
+    const p = buildManagedAgentPrompt({ cwd: '/proj', persona: 'x', toolNames: ['read_file', 'git_commit'] })
+    expect(p).toContain('git_commit')
+  })
+  it('forbids claiming a non-hip identity', () => {
+    const p = buildManagedAgentPrompt({ cwd: '/proj', persona: 'x', toolNames: [] })
+    expect(p).toContain('hip')
   })
 })

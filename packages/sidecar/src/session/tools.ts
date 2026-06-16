@@ -28,11 +28,17 @@ async function real(root: string, p: string): Promise<string> {
   return lexical
 }
 
+export interface DispatchSpec {
+  agents: Array<{ id: string; name: string; description?: string }>
+  run: (agentId: string, task: string) => Promise<string>
+}
+
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
 export function buildTools(
   root: string,
   spawnSubagent?: (description: string) => Promise<string>,
   cwd?: string,
+  dispatch?: DispatchSpec,
 ): StructuredToolInterface[] {
   const writeFile = tool(
     async ({ path: p, content }) => {
@@ -263,7 +269,29 @@ export function buildTools(
       schema: z.object({ description: z.string() }),
     },
   )
-  return [...base, task]
+  const out = [...base, task]
+
+  if (!dispatch || dispatch.agents.length === 0) return out
+
+  const roster = dispatch.agents
+    .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
+    .join('\n')
+  const ids = dispatch.agents.map((a) => a.id) as [string, ...string[]]
+  const dispatchAgent = tool(
+    async ({ agent, task: t }) => dispatch.run(agent, t),
+    {
+      name: 'dispatch_agent',
+      description:
+        'Delegate a focused, self-contained task to a specialized sub-agent and return its result. ' +
+        'Pick the agent best matched to the task. Available agents:\n' +
+        roster,
+      schema: z.object({
+        agent: z.enum(ids).describe('id of the sub-agent to delegate to'),
+        task: z.string().describe('the complete, self-contained instruction for the sub-agent'),
+      }),
+    },
+  )
+  return [...out, dispatchAgent]
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

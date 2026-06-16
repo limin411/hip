@@ -1,6 +1,7 @@
 mod sidecar;
 mod paths;
 mod auth;
+mod skills;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;

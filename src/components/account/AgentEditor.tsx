@@ -22,13 +22,11 @@ export function AgentEditor({
   initialKind,
   onSave,
   onCancel,
-  onOpenHelp,
 }: {
   initial: AgentConfig | null
   initialKind?: AgentConfig['kind']
   onSave: (draft: Omit<AgentConfig, 'id'>) => Promise<void>
   onCancel: () => void
-  onOpenHelp?: (sectionId: string) => void
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
@@ -102,7 +100,7 @@ export function AgentEditor({
         {isAcp && acpStep === 'pick' ? (
           <>
             <div className="p-5">
-              <AcpProviderPicker onPick={pickPreset} onPickCustom={pickCustom} onOpenDocs={(id) => onOpenHelp?.(id)} />
+              <AcpProviderPicker onPick={pickPreset} onPickCustom={pickCustom} />
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
               <Button variant="outline" size="sm" onClick={onCancel}>

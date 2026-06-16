@@ -1,5 +1,7 @@
 # 智能体管理 Layout Iteration Implementation Plan
 
+> **UPDATE (2026-06-16, post-implementation):** Part 3 — the in-app **help drawer** — was **removed** by user decision after implementation. Tasks 3 (`agentHelp.ts`), 7 (`AgentHelpDrawer.tsx`), the help i18n keys, and the picker's 「查看接入文档」 links / `docsId` were all deleted. The shipped feature is parts 1 (two-pane layout) + 2 (ACP provider presets) only; ACP `coming-soon` placeholders remain but carry no docs link.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rebuild the 智能体管理 settings page as a two-pane layout (left type-filter rail + right list pane), add an ACP provider-preset picker that reserves future providers, and add an in-app localized help drawer.

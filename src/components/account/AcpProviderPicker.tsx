@@ -9,11 +9,9 @@ const ICONS: Record<AcpPresetIcon, LucideIcon> = { code: Code, bot: Bot, cpu: Cp
 export function AcpProviderPicker({
   onPick,
   onPickCustom,
-  onOpenDocs,
 }: {
   onPick: (preset: AcpPreset) => void
   onPickCustom: () => void
-  onOpenDocs: (sectionId: string) => void
 }) {
   const { t } = useTranslation()
   return (
@@ -42,16 +40,7 @@ export function AcpProviderPicker({
                 <CircleCheck size={13} /> {t('settings.agents.acpPresetAvailable')}
               </div>
             ) : (
-              <div className="mt-1.5 flex items-center justify-between">
-                <span className="text-caption text-ink-tertiary">{t('settings.agents.acpPresetComingSoon')}</span>
-                <button
-                  type="button"
-                  className="text-caption text-accent-strong hover:underline"
-                  onClick={(e) => { e.stopPropagation(); onOpenDocs(preset.docsId) }}
-                >
-                  {t('settings.agents.viewDocs')}
-                </button>
-              </div>
+              <div className="mt-1.5 text-caption text-ink-tertiary">{t('settings.agents.acpPresetComingSoon')}</div>
             )}
           </div>
         )

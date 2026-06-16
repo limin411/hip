@@ -19,11 +19,9 @@ describe('ACP_PRESETS', () => {
     }
   })
 
-  it('has unique preset ids and unique docsIds', () => {
+  it('has unique preset ids', () => {
     const ids = ACP_PRESETS.map((p) => p.id)
-    const docs = ACP_PRESETS.map((p) => p.docsId)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(new Set(docs).size).toBe(docs.length)
   })
 
   it('looks presets up by id', () => {

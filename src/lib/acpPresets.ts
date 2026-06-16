@@ -11,15 +11,14 @@ export interface AcpPreset {
   args: string[] // default launch args; [] for coming-soon
   quirks?: string // quirk-profile key (packages/sidecar/.../acp-quirks.ts)
   authModeDefault?: AgentAuthMode
-  docsId: string // → src/lib/agentHelp.ts section id
   icon: AcpPresetIcon
 }
 
 export const ACP_PRESETS: AcpPreset[] = [
-  { id: 'opencode', name: 'OpenCode', status: 'available', command: 'opencode', args: ['acp'], quirks: 'opencode', authModeDefault: 'opencode-self', docsId: 'acp-opencode', icon: 'code' },
-  { id: 'claude-code', name: 'Claude Code', status: 'coming-soon', command: '', args: [], docsId: 'acp-claude-code', icon: 'bot' },
-  { id: 'codex', name: 'Codex', status: 'coming-soon', command: '', args: [], docsId: 'acp-codex', icon: 'cpu' },
-  { id: 'kimi-code', name: 'Kimi Code', status: 'coming-soon', command: '', args: [], docsId: 'acp-kimi-code', icon: 'rocket' },
+  { id: 'opencode', name: 'OpenCode', status: 'available', command: 'opencode', args: ['acp'], quirks: 'opencode', authModeDefault: 'opencode-self', icon: 'code' },
+  { id: 'claude-code', name: 'Claude Code', status: 'coming-soon', command: '', args: [], icon: 'bot' },
+  { id: 'codex', name: 'Codex', status: 'coming-soon', command: '', args: [], icon: 'cpu' },
+  { id: 'kimi-code', name: 'Kimi Code', status: 'coming-soon', command: '', args: [], icon: 'rocket' },
 ]
 
 /** The 自定义 / 通用 escape hatch — not a real preset; the picker handles it separately. */

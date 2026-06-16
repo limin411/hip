@@ -1,5 +1,7 @@
 # 智能体管理 Layout Iteration — Design
 
+> **UPDATE (2026-06-16, post-implementation):** Section C — the in-app **help drawer** — was **removed** by user decision after the feature was built. The shipped result is sections A (two-pane layout) + B (ACP provider presets) only. Disregard section C and all 「如何接入」 / 「查看接入文档」 / `agentHelp` / `docsId` references below; they were implemented then deleted.
+
 **Date:** 2026-06-16
 **Status:** Approved (brainstorm), pending spec review
 **Follow-on to:** `2026-06-16-agent-categories-internal-design.md` (three-category + internal managed agents, MERGED local)

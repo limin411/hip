@@ -379,6 +379,16 @@ describe('applyServerMessage', () => {
     const s1 = clearPermission(s0, 'other')
     expect(s1.sessions[0].pendingPermission?.requestId).toBe('r')
   })
+
+  it('stores agentFrame on pendingPermission for a nested sub-agent request', () => {
+    const base = { sessions: [{ id: 's1', config: { llmProvider: 'd', model: 'm', tools: [] }, title: '', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }] } as any
+    const next = applyServerMessage(base, {
+      type: 'permission:request', sessionId: 's1', turnId: 't', requestId: 'r',
+      tool: { title: 'edit', kind: 'edit' }, options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }],
+      agentFrame: { agentId: 'subagent-1', parentAgentId: 'supervisor', name: 'OpenCode' },
+    } as any, 0)
+    expect(next.sessions[0].pendingPermission?.agentFrame?.name).toBe('OpenCode')
+  })
 })
 
 function reset() {

@@ -28,7 +28,7 @@ export function PermissionModal() {
   const clearPermission = useDomainStore((s) => s.clearPermission)
 
   if (!sessionId || !pending) return null
-  const { requestId, tool, options } = pending
+  const { requestId, tool, options, agentFrame } = pending
 
   const respond = (choice: { optionId: string } | { cancelled: true }) => {
     sessionService.respondPermission(sessionId, requestId, choice)
@@ -43,6 +43,11 @@ export function PermissionModal() {
     >
       <div className="flex flex-col gap-4 px-5 py-4" data-testid="permission-modal">
         <p className="text-body text-ink-secondary">{t('chat.permission.intro')}</p>
+        {agentFrame && (
+          <p className="text-meta text-ink-tertiary" data-testid="permission-subagent">
+            {t('chat.permission.fromSubagent', { name: agentFrame.name })}
+          </p>
+        )}
         <div className="rounded-md border border-border bg-surface-muted px-3 py-2">
           <p className="text-body font-medium text-ink">{tool.title}</p>
           <p className="mt-0.5 text-meta uppercase tracking-wide text-ink-tertiary">{tool.kind}</p>

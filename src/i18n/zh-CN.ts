@@ -41,6 +41,7 @@ export const zhCN = {
       permission: {
         title: '需要授权',
         intro: '智能体请求执行以下操作：',
+        fromSubagent: '来自子智能体 {{name}} 的请求',
       },
       style: '风格',
       styleNone: '无',

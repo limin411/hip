@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AcpConfigOption, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import type { AcpConfigOption, AgentFrame, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
@@ -14,6 +14,7 @@ export interface PendingPermission {
   requestId: string
   tool: PermissionRequestPayload
   options: PermissionOption[]
+  agentFrame?: AgentFrame
 }
 
 export interface SessionVM {
@@ -235,7 +236,7 @@ export function applyServerMessage(
     case 'permission:request':
       return update(msg.sessionId, (s) => ({
         ...s,
-        pendingPermission: { turnId: msg.turnId, requestId: msg.requestId, tool: msg.tool, options: msg.options },
+        pendingPermission: { turnId: msg.turnId, requestId: msg.requestId, tool: msg.tool, options: msg.options, ...(msg.agentFrame ? { agentFrame: msg.agentFrame } : {}) },
       }))
 
     case 'session:thinking':

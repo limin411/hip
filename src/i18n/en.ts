@@ -41,6 +41,7 @@ export const en = {
       permission: {
         title: 'Permission required',
         intro: 'The agent is requesting to perform this action:',
+        fromSubagent: 'Requested by sub-agent {{name}}',
       },
       style: 'Style',
       styleNone: 'None',

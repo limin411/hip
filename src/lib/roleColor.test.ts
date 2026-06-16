@@ -4,7 +4,7 @@ import { ROLE_COLOR, ROLE_NAME_KEY } from './roleColor'
 
 // One literal per AgentRole member. If a role is added/removed, this array (typed as the
 // full union) forces a compile error here until updated — a deliberate exhaustiveness tripwire.
-const ALL_ROLES: AgentRole[] = ['supervisor', 'planner', 'coder', 'reviewer', 'worker']
+const ALL_ROLES: AgentRole[] = ['supervisor', 'planner', 'coder', 'reviewer', 'worker', 'subagent']
 
 describe('roleColor maps cover every AgentRole', () => {
   it('ROLE_COLOR has a CSS var for every role', () => {

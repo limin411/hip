@@ -7,6 +7,7 @@ export const ROLE_COLOR: Record<AgentRole, string> = {
   coder: 'var(--role-coder)',
   reviewer: 'var(--role-reviewer)',
   worker: 'var(--role-worker)',
+  subagent: 'var(--role-worker)',
 }
 
 /** Role → i18n key for its localized display name (artifact.roles.*). */
@@ -16,4 +17,5 @@ export const ROLE_NAME_KEY = {
   coder: 'artifact.roles.coder',
   reviewer: 'artifact.roles.reviewer',
   worker: 'artifact.roles.worker',
+  subagent: 'artifact.roles.subagent',
 } as const satisfies Record<AgentRole, string>

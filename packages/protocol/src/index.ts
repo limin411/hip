@@ -1,4 +1,4 @@
-export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer' | 'worker'
+export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer' | 'worker' | 'subagent'
 
 export interface SessionConfig {
   llmProvider: string          // provider id (was the 'deepseek' literal)
@@ -43,6 +43,7 @@ export interface BoundModel { providerID: string; modelID: string }
 export interface AgentConfig {
   id: string                          // nanoid
   name: string                        // display name
+  description?: string                // when-to-use text shown to hip's dispatch tool + the agent card
   kind: 'custom' | 'opencode' | 'acp' // selects the provider/adapter
   command: string                     // executable (PATH name or absolute path)
   args: string[]                      // static launch args
@@ -98,6 +99,13 @@ export interface PermissionRequestPayload {
   kind: string                      // read|edit|delete|execute|fetch|other
   diff?: { path: string; oldText: string; newText: string }
   content?: string
+}
+
+/** Identifies a dispatched sub-agent when its work surfaces in a parent's turn (nested HITL, frames). */
+export interface AgentFrame {
+  agentId: string
+  parentAgentId: string
+  name: string
 }
 
 /** A choice the agent offers for a permission request. */
@@ -304,7 +312,7 @@ export type ServerMessage =
   | { type: 'git:branch:list:result'; sessionId: string; branches: Branch[]; currentBranch: string | null }
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
   | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }
-  | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[] }
+  | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[]; agentFrame?: AgentFrame }
   | { type: 'agent:configOptions'; sessionId: string; options: AcpConfigOption[] }
 
 // ──────────────────────────────────────────────────────────────────

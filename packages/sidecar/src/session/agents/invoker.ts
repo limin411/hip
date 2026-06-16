@@ -1,4 +1,6 @@
-import type { AgentConfig } from '@hip/protocol'
+import type { AgentConfig, SkillMeta } from '@hip/protocol'
+import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { ApprovalFn } from '../tools.js'
 import type { GraphEmit } from '../graph.js'
 import { runManagedAgent } from '../internal-runner.js'
 import { CHILD_MAX_STEPS } from '../loop-control.js'
@@ -11,8 +13,15 @@ import type { AgentProvider, ExternalAgentHooks } from './types.js'
  *  takes a live `emit` sink. A later orchestrator adapter is NOT trivial: it must
  *  bridge this `Promise<string>` to AgentRunner's `Promise<NodeOutput>` and supply a
  *  no-op `emit` (the DAG path has no streaming card to feed). */
+/** Per-turn capabilities the parent session threads into an internal sub-agent's loop. */
+export interface InvokerExtras {
+  mcpTools?: StructuredToolInterface[]
+  skills?: SkillMeta[]
+  requestApproval?: ApprovalFn
+}
+
 export interface AgentInvoker {
-  invoke(agentId: string, task: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks): Promise<string>
+  invoke(agentId: string, task: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks, extras?: InvokerExtras): Promise<string>
 }
 
 /** Args handed to the internal-loop runner (a seam so tests can stub the loop). */
@@ -25,6 +34,9 @@ export interface RunInternalArgs {
   task: string
   emit: GraphEmit
   signal: AbortSignal
+  mcpTools?: StructuredToolInterface[]
+  skills?: SkillMeta[]
+  requestApproval?: ApprovalFn
 }
 
 export interface InvokerDeps {
@@ -39,15 +51,23 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
   const createProvider = deps.createProvider ?? createAgentProvider
   const resolveModel = deps.resolveModel ?? resolveAgentModel
   const runInternal = deps.runInternal ?? ((a: RunInternalArgs) =>
-    runManagedAgent({ resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, allowedTools: a.allowedTools, task: a.task, emit: a.emit, signal: a.signal, childMaxSteps: CHILD_MAX_STEPS }))
+    runManagedAgent({
+      resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, allowedTools: a.allowedTools, task: a.task,
+      emit: a.emit, signal: a.signal, childMaxSteps: CHILD_MAX_STEPS,
+      mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval,
+    }))
   return {
-    async invoke(agentId, task, emit, signal, hooks) {
+    async invoke(agentId, task, emit, signal, hooks, extras) {
       const agent = readAgents().find((a) => a.id === agentId && a.enabled)
       if (!agent) throw new Error(`unknown or disabled agent: ${agentId}`)
 
       if (agent.kind === 'internal') {
         // hip's own loop — no external provider, no token-teeing (runManagedAgent returns the final text).
-        return runInternal({ agentId, resolved: resolveModel(agent), cwd, prompt: agent.prompt ?? '', allowedTools: agent.allowedTools, task, emit, signal })
+        return runInternal({
+          agentId, resolved: resolveModel(agent), cwd, prompt: agent.prompt ?? '', allowedTools: agent.allowedTools,
+          task, emit, signal,
+          mcpTools: extras?.mcpTools, skills: extras?.skills, requestApproval: extras?.requestApproval,
+        })
       }
 
       const model = agent.acceptsModelConfig ? resolveModel(agent) : null

@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { AgentConfig } from '@hip/protocol'
 import type { GraphEmit } from '../graph.js'
 import type { ResolvedModel } from './registry.js'
-import { buildModelEnv, parseRichLine, type RichEvent } from './adapters.js'
+import { parseRichLine, type RichEvent } from './adapters.js'
 import type { AgentProvider } from './types.js'
 export type { AgentProvider } from './types.js'
 
@@ -58,8 +58,10 @@ export class LoopAgentProvider implements AgentProvider {
   }
 
   private spawnChild(): ChildProcessWithoutNullStreams {
+    // Model rollback: hip no longer pushes its model/key into CLI agents — they self-manage. The
+    // `model` ctor param is retained only for the shared (agent, cwd, model) provider-factory signature.
+    void this.model
     const env: NodeJS.ProcessEnv = { ...process.env }
-    if (this.agent.acceptsModelConfig && this.model) Object.assign(env, buildModelEnv(this.model))
     if (this.agent.env) Object.assign(env, this.agent.env)
     const child = spawn(this.agent.command, this.agent.args, { cwd: this.cwd, env, stdio: ['pipe', 'pipe', 'pipe'] })
     child.stdout.setEncoding('utf8')

@@ -38,13 +38,6 @@ describe('LoopAgentProvider — thin', () => {
     const b = captureEmit(); await p.runTurn('again', b.emit, new AbortController().signal)
     expect(b.cap.text).toBe('echo: again')
   })
-
-  it('injects the HIP_* model env when acceptsModelConfig', async () => {
-    const p = new LoopAgentProvider({ ...thinAgent, acceptsModelConfig: true }, process.cwd(), { providerID: 'acme', modelID: 'acme-large', baseURL: 'u', apiKey: 'sk' })
-    providers.push(p)
-    const a = captureEmit(); await p.runTurn('hi', a.emit, new AbortController().signal)
-    expect(a.cap.text).toBe('echo: hi [model=acme-large]')
-  })
 })
 
 describe('LoopAgentProvider — rich', () => {

@@ -1,4 +1,4 @@
-# 设置页 — MCP 服务器配置 + Skill 配置(+ ACP 模型变量回退)
+# 设置页 — MCP 服务器配置 + Skill 配置(+ ACP/CLI 模型变量回退)
 
 **Date:** 2026-06-16
 **Status:** Design approved, ready for implementation plan
@@ -6,11 +6,11 @@
 
 ## Goal
 
-在设置页新增两个端到端可用的配置模块,并对现有 ACP 集成做一处行为回退:
+在设置页新增两个端到端可用的配置模块,并对现有外部智能体集成做一处行为回退:
 
 1. **MCP 服务器配置** — 在设置页增删改 MCP 服务器(stdio / SSE / HTTP),持久化到 `~/.hip/config`,运行时由 sidecar 连接并把其工具合并进 hip 的工具集。
 2. **Skill 配置** — 采用 Claude 的 skill 格式(`SKILL.md` + 多目录多文件)。**不在应用内编辑正文**;通过上传 `.zip` 或把文件夹放进数据目录指定位置来安装。运行时以"渐进式披露"接入 hip 的循环,并新增 HITL 门控的 `run_script` 工具使 skill 自带脚本**能够执行**。
-3. **ACP 模型变量回退** — **不再向 ACP 智能体下推 hip 的模型/密钥**(删除 `hip-managed` 这条 ACP 路径,ACP 一律自管认证)。
+3. **ACP/CLI 模型变量回退** — **不再向 ACP 与 CLI 智能体下推 hip 的模型/密钥**(删除 ACP 的 `hip-managed` 路径与 CLI 的 `buildModelEnv` 路径,两类外部智能体一律自管模型/认证)。
 
 与现有"智能体管理 / 模型配置"一样,新模块完整复用:`Zustand store → src/ipc/* → Tauri 命令 → ~/.hip/... → sidecar 读 env 路径`。
 
@@ -23,7 +23,7 @@
 5. **MCP 传输** — `stdio` + `sse` + `http`(streamable)。配置存 `~/.hip/config/hip-mcp-servers.json`。
 6. **MCP 消费方** — hip 主循环始终合并所有 enabled 服务器的工具;内部智能体经其**已有工具白名单**(`allowedTools`)选择性获得。**不修改 [acp-connection.ts](../../../packages/sidecar/src/session/agents/acp-connection.ts) 的 `mcpServers: []`**。
 7. **MCP 连接生命周期** — sidecar 维护一个**常驻 MCP 客户端池**,每轮开始时按配置文件做**增量协调**(connect 新增 / disconnect 移除或停用 / 复用已有),无需重启 sidecar;失败优雅降级(跳过该服务器工具 + 记日志)。与现有"agents 配置每轮重读"哲学一致。
-8. **ACP 模型回退范围** — 仅 ACP。删除 `hip-managed` 分支与对应 UI。**CLI 模型下推保持不动**(见 §E "开放确认项":若需对称移除可后续一句话改)。
+8. **模型回退范围** — ACP **与** CLI 都不再接收 hip 的模型配置。删除 ACP 的 `hip-managed` 分支、CLI 的 `buildModelEnv` 注入,以及编辑器里两者的认证/模型 UI。`acceptsModelConfig` / `authMode` 退化为纯历史字段(运行时忽略,兼容旧配置)。`boundModel` **保留**(内部智能体仍用,未绑定时回退全局)。仅**内部智能体**保留模型选择器。
 
 ---
 
@@ -190,37 +190,38 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 
 ---
 
-## D. ACP 模型变量回退
+## D. 外部智能体模型变量回退(ACP + CLI)
 
-**目标:ACP 一律自管模型/认证,hip 不再下推。**
+**目标:ACP 与 CLI 智能体一律自管模型/认证,hip 不再下推任何模型配置/密钥。**
 
 | 层 | 改动 |
 |---|---|
-| sidecar `agents/acp-config.ts` | **删除 `authMode==='hip-managed'` 分支**(行 20–38):不再写 `OPENCODE_CONFIG` 临时文件、不再设 `{PROVIDER}_API_KEY`。仅保留 `agent.env` 等非模型 env 透传。等价于一律 `opencode-self`。 |
-| sidecar `session.ts:196` | ACP 不再 `resolveAgentModel`——构造 `AcpConnection` 不传 model;连接池 key(`acp-connection.ts:143`)的 model 分量对 ACP 恒为 null。 |
-| protocol `index.ts` | `AgentAuthMode` / `AgentConfig.authMode` 标记为 **deprecated**:类型保留以兼容旧配置,但运行时对 ACP **不再读取**(旧的 `hip-managed` 值被忽略当作自管)。 |
-| 前端 `AgentEditor.tsx` | **移除 ACP 的认证模式单选(authSelf/authManaged)与其条件模型下拉**(行 187–247)。ACP 编辑不再涉及模型。 |
-| 前端 `agentDraft.ts` | `isValid`:ACP 永不 `needsModel`。 |
-| 前端 `AgentCard.tsx` | ACP 卡片不再显示 `boundModel` 徽章(仅 internal/CLI 视情况显示)。 |
-| i18n | 移除/停用 `settings.agents.authSelf/authSelfDesc/authManaged/authManagedDesc/sectionAuth`(ACP 专用部分)。 |
-| 内置 OpenCode 默认 | 已是 `authMode:'opencode-self'`,无行为变化;可顺手把 `acceptsModelConfig` 对 ACP 的含义记为 inert。 |
+| sidecar `agents/acp-config.ts` | **删除 `authMode==='hip-managed'` 分支**(行 20–38):不再写 `OPENCODE_CONFIG` 临时文件、不再设 `{PROVIDER}_API_KEY`。仅保留 `agent.env` 等非模型 env。等价于一律 `opencode-self`。 |
+| sidecar `agents/adapters.ts` | **删除 `buildModelEnv`**——不再产出 `HIP_PROVIDER/HIP_MODEL/HIP_BASE_URL/HIP_API_KEY`。 |
+| sidecar `agents/loop-provider.ts:61–63` | 删除 `if (acceptsModelConfig && model) Object.assign(env, buildModelEnv(model))`;CLI 子进程 env 仅 `process.env` + `agent.env`。 |
+| sidecar `session.ts:196` | 外部智能体(acp + custom)不再 `resolveAgentModel`——一律 `model=null`,连接/spawn 不带 model;连接池 key(`acp-connection.ts:143`)的 model 分量恒为 null。`resolveAgentModel` 此后仅服务内部智能体路径。 |
+| protocol `index.ts` | `acceptsModelConfig`、`AgentAuthMode`/`AgentConfig.authMode` 标 **deprecated**:类型保留以兼容旧配置,运行时对 ACP/CLI **不再读取**(旧值忽略,按自管处理)。`boundModel` **保留**——内部智能体仍用(未绑定时回退全局)。 |
+| 前端 `AgentEditor.tsx` | **移除 ACP 的认证模式单选(authSelf/authManaged)+ 条件模型下拉**(行 187–247)**和 CLI 的 `acceptsModel` 开关 + 条件模型下拉**(行 283–315)。ACP/CLI 编辑均不再涉及模型/认证。**仅内部智能体保留模型选择器。** |
+| 前端 `agentDraft.ts` | `isValid`:acp 与 custom 永不 `needsModel`;仅内部智能体可绑定模型(未绑定回退全局,故也非必填)。 |
+| 前端 `AgentCard.tsx` | acp/custom 卡片不再显示 `boundModel` 徽章;仅 internal 显示(绑定模型或"全局模型")。 |
+| i18n | 移除/停用 ACP 的 `authSelf/authSelfDesc/authManaged/authManagedDesc/sectionAuth` 与 CLI 的 `acceptsModel/acceptsModelDesc`,以及仅外部用的 `sectionModel/selectModel`(内部智能体若复用模型选择器则保留其所需键)。 |
+| 内置 OpenCode 默认 | 已是 `authMode:'opencode-self'`,无行为变化。 |
 
-**CLI 不动**:`adapters.ts buildModelEnv` + `loop-provider.ts:61–63` 的 `HIP_PROVIDER/HIP_MODEL/HIP_BASE_URL/HIP_API_KEY` 下推保留。CLI 的 `acceptsModelConfig` 开关与模型下拉保留。
+> 结果:`acceptsModelConfig` / `authMode` 成为纯历史字段;ACP 与 CLI 两类外部智能体完全自管模型/认证。
 
 ---
 
 ## E. 开放确认项(留待 spec review)
 
-1. **CLI 是否也停止下推模型?** 你只说了 ACP;默认保留 CLI。若要对称移除,删 §D 的 CLI 例外即可。
-2. **MCP 是否需要"按服务器选工具子集"?** MVP 为"整服务器 enabled → 其全部工具进池";如需 per-tool 勾选,后续在编辑器加。
-3. **Skill 查看正文**:MVP 提供只读查看弹窗;确认是否需要。
+1. **MCP 是否需要"按服务器选工具子集"?** MVP 为"整服务器 enabled → 其全部工具进池";如需 per-tool 勾选,后续在编辑器加。
+2. **Skill 查看正文**:MVP 提供只读查看弹窗;确认是否需要。
 
 ---
 
 ## F. 受影响 / 新增文件清单
 
 **protocol**
-- `packages/protocol/src/index.ts` — `McpTransport/McpServerConfig/McpServersConfig`、`SkillMeta/SkillsConfig`;`AgentAuthMode`/`authMode` 标 deprecated。
+- `packages/protocol/src/index.ts` — `McpTransport/McpServerConfig/McpServersConfig`、`SkillMeta/SkillsConfig`;`acceptsModelConfig`/`AgentAuthMode`/`authMode` 标 deprecated(`boundModel` 保留给内部智能体)。
 
 **Rust(src-tauri)**
 - `src/paths.rs` — `mcp_servers_config_path`、`skills_dir`、`skills_config_path`。
@@ -232,12 +233,12 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 - 新增 `ipc/mcpServersConfig.ts`、`ipc/skills.ts`。
 - 新增 `store/mcpServersStore.ts`、`store/skillsStore.ts`。
 - 新增 `components/account/McpConfig.tsx`(+ `McpServerEditor`)、`components/account/SkillConfig.tsx`。
-- 改 `components/account/SettingsPanel.tsx`(`PAGES` +2)、`AgentEditor.tsx`(删 ACP 认证 UI + 内部智能体工具勾选加项)、`AgentCard.tsx`、`lib/agentDraft.ts`。
-- i18n `i18n/{en,zh-CN,zh-TW}.ts` — `settings.mcp.*` / `settings.skill.* /` `settings.mcpLabel` / `settings.skillLabel`;移除 ACP authMode 文案。
+- 改 `components/account/SettingsPanel.tsx`(`PAGES` +2)、`AgentEditor.tsx`(删 ACP 认证 UI + CLI 模型 UI;内部智能体工具勾选加项)、`AgentCard.tsx`(ACP/CLI 不再显示模型徽章)、`lib/agentDraft.ts`(acp/custom 不再 needsModel)。
+- i18n `i18n/{en,zh-CN,zh-TW}.ts` — `settings.mcp.*` / `settings.skill.* /` `settings.mcpLabel` / `settings.skillLabel`;移除 ACP authMode + CLI acceptsModel 文案。
 
 **sidecar(packages/sidecar)**
 - 新增 `config/mcp-servers.ts`、`session/mcp/manager.ts`、`session/skills/registry.ts`。
-- 改 `session/tools.ts`(`buildTools` 扩展 + `use_skill` + `run_script`)、`session/system-prompt.ts`(skill 注入)、`session/session.ts`(reconcile/装配/HITL 闭包)、`session/internal-runner.ts`(透传)、`session/agents/invoker.ts`(透传)、`session/agents/acp-config.ts`(删 hip-managed)。
+- 改 `session/tools.ts`(`buildTools` 扩展 + `use_skill` + `run_script`)、`session/system-prompt.ts`(skill 注入)、`session/session.ts`(reconcile/装配/HITL 闭包;外部一律 `model=null`)、`session/internal-runner.ts`(透传)、`session/agents/invoker.ts`(透传)、`session/agents/acp-config.ts`(删 hip-managed)、`session/agents/adapters.ts`(删 `buildModelEnv`)、`session/agents/loop-provider.ts`(删 CLI 模型 env)。
 - `package.json` — `@modelcontextprotocol/sdk`。
 
 ---
@@ -250,13 +251,13 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 - **Skill zip 非法**(无 `SKILL.md` / frontmatter 缺 name):`install_skill_zip` 报错并清理半成品目录。
 - **Skill 目录被手工删除**:`readEnabledSkills` 跳过;`use_skill` 找不到时返回"技能不存在"。
 - **run_script 拒绝 / 超时 / 非零退出**:均返回结构化文本给模型,不抛断 turn。
-- **旧配置兼容**:旧 ACP agent 带 `authMode:'hip-managed'` → 运行时忽略,按自管处理(不报错)。
+- **旧配置兼容**:旧 ACP agent 带 `authMode:'hip-managed'` 或旧 CLI agent 带 `acceptsModelConfig:true`/`boundModel` → 运行时**忽略**,按自管处理(不报错;旧的 `boundModel` 在外部智能体上变为惰性数据)。
 
 ## H. 测试策略(避免付费真实 LLM,见记忆约定)
 
 - **纯函数 TDD**:MCP 工具名命名空间化与反查、MCP JSON-Schema→zod 转换、skill frontmatter 解析(若 TS 侧也解析)、enabled-skills 协调、MCP reconcile 增量 diff、zip-slip 路径规范化(Rust 单测)。
 - **sidecar**:`McpManager.reconcile` 用 Fake transport;`use_skill` 读临时 skill 目录;`run_script` 用自动批准的 fake `requestApproval` 跑 `echo` 验证执行与截断;HITL 拒绝路径。
-- **前端**:两个 store 的 CRUD;两个页面用 mock `__TAURI_INTERNALS__.invoke` 渲染验证;ACP 编辑器移除认证 UI 的快照。
+- **前端**:两个 store 的 CRUD;两个页面用 mock `__TAURI_INTERNALS__.invoke` 渲染验证;`agentDraft.isValid` 对 acp/custom 不再要求模型;ACP/CLI 编辑器移除认证/模型 UI 的快照。
 - **Rust**:`install_skill_zip` 正常/非法 zip;`list_skills` 解析。
 - 全量 `yarn test` 前按记忆把 `~/.hip/config/auth.json` 挪开以保证 paid-free。
 

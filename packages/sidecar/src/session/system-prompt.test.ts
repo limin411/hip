@@ -81,3 +81,49 @@ describe('buildManagedAgentPrompt', () => {
     expect(p).toContain('hip')
   })
 })
+
+describe('buildSystemPrompt skills block', () => {
+  const skills = [
+    { id: 'fmt', name: 'formatter', description: 'Format code', dir: '/s/fmt', hasScripts: true },
+    { id: 'lint', name: 'linter', description: 'Lint code', dir: '/s/lint', hasScripts: false },
+  ]
+
+  it('omits the skills section when no skills are given', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    expect(s).not.toMatch(/可用 Skills/)
+  })
+
+  it('lists enabled skill names and descriptions and mentions use_skill', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills })
+    expect(s).toMatch(/可用 Skills/)
+    expect(s).toContain('formatter')
+    expect(s).toContain('Format code')
+    expect(s).toContain('linter')
+    expect(s).toMatch(/use_skill/)
+  })
+
+  it('omits the skills section when skills is an empty array', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: [] })
+    expect(s).not.toMatch(/可用 Skills/)
+  })
+})
+
+describe('buildManagedAgentPrompt skills block', () => {
+  const skills = [{ id: 'fmt', name: 'formatter', description: 'Format code', dir: '/s/fmt', hasScripts: true }]
+
+  it('injects the skills block when use_skill is in the granted tools', () => {
+    const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['use_skill', 'read_file'], skills })
+    expect(s).toMatch(/可用 Skills/)
+    expect(s).toContain('formatter')
+  })
+
+  it('omits the skills block when use_skill is not granted', () => {
+    const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['read_file'], skills })
+    expect(s).not.toMatch(/可用 Skills/)
+  })
+
+  it('omits the skills block when no skills are provided even with use_skill granted', () => {
+    const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['use_skill'] })
+    expect(s).not.toMatch(/可用 Skills/)
+  })
+})

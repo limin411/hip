@@ -1,3 +1,5 @@
+import type { SkillMeta } from '@hip/protocol'
+
 const ANTI_PHANTOM =
   'You MUST NOT claim, state, or imply any file was created, written, saved, or modified ' +
   'unless you actually called write_file/edit_file for that exact path this turn and it succeeded. ' +
@@ -39,14 +41,26 @@ function cwdBlock(cwd: string): string {
   )
 }
 
+/** A short "## 可用 Skills" block listing each enabled skill, instructing the model to call use_skill. */
+function skillsBlock(skills: SkillMeta[]): string {
+  const lines = skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
+  return (
+    '## 可用 Skills\n' +
+    '以下技能可按需加载。当任务匹配某技能时，调用 use_skill 工具（参数 name）把其完整说明读入上下文，再据此操作。\n' +
+    lines
+  )
+}
+
 export interface SystemPromptInput {
   cwd: string
   userInstructions?: string
+  skills?: SkillMeta[]
 }
 
-/** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional user instructions). */
-export function buildSystemPrompt({ cwd, userInstructions }: SystemPromptInput): string {
-  const base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+/** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions). */
+export function buildSystemPrompt({ cwd, userInstructions, skills }: SystemPromptInput): string {
+  let base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+  if (skills && skills.length > 0) base = `${base}\n\n${skillsBlock(skills)}`
   const extra = userInstructions?.trim()
   return extra
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`
@@ -70,12 +84,14 @@ export interface ManagedAgentPromptInput {
   cwd: string
   persona: string
   toolNames: string[]
+  skills?: SkillMeta[]
 }
 
 /** System prompt for an internal managed sub-agent: identity guard + an operating preamble that
  *  enumerates the agent's ACTUAL granted tools + cwd convention + anti-phantom + the persona, framed
- *  as a focused, non-delegating sub-agent. Git guidance only when a git tool is granted. */
-export function buildManagedAgentPrompt({ cwd, persona, toolNames }: ManagedAgentPromptInput): string {
+ *  as a focused, non-delegating sub-agent. Git guidance only when a git tool is granted; skills block
+ *  only when use_skill is granted AND skills are supplied. */
+export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills }: ManagedAgentPromptInput): string {
   const toolList = toolNames.length ? toolNames.join(', ') : '(no tools — answer from reasoning only)'
   const base =
     'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
@@ -86,6 +102,7 @@ export function buildManagedAgentPrompt({ cwd, persona, toolNames }: ManagedAgen
   const hasGit = toolNames.some((n) => n.startsWith('git_'))
   const parts = [IDENTITY, base, cwdBlock(cwd)]
   if (hasGit) parts.push(GIT_GUIDANCE)
+  if (toolNames.includes('use_skill') && skills && skills.length > 0) parts.push(skillsBlock(skills))
   parts.push(ANTI_PHANTOM, `## Your role and instructions\n${persona.trim()}`)
   return parts.join('\n\n')
 }

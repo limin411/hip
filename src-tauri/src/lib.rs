@@ -128,6 +128,106 @@ fn set_mcp_servers_config(app: tauri::AppHandle, json: String) -> Result<(), Str
 }
 
 #[tauri::command]
+fn list_skills(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = paths::skills_dir(&app).ok_or("no skills dir")?;
+    let metas = skills::scan_skills(&dir);
+    serde_json::to_string(&metas).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn install_skill_zip(app: tauri::AppHandle, zip_path: String) -> Result<String, String> {
+    let skills_root = paths::skills_dir(&app).ok_or("no skills dir")?;
+    // Stage into a temp dir under the skills root so a half-extracted bundle never
+    // pollutes the live list; promote to <root>/<slug> only after validation.
+    let staging = skills_root.join(format!(".staging-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
+
+    let cleanup = |dir: &std::path::Path| {
+        let _ = std::fs::remove_dir_all(dir);
+    };
+
+    if let Err(e) = skills::extract_zip(std::path::Path::new(&zip_path), &staging) {
+        cleanup(&staging);
+        return Err(format!("解压失败: {e}"));
+    }
+    let root = match skills::find_skill_root(&staging) {
+        Some(r) => r,
+        None => {
+            cleanup(&staging);
+            return Err("压缩包内未找到 SKILL.md".to_string());
+        }
+    };
+    let body = match std::fs::read_to_string(root.join("SKILL.md")) {
+        Ok(b) => b,
+        Err(e) => {
+            cleanup(&staging);
+            return Err(e.to_string());
+        }
+    };
+    let name = match skills::parse_frontmatter(&body).and_then(|f| f.name) {
+        Some(n) if !n.trim().is_empty() => n,
+        _ => {
+            cleanup(&staging);
+            return Err("SKILL.md 缺少 name 字段".to_string());
+        }
+    };
+
+    // Derive a unique slug under the skills root.
+    let base = skills::slugify(&name);
+    let mut slug = base.clone();
+    let mut n = 2;
+    while skills_root.join(&slug).exists() {
+        slug = format!("{base}-{n}");
+        n += 1;
+    }
+    let final_dir = skills_root.join(&slug);
+    if let Err(e) = std::fs::rename(&root, &final_dir) {
+        cleanup(&staging);
+        return Err(format!("安装失败: {e}"));
+    }
+    cleanup(&staging);
+    Ok(slug)
+}
+
+#[tauri::command]
+fn delete_skill(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    // Guard against path traversal in the id — it must be a single dir name.
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("非法 skill id".to_string());
+    }
+    let dir = paths::skills_dir(&app).ok_or("no skills dir")?.join(&id);
+    if !dir.is_dir() {
+        return Err("skill 不存在".to_string());
+    }
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<String, String> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("非法 skill id".to_string());
+    }
+    let skill_dir = paths::skills_dir(&app).ok_or("no skills dir")?.join(&id);
+    let target = skills::safe_join(&skill_dir, &rel).ok_or("非法文件路径")?;
+    std::fs::read_to_string(&target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_skills_config(app: tauri::AppHandle) -> Result<String, String> {
+    match paths::skills_config_path(&app) {
+        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
+        None => Ok(String::new()),
+    }
+}
+
+#[tauri::command]
+fn set_skills_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let p = paths::skills_config_path(&app).ok_or("no config dir")?;
+    std::fs::write(&p, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
     let cache = paths::cache_dir(&app).map(|d| d.join("models.json"));
     if let Some(ref c) = cache {
@@ -199,7 +299,13 @@ pub fn run() {
             get_agents_config,
             set_agents_config,
             get_mcp_servers_config,
-            set_mcp_servers_config
+            set_mcp_servers_config,
+            list_skills,
+            install_skill_zip,
+            delete_skill,
+            read_skill_file,
+            get_skills_config,
+            set_skills_config
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

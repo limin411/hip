@@ -2,6 +2,7 @@
 //! Kept separate from `lib.rs` so the path-sanitization logic is unit-testable.
 
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::path::{Component, Path, PathBuf};
 
 /// Resolve a zip entry's relative path against `dest`, rejecting anything that
@@ -128,9 +129,55 @@ pub fn scan_skills(root: &Path) -> Vec<SkillMeta> {
     out
 }
 
+/// Extract every entry of `zip_path` into `dest`, skipping any entry whose
+/// resolved path would escape `dest` (zip-slip, via `safe_join`). Directory
+/// entries create dirs; file entries create parent dirs then write bytes.
+pub fn extract_zip(zip_path: &Path, dest: &Path) -> io::Result<()> {
+    let file = std::fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+        let name = entry.name().to_string();
+        let target = match safe_join(dest, &name) {
+            Some(p) => p,
+            None => continue, // zip-slip / absolute — skip silently.
+        };
+        if entry.is_dir() {
+            std::fs::create_dir_all(&target)?;
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut out = std::fs::File::create(&target)?;
+        io::copy(&mut entry, &mut out)?;
+    }
+    Ok(())
+}
+
+/// Find the directory that actually contains `SKILL.md`: either `dest` itself or
+/// the single wrapping subfolder many archives add. Returns `None` if no
+/// `SKILL.md` is found at either level.
+pub fn find_skill_root(dest: &Path) -> Option<PathBuf> {
+    if dest.join("SKILL.md").is_file() {
+        return Some(dest.to_path_buf());
+    }
+    for entry in std::fs::read_dir(dest).ok()?.flatten() {
+        let p = entry.path();
+        if p.is_dir() && p.join("SKILL.md").is_file() {
+            return Some(p);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::{safe_join, slugify};
+    use std::io::Write;
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -230,5 +277,70 @@ mod tests {
         let root = std::env::temp_dir().join("hip-skills-does-not-exist-xyz");
         let _ = std::fs::remove_dir_all(&root);
         assert!(super::scan_skills(&root).is_empty());
+    }
+
+    fn make_zip(entries: &[(&str, &[u8])]) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "hip-skill-zip-{}-{}.zip",
+            std::process::id(),
+            entries.len(),
+        ));
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zw = zip::ZipWriter::new(file);
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        for (name, body) in entries {
+            zw.start_file(*name, opts).unwrap();
+            zw.write_all(body).unwrap();
+        }
+        zw.finish().unwrap();
+        path
+    }
+
+    #[test]
+    fn extract_zip_writes_files_and_skips_slip() {
+        let zip_path = make_zip(&[
+            ("SKILL.md", b"---\nname: Z\ndescription: d\n---\nbody"),
+            ("scripts/run.sh", b"echo hi"),
+            ("../escape.sh", b"pwned"),
+        ]);
+        let dest = std::env::temp_dir()
+            .join(format!("hip-skill-extract-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        std::fs::create_dir_all(&dest).unwrap();
+
+        super::extract_zip(&zip_path, &dest).unwrap();
+
+        assert!(dest.join("SKILL.md").exists());
+        assert!(dest.join("scripts").join("run.sh").exists());
+        // The zip-slip entry must NOT have escaped the destination.
+        assert!(!dest.parent().unwrap().join("escape.sh").exists());
+
+        let _ = std::fs::remove_dir_all(&dest);
+        let _ = std::fs::remove_file(&zip_path);
+    }
+
+    #[test]
+    fn find_skill_root_finds_nested_skill_md() {
+        let dest = std::env::temp_dir()
+            .join(format!("hip-skill-root-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest);
+        // Many archives wrap content in a top folder; find_skill_root unwraps it.
+        let inner = dest.join("my-skill");
+        std::fs::create_dir_all(&inner).unwrap();
+        std::fs::write(inner.join("SKILL.md"), "---\nname: X\n---\n").unwrap();
+
+        let found = super::find_skill_root(&dest).unwrap();
+        assert_eq!(found, inner);
+
+        // Top-level SKILL.md is found directly.
+        let dest2 = std::env::temp_dir()
+            .join(format!("hip-skill-root2-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dest2);
+        std::fs::create_dir_all(&dest2).unwrap();
+        std::fs::write(dest2.join("SKILL.md"), "---\nname: X\n---\n").unwrap();
+        assert_eq!(super::find_skill_root(&dest2).unwrap(), dest2);
+
+        let _ = std::fs::remove_dir_all(&dest);
+        let _ = std::fs::remove_dir_all(&dest2);
     }
 }

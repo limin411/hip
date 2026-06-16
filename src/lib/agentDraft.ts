@@ -2,6 +2,7 @@ import type { AgentConfig, AgentAuthMode } from '@hip/protocol'
 
 export interface AgentForm {
   name: string
+  description?: string
   kind: AgentConfig['kind']
   command: string
   args: string
@@ -31,6 +32,7 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
   const slash = form.boundModelKey.indexOf('/')
   return {
     name: form.name.trim(),
+    description: (form.description ?? '').trim() || undefined,
     kind: form.kind,
     command: form.command.trim(),
     args: form.args.trim() ? form.args.trim().split(/\s+/) : [],

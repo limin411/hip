@@ -58,4 +58,9 @@ describe('buildAgentDraft', () => {
   it('non-acp forms do not emit an authMode field', () => {
     expect('authMode' in buildAgentDraft({ ...base, kind: 'custom' })).toBe(false)
   })
+  it('carries a trimmed description, omitting it when blank', () => {
+    const b = { name: 'A', kind: 'custom' as const, command: 'c', args: '', transport: 'thin' as const, acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self' as const, enabled: true }
+    expect(buildAgentDraft({ ...b, description: '  edits code  ' }).description).toBe('edits code')
+    expect(buildAgentDraft({ ...b, description: '   ' }).description).toBeUndefined()
+  })
 })

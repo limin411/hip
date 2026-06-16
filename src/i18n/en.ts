@@ -266,6 +266,8 @@ export const en = {
         transportThinDesc: 'Plain-text stream, works with any CLI',
         transportRichDesc: 'JSON event stream, shows reasoning',
         acceptsModelDesc: 'Push the selected model and API key to this agent',
+        description: 'When to use',
+        descriptionPlaceholder: 'Describe when hip should delegate to this agent…',
         enableThis: 'Enable this agent',
         sectionCommand: 'Launch command',
         sectionTransport: 'Protocol',

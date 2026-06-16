@@ -26,6 +26,7 @@ export function AgentEditor({
   const { config, catalog } = useProvidersStore()
   const [form, setForm] = useState<AgentForm>({
     name: initial?.name ?? '',
+    description: initial?.description ?? '',
     kind: initial?.kind ?? 'custom',
     command: initial?.command ?? '',
     args: (initial?.args ?? []).join(' '),
@@ -69,6 +70,16 @@ export function AgentEditor({
         <div className="space-y-5 p-5">
           <Field label={t('settings.agents.name')}>
             <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
+          </Field>
+
+          <Field label={t('settings.agents.description')}>
+            <textarea
+              className={cn(inputCls, 'min-h-[64px] resize-y')}
+              value={form.description ?? ''}
+              onChange={(e) => patch({ description: e.target.value })}
+              placeholder={t('settings.agents.descriptionPlaceholder')}
+              rows={3}
+            />
           </Field>
 
           <Section label={t('settings.agents.sectionCommand')}>

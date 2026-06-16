@@ -266,6 +266,8 @@ export const zhTW = {
         transportThinDesc: '純文字流，相容任何 CLI',
         transportRichDesc: 'JSON 事件流，顯示思考過程',
         acceptsModelDesc: '把所選模型與 API 金鑰傳給該智能體',
+        description: '使用場景',
+        descriptionPlaceholder: '描述 hip 何時應委派給該智能體…',
         enableThis: '啟用此智能體',
         sectionCommand: '啟動命令',
         sectionTransport: '協議',

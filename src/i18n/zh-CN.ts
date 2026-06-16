@@ -266,6 +266,8 @@ export const zhCN = {
         transportThinDesc: '纯文本流，兼容任何 CLI',
         transportRichDesc: 'JSON 事件流，显示思考过程',
         acceptsModelDesc: '把所选模型与 API 密钥传给该智能体',
+        description: '使用场景',
+        descriptionPlaceholder: '描述 hip 何时应委派给该智能体…',
         enableThis: '启用此智能体',
         sectionCommand: '启动命令',
         sectionTransport: '协议',

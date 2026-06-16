@@ -66,6 +66,9 @@ export function AgentCard({
           <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
           <span className="min-w-0 truncate">{cmdline}</span>
         </div>
+        {agent.description && (
+          <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />

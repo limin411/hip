@@ -7,7 +7,8 @@ export interface Draft {
   mode: 'project' | 'chat'
   cwd?: string
   text: string
-  agentId?: string             // 'builtin' / undefined => built-in agent; else an AgentConfig.id
+  agentId?: string             // legacy; no longer set by the composer
+  modelKey?: string            // 'providerID/modelID' chosen for this chat (locked at first send)
 }
 
 interface DraftStore {
@@ -17,6 +18,7 @@ interface DraftStore {
   pickProject: (cwd: string) => void
   clearProject: () => void
   setAgentId: (agentId: string) => void
+  setModelKey: (modelKey: string) => void
   reset: () => void
 }
 
@@ -56,6 +58,11 @@ export const useDraftStore = create<DraftStore>()(
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
           return { draft: { ...base, agentId } }
+        }),
+      setModelKey: (modelKey) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          return { draft: { ...base, modelKey } }
         }),
       reset: () => set({ draft: null }),
     }),

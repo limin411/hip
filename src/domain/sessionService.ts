@@ -10,6 +10,8 @@ import type { Draft } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import i18n from '@/i18n'
+import { resolveModelConfig } from '@/lib/modelKey'
+import { useProvidersStore } from '@/store/providersStore'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -346,11 +348,14 @@ export class SessionService {
   }
 }
 
-/** Build the committed SessionConfig from the current draft, folding in a chosen external agent. */
+/** Build the committed SessionConfig from the current draft (project cwd + chosen model). */
 export function configFromDraft(draft: Draft | null): SessionConfig {
   const base: SessionConfig =
     draft?.mode === 'project' && draft.cwd ? { ...DEFAULT_CONFIG, cwd: draft.cwd } : DEFAULT_CONFIG
-  return draft?.agentId && draft.agentId !== 'builtin' ? { ...base, agentId: draft.agentId } : base
+  if (!draft?.modelKey) return base
+  const { catalog, config } = useProvidersStore.getState()
+  const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
+  return { ...base, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

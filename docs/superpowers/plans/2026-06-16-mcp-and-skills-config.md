@@ -5349,8 +5349,9 @@ Replace it with (pass the opts; MCP tools come from the singleton):
   - Run: `[ -f ~/.hip/config/auth.json ] && mv ~/.hip/config/auth.json ~/.hip/config/auth.json.slice50-bak || echo "no auth.json present"`
   - Expected: prints nothing (file moved) or `no auth.json present`.
 
-- [ ] **Step 3: Run the full sidecar test suite (scoped to the sidecar workspace, NOT root `vitest run src`).**
-  - Run: `yarn workspace @hip/sidecar exec vitest run`
+- [ ] **Step 3: Run the full sidecar test suite (scoped to the sidecar package path, from the repo ROOT).**
+  - Run: `yarn vitest run packages/sidecar/src`
+  - Note: do NOT use `yarn workspace @hip/sidecar exec vitest run` — that runs vitest with cwd=`packages/sidecar`, but there is no `vitest.config.*`/`vitest.setup.ts`/`test` script there. The vitest config lives at the repo root (`vitest.config.ts` → `setupFiles: ['./vitest.setup.ts']`), so `./vitest.setup.ts` would resolve to the non-existent `packages/sidecar/vitest.setup.ts` and ALL sidecar test files fail to load (`Failed to load url .../packages/sidecar/vitest.setup.ts`) → 0 tests run, exit 1 (false-red). Also do NOT use root `vitest run src` — that substring-matches paid suites. Run from the root scoped to the package path instead.
   - Expected: PASS — all sidecar tests green, including the new `tools-skill-script`, `system-prompt`, `internal-runner`, `agents/invoker-extras`, and `session-skills-mcp` tests. No paid real-LLM calls (every new/touched test uses fakes or injected runners).
 
 - [ ] **Step 4: Restore the auth file.**

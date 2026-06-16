@@ -2213,7 +2213,7 @@ cd /Users/lijiamin/data/my-github/hip && yarn vitest run \
   packages/sidecar/src/session/mcp/json-schema-to-zod.test.ts \
   packages/sidecar/src/session/mcp/manager.test.ts
 ```
-  Expected: PASS — `Test Files  3 passed (3)`, `Tests  25 passed` (4 + 7 + 14), 0 failed. No DeepSeek/real-LLM network output.
+  Expected: PASS — `Test Files  3 passed (3)`, `Tests  26 passed` (4 + 7 + 15), 0 failed. No DeepSeek/real-LLM network output. (manager.test.ts carries 15 `it()` blocks: 9 reconcile + 6 tools. The 9th reconcile test — "closes the client if listTools fails after a successful connect (no leak)" — is an as-built addition over the Task 16/17 spec scope of 8; it guards a real resource leak where a just-connected stdio child / socket whose `listTools` rejects would otherwise stay in the resident pool, so `manager.ts` `reconcile` splits its single try into a connect-try plus a listTools-try that calls `client.close()` on rejection.)
 
 - [ ] **Step 3: Confirm no stray non-test, non-MCP files were left uncommitted.**
   Run: `cd /Users/lijiamin/data/my-github/hip && git status --porcelain`

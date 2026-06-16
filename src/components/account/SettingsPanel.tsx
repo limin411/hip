@@ -2,19 +2,21 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
 import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
+import { SkillConfig } from './SkillConfig'
 
 const PAGES = [
   { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
   { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
   { id: 'agents', icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
   { id: 'mcp', icon: Plug, labelKey: 'settings.mcpLabel', Component: McpConfig },
+  { id: 'skill', icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
 ] as const
 
 export function SettingsPanel() {

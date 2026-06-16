@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
 import { agentCategory } from '@/lib/agentCategory'
-import { toolNamesToGroups } from '@/lib/agentTools'
+import { toolNamesToGroups, DEFAULT_TOOL_GROUPS } from '@/lib/agentTools'
 
 const inputCls =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -28,7 +28,8 @@ export function AgentEditor({
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
-  const groups0 = toolNamesToGroups(initial?.allowedTools)
+  // Existing agent → derive toggles from its stored allow-list; new agent → the git-off default.
+  const groups0 = initial ? toolNamesToGroups(initial.allowedTools) : DEFAULT_TOOL_GROUPS
   const [form, setForm] = useState<AgentForm>({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -55,7 +56,7 @@ export function AgentEditor({
   const isInternal = category === 'internal'
   const title = initial
     ? t('settings.agents.editTitle')
-    : t(form.kind === 'acp' ? 'settings.agents.addAcp' : form.kind === 'internal' ? 'settings.agents.addInternal' : 'settings.agents.addCli')
+    : t(isAcp ? 'settings.agents.addAcp' : isInternal ? 'settings.agents.addInternal' : 'settings.agents.addCli')
   const groups = groupModelOptions(catalog, config)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
 

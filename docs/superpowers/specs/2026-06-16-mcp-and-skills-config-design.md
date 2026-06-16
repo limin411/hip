@@ -24,6 +24,8 @@
 6. **MCP 消费方** — hip 主循环始终合并所有 enabled 服务器的工具;内部智能体经其**已有工具白名单**(`allowedTools`)选择性获得。**不修改 [acp-connection.ts](../../../packages/sidecar/src/session/agents/acp-connection.ts) 的 `mcpServers: []`**。
 7. **MCP 连接生命周期** — sidecar 维护一个**常驻 MCP 客户端池**,每轮开始时按配置文件做**增量协调**(connect 新增 / disconnect 移除或停用 / 复用已有),无需重启 sidecar;失败优雅降级(跳过该服务器工具 + 记日志)。与现有"agents 配置每轮重读"哲学一致。
 8. **模型回退范围** — ACP **与** CLI 都不再接收 hip 的模型配置。删除 ACP 的 `hip-managed` 分支、CLI 的 `buildModelEnv` 注入,以及编辑器里两者的认证/模型 UI。`acceptsModelConfig` / `authMode` 退化为纯历史字段(运行时忽略,兼容旧配置)。`boundModel` **保留**(内部智能体仍用,未绑定时回退全局)。仅**内部智能体**保留模型选择器。
+9. **MCP 工具粒度** — 整服务器全工具:enabled 服务器的**全部**工具进池,不做 per-tool 勾选。
+10. **Skill 查看** — 提供**只读**"查看正文"弹窗,无应用内编辑。
 
 ---
 
@@ -211,14 +213,7 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 
 ---
 
-## E. 开放确认项(留待 spec review)
-
-1. **MCP 是否需要"按服务器选工具子集"?** MVP 为"整服务器 enabled → 其全部工具进池";如需 per-tool 勾选,后续在编辑器加。
-2. **Skill 查看正文**:MVP 提供只读查看弹窗;确认是否需要。
-
----
-
-## F. 受影响 / 新增文件清单
+## E. 受影响 / 新增文件清单
 
 **protocol**
 - `packages/protocol/src/index.ts` — `McpTransport/McpServerConfig/McpServersConfig`、`SkillMeta/SkillsConfig`;`acceptsModelConfig`/`AgentAuthMode`/`authMode` 标 deprecated(`boundModel` 保留给内部智能体)。
@@ -243,7 +238,7 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 
 ---
 
-## G. 错误处理与边界
+## F. 错误处理与边界
 
 - **MCP 连接失败 / 超时**:跳过该服务器工具,记日志;UI 卡片可显示 `错误` 状态(MVP 可省,先日志)。
 - **MCP 工具调用失败**:adapter 捕获,返回错误文本给模型(同既有工具 catch 风格)。
@@ -253,7 +248,7 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 - **run_script 拒绝 / 超时 / 非零退出**:均返回结构化文本给模型,不抛断 turn。
 - **旧配置兼容**:旧 ACP agent 带 `authMode:'hip-managed'` 或旧 CLI agent 带 `acceptsModelConfig:true`/`boundModel` → 运行时**忽略**,按自管处理(不报错;旧的 `boundModel` 在外部智能体上变为惰性数据)。
 
-## H. 测试策略(避免付费真实 LLM,见记忆约定)
+## G. 测试策略(避免付费真实 LLM,见记忆约定)
 
 - **纯函数 TDD**:MCP 工具名命名空间化与反查、MCP JSON-Schema→zod 转换、skill frontmatter 解析(若 TS 侧也解析)、enabled-skills 协调、MCP reconcile 增量 diff、zip-slip 路径规范化(Rust 单测)。
 - **sidecar**:`McpManager.reconcile` 用 Fake transport;`use_skill` 读临时 skill 目录;`run_script` 用自动批准的 fake `requestApproval` 跑 `echo` 验证执行与截断;HITL 拒绝路径。
@@ -261,7 +256,7 @@ buildTools(root, spawnSubagent?, cwd?, dispatch?, opts?: {
 - **Rust**:`install_skill_zip` 正常/非法 zip;`list_skills` 解析。
 - 全量 `yarn test` 前按记忆把 `~/.hip/config/auth.json` 挪开以保证 paid-free。
 
-## I. 范围外 / 后续
+## H. 范围外 / 后续
 
 - ACP/CLI 使用 MCP/Skill(已明确排除)。
 - MCP OAuth 授权流、MCP resources/prompts(本期仅 tools)。

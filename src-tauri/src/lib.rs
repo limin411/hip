@@ -113,6 +113,20 @@ fn set_agents_config(app: tauri::AppHandle, json: String) -> Result<(), String> 
 }
 
 #[tauri::command]
+fn get_mcp_servers_config(app: tauri::AppHandle) -> Result<String, String> {
+    match paths::mcp_servers_config_path(&app) {
+        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
+        None => Ok(String::new()),
+    }
+}
+
+#[tauri::command]
+fn set_mcp_servers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let p = paths::mcp_servers_config_path(&app).ok_or("no config dir")?;
+    std::fs::write(&p, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
     let cache = paths::cache_dir(&app).map(|d| d.join("models.json"));
     if let Some(ref c) = cache {
@@ -182,7 +196,9 @@ pub fn run() {
             get_providers_config,
             set_providers_config,
             get_agents_config,
-            set_agents_config
+            set_agents_config,
+            get_mcp_servers_config,
+            set_mcp_servers_config
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -17,7 +17,7 @@ export interface RunSubagentArgs {
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
-function lastAiText(messages: BaseMessage[]): string {
+export function lastAiText(messages: BaseMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
     if (!(m instanceof AIMessage)) continue

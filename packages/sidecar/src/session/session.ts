@@ -8,12 +8,13 @@ import * as workspaceGit from './workspace-git.js'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
-import { getActiveModel, isOpenAICompatible, cheapModelFor } from '../config/providers.js'
+import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
+import { buildChatModel, activeKey, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
 import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
 import { addUsage, sumUsage } from './usage.js'
@@ -89,78 +90,6 @@ function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   }
 }
 
-/** Stable content-block index for the re-projected reasoning block — distinct from text (0)
- *  and tool-call chunk indices so it accumulates as its own block in convertChunksToEvents. */
-const REASONING_BLOCK_INDEX = 7
-
-/** Strip re-projected `reasoning`/`thinking` content blocks from a message's content so they never
- *  reach the OpenAI request body. langchain's v0 outbound converter passes array blocks through raw,
- *  and these blocks also leak into ToolMessages (which carry no output_version tag and so bypass the
- *  v1 text-only filter), making DeepSeek 400 ("unknown variant `reasoning`"). Mutates in place. */
-function stripReasoningBlocks(messages: readonly { content: unknown }[]): void {
-  for (const m of messages) {
-    if (!Array.isArray(m.content)) continue
-    const kept = m.content.filter((b) => {
-      const t = (b as { type?: unknown } | null)?.type
-      return t !== 'reasoning' && t !== 'thinking'
-    })
-    if (kept.length === m.content.length) continue
-    // Collapse to a plain string when only a single text block survives (the common case),
-    // else keep the filtered array. Empty → '' so the assistant turn still serializes.
-    if (kept.length === 1 && (kept[0] as { type?: unknown }).type === 'text') {
-      ;(m as { content: unknown }).content = (kept[0] as { text?: string }).text ?? ''
-    } else {
-      ;(m as { content: unknown }).content = kept.length === 0 ? '' : kept
-    }
-  }
-}
-
-/**
- * @langchain/openai surfaces DeepSeek chain-of-thought ONLY as
- * additional_kwargs.reasoning_content; langchain-core's v3 stream-event producer reads
- * `content` and ignores additional_kwargs, so ChatModelStream.reasoning (deepagents'
- * msg.reasoning) is empty. Re-project each reasoning delta into a typed `reasoning`
- * content block (stable index) so 2nd+ chunks emit `reasoning-delta` events that feed
- * `.reasoning`. That block accumulates into langgraph's message state, so on the *next*
- * request we strip it back out (stripReasoningBlocks) before super builds the outbound body —
- * otherwise DeepSeek 400s on the re-serialized `reasoning` block. withConfig is overridden too:
- * ChatOpenAI.withConfig rebuilds a plain ChatOpenAI from `this.fields`, which would drop this
- * subclass (deepagents calls withConfig).
- */
-class ReasoningChatOpenAI extends ChatOpenAI {
-  async *_streamResponseChunks(
-    messages: Parameters<ChatOpenAI['_streamResponseChunks']>[0],
-    options: Parameters<ChatOpenAI['_streamResponseChunks']>[1],
-    runManager?: Parameters<ChatOpenAI['_streamResponseChunks']>[2],
-  ): ReturnType<ChatOpenAI['_streamResponseChunks']> {
-    stripReasoningBlocks(messages)
-    for await (const chunk of super._streamResponseChunks(messages, options, runManager)) {
-      const msg = chunk.message as unknown as { content: unknown; additional_kwargs?: { reasoning_content?: unknown } }
-      const rc = msg.additional_kwargs?.reasoning_content
-      if (typeof rc === 'string' && rc.length > 0 && typeof msg.content === 'string') {
-        const blocks: Array<Record<string, unknown>> = [{ type: 'reasoning', reasoning: rc, index: REASONING_BLOCK_INDEX }]
-        if (msg.content.length > 0) blocks.push({ type: 'text', text: msg.content, index: 0 })
-        msg.content = blocks as unknown as string
-      }
-      yield chunk
-    }
-  }
-
-  withConfig(config: Parameters<ChatOpenAI['withConfig']>[0]): ReasoningChatOpenAI {
-    const f = (this as unknown as { fields: ConstructorParameters<typeof ChatOpenAI>[0] }).fields
-    const m = new ReasoningChatOpenAI(f)
-    ;(m as unknown as { defaultOptions: unknown }).defaultOptions = {
-      ...(this as unknown as { defaultOptions: Record<string, unknown> }).defaultOptions,
-      ...config,
-    }
-    return m
-  }
-}
-
-function activeKey(providerID: string): string {
-  return resolveApiKey(providerID) || 'sk-missing'
-}
-
 /** Pure helper: prefer the session config's model (when non-empty) over the global active model.
  *  Falls back field-by-field: providerID from config.llmProvider, modelID from config.model,
  *  baseURL from config.baseURL (falls back to fallback.baseURL when absent). */
@@ -179,31 +108,10 @@ export function resolveModelChoice(
 }
 
 function buildModel(config: SessionConfig): ChatOpenAI {
-  const { providerID, modelID, baseURL } = resolveModelChoice(config, getActiveModel())
-  return new ReasoningChatOpenAI({
-    model: modelID,
-    apiKey: activeKey(providerID),
-    configuration: { baseURL },
-    streamUsage: true,
-  })
+  return buildChatModel(resolveModelChoice(config, getActiveModel()))
 }
 
 const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
-
-const SUMMARY_SYSTEM_PROMPT =
-  '你是对话压缩器。把给定的较早对话片段压成一段简洁中文摘要，保留：任务目标、关键决策、约束、' +
-  '已写入或修改的文件、近期工具结果与未决事项；丢弃：中间推理、被否方案、冗长输出。只输出摘要正文。'
-
-/** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
-class RealSummarizer implements Summarizer {
-  async summarize(messages: BaseMessage[]): Promise<string> {
-    const { providerID, modelID, baseURL } = getActiveModel()
-    const model = new ChatOpenAI({ model: cheapModelFor(providerID, modelID), apiKey: activeKey(providerID), configuration: { baseURL }, maxTokens: 512, temperature: 0.2 })
-    const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
-    const res = await model.invoke([new SystemMessage(SUMMARY_SYSTEM_PROMPT), new HumanMessage(transcript)])
-    return typeof res.content === 'string' ? res.content : ''
-  }
-}
 
 export class Session {
   private app!: ReturnType<typeof buildGraph>
@@ -309,7 +217,7 @@ export class Session {
    *  else a no-op (injected-model/runner sessions never hit the paid path). */
   private summarizer(): Summarizer {
     if (this.injectedSummarizer) return this.injectedSummarizer
-    return this.usesEnvModel ? new RealSummarizer() : NOOP_SUMMARIZER
+    return this.usesEnvModel ? createSummarizer() : NOOP_SUMMARIZER
   }
 
   /** Seed prior conversation so the agent resumes with full context. */

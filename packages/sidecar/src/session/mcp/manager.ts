@@ -76,11 +76,20 @@ export class McpManager {
     // connect: anything wanted that is not already live (reuse skips matched fingerprints above)
     for (const [id, server] of target) {
       if (this.conns.has(id)) continue
+      let client: ClientLike
       try {
-        const client = await this.connect(server)
+        client = await this.connect(server)
+      } catch (err) {
+        console.error(`[mcp] failed to connect server ${id} (${server.name}): ${(err as Error).message}`)
+        continue
+      }
+      // connect() succeeded — from here a failure must close the just-opened client
+      // (else a stdio child / open socket leaks in this resident pool).
+      try {
         const { tools } = await client.listTools()
         this.conns.set(id, { id, fingerprint: this.fingerprint(server), client, tools })
       } catch (err) {
+        await client.close().catch(() => {})
         console.error(`[mcp] failed to connect server ${id} (${server.name}): ${(err as Error).message}`)
       }
     }

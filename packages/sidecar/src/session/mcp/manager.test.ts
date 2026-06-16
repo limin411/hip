@@ -9,8 +9,12 @@ class FakeClient implements ClientLike {
   constructor(
     private readonly toolList: Array<{ name: string; description?: string; inputSchema?: unknown }>,
     private readonly callResult: unknown = { content: [{ type: 'text', text: 'ok' }] },
+    private readonly listToolsFails = false,
   ) {}
-  async listTools() { return { tools: this.toolList } }
+  async listTools() {
+    if (this.listToolsFails) throw new Error('listTools boom')
+    return { tools: this.toolList }
+  }
   async callTool(req: { name: string; arguments?: Record<string, unknown> }) { this.callArgs.push(req); return this.callResult }
   async close() { this.closed = true }
 }
@@ -20,12 +24,18 @@ class TestManager extends McpManager {
   connectCount = 0
   lastClients = new Map<string, FakeClient>()
   failIds = new Set<string>()
+  /** ids whose connect() succeeds but listTools() then rejects (the narrow leak window). */
+  listToolsFailIds = new Set<string>()
   toolsById: Record<string, Array<{ name: string; description?: string; inputSchema?: unknown }>> = {}
 
   protected async connect(server: McpServerConfig): Promise<ClientLike> {
     this.connectCount++
     if (this.failIds.has(server.id)) throw new Error('connect boom')
-    const client = new FakeClient(this.toolsById[server.id] ?? [{ name: 'do_thing' }])
+    const client = new FakeClient(
+      this.toolsById[server.id] ?? [{ name: 'do_thing' }],
+      undefined,
+      this.listToolsFailIds.has(server.id),
+    )
     this.lastClients.set(server.id, client)
     return client
   }
@@ -94,6 +104,15 @@ describe('McpManager.reconcile', () => {
     mgr.failIds.add('s1')
     await expect(mgr.reconcile([stdio({ id: 's1' })])).resolves.toBeUndefined()
     expect(mgr.connectedIds()).toEqual([])
+  })
+
+  it('closes the client if listTools fails after a successful connect (no leak)', async () => {
+    mgr.listToolsFailIds.add('s1')
+    await mgr.reconcile([stdio({ id: 's1' }), stdio({ id: 's2' })])
+    const c1 = mgr.lastClients.get('s1')!
+    expect(c1.closed).toBe(true)              // just-opened client was closed, not leaked
+    expect(mgr.connectedIds()).toEqual(['s2']) // s1 skipped, s2 still connects
+    expect(console.error).toHaveBeenCalled()
   })
 })
 

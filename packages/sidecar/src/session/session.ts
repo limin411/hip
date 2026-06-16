@@ -12,6 +12,10 @@ import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools } from './tools.js'
+import { mcpManager } from './mcp/manager.js'
+import { readMcpServersConfig } from '../config/mcp-servers.js'
+import { readEnabledSkills } from './skills/registry.js'
+import type { ApprovalFn } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, activeKey, createSummarizer } from './model-factory.js'
@@ -616,7 +620,15 @@ export class Session {
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner()
     const summarizer = this.summarizer()
-    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt })
+    // Pre-turn MCP reconcile + enabled-skills scan (mirrors the per-turn agents re-read). Both are
+    // best-effort and never throw into the turn. ACP/CLI external turns skip this — they don't use
+    // hip's own toolset (the isExternalAgent branch below ignores `tools`).
+    let skills: ReturnType<typeof readEnabledSkills> = []
+    if (!this.isExternalAgent()) {
+      try { await mcpManager.reconcile(readMcpServersConfig()) } catch { /* degrade: skip MCP tools */ }
+      try { skills = readEnabledSkills() } catch { skills = [] }
+    }
+    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt, skills })
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => {
         if (!delta) return
@@ -661,6 +673,33 @@ export class Session {
     // parent 'supervisor'), streaming its events through makeEmit and surfacing its HITL requests.
     const enabledAgents = readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin')
     const invoker = this.invokerFactory(cwd)
+    // HITL closure for the run_script tool (and dispatched internal agents): registers a pending
+    // permission (same map + channel the external-agent and dispatch HITL paths use) and resolves on
+    // the user's permission:respond. The turn-end / abort drain in `finally` settles any still-pending
+    // request with {cancelled}. `turnId` and `nextSeq` are already in scope from the turn preamble.
+    // The advertised options below use optionId === kind, so map the user's returned optionId straight
+    // to a PermissionOption.kind-shaped ApprovalDecision (tools.ts keys allow-vs-reject off `kind`).
+    const options = [
+      { optionId: 'allow_once', name: '允许', kind: 'allow_once' },
+      { optionId: 'reject_once', name: '拒绝', kind: 'reject_once' },
+    ]
+    const requestApproval: ApprovalFn = (req) =>
+      new Promise((resolve) => {
+        const requestId = `run-script-${turnId}-${nextSeq()}`
+        this.pendingPermissions.set(requestId, (choice) => {
+          if ('cancelled' in choice) { resolve({ cancelled: true }); return }
+          const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? choice.optionId
+          resolve({ kind })
+        })
+        send({
+          type: 'permission:request',
+          sessionId: this.id,
+          turnId,
+          requestId,
+          tool: { title: req.title, kind: req.kind, content: req.content },
+          options,
+        })
+      })
     const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
       const cfg = enabledAgents.find((a) => a.id === agentId)
       if (!cfg) return `Error: unknown or disabled agent ${agentId}`
@@ -680,7 +719,7 @@ export class Session {
         configOptions: () => {},
       }
       try {
-        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks)
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools: mcpManager.tools(), skills, requestApproval })
         ensureFinished(childId, text)
         return text || '(sub-agent produced no output)'
       } catch (err) {
@@ -700,6 +739,7 @@ export class Session {
       enabledAgents.length
         ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent }
         : undefined,
+      { mcpTools: mcpManager.tools(), skills, requestApproval },
     )
     const ctx: GraphCtx = { runner, tools, emit, summarizer }
 

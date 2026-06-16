@@ -58,7 +58,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   )
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {
-    const q = (final as { pendingQuestion?: string }).pendingQuestion
+    const q = final.pendingQuestion
     return q ? `${text}\n\n[sub-agent paused — open question: ${q}]` : text
   }
   return text

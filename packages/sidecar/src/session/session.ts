@@ -197,7 +197,10 @@ export class Session {
     if (!this.externalProvider) {
       const agent = readAgentsConfig().find((x) => x.id === this._config.agentId)
       if (!agent) throw new Error(`Unknown agent: ${this._config.agentId}`)
-      const model = agent.acceptsModelConfig ? resolveAgentModel(agent) : null
+      // Model rollback: CLI ('custom') agents self-manage their model — hip never resolves/pushes one
+      // (LoopAgentProvider discards the model ctor param), so resolving it here would be dead work that
+      // contradicts the UI promise. The ACP path still resolves a model until its own rollback lands.
+      const model = agent.kind === 'custom' ? null : agent.acceptsModelConfig ? resolveAgentModel(agent) : null
       const resume = this.store?.getAcpSessionId(this.id) ?? null
       this.externalProvider = createAgentProvider(agent, this._config.cwd ?? process.cwd(), model)
       // createAgentProvider doesn't take resume; pass it via an optional setter to avoid widening the factory.

@@ -64,16 +64,19 @@ describe('createAgentInvoker', () => {
     expect(created).toBe(false)
   })
 
-  it('resolves the bound model only when acceptsModelConfig is true', async () => {
+  it('never resolves a model for a CLI (custom) agent — even with acceptsModelConfig (rollback)', async () => {
+    // Model rollback: custom CLI agents self-manage; hip must not resolve/push a model to them.
     const seen: Array<ResolvedModel | null> = []
+    let resolved = false
     const model: ResolvedModel = { providerID: 'p', modelID: 'm', baseURL: 'u' }
     const invoker = createAgentInvoker('/tmp', {
       readAgents: () => [{ ...baseAgent, acceptsModelConfig: true }],
-      resolveModel: () => model,
+      resolveModel: () => { resolved = true; return model },
       createProvider: (_a, _cwd, m) => { seen.push(m); return new FakeProvider(async () => {}) },
     })
     await invoker.invoke('echo', 'hi', collectingEmit().emit, new AbortController().signal)
-    expect(seen).toEqual([model])
+    expect(seen).toEqual([null])
+    expect(resolved).toBe(false)
   })
 
   it('forwards the same hooks reference to the provider turn', async () => {

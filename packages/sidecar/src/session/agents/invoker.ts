@@ -70,7 +70,10 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         })
       }
 
-      const model = agent.acceptsModelConfig ? resolveModel(agent) : null
+      // Model rollback: CLI ('custom') agents self-manage their model — hip never resolves/pushes one
+      // (LoopAgentProvider discards the model ctor param), so resolving it here would be dead work that
+      // contradicts the UI promise. The ACP path still resolves a model until its own rollback lands.
+      const model = agent.kind === 'custom' ? null : agent.acceptsModelConfig ? resolveModel(agent) : null
       const provider = createProvider(agent, cwd, model)
       let text = ''
       // Tee token deltas so we can return the final text while still forwarding

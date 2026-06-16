@@ -5,7 +5,6 @@ import { chmodSync } from 'node:fs'
 import type { AgentConfig } from '@hip/protocol'
 import { LoopAgentProvider } from './loop-provider.js'
 import type { GraphEmit } from '../graph.js'
-import type { ResolvedModel } from './registry.js'
 
 // Drives the real scripts/opencode-bridge.mjs through hip's real LoopAgentProvider,
 // but points it at a mock `opencode` (no paid LLM call). Proves the Custom CLI
@@ -89,18 +88,9 @@ describe('opencode bridge (via hip LoopAgentProvider, mock opencode)', () => {
     expect(b.out.text).toContain('[continue]') // --continue from args enables continuity
   })
 
-  it('forwards the pushed model as `-m provider/model` when acceptsModelConfig', async () => {
-    const model: ResolvedModel = { providerID: 'deepseek', modelID: 'deepseek-chat', baseURL: 'https://api.deepseek.com/v1', apiKey: 'sk' }
-    const p = new LoopAgentProvider(
-      bridgeAgent({ acceptsModelConfig: true, boundModel: { providerID: 'deepseek', modelID: 'deepseek-chat' } }),
-      process.cwd(),
-      model,
-    )
-    providers.push(p)
-    const a = cap()
-    await p.runTurn('hi', a.emit, new AbortController().signal)
-    expect(a.out.text).toContain('[model=deepseek/deepseek-chat]')
-  })
+  // Model rollback: hip no longer pushes its model into CLI/bridge agents — they self-manage. The
+  // former "forwards the pushed model as `-m provider/model`" test asserted a contract that no longer
+  // exists (LoopAgentProvider discards the model ctor param), so it has been removed.
 })
 
 describe('opencode bridge --rich (drives `opencode serve` HTTP+SSE → hip rich events)', () => {
@@ -144,16 +134,6 @@ describe('opencode bridge --rich (drives `opencode serve` HTTP+SSE → hip rich 
     expect(b.out.reasoning).toBe('thinking about two')
   })
 
-  it('pushes the bound model into the prompt body when acceptsModelConfig', async () => {
-    const model: ResolvedModel = { providerID: 'deepseek', modelID: 'deepseek-reasoner', baseURL: 'https://api.deepseek.com/v1', apiKey: 'sk' }
-    const p = new LoopAgentProvider(
-      richAgent({ acceptsModelConfig: true, boundModel: { providerID: 'deepseek', modelID: 'deepseek-reasoner' } }),
-      process.cwd(),
-      model,
-    )
-    providers.push(p)
-    const a = cap()
-    await p.runTurn('hi', a.emit, new AbortController().signal)
-    expect(a.out.text).toBe('reply to: hi [model=deepseek/deepseek-reasoner]')
-  })
+  // Model rollback: hip no longer pushes the bound model into the rich prompt body — opencode self-manages
+  // its model. The former "pushes the bound model into the prompt body" test has been removed.
 })

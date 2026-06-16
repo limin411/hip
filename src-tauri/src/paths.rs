@@ -58,12 +58,6 @@ pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))
 }
 
-/// Pure core for skill-related paths: `<base>/<sub>`. Split out so the join
-/// logic is unit-testable without a Tauri AppHandle (mirrors `hip_base_from`).
-pub fn skills_subpath_from(base: &std::path::Path, sub: &str) -> PathBuf {
-    base.join(sub)
-}
-
 /// Directory holding installed Claude-format skills (`<dir>/<skill-id>/SKILL.md`).
 pub fn skills_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "skills")
@@ -76,7 +70,7 @@ pub fn skills_config_path(app: &AppHandle) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{hip_base_from, skills_subpath_from};
+    use super::hip_base_from;
     use std::path::PathBuf;
 
     #[test]
@@ -92,16 +86,21 @@ mod tests {
         assert_eq!(hip_base_from(None, Some(PathBuf::from("/x"))), None);
     }
 
+    // The skill layout: `skills_dir` resolves to `<base>/skills` (via `hip_subdir`)
+    // and `skills_config_path` to `<base>/config/hip-skills.json` (via `config_dir`).
+    // Both wrap `hip_base_dir` = `hip_base_from(HOME, app_data)`, so composing the
+    // real pure core with the exact subpaths the wrappers append pins the actual
+    // on-disk layout these two functions produce.
     #[test]
     #[cfg(not(windows))]
-    fn skills_subpath_joins_under_base() {
-        let base = PathBuf::from("/Users/x/.hip");
+    fn skills_layout_lives_under_base() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        // `skills_dir(app)` → `hip_subdir(app, "skills")` → `<base>/skills`.
+        assert_eq!(base.join("skills"), PathBuf::from("/Users/x/.hip/skills"));
+        // `skills_config_path(app)` → `config_dir(app)?.join("hip-skills.json")`
+        // → `<base>/config/hip-skills.json`.
         assert_eq!(
-            skills_subpath_from(&base, "skills"),
-            PathBuf::from("/Users/x/.hip/skills"),
-        );
-        assert_eq!(
-            skills_subpath_from(&base, "config/hip-skills.json"),
+            base.join("config").join("hip-skills.json"),
             PathBuf::from("/Users/x/.hip/config/hip-skills.json"),
         );
     }

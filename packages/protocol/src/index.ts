@@ -60,6 +60,45 @@ export interface AgentConfig {
 
 export interface AgentsConfig { agents: AgentConfig[] }
 
+// ──────────────────────────────────────────────────────────────────
+// MCP server config (persisted to ~/.hip/config/hip-mcp-servers.json)
+// ──────────────────────────────────────────────────────────────────
+
+/** Transport hip uses to reach an MCP server. */
+export type McpTransport = 'stdio' | 'sse' | 'http'
+
+/** One user-configured MCP server. stdio uses command/args/env; sse/http use url/headers. */
+export interface McpServerConfig {
+  id: string                          // nanoid
+  name: string                        // display name
+  transport: McpTransport
+  command?: string                    // stdio: executable (PATH name or absolute path)
+  args?: string[]                     // stdio: launch args
+  env?: Record<string, string>        // stdio: child-process env overrides
+  url?: string                        // sse/http: endpoint URL
+  headers?: Record<string, string>    // sse/http: request headers (e.g. Authorization)
+  enabled: boolean
+}
+
+/** Durable MCP server config persisted to ~/.hip/config/hip-mcp-servers.json. */
+export interface McpServersConfig { servers: McpServerConfig[] }
+
+// ──────────────────────────────────────────────────────────────────
+// Skills (Claude-format SKILL.md folders under ~/.hip/skills)
+// ──────────────────────────────────────────────────────────────────
+
+/** One installed skill, scanned from ~/.hip/skills/<id>/SKILL.md frontmatter. */
+export interface SkillMeta {
+  id: string                          // folder slug under ~/.hip/skills
+  name: string                        // frontmatter `name`
+  description: string                 // frontmatter `description`
+  dir: string                         // absolute skill directory
+  hasScripts: boolean                 // true iff the skill ships a scripts/ dir (run_script hint)
+}
+
+/** Skill enable/disable overrides, persisted to ~/.hip/config/hip-skills.json. A missing id is treated as enabled. */
+export interface SkillsConfig { enabled: Record<string, boolean> }
+
 /** auth.json key name AND env var name for a provider's API key. Single source of the rule. */
 export function providerKeyEnv(providerID: string): string {
   return `HIP_MODEL_${providerID.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`

@@ -12,6 +12,9 @@ function providerEnvVar(providerID: string): string {
 export interface AcpSpawn { command: string; args: string[]; env: NodeJS.ProcessEnv }
 
 export function buildAcpSpawn(agent: AgentConfig, model: ResolvedModel | null): AcpSpawn {
+  // NOTE: this spawn path is OpenCode-shaped (writes opencode.json via OPENCODE_CONFIG). A future ACP
+  // provider (claude-code/codex/kimi-code) will branch here on its preset/quirks. Reserved — not
+  // reachable yet because only OpenCode is selectable in the provider picker (src/lib/acpPresets.ts).
   const env: NodeJS.ProcessEnv = { ...process.env, ...(agent.env ?? {}) }
 
   if (agent.authMode === 'hip-managed') {

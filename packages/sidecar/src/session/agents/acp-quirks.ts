@@ -7,6 +7,9 @@ export interface AcpQuirks {
 
 const DEFAULTS: AcpQuirks = { cancelReportsEndTurn: false, defaultModelIsBilled: false }
 
+// Reserve point — future ACP providers (claude-code, codex, kimi-code) add their quirk profile here.
+// Today only OpenCode is selectable in the provider picker (src/lib/acpPresets.ts); the others are
+// 'coming-soon' placeholders, so no unimplemented profile can be reached at runtime.
 const PROFILES: Record<string, Partial<AcpQuirks>> = {
   opencode: { cancelReportsEndTurn: true, defaultModelIsBilled: true },
 }

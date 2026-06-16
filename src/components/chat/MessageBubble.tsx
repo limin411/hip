@@ -10,6 +10,8 @@ import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
 import { CodeBlock } from './CodeBlock'
 import { TurnTimeline } from './TurnTimeline'
+import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
+import { groupByAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { useProvidersStore } from '@/store/providersStore'
@@ -32,6 +34,11 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
     const am = s.config.activeModel
     return am ? s.catalog[am.providerID]?.models[am.modelID]?.cost : undefined
   })
+
+  // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
+  const nested = isUser ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
+  const nestedIds = new Set(nested.map((a) => a.agentId))
+  const flatSteps = (message.timeline ?? []).filter((s) => !nestedIds.has(s.agentId))
 
   return (
     <div className="group flex gap-3">
@@ -64,7 +71,10 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           )}
         >
           {message.role === 'assistant' && (
-            <TurnTimeline steps={message.timeline} toolCalls={message.toolCalls} agentRuns={message.agentRuns} />
+            <>
+              <TurnTimeline steps={flatSteps} toolCalls={message.toolCalls} agentRuns={message.agentRuns} />
+              {nested.map((a) => <SubAgentCard key={a.agentId} agent={a} />)}
+            </>
           )}
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{message.content}</ReactMarkdown>
           {streaming && <StreamingCursor />}

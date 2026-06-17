@@ -1,5 +1,15 @@
 export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer' | 'worker' | 'subagent'
 
+/**
+ * Per-conversation permission mode (Claude-Desktop style), gating hip's own
+ * file/exec tools and sandbox scope at runtime.
+ *  - 'chat': read-only (read_file/ls/glob/grep + use_skill + MCP); NO write/edit/run_script; reads jailed to cwd.
+ *  - 'edit': DEFAULT — write/edit inside cwd (no HITL), run_script HITL-gated; jailed to cwd.
+ *  - 'full': write/edit/read any directory (un-jailed); run_script auto-approved. MCP available in all modes.
+ * undefined on an existing SessionConfig ⇒ readers treat it as 'edit' (back-compat, no migration).
+ */
+export type PermissionMode = 'chat' | 'edit' | 'full'
+
 export interface SessionConfig {
   llmProvider: string          // provider id (was the 'deepseek' literal)
   model: string
@@ -10,6 +20,7 @@ export interface SessionConfig {
   thinking?: boolean           // DEPRECATED: retained for back-compat; no longer swaps models
   language?: 'en' | 'zh-CN' | 'zh-TW'
   agentId?: string             // undefined / 'builtin' => built-in hip agent; else an AgentConfig.id
+  permissionMode?: PermissionMode  // per-conversation gate; undefined ⇒ treated as 'edit'
 }
 
 /** Global current model the whole app uses. */

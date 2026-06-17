@@ -10,8 +10,9 @@ import { cn } from '@/lib/utils'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
 import { agentCategory } from '@/lib/agentCategory'
-import { toolNamesToGroups, DEFAULT_TOOL_GROUPS, grantedMcpServerIds } from '@/lib/agentTools'
+import { grantedMcpServerIds } from '@/lib/agentTools'
 import { useMcpServersStore } from '@/store/mcpServersStore'
+import { useSkillsStore } from '@/store/skillsStore'
 import { AcpProviderPicker } from './AcpProviderPicker'
 import type { AcpPreset } from '@/lib/acpPresets'
 
@@ -32,8 +33,11 @@ export function AgentEditor({
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
   const { servers: mcpServers } = useMcpServersStore()
-  // Existing agent → derive toggles from its stored allow-list; new agent → the git-off default.
-  const groups0 = initial ? toolNamesToGroups(initial.allowedTools) : DEFAULT_TOOL_GROUPS
+  const { skills } = useSkillsStore()
+  // Seed the per-skill / per-MCP grants from the stored agent. Back-compat: an old internal agent
+  // has no allowedMcpServers — derive it once from legacy `mcp__<id>__*` wildcards in allowedTools
+  // (grantedMcpServerIds(undefined) === [] when initial is null, so a new agent starts empty);
+  // allowedSkills was never represented in the old model, so it starts empty (user re-selects).
   const [form, setForm] = useState<AgentForm>({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -46,18 +50,16 @@ export function AgentEditor({
     authMode: initial?.authMode ?? 'opencode-self',
     quirks: initial?.quirks,
     prompt: initial?.prompt ?? '',
-    toolsRead: groups0.read,
-    toolsEdit: groups0.edit,
-    toolsPlan: groups0.plan,
-    toolsGit: groups0.git,
-    toolsSkill: groups0.skill,
-    toolsScript: groups0.script,
-    mcpServerIds: initial ? grantedMcpServerIds(initial.allowedTools) : [],
+    allowedSkills: initial?.allowedSkills ?? [],
+    allowedMcpServers: initial?.allowedMcpServers ?? grantedMcpServerIds(initial?.allowedTools),
     enabled: initial?.enabled ?? true,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => { void useMcpServersStore.getState().load() }, [])
+  useEffect(() => {
+    void useMcpServersStore.getState().load()
+    void useSkillsStore.getState().load()
+  }, [])
 
   const isNewAcp = !initial && initialKind === 'acp'
   const [acpStep, setAcpStep] = useState<'pick' | 'form'>(isNewAcp ? 'pick' : 'form')
@@ -72,8 +74,10 @@ export function AgentEditor({
       : t(isAcp ? 'settings.agents.addAcp' : isInternal ? 'settings.agents.addInternal' : 'settings.agents.addCli')
   const groups = groupModelOptions(catalog, config)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
+  const toggleSkill = (id: string, on: boolean) =>
+    setForm((f) => ({ ...f, allowedSkills: on ? [...f.allowedSkills, id] : f.allowedSkills.filter((x) => x !== id) }))
   const toggleMcpServer = (id: string, on: boolean) =>
-    setForm((f) => ({ ...f, mcpServerIds: on ? [...f.mcpServerIds, id] : f.mcpServerIds.filter((x) => x !== id) }))
+    setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
 
   const pickPreset = (preset: AcpPreset) => {
     patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self', transport: 'rich' })
@@ -164,13 +168,28 @@ export function AgentEditor({
               </Section>
 
               <Section label={t('settings.agents.sectionTools')}>
-                <div className="text-caption text-ink-tertiary">{t('settings.agents.toolsHint')}</div>
-                <ToolToggle label={t('settings.agents.toolRead')} desc={t('settings.agents.toolReadDesc')} checked={form.toolsRead} onChange={(v) => patch({ toolsRead: v })} />
-                <ToolToggle label={t('settings.agents.toolEdit')} desc={t('settings.agents.toolEditDesc')} checked={form.toolsEdit} onChange={(v) => patch({ toolsEdit: v })} />
-                <ToolToggle label={t('settings.agents.toolPlan')} desc={t('settings.agents.toolPlanDesc')} checked={form.toolsPlan} onChange={(v) => patch({ toolsPlan: v })} />
-                <ToolToggle label={t('settings.agents.toolGit')} desc={t('settings.agents.toolGitDesc')} checked={form.toolsGit} onChange={(v) => patch({ toolsGit: v })} />
-                <ToolToggle label={t('settings.agents.toolSkill')} desc={t('settings.agents.toolSkillDesc')} checked={form.toolsSkill} onChange={(v) => patch({ toolsSkill: v })} />
-                <ToolToggle label={t('settings.agents.toolScript')} desc={t('settings.agents.toolScriptDesc')} checked={form.toolsScript} onChange={(v) => patch({ toolsScript: v })} />
+                <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
+                  {t('settings.agents.toolBuiltinNote')}
+                </div>
+              </Section>
+
+              <Section label={t('settings.agents.toolSkillsSection')}>
+                <div className="text-caption text-ink-tertiary">{t('settings.agents.toolSkillsSectionDesc')}</div>
+                {skills.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
+                    {t('settings.agents.toolSkillsEmpty')}
+                  </div>
+                ) : (
+                  skills.map((s) => (
+                    <ToolToggle
+                      key={s.id}
+                      label={s.name}
+                      desc={s.description}
+                      checked={form.allowedSkills.includes(s.id)}
+                      onChange={(v) => toggleSkill(s.id, v)}
+                    />
+                  ))
+                )}
               </Section>
 
               <Section label={t('settings.agents.toolMcpServers')}>
@@ -185,7 +204,7 @@ export function AgentEditor({
                       key={s.id}
                       label={s.name}
                       desc={s.id}
-                      checked={form.mcpServerIds.includes(s.id)}
+                      checked={form.allowedMcpServers.includes(s.id)}
                       onChange={(v) => toggleMcpServer(s.id, v)}
                     />
                   ))

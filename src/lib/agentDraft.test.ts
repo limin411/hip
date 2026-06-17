@@ -17,6 +17,9 @@ const base: AgentForm = {
   toolsEdit: true,
   toolsPlan: true,
   toolsGit: false,
+  toolsSkill: false,
+  toolsScript: false,
+  mcpServerIds: [],
 }
 
 describe('isAgentDraftValid', () => {
@@ -63,7 +66,7 @@ describe('buildAgentDraft', () => {
     expect('authMode' in buildAgentDraft({ ...base, kind: 'custom' })).toBe(false)
   })
   it('carries a trimmed description, omitting it when blank', () => {
-    const b = { name: 'A', kind: 'custom' as const, command: 'c', args: '', transport: 'thin' as const, acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self' as const, enabled: true, prompt: '', toolsRead: true, toolsEdit: true, toolsPlan: true, toolsGit: false }
+    const b = { name: 'A', kind: 'custom' as const, command: 'c', args: '', transport: 'thin' as const, acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self' as const, enabled: true, prompt: '', toolsRead: true, toolsEdit: true, toolsPlan: true, toolsGit: false, toolsSkill: false, toolsScript: false, mcpServerIds: [] }
     expect(buildAgentDraft({ ...b, description: '  edits code  ' }).description).toBe('edits code')
     expect(buildAgentDraft({ ...b, description: '   ' }).description).toBeUndefined()
   })
@@ -73,6 +76,7 @@ const internalBase: AgentForm = {
   name: 'Reviewer', kind: 'internal', command: '', args: '', transport: 'thin',
   acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self', enabled: true,
   prompt: 'You review code.', toolsRead: true, toolsEdit: false, toolsPlan: true, toolsGit: false,
+  toolsSkill: false, toolsScript: false, mcpServerIds: [],
 }
 
 describe('internal agents', () => {

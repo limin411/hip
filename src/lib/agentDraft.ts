@@ -1,5 +1,5 @@
 import type { AgentConfig, AgentAuthMode } from '@hip/protocol'
-import { groupsToToolNames } from './agentTools'
+import { groupsToToolNames, mcpServerWildcard } from './agentTools'
 
 export interface AgentForm {
   name: string
@@ -18,6 +18,9 @@ export interface AgentForm {
   toolsEdit: boolean
   toolsPlan: boolean
   toolsGit: boolean
+  toolsSkill: boolean
+  toolsScript: boolean
+  mcpServerIds: string[]   // serverIds granted whole-server access (→ mcp__<id>__* wildcards)
   enabled: boolean
 }
 
@@ -46,7 +49,17 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
       transport: 'thin',
       acceptsModelConfig: false,
       prompt: form.prompt.trim(),
-      allowedTools: groupsToToolNames({ read: form.toolsRead, edit: form.toolsEdit, plan: form.toolsPlan, git: form.toolsGit }),
+      allowedTools: [
+        ...groupsToToolNames({
+          read: form.toolsRead,
+          edit: form.toolsEdit,
+          plan: form.toolsPlan,
+          git: form.toolsGit,
+          skill: form.toolsSkill,
+          script: form.toolsScript,
+        }),
+        ...form.mcpServerIds.map(mcpServerWildcard),
+      ],
       boundModel: parseBoundModel(form.boundModelKey),
       enabled: form.enabled,
     }

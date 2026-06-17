@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode, Branch } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -258,6 +258,14 @@ export class Session {
     if (this.running) return false
     this._config = { ...this._config, thinking }
     this.buildAgent()
+    return true
+  }
+
+  /** Set the per-conversation permission mode. NO-OP (returns false) while a turn is running; the
+   *  next runTurn picks it up (no agent rebuild needed — runTurn reads _config.permissionMode). */
+  setPermissionMode(permissionMode: PermissionMode): boolean {
+    if (this.running) return false
+    this._config = { ...this._config, permissionMode }
     return true
   }
 
@@ -631,7 +639,12 @@ export class Session {
       try { await mcpManager.reconcile(readMcpServersConfig()) } catch { /* degrade: skip MCP tools */ }
       try { skills = readEnabledSkills() } catch { skills = [] }
     }
-    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt, skills })
+    // Conversation permission mode (default + dirty-data → 'edit'). Drives the system-prompt cwd-block
+    // wording, run_script approval, AND the file-tool jail/registration (threaded into buildTools below),
+    // and CASCADES into dispatched agents.
+    const rawMode = this._config.permissionMode
+    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt, skills, permissionMode: mode })
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => {
         if (!delta) return
@@ -686,7 +699,8 @@ export class Session {
       { optionId: 'allow_once', name: '允许', kind: 'allow_once' },
       { optionId: 'reject_once', name: '拒绝', kind: 'reject_once' },
     ]
-    const requestApproval: ApprovalFn = (req) =>
+    // Real HITL closure (edit mode): register a pending permission and resolve on the user's choice.
+    const hitlApproval: ApprovalFn = (req) =>
       new Promise((resolve) => {
         const requestId = `run-script-${turnId}-${nextSeq()}`
         this.pendingPermissions.set(requestId, (choice) => {
@@ -705,6 +719,12 @@ export class Session {
           options,
         })
       })
+    // Per-mode run_script gate: chat ⇒ no run_script (undefined → buildTools omits it); edit ⇒ HITL;
+    // full ⇒ auto-approve (resolve immediately, no permission:request, no modal). Cascades to dispatched agents.
+    const requestApproval: ApprovalFn | undefined =
+      mode === 'chat' ? undefined
+      : mode === 'full' ? (() => Promise.resolve({ kind: 'allow_once' }))
+      : hitlApproval
     const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
       const cfg = enabledAgents.find((a) => a.id === agentId)
       if (!cfg) return `Error: unknown or disabled agent ${agentId}`
@@ -724,7 +744,7 @@ export class Session {
         configOptions: () => {},
       }
       try {
-        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools: mcpManager.tools(), skills, requestApproval })
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools: mcpManager.tools(), skills, requestApproval, permissionMode: mode })
         ensureFinished(childId, text)
         return text || '(sub-agent produced no output)'
       } catch (err) {
@@ -744,7 +764,7 @@ export class Session {
       enabledAgents.length
         ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent }
         : undefined,
-      { mcpTools: mcpManager.tools(), skills, requestApproval },
+      { mcpTools: mcpManager.tools(), skills, requestApproval, permissionMode: mode },
     )
     const ctx: GraphCtx = { runner, tools, emit, summarizer }
 

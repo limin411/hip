@@ -1,5 +1,4 @@
 import type { AgentConfig, AgentAuthMode } from '@hip/protocol'
-import { groupsToToolNames, mcpServerWildcard } from './agentTools'
 
 export interface AgentForm {
   name: string
@@ -14,13 +13,8 @@ export interface AgentForm {
   quirks?: string
   // internal-only fields:
   prompt: string
-  toolsRead: boolean
-  toolsEdit: boolean
-  toolsPlan: boolean
-  toolsGit: boolean
-  toolsSkill: boolean
-  toolsScript: boolean
-  mcpServerIds: string[]   // serverIds granted whole-server access (→ mcp__<id>__* wildcards)
+  allowedSkills: string[]      // skill ids this internal agent may use (use_skill restricted to these)
+  allowedMcpServers: string[]  // MCP server ids whose tools this internal agent may use
   enabled: boolean
 }
 
@@ -49,17 +43,10 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
       transport: 'thin',
       acceptsModelConfig: false,
       prompt: form.prompt.trim(),
-      allowedTools: [
-        ...groupsToToolNames({
-          read: form.toolsRead,
-          edit: form.toolsEdit,
-          plan: form.toolsPlan,
-          git: form.toolsGit,
-          skill: form.toolsSkill,
-          script: form.toolsScript,
-        }),
-        ...form.mcpServerIds.map(mcpServerWildcard),
-      ],
+      // Built-in tools are always available; only per-agent skill/MCP grants are configured here.
+      // NO allowedTools is emitted — the sidecar no longer gates built-ins by an allow-list.
+      allowedSkills: [...form.allowedSkills],
+      allowedMcpServers: [...form.allowedMcpServers],
       boundModel: parseBoundModel(form.boundModelKey),
       enabled: form.enabled,
     }

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from './agentDraft'
-import { TOOL_GROUPS } from './agentTools'
 
 const base: AgentForm = {
   name: 'Claude Code',
@@ -13,13 +12,8 @@ const base: AgentForm = {
   authMode: 'opencode-self',
   enabled: true,
   prompt: '',
-  toolsRead: true,
-  toolsEdit: true,
-  toolsPlan: true,
-  toolsGit: false,
-  toolsSkill: false,
-  toolsScript: false,
-  mcpServerIds: [],
+  allowedSkills: [],
+  allowedMcpServers: [],
 }
 
 describe('isAgentDraftValid', () => {
@@ -66,30 +60,55 @@ describe('buildAgentDraft', () => {
     expect('authMode' in buildAgentDraft({ ...base, kind: 'custom' })).toBe(false)
   })
   it('carries a trimmed description, omitting it when blank', () => {
-    const b = { name: 'A', kind: 'custom' as const, command: 'c', args: '', transport: 'thin' as const, acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self' as const, enabled: true, prompt: '', toolsRead: true, toolsEdit: true, toolsPlan: true, toolsGit: false, toolsSkill: false, toolsScript: false, mcpServerIds: [] }
-    expect(buildAgentDraft({ ...b, description: '  edits code  ' }).description).toBe('edits code')
-    expect(buildAgentDraft({ ...b, description: '   ' }).description).toBeUndefined()
+    expect(buildAgentDraft({ ...base, description: '  edits code  ' }).description).toBe('edits code')
+    expect(buildAgentDraft({ ...base, description: '   ' }).description).toBeUndefined()
+  })
+  it('external (custom/acp) drafts never emit allowedSkills / allowedMcpServers', () => {
+    const d = buildAgentDraft({ ...base, allowedSkills: ['s1'], allowedMcpServers: ['m1'] })
+    expect('allowedSkills' in d).toBe(false)
+    expect('allowedMcpServers' in d).toBe(false)
   })
 })
 
 const internalBase: AgentForm = {
   name: 'Reviewer', kind: 'internal', command: '', args: '', transport: 'thin',
   acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self', enabled: true,
-  prompt: 'You review code.', toolsRead: true, toolsEdit: false, toolsPlan: true, toolsGit: false,
-  toolsSkill: false, toolsScript: false, mcpServerIds: [],
+  prompt: 'You review code.', allowedSkills: [], allowedMcpServers: [],
 }
 
 describe('internal agents', () => {
   it('requires a name and a non-empty prompt (command not required)', () => {
     expect(isAgentDraftValid(internalBase)).toBe(true)
     expect(isAgentDraftValid({ ...internalBase, prompt: '   ' })).toBe(false)
-    expect(isAgentDraftValid({ ...internalBase, command: '' })).toBe(true) // command irrelevant
+    expect(isAgentDraftValid({ ...internalBase, command: '' })).toBe(true) // command irrelevant for internal
   })
-  it('builds an internal draft: prompt + allowedTools from groups, inert command/args', () => {
-    const d = buildAgentDraft(internalBase)
-    expect(d).toMatchObject({ kind: 'internal', prompt: 'You review code.', command: '', args: [], transport: 'thin', acceptsModelConfig: false })
-    expect(d.allowedTools).toEqual([...TOOL_GROUPS.read, ...TOOL_GROUPS.plan])
+  it('builds an internal draft: prompt + allowedSkills/allowedMcpServers, NO allowedTools, inert command/args', () => {
+    const d = buildAgentDraft({ ...internalBase, allowedSkills: ['code-review'], allowedMcpServers: ['fs'] })
+    expect(d).toMatchObject({
+      kind: 'internal',
+      prompt: 'You review code.',
+      command: '',
+      args: [],
+      transport: 'thin',
+      acceptsModelConfig: false,
+      allowedSkills: ['code-review'],
+      allowedMcpServers: ['fs'],
+    })
+    expect('allowedTools' in d).toBe(false)
     expect(d.boundModel).toBeUndefined()
+  })
+  it('empty skill/mcp selections emit empty arrays (explicit none)', () => {
+    const d = buildAgentDraft(internalBase)
+    expect(d).toMatchObject({ allowedSkills: [], allowedMcpServers: [] })
+    expect('allowedTools' in d).toBe(false)
+  })
+  it('copies the arrays (does not alias the form arrays)', () => {
+    const skills = ['a']
+    const mcp = ['b']
+    const d = buildAgentDraft({ ...internalBase, allowedSkills: skills, allowedMcpServers: mcp })
+    expect(d.allowedSkills).toEqual(['a'])
+    expect(d.allowedSkills).not.toBe(skills)
+    expect(d.allowedMcpServers).not.toBe(mcp)
   })
   it('binds a model when a key is chosen', () => {
     const d = buildAgentDraft({ ...internalBase, boundModelKey: 'anthropic/claude-opus-4' })

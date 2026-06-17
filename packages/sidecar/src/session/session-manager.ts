@@ -124,8 +124,8 @@ export class SessionManager {
         const s = this.ensureSession(msg.sessionId)
         const applied = s.setPermissionMode(msg.permissionMode)
         if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        // Echo the session's REAL mode (undefined ⇒ 'edit') so the client syncs to truth even if the
-        // toggle was rejected mid-turn.
+        // Echo the session's REAL mode (default 'edit') so the client syncs to truth even if the set
+        // was rejected mid-turn.
         send({ type: 'session:permissionMode', sessionId: msg.sessionId, permissionMode: s.config.permissionMode ?? 'edit' })
         break
       }

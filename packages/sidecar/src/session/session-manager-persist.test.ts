@@ -134,20 +134,6 @@ describe('SessionManager persistence', () => {
     expect(echo).toMatchObject({ sessionId: 's1', thinking: false })
   })
 
-  it('session:setPermissionMode persists permissionMode into the session config', () => {
-    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
-    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'chat' }, send)
-    expect(JSON.parse(store.getSession('s1')!.config).permissionMode).toBe('chat')
-  })
-
-  it('session:setPermissionMode echoes session:permissionMode with store-backed manager', () => {
-    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
-    sent = []
-    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' }, send)
-    const echo = sent.find((m) => m.type === 'session:permissionMode') as Extract<ServerMessage, { type: 'session:permissionMode' }>
-    expect(echo).toMatchObject({ sessionId: 's1', permissionMode: 'full' })
-  })
-
   it('session:setSystemPrompt persists systemPrompt into the session config', () => {
     mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
     mgr.handle({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: 'Be terse' }, send)
@@ -166,6 +152,31 @@ describe('SessionManager persistence', () => {
     mgr.handle({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: 'Be terse' }, send)
     const echo = sent.find((m) => m.type === 'session:systemPrompt') as Extract<ServerMessage, { type: 'session:systemPrompt' }>
     expect(echo).toMatchObject({ sessionId: 's1', systemPrompt: 'Be terse' })
+  })
+
+  it('session:setPermissionMode persists permissionMode into the session config', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' }, send)
+    expect(JSON.parse(store.getSession('s1')!.config).permissionMode).toBe('full')
+  })
+
+  it('session:setPermissionMode echoes session:permissionMode with the real state', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    sent = []
+    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'chat' }, send)
+    const echo = sent.find((m) => m.type === 'session:permissionMode') as Extract<ServerMessage, { type: 'session:permissionMode' }>
+    expect(echo).toMatchObject({ sessionId: 's1', permissionMode: 'chat' })
+  })
+
+  it('session:setPermissionMode echoes the default edit when the set is rejected mid-turn', () => {
+    mgr.handle({ type: 'session:create', id: 's1', config: cfg }, send)
+    // simulate a rejected set mid-turn: the session keeps its (undefined) mode → echo 'edit'.
+    const s = mgr.getSessionForTest('s1')!
+    ;(s as unknown as { running: boolean }).running = true
+    sent = []
+    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' }, send)
+    const echo = sent.find((m) => m.type === 'session:permissionMode') as Extract<ServerMessage, { type: 'session:permissionMode' }>
+    expect(echo).toMatchObject({ sessionId: 's1', permissionMode: 'edit' })
   })
 
   it('session:load echoes the persisted config', () => {

@@ -33,6 +33,23 @@ async function real(root: string, p: string): Promise<string> {
   return lexical
 }
 
+/** Canonicalize an ABSOLUTE path and confirm it resolves to within one of `skillDirs` (exact dir or
+ *  under dir + sep), with a realpath/symlink guard so a symlinked bundled file can't escape its skill
+ *  dir. Returns the real path on success, or null if the path is not under any skill dir. Skills are
+ *  read-only and live OUTSIDE the project root (~/.hip/skills/<id>), so this is a read_file-only seam
+ *  parallel to `real()` — it widens nothing else. */
+async function realInSkill(skillDirs: string[], p: string): Promise<string | null> {
+  if (!path.isAbsolute(p)) return null
+  let realPath: string
+  try { realPath = await fs.realpath(p) } catch { return null }
+  for (const dir of skillDirs) {
+    let realDir: string
+    try { realDir = await fs.realpath(dir) } catch { continue }
+    if (realPath === realDir || realPath.startsWith(realDir + path.sep)) return realPath
+  }
+  return null
+}
+
 export interface DispatchSpec {
   agents: Array<{ id: string; name: string; description?: string }>
   run: (agentId: string, task: string) => Promise<string>
@@ -73,6 +90,10 @@ export function buildTools(
   dispatch?: DispatchSpec,
   opts: BuildToolsOpts = {},
 ): StructuredToolInterface[] {
+  // Enabled-skill dirs (~/.hip/skills/<id>), DISJOINT from the project root. read_file may ALSO reach
+  // bundled reference files under these (read-only); every other path stays jailed to `root` via real().
+  const skillDirs = (opts.skills ?? []).map((s) => s.dir)
+
   const writeFile = tool(
     async ({ path: p, content }) => {
       try {
@@ -94,6 +115,18 @@ export function buildTools(
 
   const readFile = tool(
     async ({ path: p }) => {
+      // First, allow an absolute path that canonicalizes to within an enabled skill dir (read-only
+      // bundled reference files live outside the project root). Anything else stays jailed to `root`.
+      if (skillDirs.length > 0) {
+        const inSkill = await realInSkill(skillDirs, p)
+        if (inSkill) {
+          try {
+            return await fs.readFile(inSkill, 'utf8')
+          } catch {
+            return `Error: file not found: ${p}`
+          }
+        }
+      }
       try {
         const abs = await real(root, p)
         return await fs.readFile(abs, 'utf8')
@@ -105,7 +138,9 @@ export function buildTools(
     },
     {
       name: 'read_file',
-      description: 'Read a text file. `path` is absolute relative to the project root.',
+      description:
+        'Read a text file. `path` is absolute relative to the project root, OR an absolute path to a ' +
+        'bundled file inside a loaded skill dir (as disclosed by use_skill).',
       schema: z.object({ path: z.string() }),
     },
   )
@@ -303,9 +338,11 @@ export function buildTools(
           const body = readSkillBody(s.dir)
           const files = listSkillFiles(s.dir)
           const manifest = files.length
-            ? `\n\n## Files in this skill (read with read_file relative to this skill dir):\n${files.map((f) => `- ${f}`).join('\n')}`
+            ? `\n\n## Files in this skill (absolute paths — read bundled reference files with ` +
+              `read_file using the absolute path; run bundled scripts with run_script using the absolute path):\n` +
+              files.map((f) => `- ${path.join(s.dir, f)}`).join('\n')
             : ''
-          return `${body}${manifest}`
+          return `# Skill dir: ${s.dir}\n\n${body}${manifest}`
         } catch (err) {
           return `Error: ${(err as Error).message}`
         }
@@ -313,9 +350,11 @@ export function buildTools(
       {
         name: 'use_skill',
         description:
-          'Load a skill into context by `name`. Returns the skill\'s full SKILL.md instructions plus a ' +
-          'manifest of its bundled files. Call this when a task matches an advertised skill, then follow ' +
-          'the loaded instructions (use read_file for reference files, run_script for bundled scripts).',
+          'Load a skill into context by `name`. Returns the skill\'s full SKILL.md instructions, the ' +
+          'absolute skill dir, plus a manifest of its bundled files as absolute paths. Call this when a ' +
+          'task matches an advertised skill, then follow the loaded instructions: read bundled reference ' +
+          'files with read_file using the absolute path, run bundled scripts with run_script using the ' +
+          'absolute path.',
         schema: z.object({ name: z.string() }),
       },
     )

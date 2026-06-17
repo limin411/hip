@@ -50,6 +50,58 @@ describe('use_skill tool', () => {
   })
 })
 
+describe('use_skill + read_file bundled files (skill dir OUTSIDE the project root)', () => {
+  // Regression: enabled skills live at HIP_SKILLS_DIR/<id> = ~/.hip/skills/<id>, DISJOINT from the
+  // session project root. use_skill must disclose the ABSOLUTE skill dir + absolute file paths, and
+  // read_file must reach bundled reference files there — even though it is jailed to the project root
+  // for everything else.
+  let skillRoot: string
+  beforeEach(() => { skillRoot = mkdtempSync(join(tmpdir(), 'hip-skilldir-')) })
+  afterEach(() => { rmSync(skillRoot, { recursive: true, force: true }) })
+
+  function makeExternalSkill(id: string, name: string, body: string): SkillMeta {
+    const dir = join(skillRoot, id)
+    mkdirSync(join(dir, 'references'), { recursive: true })
+    mkdirSync(join(dir, 'scripts'), { recursive: true })
+    writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: d\n---\n${body}`, 'utf8')
+    writeFileSync(join(dir, 'references', 'note.md'), 'BUNDLED NOTE CONTENT', 'utf8')
+    writeFileSync(join(dir, 'scripts', 'run.sh'), 'echo run', 'utf8')
+    return { id, name, description: 'd', dir, hasScripts: true }
+  }
+
+  it('use_skill discloses the absolute skill dir and absolute file paths', async () => {
+    const skill = makeExternalSkill('ref', 'ref', 'See references/note.md.')
+    const tools = buildTools(root, undefined, root, undefined, { skills: [skill] })
+    const out = String(await byName(tools, 'use_skill').invoke({ name: 'ref' }))
+    expect(out).toContain(skill.dir)
+    expect(out).toContain(join(skill.dir, 'references', 'note.md'))
+  })
+
+  it('read_file reads a bundled reference file via its absolute path (outside the project root)', async () => {
+    const skill = makeExternalSkill('ref', 'ref', 'body')
+    const tools = buildTools(root, undefined, root, undefined, { skills: [skill] })
+    const abs = join(skill.dir, 'references', 'note.md')
+    const out = String(await byName(tools, 'read_file').invoke({ path: abs }))
+    expect(out).toBe('BUNDLED NOTE CONTENT')
+  })
+
+  it('read_file still rejects an absolute path that is neither under a skill dir nor the project root', async () => {
+    const skill = makeExternalSkill('ref', 'ref', 'body')
+    const tools = buildTools(root, undefined, root, undefined, { skills: [skill] })
+    // A sibling temp file outside both skillRoot/<id> and the project root.
+    const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
+    try {
+      const secret = join(outside, 'secret.txt')
+      writeFileSync(secret, 'TOP SECRET', 'utf8')
+      const out = String(await byName(tools, 'read_file').invoke({ path: secret }))
+      expect(out).not.toContain('TOP SECRET')
+      expect(out).toMatch(/not found|escapes|Error/i)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('run_script tool', () => {
   it('is absent when no requestApproval is given', () => {
     const tools = buildTools(root, undefined, root, undefined, {})

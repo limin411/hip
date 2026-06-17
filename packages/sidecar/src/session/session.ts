@@ -680,6 +680,12 @@ export class Session {
         signal: this.abortController!.signal,
         description,
         childMaxSteps: CHILD_MAX_STEPS,
+        // Cascade the conversation permission mode + the same per-mode approval seam the main agent
+        // uses, so the generic `task` worker honors chat (read-only) / edit (HITL) / full (auto-approve).
+        // `requestApproval` is assigned below in this same runTurn; spawnSubagent only fires later (when
+        // the model calls `task`), by which point it is in scope.
+        permissionMode: mode,
+        requestApproval,
       })
       ensureFinished(childId, text)
       return text

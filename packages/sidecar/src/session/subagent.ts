@@ -1,8 +1,9 @@
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
+import type { PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
-import { buildTools } from './tools.js'
+import { buildTools, type ApprovalFn } from './tools.js'
 import { recursionLimit } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
 
@@ -14,6 +15,12 @@ export interface RunSubagentArgs {
   signal: AbortSignal
   description: string
   childMaxSteps: number
+  /** Conversation permission mode, cascaded from the parent turn (undefined ⇒ 'edit'). Drives the
+   *  child toolset (chat = read-only, full = un-jailed) and the child cwd-block wording. */
+  permissionMode?: PermissionMode
+  /** HITL approval seam cascaded from the parent: chat ⇒ undefined (no run_script for the worker),
+   *  edit ⇒ real HITL, full ⇒ auto-approve. Mirrors the dispatch_agent cascade. */
+  requestApproval?: ApprovalFn
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
@@ -40,13 +47,16 @@ export function lastAiText(messages: BaseMessage[]): string {
  *   partial assistant text with the pending question appended as context (P3-D3, no agent:interrupt).
  */
 export async function runSubagent(args: RunSubagentArgs): Promise<string> {
-  const { runner, root, summarizer, emit, signal, description, childMaxSteps } = args
-  const tools = buildTools(root) // depth-1: no task tool
+  const { runner, root, summarizer, emit, signal, description, childMaxSteps, permissionMode, requestApproval } = args
+  // depth-1: no task tool (no spawn closure). Cascade the conversation's permission mode + approval
+  // seam so a chat worker is read-only, an edit worker can write + HITL-gate run_script, and a full
+  // worker un-jails files + auto-approves — mirroring how dispatch_agent cascades the same mode.
+  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval })
   const ctx: GraphCtx = { runner, tools, emit, summarizer }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(childSystemPrompt(description, root)), new HumanMessage(description)],
+      messages: [new SystemMessage(childSystemPrompt(description, root, permissionMode)), new HumanMessage(description)],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

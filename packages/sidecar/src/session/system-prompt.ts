@@ -91,9 +91,11 @@ const CHILD_BASE =
   'describing what you found or changed.'
 
 /** System prompt for a delegated sub-agent: identity + base tools + cwd convention + anti-phantom,
- *  framed around a single sub-task. No planning/delegation guidance (the child has no task tool). */
-export function childSystemPrompt(description: string, cwd: string): string {
-  return `${IDENTITY}\n\n${CHILD_BASE}\n\n${cwdBlock(cwd)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
+ *  framed around a single sub-task. No planning/delegation guidance (the child has no task tool).
+ *  `permissionMode` cascades from the parent turn so the cwd block matches the worker's actual toolset
+ *  (chat = read-only, full = un-sandboxed), mirroring buildSystemPrompt/buildManagedAgentPrompt. */
+export function childSystemPrompt(description: string, cwd: string, permissionMode?: PermissionMode): string {
+  return `${IDENTITY}\n\n${CHILD_BASE}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}\n\n## Your delegated sub-task\n${description}`
 }
 
 export interface ManagedAgentPromptInput {

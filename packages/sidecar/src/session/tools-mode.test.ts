@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildTools } from './tools.js'
@@ -120,5 +120,42 @@ describe('buildTools permissionMode — path jail', () => {
     const out = String(await byName(tools, 'write_file').invoke({ path: 'rel.txt', content: 'R' }))
     expect(out).toMatch(/wrote/)
     expect(readFileSync(join(root, 'rel.txt'), 'utf8')).toBe('R')
+  })
+
+  it("full mode glob scans the un-jailed root (cwd) and returns paths relative to it", async () => {
+    // cwd is a parent dir; root (the file-tool jail base) is a child of it. In full mode glob must
+    // scan cwd (un-jailed), not the jail root — so a sibling file above `root` is found.
+    const cwd = mkdtempSync(join(tmpdir(), 'hip-fullglob-cwd-'))
+    try {
+      const sub = join(cwd, 'inner')
+      mkdirSync(sub)
+      writeFileSync(join(cwd, 'outside.md'), '# out', 'utf8') // above the jail root
+      writeFileSync(join(sub, 'inside.md'), '# in', 'utf8')   // inside the jail root
+      const tools = buildTools(sub, undefined, cwd, undefined, { permissionMode: 'full' })
+      const out = String(await byName(tools, 'glob').invoke({ pattern: '**/*.md' }))
+      // walk + rel are based on cwd (the un-jailed root): both the above-root and in-root files appear,
+      // relative to cwd.
+      expect(out).toContain('/outside.md')
+      expect(out).toContain('/inner/inside.md')
+    } finally {
+      rmSync(cwd, { recursive: true, force: true })
+    }
+  })
+
+  it("edit mode glob stays jailed to root (a file above root is NOT scanned)", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'hip-editglob-cwd-'))
+    try {
+      const sub = join(cwd, 'inner')
+      mkdirSync(sub)
+      writeFileSync(join(cwd, 'outside.md'), '# out', 'utf8') // above the jail root
+      writeFileSync(join(sub, 'inside.md'), '# in', 'utf8')   // inside the jail root (sub == root)
+      const tools = buildTools(sub, undefined, cwd, undefined, { permissionMode: 'edit' })
+      const out = String(await byName(tools, 'glob').invoke({ pattern: '**/*.md' }))
+      // edit mode walks `root` (== sub): only the in-root file is found; the above-root file is invisible.
+      expect(out).toContain('/inside.md')
+      expect(out).not.toContain('outside.md')
+    } finally {
+      rmSync(cwd, { recursive: true, force: true })
+    }
   })
 })

@@ -214,6 +214,9 @@ export function buildTools(
         return `Error: invalid pattern: ${(err as Error).message}`
       }
       const out: string[] = []
+      // In 'full' (un-jailed) mode glob scans the un-jailed root (cwd) and reports paths relative to it,
+      // matching ls/read_file/grep via resolvePath. Otherwise it stays jailed to `root`.
+      const globBase = isFull ? pathRoot : root
       async function walk(dir: string): Promise<void> {
         if (out.length >= 200) return
         for (const e of await fs.readdir(dir, { withFileTypes: true })) {
@@ -222,12 +225,12 @@ export function buildTools(
           const full = path.join(dir, e.name)
           if (e.isDirectory()) await walk(full)
           else {
-            const rel = '/' + path.relative(root, full)
+            const rel = '/' + path.relative(globBase, full)
             if (rx.test(rel)) out.push(rel)
           }
         }
       }
-      await walk(root)
+      await walk(globBase)
       return out.sort().slice(0, 200).join('\n') || `No files match ${pattern}`
     },
     {

@@ -25,13 +25,12 @@ describe('isAgentDraftValid', () => {
     expect(isAgentDraftValid({ ...base, name: '  ' })).toBe(false)
     expect(isAgentDraftValid({ ...base, command: '' })).toBe(false)
   })
-  it('requires a model when acceptsModelConfig is on', () => {
-    expect(isAgentDraftValid({ ...base, acceptsModelConfig: true, boundModelKey: '' })).toBe(false)
-    expect(isAgentDraftValid({ ...base, acceptsModelConfig: true, boundModelKey: 'anthropic/claude-opus-4' })).toBe(true)
+  it('custom agents never require a model (rollback)', () => {
+    expect(isAgentDraftValid({ ...base, acceptsModelConfig: true, boundModelKey: '' })).toBe(true)
+    expect(isAgentDraftValid({ ...base, acceptsModelConfig: false, boundModelKey: '' })).toBe(true)
   })
-  it('acp + hip-managed requires a model; opencode-self does not', () => {
-    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'hip-managed', boundModelKey: '' })).toBe(false)
-    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'hip-managed', boundModelKey: 'anthropic/x' })).toBe(true)
+  it('acp agents never require a model regardless of legacy authMode (rollback)', () => {
+    expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'hip-managed', boundModelKey: '' })).toBe(true)
     expect(isAgentDraftValid({ ...base, kind: 'acp', authMode: 'opencode-self', boundModelKey: '' })).toBe(true)
   })
 })
@@ -44,22 +43,21 @@ describe('buildAgentDraft', () => {
   it('empty args → []', () => {
     expect(buildAgentDraft({ ...base, args: '   ' }).args).toEqual([])
   })
-  it('omits boundModel when acceptsModelConfig is off, even if a key is set', () => {
+  it('custom agents never emit a boundModel, even when a key is set (rollback)', () => {
     expect(buildAgentDraft({ ...base, acceptsModelConfig: false, boundModelKey: 'anthropic/x' }).boundModel).toBeUndefined()
+    expect(buildAgentDraft({ ...base, acceptsModelConfig: true, boundModelKey: 'openrouter/meta/llama-3' }).boundModel).toBeUndefined()
   })
-  it('splits boundModel on the FIRST slash (modelID may contain slashes)', () => {
-    const d = buildAgentDraft({ ...base, acceptsModelConfig: true, boundModelKey: 'openrouter/meta/llama-3' })
-    expect(d.boundModel).toEqual({ providerID: 'openrouter', modelID: 'meta/llama-3' })
-  })
-  it('acp + opencode-self: authMode carried, no model, acceptsModelConfig false', () => {
+  it('acp: no model pushed, acceptsModelConfig false, no authMode field (rollback)', () => {
     const d = buildAgentDraft({ ...base, kind: 'acp', authMode: 'opencode-self', quirks: 'opencode', boundModelKey: 'anthropic/x' })
-    expect(d).toMatchObject({ kind: 'acp', authMode: 'opencode-self', quirks: 'opencode', acceptsModelConfig: false })
+    expect(d).toMatchObject({ kind: 'acp', quirks: 'opencode', acceptsModelConfig: false })
     expect(d.boundModel).toBeUndefined()
+    expect('authMode' in d).toBe(false)
   })
-  it('acp + hip-managed: acceptsModelConfig true with the chosen model', () => {
+  it('acp ignores a legacy hip-managed selection: still no model, no authMode (rollback)', () => {
     const d = buildAgentDraft({ ...base, kind: 'acp', authMode: 'hip-managed', quirks: 'opencode', boundModelKey: 'anthropic/claude-opus-4' })
-    expect(d).toMatchObject({ kind: 'acp', authMode: 'hip-managed', acceptsModelConfig: true })
-    expect(d.boundModel).toEqual({ providerID: 'anthropic', modelID: 'claude-opus-4' })
+    expect(d).toMatchObject({ kind: 'acp', acceptsModelConfig: false })
+    expect(d.boundModel).toBeUndefined()
+    expect('authMode' in d).toBe(false)
   })
   it('non-acp forms do not emit an authMode field', () => {
     expect('authMode' in buildAgentDraft({ ...base, kind: 'custom' })).toBe(false)

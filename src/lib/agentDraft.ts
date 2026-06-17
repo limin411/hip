@@ -25,13 +25,8 @@ export function isAgentDraftValid(form: AgentForm): boolean {
   if (form.kind === 'internal') {
     return form.name.trim() !== '' && form.prompt.trim() !== ''
   }
-  // For an acp agent with hip-managed auth, a model must be chosen.
-  const needsModel = form.kind === 'acp' ? form.authMode === 'hip-managed' : form.acceptsModelConfig
-  return (
-    form.name.trim() !== '' &&
-    form.command.trim() !== '' &&
-    (!needsModel || form.boundModelKey !== '')
-  )
+  // Model rollback: external agents (acp + custom) self-manage — a model is never required.
+  return form.name.trim() !== '' && form.command.trim() !== ''
 }
 
 function parseBoundModel(key: string): AgentConfig['boundModel'] {
@@ -57,9 +52,9 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
     }
   }
 
-  const isAcp = form.kind === 'acp'
-  const acceptsModelConfig = isAcp ? form.authMode === 'hip-managed' : form.acceptsModelConfig
-  const useModel = acceptsModelConfig && form.boundModelKey !== ''
+  // Model rollback: external agents (acp + custom) self-manage. We never push a model, so
+  // acceptsModelConfig is always false and no boundModel/authMode is emitted (legacy fields stay
+  // inert in the type for back-compat with already-saved configs).
   return {
     name: form.name.trim(),
     description: (form.description ?? '').trim() || undefined,
@@ -67,9 +62,7 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
     command: form.command.trim(),
     args: form.args.trim() ? form.args.trim().split(/\s+/) : [],
     transport: form.transport,
-    acceptsModelConfig,
-    boundModel: useModel ? parseBoundModel(form.boundModelKey) : undefined,
-    ...(isAcp ? { authMode: form.authMode } : {}),
+    acceptsModelConfig: false,
     ...(form.quirks ? { quirks: form.quirks } : {}),
     enabled: form.enabled,
   }

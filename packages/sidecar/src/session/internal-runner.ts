@@ -11,59 +11,46 @@ import { buildChatModel, createSummarizer } from './model-factory.js'
 import { getActiveModel } from '../config/providers.js'
 import type { Summarizer } from './compaction.js'
 import type { ResolvedModel } from './agents/registry.js'
-import type { SkillMeta } from '@hip/protocol'
+import type { SkillMeta, PermissionMode } from '@hip/protocol'
 import type { ApprovalFn } from './tools.js'
-
-/** Keep only the tools whose name is in `allowed`. undefined ⇒ keep all (legacy-safe).
- *  An entry of the form `mcp__<serverId>__*` is a whole-server wildcard: it permits any tool whose
- *  name starts with `mcp__<serverId>__` (the frontend grants MCP access per-server, since it cannot
- *  enumerate a server's individual tool names without a live connection). Every other entry is an
- *  exact name match. */
-export function filterTools(tools: StructuredToolInterface[], allowed?: string[]): StructuredToolInterface[] {
-  if (!allowed) return tools
-  const exact = new Set<string>()
-  const prefixes: string[] = []
-  for (const a of allowed) {
-    const m = /^mcp__(.+)__\*$/.exec(a)
-    if (m) prefixes.push(`mcp__${m[1]}__`)
-    else exact.add(a)
-  }
-  return tools.filter((t) => exact.has(t.name) || prefixes.some((p) => t.name.startsWith(p)))
-}
 
 export interface RunManagedAgentArgs {
   resolved: ResolvedModel | null      // the agent's bound model; null ⇒ global active model
   cwd: string
   prompt: string                      // persona
-  allowedTools?: string[]
   task: string
   emit: GraphEmit
   signal: AbortSignal
   childMaxSteps: number
   runner?: ModelRunner                // injectable for tests; default builds the real model
   summarizer?: Summarizer             // injectable for tests; default = real summarizer
-  mcpTools?: StructuredToolInterface[]  // namespaced MCP tools threaded from the parent session
-  skills?: SkillMeta[]                  // enabled skills (use_skill candidate)
-  requestApproval?: ApprovalFn          // HITL closure threaded from the parent session (run_script)
+  mcpTools?: StructuredToolInterface[]  // namespaced MCP tools, ALREADY narrowed to the agent's allowedMcpServers by the caller
+  skills?: SkillMeta[]                  // skills ALREADY narrowed to the agent's allowedSkills by the caller (use_skill candidate)
+  requestApproval?: ApprovalFn          // HITL closure threaded from the parent session (run_script); presence decides registration
+  permissionMode?: PermissionMode       // cascaded from the parent conversation; default 'edit'
 }
 
 /**
- * Run an internal managed agent: hip's built-in ReAct loop with a custom persona prompt, a model of
- * the agent's choosing (or the global active model), and a tool allow-list. Depth-1 (no task/dispatch).
- * Streams every event through `emit` and returns the final assistant text.
+ * Run an internal managed agent: hip's built-in ReAct loop with a custom persona prompt and a model of
+ * the agent's choosing (or the global active model). Depth-1 (no task/dispatch). ALL built-in tools are
+ * always granted (+ run_script when requestApproval is present, + use_skill when skills are present);
+ * the per-agent narrowing already happened on the inputs (skills/mcpTools) at the caller. The permission
+ * mode controls write/edit registration and the filesystem jail (see buildTools). Streams every event
+ * through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, allowedTools, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval } = args
+  const { resolved, cwd, prompt, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
-  // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1), then narrow to the allow-list.
-  const tools = filterTools(buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval }), allowedTools)
+  // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
+  // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
+  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode })
   const toolNames = tools.map((t) => t.name)
   const ctx: GraphCtx = { runner, tools, emit, summarizer }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills })), new HumanMessage(task)],
+      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode })), new HumanMessage(task)],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

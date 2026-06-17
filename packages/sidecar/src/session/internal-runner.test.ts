@@ -5,9 +5,7 @@ import { join } from 'node:path'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { GraphEmit } from './graph.js'
-import type { StructuredToolInterface } from '@langchain/core/tools'
-import { filterTools, runManagedAgent } from './internal-runner.js'
-import { buildTools } from './tools.js'
+import { runManagedAgent } from './internal-runner.js'
 
 const dirs: string[] = []
 function tmp() { const d = mkdtempSync(join(tmpdir(), 'hip-internal-')); dirs.push(d); return d }
@@ -28,42 +26,21 @@ class TextRunner implements ModelRunner {
   }
 }
 
-describe('filterTools', () => {
-  it('keeps all tools when allowedTools is undefined', () => {
-    const tools = buildTools('/proj')
-    expect(filterTools(tools, undefined)).toHaveLength(tools.length)
-  })
-  it('keeps only the named tools', () => {
-    const tools = buildTools('/proj')
-    const kept = filterTools(tools, ['read_file', 'grep']).map((t) => t.name).sort()
-    expect(kept).toEqual(['grep', 'read_file'])
-  })
-  it('a mcp__<id>__* wildcard keeps every tool of that server', () => {
-    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
-    const tools = [fake('read_file'), fake('mcp__fs__read'), fake('mcp__fs__write'), fake('mcp__db__query')]
-    const kept = filterTools(tools, ['mcp__fs__*']).map((t) => t.name).sort()
-    expect(kept).toEqual(['mcp__fs__read', 'mcp__fs__write'])
-  })
-  it('mixes exact names and wildcards', () => {
-    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
-    const tools = [fake('read_file'), fake('write_file'), fake('mcp__fs__read'), fake('mcp__db__query')]
-    const kept = filterTools(tools, ['read_file', 'mcp__db__*']).map((t) => t.name).sort()
-    expect(kept).toEqual(['mcp__db__query', 'read_file'])
-  })
-  it('a wildcard does not match a different server prefix', () => {
-    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
-    const tools = [fake('mcp__fsx__read'), fake('mcp__fs__read')]
-    const kept = filterTools(tools, ['mcp__fs__*']).map((t) => t.name)
-    expect(kept).toEqual(['mcp__fs__read'])
-  })
-})
+/** A runner that records the tool names it was handed, then emits a fixed answer (no tool calls). */
+function spyRunner(): { runner: ModelRunner; seen: () => string[] } {
+  let names: string[] = []
+  return {
+    runner: { async run(_m, opts) { names = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') } },
+    seen: () => names,
+  }
+}
 
 describe('runManagedAgent', () => {
   it('runs the loop with the injected runner and returns the final text', async () => {
     const cwd = tmp()
     const { emit, tokens } = collectingEmit()
     const text = await runManagedAgent({
-      resolved: null, cwd, prompt: 'You are a tester.', allowedTools: ['read_file'],
+      resolved: null, cwd, prompt: 'You are a tester.',
       task: 'say hi', emit, signal: new AbortController().signal, childMaxSteps: 5,
       runner: new TextRunner('done'),
       summarizer: { async summarize() { return '' } },
@@ -71,68 +48,84 @@ describe('runManagedAgent', () => {
     expect(text).toBe('done')
     expect(tokens.join('')).toBe('done')
   })
+})
 
-  it('a read-only allow-list produces a toolset with no write_file', async () => {
+describe('runManagedAgent built-in tools always on', () => {
+  it("edit mode (default) grants the full built-in set incl. write_file/edit_file/write_todos", async () => {
     const cwd = tmp()
     writeFileSync(join(cwd, 'a.txt'), 'hello', 'utf8')
-    let seenToolNames: string[] = []
-    const runner: ModelRunner = {
-      async run(_m, opts) { seenToolNames = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
-    }
+    const { runner, seen } = spyRunner()
     await runManagedAgent({
-      resolved: null, cwd, prompt: 'read only', allowedTools: ['read_file', 'ls', 'glob', 'grep'],
+      resolved: null, cwd, prompt: 'p',
       task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
       runner, summarizer: { async summarize() { return '' } },
     })
-    expect(seenToolNames).not.toContain('write_file')
-    expect(seenToolNames).not.toContain('edit_file')
-    expect(seenToolNames).toContain('read_file')
+    expect(seen()).toContain('read_file')
+    expect(seen()).toContain('write_file')
+    expect(seen()).toContain('edit_file')
+    expect(seen()).toContain('write_todos')
+  })
+
+  it("chat mode drops write_file/edit_file (read-only); keeps read_file", async () => {
+    const cwd = tmp()
+    const { runner, seen } = spyRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p', permissionMode: 'chat',
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    expect(seen()).not.toContain('write_file')
+    expect(seen()).not.toContain('edit_file')
+    expect(seen()).toContain('read_file')
+  })
+
+  it("chat mode with NO requestApproval (mirrors the real chat cascade) does not grant run_script", async () => {
+    // In the live path session.ts passes requestApproval:undefined for chat, so run_script is never offered.
+    // run_script gating is on requestApproval presence, NOT on mode — so we mirror the real cascade here.
+    const cwd = tmp()
+    const { runner, seen } = spyRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p', permissionMode: 'chat',
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    expect(seen()).not.toContain('run_script')
   })
 })
 
-describe('runManagedAgent skills + run_script wiring', () => {
-  it('grants use_skill when allowed and skills are supplied', async () => {
+describe('runManagedAgent skills + run_script wiring (no allow-list gate anymore)', () => {
+  it('grants use_skill whenever skills are supplied', async () => {
     const cwd = tmp()
-    let seen: string[] = []
-    const runner: ModelRunner = {
-      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
-    }
+    const { runner, seen } = spyRunner()
     await runManagedAgent({
-      resolved: null, cwd, prompt: 'p', allowedTools: ['read_file', 'use_skill'],
+      resolved: null, cwd, prompt: 'p',
       task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
       runner, summarizer: { async summarize() { return '' } },
       skills: [{ id: 'fmt', name: 'formatter', description: 'd', dir: cwd, hasScripts: false }],
     })
-    expect(seen).toContain('use_skill')
+    expect(seen()).toContain('use_skill')
   })
 
-  it('does not grant run_script when not in the allow-list even with requestApproval', async () => {
+  it('grants run_script whenever requestApproval is supplied', async () => {
     const cwd = tmp()
-    let seen: string[] = []
-    const runner: ModelRunner = {
-      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
-    }
+    const { runner, seen } = spyRunner()
     await runManagedAgent({
-      resolved: null, cwd, prompt: 'p', allowedTools: ['read_file'],
+      resolved: null, cwd, prompt: 'p',
       task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
       runner, summarizer: { async summarize() { return '' } },
       requestApproval: async () => ({ kind: 'allow_once' }),
     })
-    expect(seen).not.toContain('run_script')
+    expect(seen()).toContain('run_script')
   })
 
-  it('grants run_script when allowed and requestApproval is supplied', async () => {
+  it('does not grant run_script when requestApproval is absent', async () => {
     const cwd = tmp()
-    let seen: string[] = []
-    const runner: ModelRunner = {
-      async run(_m, opts) { seen = opts.tools.map((t) => t.name); opts.onText('ok'); return new AIMessage('ok') },
-    }
+    const { runner, seen } = spyRunner()
     await runManagedAgent({
-      resolved: null, cwd, prompt: 'p', allowedTools: ['run_script'],
+      resolved: null, cwd, prompt: 'p',
       task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
       runner, summarizer: { async summarize() { return '' } },
-      requestApproval: async () => ({ kind: 'allow_once' }),
     })
-    expect(seen).toContain('run_script')
+    expect(seen()).not.toContain('run_script')
   })
 })

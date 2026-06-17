@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import type { SkillMeta } from '@hip/protocol'
+import type { SkillMeta, PermissionMode } from '@hip/protocol'
 import { resolveWithin } from './workspace-fs.js'
 import { gitCommit, gitCreateBranch, gitSwitchBranch } from './workspace-git.js'
 import { readSkillBody, listSkillFiles } from './skills/registry.js'
@@ -50,6 +50,12 @@ async function realInSkill(skillDirs: string[], p: string): Promise<string | nul
   return null
 }
 
+/** Resolve a model-supplied path in 'full' (un-jailed) mode. Absolute paths are taken AS-IS; relative
+ *  paths resolve against `cwd`. No symlink/escape check — 'full' is an explicit "all directories" grant. */
+function resolveFull(cwd: string, p: string): string {
+  return path.isAbsolute(p) ? path.normalize(p) : path.resolve(cwd, p)
+}
+
 export interface DispatchSpec {
   agents: Array<{ id: string; name: string; description?: string }>
   run: (agentId: string, task: string) => Promise<string>
@@ -73,6 +79,10 @@ export interface BuildToolsOpts {
   skills?: SkillMeta[]
   /** When present, adds the HITL-gated run_script tool. */
   requestApproval?: ApprovalFn
+  /** Conversation permission mode. 'chat' = read-only (no write/edit, reads jailed); 'edit' = DEFAULT
+   *  (write/edit jailed to root); 'full' = file tools un-jailed (any absolute path). Defaults to 'edit'.
+   *  Unknown values are treated as 'edit'. MCP tools + run_script gating are unaffected by mode. */
+  permissionMode?: PermissionMode
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -93,11 +103,18 @@ export function buildTools(
   // Enabled-skill dirs (~/.hip/skills/<id>), DISJOINT from the project root. read_file may ALSO reach
   // bundled reference files under these (read-only); every other path stays jailed to `root` via real().
   const skillDirs = (opts.skills ?? []).map((s) => s.dir)
+  // Mode (default + dirty-data → 'edit'). 'full' un-jails file paths; 'chat' is read-only.
+  const mode: PermissionMode = opts.permissionMode === 'chat' || opts.permissionMode === 'full' ? opts.permissionMode : 'edit'
+  const isFull = mode === 'full'
+  const pathRoot = cwd ?? root
+  /** Resolve a model path under the active mode: 'full' un-jails (absolute as-is, relative vs cwd);
+   *  otherwise the symlink-guarded jail to `root`. */
+  const resolvePath = (p: string): Promise<string> => (isFull ? Promise.resolve(resolveFull(pathRoot, p)) : real(root, p))
 
   const writeFile = tool(
     async ({ path: p, content }) => {
       try {
-        const abs = await real(root, p)
+        const abs = await resolvePath(p)
         await fs.mkdir(path.dirname(abs), { recursive: true })
         await fs.writeFile(abs, content, 'utf8')
         return `wrote ${p} (${content.length} bytes)`
@@ -128,7 +145,7 @@ export function buildTools(
         }
       }
       try {
-        const abs = await real(root, p)
+        const abs = await resolvePath(p)
         return await fs.readFile(abs, 'utf8')
       } catch (err) {
         const msg = (err as Error).message
@@ -148,7 +165,7 @@ export function buildTools(
   const editFile = tool(
     async ({ path: p, oldString, newString, replaceAll }) => {
       try {
-        const abs = await real(root, p)
+        const abs = await resolvePath(p)
         const cur = await fs.readFile(abs, 'utf8')
         if (!cur.includes(oldString)) return `Error: oldString not found in ${p}`
         const next = replaceAll ? cur.split(oldString).join(newString) : cur.replace(oldString, newString)
@@ -173,7 +190,7 @@ export function buildTools(
   const ls = tool(
     async ({ path: p }) => {
       try {
-        const abs = await real(root, p ?? '/')
+        const abs = await resolvePath(p ?? '/')
         const ents = await fs.readdir(abs, { withFileTypes: true })
         return ents.map((e) => (e.isDirectory() ? `${e.name}/` : e.name)).sort().join('\n') || '(empty)'
       } catch (err) {
@@ -248,7 +265,7 @@ export function buildTools(
           }
         }
       }
-      await walk(await real(root, p ?? '/'))
+      await walk(await resolvePath(p ?? '/'))
       return hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
     },
     {
@@ -281,7 +298,10 @@ export function buildTools(
     },
   )
 
-  const base: StructuredToolInterface[] = [writeFile, readFile, editFile, ls, glob, grep, writeTodos]
+  // 'chat' = read-only: drop write_file/edit_file. (read_file/ls/glob/grep + write_todos stay.)
+  const base: StructuredToolInterface[] = mode === 'chat'
+    ? [readFile, ls, glob, grep, writeTodos]
+    : [writeFile, readFile, editFile, ls, glob, grep, writeTodos]
 
   // Git tools are registered only for a real on-disk cwd (a git repo). They run against `cwd`
   // (the bound project root), NOT the file-tool sandbox `root` — same dir in practice, but explicit.

@@ -366,14 +366,19 @@ export function buildTools(
     const scriptCwd = cwd ?? root
     const runScript = tool(
       async ({ command, reason }) => {
-        const decision = await requestApproval({ title: 'Run script', kind: 'execute', content: command })
+        const decision = await requestApproval({
+          title: 'Run script',
+          kind: 'execute',
+          content: reason ? `${command}\n\n# ${reason}` : command,
+        })
         if (!isApproved(decision)) return '用户拒绝执行该脚本（command was rejected by the user; nothing ran）。'
         const isWin = process.platform === 'win32'
         const shell = isWin ? 'cmd' : 'sh'
         const shellArgs = isWin ? ['/c', command] : ['-c', command]
-        void reason
         return await new Promise<string>((resolve) => {
-          const child = spawn(shell, shellArgs, { cwd: scriptCwd, env: process.env })
+          // Detached on non-Windows so the shell gets its own process group; killing -pid on timeout
+          // reaps any grandchildren the script spawned (a bare child.kill leaves orphans).
+          const child = spawn(shell, shellArgs, { cwd: scriptCwd, env: process.env, detached: !isWin })
           let out = ''
           let capped = false
           const onChunk = (b: Buffer) => {
@@ -384,7 +389,14 @@ export function buildTools(
           child.stdout.on('data', onChunk)
           child.stderr.on('data', onChunk)
           let timedOut = false
-          const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL') }, SCRIPT_TIMEOUT_MS)
+          const timer = setTimeout(() => {
+            timedOut = true
+            if (!isWin && child.pid) {
+              try { process.kill(-child.pid, 'SIGKILL') } catch { try { child.kill('SIGKILL') } catch { /* already gone */ } }
+            } else {
+              try { child.kill('SIGKILL') } catch { /* already gone */ }
+            }
+          }, SCRIPT_TIMEOUT_MS)
           timer.unref?.()
           child.on('error', (err) => {
             clearTimeout(timer)

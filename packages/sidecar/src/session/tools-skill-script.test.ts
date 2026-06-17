@@ -108,6 +108,23 @@ describe('run_script tool', () => {
     expect(tools.find((t) => t.name === 'run_script')).toBeUndefined()
   })
 
+  it('folds the reason into the approval prompt content so the user sees why', async () => {
+    let seen: { title: string; kind: string; content?: string } | null = null
+    const capture: ApprovalFn = async (req) => { seen = req; return { kind: 'allow_once' } }
+    const tools = buildTools(root, undefined, root, undefined, { requestApproval: capture })
+    await byName(tools, 'run_script').invoke({ command: 'echo hi', reason: 'format the code' })
+    expect(seen!.content).toContain('echo hi')
+    expect(seen!.content).toContain('format the code')
+  })
+
+  it('approval content is just the command when no reason is given', async () => {
+    let seen: { content?: string } | null = null
+    const capture: ApprovalFn = async (req) => { seen = req; return { kind: 'reject_once' } }
+    const tools = buildTools(root, undefined, root, undefined, { requestApproval: capture })
+    await byName(tools, 'run_script').invoke({ command: 'echo hi' })
+    expect(seen!.content).toBe('echo hi')
+  })
+
   it('executes after approval and returns exit code + stdout', async () => {
     const tools = buildTools(root, undefined, root, undefined, { requestApproval: allowApproval })
     const out = String(await byName(tools, 'run_script').invoke({ command: 'echo hi' }))

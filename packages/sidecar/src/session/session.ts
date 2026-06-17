@@ -24,7 +24,7 @@ import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
 import { addUsage, sumUsage } from './usage.js'
 import type { Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
-import { createAgentProvider, readAgentsConfig, resolveAgentModel, type AgentProvider } from './agents/index.js'
+import { createAgentProvider, readAgentsConfig, type AgentProvider } from './agents/index.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { ExternalAgentHooks } from './agents/types.js'
 
@@ -197,10 +197,10 @@ export class Session {
     if (!this.externalProvider) {
       const agent = readAgentsConfig().find((x) => x.id === this._config.agentId)
       if (!agent) throw new Error(`Unknown agent: ${this._config.agentId}`)
-      // Model rollback: CLI ('custom') agents self-manage their model — hip never resolves/pushes one
-      // (LoopAgentProvider discards the model ctor param), so resolving it here would be dead work that
-      // contradicts the UI promise. The ACP path still resolves a model until its own rollback lands.
-      const model = agent.kind === 'custom' ? null : agent.acceptsModelConfig ? resolveAgentModel(agent) : null
+      // Model rollback: external agents (acp + custom) always self-manage — hip never resolves/pushes
+      // a model. The legacy acceptsModelConfig/authMode fields are ignored here. resolveAgentModel now
+      // serves only the internal-agent path (via the AgentInvoker).
+      const model = null
       const resume = this.store?.getAcpSessionId(this.id) ?? null
       this.externalProvider = createAgentProvider(agent, this._config.cwd ?? process.cwd(), model)
       // createAgentProvider doesn't take resume; pass it via an optional setter to avoid widening the factory.

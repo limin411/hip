@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { GraphEmit } from './graph.js'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import { filterTools, runManagedAgent } from './internal-runner.js'
 import { buildTools } from './tools.js'
 
@@ -36,6 +37,24 @@ describe('filterTools', () => {
     const tools = buildTools('/proj')
     const kept = filterTools(tools, ['read_file', 'grep']).map((t) => t.name).sort()
     expect(kept).toEqual(['grep', 'read_file'])
+  })
+  it('a mcp__<id>__* wildcard keeps every tool of that server', () => {
+    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
+    const tools = [fake('read_file'), fake('mcp__fs__read'), fake('mcp__fs__write'), fake('mcp__db__query')]
+    const kept = filterTools(tools, ['mcp__fs__*']).map((t) => t.name).sort()
+    expect(kept).toEqual(['mcp__fs__read', 'mcp__fs__write'])
+  })
+  it('mixes exact names and wildcards', () => {
+    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
+    const tools = [fake('read_file'), fake('write_file'), fake('mcp__fs__read'), fake('mcp__db__query')]
+    const kept = filterTools(tools, ['read_file', 'mcp__db__*']).map((t) => t.name).sort()
+    expect(kept).toEqual(['mcp__db__query', 'read_file'])
+  })
+  it('a wildcard does not match a different server prefix', () => {
+    const fake = (name: string) => ({ name } as unknown as StructuredToolInterface)
+    const tools = [fake('mcp__fsx__read'), fake('mcp__fs__read')]
+    const kept = filterTools(tools, ['mcp__fs__*']).map((t) => t.name)
+    expect(kept).toEqual(['mcp__fs__read'])
   })
 })
 

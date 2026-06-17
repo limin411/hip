@@ -14,11 +14,21 @@ import type { ResolvedModel } from './agents/registry.js'
 import type { SkillMeta } from '@hip/protocol'
 import type { ApprovalFn } from './tools.js'
 
-/** Keep only the tools whose name is in `allowed`. undefined ⇒ keep all (legacy-safe). */
+/** Keep only the tools whose name is in `allowed`. undefined ⇒ keep all (legacy-safe).
+ *  An entry of the form `mcp__<serverId>__*` is a whole-server wildcard: it permits any tool whose
+ *  name starts with `mcp__<serverId>__` (the frontend grants MCP access per-server, since it cannot
+ *  enumerate a server's individual tool names without a live connection). Every other entry is an
+ *  exact name match. */
 export function filterTools(tools: StructuredToolInterface[], allowed?: string[]): StructuredToolInterface[] {
   if (!allowed) return tools
-  const set = new Set(allowed)
-  return tools.filter((t) => set.has(t.name))
+  const exact = new Set<string>()
+  const prefixes: string[] = []
+  for (const a of allowed) {
+    const m = /^mcp__(.+)__\*$/.exec(a)
+    if (m) prefixes.push(`mcp__${m[1]}__`)
+    else exact.add(a)
+  }
+  return tools.filter((t) => exact.has(t.name) || prefixes.some((p) => t.name.startsWith(p)))
 }
 
 export interface RunManagedAgentArgs {

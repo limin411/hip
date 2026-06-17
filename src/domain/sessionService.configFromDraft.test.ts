@@ -60,4 +60,12 @@ describe('configFromDraft', () => {
     // even a legacy draft that still carries an agentId must not produce one
     expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'opencode' } as never)).toBe(false)
   })
+  it('carries the draft permissionMode into the config', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', permissionMode: 'full' })
+    expect(cfg.permissionMode).toBe('full')
+  })
+  it('omits permissionMode when the draft has none (server default applies)', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '' })
+    expect(cfg.permissionMode).toBeUndefined()
+  })
 })

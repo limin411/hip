@@ -353,14 +353,15 @@ export class SessionService {
   }
 }
 
-/** Build the committed SessionConfig from the current draft (project cwd + chosen model). */
+/** Build the committed SessionConfig from the current draft (project cwd + chosen model + permission mode). */
 export function configFromDraft(draft: Draft | null): SessionConfig {
   const base: SessionConfig =
     draft?.mode === 'project' && draft.cwd ? { ...DEFAULT_CONFIG, cwd: draft.cwd } : DEFAULT_CONFIG
-  if (!draft?.modelKey) return base
+  const withMode: SessionConfig = draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
+  if (!draft?.modelKey) return withMode
   const { catalog, config } = useProvidersStore.getState()
   const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
-  return { ...base, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
+  return { ...withMode, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

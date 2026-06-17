@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { nanoid } from 'nanoid'
+import type { PermissionMode } from '@hip/protocol'
 
 export interface Draft {
   tempId: string
@@ -9,6 +10,7 @@ export interface Draft {
   text: string
   agentId?: string             // legacy; no longer set by the composer
   modelKey?: string            // 'providerID/modelID' chosen for this chat (locked at first send)
+  permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
 }
 
 interface DraftStore {
@@ -19,6 +21,7 @@ interface DraftStore {
   clearProject: () => void
   setAgentId: (agentId: string) => void
   setModelKey: (modelKey: string) => void
+  setPermissionMode: (permissionMode: PermissionMode) => void
   reset: () => void
 }
 
@@ -63,6 +66,11 @@ export const useDraftStore = create<DraftStore>()(
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
           return { draft: { ...base, modelKey } }
+        }),
+      setPermissionMode: (permissionMode) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          return { draft: { ...base, permissionMode } }
         }),
       reset: () => set({ draft: null }),
     }),

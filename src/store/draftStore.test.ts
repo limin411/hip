@@ -50,3 +50,24 @@ describe('draftStore agentId', () => {
     expect(useDraftStore.getState().draft).toBeNull()
   })
 })
+
+describe('draftStore permissionMode', () => {
+  it('setPermissionMode creates a draft if none and records the mode', () => {
+    useDraftStore.getState().setPermissionMode('full')
+    expect(useDraftStore.getState().draft?.permissionMode).toBe('full')
+  })
+  it('setPermissionMode preserves existing draft fields', () => {
+    useDraftStore.getState().pickProject('/tmp/x')
+    useDraftStore.getState().setPermissionMode('chat')
+    const d = useDraftStore.getState().draft!
+    expect(d.cwd).toBe('/tmp/x')
+    expect(d.mode).toBe('project')
+    expect(d.permissionMode).toBe('chat')
+  })
+  it('reset clears the draft (and with it permissionMode)', () => {
+    useDraftStore.getState().setPermissionMode('edit')
+    expect(useDraftStore.getState().draft?.permissionMode).toBe('edit')
+    useDraftStore.getState().reset()
+    expect(useDraftStore.getState().draft).toBeNull()
+  })
+})

@@ -61,7 +61,7 @@ export function AgentCard({
               {t(agent.transport === 'rich' ? 'settings.agents.transportRich' : 'settings.agents.transportThin')}
             </Badge>
           )}
-          {(agent.boundModel || cat === 'internal') && (
+          {cat === 'internal' && (
             <Badge>
               <Cpu size={11} />
               {agent.boundModel ? agent.boundModel.modelID : t('settings.agents.badgeGlobalModel')}

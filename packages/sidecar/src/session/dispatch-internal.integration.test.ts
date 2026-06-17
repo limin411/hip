@@ -25,7 +25,7 @@ describe('dispatch -> internal managed agent (end-to-end)', () => {
     // Real invoker, but the internal child uses a FAKE model (paid-free) on the REAL loop.
     const invokerFactory = (cwd: string) => createAgentInvoker(cwd, {
       runInternal: (a) => runManagedAgent({
-        resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, allowedTools: a.allowedTools,
+        resolved: a.resolved, cwd: a.cwd, prompt: a.prompt,
         task: a.task, emit: a.emit, signal: a.signal, childMaxSteps: 5,
         runner: makeTextRunner('looks good'),
         summarizer: { async summarize() { return '' } },

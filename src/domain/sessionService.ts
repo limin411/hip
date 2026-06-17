@@ -1,5 +1,5 @@
 // src/domain/sessionService.ts
-import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode, PermissionMode } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -179,6 +179,11 @@ export class SessionService {
   setThinking(id: string, thinking: boolean): void {
     useDomainStore.getState().apply({ type: 'session:thinking', sessionId: id, thinking }) // optimistic
     this.transport.send({ type: 'session:setThinking', sessionId: id, thinking })
+  }
+
+  setPermissionMode(id: string, mode: PermissionMode): void {
+    useDomainStore.getState().apply({ type: 'session:permissionMode', sessionId: id, permissionMode: mode }) // optimistic
+    this.transport.send({ type: 'session:setPermissionMode', sessionId: id, permissionMode: mode })
   }
 
   setSystemPrompt(id: string, systemPrompt: string | null): void {

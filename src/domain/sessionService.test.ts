@@ -114,6 +114,13 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: null })
   })
 
+  it('setPermissionMode optimistically sets config and sends session:setPermissionMode', () => {
+    const t = new FakeTransport()
+    new SessionService(t).setPermissionMode('s1', 'full')
+    expect(useDomainStore.getState().sessions[0].config.permissionMode).toBe('full')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' })
+  })
+
   it('readFile marks the preview loading and sends fs:read', () => {
     const t = new FakeTransport()
     new SessionService(t).readFile('s1', '/proj/a.md')

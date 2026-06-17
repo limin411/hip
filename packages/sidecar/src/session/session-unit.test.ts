@@ -89,23 +89,6 @@ describe('Session.setThinking', () => {
   })
 })
 
-describe('Session.setPermissionMode', () => {
-  it('returns true and updates config when session is idle', () => {
-    const model = new FakeListChatModel({ responses: ['ok'] })
-    const session = new Session('t-mode-idle', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], permissionMode: 'edit' }, model)
-    expect(session.setPermissionMode('chat')).toBe(true)
-    expect(session.config.permissionMode).toBe('chat')
-  })
-
-  it('returns false and leaves config unchanged when a turn is running', () => {
-    const model = new FakeListChatModel({ responses: ['ok'] })
-    const session = new Session('t-mode-running', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], permissionMode: 'edit' }, model)
-    ;(session as unknown as { running: boolean }).running = true
-    expect(session.setPermissionMode('full')).toBe(false)
-    expect(session.config.permissionMode).toBe('edit')
-  })
-})
-
 describe('Session.setSystemPrompt', () => {
   it('returns true and updates config when idle', () => {
     const model = new FakeListChatModel({ responses: ['ok'] })
@@ -131,6 +114,28 @@ describe('Session.setSystemPrompt', () => {
     ;(session as unknown as { running: boolean }).running = true
     expect(session.setSystemPrompt('new')).toBe(false)
     expect(session.config.systemPrompt).toBe('keep')
+  })
+})
+
+describe('Session.setPermissionMode', () => {
+  it('returns true and updates config when idle', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-pm-idle', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, model)
+    expect(session.setPermissionMode('full')).toBe(true)
+    expect(session.config.permissionMode).toBe('full')
+  })
+  it('can set chat mode', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-pm-chat', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, model)
+    expect(session.setPermissionMode('chat')).toBe(true)
+    expect(session.config.permissionMode).toBe('chat')
+  })
+  it('returns false and leaves config unchanged while a turn is running', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-pm-running', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], permissionMode: 'edit' }, model)
+    ;(session as unknown as { running: boolean }).running = true
+    expect(session.setPermissionMode('full')).toBe(false)
+    expect(session.config.permissionMode).toBe('edit')
   })
 })
 

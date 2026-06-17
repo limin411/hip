@@ -1,4 +1,4 @@
-import type { SkillMeta } from '@hip/protocol'
+import type { SkillMeta, PermissionMode } from '@hip/protocol'
 
 const ANTI_PHANTOM =
   'You MUST NOT claim, state, or imply any file was created, written, saved, or modified ' +
@@ -32,7 +32,22 @@ const BASE =
   'a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
   'For a simple, single-step request, just do it directly — do not over-plan or call write_todos.'
 
-function cwdBlock(cwd: string): string {
+function cwdBlock(cwd: string, permissionMode?: PermissionMode): string {
+  if (permissionMode === 'full') {
+    return (
+      `Your working directory is the project root \`${cwd}\`. Filesystem tools are NOT sandboxed: you ` +
+      'may read and write any directory on this machine. Prefer absolute paths; a relative or ' +
+      `\`/\`-rooted path resolves against \`${cwd}\`. The user has explicitly granted full filesystem access.`
+    )
+  }
+  if (permissionMode === 'chat') {
+    return (
+      `Your working directory is the project root \`${cwd}\`. You are in READ-ONLY mode: you cannot write ` +
+      'or edit files and cannot run scripts (those tools are not available). Use read_file, ls, glob, and ' +
+      'grep to inspect the project. Address every path as an absolute path starting with `/`, relative to ' +
+      `this root — e.g. \`/index.html\` (maps to \`${cwd}/index.html\`). Never use a path outside this root.`
+    )
+  }
   return (
     `Your working directory is the project root \`${cwd}\`. Filesystem tools are sandboxed to it. ` +
     'Address every path as an absolute path starting with `/`, relative to this root — ' +
@@ -55,11 +70,12 @@ export interface SystemPromptInput {
   cwd: string
   userInstructions?: string
   skills?: SkillMeta[]
+  permissionMode?: PermissionMode
 }
 
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions). */
-export function buildSystemPrompt({ cwd, userInstructions, skills }: SystemPromptInput): string {
-  let base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode }: SystemPromptInput): string {
+  let base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
   if (skills && skills.length > 0) base = `${base}\n\n${skillsBlock(skills)}`
   const extra = userInstructions?.trim()
   return extra
@@ -85,13 +101,14 @@ export interface ManagedAgentPromptInput {
   persona: string
   toolNames: string[]
   skills?: SkillMeta[]
+  permissionMode?: PermissionMode
 }
 
 /** System prompt for an internal managed sub-agent: identity guard + an operating preamble that
  *  enumerates the agent's ACTUAL granted tools + cwd convention + anti-phantom + the persona, framed
  *  as a focused, non-delegating sub-agent. Git guidance only when a git tool is granted; skills block
  *  only when use_skill is granted AND skills are supplied. */
-export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills }: ManagedAgentPromptInput): string {
+export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills, permissionMode }: ManagedAgentPromptInput): string {
   const toolList = toolNames.length ? toolNames.join(', ') : '(no tools — answer from reasoning only)'
   const base =
     'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
@@ -100,7 +117,7 @@ export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills }: Man
     'and verify your results. You cannot delegate further. When done, return a concise text result ' +
     'describing what you found or changed.'
   const hasGit = toolNames.some((n) => n.startsWith('git_'))
-  const parts = [IDENTITY, base, cwdBlock(cwd)]
+  const parts = [IDENTITY, base, cwdBlock(cwd, permissionMode)]
   if (hasGit) parts.push(GIT_GUIDANCE)
   if (toolNames.includes('use_skill') && skills && skills.length > 0) parts.push(skillsBlock(skills))
   parts.push(ANTI_PHANTOM, `## Your role and instructions\n${persona.trim()}`)

@@ -127,3 +127,35 @@ describe('buildManagedAgentPrompt skills block', () => {
     expect(s).not.toMatch(/可用 Skills/)
   })
 })
+
+describe('buildSystemPrompt permissionMode-aware cwd block', () => {
+  it("edit mode (default) keeps the sandboxed-to-root wording", () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', permissionMode: 'edit' })
+    expect(s).toMatch(/sandboxed to it/i)
+  })
+  it("default (no permissionMode) keeps the sandboxed-to-root wording", () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    expect(s).toMatch(/sandboxed to it/i)
+  })
+  it("chat mode says the agent is read-only and cannot write or run scripts", () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', permissionMode: 'chat' })
+    expect(s).toMatch(/read-only/i)
+    expect(s).toMatch(/cannot write/i)
+  })
+  it("full mode says filesystem tools are NOT sandboxed and may read/write any directory", () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', permissionMode: 'full' })
+    expect(s).toMatch(/not sandboxed/i)
+    expect(s).toMatch(/any directory/i)
+  })
+})
+
+describe('buildManagedAgentPrompt permissionMode-aware cwd block', () => {
+  it("threads chat mode into the managed-agent cwd block (read-only)", () => {
+    const p = buildManagedAgentPrompt({ cwd: '/proj', persona: 'x', toolNames: ['read_file'], permissionMode: 'chat' })
+    expect(p).toMatch(/read-only/i)
+  })
+  it("threads full mode into the managed-agent cwd block (not sandboxed)", () => {
+    const p = buildManagedAgentPrompt({ cwd: '/proj', persona: 'x', toolNames: ['read_file'], permissionMode: 'full' })
+    expect(p).toMatch(/not sandboxed/i)
+  })
+})

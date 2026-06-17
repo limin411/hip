@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
 import { agentCategory } from '@/lib/agentCategory'
-import { toolNamesToGroups, DEFAULT_TOOL_GROUPS } from '@/lib/agentTools'
+import { toolNamesToGroups, DEFAULT_TOOL_GROUPS, grantedMcpServerIds } from '@/lib/agentTools'
 import { AcpProviderPicker } from './AcpProviderPicker'
 import type { AcpPreset } from '@/lib/acpPresets'
 
@@ -48,6 +48,9 @@ export function AgentEditor({
     toolsEdit: groups0.edit,
     toolsPlan: groups0.plan,
     toolsGit: groups0.git,
+    toolsSkill: groups0.skill,
+    toolsScript: groups0.script,
+    mcpServerIds: initial ? grantedMcpServerIds(initial.allowedTools) : [],
     enabled: initial?.enabled ?? true,
   })
   const [busy, setBusy] = useState(false)

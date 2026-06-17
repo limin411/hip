@@ -72,7 +72,18 @@ export interface AgentConfig {
   quirks?: string                     // acp only: per-agent quirk-profile key (e.g. 'opencode')
   env?: Record<string, string>        // advanced manual env overrides
   prompt?: string                     // internal only: the persona system prompt (required for kind 'internal')
-  allowedTools?: string[]             // internal only: tool-name allow-list; undefined ⇒ full default set
+  /**
+   * @deprecated No longer used to gate internal built-in tools (built-ins incl. run_script + use_skill
+   * are always available to internal agents). Retained for back-compat with old hip-agents.json configs
+   * AND as a one-time migration source: legacy `mcp__<id>__*` wildcards seed `allowedMcpServers` when that
+   * field is undefined. New configs should set allowedSkills/allowedMcpServers instead.
+   */
+  allowedTools?: string[]
+  /** internal only: Skill ids this agent may use (use_skill is restricted to these, and only these are
+   *  advertised in its prompt). undefined/[] ⇒ none. */
+  allowedSkills?: string[]
+  /** internal only: MCP server ids whose tools this agent may use. undefined/[] ⇒ none. */
+  allowedMcpServers?: string[]
   enabled: boolean
 }
 
@@ -317,6 +328,7 @@ export type ClientMessage =
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
+  | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
@@ -345,6 +357,7 @@ export type ServerMessage =
   | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
+  | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }

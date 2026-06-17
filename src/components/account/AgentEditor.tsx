@@ -185,66 +185,14 @@ export function AgentEditor({
               </Section>
 
               {isAcp && (
-                <>
-                  <Field label={t('settings.agents.quirks')}>
-                    <input
-                      className={cn(inputCls, 'font-mono')}
-                      value={form.quirks ?? ''}
-                      onChange={(e) => patch({ quirks: e.target.value || undefined })}
-                      placeholder={t('settings.agents.quirksPlaceholder')}
-                    />
-                  </Field>
-                  <Section label={t('settings.agents.sectionAuth')}>
-                    <div
-                      role="radiogroup"
-                      aria-label={t('settings.agents.sectionAuth')}
-                      className="flex gap-2"
-                      onKeyDown={(e) => {
-                        const next =
-                          e.key === 'ArrowRight' || e.key === 'ArrowDown'
-                            ? 'hip-managed'
-                            : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
-                              ? 'opencode-self'
-                              : null
-                        if (!next) return
-                        e.preventDefault()
-                        patch({ authMode: next })
-                        e.currentTarget.querySelectorAll('button')[next === 'opencode-self' ? 0 : 1]?.focus()
-                      }}
-                    >
-                      <ChoiceCard
-                        selected={form.authMode === 'opencode-self'}
-                        title={t('settings.agents.authSelf')}
-                        desc={t('settings.agents.authSelfDesc')}
-                        onClick={() => patch({ authMode: 'opencode-self' })}
-                      />
-                      <ChoiceCard
-                        selected={form.authMode === 'hip-managed'}
-                        title={t('settings.agents.authManaged')}
-                        desc={t('settings.agents.authManagedDesc')}
-                        onClick={() => patch({ authMode: 'hip-managed' })}
-                      />
-                    </div>
-                    {form.authMode === 'hip-managed' && (
-                      <select
-                        className={cn(inputCls, 'mt-2')}
-                        value={form.boundModelKey}
-                        onChange={(e) => patch({ boundModelKey: e.target.value })}
-                      >
-                        <option value="">{t('settings.agents.selectModel')}</option>
-                        {groups.map((g) => (
-                          <optgroup key={g.providerID} label={g.providerName}>
-                            {g.models.map((m) => (
-                              <option key={m.key} value={m.key}>
-                                {m.modelID}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    )}
-                  </Section>
-                </>
+                <Field label={t('settings.agents.quirks')}>
+                  <input
+                    className={cn(inputCls, 'font-mono')}
+                    value={form.quirks ?? ''}
+                    onChange={(e) => patch({ quirks: e.target.value || undefined })}
+                    placeholder={t('settings.agents.quirksPlaceholder')}
+                  />
+                </Field>
               )}
 
               <Section label={t('settings.agents.sectionTransport')}>
@@ -280,39 +228,6 @@ export function AgentEditor({
                 </div>
               </Section>
 
-              {!isAcp && (
-                <Section label={t('settings.agents.sectionModel')}>
-                  <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-                    <div className="flex-1">
-                      <div className="text-body text-ink">{t('settings.agents.acceptsModel')}</div>
-                      <div className="mt-0.5 text-caption text-ink-tertiary">{t('settings.agents.acceptsModelDesc')}</div>
-                    </div>
-                    <Switch
-                      checked={form.acceptsModelConfig}
-                      onCheckedChange={(v) => patch({ acceptsModelConfig: v, boundModelKey: v ? form.boundModelKey : '' })}
-                      ariaLabel={t('settings.agents.acceptsModel')}
-                    />
-                  </div>
-                  {form.acceptsModelConfig && (
-                    <select
-                      className={cn(inputCls, 'mt-2')}
-                      value={form.boundModelKey}
-                      onChange={(e) => patch({ boundModelKey: e.target.value })}
-                    >
-                      <option value="">{t('settings.agents.selectModel')}</option>
-                      {groups.map((g) => (
-                        <optgroup key={g.providerID} label={g.providerName}>
-                          {g.models.map((m) => (
-                            <option key={m.key} value={m.key}>
-                              {m.modelID}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  )}
-                </Section>
-              )}
             </>
           )}
 

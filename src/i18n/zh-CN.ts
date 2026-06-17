@@ -42,6 +42,17 @@ export const zhCN = {
         title: '需要授权',
         intro: '智能体请求执行以下操作：',
         fromSubagent: '来自子智能体 {{name}} 的请求',
+        label: '本对话的权限模式',
+        modes: {
+          chat: '仅对话',
+          edit: '编辑目录内文件',
+          full: '完全放开',
+        },
+        desc: {
+          chat: '只读 —— 可读取与搜索文件，但不能写入或运行脚本',
+          edit: '可读取并编辑项目目录内的文件；运行脚本会逐次确认',
+          full: '可读写任意目录；运行脚本不再确认',
+        },
       },
       style: '风格',
       styleNone: '无',

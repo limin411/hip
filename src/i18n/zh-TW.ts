@@ -42,6 +42,17 @@ export const zhTW = {
         title: '需要授權',
         intro: '智能體請求執行以下操作：',
         fromSubagent: '來自子智能體 {{name}} 的請求',
+        label: '本對話的權限模式',
+        modes: {
+          chat: '僅對話',
+          edit: '編輯目錄內檔案',
+          full: '完全放開',
+        },
+        desc: {
+          chat: '唯讀 —— 可讀取與搜尋檔案，但不能寫入或執行腳本',
+          edit: '可讀取並編輯專案目錄內的檔案；執行腳本會逐次確認',
+          full: '可讀寫任意目錄；執行腳本不再確認',
+        },
       },
       style: '風格',
       styleNone: '無',

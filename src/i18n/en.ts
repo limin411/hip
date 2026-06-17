@@ -42,6 +42,17 @@ export const en = {
         title: 'Permission required',
         intro: 'The agent is requesting to perform this action:',
         fromSubagent: 'Requested by sub-agent {{name}}',
+        label: 'Permission mode for this conversation',
+        modes: {
+          chat: 'Chat only',
+          edit: 'Edit files',
+          full: 'Full access',
+        },
+        desc: {
+          chat: 'Read-only — can read and search files, but not write or run scripts',
+          edit: 'Read and edit files inside the project folder; scripts ask first',
+          full: 'Read and write any directory; scripts run without asking',
+        },
       },
       style: 'Style',
       styleNone: 'None',

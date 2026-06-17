@@ -47,6 +47,30 @@ describe('buildTools permissionMode — registration', () => {
     expect(names).toContain('write_file')
     expect(names).toContain('edit_file')
   })
+
+  it("chat mode drops run_script even when an approval fn is wired (a read-only agent must not mutate)", () => {
+    const names = buildTools(root, undefined, root, undefined, {
+      permissionMode: 'chat',
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    }).map((t) => t.name)
+    expect(names).not.toContain('run_script')
+  })
+
+  it("edit mode keeps run_script when an approval fn is wired", () => {
+    const names = buildTools(root, undefined, root, undefined, {
+      permissionMode: 'edit',
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    }).map((t) => t.name)
+    expect(names).toContain('run_script')
+  })
+
+  it("full mode keeps run_script when an approval fn is wired", () => {
+    const names = buildTools(root, undefined, root, undefined, {
+      permissionMode: 'full',
+      requestApproval: async () => ({ kind: 'allow_once' }),
+    }).map((t) => t.name)
+    expect(names).toContain('run_script')
+  })
 })
 
 describe('buildTools permissionMode — path jail', () => {

@@ -79,9 +79,10 @@ export interface BuildToolsOpts {
   skills?: SkillMeta[]
   /** When present, adds the HITL-gated run_script tool. */
   requestApproval?: ApprovalFn
-  /** Conversation permission mode. 'chat' = read-only (no write/edit, reads jailed); 'edit' = DEFAULT
-   *  (write/edit jailed to root); 'full' = file tools un-jailed (any absolute path). Defaults to 'edit'.
-   *  Unknown values are treated as 'edit'. MCP tools + run_script gating are unaffected by mode. */
+  /** Conversation permission mode. 'chat' = read-only (no write/edit + no run_script, reads jailed);
+   *  'edit' = DEFAULT (write/edit jailed to root); 'full' = file tools un-jailed (any absolute path).
+   *  Defaults to 'edit'. Unknown values are treated as 'edit'. MCP tools are unaffected by mode;
+   *  run_script is dropped in chat mode (it would let a read-only agent mutate the project). */
   permissionMode?: PermissionMode
 }
 
@@ -381,7 +382,10 @@ export function buildTools(
     extras.push(useSkill)
   }
 
-  if (opts.requestApproval) {
+  // run_script is dropped in chat (read-only) mode: a shell command would let a "read-only" agent
+  // mutate the project, defeating the mode. Outside chat it is registered whenever an approval fn
+  // is wired (every call is still HITL-gated).
+  if (opts.requestApproval && mode !== 'chat') {
     const requestApproval = opts.requestApproval
     const scriptCwd = cwd ?? root
     const runScript = tool(

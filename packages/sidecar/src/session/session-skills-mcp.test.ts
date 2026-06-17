@@ -78,4 +78,31 @@ describe('Session wires skills, MCP reconcile, and the run_script HITL closure',
     const toolFinished = sent.find((m) => m.type === 'tool:finished' && (m as { output?: string }).output?.includes('formatted'))
     expect(toolFinished).toBeTruthy()
   }, 30_000)
+
+  it('fails CLOSED: an unrecognized permission optionId never approves the script', async () => {
+    // Security regression: if the UI returns an optionId that maps to no advertised option, the
+    // closure must resolve to a REJECT kind (not echo the opaque id, which isApproved would have to
+    // re-interpret). The script must not run.
+    const runner = new ScriptThenTextRunner()
+    const session = new Session('s2', { llmProvider: 'deepseek', model: '', tools: [], cwd: root } as any, undefined, undefined, undefined, 60_000, runner)
+    const sent: ServerMessage[] = []
+    const send = (m: ServerMessage) => {
+      sent.push(m)
+      if (m.type === 'permission:request') {
+        // an optionId that is NOT among the advertised options (allow_once / reject_once) yet starts
+        // with 'allow' — the old `?? choice.optionId` fallback would echo it and isApproved (kind
+        // .startsWith('allow')) would APPROVE. Failing closed (?? 'reject_once') rejects it.
+        session.respondPermission((m as { requestId: string }).requestId, { optionId: 'allow-but-unadvertised' })
+      }
+    }
+    await session.sendMessage('please format', send, 'u2')
+
+    expect(sent.some((m) => m.type === 'permission:request')).toBe(true)
+    // the command must NOT have executed
+    const ranIt = sent.find((m) => m.type === 'tool:finished' && (m as { output?: string }).output?.includes('formatted'))
+    expect(ranIt).toBeFalsy()
+    // the run_script tool result must reflect a refusal
+    const refused = sent.find((m) => m.type === 'tool:finished' && (m as { output?: string }).output && /拒绝|reject|declined/i.test((m as { output: string }).output))
+    expect(refused).toBeTruthy()
+  }, 30_000)
 })

@@ -691,7 +691,9 @@ export class Session {
         const requestId = `run-script-${turnId}-${nextSeq()}`
         this.pendingPermissions.set(requestId, (choice) => {
           if ('cancelled' in choice) { resolve({ cancelled: true }); return }
-          const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? choice.optionId
+          // Fail CLOSED: an unrecognized optionId must never approve (isApproved keys off
+          // kind.startsWith('allow'), so echoing an 'allow'-prefixed bogus id would auto-approve).
+          const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? 'reject_once'
           resolve({ kind })
         })
         send({

@@ -89,6 +89,23 @@ describe('Session.setThinking', () => {
   })
 })
 
+describe('Session.setPermissionMode', () => {
+  it('returns true and updates config when session is idle', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-mode-idle', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], permissionMode: 'edit' }, model)
+    expect(session.setPermissionMode('chat')).toBe(true)
+    expect(session.config.permissionMode).toBe('chat')
+  })
+
+  it('returns false and leaves config unchanged when a turn is running', () => {
+    const model = new FakeListChatModel({ responses: ['ok'] })
+    const session = new Session('t-mode-running', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], permissionMode: 'edit' }, model)
+    ;(session as unknown as { running: boolean }).running = true
+    expect(session.setPermissionMode('full')).toBe(false)
+    expect(session.config.permissionMode).toBe('edit')
+  })
+})
+
 describe('Session.setSystemPrompt', () => {
   it('returns true and updates config when idle', () => {
     const model = new FakeListChatModel({ responses: ['ok'] })

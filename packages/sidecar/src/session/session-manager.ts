@@ -120,6 +120,15 @@ export class SessionManager {
         send({ type: 'session:systemPrompt', sessionId: msg.sessionId, systemPrompt: s.config.systemPrompt ?? null })
         break
       }
+      case 'session:setPermissionMode': {
+        const s = this.ensureSession(msg.sessionId)
+        const applied = s.setPermissionMode(msg.permissionMode)
+        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        // Echo the session's REAL mode (undefined ⇒ 'edit') so the client syncs to truth even if the
+        // toggle was rejected mid-turn.
+        send({ type: 'session:permissionMode', sessionId: msg.sessionId, permissionMode: s.config.permissionMode ?? 'edit' })
+        break
+      }
       case 'config:setActiveModel': {
         setActiveModel({ providerID: msg.providerID, modelID: msg.modelID, baseURL: msg.baseURL })
         // Apply to every in-memory session at its next idle turn (no restart).

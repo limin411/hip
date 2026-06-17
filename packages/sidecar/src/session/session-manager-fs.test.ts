@@ -40,6 +40,22 @@ describe('session-manager fs', () => {
     expect(sent).toContainEqual({ type: 'session:thinking', sessionId: 's1', thinking: true })
   })
 
+  it('session:setPermissionMode echoes session:permissionMode and updates the live session', () => {
+    const { mgr, sent, send } = setup()
+    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'chat' }, send)
+    expect(sent).toContainEqual({ type: 'session:permissionMode', sessionId: 's1', permissionMode: 'chat' })
+    expect(mgr.getSessionForTest('s1')!.config.permissionMode).toBe('chat')
+  })
+
+  it('session:setPermissionMode echoes the REAL mode (edit default) when rejected mid-turn', () => {
+    const { mgr, sent, send } = setup()
+    // Simulate an in-flight turn so setPermissionMode is a NO-OP; the echo must still report truth.
+    ;(mgr.getSessionForTest('s1') as unknown as { running: boolean }).running = true
+    mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' }, send)
+    expect(sent).toContainEqual({ type: 'session:permissionMode', sessionId: 's1', permissionMode: 'edit' })
+    expect(mgr.getSessionForTest('s1')!.config.permissionMode).toBeUndefined()
+  })
+
   it('fs:ls returns directory entries', async () => {
     const { mgr, sent, send } = setup()
     mgr.handle({ type: 'session:setCwd', sessionId: 's1', cwd: root }, send)

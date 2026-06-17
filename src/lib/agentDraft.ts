@@ -43,8 +43,11 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
       transport: 'thin',
       acceptsModelConfig: false,
       prompt: form.prompt.trim(),
-      // Built-in tools are always available; only per-agent skill/MCP grants are configured here.
-      // NO allowedTools is emitted — the sidecar no longer gates built-ins by an allow-list.
+      // Built-in tools are always available; only per-agent skill/MCP grants are configured here. The
+      // sidecar no longer gates built-ins by an allow-list, so explicitly emit allowedTools: undefined
+      // — agentsStore.updateAgent does a shallow merge ({ ...x, ...patch }), and emitting the key clears
+      // any legacy allowedTools value left on a migrated internal agent when it is re-saved.
+      allowedTools: undefined,
       allowedSkills: [...form.allowedSkills],
       allowedMcpServers: [...form.allowedMcpServers],
       boundModel: parseBoundModel(form.boundModelKey),

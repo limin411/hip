@@ -82,7 +82,7 @@ describe('internal agents', () => {
     expect(isAgentDraftValid({ ...internalBase, prompt: '   ' })).toBe(false)
     expect(isAgentDraftValid({ ...internalBase, command: '' })).toBe(true) // command irrelevant for internal
   })
-  it('builds an internal draft: prompt + allowedSkills/allowedMcpServers, NO allowedTools, inert command/args', () => {
+  it('builds an internal draft: prompt + allowedSkills/allowedMcpServers, allowedTools cleared to undefined, inert command/args', () => {
     const d = buildAgentDraft({ ...internalBase, allowedSkills: ['code-review'], allowedMcpServers: ['fs'] })
     expect(d).toMatchObject({
       kind: 'internal',
@@ -94,13 +94,16 @@ describe('internal agents', () => {
       allowedSkills: ['code-review'],
       allowedMcpServers: ['fs'],
     })
-    expect('allowedTools' in d).toBe(false)
+    // Explicitly emits allowedTools: undefined so the shallow merge in updateAgent clears any legacy value.
+    expect('allowedTools' in d).toBe(true)
+    expect(d.allowedTools).toBeUndefined()
     expect(d.boundModel).toBeUndefined()
   })
-  it('empty skill/mcp selections emit empty arrays (explicit none)', () => {
+  it('empty skill/mcp selections emit empty arrays (explicit none) and clear allowedTools', () => {
     const d = buildAgentDraft(internalBase)
     expect(d).toMatchObject({ allowedSkills: [], allowedMcpServers: [] })
-    expect('allowedTools' in d).toBe(false)
+    expect('allowedTools' in d).toBe(true)
+    expect(d.allowedTools).toBeUndefined()
   })
   it('copies the arrays (does not alias the form arrays)', () => {
     const skills = ['a']

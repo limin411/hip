@@ -277,6 +277,17 @@ describe('applyServerMessage', () => {
     const off = applyServerMessage(s0, { type: 'session:thinking', sessionId: 's1', thinking: false }, 0)
     expect(off.sessions[0].config.thinking).toBe(false)
   })
+  it('session:permissionMode writes config.permissionMode', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'session:permissionMode', sessionId: 's1', permissionMode: 'full' }, 0)
+    expect(next.sessions[0].config.permissionMode).toBe('full')
+  })
+
+  it('session:permissionMode for an unknown session is a no-op (same reference)', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'session:permissionMode', sessionId: 'nope', permissionMode: 'chat' }, 0)
+    expect(next).toBe(s0)
+  })
   it('reasoning:delta for an unknown turnId is a no-op', () => {
     const s0 = { sessions: [baseSession({ messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }] })] }
     const next = applyServerMessage(s0, { type: 'reasoning:delta', sessionId: 's1', turnId: 'ghost', agentId: 'supervisor', role: 'supervisor', stepSeq: 0, delta: 'x' }, 0)

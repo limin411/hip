@@ -21,6 +21,10 @@ export interface SessionConfig {
   language?: 'en' | 'zh-CN' | 'zh-TW'
   agentId?: string             // undefined / 'builtin' => built-in hip agent; else an AgentConfig.id
   permissionMode?: PermissionMode  // per-conversation gate; undefined ⇒ treated as 'edit'
+  /** Which top-level surface owns this conversation. 'chat' = sandboxed conversation-only;
+   *  'code' = conversation + directory tree + git. undefined on a legacy row ⇒ inferred from
+   *  the cwd (a scratch cwd ⇒ 'chat', else 'code'); see surfaceOf in the sidecar. */
+  surface?: 'chat' | 'code'
 }
 
 /** Global current model the whole app uses. */
@@ -229,6 +233,7 @@ export interface SessionSummary {
   preview: string
   updatedAt: number
   messageCount: number
+  surface: 'chat' | 'code'
 }
 export interface SearchHit {
   sessionId: string

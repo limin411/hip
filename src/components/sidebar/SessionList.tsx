@@ -1,12 +1,14 @@
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, useSearchHits, sessionService } from '@/domain'
-import { filterSessions } from '@/lib/sessions'
+import { filterSessions, filterBySurface } from '@/lib/sessions'
 import { SessionItem } from './SessionItem'
 
 export function SessionList() {
   const { t } = useTranslation()
-  const sessions = useSessions()
+  const activeView = useUiStore((s) => s.activeView)
+  const surface = activeView === 'code' ? 'code' : 'chat'
+  const sessions = filterBySurface(useSessions(), surface)
   const search = useUiStore((s) => s.search)
   const activeSessionId = useActiveSessionId()
   const hits = useSearchHits()
@@ -15,10 +17,11 @@ export function SessionList() {
   const local = filterSessions(sessions, q)
   // Content matches (sidecar FTS) for sessions the instant local title/preview
   // filter didn't already surface; dedupe so each session appears once.
+  const surfaceIds = new Set(sessions.map((s) => s.id))
   const seen = new Set(local.map((s) => s.id))
   const contentHits = q
     ? hits.filter((h) => {
-        if (!h.sessionId || seen.has(h.sessionId)) return false
+        if (!h.sessionId || !surfaceIds.has(h.sessionId) || seen.has(h.sessionId)) return false
         seen.add(h.sessionId)
         return true
       })

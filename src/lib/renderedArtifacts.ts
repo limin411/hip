@@ -1,4 +1,4 @@
-import type { ToolCall } from '@hip/protocol'
+import type { ToolCall, Message } from '@hip/protocol'
 import { previewKind, type PreviewKind } from '@/components/artifact/previewKind'
 
 /** A renderable file the agent wrote this turn — surfaced as an artifact-card row. */
@@ -68,6 +68,22 @@ export function extractRenderedArtifacts(toolCalls?: ToolCall[]): RenderedArtifa
     if (!RENDERABLE.has(kind)) continue
     if (!byPath.has(path)) order.push(path)
     byPath.set(path, { path, name: basename(path), kind: kind as RenderedArtifact['kind'] })
+  }
+  return order.map((p) => byPath.get(p)!)
+}
+
+/** Conversation-level rollup of renderable artifacts: the union of every assistant turn's
+ *  extractRenderedArtifacts, deduped by path keeping the LAST write while preserving first-seen
+ *  order. Drives the Chat surface's PreviewPanel list. Never throws. */
+export function collectConversationArtifacts(messages: Message[]): RenderedArtifact[] {
+  const byPath = new Map<string, RenderedArtifact>()
+  const order: string[] = []
+  for (const m of messages) {
+    if (m.role !== 'assistant') continue
+    for (const a of extractRenderedArtifacts(m.toolCalls)) {
+      if (!byPath.has(a.path)) order.push(a.path)
+      byPath.set(a.path, a)
+    }
   }
   return order.map((p) => byPath.get(p)!)
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import type { ToolCall } from '@hip/protocol'
-import { extractRenderedArtifacts, type RenderedArtifact } from './renderedArtifacts'
+import type { ToolCall, Message } from '@hip/protocol'
+import { extractRenderedArtifacts, collectConversationArtifacts, type RenderedArtifact } from './renderedArtifacts'
 
 function tc(over: Partial<ToolCall>): ToolCall {
   return { callId: 'c', agentId: 'coder', name: 'write_file', input: '{}', status: 'finished', seq: 0, ...over }
@@ -101,5 +101,27 @@ describe('extractRenderedArtifacts', () => {
   it('returns [] for undefined or empty input', () => {
     expect(extractRenderedArtifacts(undefined)).toEqual([])
     expect(extractRenderedArtifacts([])).toEqual([])
+  })
+})
+
+function asstMsg(id: string, toolCalls: Message['toolCalls']): Message {
+  return { id, role: 'assistant', content: '', timestamp: 1, toolCalls }
+}
+const w = (callId: string, path: string, seq: number) =>
+  ({ callId, agentId: 'supervisor', name: 'write_file', input: JSON.stringify({ path }), status: 'finished' as const, seq })
+
+describe('collectConversationArtifacts', () => {
+  it('aggregates renderable artifacts across assistant turns, last write wins, first-seen order', () => {
+    const messages: Message[] = [
+      asstMsg('a', [w('1', '/doc.md', 0), w('2', '/pic.png', 1)]),
+      { id: 'u', role: 'user', content: 'x', timestamp: 2 },
+      asstMsg('b', [w('3', '/doc.md', 0)]),
+    ]
+    const out = collectConversationArtifacts(messages)
+    expect(out.map((a) => a.path)).toEqual(['/doc.md', '/pic.png'])
+  })
+  it('ignores user messages and non-renderable writes; empty input → []', () => {
+    expect(collectConversationArtifacts([])).toEqual([])
+    expect(collectConversationArtifacts([asstMsg('a', [w('1', '/main.ts', 0)])])).toEqual([])
   })
 })

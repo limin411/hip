@@ -83,10 +83,6 @@ export function AgentEditor({
     patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self' })
     setAcpStep('form')
   }
-  const pickCustom = () => {
-    patch({ command: '', args: '', quirks: undefined, authMode: 'opencode-self' })
-    setAcpStep('form')
-  }
 
   const submit = async () => {
     setBusy(true)
@@ -112,7 +108,7 @@ export function AgentEditor({
         {isAcp && acpStep === 'pick' ? (
           <>
             <div className="p-5">
-              <AcpProviderPicker onPick={pickPreset} onPickCustom={pickCustom} />
+              <AcpProviderPicker onPick={pickPreset} />
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
               <Button variant="outline" size="sm" onClick={onCancel}>

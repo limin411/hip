@@ -383,8 +383,6 @@ export const zhTW = {
         acpPickTitle: '新增 ACP — 選擇提供方',
         acpPresetAvailable: '現已支援',
         acpPresetComingSoon: '即將支援',
-        acpPresetCustom: '自訂 / 通用',
-        acpPresetCustomDesc: '手填命令與參數',
         backToProviders: '← 返回選擇提供方',
       },
     },

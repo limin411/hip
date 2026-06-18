@@ -21,9 +21,6 @@ export const ACP_PRESETS: AcpPreset[] = [
   { id: 'kimi-code', name: 'Kimi Code', status: 'coming-soon', command: '', args: [], icon: 'rocket' },
 ]
 
-/** The 自定义 / 通用 escape hatch — not a real preset; the picker handles it separately. */
-export const CUSTOM_ACP_PRESET_ID = 'custom'
-
 export function acpPresetById(id: string): AcpPreset | undefined {
   return ACP_PRESETS.find((p) => p.id === id)
 }

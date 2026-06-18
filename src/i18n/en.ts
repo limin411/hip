@@ -383,8 +383,6 @@ export const en = {
         acpPickTitle: 'New ACP agent — pick a provider',
         acpPresetAvailable: 'Available',
         acpPresetComingSoon: 'Coming soon',
-        acpPresetCustom: 'Custom / generic',
-        acpPresetCustomDesc: 'Enter command and args manually',
         backToProviders: '← Back to providers',
       },
     },

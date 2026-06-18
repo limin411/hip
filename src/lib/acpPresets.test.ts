@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ACP_PRESETS, acpPresetById, CUSTOM_ACP_PRESET_ID } from './acpPresets'
+import { ACP_PRESETS, acpPresetById } from './acpPresets'
 
 describe('ACP_PRESETS', () => {
   it('has a single, available OpenCode preset that seeds the OpenCode defaults', () => {
@@ -27,6 +27,5 @@ describe('ACP_PRESETS', () => {
   it('looks presets up by id', () => {
     expect(acpPresetById('opencode')?.name).toBe('OpenCode')
     expect(acpPresetById('nope')).toBeUndefined()
-    expect(CUSTOM_ACP_PRESET_ID).toBe('custom')
   })
 })

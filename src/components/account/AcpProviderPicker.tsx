@@ -1,18 +1,13 @@
 import { useTranslation } from 'react-i18next'
-import { Code, Bot, Cpu, Rocket, Settings2, CircleCheck, type LucideIcon } from 'lucide-react'
+import { Code, Bot, Cpu, Rocket, CircleCheck, type LucideIcon } from 'lucide-react'
 import { ACP_PRESETS, type AcpPreset, type AcpPresetIcon } from '@/lib/acpPresets'
 import { cn } from '@/lib/utils'
 
 const ICONS: Record<AcpPresetIcon, LucideIcon> = { code: Code, bot: Bot, cpu: Cpu, rocket: Rocket }
 
-/** Step 1 of adding a new ACP agent: choose a provider preset (or the custom escape hatch). */
-export function AcpProviderPicker({
-  onPick,
-  onPickCustom,
-}: {
-  onPick: (preset: AcpPreset) => void
-  onPickCustom: () => void
-}) {
+/** Step 1 of adding a new ACP agent: choose one of the supported provider presets.
+ *  Custom/generic ACP agents are intentionally not offered — only the named providers. */
+export function AcpProviderPicker({ onPick }: { onPick: (preset: AcpPreset) => void }) {
   const { t } = useTranslation()
   return (
     <div className="grid grid-cols-2 gap-2.5">
@@ -45,17 +40,6 @@ export function AcpProviderPicker({
           </div>
         )
       })}
-      <button
-        type="button"
-        onClick={onPickCustom}
-        className="rounded-lg border border-dashed border-border px-3 py-2.5 text-left transition-colors hover:bg-surface-muted"
-      >
-        <div className="flex items-center gap-2">
-          <Settings2 size={18} className="text-ink-secondary" />
-          <span className="text-body font-medium text-ink">{t('settings.agents.acpPresetCustom')}</span>
-        </div>
-        <div className="mt-1.5 text-caption text-ink-tertiary">{t('settings.agents.acpPresetCustomDesc')}</div>
-      </button>
     </div>
   )
 }

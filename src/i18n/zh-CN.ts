@@ -383,8 +383,6 @@ export const zhCN = {
         acpPickTitle: '新增 ACP — 选择提供方',
         acpPresetAvailable: '现已支持',
         acpPresetComingSoon: '即将支持',
-        acpPresetCustom: '自定义 / 通用',
-        acpPresetCustomDesc: '手填命令与参数',
         backToProviders: '← 返回选择提供方',
       },
     },

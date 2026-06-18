@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Bot, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import type { AgentCategory } from '@/lib/agentCategory'
 import type { AgentFilter } from '@/lib/agentFilters'

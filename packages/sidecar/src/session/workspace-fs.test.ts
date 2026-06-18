@@ -33,6 +33,26 @@ describe('resolveWithin', () => {
   })
 })
 
+describe('readForPreview tool-root-relative paths', () => {
+  it('reads a file-tool root-relative path ("/page.html" = <root>/page.html)', async () => {
+    await fs.writeFile(path.join(root, 'page.html'), '<!doctype html><h1>hi</h1>')
+    const r = await readForPreview(root, '/page.html')
+    expect(r).toMatchObject({ encoding: 'utf8', mimeType: 'text/html' })
+    expect('content' in r && r.content).toContain('<h1>hi</h1>')
+  })
+  it('reads a nested root-relative path', async () => {
+    const r = await readForPreview(root, '/src/a.ts')
+    expect('content' in r && r.content).toContain('export const a = 1')
+  })
+  it('still reads a real-absolute path within root (file-tree convention)', async () => {
+    const r = await readForPreview(root, path.join(root, 'README.md'))
+    expect('content' in r && r.content).toContain('# Hello')
+  })
+  it('still rejects a root-relative path that traverses outside root', async () => {
+    await expect(readForPreview(root, '/../../etc/passwd')).rejects.toThrow()
+  })
+})
+
 describe('lsDir', () => {
   it('lists immediate children, dirs first, with absolute paths', async () => {
     const entries = await lsDir(root, root)

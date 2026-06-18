@@ -85,9 +85,23 @@ export async function readHead(file: string, n: number): Promise<Buffer> {
   }
 }
 
+/** Resolve a preview path that may use EITHER convention: a real absolute path within the project
+ *  (as fs:ls returns for the file tree), OR the file tools' root-relative form ("/index.html" =
+ *  <root>/index.html, per write_file/read_file — what artifact cards carry). Tries the literal path
+ *  first; if it escapes the root, retries the root-relative interpretation. Both go through
+ *  resolveRealWithin, so the lexical jail + symlink guard still hold — a path that escapes under
+ *  BOTH interpretations still throws. */
+async function resolvePreviewPath(cwd: string, abs: string): Promise<string> {
+  try {
+    return await resolveRealWithin(cwd, abs)
+  } catch {
+    return await resolveRealWithin(cwd, path.join(cwd, abs.replace(/^[/\\]+/, '')))
+  }
+}
+
 /** Read a file for UI preview. Text → utf8 (capped+truncated); images/PDFs → base64; else error. */
 export async function readForPreview(cwd: string, abs: string): Promise<PreviewResult> {
-  const file = await resolveRealWithin(cwd, abs)
+  const file = await resolvePreviewPath(cwd, abs)
   const ext = path.extname(file).toLowerCase()
   const stat = await fs.stat(file)
   if (stat.isDirectory()) return { error: 'is_directory' }

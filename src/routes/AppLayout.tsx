@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
+import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
 import { MenuRail } from '@/components/rail/MenuRail'
 import { TitleBar } from '@/components/layout/TitleBar'
@@ -18,6 +19,8 @@ export function AppLayout() {
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
+  const chatPanelOpen = useUiStore((s) => s.chatPanelOpen)
+  const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen)
   const activeView = useUiStore((s) => s.activeView)
   const activeSessionId = useActiveSessionId()
 
@@ -78,28 +81,32 @@ export function AppLayout() {
           </div>
         </Panel>
 
-        {panelOpen && (
-          <>
-            <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
-              <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
-            </PanelResizeHandle>
-
-            <Panel
-              defaultSize={26}
-              minSize={18}
-              maxSize={65}
-              collapsible
-              collapsedSize={0}
-              onCollapse={() => setPanelOpen(false)}
-              onExpand={() => setPanelOpen(true)}
-            >
-              <ArtifactPanel />
-            </Panel>
-          </>
-        )}
+        {(() => {
+          const codeOpen = activeView === 'code' && panelOpen
+          const chatOpen = activeView === 'chat' && chatPanelOpen
+          if (!codeOpen && !chatOpen) return null
+          return (
+            <>
+              <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
+                <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+              </PanelResizeHandle>
+              <Panel
+                defaultSize={26}
+                minSize={18}
+                maxSize={65}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => (codeOpen ? setPanelOpen(false) : setChatPanelOpen(false))}
+                onExpand={() => (codeOpen ? setPanelOpen(true) : setChatPanelOpen(true))}
+              >
+                {codeOpen ? <ArtifactPanel /> : <PreviewPanel />}
+              </Panel>
+            </>
+          )
+        })()}
         </PanelGroup>
 
-        {activeView === 'chat' && <SidebarPeek />}
+        {activeView !== 'settings' && <SidebarPeek />}
 
         {activeView === 'settings' && (
           <div className="absolute inset-0 z-20 bg-surface">

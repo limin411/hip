@@ -44,7 +44,7 @@ export function AgentEditor({
     kind: initial?.kind ?? initialKind ?? 'custom',
     command: initial?.command ?? '',
     args: (initial?.args ?? []).join(' '),
-    transport: initial?.transport ?? (initialKind === 'acp' ? 'rich' : 'thin'),
+    transport: initial?.transport ?? 'thin',
     acceptsModelConfig: initial?.acceptsModelConfig ?? false,
     boundModelKey: initial?.boundModel ? `${initial.boundModel.providerID}/${initial.boundModel.modelID}` : '',
     authMode: initial?.authMode ?? 'opencode-self',
@@ -80,11 +80,11 @@ export function AgentEditor({
     setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
 
   const pickPreset = (preset: AcpPreset) => {
-    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self', transport: 'rich' })
+    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self' })
     setAcpStep('form')
   }
   const pickCustom = () => {
-    patch({ command: '', args: '', quirks: undefined, authMode: 'opencode-self', transport: 'rich' })
+    patch({ command: '', args: '', quirks: undefined, authMode: 'opencode-self' })
     setAcpStep('form')
   }
 
@@ -243,38 +243,42 @@ export function AgentEditor({
                 </Field>
               )}
 
-              <Section label={t('settings.agents.sectionTransport')}>
-                <div
-                  role="radiogroup"
-                  aria-label={t('settings.agents.sectionTransport')}
-                  className="flex gap-2"
-                  onKeyDown={(e) => {
-                    const next =
-                      e.key === 'ArrowRight' || e.key === 'ArrowDown'
-                        ? 'rich'
-                        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
-                          ? 'thin'
-                          : null
-                    if (!next) return
-                    e.preventDefault()
-                    patch({ transport: next })
-                    e.currentTarget.querySelectorAll('button')[next === 'thin' ? 0 : 1]?.focus()
-                  }}
-                >
-                  <ChoiceCard
-                    selected={form.transport === 'thin'}
-                    title={t('settings.agents.transportThin')}
-                    desc={t('settings.agents.transportThinDesc')}
-                    onClick={() => patch({ transport: 'thin' })}
-                  />
-                  <ChoiceCard
-                    selected={form.transport === 'rich'}
-                    title={t('settings.agents.transportRich')}
-                    desc={t('settings.agents.transportRichDesc')}
-                    onClick={() => patch({ transport: 'rich' })}
-                  />
-                </div>
-              </Section>
+              {/* CLI-only: thin/rich selects how hip's LoopAgentProvider frames stdin/stdout.
+                  ACP agents speak the structured ACP protocol and ignore this field entirely. */}
+              {!isAcp && (
+                <Section label={t('settings.agents.sectionTransport')}>
+                  <div
+                    role="radiogroup"
+                    aria-label={t('settings.agents.sectionTransport')}
+                    className="flex gap-2"
+                    onKeyDown={(e) => {
+                      const next =
+                        e.key === 'ArrowRight' || e.key === 'ArrowDown'
+                          ? 'rich'
+                          : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                            ? 'thin'
+                            : null
+                      if (!next) return
+                      e.preventDefault()
+                      patch({ transport: next })
+                      e.currentTarget.querySelectorAll('button')[next === 'thin' ? 0 : 1]?.focus()
+                    }}
+                  >
+                    <ChoiceCard
+                      selected={form.transport === 'thin'}
+                      title={t('settings.agents.transportThin')}
+                      desc={t('settings.agents.transportThinDesc')}
+                      onClick={() => patch({ transport: 'thin' })}
+                    />
+                    <ChoiceCard
+                      selected={form.transport === 'rich'}
+                      title={t('settings.agents.transportRich')}
+                      desc={t('settings.agents.transportRichDesc')}
+                      onClick={() => patch({ transport: 'rich' })}
+                    />
+                  </div>
+                </Section>
+              )}
 
             </>
           )}

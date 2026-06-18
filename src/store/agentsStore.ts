@@ -5,7 +5,7 @@ import { getAgentsConfig, setAgentsConfig } from '@/ipc/agentsConfig'
 
 const BUILTIN_OPENCODE: AgentConfig = {
   id: 'opencode', name: 'OpenCode', kind: 'acp', command: 'opencode', args: ['acp', '--pure'],
-  transport: 'rich', acceptsModelConfig: true, authMode: 'opencode-self', quirks: 'opencode', enabled: false,
+  transport: 'thin', acceptsModelConfig: true, authMode: 'opencode-self', quirks: 'opencode', enabled: false,
 }
 
 /** Ensure the built-in OpenCode agent is present exactly once, without clobbering user edits. */

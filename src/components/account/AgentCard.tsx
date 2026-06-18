@@ -56,7 +56,9 @@ export function AgentCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-body font-medium text-ink">{agent.name}</span>
           <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
-          {cat !== 'internal' && (
+          {/* CLI-only: thin/rich is a LoopAgentProvider framing concept. ACP agents ignore it,
+              so don't surface a transport badge for them. */}
+          {cat === 'cli' && (
             <Badge className={agent.transport === 'rich' ? 'bg-accent-subtle text-accent-strong' : undefined}>
               {t(agent.transport === 'rich' ? 'settings.agents.transportRich' : 'settings.agents.transportThin')}
             </Badge>

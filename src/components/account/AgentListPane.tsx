@@ -94,9 +94,7 @@ export function AgentListPane({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => onAdd('internal')}>
-              <Bot size={14} /> {t('settings.agents.addInternal')}
-            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onAdd('internal')}>{t('settings.agents.addInternal')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onAdd('custom')}>{t('settings.agents.addCli')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onAdd('acp')}>{t('settings.agents.addAcp')}</DropdownMenuItem>
           </DropdownMenuContent>

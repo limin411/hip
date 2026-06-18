@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare, Settings, LogOut } from 'lucide-react'
+import { MessageSquare, FolderGit2, Settings, LogOut } from 'lucide-react'
+import { sessionService } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar } from '@/components/ui/Avatar'
@@ -47,7 +48,13 @@ export function MenuRail() {
           icon={MessageSquare}
           label={t('nav.chat')}
           active={activeView === 'chat'}
-          onClick={() => setActiveView('chat')}
+          onClick={() => sessionService.setSurface('chat')}
+        />
+        <RailButton
+          icon={FolderGit2}
+          label={t('nav.code')}
+          active={activeView === 'code'}
+          onClick={() => sessionService.setSurface('code')}
         />
       </nav>
 

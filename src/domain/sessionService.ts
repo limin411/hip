@@ -12,6 +12,7 @@ import { useDiffStore } from '@/store/diffStore'
 import i18n from '@/i18n'
 import { resolveModelConfig } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
+import { surfaceOf } from '@/lib/sessions'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -140,12 +141,14 @@ export class SessionService {
     const id = nanoid()
     const enriched: SessionConfig = { ...config, language: currentLanguage() }
     useDomainStore.getState().createSession(id, enriched)
+    this.rememberActiveForSurface(id)
     this.transport.send({ type: 'session:create', id, config: enriched })
     return id
   }
 
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
+    this.rememberActiveForSurface(id)
     // Lazily fetch history the first time a summary-only session is opened.
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
     if (s && !s.loaded) this.transport.send({ type: 'session:load', sessionId: id })
@@ -159,8 +162,36 @@ export class SessionService {
     useUiStore.getState().setScrollTarget(messageId ?? null)
   }
 
+  /** Remember the currently-open conversation for the active surface (so returning restores it,
+   *  and so Code's persisted last-conversation pointer stays fresh across launches). */
+  private rememberActiveForSurface(id: string | null): void {
+    const view = useUiStore.getState().activeView
+    if (view === 'chat') useUiStore.getState().setChatSessionId(id)
+    else if (view === 'code') useUiStore.getState().setCodeSessionId(id)
+  }
+
+  /** Switch the active top-level surface. Snapshots the leaving surface's open conversation, then
+   *  restores the entering surface's (validated against the loaded list + its surface). Code restores
+   *  its last conversation; Chat starts at new-conversation on cold launch (chatSessionId starts null). */
+  setSurface(view: 'chat' | 'code'): void {
+    const cur = useUiStore.getState().activeView
+    const activeId = useDomainStore.getState().activeSessionId
+    if (cur === 'chat') useUiStore.getState().setChatSessionId(activeId)
+    else if (cur === 'code') useUiStore.getState().setCodeSessionId(activeId)
+    useUiStore.getState().setActiveView(view)
+    const want = view === 'chat' ? useUiStore.getState().chatSessionId : useUiStore.getState().codeSessionId
+    const sessions = useDomainStore.getState().sessions
+    if (want != null && sessions.some((s) => s.id === want && surfaceOf(s.config) === view)) {
+      this.selectSession(want)
+    } else {
+      useDomainStore.getState().deselect()
+    }
+  }
+
   deleteSession(id: string): void {
     useDomainStore.getState().deleteSession(id)
+    if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
+    if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
     this.transport.send({ type: 'session:delete', sessionId: id })
   }
 

@@ -7,6 +7,7 @@ import { useProvidersStore } from '@/store/providersStore'
 import { useActiveSession, useActiveSessionId } from '@/domain'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { parseModelKey, activeModelKey } from '@/lib/modelKey'
+import type { ProvidersConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 
 /** Pure: groups for the dropdown. */
@@ -14,6 +15,13 @@ export const modelPickerItems = groupModelOptions
 /** Pure: label for a model key. */
 export function currentModelLabel(key: string): string {
   return key ? parseModelKey(key).modelID : ''
+}
+/** Pure: the model id shown on a committed session's locked chip — the pinned model if the session
+ *  has one, else the global active model the session actually uses (the sidecar's resolveModelChoice
+ *  falls back to the active model when config.model is empty), else '' so the caller renders the
+ *  unknown-model label. */
+export function committedModelId(model: string, config: ProvidersConfig): string {
+  return model || parseModelKey(activeModelKey(config)).modelID
 }
 
 export function ModelPicker() {
@@ -26,9 +34,11 @@ export function ModelPicker() {
   const activeId = useActiveSessionId()
   const session = useActiveSession()
 
-  // Committed session: locked read-only model badge. Legacy sessions may have no stored model.
+  // Committed session: locked read-only model badge. A session with no pinned model follows the
+  // global active model (the sidecar's resolveModelChoice falls back to it), so show that rather
+  // than "未知模型".
   if (activeId && session) {
-    const model = session.config.model
+    const model = committedModelId(session.config.model, config)
     return (
       <ComposerChip disabled active={!!model} title={t('chat.modelLocked')} data-testid="model-chip-locked">
         <Cpu size={13} className="shrink-0" aria-hidden />

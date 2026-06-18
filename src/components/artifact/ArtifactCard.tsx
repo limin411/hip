@@ -8,7 +8,7 @@ import { useUiStore } from '@/store/uiStore'
 import { extractRenderedArtifacts, type RenderedArtifact } from '@/lib/renderedArtifacts'
 import { cn } from '@/lib/utils'
 
-function iconFor(kind: RenderedArtifact['kind']) {
+export function iconFor(kind: RenderedArtifact['kind']) {
   if (kind === 'image') return FileImage
   if (kind === 'html') return FileCode
   if (kind === 'pdf') return FileType
@@ -29,14 +29,19 @@ export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
     useFsStore.getState().setActive(scopeId, path)
     if (isDraft) sessionService.readDraftFile(scopeId, path)
     else sessionService.readFile(scopeId, path)
-    // Smart auto-open: if the panel is closed, open it then defer the tab switch one tick so the
-    // Files tab mounts after the panel (avoids a mount race). If already open, switch synchronously.
     const ui = useUiStore.getState()
-    if (!ui.panelOpen) {
-      ui.setPanelOpen(true)
-      setTimeout(() => useUiStore.getState().setTab('files'), 0)
+    if (ui.activeView === 'code') {
+      // Code: open the artifact panel's Files tab (defer the tab switch one tick if it was closed).
+      if (!ui.panelOpen) {
+        ui.setPanelOpen(true)
+        setTimeout(() => useUiStore.getState().setTab('files'), 0)
+      } else {
+        ui.setTab('files')
+      }
     } else {
-      ui.setTab('files')
+      // Chat: open the slim preview panel and select this artifact.
+      ui.setSelectedArtifactPath(path)
+      ui.setChatPanelOpen(true)
     }
   }
 

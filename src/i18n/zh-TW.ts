@@ -20,6 +20,8 @@ export const zhTW = {
       errorGeneric: '出錯了：{{message}}',
       openSettings: '前往設置',
       newConversationGreeting: '我們來做點什麼？',
+      codeGreeting: '我們來寫點什麼？',
+      codeNeedFolder: '選擇一個專案資料夾以開始編碼',
       pickFolder: '選擇專案資料夾',
       orJustChat: '或直接對話（沙箱）',
       clearFolder: '純對話',
@@ -95,6 +97,9 @@ export const zhTW = {
       files: '文件',
       agents: '智能體',
       closePanel: '關閉面板',
+      noArtifacts: '智慧代理產生的文件與圖片會顯示在這裡',
+      copyArtifact: '複製',
+      downloadArtifact: '下載',
       diffView: {
         noSession: '沒有進行中的對話',
         noSessionDesc: '開啟一個對話以查看其工作區變更',
@@ -394,6 +399,7 @@ export const zhTW = {
     },
     nav: {
       chat: '對話',
+      code: '程式碼',
       settings: '設定',
     },
     common: {

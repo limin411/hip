@@ -20,6 +20,8 @@ export const zhCN = {
       errorGeneric: '出错了：{{message}}',
       openSettings: '前往设置',
       newConversationGreeting: '我们来做点什么？',
+      codeGreeting: '我们来写点什么？',
+      codeNeedFolder: '选择一个项目文件夹以开始编码',
       pickFolder: '选择项目文件夹',
       orJustChat: '或直接对话（沙箱）',
       clearFolder: '纯对话',
@@ -95,6 +97,9 @@ export const zhCN = {
       files: '文件',
       agents: '智能体',
       closePanel: '关闭面板',
+      noArtifacts: '智能体生成的文档与图片会显示在这里',
+      copyArtifact: '复制',
+      downloadArtifact: '下载',
       diffView: {
         noSession: '没有进行中的对话',
         noSessionDesc: '打开一个对话以查看其工作区改动',
@@ -394,6 +399,7 @@ export const zhCN = {
     },
     nav: {
       chat: '对话',
+      code: '代码',
       settings: '设置',
     },
     common: {

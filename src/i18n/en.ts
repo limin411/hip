@@ -20,6 +20,8 @@ export const en = {
       errorGeneric: 'Something went wrong: {{message}}',
       openSettings: 'Open Settings',
       newConversationGreeting: 'What are we building?',
+      codeGreeting: 'What should we build?',
+      codeNeedFolder: 'Choose a project folder to start coding',
       pickFolder: 'Choose project folder',
       orJustChat: 'or just chat (sandbox)',
       clearFolder: 'Pure chat',
@@ -95,6 +97,9 @@ export const en = {
       files: 'Files',
       agents: 'Agents',
       closePanel: 'Close Panel',
+      noArtifacts: 'Generated documents and images will appear here',
+      copyArtifact: 'Copy',
+      downloadArtifact: 'Download',
       diffView: {
         noSession: 'No active conversation',
         noSessionDesc: 'Open a conversation to see its workspace changes',
@@ -394,6 +399,7 @@ export const en = {
     },
     nav: {
       chat: 'Chat',
+      code: 'Code',
       settings: 'Settings',
     },
     common: {

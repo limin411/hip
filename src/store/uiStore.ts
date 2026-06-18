@@ -1,17 +1,16 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { CheckpointMode } from '@hip/protocol'
 
 export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
-export type ActiveView = 'chat' | 'settings'
+export type ActiveView = 'chat' | 'code' | 'settings'
 
 interface UiState {
-  // 对话列表（会话侧栏）折叠态
   collapsed: boolean
   setCollapsed: (v: boolean) => void
   toggleCollapsed: () => void
 
-  // 设置页分类侧栏折叠态 —— 与 collapsed 同构，便于标题栏的统一折叠按钮按当前视图分派
   settingsNavCollapsed: boolean
   setSettingsNavCollapsed: (v: boolean) => void
   toggleSettingsNav: () => void
@@ -19,63 +18,98 @@ interface UiState {
   search: string
   setSearch: (q: string) => void
 
-  // Transient scroll target: the messageId of a clicked search hit. ChatPane scrolls
-  // to it + briefly highlights it, then clears it. Not persisted.
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
 
+  // Code surface: the four-tab ArtifactPanel.
   panelOpen: boolean
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
   togglePanel: () => void
   setPanelOpen: (v: boolean) => void
 
-  // 主视图：对话区（三栏）或设置独立页。视图状态驱动，不走路由。
+  // Chat surface: the slim preview/artifacts panel.
+  chatPanelOpen: boolean
+  toggleChatPanel: () => void
+  setChatPanelOpen: (v: boolean) => void
+  selectedArtifactPath: string | null
+  setSelectedArtifactPath: (p: string | null) => void
+
+  // Per-surface open conversation. codeSessionId is persisted (Code restores last on launch);
+  // chatSessionId is in-memory only (Chat opens new on cold launch — industry norm).
+  chatSessionId: string | null
+  setChatSessionId: (id: string | null) => void
+  codeSessionId: string | null
+  setCodeSessionId: (id: string | null) => void
+
   activeView: ActiveView
   setActiveView: (v: ActiveView) => void
 
-  // Diff view mode: unified (default) or split (side-by-side). In-memory only,
-  // resets on refresh — no persist middleware, intentionally matches activeTab style.
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
-  // Timeline checkpoint diff mode (本轮/自此至今/起点至今). In-memory only, like diffViewMode.
   checkpointMode: CheckpointMode
   setCheckpointMode: (m: CheckpointMode) => void
 }
 
-export const useUiStore = create<UiState>((set) => ({
-  collapsed: false,
-  setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
-  toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
+// In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
+function memoryStorage(): StateStorage {
+  const m: Record<string, string> = {}
+  return {
+    getItem: (k) => (k in m ? m[k] : null),
+    setItem: (k, v) => { m[k] = v },
+    removeItem: (k) => { delete m[k] },
+  }
+}
 
-  settingsNavCollapsed: false,
-  setSettingsNavCollapsed: (v) =>
-    set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
-  toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
+const storage = createJSONStorage<{ codeSessionId: string | null }>(() =>
+  typeof localStorage !== 'undefined' ? localStorage : memoryStorage(),
+)
 
-  search: '',
-  setSearch: (q) => set({ search: q }),
+export const useUiStore = create<UiState>()(
+  persist(
+    (set) => ({
+      collapsed: false,
+      setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
+      toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
 
-  scrollTargetMessageId: null,
-  setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
+      settingsNavCollapsed: false,
+      setSettingsNavCollapsed: (v) =>
+        set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
+      toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
 
-  panelOpen: false,
-  activeTab: 'agents',
-  setTab: (t) => set({ activeTab: t }),
-  togglePanel: () => set((s) => ({
-    panelOpen: !s.panelOpen,
-  })),
-  setPanelOpen: (v) => set((s) =>
-    s.panelOpen === v ? s : { panelOpen: v },
+      search: '',
+      setSearch: (q) => set({ search: q }),
+
+      scrollTargetMessageId: null,
+      setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
+
+      panelOpen: false,
+      activeTab: 'agents',
+      setTab: (t) => set({ activeTab: t }),
+      togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
+      setPanelOpen: (v) => set((s) => (s.panelOpen === v ? s : { panelOpen: v })),
+
+      chatPanelOpen: false,
+      toggleChatPanel: () => set((s) => ({ chatPanelOpen: !s.chatPanelOpen })),
+      setChatPanelOpen: (v) => set((s) => (s.chatPanelOpen === v ? s : { chatPanelOpen: v })),
+      selectedArtifactPath: null,
+      setSelectedArtifactPath: (p) => set((s) => (s.selectedArtifactPath === p ? s : { selectedArtifactPath: p })),
+
+      chatSessionId: null,
+      setChatSessionId: (id) => set((s) => (s.chatSessionId === id ? s : { chatSessionId: id })),
+      codeSessionId: null,
+      setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
+
+      activeView: 'chat',
+      setActiveView: (v) => set((s) => (s.activeView === v ? s : { activeView: v })),
+
+      diffViewMode: 'unified',
+      setDiffViewMode: (m) => set({ diffViewMode: m }),
+
+      checkpointMode: 'this-turn',
+      setCheckpointMode: (m) => set({ checkpointMode: m }),
+    }),
+    { name: 'hip-ui', storage, partialize: (s) => ({ codeSessionId: s.codeSessionId }) },
   ),
-
-  activeView: 'chat',
-  setActiveView: (v) => set((s) => (s.activeView === v ? s : { activeView: v })),
-
-  diffViewMode: 'unified',
-  setDiffViewMode: (m) => set({ diffViewMode: m }),
-
-  checkpointMode: 'this-turn',
-  setCheckpointMode: (m) => set({ checkpointMode: m }),
-}))
+)

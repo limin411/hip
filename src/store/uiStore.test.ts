@@ -134,3 +134,30 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState()).toBe(before)
   })
 })
+
+describe('uiStore - code surface', () => {
+  beforeEach(() => useUiStore.setState({ activeView: 'chat', chatPanelOpen: false, selectedArtifactPath: null, chatSessionId: null, codeSessionId: null }))
+
+  it('setActiveView accepts code', () => {
+    useUiStore.getState().setActiveView('code')
+    expect(useUiStore.getState().activeView).toBe('code')
+  })
+  it('toggleChatPanel / setChatPanelOpen drive the chat preview panel', () => {
+    useUiStore.getState().toggleChatPanel()
+    expect(useUiStore.getState().chatPanelOpen).toBe(true)
+    useUiStore.getState().setChatPanelOpen(false)
+    expect(useUiStore.getState().chatPanelOpen).toBe(false)
+  })
+  it('setSelectedArtifactPath stores + clears the selected file', () => {
+    useUiStore.getState().setSelectedArtifactPath('/a.md')
+    expect(useUiStore.getState().selectedArtifactPath).toBe('/a.md')
+    useUiStore.getState().setSelectedArtifactPath(null)
+    expect(useUiStore.getState().selectedArtifactPath).toBeNull()
+  })
+  it('per-surface conversation ids are independent', () => {
+    useUiStore.getState().setChatSessionId('h1')
+    useUiStore.getState().setCodeSessionId('c1')
+    expect(useUiStore.getState().chatSessionId).toBe('h1')
+    expect(useUiStore.getState().codeSessionId).toBe('c1')
+  })
+})

@@ -30,3 +30,14 @@ export function ensureScratchDir(sessionId: string, root: string = defaultScratc
 export function removeScratchDir(sessionId: string, root: string = defaultScratchRoot()): void {
   rmSync(scratchDirFor(sessionId, root), { recursive: true, force: true })
 }
+
+/** True iff `cwd` is exactly this session's scratch dir (the pure-chat sandbox), under `root`.
+ *  Never throws — a bad/empty id or path simply yields false. */
+export function isScratchCwd(cwd: string | undefined, sessionId: string, root: string = defaultScratchRoot()): boolean {
+  if (!cwd) return false
+  try {
+    return path.resolve(cwd) === path.resolve(scratchDirFor(sessionId, root))
+  } catch {
+    return false
+  }
+}

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { scratchDirFor, ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
+import { scratchDirFor, ensureScratchDir, removeScratchDir, defaultScratchRoot, isScratchCwd } from './scratch.js'
 
 let root: string
 beforeEach(() => { root = mkdtempSync(path.join(os.tmpdir(), 'hip-scratch-')) })
@@ -44,5 +44,21 @@ describe('defaultScratchRoot', () => {
   it('falls back to ~/.hip/scratch when unset', () => {
     delete process.env.HIP_SCRATCH_ROOT
     expect(defaultScratchRoot()).toBe(path.join(os.homedir(), '.hip', 'scratch'))
+  })
+})
+
+describe('isScratchCwd', () => {
+  it('true when cwd is exactly the session scratch dir', () => {
+    expect(isScratchCwd(scratchDirFor('s1', root), 's1', root)).toBe(true)
+  })
+  it('false for a real project dir', () => {
+    expect(isScratchCwd('/Users/me/project', 's1', root)).toBe(false)
+  })
+  it('false for another session’s scratch dir', () => {
+    expect(isScratchCwd(scratchDirFor('s2', root), 's1', root)).toBe(false)
+  })
+  it('false for undefined cwd, and never throws on a bad id', () => {
+    expect(isScratchCwd(undefined, 's1', root)).toBe(false)
+    expect(isScratchCwd('/whatever', '../evil', root)).toBe(false)
   })
 })

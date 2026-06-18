@@ -353,11 +353,18 @@ export class SessionService {
   }
 }
 
-/** Build the committed SessionConfig from the current draft (project cwd + chosen model + permission mode). */
+/** Build the committed SessionConfig from the current draft. Surface is derived from the draft
+ *  mode — a project draft (folder picked) is a Code conversation; a chat draft is a sandboxed
+ *  Chat conversation. The Chat new-conversation view keeps chat drafts in chat mode, so the chat
+ *  branch never carries a cwd/permissionMode (Chat is picker-less). */
 export function configFromDraft(draft: Draft | null): SessionConfig {
+  const surface: 'chat' | 'code' = draft?.mode === 'project' ? 'code' : 'chat'
   const base: SessionConfig =
-    draft?.mode === 'project' && draft.cwd ? { ...DEFAULT_CONFIG, cwd: draft.cwd } : DEFAULT_CONFIG
-  const withMode: SessionConfig = draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
+    surface === 'code' && draft?.cwd
+      ? { ...DEFAULT_CONFIG, surface, cwd: draft.cwd }
+      : { ...DEFAULT_CONFIG, surface }
+  const withMode: SessionConfig =
+    surface === 'code' && draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
   if (!draft?.modelKey) return withMode
   const { catalog, config } = useProvidersStore.getState()
   const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)

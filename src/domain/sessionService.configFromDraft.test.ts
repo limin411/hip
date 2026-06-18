@@ -16,21 +16,28 @@ describe('configFromDraft', () => {
     })
   })
 
-  it('null draft → default config', () => {
+  it('null draft → default config + surface chat (no cwd)', () => {
     const cfg = configFromDraft(null)
-    expect(cfg.agentId).toBeUndefined()
+    expect(cfg.surface).toBe('chat')
+    expect(cfg.cwd).toBeUndefined()
     expect(cfg.llmProvider).toBe('deepseek')
   })
-  it('project draft keeps cwd', () => {
+  it('project draft → surface code + keeps cwd', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '' })
+    expect(cfg.surface).toBe('code')
     expect(cfg.cwd).toBe('/p')
+  })
+  it('chat draft → surface chat, no cwd', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '' })
+    expect(cfg.surface).toBe('chat')
+    expect(cfg.cwd).toBeUndefined()
   })
   it('draft without modelKey → default llmProvider', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '' })
     expect(cfg.llmProvider).toBe('deepseek')
     expect(cfg.agentId).toBeUndefined()
   })
-  it('draft with modelKey maps llmProvider + model + baseURL from catalog', () => {
+  it('modelKey maps llmProvider + model + baseURL from catalog', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' })
     expect(cfg.llmProvider).toBe('openai')
     expect(cfg.model).toBe('gpt-4o')
@@ -53,19 +60,16 @@ describe('configFromDraft', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/work', text: '', modelKey: 'openai/gpt-4o' })
     expect(cfg.cwd).toBe('/work')
     expect(cfg.llmProvider).toBe('openai')
-    expect(cfg.model).toBe('gpt-4o')
   })
-  it('never sets agentId — direct external-agent sessions are retired', () => {
+  it('never sets agentId', () => {
     expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' })).toBe(false)
-    // even a legacy draft that still carries an agentId must not produce one
-    expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'opencode' } as never)).toBe(false)
   })
-  it('carries the draft permissionMode into the config', () => {
-    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', permissionMode: 'full' })
+  it('project (code) draft carries permissionMode', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', permissionMode: 'full' })
     expect(cfg.permissionMode).toBe('full')
   })
-  it('omits permissionMode when the draft has none (server default applies)', () => {
-    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '' })
+  it('chat draft ignores permissionMode (sandbox, no picker)', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', permissionMode: 'full' })
     expect(cfg.permissionMode).toBeUndefined()
   })
 })

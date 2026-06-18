@@ -1,6 +1,7 @@
 // src/domain/sessionStore.test.ts
 import { describe, it, expect } from 'vitest'
 import { applyServerMessage, clearPermission, emptySession, useDomainStore, type SessionVM } from './sessionStore'
+import type { SessionSummary } from '@hip/protocol'
 
 function baseSession(over: Partial<SessionVM> = {}): SessionVM {
   return {
@@ -511,5 +512,22 @@ describe('regenerateLastTurn', () => {
     expect(s.messages.map((m) => m.id)).toEqual(['u1'])
     expect(s.status).toBe('running')
     expect(s.error).toBeNull()
+  })
+})
+
+describe('sessionStore surface', () => {
+  const summary = (id: string, surface: 'chat' | 'code'): SessionSummary =>
+    ({ id, title: 't', preview: '', updatedAt: 1, messageCount: 0, surface })
+
+  it('session:list:result carries surface onto the VM config', () => {
+    const next = applyServerMessage({ sessions: [] }, { type: 'session:list:result', sessions: [summary('a', 'chat'), summary('b', 'code')] }, 1)
+    expect(next.sessions.find((s) => s.id === 'a')!.config.surface).toBe('chat')
+    expect(next.sessions.find((s) => s.id === 'b')!.config.surface).toBe('code')
+  })
+
+  it('session:loaded preserves the surface when the loaded config omits it', () => {
+    const start = applyServerMessage({ sessions: [] }, { type: 'session:list:result', sessions: [summary('a', 'chat')] }, 1)
+    const loaded = applyServerMessage(start, { type: 'session:loaded', sessionId: 'a', messages: [], config: { llmProvider: 'd', model: 'm', tools: [] } }, 2)
+    expect(loaded.sessions.find((s) => s.id === 'a')!.config.surface).toBe('chat')
   })
 })

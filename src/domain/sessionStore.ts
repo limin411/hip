@@ -132,7 +132,7 @@ function finalizeAssistant(messages: Message[], message: Message): Message[] {
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: DEFAULT_CONFIG, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null }
+  return { id: s.id, config: { ...DEFAULT_CONFIG, surface: s.surface }, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null }
 }
 
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
@@ -274,7 +274,7 @@ export function applyServerMessage(
         return {
           ...s,
           loaded: true,
-          config: msg.config ?? s.config,
+          config: msg.config ? { ...msg.config, surface: msg.config.surface ?? s.config.surface } : s.config,
           messages: msg.messages,
           status: interrupted ? 'error' : 'idle',
           error: interrupted ? { code: 'INTERRUPTED', message: '' } : null,

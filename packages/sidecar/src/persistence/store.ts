@@ -1,6 +1,7 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Checkpoint, Message, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
+import type { AgentRole, AgentRun, Checkpoint, Message, SessionConfig, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
 import { sumUsage } from '../session/usage.js'
+import { surfaceOf } from '../session/surface.js'
 
 const PREVIEW_LEN = 80
 
@@ -192,12 +193,16 @@ export class SessionStore {
 
   listSessions(): SessionSummary[] {
     const rows = this.db.prepare(`
-      SELECT s.id, s.title, s.updated_at AS updatedAt,
+      SELECT s.id, s.title, s.config AS config, s.updated_at AS updatedAt,
         (SELECT content FROM messages m WHERE m.session_id=s.id ORDER BY seq DESC LIMIT 1) AS preview,
         (SELECT COUNT(*) FROM messages m WHERE m.session_id=s.id) AS messageCount
       FROM sessions s ORDER BY s.updated_at DESC
-    `).all() as { id: string; title: string; updatedAt: number; preview: string | null; messageCount: number }[]
-    return rows.map((r) => ({ id: r.id, title: r.title, updatedAt: r.updatedAt, messageCount: r.messageCount, preview: (r.preview ?? '').slice(0, PREVIEW_LEN) }))
+    `).all() as { id: string; title: string; config: string; updatedAt: number; preview: string | null; messageCount: number }[]
+    return rows.map((r) => {
+      let surface: 'chat' | 'code' = 'code'
+      try { surface = surfaceOf(JSON.parse(r.config) as SessionConfig, r.id) } catch { surface = 'code' }
+      return { id: r.id, title: r.title, surface, updatedAt: r.updatedAt, messageCount: r.messageCount, preview: (r.preview ?? '').slice(0, PREVIEW_LEN) }
+    })
   }
 
   search(query: string): SearchHit[] {

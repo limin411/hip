@@ -105,7 +105,7 @@ describe('applyServerMessage', () => {
   it('session:list:result populates unloaded summaries', () => {
     const next = applyServerMessage(
       { sessions: [] },
-      { type: 'session:list:result', sessions: [{ id: 's1', title: 'T', preview: 'P', updatedAt: 1000, messageCount: 2 }] },
+      { type: 'session:list:result', sessions: [{ id: 's1', title: 'T', preview: 'P', updatedAt: 1000, messageCount: 2, surface: 'code' }] },
       2000,
     )
     expect(next.sessions[0]).toMatchObject({ id: 's1', title: 'T', loaded: false, updatedAtMs: 1000 })

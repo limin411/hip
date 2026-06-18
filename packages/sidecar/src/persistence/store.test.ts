@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDatabase } from './open.js'
 import { SessionStore } from './store.js'
+import { scratchDirFor } from '../session/scratch.js'
 
 function freshStore() {
   const { db, ftsEnabled } = openDatabase(':memory:')
@@ -337,5 +338,30 @@ describe('SessionStore', () => {
       store.setAcpSessionId('s1', 'ses_abc')
       expect(store.getAcpSessionId('s1')).toBe('ses_abc')
     })
+  })
+})
+
+describe('SessionStore listSessions surface', () => {
+  let store: SessionStore
+  beforeEach(() => { store = freshStore() })
+
+  it('returns the explicit surface from the stored config', () => {
+    const codeCfg = JSON.stringify({ llmProvider: 'd', model: 'm', tools: [], surface: 'code', cwd: '/proj' })
+    const chatCfg = JSON.stringify({ llmProvider: 'd', model: 'm', tools: [], surface: 'chat' })
+    store.insertSession({ id: 'c', title: 't', config: codeCfg, createdAt: 1, updatedAt: 2 })
+    store.insertSession({ id: 'h', title: 't', config: chatCfg, createdAt: 1, updatedAt: 1 })
+    const list = store.listSessions()
+    expect(list.find((s) => s.id === 'c')!.surface).toBe('code')
+    expect(list.find((s) => s.id === 'h')!.surface).toBe('chat')
+  })
+
+  it('infers a legacy session: scratch cwd ⇒ chat, real cwd ⇒ code', () => {
+    const legacyChat = JSON.stringify({ llmProvider: 'd', model: 'm', tools: [], cwd: scratchDirFor('lc') })
+    const legacyCode = JSON.stringify({ llmProvider: 'd', model: 'm', tools: [], cwd: '/Users/me/proj' })
+    store.insertSession({ id: 'lc', title: 't', config: legacyChat, createdAt: 1, updatedAt: 2 })
+    store.insertSession({ id: 'ld', title: 't', config: legacyCode, createdAt: 1, updatedAt: 1 })
+    const list = store.listSessions()
+    expect(list.find((s) => s.id === 'lc')!.surface).toBe('chat')
+    expect(list.find((s) => s.id === 'ld')!.surface).toBe('code')
   })
 })

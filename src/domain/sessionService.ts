@@ -148,6 +148,7 @@ export class SessionService {
 
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
+    useUiStore.getState().setSelectedArtifactPath(null)
     this.rememberActiveForSurface(id)
     // Lazily fetch history the first time a summary-only session is opened.
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
@@ -179,6 +180,9 @@ export class SessionService {
     if (cur === 'chat') useUiStore.getState().setChatSessionId(activeId)
     else if (cur === 'code') useUiStore.getState().setCodeSessionId(activeId)
     useUiStore.getState().setActiveView(view)
+    if (view === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
+      useDraftStore.getState().clearProject()
+    }
     const want = view === 'chat' ? useUiStore.getState().chatSessionId : useUiStore.getState().codeSessionId
     const sessions = useDomainStore.getState().sessions
     if (want != null && sessions.some((s) => s.id === want && surfaceOf(s.config) === view)) {
@@ -192,6 +196,19 @@ export class SessionService {
     useDomainStore.getState().deleteSession(id)
     if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
     if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
+    // The domain delete-fallback may auto-select sessions[0] from the GLOBAL list, which can belong
+    // to the other surface. Reconcile: if the now-active session doesn't match the current surface,
+    // pick the newest same-surface session, else show new-conversation.
+    const view = useUiStore.getState().activeView
+    if (view === 'chat' || view === 'code') {
+      const st = useDomainStore.getState()
+      const cur = st.sessions.find((s) => s.id === st.activeSessionId)
+      if (!cur || surfaceOf(cur.config) !== view) {
+        const next = st.sessions.find((s) => surfaceOf(s.config) === view)
+        if (next) this.selectSession(next.id)
+        else { useDomainStore.getState().deselect(); this.rememberActiveForSurface(null) }
+      }
+    }
     this.transport.send({ type: 'session:delete', sessionId: id })
   }
 
@@ -304,6 +321,7 @@ export class SessionService {
   newConversation(): void {
     useDraftStore.getState().ensureDraft()
     useDomainStore.getState().deselect()
+    this.rememberActiveForSurface(null)
   }
 
   // Draft FS: fsStore is keyed by an arbitrary scope string — a committed session's

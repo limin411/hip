@@ -38,8 +38,9 @@ export function PreviewPanel() {
   const ready = preview && preview.status === 'ready' && preview.content != null
   const copy = () => { if (ready && preview.encoding !== 'base64') void navigator.clipboard?.writeText(preview.content!) }
   const download = () => {
-    if (!ready || selected == null) return
-    const name = selected.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'artifact'
+    if (!ready || preview.path == null) return
+    const p = preview.path
+    const name = p.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'artifact'
     const blob = preview.encoding === 'base64'
       ? new Blob([base64ToBytes(preview.content!)], { type: preview.mimeType || 'application/octet-stream' })
       : new Blob([preview.content!], { type: 'text/plain' })

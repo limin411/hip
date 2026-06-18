@@ -50,3 +50,22 @@ describe('setSurface', () => {
     expect(useDomainStore.getState().activeSessionId).toBeNull()
   })
 })
+
+describe('deleteSession surface reconcile', () => {
+  it('deleting the active code session does not leave a chat session active on the code surface', () => {
+    // newest-first global order: a chat session is newest, then the active code session
+    useDomainStore.setState({ sessions: [vm('h1', 'chat'), vm('c1', 'code')], activeSessionId: 'c1' })
+    useUiStore.setState({ activeView: 'code', chatSessionId: 'h1', codeSessionId: 'c1' })
+    svc.deleteSession('c1')
+    const st = useDomainStore.getState()
+    // must NOT be the chat session; with no other code session it falls back to new-conversation
+    expect(st.activeSessionId).toBeNull()
+    expect(useUiStore.getState().codeSessionId).toBeNull()
+  })
+  it('falls back to the newest same-surface session when one exists', () => {
+    useDomainStore.setState({ sessions: [vm('h1', 'chat'), vm('c2', 'code'), vm('c1', 'code')], activeSessionId: 'c1' })
+    useUiStore.setState({ activeView: 'code', chatSessionId: 'h1', codeSessionId: 'c1' })
+    svc.deleteSession('c1')
+    expect(useDomainStore.getState().activeSessionId).toBe('c2')
+  })
+})

@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { Composer } from './Composer'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
-import { sessionService, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { surfaceOf } from '@/lib/sessions'
 
 export function InputBar() {
   const [value, setValue] = useState('')
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
+  const active = useActiveSession()
+  const isCode = active ? surfaceOf(active.config) === 'code' : false
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
@@ -28,7 +31,7 @@ export function InputBar() {
           running={status === 'running'}
           onStop={() => sessionService.cancel()}
           reconnecting={reconnecting}
-          leftSlot={<><ModelPicker /><PermissionModePicker /></>}
+          leftSlot={isCode ? <><ModelPicker /><PermissionModePicker /></> : <ModelPicker />}
         />
       </div>
     </div>

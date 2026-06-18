@@ -11,6 +11,7 @@ export function Composer({
   onStop,
   reconnecting,
   leftSlot,
+  submitDisabled,
 }: {
   value: string
   onChange: (v: string) => void
@@ -20,6 +21,7 @@ export function Composer({
   onStop?: () => void
   reconnecting?: boolean
   leftSlot?: React.ReactNode
+  submitDisabled?: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -31,7 +33,7 @@ export function Composer({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            if (!running) onSubmit()
+            if (!running && !submitDisabled) onSubmit()
           }
         }}
         rows={2}
@@ -59,7 +61,7 @@ export function Composer({
         ) : (
           <button
             onClick={onSubmit}
-            disabled={!value.trim()}
+            disabled={!value.trim() || submitDisabled}
             data-testid="composer-send"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover disabled:opacity-40"
             title={t('chat.send')}

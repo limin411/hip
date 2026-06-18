@@ -21,12 +21,12 @@ export function TitleBar() {
       <div className="shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
       <SidebarToggle />
 
-      {activeView === 'chat' ? (
-        <ChatTitleBar />
-      ) : (
+      {activeView === 'settings' ? (
         <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 truncate text-body font-medium text-ink">
           {t('settings.title')}
         </span>
+      ) : (
+        <ChatTitleBar />
       )}
     </header>
   )

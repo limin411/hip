@@ -25,7 +25,10 @@ const DOT: Record<string, string> = {
  */
 export function ChatTitleBar() {
   const { t } = useTranslation()
+  const activeView = useUiStore((s) => s.activeView)
   const togglePanel = useUiStore((s) => s.togglePanel)
+  const toggleChatPanel = useUiStore((s) => s.toggleChatPanel)
+  const onTogglePanel = activeView === 'code' ? togglePanel : toggleChatPanel
   const active = useActiveSession()
   const status = useConnectionStatus()
   const hasApiKey = useHasApiKey()
@@ -90,7 +93,7 @@ export function ChatTitleBar() {
       <Button
         variant="ghost"
         size="icon"
-        onClick={togglePanel}
+        onClick={onTogglePanel}
         title={t('chat.togglePanel')}
         data-tauri-drag-region="false"
         data-testid="toggle-panel"

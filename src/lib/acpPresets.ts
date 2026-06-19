@@ -20,6 +20,8 @@ export interface AcpPreset {
   quirks: string              // sidecar quirk-profile key (acp-quirks.ts); === id
   authEnvVar?: string         // adapter agents: env var the API key maps to
   installCmd: string          // shown when 未安装 (copyable) — installs the AGENT
+  adapterPkg?: string         // set iff the agent has no native ACP: the community npm
+                              // adapter hip bridges through (shown as a clarifying note)
 }
 
 export const ACP_PRESETS: AcpPreset[] = [
@@ -41,6 +43,7 @@ export const ACP_PRESETS: AcpPreset[] = [
     command: 'npx', args: ['-y', '@agentclientprotocol/claude-agent-acp@latest'],
     quirks: 'claude-code', authEnvVar: 'ANTHROPIC_API_KEY',
     installCmd: 'npm i -g @anthropic-ai/claude-code',
+    adapterPkg: '@agentclientprotocol/claude-agent-acp',
   },
   {
     // Detect the Codex agent (`codex`); speak ACP via the @zed-industries/codex-acp adapter.
@@ -49,6 +52,7 @@ export const ACP_PRESETS: AcpPreset[] = [
     command: 'npx', args: ['-y', '@zed-industries/codex-acp'],
     quirks: 'codex', authEnvVar: 'OPENAI_API_KEY',
     installCmd: 'npm i -g @openai/codex',
+    adapterPkg: '@zed-industries/codex-acp',
   },
 ]
 

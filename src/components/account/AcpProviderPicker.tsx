@@ -72,6 +72,11 @@ export function AcpProviderPicker({
                   </code>
                 </div>
               ))}
+              {preset.adapterPkg && (
+                <div className="mt-1.5 text-caption text-ink-tertiary">
+                  {t('settings.agents.acpAdapterNote', { pkg: preset.adapterPkg })}
+                </div>
+              )}
             </div>
           )
         })}

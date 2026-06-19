@@ -387,6 +387,7 @@ export const zhTW = {
         redetect: '重新偵測',
         apiKey: 'API Key',
         apiKeyHint: '將寫入該智能體的 {{env}} 環境變數；留空則使用系統環境變數。',
+        acpAdapterNote: '無官方 ACP，經社區介接器 {{pkg}} 接入',
         backToProviders: '← 返回選擇提供方',
       },
     },

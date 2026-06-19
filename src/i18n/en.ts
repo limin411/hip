@@ -387,6 +387,7 @@ export const en = {
         redetect: 'Re-check',
         apiKey: 'API Key',
         apiKeyHint: 'Stored in this agent’s {{env}} env var; leave blank to use your system environment.',
+        acpAdapterNote: 'No native ACP — bridged via the community adapter {{pkg}}',
         backToProviders: '← Back to providers',
       },
     },

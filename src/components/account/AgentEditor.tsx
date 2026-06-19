@@ -79,6 +79,9 @@ export function AgentEditor({
   const category = agentCategory({ kind: form.kind })
   const isAcp = category === 'acp'
   const isInternal = category === 'internal'
+  // For adapter-bridged ACP agents (Claude Code/Codex), the community adapter package — shown as a
+  // clarifying note so the `npx @<vendor>/…` launch command doesn't read as a mistake.
+  const adapterPkg = isAcp && form.quirks ? acpPresetById(form.quirks)?.adapterPkg : undefined
   const title = initial
     ? t('settings.agents.editTitle')
     : isAcp && acpStep === 'pick'
@@ -239,6 +242,12 @@ export function AgentEditor({
                   />
                 </Field>
               </Section>
+
+              {adapterPkg && (
+                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-caption text-ink-tertiary">
+                  {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
+                </div>
+              )}
 
               {isAcp && (
                 <Field label={t('settings.agents.quirks')}>

@@ -24,20 +24,24 @@ describe('ACP_PRESETS', () => {
     expect(acpPresetById('kimi-code')?.authEnvVar).toBeUndefined()
   })
 
-  it('adapter presets detect the AGENT command and bridge ACP via npx', () => {
+  it('adapter presets detect the AGENT command, bridge ACP via npx, and name the adapter pkg', () => {
     const cc = acpPresetById('claude-code')!
     expect(cc.detectBin).toBe('claude')
     expect(cc.command).toBe('npx')
     expect(cc.args).toEqual(['-y', '@agentclientprotocol/claude-agent-acp@latest'])
+    expect(cc.adapterPkg).toBe('@agentclientprotocol/claude-agent-acp')
     const cx = acpPresetById('codex')!
     expect(cx.detectBin).toBe('codex')
     expect(cx.command).toBe('npx')
     expect(cx.args).toEqual(['-y', '@zed-industries/codex-acp'])
+    expect(cx.adapterPkg).toBe('@zed-industries/codex-acp')
   })
 
-  it('native presets launch their detected binary directly (OpenCode keeps acp --pure)', () => {
+  it('native presets launch their detected binary directly with no adapter pkg', () => {
     expect(acpPresetById('opencode')).toMatchObject({ detectBin: 'opencode', command: 'opencode', args: ['acp', '--pure'] })
+    expect(acpPresetById('opencode')?.adapterPkg).toBeUndefined()
     expect(acpPresetById('kimi-code')).toMatchObject({ detectBin: 'kimi', command: 'kimi', args: ['acp'] })
+    expect(acpPresetById('kimi-code')?.adapterPkg).toBeUndefined()
   })
 
   it('looks presets up by id', () => {

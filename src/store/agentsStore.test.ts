@@ -16,7 +16,7 @@ beforeEach(async () => {
 
 describe('agentsStore', () => {
   it('load() hydrates from the IPC config (no auto-injected agents)', async () => {
-    getAgentsConfig.mockResolvedValueOnce({ agents: [{ id: 'a', name: 'A', kind: 'custom', command: 'x', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true }] })
+    getAgentsConfig.mockResolvedValueOnce({ agents: [{ id: 'a', name: 'A', kind: 'acp', command: 'x', args: [], enabled: true }] })
     const { useAgentsStore } = await import('./agentsStore.js')
     await useAgentsStore.getState().load()
     const agents = useAgentsStore.getState().agents
@@ -25,20 +25,20 @@ describe('agentsStore', () => {
   })
   it('addAgent persists and returns an id', async () => {
     const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'New', kind: 'custom', command: 'mybin', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true })
+    const id = await useAgentsStore.getState().addAgent({ name: 'New', kind: 'acp', command: 'mybin', args: [], enabled: true })
     expect(typeof id).toBe('string')
     expect(useAgentsStore.getState().agents[0]).toMatchObject({ id, name: 'New' })
     expect(setAgentsConfig).toHaveBeenCalledWith({ agents: [expect.objectContaining({ id, name: 'New' })] })
   })
   it('updateAgent patches the matching agent', async () => {
     const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'custom', command: 'b', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true })
+    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
     await useAgentsStore.getState().updateAgent(id, { enabled: false })
     expect(useAgentsStore.getState().agents.find((a) => a.id === id)!.enabled).toBe(false)
   })
   it('removeAgent drops it', async () => {
     const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'custom', command: 'b', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true })
+    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
     await useAgentsStore.getState().removeAgent(id)
     expect(useAgentsStore.getState().agents).toHaveLength(0)
   })

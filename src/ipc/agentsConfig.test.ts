@@ -8,7 +8,7 @@ beforeEach(() => invoke.mockReset())
 describe('agentsConfig IPC', () => {
   it('getAgentsConfig parses the file payload', async () => {
     const { getAgentsConfig } = await import('./agentsConfig.js')
-    invoke.mockResolvedValueOnce(JSON.stringify({ agents: [{ id: 'a', name: 'A', kind: 'custom', command: 'x', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true }] }))
+    invoke.mockResolvedValueOnce(JSON.stringify({ agents: [{ id: 'a', name: 'A', kind: 'acp', command: 'x', args: [], enabled: true }] }))
     const cfg = await getAgentsConfig()
     expect(cfg.agents).toHaveLength(1)
     expect(invoke).toHaveBeenCalledWith('get_agents_config')

@@ -24,7 +24,7 @@ export const TabsTrigger = forwardRef<
     ref={ref}
     className={cn(
       'relative inline-flex h-full items-center text-body font-medium text-ink-secondary transition-colors hover:text-ink',
-      'after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded-full after:bg-accent after:opacity-0',
+      'after:absolute after:inset-x-0 after:bottom-[-1px] after:h-0.5 after:rounded-full after:bg-accent after:opacity-0 hover:after:opacity-40 hover:after:bg-border',
       'data-[state=active]:text-ink data-[state=active]:after:opacity-100',
       className,
     )}

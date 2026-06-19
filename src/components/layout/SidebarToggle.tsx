@@ -24,7 +24,7 @@ export function SidebarToggle() {
       aria-label={label}
       aria-pressed={collapsed}
       data-tauri-drag-region="false"
-      className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+      className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition hover:scale-110 hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
     >
       <PanelLeft size={16} />
     </button>

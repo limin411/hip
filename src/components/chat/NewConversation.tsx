@@ -4,6 +4,7 @@ import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { sessionService } from '@/domain'
 import { Composer } from './Composer'
+import { FishMascot, useFishAnimation, GREETING_GROUP } from './FishMascot'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
@@ -34,12 +35,22 @@ export function NewConversation() {
     sessionService.sendMessage(text) // commit: creates the session (surface-aware) + resets the draft
   }
 
+  const { animClass, animName } = useFishAnimation(surface)
+  const greetGroup = GREETING_GROUP[animName]
+  const defaultGreeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
+
   return (
     <div className="flex flex-1 flex-col items-center overflow-y-auto px-5" data-testid="new-conversation">
-      <div className="mt-[20vh] w-full max-w-3xl">
-        <h1 className="mb-4 text-center text-display font-semibold text-ink">
-          {surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')}
-        </h1>
+      <div className="mt-[8vh] w-full max-w-3xl">
+        <FishMascot animClass={animClass} />
+        <div key={animName} className="animate-greeting-enter">
+          <h1 className="mb-1 text-center text-display font-semibold text-ink">
+            {t(`chat.greeting.${greetGroup}`, defaultGreeting)}
+          </h1>
+          <p className="mb-4 text-center text-body text-ink-secondary">
+            {t(`chat.greetingSub.${greetGroup}`, '')}
+          </p>
+        </div>
         <Composer
           value={text}
           onChange={(v) => useDraftStore.getState().setText(v)}

@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
+import { open } from '@tauri-apps/plugin-shell'
 import type { Message } from '@hip/protocol'
 import { formatClockTime, formatAbsolute } from '@/lib/datetime'
 import { Avatar } from '@/components/ui/Avatar'
@@ -16,7 +17,26 @@ import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 
 const REMARK_PLUGINS = [remarkGfm]
-const MD_COMPONENTS: Components = { pre: CodeBlock }
+const MD_COMPONENTS: Components = {
+  pre: CodeBlock,
+  a: ({ href, children, ...props }) => {
+    const handleClick = async (e: React.MouseEvent) => {
+      e.preventDefault()
+      if (!href) return
+      try {
+        await open(href)
+      } catch {
+        // Fallback: open in a new window if Tauri shell fails
+        window.open(href, '_blank', 'noopener,noreferrer')
+      }
+    }
+    return (
+      <a href={href} onClick={handleClick} {...props} className="text-accent underline hover:opacity-80 cursor-pointer">
+        {children}
+      </a>
+    )
+  },
+}
 
 interface MessageBubbleProps {
   message: Message

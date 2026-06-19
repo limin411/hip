@@ -7,9 +7,9 @@ export interface AcpSpawn { command: string; args: string[]; env: NodeJS.Process
 // `hip-managed` authMode is ignored at runtime). The `model` param is retained only for the shared
 // (agent, model) provider/connection factory signature; it is intentionally unused here.
 export function buildAcpSpawn(agent: AgentConfig, model: ResolvedModel | null): AcpSpawn {
-  // NOTE: this spawn path is OpenCode-shaped. A future ACP provider (claude-code/codex/kimi-code)
-  // will branch here on its preset/quirks. Reserved — not reachable yet because only OpenCode is
-  // selectable in the provider picker (src/lib/acpPresets.ts).
+  // All four ACP presets (opencode/kimi-code/claude-code/codex) bake their concrete command/args
+  // at add-time (src/lib/acpPresets.ts), so this path spawns them verbatim. agent.env carries any
+  // user-supplied API key (claude-code/codex). Self-managed: no model/key injection here.
   void model
   const env: NodeJS.ProcessEnv = { ...process.env, ...(agent.env ?? {}) }
   // All ACP agents are self-managed: inject nothing model/key-related; OpenCode reads its own auth.json.

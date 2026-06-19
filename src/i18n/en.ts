@@ -387,7 +387,6 @@ export const en = {
         redetect: 'Re-check',
         apiKey: 'API Key',
         apiKeyHint: 'Stored in this agent’s {{env}} env var; leave blank to use your system environment.',
-        acpPresetInstallHint: 'Install: {{cmd}}',
         backToProviders: '← Back to providers',
       },
     },

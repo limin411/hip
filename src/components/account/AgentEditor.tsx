@@ -13,6 +13,9 @@ import { agentCategory } from '@/lib/agentCategory'
 import { grantedMcpServerIds } from '@/lib/agentTools'
 import { useMcpServersStore } from '@/store/mcpServersStore'
 import { useSkillsStore } from '@/store/skillsStore'
+import { useAgentsStore } from '@/store/agentsStore'
+import { useDetectionStore } from '@/store/detectionStore'
+import { acpPresetById } from '@/lib/acpPresets'
 import { AcpProviderPicker } from './AcpProviderPicker'
 import type { AcpPreset } from '@/lib/acpPresets'
 
@@ -34,10 +37,15 @@ export function AgentEditor({
   const { config, catalog } = useProvidersStore()
   const { servers: mcpServers } = useMcpServersStore()
   const { skills } = useSkillsStore()
+  const agents = useAgentsStore((s) => s.agents)
+  const installed = useDetectionStore((s) => s.installed)
+  const detectionChecked = useDetectionStore((s) => s.checked)
+  const refreshDetection = useDetectionStore((s) => s.refresh)
   // Seed the per-skill / per-MCP grants from the stored agent. Back-compat: an old internal agent
   // has no allowedMcpServers — derive it once from legacy `mcp__<id>__*` wildcards in allowedTools
   // (grantedMcpServerIds(undefined) === [] when initial is null, so a new agent starts empty);
   // allowedSkills was never represented in the old model, so it starts empty (user re-selects).
+  const seedAuthEnvVar = initial?.quirks ? acpPresetById(initial.quirks)?.authEnvVar : undefined
   const [form, setForm] = useState<AgentForm>({
     name: initial?.name ?? '',
     description: initial?.description ?? '',
@@ -53,13 +61,17 @@ export function AgentEditor({
     allowedSkills: initial?.allowedSkills ?? [],
     allowedMcpServers: initial?.allowedMcpServers ?? grantedMcpServerIds(initial?.allowedTools),
     enabled: initial?.enabled ?? true,
+    apiKey: seedAuthEnvVar ? (initial?.env?.[seedAuthEnvVar] ?? '') : '',
+    authEnvVar: seedAuthEnvVar,
+    env: initial?.env,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     void useMcpServersStore.getState().load()
     void useSkillsStore.getState().load()
-  }, [])
+    void refreshDetection()
+  }, [refreshDetection])
 
   const isNewAcp = !initial && initialKind === 'acp'
   const [acpStep, setAcpStep] = useState<'pick' | 'form'>(isNewAcp ? 'pick' : 'form')
@@ -80,7 +92,7 @@ export function AgentEditor({
     setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
 
   const pickPreset = (preset: AcpPreset) => {
-    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authEnvVar ? 'hip-managed' : 'opencode-self' })
+    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authEnvVar: preset.authEnvVar, apiKey: '' })
     setAcpStep('form')
   }
 
@@ -108,7 +120,7 @@ export function AgentEditor({
         {isAcp && acpStep === 'pick' ? (
           <>
             <div className="p-5">
-              <AcpProviderPicker onPick={pickPreset} />
+              <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
               <Button variant="outline" size="sm" onClick={onCancel}>
@@ -236,6 +248,19 @@ export function AgentEditor({
                     onChange={(e) => patch({ quirks: e.target.value || undefined })}
                     placeholder={t('settings.agents.quirksPlaceholder')}
                   />
+                </Field>
+              )}
+
+              {isAcp && form.authEnvVar && (
+                <Field label={t('settings.agents.apiKey')}>
+                  <input
+                    className={cn(inputCls, 'font-mono')}
+                    type="password"
+                    value={form.apiKey ?? ''}
+                    onChange={(e) => patch({ apiKey: e.target.value })}
+                    placeholder={form.authEnvVar}
+                  />
+                  <div className="mt-1 text-caption text-ink-tertiary">{t('settings.agents.apiKeyHint', { env: form.authEnvVar })}</div>
                 </Field>
               )}
 

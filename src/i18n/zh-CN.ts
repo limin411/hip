@@ -387,7 +387,6 @@ export const zhCN = {
         redetect: '重新检测',
         apiKey: 'API Key',
         apiKeyHint: '将写入该智能体的 {{env}} 环境变量；留空则使用系统环境变量。',
-        acpPresetInstallHint: '安装：{{cmd}}',
         backToProviders: '← 返回选择提供方',
       },
     },

@@ -387,7 +387,6 @@ export const zhTW = {
         redetect: '重新偵測',
         apiKey: 'API Key',
         apiKeyHint: '將寫入該智能體的 {{env}} 環境變數；留空則使用系統環境變數。',
-        acpPresetInstallHint: '安裝：{{cmd}}',
         backToProviders: '← 返回選擇提供方',
       },
     },

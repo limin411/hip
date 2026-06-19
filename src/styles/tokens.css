@@ -31,6 +31,9 @@
   --rail-width: 72px;
   /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
   --titlebar-lights-inset: 90px;
+  /* 毛玻璃效果：仅标题栏使用，半透明背景 + 模糊 */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.06);
 }
 
 html,
@@ -108,6 +111,23 @@ a:hover {
   75% { transform: rotate(-1.6deg); }
 }
 
+/* —— UI micro-interaction keyframes —— */
+
+@keyframes dot-bounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+
+@keyframes msg-enter-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes msg-enter-left {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* 眨眼：整组沿自身中心纵向压扁再弹回 */
 .hip-eyes-blink {
   transform-box: fill-box;
@@ -142,4 +162,23 @@ a:hover {
   transform-box: fill-box;
   transform-origin: center;
   animation: hip-fish-wiggle 2.6s ease-in-out infinite;
+}
+
+/* —— 滚动条美化 —— */
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }

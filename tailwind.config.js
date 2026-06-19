@@ -73,6 +73,8 @@ export default {
         float: 'none',
         menu: '0 6px 20px -6px rgba(17, 17, 17, 0.14), 0 2px 6px -2px rgba(17, 17, 17, 0.08)',
         overlay: '0 16px 48px -12px rgba(17, 17, 17, 0.22), 0 6px 16px -8px rgba(17, 17, 17, 0.12)',
+        'card-hover': '0 4px 16px -4px rgba(17, 17, 17, 0.08)',
+        'sticky-top': '0 1px 3px rgba(17, 17, 17, 0.06)',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
@@ -89,6 +91,18 @@ export default {
           from: { opacity: '0', transform: 'translateX(8px)' },
           to: { opacity: '1', transform: 'translateX(0)' },
         },
+        'dot-bounce': {
+          '0%,60%,100%': { opacity: '0.3', transform: 'translateY(0)' },
+          '30%': { opacity: '1', transform: 'translateY(-2px)' },
+        },
+        'msg-enter-right': {
+          from: { opacity: '0', transform: 'translateX(12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        'msg-enter-left': {
+          from: { opacity: '0', transform: 'translateX(-12px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
       },
       animation: {
         blink: 'blink 1s step-start infinite',
@@ -96,6 +110,9 @@ export default {
         'message-enter': 'message-enter 0.3s ease-out',
         'menu-in': 'menu-in 0.12s ease-out',
         'panel-in': 'panel-in 0.2s ease-out',
+        'dot-bounce': 'dot-bounce 1.2s ease-in-out infinite',
+        'msg-enter-right': 'msg-enter-right 0.3s ease-out',
+        'msg-enter-left': 'msg-enter-left 0.3s ease-out',
       },
       transitionDuration: {
         DEFAULT: '150ms',

@@ -64,7 +64,7 @@ describe('protocol: AgentConfig skill/MCP allow-lists', () => {
   it('models an internal agent with allowedSkills + allowedMcpServers', () => {
     const a: AgentConfig = {
       id: 'helper', name: 'Helper', kind: 'internal', command: '', args: [],
-      transport: 'rich', acceptsModelConfig: false, enabled: true,
+      enabled: true,
       prompt: 'You help.',
       allowedSkills: ['pdf-tools'],
       allowedMcpServers: ['srv-1'],
@@ -77,7 +77,7 @@ describe('protocol: AgentConfig skill/MCP allow-lists', () => {
   it('treats both allow-lists as optional (undefined ⇒ none)', () => {
     const a: AgentConfig = {
       id: 'bare', name: 'Bare', kind: 'internal', command: '', args: [],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, prompt: 'p',
+      enabled: true, prompt: 'p',
     }
     expect(a.allowedSkills).toBeUndefined()
     expect(a.allowedMcpServers).toBeUndefined()
@@ -86,7 +86,7 @@ describe('protocol: AgentConfig skill/MCP allow-lists', () => {
   it('still admits the deprecated allowedTools field (back-compat)', () => {
     const a: AgentConfig = {
       id: 'legacy', name: 'Legacy', kind: 'internal', command: '', args: [],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, prompt: 'p',
+      enabled: true, prompt: 'p',
       allowedTools: ['read_file', 'mcp__srv-1__*'],
     }
     expect(a.allowedTools).toEqual(['read_file', 'mcp__srv-1__*'])

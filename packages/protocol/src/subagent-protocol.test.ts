@@ -10,7 +10,7 @@ describe('sub-agent protocol additions', () => {
   it('AgentConfig carries an optional description', () => {
     const a: AgentConfig = {
       id: 'x', name: 'X', kind: 'custom', command: 'c', args: [],
-      transport: 'thin', acceptsModelConfig: false, enabled: true,
+      enabled: true,
       description: 'when to use X',
     }
     expect(a.description).toBe('when to use X')

@@ -3,7 +3,7 @@ import type { AgentConfig } from '@hip/protocol'
 import { agentCategory } from './agentCategory'
 
 function a(kind: AgentConfig['kind']): AgentConfig {
-  return { id: 'x', name: 'X', kind, command: '', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true }
+  return { id: 'x', name: 'X', kind, command: '', args: [], enabled: true }
 }
 
 describe('agentCategory', () => {
@@ -11,8 +11,8 @@ describe('agentCategory', () => {
     expect(agentCategory(a('acp'))).toBe('acp')
     expect(agentCategory(a('opencode'))).toBe('acp')
   })
-  it('maps custom to cli', () => {
-    expect(agentCategory(a('custom'))).toBe('cli')
+  it('maps custom to acp', () => {
+    expect(agentCategory(a('custom'))).toBe('acp')
   })
   it('maps internal to internal', () => {
     expect(agentCategory(a('internal'))).toBe('internal')

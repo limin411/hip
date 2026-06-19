@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentAuthMode } from '@hip/protocol'
+import type { AgentConfig } from '@hip/protocol'
 
 export interface AgentForm {
   name: string
@@ -6,10 +6,7 @@ export interface AgentForm {
   kind: AgentConfig['kind']
   command: string
   args: string
-  transport: AgentConfig['transport']
-  acceptsModelConfig: boolean
   boundModelKey: string
-  authMode: AgentAuthMode
   quirks?: string
   // internal-only fields:
   prompt: string
@@ -26,8 +23,7 @@ export function isAgentDraftValid(form: AgentForm): boolean {
   if (form.kind === 'internal') {
     return form.name.trim() !== '' && form.prompt.trim() !== ''
   }
-  // Model rollback: external agents (acp + custom) self-manage — a model is never required.
-  return form.name.trim() !== '' && form.command.trim() !== ''
+  return form.name.trim() !== ''
 }
 
 function parseBoundModel(key: string): AgentConfig['boundModel'] {
@@ -44,8 +40,6 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
       kind: 'internal',
       command: '',
       args: [],
-      transport: 'thin',
-      acceptsModelConfig: false,
       prompt: form.prompt.trim(),
       // Built-in tools are always available; only per-agent skill/MCP grants are configured here. The
       // sidecar no longer gates built-ins by an allow-list, so explicitly emit allowedTools: undefined
@@ -59,9 +53,7 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
     }
   }
 
-  // Model rollback: external agents (acp + custom) self-manage. We never push a model, so
-  // acceptsModelConfig is always false and no boundModel/authMode is emitted (legacy fields stay
-  // inert in the type for back-compat with already-saved configs).
+  // ACP agents self-manage their model — hip never pushes one.
   const env0 = { ...(form.env ?? {}) }
   if (form.authEnvVar) {
     const v = (form.apiKey ?? '').trim()
@@ -75,8 +67,6 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
     kind: form.kind,
     command: form.command.trim(),
     args: form.args.trim() ? form.args.trim().split(/\s+/) : [],
-    transport: form.transport,
-    acceptsModelConfig: false,
     ...(form.quirks ? { quirks: form.quirks } : {}),
     ...(env ? { env } : {}),
     enabled: form.enabled,

@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { Code, Bot, Cpu, Rocket, CircleCheck, type LucideIcon } from 'lucide-react'
+import { Code, Bot, Cpu, Rocket, type LucideIcon } from 'lucide-react'
 import { ACP_PRESETS, type AcpPreset, type AcpPresetIcon } from '@/lib/acpPresets'
-import { cn } from '@/lib/utils'
 
 const ICONS: Record<AcpPresetIcon, LucideIcon> = { code: Code, bot: Bot, cpu: Cpu, rocket: Rocket }
 
@@ -13,30 +12,20 @@ export function AcpProviderPicker({ onPick }: { onPick: (preset: AcpPreset) => v
     <div className="grid grid-cols-2 gap-2.5">
       {ACP_PRESETS.map((preset) => {
         const Icon = ICONS[preset.icon]
-        const available = preset.status === 'available'
         return (
           <div
             key={preset.id}
-            role={available ? 'button' : undefined}
-            tabIndex={available ? 0 : undefined}
-            onClick={available ? () => onPick(preset) : undefined}
-            onKeyDown={available ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(preset) } } : undefined}
-            className={cn(
-              'rounded-lg border px-3 py-2.5 transition-colors',
-              available ? 'cursor-pointer border-border hover:border-accent hover:bg-accent-subtle' : 'border-border opacity-70',
-            )}
+            role="button"
+            tabIndex={0}
+            onClick={() => onPick(preset)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(preset) } }}
+            className="cursor-pointer rounded-lg border border-border px-3 py-2.5 transition-colors hover:border-accent hover:bg-accent-subtle"
           >
             <div className="flex items-center gap-2">
-              <Icon size={18} className={available ? 'text-accent-strong' : 'text-ink-tertiary'} />
-              <span className={cn('text-body font-medium', available ? 'text-ink' : 'text-ink-secondary')}>{preset.name}</span>
+              <Icon size={18} className="text-accent-strong" />
+              <span className="text-body font-medium text-ink">{preset.name}</span>
             </div>
-            {available ? (
-              <div className="mt-1.5 flex items-center gap-1 text-caption text-success">
-                <CircleCheck size={13} /> {t('settings.agents.acpPresetAvailable')}
-              </div>
-            ) : (
-              <div className="mt-1.5 text-caption text-ink-tertiary">{t('settings.agents.acpPresetComingSoon')}</div>
-            )}
+            <div className="mt-1.5 text-caption text-ink-tertiary">{t('settings.agents.acpPresetInstallHint', { cmd: preset.installCmd })}</div>
           </div>
         )
       })}

@@ -80,7 +80,7 @@ export function AgentEditor({
     setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
 
   const pickPreset = (preset: AcpPreset) => {
-    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authModeDefault ?? 'opencode-self' })
+    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authMode: preset.authEnvVar ? 'hip-managed' : 'opencode-self' })
     setAcpStep('form')
   }
 

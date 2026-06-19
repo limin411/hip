@@ -244,6 +244,19 @@ export class SessionService {
     this.transport.send({ type: 'config:setActiveModel', providerID, modelID, baseURL })
   }
 
+  /** Switch the active session's model mid-conversation. Resolves the modelKey to llmProvider /
+   *  model / baseURL, sends session:setModel to the sidecar (which also updates the global active
+   *  model), and optimistically updates the session's config. */
+  setSessionModel(modelKey: string): void {
+    const { activeSessionId } = useDomainStore.getState()
+    if (!activeSessionId) return
+    const { catalog, config } = useProvidersStore.getState()
+    const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, modelKey)
+    // Optimistic — the sidecar echoes session:model to confirm.
+    useDomainStore.getState().apply({ type: 'session:model', sessionId: activeSessionId, llmProvider, model })
+    this.transport.send({ type: 'session:setModel', sessionId: activeSessionId, llmProvider, model, baseURL })
+  }
+
   /** Switch a live ACP-agent config selector (model/mode); the agent re-advertises via agent:configOptions. */
   setAgentConfigOption(sessionId: string, configId: string, value: string): void {
     this.transport.send({ type: 'agent:setConfigOption', sessionId, configId, value })

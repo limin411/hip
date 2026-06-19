@@ -68,9 +68,7 @@ export const en = {
       styleDelete: 'Delete style',
       styleEmpty: 'No saved styles yet. Create one below.',
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
-      modelHint: 'Choose the model (before the conversation starts)',
-      modelLocked: 'Model is locked for this conversation',
-      modelUnknown: 'Unknown model',
+      modelHint: 'Choose the model',
       noModelSelected: 'Select a model',
       todos: {
         plan: 'Plan',

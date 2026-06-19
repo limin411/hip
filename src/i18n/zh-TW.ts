@@ -68,9 +68,7 @@ export const zhTW = {
       styleDelete: '刪除風格',
       styleEmpty: '還沒有儲存的風格，請在下方新增。',
       agentRestarted: '外部智能體已重啟 —— 先前的上下文未保留。',
-      modelHint: '選擇模型（對話開始前）',
-      modelLocked: '本次對話的模型已鎖定',
-      modelUnknown: '未知模型',
+      modelHint: '選擇模型',
       noModelSelected: '選擇模型',
       todos: {
         plan: '計畫',

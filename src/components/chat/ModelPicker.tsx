@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { Cpu, Lock, Check } from 'lucide-react'
+import { Cpu, Check } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuGroup } from '@/components/ui/DropdownMenu'
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
-import { useActiveSession, useActiveSessionId } from '@/domain'
+import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { parseModelKey, activeModelKey } from '@/lib/modelKey'
-import type { ProvidersConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 
 /** Pure: groups for the dropdown. */
@@ -15,13 +14,6 @@ export const modelPickerItems = groupModelOptions
 /** Pure: label for a model key. */
 export function currentModelLabel(key: string): string {
   return key ? parseModelKey(key).modelID : ''
-}
-/** Pure: the model id shown on a committed session's locked chip — the pinned model if the session
- *  has one, else the global active model the session actually uses (the sidecar's resolveModelChoice
- *  falls back to the active model when config.model is empty), else '' so the caller renders the
- *  unknown-model label. */
-export function committedModelId(model: string, config: ProvidersConfig): string {
-  return model || parseModelKey(activeModelKey(config)).modelID
 }
 
 export function ModelPicker() {
@@ -34,24 +26,15 @@ export function ModelPicker() {
   const activeId = useActiveSessionId()
   const session = useActiveSession()
 
-  // Committed session: locked read-only model badge. A session with no pinned model follows the
-  // global active model (the sidecar's resolveModelChoice falls back to it), so show that rather
-  // than "未知模型".
-  if (activeId && session) {
-    const model = committedModelId(session.config.model, config)
-    return (
-      <ComposerChip disabled active={!!model} title={t('chat.modelLocked')} data-testid="model-chip-locked">
-        <Cpu size={13} className="shrink-0" aria-hidden />
-        <span className="max-w-[140px] truncate">{model || t('chat.modelUnknown')}</span>
-        <Lock size={11} className="shrink-0 opacity-60" aria-hidden />
-      </ComposerChip>
-    )
-  }
-
-  // Draft: interactive model picker.
   const groups = groupModelOptions(catalog, config)
-  const currentKey = draft?.modelKey ?? activeModelKey(config)
+
+  // Active session: show the session's current model (pinned or global fallback) and allow switching.
+  // Draft (no session): show the draft's modelKey (or global fallback).
+  const currentKey = activeId && session
+    ? (session.config.model ? `${session.config.llmProvider}/${session.config.model}` : activeModelKey(config))
+    : (draft?.modelKey ?? activeModelKey(config))
   const label = currentModelLabel(currentKey) || t('chat.noModelSelected')
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -65,7 +48,16 @@ export function ModelPicker() {
           <DropdownMenuGroup key={g.providerID}>
             <DropdownMenuLabel>{g.providerName}</DropdownMenuLabel>
             {g.models.map((m) => (
-              <DropdownMenuItem key={m.key} onSelect={() => setModelKey(m.key)}>
+              <DropdownMenuItem
+                key={m.key}
+                onSelect={() => {
+                  if (activeId && session) {
+                    sessionService.setSessionModel(m.key)
+                  } else {
+                    setModelKey(m.key)
+                  }
+                }}
+              >
                 <Check size={14} className={cn('shrink-0', currentKey === m.key ? 'opacity-100' : 'opacity-0')} />
                 <span className="truncate">{m.modelID}</span>
               </DropdownMenuItem>

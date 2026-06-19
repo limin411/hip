@@ -68,9 +68,7 @@ export const zhCN = {
       styleDelete: '删除风格',
       styleEmpty: '还没有保存的风格，请在下方新建。',
       agentRestarted: '外部智能体已重启 —— 之前的上下文未保留。',
-      modelHint: '选择模型（对话开始前）',
-      modelLocked: '本次对话的模型已锁定',
-      modelUnknown: '未知模型',
+      modelHint: '选择模型',
       noModelSelected: '选择模型',
       todos: {
         plan: '计划',

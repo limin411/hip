@@ -248,6 +248,9 @@ export function applyServerMessage(
     case 'session:systemPrompt':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, systemPrompt: msg.systemPrompt || undefined } }))
 
+    case 'session:model':
+      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, llmProvider: msg.llmProvider, model: msg.model } }))
+
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state

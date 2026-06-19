@@ -9,7 +9,7 @@ export interface Draft {
   cwd?: string
   text: string
   agentId?: string             // legacy; no longer set by the composer
-  modelKey?: string            // 'providerID/modelID' chosen for this chat (locked at first send)
+  modelKey?: string            // 'providerID/modelID' chosen for this chat
   permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
 }
 

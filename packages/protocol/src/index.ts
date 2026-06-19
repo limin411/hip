@@ -334,6 +334,7 @@ export type ClientMessage =
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
+  | { type: 'session:setModel'; sessionId: string; llmProvider: string; model: string; baseURL?: string }
   | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
@@ -363,6 +364,7 @@ export type ServerMessage =
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
+  | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }

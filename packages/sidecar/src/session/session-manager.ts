@@ -129,6 +129,22 @@ export class SessionManager {
         send({ type: 'session:permissionMode', sessionId: msg.sessionId, permissionMode: s.config.permissionMode ?? 'edit' })
         break
       }
+      case 'session:setModel': {
+        // Change the global active model AND clear the session's pinned model so
+        // resolveModelChoice falls back to the newly-set global default.
+        setActiveModel({ providerID: msg.llmProvider, modelID: msg.model, baseURL: msg.baseURL ?? '' })
+        const s = this.ensureSession(msg.sessionId)
+        const applied = s.setModel(msg.llmProvider)
+        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        // Also apply to other sessions — they follow the global model if unpinned.
+        for (const other of this.sessions.values()) {
+          if (other !== s) other.applyActiveModel()
+        }
+        const hasApiKey = !!resolveApiKey(msg.llmProvider)
+        send({ type: 'config:activeModel', providerID: msg.llmProvider, modelID: msg.model, hasApiKey })
+        send({ type: 'session:model', sessionId: msg.sessionId, llmProvider: msg.llmProvider, model: msg.model })
+        break
+      }
       case 'config:setActiveModel': {
         setActiveModel({ providerID: msg.providerID, modelID: msg.modelID, baseURL: msg.baseURL })
         // Apply to every in-memory session at its next idle turn (no restart).

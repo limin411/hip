@@ -278,6 +278,17 @@ export class Session {
     return true
   }
 
+  /** Clear the session's pinned model so it follows the global active model. NO-OP (returns false)
+   *  while a turn is running; the next sendMessage picks up the change via modelDirty. */
+  setModel(llmProvider: string): boolean {
+    if (!this.usesEnvModel) return true
+    if (this.running) { this.modelDirty = true; return false }
+    // Clear the pinned model — resolveModelChoice will fall back to the global active model.
+    this._config = { ...this._config, llmProvider, model: '' }
+    this.buildAgent()
+    return true
+  }
+
   /** Set/clear per-conversation instructions and rebuild the agent. NO-OP (returns false) while a turn is running. */
   setSystemPrompt(systemPrompt: string | null): boolean {
     if (this.running) return false

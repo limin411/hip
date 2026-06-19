@@ -73,6 +73,11 @@ pub fn plugins_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip-plugins.json"))
 }
 
+/// Canonical path of the unified TOML config inside `config/`.
+pub fn hip_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip.toml"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")

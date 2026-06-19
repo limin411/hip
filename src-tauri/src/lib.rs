@@ -5,9 +5,11 @@ mod skills;
 mod plugins;
 mod path_env;
 
+use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
 
@@ -28,6 +30,154 @@ impl SidecarState {
             generation: AtomicU64::new(0),
         }
     }
+}
+
+// ── Unified TOML config types (wave 1) ──
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct BoundModel {
+    provider_id: String,
+    model_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ProviderEntry {
+    id: String,
+    name: String,
+    base_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    api_key: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct McpServerEntry {
+    id: String,
+    name: String,
+    transport: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    headers: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    enabled_tools: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disabled_tools: Option<Vec<String>>,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct AgentEntry {
+    id: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    kind: String,
+    command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bound_model: Option<BoundModel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    quirks: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed_tools: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed_skills: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed_mcp_servers: Option<Vec<String>>,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct SkillEntry {
+    id: String,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ToolPermissionConfig {
+    default_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    overrides: Option<HashMap<String, String>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct PermissionEntry {
+    coarse_mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_permissions: Option<ToolPermissionConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct HipConfig {
+    version: u32,
+    #[serde(default)]
+    providers: Vec<ProviderEntry>,
+    #[serde(default)]
+    mcp_servers: Vec<McpServerEntry>,
+    #[serde(default)]
+    skills: Vec<SkillEntry>,
+    #[serde(default)]
+    agents: Vec<AgentEntry>,
+    #[serde(default)]
+    permissions: Option<PermissionEntry>,
+}
+
+// ── Legacy JSON deserialization helpers (read-only migration) ──
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct LegacyProviderEntry {
+    enabled: bool,
+    #[serde(default, alias = "baseURL")]
+    base_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct LegacyProvidersConfig {
+    providers: HashMap<String, LegacyProviderEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct LegacyAgentsConfig {
+    agents: Vec<AgentEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct LegacyMcpServersConfig {
+    servers: Vec<McpServerEntry>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+struct LegacySkillsConfig {
+    enabled: HashMap<String, bool>,
 }
 
 #[tauri::command]
@@ -51,6 +201,101 @@ async fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
     let port = sidecar::spawn_sidecar(&app).await?;
     *app.state::<SidecarState>().port.lock().unwrap() = Some(port);
     Ok(port)
+}
+
+/// Read a single merged HipConfig from the legacy JSON files (read-only, never deletes).
+#[allow(dead_code)]
+fn from_legacy_json(app: &tauri::AppHandle) -> HipConfig {
+    let mut cfg = HipConfig {
+        version: 1,
+        providers: vec![],
+        mcp_servers: vec![],
+        skills: vec![],
+        agents: vec![],
+        permissions: None,
+    };
+
+    if let Some(p) = paths::providers_config_path(app) {
+        if let Ok(body) = std::fs::read_to_string(&p) {
+            if let Ok(legacy) = serde_json::from_str::<LegacyProvidersConfig>(&body) {
+                cfg.providers = legacy
+                    .providers
+                    .into_iter()
+                    .filter(|(_, v)| v.enabled)
+                    .map(|(id, v)| ProviderEntry {
+                        id: id.clone(),
+                        name: id,
+                        base_url: v.base_url.unwrap_or_default(),
+                        api_key: None,
+                    })
+                    .collect();
+            }
+        }
+    }
+
+    if let Some(p) = paths::agents_config_path(app) {
+        if let Ok(body) = std::fs::read_to_string(&p) {
+            if let Ok(legacy) = serde_json::from_str::<LegacyAgentsConfig>(&body) {
+                cfg.agents = legacy.agents;
+            }
+        }
+    }
+
+    if let Some(p) = paths::mcp_servers_config_path(app) {
+        if let Ok(body) = std::fs::read_to_string(&p) {
+            if let Ok(legacy) = serde_json::from_str::<LegacyMcpServersConfig>(&body) {
+                cfg.mcp_servers = legacy.servers;
+            }
+        }
+    }
+
+    if let Some(p) = paths::skills_config_path(app) {
+        if let Ok(body) = std::fs::read_to_string(&p) {
+            if let Ok(legacy) = serde_json::from_str::<LegacySkillsConfig>(&body) {
+                cfg.skills = legacy
+                    .enabled
+                    .into_iter()
+                    .map(|(id, enabled)| SkillEntry { id, enabled })
+                    .collect();
+            }
+        }
+    }
+
+    cfg
+}
+
+#[tauri::command]
+fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
+    let path = paths::hip_config_path(&app).ok_or("no config dir")?;
+    match std::fs::read_to_string(&path) {
+        Ok(raw) => {
+            let cfg: HipConfig =
+                toml::from_str(&raw).map_err(|e| format!("TOML parse error: {e}"))?;
+            serde_json::to_string(&cfg).map_err(|e| e.to_string())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let cfg = HipConfig {
+                version: 1,
+                providers: vec![],
+                mcp_servers: vec![],
+                skills: vec![],
+                agents: vec![],
+                permissions: None,
+            };
+            serde_json::to_string(&cfg).map_err(|e| e.to_string())
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn set_hip_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let cfg: HipConfig =
+        serde_json::from_str(&json).map_err(|e| format!("JSON parse error: {e}"))?;
+    let toml_str =
+        toml::to_string_pretty(&cfg).map_err(|e| format!("TOML serialize error: {e}"))?;
+    let path = paths::hip_config_path(&app).ok_or("no config dir")?;
+    std::fs::write(&path, toml_str).map_err(|e| e.to_string())
 }
 
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
@@ -288,9 +533,11 @@ fn delete_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn list_skills(app: tauri::AppHandle) -> Result<String, String> {
-    let dir = paths::skills_dir(&app).ok_or("no skills dir")?;
-    let metas = skills::scan_skills(&dir);
+fn list_skills(app: tauri::AppHandle, project_root: Option<String>) -> Result<String, String> {
+    let proj = project_root
+        .as_deref()
+        .map(std::path::Path::new);
+    let metas = skills::scan_skills(&app, proj);
     serde_json::to_string(&metas).map_err(|e| e.to_string())
 }
 
@@ -465,6 +712,8 @@ pub fn run() {
             set_agents_config,
             get_mcp_servers_config,
             set_mcp_servers_config,
+            get_hip_config,
+            set_hip_config,
             list_skills,
             install_skill_zip,
             delete_skill,
@@ -539,5 +788,286 @@ mod tests {
         let got = super::find_on_path(&["opencode".to_string()], &[std::path::PathBuf::from(&dir)]);
         assert_eq!(got.get("opencode"), Some(&false));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ── HipConfig TOML roundtrip tests ──
+
+    fn sample_config() -> super::HipConfig {
+        super::HipConfig {
+            version: 1,
+            providers: vec![super::ProviderEntry {
+                id: "openai".into(),
+                name: "OpenAI".into(),
+                base_url: "https://api.openai.com/v1".into(),
+                api_key: Some("sk-abc".into()),
+            }],
+            mcp_servers: vec![super::McpServerEntry {
+                id: "srv-1".into(),
+                name: "Local".into(),
+                transport: "stdio".into(),
+                command: Some("npx".into()),
+                args: vec![],
+                env: None,
+                url: None,
+                headers: None,
+                enabled_tools: None,
+                disabled_tools: None,
+                enabled: true,
+            }],
+            skills: vec![super::SkillEntry { id: "pdf-tools".into(), enabled: true }],
+            agents: vec![super::AgentEntry {
+                id: "helper".into(),
+                name: "Helper".into(),
+                description: None,
+                kind: "internal".into(),
+                command: "".into(),
+                args: vec![],
+                bound_model: None,
+                quirks: None,
+                env: None,
+                prompt: Some("You help.".into()),
+                allowed_tools: None,
+                allowed_skills: None,
+                allowed_mcp_servers: None,
+                enabled: true,
+            }],
+            permissions: Some(super::PermissionEntry {
+                coarse_mode: "edit".into(),
+                tool_permissions: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn toml_roundtrip_preserves_all_sections() {
+        let cfg = sample_config();
+
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        let from_toml: super::HipConfig = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(from_toml.version, 1);
+        assert_eq!(from_toml.providers.len(), 1);
+        assert_eq!(from_toml.providers[0].id, "openai");
+        assert_eq!(from_toml.providers[0].api_key.as_deref(), Some("sk-abc"));
+        assert_eq!(from_toml.mcp_servers.len(), 1);
+        assert_eq!(from_toml.mcp_servers[0].id, "srv-1");
+        assert_eq!(from_toml.mcp_servers[0].transport, "stdio");
+        assert_eq!(from_toml.skills.len(), 1);
+        assert_eq!(from_toml.skills[0].id, "pdf-tools");
+        assert!(from_toml.skills[0].enabled);
+        assert_eq!(from_toml.agents.len(), 1);
+        assert_eq!(from_toml.agents[0].id, "helper");
+        assert_eq!(from_toml.agents[0].prompt.as_deref(), Some("You help."));
+        assert_eq!(
+            from_toml.permissions.as_ref().unwrap().coarse_mode,
+            "edit"
+        );
+    }
+
+    #[test]
+    fn json_to_toml_to_json_roundtrip() {
+        let cfg = sample_config();
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(from_json.providers[0].id, "openai");
+
+        let toml_str = toml::to_string_pretty(&from_json).unwrap();
+        let from_toml: super::HipConfig = toml::from_str(&toml_str).unwrap();
+
+        let json2 = serde_json::to_string(&from_toml).unwrap();
+        let from_json2: super::HipConfig = serde_json::from_str(&json2).unwrap();
+        assert_eq!(from_json2.version, 1);
+        assert_eq!(from_json2.mcp_servers[0].id, "srv-1");
+    }
+
+    #[test]
+    fn default_config_has_empty_sections() {
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            permissions: None,
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(from_json.version, 1);
+        assert!(from_json.providers.is_empty());
+        assert!(from_json.mcp_servers.is_empty());
+        assert!(from_json.skills.is_empty());
+        assert!(from_json.agents.is_empty());
+        assert!(from_json.permissions.is_none());
+    }
+
+    #[test]
+    fn invalid_toml_returns_error() {
+        let result: Result<super::HipConfig, _> = toml::from_str("this is {{{ not toml");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn legacy_providers_migration_parses_enabled_only() {
+        let json = r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"},"off":{"enabled":false,"baseURL":"https://x.com"}}}"#;
+        let legacy: super::LegacyProvidersConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(legacy.providers.len(), 2);
+
+        let providers: Vec<super::ProviderEntry> = legacy
+            .providers
+            .into_iter()
+            .filter(|(_, v)| v.enabled)
+            .map(|(id, v)| super::ProviderEntry {
+                id: id.clone(),
+                name: id,
+                base_url: v.base_url.unwrap_or_default(),
+                api_key: None,
+            })
+            .collect();
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].id, "openai");
+        assert_eq!(providers[0].base_url, "https://api.openai.com/v1");
+    }
+
+    #[test]
+    fn legacy_skills_migration_converts_to_entries() {
+        let json = r#"{"enabled":{"pdf-tools":true,"git-tools":false}}"#;
+        let legacy: super::LegacySkillsConfig = serde_json::from_str(json).unwrap();
+        let skills: Vec<super::SkillEntry> = legacy
+            .enabled
+            .into_iter()
+            .map(|(id, enabled)| super::SkillEntry { id, enabled })
+            .collect();
+        assert_eq!(skills.len(), 2);
+        let pdf = skills.iter().find(|s| s.id == "pdf-tools").unwrap();
+        assert!(pdf.enabled);
+        let git = skills.iter().find(|s| s.id == "git-tools").unwrap();
+        assert!(!git.enabled);
+    }
+
+    #[test]
+    fn legacy_agents_migration_parses_directly() {
+        let json = r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."}]}"#;
+        let legacy: super::LegacyAgentsConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(legacy.agents.len(), 1);
+        assert_eq!(legacy.agents[0].id, "helper");
+        assert_eq!(legacy.agents[0].enabled, true);
+    }
+
+    #[test]
+    fn legacy_mcp_servers_migration_parses_directly() {
+        let json = r#"{"servers":[{"id":"srv-1","name":"Local","transport":"stdio","command":"npx","args":[],"enabled":true}]}"#;
+        let legacy: super::LegacyMcpServersConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(legacy.servers.len(), 1);
+        assert_eq!(legacy.servers[0].id, "srv-1");
+        assert_eq!(legacy.servers[0].transport, "stdio");
+    }
+
+    #[test]
+    fn from_legacy_json_integration() {
+        let dir =
+            std::env::temp_dir().join(format!("hip-legacy-test-{}", std::process::id()));
+        let config_dir = dir.join("config");
+        std::fs::create_dir_all(&config_dir).unwrap();
+
+        std::fs::write(
+            config_dir.join("hip-providers.json"),
+            r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"}}}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            config_dir.join("hip-skills.json"),
+            r#"{"enabled":{"pdf-tools":true}}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            config_dir.join("hip-agents.json"),
+            r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            config_dir.join("hip-mcp-servers.json"),
+            r#"{"servers":[{"id":"srv-1","name":"Local","transport":"stdio","command":"npx","args":[],"enabled":true}]}"#,
+        )
+        .unwrap();
+
+        // Simulate what from_legacy_json does (cannot call it without AppHandle)
+        let providers_body =
+            std::fs::read_to_string(config_dir.join("hip-providers.json")).unwrap();
+        let legacy_p: super::LegacyProvidersConfig =
+            serde_json::from_str(&providers_body).unwrap();
+        let providers: Vec<super::ProviderEntry> = legacy_p
+            .providers
+            .into_iter()
+            .filter(|(_, v)| v.enabled)
+            .map(|(id, v)| super::ProviderEntry {
+                id: id.clone(),
+                name: id,
+                base_url: v.base_url.unwrap_or_default(),
+                api_key: None,
+            })
+            .collect();
+        assert_eq!(providers.len(), 1);
+
+        let skills_body =
+            std::fs::read_to_string(config_dir.join("hip-skills.json")).unwrap();
+        let legacy_s: super::LegacySkillsConfig =
+            serde_json::from_str(&skills_body).unwrap();
+        assert_eq!(legacy_s.enabled.get("pdf-tools"), Some(&true));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn mcp_server_entry_with_enabled_tools() {
+        let json = r#"{"id":"srv-a","name":"Filtered","transport":"stdio","command":"npx","args":[],"enabledTools":["read_file","search"],"enabled":true}"#;
+        let srv: super::McpServerEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(srv.id, "srv-a");
+        let expected: Vec<String> = vec!["read_file".into(), "search".into()];
+        assert_eq!(srv.enabled_tools.as_deref(), Some(expected.as_slice()));
+        assert!(srv.disabled_tools.is_none());
+
+        let toml_str = toml::to_string_pretty(&srv).unwrap();
+        let from_toml: super::McpServerEntry = toml::from_str(&toml_str).unwrap();
+        assert_eq!(from_toml.enabled_tools.as_deref(), Some(expected.as_slice()));
+    }
+
+    #[test]
+    fn permission_entry_with_tool_overrides() {
+        let mut overrides = std::collections::HashMap::new();
+        overrides.insert("write_file".to_string(), "auto".to_string());
+        overrides.insert("run_script".to_string(), "approve".to_string());
+
+        let perm = super::PermissionEntry {
+            coarse_mode: "full".into(),
+            tool_permissions: Some(super::ToolPermissionConfig {
+                default_mode: "prompt".into(),
+                overrides: Some(overrides),
+            }),
+        };
+
+        let json = serde_json::to_string(&perm).unwrap();
+        let from_json: super::PermissionEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(from_json.coarse_mode, "full");
+        let tp = from_json.tool_permissions.as_ref().unwrap();
+        assert_eq!(tp.default_mode, "prompt");
+        assert_eq!(tp.overrides.as_ref().unwrap().get("write_file"), Some(&"auto".to_string()));
+
+        let toml_str = toml::to_string_pretty(&perm).unwrap();
+        let from_toml: super::PermissionEntry = toml::from_str(&toml_str).unwrap();
+        assert_eq!(from_toml.coarse_mode, "full");
+    }
+
+    #[test]
+    fn hip_config_sections_optional_in_toml() {
+        let minimal = "version = 1\n";
+        let cfg: super::HipConfig = toml::from_str(minimal).unwrap();
+        assert_eq!(cfg.version, 1);
+        assert!(cfg.providers.is_empty());
+        assert!(cfg.mcp_servers.is_empty());
+        assert!(cfg.skills.is_empty());
+        assert!(cfg.agents.is_empty());
+        assert!(cfg.permissions.is_none());
     }
 }

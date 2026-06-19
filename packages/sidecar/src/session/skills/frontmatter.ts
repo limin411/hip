@@ -1,29 +1,21 @@
 // packages/sidecar/src/session/skills/frontmatter.ts
+import { parse as parseYaml } from 'yaml'
 
-/** Parsed frontmatter: scalar string values keyed by their YAML field name. */
+/** Parsed frontmatter: unknown-typed values keyed by their YAML field name. */
 export interface Frontmatter {
-  data: Record<string, string>
+  data: Record<string, unknown>
   body: string
 }
 
-/** Strip one matching pair of surrounding single or double quotes from a scalar value. */
-function unquote(raw: string): string {
-  const v = raw.trim()
-  if (v.length >= 2) {
-    const first = v[0]
-    const last = v[v.length - 1]
-    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-      return v.slice(1, -1)
-    }
-  }
-  return v
-}
-
 /**
- * Minimal, dependency-free YAML-frontmatter splitter for SKILL.md.
- * Only flat `key: value` scalar lines are parsed (enough for `name`/`description`);
- * non-scalar/nested YAML is ignored. No frontmatter (or a missing closing fence,
- * or an opening fence not on line 1) → empty data and the whole input as body.
+ * Full-YAML frontmatter parser using the `yaml` library.
+ *
+ * Extracts the leading `---`-fenced YAML block and parses it with yaml.parse(),
+ * supporting scalars, booleans, numbers, arrays, nested objects, and multi-line strings.
+ *
+ * No frontmatter (or a missing closing fence, or an opening fence not on line 1)
+ * → `{ data: {}, body: src }`. Invalid YAML in the block → graceful fallback to
+ * `{ data: {}, body: src }` (never throws).
  */
 export function parseFrontmatter(src: string): Frontmatter {
   const normalized = src.replace(/\r\n/g, '\n')
@@ -36,15 +28,16 @@ export function parseFrontmatter(src: string): Frontmatter {
   }
   if (end === -1) return { data: {}, body: src }
 
-  const data: Record<string, string> = {}
-  for (let i = 1; i < end; i++) {
-    const line = lines[i]
-    if (!line.trim() || line.trimStart().startsWith('#')) continue
-    const colon = line.indexOf(':')
-    if (colon === -1) continue
-    const key = line.slice(0, colon).trim()
-    if (!key) continue
-    data[key] = unquote(line.slice(colon + 1))
+  const yamlBlock = lines.slice(1, end).join('\n')
+
+  let data: Record<string, unknown> = {}
+  try {
+    const parsed = parseYaml(yamlBlock)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      data = parsed as Record<string, unknown>
+    }
+  } catch {
+    // Invalid YAML — graceful degrade to empty data
   }
 
   const body = lines.slice(end + 1).join('\n').replace(/^\n+/, '')

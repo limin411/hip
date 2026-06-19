@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { buildSystemPrompt, childSystemPrompt, buildManagedAgentPrompt } from './system-prompt.js'
 
 describe('buildSystemPrompt', () => {
@@ -90,12 +93,12 @@ describe('buildSystemPrompt skills block', () => {
 
   it('omits the skills section when no skills are given', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
-    expect(s).not.toMatch(/可用 Skills/)
+    expect(s).not.toMatch(/^## Skills$/m)
   })
 
   it('lists enabled skill names and descriptions and mentions use_skill', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj', skills })
-    expect(s).toMatch(/可用 Skills/)
+    expect(s).toMatch(/^## Skills$/m)
     expect(s).toContain('formatter')
     expect(s).toContain('Format code')
     expect(s).toContain('linter')
@@ -104,7 +107,55 @@ describe('buildSystemPrompt skills block', () => {
 
   it('omits the skills section when skills is an empty array', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: [] })
-    expect(s).not.toMatch(/可用 Skills/)
+    expect(s).not.toMatch(/^## Skills$/m)
+  })
+
+  it('auto-invoke instruction tells model to call use_skill when task matches', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills })
+    expect(s).toMatch(/When a user's task matches a skill's description, call use_skill/)
+    expect(s).toMatch(/Only use skills listed below/)
+  })
+})
+
+describe('skillsBlock autoInvoke filtering', () => {
+  const skills = [
+    { id: 'a', name: 'alpha', description: 'Alpha skill', dir: '/s/a', hasScripts: false, autoInvoke: true as const },
+    { id: 'b', name: 'bravo', description: 'Bravo skill', dir: '/s/b', hasScripts: false, autoInvoke: false as const },
+    { id: 'c', name: 'charlie', description: 'Charlie skill', dir: '/s/c', hasScripts: false },
+  ]
+
+  it('includes skills with autoInvoke=true', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: [skills[0]] })
+    expect(s).toContain('alpha')
+    expect(s).toContain('Alpha skill')
+  })
+
+  it('excludes skills with autoInvoke=false', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: [skills[1]] })
+    expect(s).not.toMatch(/^## Skills$/m)
+    expect(s).not.toContain('bravo')
+  })
+
+  it('includes skills where autoInvoke is undefined (default=true)', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: [skills[2]] })
+    expect(s).toContain('charlie')
+    expect(s).toContain('Charlie skill')
+  })
+
+  it('filters mixed: only autoInvoke !== false are listed', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills })
+    expect(s).toContain('alpha')
+    expect(s).toContain('charlie')
+    expect(s).not.toContain('bravo')
+  })
+
+  it('omits entire skills section when ALL skills have autoInvoke=false', () => {
+    const allOff = [
+      { id: 'x', name: 'x', description: 'x', dir: '/s/x', hasScripts: false, autoInvoke: false as const },
+      { id: 'y', name: 'y', description: 'y', dir: '/s/y', hasScripts: false, autoInvoke: false as const },
+    ]
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', skills: allOff })
+    expect(s).not.toMatch(/^## Skills$/m)
   })
 })
 
@@ -113,18 +164,104 @@ describe('buildManagedAgentPrompt skills block', () => {
 
   it('injects the skills block when use_skill is in the granted tools', () => {
     const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['use_skill', 'read_file'], skills })
-    expect(s).toMatch(/可用 Skills/)
+    expect(s).toMatch(/^## Skills$/m)
     expect(s).toContain('formatter')
   })
 
   it('omits the skills block when use_skill is not granted', () => {
     const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['read_file'], skills })
-    expect(s).not.toMatch(/可用 Skills/)
+    expect(s).not.toMatch(/^## Skills$/m)
   })
 
   it('omits the skills block when no skills are provided even with use_skill granted', () => {
     const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['use_skill'] })
-    expect(s).not.toMatch(/可用 Skills/)
+    expect(s).not.toMatch(/^## Skills$/m)
+  })
+
+  it('filters out autoInvoke=false skills in managed agent prompt', () => {
+    const mixed = [
+      { id: 'a', name: 'visible', description: 'Should appear', dir: '/s/a', hasScripts: false, autoInvoke: true as const },
+      { id: 'b', name: 'hidden', description: 'Should NOT appear', dir: '/s/b', hasScripts: false, autoInvoke: false as const },
+    ]
+    const s = buildManagedAgentPrompt({ cwd: '/tmp/proj', persona: 'P', toolNames: ['use_skill'], skills: mixed })
+    expect(s).toContain('visible')
+    expect(s).toContain('Should appear')
+    expect(s).not.toContain('hidden')
+    expect(s).not.toContain('Should NOT appear')
+  })
+})
+
+describe('skillsBlock paths glob filtering', () => {
+  let tmpDir: string
+
+  beforeAll(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'hip-test-paths-'))
+    writeFileSync(join(tmpDir, 'main.py'), '')
+    writeFileSync(join(tmpDir, 'component.tsx'), '')
+  })
+
+  afterAll(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  const pySkill = {
+    id: 'py',
+    name: 'python-helper',
+    description: 'Python helper',
+    dir: '/s/py',
+    hasScripts: false,
+    paths: ['**/*.py'],
+  }
+  const rsSkill = {
+    id: 'rs',
+    name: 'rust-helper',
+    description: 'Rust helper',
+    dir: '/s/rs',
+    hasScripts: false,
+    paths: ['**/*.rs'],
+  }
+  const multiSkill = {
+    id: 'multi',
+    name: 'multi-helper',
+    description: 'Multi helper',
+    dir: '/s/multi',
+    hasScripts: false,
+    paths: ['**/*.ts', '**/*.tsx'],
+  }
+
+  it('includes skill when cwd has matching files', () => {
+    const s = buildSystemPrompt({ cwd: tmpDir, skills: [pySkill] })
+    expect(s).toContain('python-helper')
+    expect(s).toContain('Python helper')
+  })
+
+  it('excludes skill when cwd has no matching files', () => {
+    const s = buildSystemPrompt({ cwd: tmpDir, skills: [rsSkill] })
+    expect(s).not.toMatch(/^## Skills$/m)
+    expect(s).not.toContain('rust-helper')
+  })
+
+  it('includes skill when cwd matches any of multiple patterns', () => {
+    const s = buildSystemPrompt({ cwd: tmpDir, skills: [multiSkill] })
+    expect(s).toContain('multi-helper')
+  })
+
+  it('excludes path-gated skill when no cwd files match any glob', () => {
+    const skillsWithPath = [{ id: 'p', name: 'pathed', description: 'Has path', dir: '/s/p', hasScripts: false, paths: ['**/*.ts'] }]
+    const s = buildSystemPrompt({ cwd: tmpDir, skills: skillsWithPath })
+    expect(s).not.toContain('pathed')
+  })
+
+  it('mixes autoInvoke and paths: both filters apply', () => {
+    const skills = [
+      { id: 'a', name: 'alpha', description: 'Alpha', dir: '/s/a', hasScripts: false, autoInvoke: true as const, paths: ['**/*.py'] },
+      { id: 'b', name: 'bravo', description: 'Bravo', dir: '/s/b', hasScripts: false, autoInvoke: false as const, paths: ['**/*.py'] },
+      { id: 'c', name: 'charlie', description: 'Charlie', dir: '/s/c', hasScripts: false, paths: ['**/*.rs'] },
+    ]
+    const s = buildSystemPrompt({ cwd: tmpDir, skills })
+    expect(s).toContain('alpha')
+    expect(s).not.toContain('bravo')
+    expect(s).not.toContain('charlie')
   })
 })
 

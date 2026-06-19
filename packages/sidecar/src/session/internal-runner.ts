@@ -5,6 +5,7 @@ import { buildGraph } from './graph.js'
 import { buildTools } from './tools.js'
 import { recursionLimit } from './loop-control.js'
 import { buildManagedAgentPrompt } from './system-prompt.js'
+import { mcpManager } from './mcp/manager.js'
 import { lastAiText } from './subagent.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
@@ -50,7 +51,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode })), new HumanMessage(task)],
+      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode, mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined })), new HumanMessage(task)],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

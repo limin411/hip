@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
-import { Sparkles, Upload, FileText, Eye, Trash2, MoreVertical, TerminalSquare } from 'lucide-react'
+import type { Components } from 'react-markdown'
+import { Sparkles, Upload, FileText, Eye, Trash2, MoreVertical, TerminalSquare, Zap, GitFork, Wrench, BookOpen } from 'lucide-react'
 import type { SkillMeta } from '@hip/protocol'
 import { useSkillsStore } from '@/store/skillsStore'
 import { pickZipFile } from '@/ipc/dialog'
@@ -18,6 +19,36 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
+
+// ── Display helpers (pure functions, testable) ──
+
+export function badgeForAutoInvoke(skill: SkillMeta): { label: string; variant: 'auto' | 'manual' } | null {
+  if (skill.autoInvoke !== false) return null
+  return { label: 'Manual', variant: 'manual' }
+}
+
+export function badgeForContext(skill: SkillMeta): { label: string } | null {
+  if (skill.context !== 'fork') return null
+  return { label: 'Fork' }
+}
+
+export function refCountLabel(skill: SkillMeta): string | null {
+  const refs = skill.hasReferences ? 1 : 0
+  const assets = skill.hasAssets ? 1 : 0
+  const count = refs + assets
+  if (count === 0) return null
+  const parts: string[] = []
+  if (refs) parts.push('refs')
+  if (assets) parts.push('assets')
+  return parts.join(', ')
+}
+
+export function toolAllowlistPreview(skill: SkillMeta, max = 3): string | null {
+  if (!skill.allowedTools || skill.allowedTools.length === 0) return null
+  const preview = skill.allowedTools.slice(0, max).join(', ')
+  if (skill.allowedTools.length > max) return `${preview} +${skill.allowedTools.length - max}`
+  return preview
+}
 
 export function SkillConfig() {
   const { t } = useTranslation()
@@ -129,6 +160,10 @@ function SkillCard({
   onDelete: () => void
 }) {
   const { t } = useTranslation()
+  const autoBadge = badgeForAutoInvoke(skill)
+  const ctxBadge = badgeForContext(skill)
+  const refLabel = refCountLabel(skill)
+  const toolsPreview = toolAllowlistPreview(skill)
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
       <Avatar name={skill.name} shape="square" size={38} />
@@ -139,6 +174,36 @@ function SkillCard({
             <Badge title={t('settings.skill.hasScriptsTitle')}>
               <TerminalSquare size={11} />
               {t('settings.skill.hasScripts')}
+            </Badge>
+          )}
+          {autoBadge && (
+            <Badge
+              className={
+                autoBadge.variant === 'auto'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-surface-muted text-ink-tertiary'
+              }
+            >
+              <Zap size={11} />
+              {autoBadge.label}
+            </Badge>
+          )}
+          {ctxBadge && (
+            <Badge className="bg-accent/10 text-accent">
+              <GitFork size={11} />
+              {ctxBadge.label}
+            </Badge>
+          )}
+          {refLabel && (
+            <Badge>
+              <BookOpen size={11} />
+              {refLabel}
+            </Badge>
+          )}
+          {toolsPreview && (
+            <Badge title={skill.allowedTools?.join(', ')}>
+              <Wrench size={11} />
+              {toolsPreview}
             </Badge>
           )}
         </div>
@@ -195,6 +260,29 @@ function SkillViewModal({ skill, onClose }: { skill: SkillMeta; onClose: () => v
     }
   }, [skill.id])
 
+  const markdownComponents: Components = {
+    code({ className, children, ...props }) {
+      const text = String(children).replace(/\n$/, '')
+      const isCmd = /^!\S/.test(text)
+      if (isCmd) {
+        return (
+          <code className="rounded bg-accent/15 px-1.5 py-0.5 text-[0.85em] font-semibold text-accent" {...props}>
+            {children}
+          </code>
+        )
+      }
+      const isBlock = className?.startsWith('language-')
+      return (
+        <code
+          className={isBlock ? className : undefined}
+          {...props}
+        >
+          {children}
+        </code>
+      )
+    },
+  }
+
   return (
     <Modal
       open
@@ -214,7 +302,7 @@ function SkillViewModal({ skill, onClose }: { skill: SkillMeta; onClose: () => v
           <div className="text-body text-ink-tertiary">…</div>
         ) : (
           <div className="max-w-none text-prose leading-relaxed text-ink">
-            <ReactMarkdown>{body}</ReactMarkdown>
+            <ReactMarkdown components={markdownComponents}>{body}</ReactMarkdown>
           </div>
         )}
       </div>

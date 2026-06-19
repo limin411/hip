@@ -5,11 +5,12 @@ import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import type { SkillMeta, PermissionMode } from '@hip/protocol'
+import type { SkillMeta, PermissionMode, ToolPermissionConfig } from '@hip/protocol'
 import { resolveWithin } from './workspace-fs.js'
 import { gitCommit, gitCreateBranch, gitSwitchBranch, createWorktree, listWorktrees, removeWorktree } from './workspace-git.js'
 import { getWorktreesDir } from './worktree-config.js'
 import { readSkillBody, listSkillFiles } from './skills/registry.js'
+import { resolveDynamicContext } from './skills/dynamic-context.js'
 import { generateAgentConfig } from './agents/generate.js'
 
 const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
@@ -180,6 +181,100 @@ export interface BuildToolsOpts {
   webSearchEnabled?: boolean
   /** Enable generate_agent tool that calls generateAgentConfig to produce an AgentConfig JSON. */
   generateAgentEnabled?: boolean
+  /** Session ID for skill body substitution (${HIP_SESSION_ID}). */
+  sessionId?: string
+  /** Per-tool permission config: auto/prompt/approve/deny per tool name. */
+  toolPermissions?: ToolPermissionConfig
+  /** Callback to record a sticky 'approve' grant for a tool (used when mode='approve'). */
+  recordApproved?: (toolName: string) => void
+  /** Callback to check if a tool has a sticky 'approve' grant. */
+  isApproved?: (toolName: string) => boolean
+}
+
+function splitArgs(input: string): { positional: string[]; named: Record<string, string> } {
+  const words: string[] = []
+  let current = ''
+  let inQuote: string | null = null
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i]
+    if (inQuote) {
+      if (ch === inQuote) { inQuote = null }
+      else { current += ch }
+    } else if (ch === '"' || ch === "'") {
+      inQuote = ch
+    } else if (ch === ' ' || ch === '\t') {
+      if (current.length > 0) { words.push(current); current = '' }
+    } else {
+      current += ch
+    }
+  }
+  if (current.length > 0) words.push(current)
+
+  const positional: string[] = []
+  const named: Record<string, string> = {}
+  for (const word of words) {
+    const eqIdx = word.indexOf('=')
+    if (eqIdx > 0) { named[word.slice(0, eqIdx)] = word.slice(eqIdx + 1) }
+    else { positional.push(word) }
+  }
+  return { positional, named }
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function substituteSkillBody(
+  body: string,
+  args: string | undefined,
+  skillArgs: Array<{ name: string; description: string; required?: boolean }> | undefined,
+  skillDir: string,
+  sessionId: string | undefined,
+): string {
+  let result = body
+  const parsed = args != null ? splitArgs(args) : { positional: [] as string[], named: {} as Record<string, string> }
+
+  result = result.replace(/\\\$/g, '\x00ESC\x00')
+
+  result = result.replace(/\$\{(\w+)\}/g, (_, name: string) => {
+    if (name === 'HIP_SKILL_DIR') return skillDir
+    if (name === 'HIP_SESSION_ID') return sessionId ?? ''
+    return `\${${name}}`
+  })
+
+  result = result.replace(/\$ARGUMENTS/g, args ?? '')
+
+  if (skillArgs && skillArgs.length > 0) {
+    const namedValues: Record<string, string> = {}
+    const hasExplicitNamed = Object.keys(parsed.named).length > 0
+
+    for (let i = 0; i < skillArgs.length; i++) {
+      const sa = skillArgs[i]
+      if (hasExplicitNamed && sa.name in parsed.named) {
+        namedValues[sa.name] = parsed.named[sa.name]
+      } else if (parsed.positional[i] !== undefined) {
+        namedValues[sa.name] = parsed.positional[i]
+      }
+    }
+
+    for (const [name, value] of Object.entries(namedValues)) {
+      result = result.replace(new RegExp(`\\$${escapeRegex(name)}(?!\\w)`, 'g'), value)
+    }
+  }
+
+  result = result.replace(/\$(\d+)/g, (_, n: string) => {
+    const idx = Number(n)
+    return parsed.positional[idx] ?? `$${n}`
+  })
+
+  result = result.replace(/\x00ESC\x00/g, '$')
+
+  if (args != null && args.trim().length > 0 && !body.includes('$ARGUMENTS')) {
+    result += `\n\nArguments: ${args}`
+  }
+
+  return result
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -187,6 +282,68 @@ export interface BuildToolsOpts {
  *  Anything that is not an explicit allow_* (reject_*, cancel, or an unknown kind) ⇒ false. */
 function isApproved(d: ApprovalDecision): boolean {
   return 'kind' in d && d.kind.startsWith('allow')
+}
+
+/** Resolve the effective permission mode for a tool given the ToolPermissionConfig. */
+function resolveEffectiveMode(
+  toolName: string,
+  permissions: ToolPermissionConfig,
+  requestApproval: ApprovalFn | undefined,
+  recordApproved: ((name: string) => void) | undefined,
+  isStickyApproved: ((name: string) => boolean) | undefined,
+): 'auto' | 'prompt' | 'approve' | 'deny' | 'none' {
+  const override = permissions.overrides?.[toolName]
+  const mode = override ?? permissions.defaultMode
+  if (mode === 'approve' && isStickyApproved?.(toolName)) return 'auto'
+  if (mode === 'prompt' && !requestApproval) return 'deny'
+  if (mode === 'approve' && !requestApproval) return 'deny'
+  return mode
+}
+
+/** Wrap a tool with per-tool permission gating. Returns the original tool if no gating needed. */
+function wrapWithPermission(
+  t: StructuredToolInterface,
+  toolName: string,
+  permissions: ToolPermissionConfig,
+  requestApproval: ApprovalFn | undefined,
+  recordApproved: ((name: string) => void) | undefined,
+  isStickyApproved: ((name: string) => boolean) | undefined,
+): StructuredToolInterface {
+  const mode = resolveEffectiveMode(toolName, permissions, requestApproval, recordApproved, isStickyApproved)
+  if (mode === 'auto' || mode === 'none') return t
+
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const origInvoke = t.invoke.bind(t) as StructuredToolInterface['invoke']
+  const wrapped = Object.create(Object.getPrototypeOf(t))
+  Object.assign(wrapped, t, {
+    invoke: async (input: unknown, config?: unknown) => {
+      if (mode === 'deny') return `Error: tool "${toolName}" is blocked by permission policy`
+
+      if (mode === 'approve') {
+        const decision = await requestApproval!({
+          title: `Approve ${toolName}`,
+          kind: 'execute',
+          content: `Allow ${toolName}? Once approved, it will be auto-allowed for the rest of this session.`,
+        })
+        if (!isApproved(decision)) return '用户拒绝了该工具执行'
+        recordApproved?.(toolName)
+        return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
+      }
+
+      if (mode === 'prompt') {
+        const decision = await requestApproval!({
+          title: `Run ${toolName}`,
+          kind: 'execute',
+          content: `Allow ${toolName}?`,
+        })
+        if (!isApproved(decision)) return '用户拒绝了该工具执行'
+        return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
+      }
+
+      return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
+    },
+  })
+  return wrapped
 }
 
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
@@ -503,19 +660,34 @@ export function buildTools(
 
   if (opts.skills && opts.skills.length > 0) {
     const skills = opts.skills
+    const sessionId = opts.sessionId
     const useSkill = tool(
-      async ({ name }) => {
+      async ({ name, arguments: args }) => {
         const s = skills.find((sk) => sk.name === name || sk.id === name)
         if (!s) return `Error: skill not found: ${name}`
         try {
-          const body = readSkillBody(s.dir)
+          const rawBody = readSkillBody(s.dir)
+          const substituted = substituteSkillBody(rawBody, args, s.arguments, s.dir, sessionId)
+          const body = resolveDynamicContext(substituted, s.dir, {
+            disabled: s.disableShellExecution,
+          })
           const files = listSkillFiles(s.dir)
-          const manifest = files.length
-            ? `\n\n## Files in this skill (absolute paths — read bundled reference files with ` +
-              `read_file using the absolute path; run bundled scripts with run_script using the absolute path):\n` +
-              files.map((f) => `- ${path.join(s.dir, f)}`).join('\n')
+          const refFiles = files.filter((f) => f.startsWith('references/'))
+          const assetFiles = files.filter((f) => f.startsWith('assets/'))
+          const otherFiles = files.filter((f) => !f.startsWith('references/') && !f.startsWith('assets/'))
+          const refNote = refFiles.length
+            ? `\n- references/ (${refFiles.length} file${refFiles.length === 1 ? '' : 's'}): use read_file with the absolute paths below`
             : ''
-          return `# Skill dir: ${s.dir}\n\n${body}${manifest}`
+          const assetNote = assetFiles.length
+            ? `\n- assets/ (${assetFiles.length} file${assetFiles.length === 1 ? '' : 's'}): use read_file with the absolute paths below`
+            : ''
+          const manifestHeader = files.length
+            ? `\n\n## Level 3 — Bundled resources (absolute paths)\n` +
+              `Files shipped with this skill. These are NOT auto-read: call read_file with the ` +
+              `absolute path for any file you need.${refNote}${assetNote}\n` +
+              [...refFiles, ...assetFiles, ...otherFiles].map((f) => `- ${path.join(s.dir, f)}`).join('\n')
+            : ''
+          return `# Skill dir: ${s.dir}\n\n${body}${manifestHeader}`
         } catch (err) {
           return `Error: ${(err as Error).message}`
         }
@@ -523,12 +695,13 @@ export function buildTools(
       {
         name: 'use_skill',
         description:
-          'Load a skill into context by `name`. Returns the skill\'s full SKILL.md instructions, the ' +
-          'absolute skill dir, plus a manifest of its bundled files as absolute paths. Call this when a ' +
-          'task matches an advertised skill, then follow the loaded instructions: read bundled reference ' +
-          'files with read_file using the absolute path, run bundled scripts with run_script using the ' +
-          'absolute path.',
-        schema: z.object({ name: z.string() }),
+          'Load a skill into context by `name`. Skills use progressive disclosure: Level 1 (metadata in ' +
+          'system prompt) shows name+description; Level 2 (full SKILL.md body, loaded by this tool) provides ' +
+          'step-by-step instructions; Level 3 (bundled resources in references/ + assets/) are listed in the ' +
+          'returned file manifest as absolute paths — read them with read_file. Call this when a task matches ' +
+          'an advertised skill, then follow the loaded instructions. Pass `arguments` to substitute ' +
+          '$ARGUMENTS, $0/$1, $name, and context variables.',
+        schema: z.object({ name: z.string(), arguments: z.string().optional() }),
       },
     )
     extras.push(useSkill)
@@ -684,7 +857,13 @@ export function buildTools(
 
   if (opts.mcpTools && opts.mcpTools.length > 0) extras.push(...opts.mcpTools)
 
-  if (!spawnSubagent) return [...base, ...extras]
+  const applyPermissions = (tools: StructuredToolInterface[]): StructuredToolInterface[] => {
+    if (!opts.toolPermissions) return tools
+    const tp = opts.toolPermissions
+    return tools.map((t) => wrapWithPermission(t, t.name, tp, opts.requestApproval, opts.recordApproved, opts.isApproved))
+  }
+
+  if (!spawnSubagent) return applyPermissions([...base, ...extras])
   const task = tool(
     async ({ description, mode }) => spawnSubagent(description, mode),
     {
@@ -702,7 +881,7 @@ export function buildTools(
   )
   const out = [...base, task]
 
-  if (!dispatch || dispatch.agents.length === 0) return [...out, ...extras]
+  if (!dispatch || dispatch.agents.length === 0) return applyPermissions([...out, ...extras])
 
   const roster = dispatch.agents
     .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
@@ -722,7 +901,7 @@ export function buildTools(
       }),
     },
   )
-  return [...out, dispatchAgent, ...extras]
+  return applyPermissions([...out, dispatchAgent, ...extras])
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

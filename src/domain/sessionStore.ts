@@ -317,12 +317,22 @@ export function emptySession(id: string): SessionVM {
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
 
+export interface McpServerStatusVM {
+  id: string
+  name: string
+  status: 'connected' | 'connecting' | 'disconnected' | 'error'
+  toolCount: number
+  toolNames: string[]
+  lastError?: string
+}
+
 interface DomainStore {
   sessions: SessionVM[]
   activeSessionId: string | null
   connection: Connection
   hasApiKey: boolean
   searchHits: SearchHit[]
+  mcpStatuses: McpServerStatusVM[]
 
   apply: (msg: ServerMessage) => void
   createSession: (id: string, config: SessionConfig) => string
@@ -343,6 +353,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
   // Optimistic until the sidecar reports via 'ready' — avoids flashing "no key" before connect.
   hasApiKey: true,
   searchHits: [],
+  mcpStatuses: [],
 
   apply: (msg) =>
     set((s) => {
@@ -351,6 +362,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
       // waiting for a reconnect's `ready`. (Top-level field, so handle here like `ready`, not in the reducer.)
       if (msg.type === 'config:activeModel') return { hasApiKey: msg.hasApiKey }
       if (msg.type === 'session:search:result') return { searchHits: msg.hits }
+      if (msg.type === 'mcp:status') return { mcpStatuses: msg.servers }
       return applyServerMessage(s, msg, Date.now())
     }),
 

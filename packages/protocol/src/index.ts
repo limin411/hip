@@ -95,6 +95,8 @@ export interface McpServerConfig {
   env?: Record<string, string>        // stdio: child-process env overrides
   url?: string                        // sse/http: endpoint URL
   headers?: Record<string, string>    // sse/http: request headers (e.g. Authorization)
+  enabledTools?: string[]            // allowlist of tool names (if set, only these are exposed)
+  disabledTools?: string[]           // denylist of tool names (applied after enabledTools)
   enabled: boolean
 }
 
@@ -141,12 +143,44 @@ export interface PluginMeta {
 // ──────────────────────────────────────────────────────────────────
 
 /** One installed skill, scanned from ~/.hip/skills/<id>/SKILL.md frontmatter. */
+/** Multi-level skill scope: global (~/.hip/skills), project (.hip/skills), or plugin-scoped. */
+export type SkillScope = 'global' | 'project' | 'plugin'
+
+/** One installed skill, scanned from ~/.hip/skills/<id>/SKILL.md frontmatter. */
 export interface SkillMeta {
   id: string                          // folder slug under ~/.hip/skills
   name: string                        // frontmatter `name`
   description: string                 // frontmatter `description`
   dir: string                         // absolute skill directory
   hasScripts: boolean                 // true iff the skill ships a scripts/ dir (run_script hint)
+  scope?: SkillScope                  // which level the skill was loaded from (defaults to 'global')
+  pluginId?: string                   // set when scope='plugin' to link back to the owning plugin
+  /** If false, skill is NOT auto-listed in system prompt (must be $ invoked). Default true. */
+  autoInvoke?: boolean
+  /** If false, skill is hidden from / command menu. Default true. */
+  userInvocable?: boolean
+  /** Tools pre-approved while this skill is active. */
+  allowedTools?: string[]
+  /** Tools explicitly denied while this skill is active. */
+  disallowedTools?: string[]
+  /** Execution context: 'inline' (default) or 'fork' (isolated subagent). */
+  context?: 'inline' | 'fork'
+  /** Glob patterns — skill only auto-listed when cwd matches. */
+  paths?: string[]
+  /** Model override for this skill. */
+  model?: string
+  /** Reasoning effort level. */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  /** Named arguments the skill accepts. */
+  arguments?: Array<{ name: string; description: string; required?: boolean }>
+  /** Shell for !`cmd` execution. Default 'bash'. */
+  shell?: 'bash' | 'powershell'
+  /** If true, !`cmd` blocks are NOT executed. */
+  disableShellExecution?: boolean
+  /** Whether skill has references/ directory. */
+  hasReferences?: boolean
+  /** Whether skill has assets/ directory. */
+  hasAssets?: boolean
 }
 
 /** Skill enable/disable overrides, persisted to ~/.hip/config/hip-skills.json. A missing id is treated as enabled. */
@@ -382,6 +416,10 @@ export type ClientMessage =
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
   | { type: 'workflow:run'; sessionId: string; def: WorkflowDef }
+  | { type: 'mcp:listResources'; serverId: string }
+  | { type: 'mcp:readResource'; serverId: string; uri: string }
+  | { type: 'mcp:listPrompts'; serverId: string }
+  | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -429,6 +467,11 @@ export type ServerMessage =
   | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; error?: string }
   | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
   | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
+  | { type: 'mcp:listResources:result'; serverId: string; resources: McpResource[]; resourceTemplates?: McpResourceTemplate[]; error?: string }
+  | { type: 'mcp:readResource:result'; serverId: string; uri: string; contents: McpResourceContent[]; error?: string }
+  | { type: 'mcp:listPrompts:result'; serverId: string; prompts: McpPrompt[]; error?: string }
+  | { type: 'mcp:getPrompt:result'; serverId: string; name: string; messages: McpPromptMessage[]; error?: string }
+  | { type: 'mcp:status'; servers: Array<{ id: string; name: string; status: 'connected' | 'connecting' | 'disconnected' | 'error'; toolCount: number; toolNames: string[]; lastError?: string }> }
 
 // ──────────────────────────────────────────────────────────────────
 // Lifecycle hooks (tool interception, safety gating, turn lifecycle)
@@ -516,3 +559,85 @@ export type OrchestratorEvent =
   | { type: 'node:skipped'; nodeId: NodeId }
   | { type: 'run:cancelled' }
   | { type: 'run:finished'; status: RunStatus }
+
+// ──────────────────────────────────────────────────────────────────
+// Per-tool permission granularity (Todo 35)
+// ──────────────────────────────────────────────────────────────────
+
+export type ToolPermissionMode = 'auto' | 'prompt' | 'approve' | 'deny'
+
+export interface ToolPermissionConfig {
+  defaultMode: ToolPermissionMode
+  overrides?: Record<string, ToolPermissionMode>
+}
+
+// ──────────────────────────────────────────────────────────────────
+// MCP resources & prompts types (Todo 28)
+// ──────────────────────────────────────────────────────────────────
+
+export interface McpResource {
+  uri: string
+  name: string
+  description?: string
+  mimeType?: string
+}
+
+export interface McpResourceTemplate {
+  uriTemplate: string
+  name: string
+  description?: string
+}
+
+export interface McpPromptArgument {
+  name: string
+  description?: string
+  required?: boolean
+}
+
+export interface McpPrompt {
+  name: string
+  description?: string
+  arguments?: McpPromptArgument[]
+}
+
+export interface McpPromptMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface McpResourceContent {
+  uri: string
+  mimeType?: string
+  text?: string
+  blob?: string
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Unified TOML config types (Todo 1)
+// ──────────────────────────────────────────────────────────────────
+
+export interface ProviderEntry {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey?: string
+}
+
+export interface SkillEntry {
+  id: string
+  enabled: boolean
+}
+
+export interface PermissionEntry {
+  coarseMode: PermissionMode
+  toolPermissions?: ToolPermissionConfig
+}
+
+export interface HipConfig {
+  version: number
+  providers?: ProviderEntry[]
+  mcpServers?: McpServerConfig[]
+  skills?: SkillEntry[]
+  agents?: AgentConfig[]
+  permissions?: PermissionEntry
+}

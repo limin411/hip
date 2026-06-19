@@ -29,6 +29,14 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
             None => cmd = cmd.env(&env, ""),
         }
     }
+    // Point the sidecar at the unified TOML config (single source of truth for
+    // mcpServers, skills, providers, agents, permissions). The sidecar resolves
+    // effective config by merging this global hip.toml with a project-level
+    // .hip/hip.toml. When hip.toml is absent the sidecar falls back to reading
+    // the legacy per-domain JSON files (see buildLegacyConfig() in hip-config.ts).
+    if let Some(p) = crate::paths::hip_config_path(app) {
+        cmd = cmd.env("HIP_CONFIG_PATH", p.to_string_lossy().into_owned());
+    }
     // Point the sidecar at the non-secret providers config (active model + base URLs).
     if let Some(p) = crate::paths::providers_config_path(app) {
         cmd = cmd.env("HIP_PROVIDERS_PATH", p.to_string_lossy().into_owned());
@@ -36,18 +44,6 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     // Point the sidecar at the external-agent registry (read fresh per external spawn).
     if let Some(p) = crate::paths::agents_config_path(app) {
         cmd = cmd.env("HIP_AGENTS_PATH", p.to_string_lossy().into_owned());
-    }
-    // Point the sidecar at the MCP-servers registry (read fresh per turn for reconcile).
-    if let Some(p) = crate::paths::mcp_servers_config_path(app) {
-        cmd = cmd.env("HIP_MCP_SERVERS_PATH", p.to_string_lossy().into_owned());
-    }
-    // Point the sidecar at the installed skills directory + the enable/disable table.
-    // The sidecar scans <HIP_SKILLS_DIR>/*/SKILL.md and cross-refs HIP_SKILLS_PATH.
-    if let Some(p) = crate::paths::skills_dir(app) {
-        cmd = cmd.env("HIP_SKILLS_DIR", p.to_string_lossy().into_owned());
-    }
-    if let Some(p) = crate::paths::skills_config_path(app) {
-        cmd = cmd.env("HIP_SKILLS_PATH", p.to_string_lossy().into_owned());
     }
     // Point the sidecar at the plugin registry (installed plugin manifests).
     if let Some(p) = crate::paths::plugins_config_path(app) {
@@ -182,6 +178,7 @@ pub fn db_path_for(data_dir: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{parse_info_line, provider_key_env};
+    use std::path::PathBuf;
 
     #[test]
     fn provider_key_env_matches_ts_normalization() {
@@ -215,5 +212,22 @@ mod tests {
     fn db_path_is_hip_db_under_data_dir() {
         let p = super::db_path_for(std::path::Path::new("/tmp/app"));
         assert_eq!(p, std::path::PathBuf::from("/tmp/app/hip.db"));
+    }
+
+    // spawn_sidecar injects HIP_CONFIG_PATH → <base>/config/hip.toml.
+    // The sidecar reads this env var in readHipConfig()/resolveEffectiveConfig().
+    #[test]
+    #[cfg(not(windows))]
+    fn hip_config_path_points_at_base_config_hip_toml() {
+        let base = crate::paths::hip_base_from(
+            Some(PathBuf::from("/Users/me")),
+            None,
+        )
+        .unwrap();
+        let config_path = base.join("config").join("hip.toml");
+        assert_eq!(
+            config_path,
+            PathBuf::from("/Users/me/.hip/config/hip.toml"),
+        );
     }
 }

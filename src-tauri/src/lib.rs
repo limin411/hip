@@ -2,6 +2,7 @@ mod sidecar;
 mod paths;
 mod auth;
 mod skills;
+mod path_env;
 
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
@@ -311,6 +312,11 @@ fn fallback_catalog(cache: Option<&std::path::Path>) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // A GUI/IDE-launched macOS app inherits a stripped PATH; resolve the user's real
+    // global PATH first so detection (which_binaries), the sidecar, and every spawned
+    // ACP/CLI agent can find globally-installed tools.
+    path_env::ensure_user_path();
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())

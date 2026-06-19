@@ -2,7 +2,7 @@ import type { WorkflowDef, RunState, NodeOutput, NodeId } from '@hip/protocol'
 import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 
-export interface RunWorkflowOpts { runId: string; runInputs?: NodeOutput; signal: AbortSignal }
+export interface RunWorkflowOpts { runId: string; runInputs?: NodeOutput; signal: AbortSignal; maxConcurrency?: number }
 
 export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, opts: RunWorkflowOpts): Promise<RunState> {
   const sink = ports.eventSink
@@ -27,7 +27,9 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
 
   const launch = () => {
     if (opts.signal.aborted) return
+    const maxCon = opts.maxConcurrency ?? 5
     for (const id of readyNodes(state)) {
+      if (inFlight.size >= maxCon) break
       if (inFlight.has(id)) continue
       const node = nodeById.get(id)!
       const input = resolveInput(node, state, opts.runInputs)

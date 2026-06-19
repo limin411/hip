@@ -102,6 +102,41 @@ export interface McpServerConfig {
 export interface McpServersConfig { servers: McpServerConfig[] }
 
 // ──────────────────────────────────────────────────────────────────
+// Plugin manifest (local plugin bundles following Vercel open-plugin-spec)
+// ──────────────────────────────────────────────────────────────────
+
+export interface PluginManifest {
+  id: string
+  name: string
+  version: string
+  description?: string
+  author?: { name: string; email?: string; url?: string }
+  license?: string
+  keywords?: string[]
+  skills?: string | string[]
+  mcpServers?: McpServerConfig[] | string
+  agents?: AgentConfig[] | string
+  hooks?: Hook[] | string
+}
+
+export interface PluginComponentRef {
+  pluginId: string
+  componentType: 'skill' | 'mcp' | 'agent' | 'hook'
+  componentId: string
+}
+
+export interface PluginsConfig { plugins: PluginManifest[] }
+
+/** One installed plugin, scanned from ~/.hip/plugins/<id>/.plugin/plugin.json. */
+export interface PluginMeta {
+  id: string                          // folder slug under ~/.hip/plugins
+  name: string                        // manifest `name`
+  version: string                     // manifest `version`
+  description: string                 // manifest `description`
+  dir: string                         // absolute plugin directory
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Skills (Claude-format SKILL.md folders under ~/.hip/skills)
 // ──────────────────────────────────────────────────────────────────
 
@@ -303,6 +338,9 @@ export type CheckpointMode = 'this-turn' | 'since-then' | 'since-start'
 /** One branch in the repo, with a flag for the checked-out one. */
 export interface Branch { name: string; current: boolean }
 
+export interface WorktreeInfo { path: string; branch: string; head: string }
+export type SubagentMode = 'foreground' | 'background'
+
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
@@ -337,6 +375,13 @@ export type ClientMessage =
   | { type: 'git:revert'; sessionId: string; checkpointId: string }
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
+  | { type: 'plugin:install'; manifest: PluginManifest }
+  | { type: 'plugin:delete'; pluginId: string }
+  | { type: 'plugin:list' }
+  | { type: 'git:worktree:create'; sessionId: string; branch: string }
+  | { type: 'git:worktree:list'; sessionId: string }
+  | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
+  | { type: 'workflow:run'; sessionId: string; def: WorkflowDef }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -378,6 +423,37 @@ export type ServerMessage =
   | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }
   | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[]; agentFrame?: AgentFrame }
   | { type: 'agent:configOptions'; sessionId: string; options: AcpConfigOption[] }
+  /** Emitted by the Guardian hook when a tool invocation exceeds the risk threshold. */
+  | { type: 'guardian:risk'; sessionId: string; turnId: string; toolName: string; risk: 'low' | 'medium' | 'high'; category: string; reason: string }
+  | { type: 'plugin:list:result'; plugins: PluginManifest[] }
+  | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; error?: string }
+  | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
+  | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
+
+// ──────────────────────────────────────────────────────────────────
+// Lifecycle hooks (tool interception, safety gating, turn lifecycle)
+// ──────────────────────────────────────────────────────────────────
+
+export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete'
+
+export type HookResult = { kind: 'allow' | 'deny' | 'ask'; reason?: string; updatedInput?: Record<string, unknown> }
+
+export type HookMatcher = string | string[]
+
+export interface HookContext {
+  sessionId: string
+  turnId?: string
+  toolName?: string
+  toolInput?: Record<string, unknown>
+  toolOutput?: string
+  toolError?: string
+}
+
+export interface Hook {
+  event: HookEvent
+  matcher?: HookMatcher
+  handler: (ctx: HookContext) => Promise<HookResult>
+}
 
 // ──────────────────────────────────────────────────────────────────
 // Agent orchestration foundation (multi-agent workflows over the AgentProvider seam)

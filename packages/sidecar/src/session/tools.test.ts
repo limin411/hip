@@ -127,6 +127,25 @@ describe('task tool gating (depth-1)', () => {
     expect(calls).toEqual(['investigate the bug'])
     expect(out).toBe('done: investigate the bug')
   })
+
+  it('passes mode through to spawnSubagent', async () => {
+    const calls: Array<{ desc: string; mode?: string }> = []
+    const spawn = async (description: string, mode?: 'foreground' | 'background') => {
+      calls.push({ desc: description, mode })
+      return `done: ${description}`
+    }
+    const tools = buildTools(root, spawn)
+    const task = tools.find((t) => t.name === 'task')
+    expect(task).toBeDefined()
+
+    const outFg = String(await task!.invoke({ description: 'fg task', mode: 'foreground' }))
+    expect(outFg).toBe('done: fg task')
+    expect(calls[0]).toEqual({ desc: 'fg task', mode: 'foreground' })
+
+    const outBg = String(await task!.invoke({ description: 'bg task', mode: 'background' }))
+    expect(outBg).toBe('done: bg task')
+    expect(calls[1]).toEqual({ desc: 'bg task', mode: 'background' })
+  })
 })
 
 describe('git tools (cwd-gated)', () => {
@@ -135,11 +154,14 @@ describe('git tools (cwd-gated)', () => {
     expect(names).not.toContain('git_commit')
     expect(names).not.toContain('git_create_branch')
     expect(names).not.toContain('git_switch_branch')
+    expect(names).not.toContain('git_worktree_create')
+    expect(names).not.toContain('git_worktree_list')
+    expect(names).not.toContain('git_worktree_remove')
   })
 
-  it('buildTools(root, undefined, cwd) registers the three git tools', () => {
+  it('buildTools(root, undefined, cwd) registers all six git tools', () => {
     const names = buildTools(root, undefined, root).map((t) => t.name)
-    expect(names).toEqual(expect.arrayContaining(['git_commit', 'git_create_branch', 'git_switch_branch']))
+    expect(names).toEqual(expect.arrayContaining(['git_commit', 'git_create_branch', 'git_switch_branch', 'git_worktree_create', 'git_worktree_list', 'git_worktree_remove']))
   })
 
   it('git_commit stages + commits and returns a short-sha confirmation', async () => {
@@ -175,5 +197,69 @@ describe('git tools (cwd-gated)', () => {
     await makeRepo(root)
     const out = String(await byNameCwd(root, 'git_switch_branch').invoke({ branchName: 'nope' }))
     expect(out).toMatch(/^Error:/)
+  })
+
+  describe('worktree tools', () => {
+    let wtDir: string
+    let prevWtEnv: string | undefined
+
+    beforeEach(() => {
+      wtDir = mkdtempSync(join(tmpdir(), 'hip-wt-'))
+      prevWtEnv = process.env.HIP_WORKTREES_DIR
+      process.env.HIP_WORKTREES_DIR = wtDir
+    })
+    afterEach(() => {
+      if (prevWtEnv === undefined) delete process.env.HIP_WORKTREES_DIR
+      else process.env.HIP_WORKTREES_DIR = prevWtEnv
+      rmSync(wtDir, { recursive: true, force: true })
+    })
+
+    it('git_worktree_create succeeds for an existing branch', async () => {
+      await makeRepo(root)
+      await git(root, 'branch', 'feat-wt')
+      const out = String(await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'feat-wt' }))
+      expect(out).toMatch(/Worktree created at/)
+      expect(out).toContain('feat-wt')
+    })
+
+    it('git_worktree_create returns an Error string for a missing branch', async () => {
+      await makeRepo(root)
+      const out = String(await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'nonexistent' }))
+      expect(out).toMatch(/^Error:/)
+    })
+
+    it('git_worktree_list returns a JSON array of worktrees', async () => {
+      await makeRepo(root)
+      await git(root, 'branch', 'feat-ls')
+      await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'feat-ls' })
+      const out = String(await byNameCwd(root, 'git_worktree_list').invoke({}))
+      const parsed = JSON.parse(out) as Array<{ path: string; branch: string; head: string }>
+      expect(Array.isArray(parsed)).toBe(true)
+      expect(parsed.length).toBeGreaterThanOrEqual(2) // main + feat-ls
+      expect(parsed.some((w) => w.branch === 'feat-ls')).toBe(true)
+    })
+
+    it('git_worktree_remove succeeds for an existing worktree', async () => {
+      await makeRepo(root)
+      await git(root, 'branch', 'feat-rm')
+      const createOut = String(await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'feat-rm' }))
+      expect(createOut).toMatch(/Worktree created at/)
+      // Extract the path from the success message
+      const match = createOut.match(/Worktree created at (.+)/)
+      expect(match).toBeTruthy()
+      const wtPath = match![1]
+      const removeOut = String(await byNameCwd(root, 'git_worktree_remove').invoke({ worktreePath: wtPath }))
+      expect(removeOut).toMatch(/Removed worktree/)
+      // Confirm it's gone from list
+      const listOut = String(await byNameCwd(root, 'git_worktree_list').invoke({}))
+      const parsed = JSON.parse(listOut) as Array<{ branch: string }>
+      expect(parsed.some((w) => w.branch === 'feat-rm')).toBe(false)
+    })
+
+    it('git_worktree_remove returns an Error string for a nonexistent path', async () => {
+      await makeRepo(root)
+      const out = String(await byNameCwd(root, 'git_worktree_remove').invoke({ worktreePath: join(wtDir, 'nope') }))
+      expect(out).toMatch(/^Error:/)
+    })
   })
 })

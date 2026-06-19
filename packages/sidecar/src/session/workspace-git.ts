@@ -4,7 +4,8 @@ import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { createHash } from 'node:crypto'
-import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch } from '@hip/protocol'
+import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch, WorktreeInfo } from '@hip/protocol'
+import { getWorktreesDir } from './worktree-config.js'
 
 const execFileP = promisify(execFile)
 
@@ -405,6 +406,91 @@ export async function switchBranch(cwd: string, name: string, gitBin = 'git'): P
   if (!isSafeBranchName(name)) return { ok: false, error: 'invalid branch name' }
   try { await runGit(cwd, ['switch', name], gitBin); return { ok: true } }
   catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+}
+
+/** Create a linked worktree at `worktreePath` for `branch`. The branch must exist unless
+ *  `git worktree add -b` semantics are desired — callers that want a new branch should use
+ *  `gitCreateBranch` first and then pass the resulting name here. Validates the branch name
+ *  via `isSafeBranchName` before execution. Never throws → { ok, path?, error? }. */
+export async function createWorktree(cwd: string, branch: string, worktreePath: string, gitBin = 'git'): Promise<{ ok: boolean; path?: string; error?: string }> {
+  if (!isSafeBranchName(branch)) return { ok: false, error: `unsafe branch name: ${branch}` }
+  try {
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
+    return { ok: false, error: 'not_a_repo' }
+  }
+  try { await fs.mkdir(path.dirname(worktreePath), { recursive: true }) } catch { /* noop */ }
+  try {
+    await runGit(cwd, ['worktree', 'add', worktreePath, branch], gitBin)
+    return { ok: true, path: worktreePath }
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException
+    if (err.code === 'ENOENT') return { ok: false, error: 'git not found' }
+    const msg = (err.message ?? String(e)).toLowerCase()
+    if (msg.includes('already exists') || msg.includes('already checked out')) return { ok: false, error: 'worktree already exists' }
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
+}
+
+/** List all linked worktrees via `git worktree list --porcelain`. Parses the porcelain format
+ *  into WorktreeInfo[] (path, branch, head). Handles detached-HEAD worktrees (branch = '').
+ *  Never throws → { ok, worktrees?, error? }. */
+export async function listWorktrees(cwd: string, gitBin = 'git'): Promise<{ ok: boolean; worktrees?: WorktreeInfo[]; error?: string }> {
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
+    return { ok: false, error: 'not_a_repo' }
+  }
+  try {
+    const out = (await runGit(cwd, ['worktree', 'list', '--porcelain'], gitBin)).stdout
+    const worktrees: WorktreeInfo[] = []
+    let cur: Partial<WorktreeInfo> = {}
+    for (const line of out.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (cur.path) worktrees.push({ path: cur.path, branch: cur.branch ?? '', head: cur.head ?? '' })
+        cur = { path: line.slice('worktree '.length) }
+      } else if (line.startsWith('HEAD ')) {
+        cur.head = line.slice('HEAD '.length)
+      } else if (line.startsWith('branch ')) {
+        cur.branch = line.slice('branch '.length).replace('refs/heads/', '')
+      } else if (line === 'detached') {
+      }
+    }
+    if (cur.path) worktrees.push({ path: cur.path, branch: cur.branch ?? '', head: cur.head ?? '' })
+    return { ok: true, worktrees }
+  } catch (e) {
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
+}
+
+/** Remove a linked worktree via `git worktree remove --force`. Safety gate: only removes
+ *  worktrees located inside HIP_WORKTREES_DIR (centralized dir, outside the project).
+ *  Never throws → { ok, error? }. */
+export async function removeWorktree(cwd: string, worktreePath: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+  const worktreesDir = getWorktreesDir()
+  const resolved = path.resolve(worktreePath)
+  const resolvedDir = path.resolve(worktreesDir)
+  if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) {
+    return { ok: false, error: 'worktree path outside managed directory' }
+  }
+  try {
+    await fs.stat(cwd)
+    await runGit(cwd, ['rev-parse', '--is-inside-work-tree'], gitBin)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
+    return { ok: false, error: 'not_a_repo' }
+  }
+  try {
+    await runGit(cwd, ['worktree', 'remove', worktreePath, '--force'], gitBin)
+    return { ok: true }
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
+    if (msg.includes('not a working tree') || msg.includes('no such')) return { ok: false, error: 'worktree not found' }
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
 }
 
 /** Read the user's *effective* git identity value (e.g. user.name), merging system/global/local

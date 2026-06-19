@@ -44,7 +44,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
   // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
-  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode })
+  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true })
   const toolNames = tools.map((t) => t.name)
   const ctx: GraphCtx = { runner, tools, emit, summarizer }
   const app = buildGraph(childMaxSteps)

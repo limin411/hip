@@ -178,6 +178,72 @@ describe('runWorkflow — 失败 fail-fast', () => {
   })
 })
 
+describe('runWorkflow — 并发上限 maxConcurrency', () => {
+  it('maxConcurrency:1 时扇出 a→b,a→c,a→d,a→e 串行执行,调用序为 a,b,c,d,e', async () => {
+    const def = wf({
+      nodes: [node('a'), node('b'), node('c'), node('d'), node('e')],
+      edges: [
+        { from: 'a', to: 'b' } as WorkflowEdge,
+        { from: 'a', to: 'c' } as WorkflowEdge,
+        { from: 'a', to: 'd' } as WorkflowEdge,
+        { from: 'a', to: 'e' } as WorkflowEdge,
+      ],
+      entry: ['a'],
+    })
+    const { runner, ports } = harness()
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'r9', signal: ac.signal, maxConcurrency: 1 })
+
+    expect(state.status).toBe('succeeded')
+    expect(runner.calls.map((c) => c.nodeId)).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('maxConcurrency:2 时扇出 4 个节点全部成功完成', async () => {
+    const def = wf({
+      nodes: [node('a'), node('b'), node('c'), node('d'), node('e')],
+      edges: [
+        { from: 'a', to: 'b' } as WorkflowEdge,
+        { from: 'a', to: 'c' } as WorkflowEdge,
+        { from: 'a', to: 'd' } as WorkflowEdge,
+        { from: 'a', to: 'e' } as WorkflowEdge,
+      ],
+      entry: ['a'],
+    })
+    const { ports } = harness()
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'r10', signal: ac.signal, maxConcurrency: 2 })
+
+    expect(state.status).toBe('succeeded')
+    expect(state.nodes.b.status).toBe('succeeded')
+    expect(state.nodes.c.status).toBe('succeeded')
+    expect(state.nodes.d.status).toBe('succeeded')
+    expect(state.nodes.e.status).toBe('succeeded')
+    expect(Object.values(state.nodes).every((n) => n.status !== 'running')).toBe(true)
+  })
+
+  it('默认 maxConcurrency(5)下 6 个扇出节点全部成功完成', async () => {
+    const nodes = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => node(id))
+    const def = wf({
+      nodes,
+      edges: [
+        { from: 'a', to: 'b' } as WorkflowEdge,
+        { from: 'a', to: 'c' } as WorkflowEdge,
+        { from: 'a', to: 'd' } as WorkflowEdge,
+        { from: 'a', to: 'e' } as WorkflowEdge,
+        { from: 'a', to: 'f' } as WorkflowEdge,
+        { from: 'a', to: 'g' } as WorkflowEdge,
+      ],
+      entry: ['a'],
+    })
+    const { ports } = harness()
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'r11', signal: ac.signal })
+
+    expect(state.status).toBe('succeeded')
+    expect(Object.values(state.nodes).every((n) => n.status === 'succeeded')).toBe(true)
+  })
+})
+
 describe('runWorkflow — 取消', () => {
   it('在飞节点 delayMs:200,启动后 ~50ms abort → run cancelled,无 run:finished(succeeded)', async () => {
     const def = wf({

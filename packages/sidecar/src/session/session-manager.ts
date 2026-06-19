@@ -6,6 +6,7 @@ import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
 import * as workspaceGit from './workspace-git.js'
+import { getWorktreesDir } from './worktree-config.js'
 import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 
@@ -43,7 +44,7 @@ export class SessionManager {
         this.createSession(msg.id, msg.config, send)
         break
       case 'session:destroy':
-        this.destroySession(msg.sessionId)
+        await this.destroySession(msg.sessionId)
         break
       case 'message:send':
         await this.ensureSession(msg.sessionId).sendMessage(msg.content, send, msg.id)
@@ -233,6 +234,34 @@ export class SessionManager {
         send({ type: 'git:revert:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, ok: r.ok, ...(r.safetyCheckpointId ? { safetyCheckpointId: r.safetyCheckpointId } : {}), ...(r.error ? { error: r.error } : {}) })
         break
       }
+      case 'git:worktree:create': {
+        const s = this.ensureSession(msg.sessionId)
+        const cwd = s.config.cwd
+        if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
+        const worktreePath = path.join(getWorktreesDir(), msg.branch)
+        const r = await workspaceGit.createWorktree(cwd, msg.branch, worktreePath)
+        send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: r.ok, ...(r.path ? { path: r.path } : {}), ...(r.error ? { error: r.error } : {}) })
+        break
+      }
+      case 'git:worktree:list': {
+        const s = this.ensureSession(msg.sessionId)
+        const cwd = s.config.cwd
+        if (!cwd) { send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: [] }); break }
+        const r = await workspaceGit.listWorktrees(cwd)
+        send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: r.worktrees ?? [] })
+        break
+      }
+      case 'git:worktree:remove': {
+        const s = this.ensureSession(msg.sessionId)
+        const cwd = s.config.cwd
+        if (!cwd) { send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
+        const r = await workspaceGit.removeWorktree(cwd, msg.worktreePath)
+        send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
+        break
+      }
+      case 'workflow:run':
+        await this.ensureSession(msg.sessionId).runWorkflowTurn(msg.def, send)
+        break
     }
   }
 
@@ -270,8 +299,8 @@ export class SessionManager {
     try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
   }
 
-  private destroySession(id: string): void {
-    this.sessions.get(id)?.destroy()
+  private async destroySession(id: string): Promise<void> {
+    await this.sessions.get(id)?.destroy()
     this.sessions.delete(id)
   }
 

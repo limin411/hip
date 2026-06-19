@@ -15,6 +15,9 @@ export interface RunSubagentArgs {
   signal: AbortSignal
   description: string
   childMaxSteps: number
+  /** Execution mode: 'foreground' blocks the caller until the subagent completes;
+   *  'background' returns immediately and runs detached. Default 'foreground'. */
+  mode?: 'foreground' | 'background'
   /** Conversation permission mode, cascaded from the parent turn (undefined ⇒ 'edit'). Drives the
    *  child toolset (chat = read-only, full = un-jailed) and the child cwd-block wording. */
   permissionMode?: PermissionMode
@@ -51,7 +54,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   // depth-1: no task tool (no spawn closure). Cascade the conversation's permission mode + approval
   // seam so a chat worker is read-only, an edit worker can write + HITL-gate run_script, and a full
   // worker un-jails files + auto-approves — mirroring how dispatch_agent cascades the same mode.
-  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval })
+  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true })
   const ctx: GraphCtx = { runner, tools, emit, summarizer }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(

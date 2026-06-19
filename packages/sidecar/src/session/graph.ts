@@ -7,6 +7,7 @@ import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
+import type { HookRegistry } from './hooks/registry.js'
 
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
 export interface GraphEmit {
@@ -23,6 +24,8 @@ export interface GraphCtx {
   tools: StructuredToolInterface[]
   emit: GraphEmit
   summarizer: Summarizer
+  hooks?: HookRegistry
+  sessionId?: string
 }
 
 const LoopState = Annotation.Root({
@@ -68,7 +71,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   }
 
   async function toolsNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { tools, emit } = ctxOf(config)
+    const { tools, emit, hooks, sessionId } = ctxOf(config)
     const byName = new Map(tools.map((t) => [t.name, t]))
     const last = state.messages[state.messages.length - 1] as AIMessage
     const out: ToolMessage[] = []
@@ -81,13 +84,51 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         out.push(new ToolMessage({ content: `Error: unknown tool ${call.name}`, tool_call_id: id, name: call.name }))
         continue
       }
+      let invokeArgs = call.args
+      if (hooks) {
+        const preResult = await hooks.fire('PreToolUse', {
+          sessionId: sessionId ?? '',
+          toolName: call.name,
+          toolInput: call.args as Record<string, unknown>,
+        })
+        if (preResult.kind === 'deny') {
+          const reason = preResult.reason ? `: ${preResult.reason}` : ''
+          emit.toolFinished(id, 'error', undefined, `denied by hook${reason}`)
+          out.push(new ToolMessage({ content: `Error: tool execution denied by hook${reason}`, tool_call_id: id, name: call.name }))
+          continue
+        }
+        if (preResult.updatedInput) {
+          invokeArgs = preResult.updatedInput
+        }
+      }
       try {
-        const result = String(await t.invoke(call.args))
+        const result = String(await t.invoke(invokeArgs))
         emit.toolFinished(id, 'finished', result)
+        if (hooks) {
+          const postResult = await hooks.fire('PostToolUse', {
+            sessionId: sessionId ?? '',
+            toolName: call.name,
+            toolInput: call.args as Record<string, unknown>,
+            toolOutput: result,
+          })
+          if (postResult.updatedInput) {
+            const updatedOutput = String(postResult.updatedInput.output ?? postResult.updatedInput)
+            out.push(new ToolMessage({ content: updatedOutput, tool_call_id: id, name: call.name }))
+            continue
+          }
+        }
         out.push(new ToolMessage({ content: result, tool_call_id: id, name: call.name }))
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e)
         emit.toolFinished(id, 'error', undefined, error)
+        if (hooks) {
+          await hooks.fire('PostToolUseFailure', {
+            sessionId: sessionId ?? '',
+            toolName: call.name,
+            toolInput: call.args as Record<string, unknown>,
+            toolError: error,
+          })
+        }
         out.push(new ToolMessage({ content: `Error: ${error}`, tool_call_id: id, name: call.name }))
       }
     }

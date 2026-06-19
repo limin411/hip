@@ -1,7 +1,9 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, NodeOutput, OrchestratorEvent, Hook, SkillMeta, AgentConfig, McpServerConfig } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
+import { readFileSync, existsSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import type { SessionStore } from '../persistence/store.js'
 import * as workspaceFs from './workspace-fs.js'
 import * as workspaceGit from './workspace-git.js'
@@ -14,7 +16,11 @@ import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools } from './tools.js'
 import { mcpManager } from './mcp/manager.js'
 import { readMcpServersConfig } from '../config/mcp-servers.js'
+import { readPluginsConfig } from '../config/plugins.js'
 import { readEnabledSkills } from './skills/registry.js'
+import { parseFrontmatter } from './skills/frontmatter.js'
+import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
+import { synthesizePlugin } from './plugins/synthesizer.js'
 import type { ApprovalFn } from './tools.js'
 import { buildSystemPrompt } from './system-prompt.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
@@ -27,6 +33,10 @@ import { PAUSE_QUESTION } from './doom-loop.js'
 import { createAgentProvider, readAgentsConfig, type AgentProvider } from './agents/index.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { ExternalAgentHooks } from './agents/types.js'
+import { HookRegistry } from './hooks/registry.js'
+import type { AgentRunner, OrchestratorEventSink } from '../orchestrator/ports.js'
+import { runWorkflow } from '../orchestrator/executor.js'
+import { createSessionAgentRunner, type RunSubagentFn } from './orchestrator-adapter.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -34,6 +44,23 @@ const TITLE_LEN = 40
 
 /** A turn with no outbound activity for this long is treated as a stalled provider stream and aborted. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
+
+/** Read a plugin skill directory's SKILL.md and build a SkillMeta entry. Returns null if the
+ *  directory is missing a SKILL.md or has no `name` in its frontmatter. */
+function skillMetaFromDir(dir: string, id: string): SkillMeta | null {
+  try {
+    const skillMd = join(dir, 'SKILL.md')
+    if (!existsSync(skillMd)) return null
+    const raw = readFileSync(skillMd, 'utf8')
+    const { data } = parseFrontmatter(raw)
+    const name = data.name?.trim()
+    if (!name) return null
+    const hasScripts = (() => { try { return statSync(join(dir, 'scripts')).isDirectory() } catch { return false } })()
+    return { id, name, description: data.description?.trim() ?? '', dir, hasScripts }
+  } catch {
+    return null
+  }
+}
 
 /** DEPRECATED — superseded by the global active model (config/providers.ts). buildModel no longer
  *  calls this; it remains only for the legacy DeepSeek thinking-toggle unit tests pending full removal.
@@ -119,6 +146,8 @@ const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
 
 export class Session {
   private app!: ReturnType<typeof buildGraph>
+  private orchestratorRunner?: AgentRunner
+  private readonly hooks = new HookRegistry()
   private readonly injectedRunner?: ModelRunner
   private _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
@@ -145,6 +174,66 @@ export class Session {
   // Factory for the per-turn AgentInvoker that runs a dispatched configured agent as a nested sub-agent
   // turn. Injectable so tests stub the sub-agent (no real provider process); defaults to the real one.
   private readonly invokerFactory: (cwd: string) => AgentInvoker
+  // Track in-flight background subagent tasks. Each entry is a fire-and-forget promise. The map acts as
+  // a concurrency gate (see runTurn's spawnSubagent closure). Cleared entry-by-entry on resolution.
+  readonly backgroundTasks: Map<string, Promise<void>> = new Map()
+
+  // Per-session plugin component cache (loaded once in constructor, reloaded via reloadPlugins())
+  private cachedSkills: SkillMeta[] | null = null
+  private cachedMcpConfigs: McpServerConfig[] | null = null
+  private cachedPluginAgents: AgentConfig[] | null = null
+
+  static readonly MAX_BACKGROUND_TASKS = 10
+
+  listBackgroundTasks(): string[] {
+    return [...this.backgroundTasks.keys()]
+  }
+
+  registerHook(hook: Hook): void {
+    this.hooks.register(hook)
+  }
+
+  /** Load (or reload) per-session plugin components: cached skills, MCP configs, and agent configs.
+   *  Called once in the constructor; call reloadPlugins() to refresh after config changes.
+   *  External-agent sessions still initialize empty caches so they are ready on a future switch. */
+  private loadPluginComponents(): void {
+    if (this.isExternalAgent()) {
+      this.cachedSkills = []
+      this.cachedMcpConfigs = []
+      this.cachedPluginAgents = []
+      return
+    }
+    try { this.cachedSkills = readEnabledSkills() } catch { this.cachedSkills = [] }
+    this.cachedMcpConfigs = readMcpServersConfig()
+    const pluginAgents: AgentConfig[] = []
+    try {
+      for (const pluginDir of readPluginsConfig().plugins) {
+        try {
+          const manifest = parsePluginManifest(pluginDir as unknown as string)
+          const synth = synthesizePlugin(manifest)
+          for (const se of synth.skills) {
+            const meta = skillMetaFromDir(se.dir, se.id)
+            if (meta) this.cachedSkills!.push(meta)
+          }
+          for (const mcp of synth.mcpServers) this.cachedMcpConfigs!.push(mcp.config)
+          for (const agent of synth.agents) pluginAgents.push(agent.config)
+        } catch (e) {
+          if (e instanceof PluginManifestError) {
+            console.warn(`Skipping invalid plugin: ${e.message}`)
+          }
+        }
+      }
+    } catch { /* degrade: skip plugins */ }
+    this.cachedPluginAgents = pluginAgents
+  }
+
+  /** Reload plugin components after config changes (e.g. new plugin installed, MCP server added). */
+  reloadPlugins(): void {
+    this.cachedSkills = null
+    this.cachedMcpConfigs = null
+    this.cachedPluginAgents = null
+    this.loadPluginComponents()
+  }
 
   constructor(
     readonly id: string,
@@ -167,6 +256,7 @@ export class Session {
     // production model. Injected-model sessions get no generator → no LLM title.
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
     this.buildAgent()
+    this.loadPluginComponents()
   }
 
   /** Current config (cwd may change via setCwd). */
@@ -541,6 +631,18 @@ export class Session {
       }
     }
 
+    // Gating hook: deny stops the turn before the message enters context.
+    const promptResult = await this.hooks.fire('UserPromptSubmit', { sessionId: this.id }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+    if (promptResult.kind !== 'allow') {
+      _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
+      return
+    }
+
+    // Observational lifecycle hook — must not block the turn.
+    if (isFirstTurn) {
+      void this.hooks.fire('SessionStart', { sessionId: this.id }).catch(() => {})
+    }
+
     this.messages.push(new HumanMessage(content))
     const supervisorText = await this.runTurn(_send)
 
@@ -639,16 +741,21 @@ export class Session {
     let supervisorText = ''
     ensureStarted('supervisor', 'supervisor')
 
+    const turnStartResult = await this.hooks.fire('TurnStart', { sessionId: this.id, turnId }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+    if (turnStartResult.kind !== 'allow') {
+      rawSend({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `Turn start rejected: ${turnStartResult.reason ?? 'blocked by hook'}` })
+      return ''
+    }
+
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner()
     const summarizer = this.summarizer()
-    // Pre-turn MCP reconcile + enabled-skills scan (mirrors the per-turn agents re-read). Both are
-    // best-effort and never throw into the turn. ACP/CLI external turns skip this — they don't use
-    // hip's own toolset (the isExternalAgent branch below ignores `tools`).
-    let skills: ReturnType<typeof readEnabledSkills> = []
+    // Pre-turn MCP reconcile: use cached MCP configs from loadPluginComponents().
+    // Skills and plugin agents are also cached — per-turn re-reads are eliminated.
+    const skills = this.cachedSkills ?? []
+    const pluginAgents = this.cachedPluginAgents ?? []
     if (!this.isExternalAgent()) {
-      try { await mcpManager.reconcile(readMcpServersConfig()) } catch { /* degrade: skip MCP tools */ }
-      try { skills = readEnabledSkills() } catch { skills = [] }
+      try { await mcpManager.reconcile(this.cachedMcpConfigs ?? readMcpServersConfig()) } catch { /* degrade: skip MCP tools */ }
     }
     // Conversation permission mode (default + dirty-data → 'edit'). Drives the system-prompt cwd-block
     // wording, run_script approval, AND the file-tool jail/registration (threaded into buildTools below),
@@ -680,8 +787,40 @@ export class Session {
     })
     const emit = makeEmit('supervisor', 'supervisor')
     let subagentSeq = 0
-    const spawnSubagent = async (description: string): Promise<string> => {
+    const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground'): Promise<string> => {
       const childId = `worker-${++subagentSeq}`
+
+      if (subagentMode === 'background') {
+        if (this.backgroundTasks.size >= Session.MAX_BACKGROUND_TASKS) {
+          return `Error: maximum ${Session.MAX_BACKGROUND_TASKS} concurrent background tasks reached`
+        }
+        ensureStarted(childId, 'worker', 'supervisor', description)
+        const promise = (async () => {
+          try {
+            const text = await runSubagent({
+              runner,
+              root: cwd,
+              summarizer,
+              emit: makeEmit(childId, 'worker'),
+              signal: this.abortController!.signal,
+              description,
+              childMaxSteps: CHILD_MAX_STEPS,
+              permissionMode: mode,
+              requestApproval,
+            })
+            ensureFinished(childId, text)
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error(`Background task ${childId} failed:`, msg)
+            ensureFinished(childId, `Error: ${msg}`)
+          } finally {
+            this.backgroundTasks.delete(childId)
+          }
+        })()
+        this.backgroundTasks.set(childId, promise)
+        return `Background task started: ${childId}`
+      }
+
       ensureStarted(childId, 'worker', 'supervisor', description)
       const text = await runSubagent({
         runner,
@@ -691,10 +830,6 @@ export class Session {
         signal: this.abortController!.signal,
         description,
         childMaxSteps: CHILD_MAX_STEPS,
-        // Cascade the conversation permission mode + the same per-mode approval seam the main agent
-        // uses, so the generic `task` worker honors chat (read-only) / edit (HITL) / full (auto-approve).
-        // `requestApproval` is assigned below in this same runTurn; spawnSubagent only fires later (when
-        // the model calls `task`), by which point it is in scope.
         permissionMode: mode,
         requestApproval,
       })
@@ -704,7 +839,7 @@ export class Session {
 
     // dispatch_agent: run a configured external agent as a nested sub-agent (role 'subagent',
     // parent 'supervisor'), streaming its events through makeEmit and surfacing its HITL requests.
-    const enabledAgents = readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin')
+    const enabledAgents = [...readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
     const invoker = this.invokerFactory(cwd)
     // HITL closure for the run_script tool (and dispatched internal agents): registers a pending
     // permission (same map + channel the external-agent and dispatch HITL paths use) and resolves on
@@ -781,9 +916,9 @@ export class Session {
       enabledAgents.length
         ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent }
         : undefined,
-      { mcpTools: mcpManager.tools(), skills, requestApproval, permissionMode: mode },
+      { mcpTools: mcpManager.tools(), skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true },
     )
-    const ctx: GraphCtx = { runner, tools, emit, summarizer }
+    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id }
 
     try {
       if (this.isExternalAgent()) {
@@ -818,6 +953,7 @@ export class Session {
           this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }
           this.awaitingResume = true
           const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
+          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
           send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
           return stoppedText
         }
@@ -827,6 +963,7 @@ export class Session {
       finishRemaining()
       if (isAbort && supervisorText) {
         const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
+        void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
         if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
         return text
       }
@@ -850,11 +987,169 @@ export class Session {
     }
 
     const finalText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)
+    void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
     // Per-turn checkpoint AFTER persistence (writes are done). Fire-and-forget — never block the
     // send path or let a git failure surface as a turn error. Label = a short slice of the reply.
     const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
     void this.captureCheckpoint(turnId, ckptLabel, send).catch(() => {})
     return finalText
+  }
+
+  /** Execute a multi-agent DAG workflow. Translates orchestrator events to WS messages
+   *  (node:started→agent:started, node:succeeded/failed/skipped→agent:finished), calls
+   *  runWorkflow(), then finalizes and persists the turn as message:complete.
+   *  Returns the final concatenated node outputs, or '' on abort/error. */
+  async runWorkflowTurn(def: WorkflowDef, send: SendFn): Promise<string> {
+    this.abortController = new AbortController()
+    this.running = true
+    let timedOut = false
+    const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
+
+    const turnId = `asst-supervisor-${Date.now()}-${this.turnSeq++}`
+    const trajectory = new Map<string, TraceRun>()
+    let agentSeq = 0
+    const started = new Set<string>()
+
+    const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
+      if (started.has(agentId)) return
+      started.add(agentId)
+      trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+    }
+
+    const ensureFinished = (agentId: string, output: string) => {
+      if (!started.has(agentId)) return
+      const r = trajectory.get(agentId)
+      if (r) { r.output = output; r.finishedAt = Date.now() }
+      started.delete(agentId)
+      send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+    }
+
+    const finishRemaining = () => {
+      for (const id of started) {
+        const r = trajectory.get(id); if (r) r.finishedAt = Date.now()
+        send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: id })
+      }
+      started.clear()
+    }
+
+    // Create orchestratorRunner via createSessionAgentRunner() if not already set.
+    // Subagent runner closure re-reads modelRunner/summarizer on each invocation to
+    // avoid stale model references.
+    if (!this.orchestratorRunner) {
+      const cwd = this._config.cwd ?? process.cwd()
+      this.orchestratorRunner = createSessionAgentRunner(
+        cwd,
+        this.invokerFactory,
+        async (input: string, signal: AbortSignal): Promise<string> => {
+          return runSubagent({
+            runner: this.modelRunner(),
+            root: this._config.cwd ?? process.cwd(),
+            summarizer: this.summarizer(),
+            emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {} },
+            signal,
+            description: input,
+            childMaxSteps: CHILD_MAX_STEPS,
+            permissionMode: 'full',
+            requestApproval: undefined,
+          })
+        },
+      )
+    }
+
+    // OrchestratorEventSink — translates DAG lifecycle events to WS messages
+    const ses = this
+    const eventSink: OrchestratorEventSink = {
+      emit(e: OrchestratorEvent) {
+        switch (e.type) {
+          case 'node:started':
+            ensureStarted(e.nodeId, 'worker', 'supervisor')
+            break
+          case 'node:succeeded':
+            ensureFinished(e.nodeId, e.output.text)
+            break
+          case 'node:failed':
+            ensureFinished(e.nodeId, `Error: ${e.error}`)
+            break
+          case 'node:skipped':
+            ensureFinished(e.nodeId, '(skipped)')
+            break
+          case 'run:cancelled':
+            // Cancel propagation — abort signal stops in-flight nodes
+            ses.abortController?.abort()
+            break
+          case 'run:started':
+          case 'run:finished':
+            break
+        }
+      },
+    }
+
+    try {
+      const runState = await runWorkflow(def, { agentRunner: this.orchestratorRunner!, eventSink }, { runId: turnId, signal: this.abortController.signal })
+      finishRemaining()
+
+      // Build final message from succeeded-node outputs.
+      // When multiple nodes produced output, aggregate them through a summarising subagent;
+      // on failure (or single / no output) fall back to raw concatenation.
+      const outputs = Object.values(runState.nodes)
+        .filter((n) => n.status === 'succeeded' && n.output)
+        .map((n) => n.output!)
+      let finalText: string
+      if (outputs.length === 0) {
+        finalText = '(workflow completed)'
+      } else if (outputs.length === 1) {
+        finalText = outputs[0].text
+      } else {
+        const rawTexts = outputs.map((o) => o.text)
+        const fallback = rawTexts.join('\n\n')
+        try {
+          finalText = await runSubagent({
+            runner: this.modelRunner(),
+            root: this._config.cwd ?? process.cwd(),
+            summarizer: this.summarizer(),
+            emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {} },
+            signal: this.abortController!.signal,
+            description: `You are an aggregator. Merge these subagent results into one coherent summary:\n\n${rawTexts.join('\n\n---\n\n')}`,
+            childMaxSteps: CHILD_MAX_STEPS,
+            permissionMode: 'chat',
+            requestApproval: undefined,
+          }) || fallback
+        } catch {
+          finalText = fallback
+        }
+      }
+
+      const finalMsg = this.finalizeAndPersist(send, turnId, finalText, trajectory, false)
+      return finalMsg
+    } catch (err) {
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      finishRemaining()
+      if (isAbort) {
+        send({
+          type: 'error',
+          sessionId: this.id,
+          code: timedOut ? 'TIMEOUT' : 'CANCELLED',
+          message: timedOut ? '' : 'User cancelled the request',
+        })
+        return ''
+      }
+      send({
+        type: 'error',
+        sessionId: this.id,
+        code: timedOut ? 'TIMEOUT' : 'AGENT_ERROR',
+        message: timedOut ? '' : err instanceof Error ? err.message : String(err),
+      })
+      return ''
+    } finally {
+      watchdog.stop()
+      this.running = false
+      this.abortController = null
+      if (this.pendingPermissions.size) {
+        for (const resolve of this.pendingPermissions.values()) resolve({ cancelled: true })
+        this.pendingPermissions.clear()
+      }
+    }
   }
 
   /** Run the phantom-write safety net, push the assistant message into context, persist the turn
@@ -907,8 +1202,14 @@ export class Session {
     this.abortController?.abort()
   }
 
-  destroy(): void {
+  async destroy(): Promise<void> {
     this.cancel()
+    if (this.backgroundTasks.size > 0) {
+      const timeout = new Promise<'timed_out'>((resolve) => setTimeout(() => resolve('timed_out'), 5_000))
+      const settled = Promise.allSettled([...this.backgroundTasks.values()]).then(() => 'settled' as const)
+      await Promise.race([settled, timeout])
+      this.backgroundTasks.clear()
+    }
     this.externalProvider?.dispose()
     this.externalProvider = null
   }

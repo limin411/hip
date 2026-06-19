@@ -68,6 +68,21 @@ pub fn skills_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip-skills.json"))
 }
 
+/// Canonical path of the plugin registry inside `config/`.
+pub fn plugins_config_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("hip-plugins.json"))
+}
+
+/// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
+pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "plugins")
+}
+
+/// Directory holding git worktrees for agent workspace isolation.
+pub fn worktrees_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "worktrees")
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;

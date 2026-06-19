@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { promises as dns } from 'node:dns'
 import * as path from 'node:path'
 import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
@@ -6,13 +7,104 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
 import { resolveWithin } from './workspace-fs.js'
-import { gitCommit, gitCreateBranch, gitSwitchBranch } from './workspace-git.js'
+import { gitCommit, gitCreateBranch, gitSwitchBranch, createWorktree, listWorktrees, removeWorktree } from './workspace-git.js'
+import { getWorktreesDir } from './worktree-config.js'
 import { readSkillBody, listSkillFiles } from './skills/registry.js'
+import { generateAgentConfig } from './agents/generate.js'
 
 const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
 const MAX_SCAN_FILE_BYTES = 256 * 1024
 const SCRIPT_TIMEOUT_MS = 120_000
 const SCRIPT_OUTPUT_CAP = 64 * 1024
+const WEB_OUTPUT_CAP = 64 * 1024
+
+/** Clip text to `cap` bytes, appending a truncation note when shortened. */
+function clipText(text: string, cap: number): string {
+  if (text.length <= cap) return text
+  return text.slice(0, cap) + `\n…(output truncated to ${Math.round(cap / 1024)}KB)`
+}
+
+/** Check if an IPv4 or IPv6 address belongs to a private/internal network. */
+function isPrivateIp(ip: string): boolean {
+  // IPv4-mapped IPv6: ::ffff:x.x.x.x
+  const v4Mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
+  if (v4Mapped) return isPrivateIp(v4Mapped[1])
+
+  // IPv6 unspecified
+  if (ip === '::' || ip === '0:0:0:0:0:0:0:0') return true
+
+  // IPv4 classification
+  const parts = ip.split('.')
+  if (parts.length !== 4) return false
+  const nums = parts.map(Number)
+  if (nums.some((n) => isNaN(n) || n < 0 || n > 255)) return false
+
+  const [a, b, c, d] = nums
+  if (a === 0 && b === 0 && c === 0 && d === 0) return true // 0.0.0.0
+  if (a === 10) return true // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
+  if (a === 192 && b === 168) return true // 192.168.0.0/16
+  if (a === 127) return true // 127.0.0.0/8
+  if (a === 169 && b === 254) return true // 169.254.0.0/16 (link-local)
+
+  return false
+}
+
+/**
+ * Validate a URL for SSRF before fetching. Returns null if safe, or an
+ * error string describing the rejection reason.
+ */
+async function validateFetchUrl(rawUrl: string): Promise<string | null> {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return 'Error: invalid URL'
+  }
+
+  if (parsed.protocol !== 'https:') {
+    return `Error: scheme "${parsed.protocol.replace(/:$/, '')}" is not allowed — only https:// is permitted`
+  }
+
+  const hostname = parsed.hostname
+
+  // Reject bare IPv4 addresses
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+    if (isPrivateIp(hostname)) {
+      return `Error: URL resolves to a private/internal IP address (${hostname})`
+    }
+    return 'Error: bare IP addresses are not allowed — use a hostname'
+  }
+
+  // Reject bare IPv6 addresses (with or without brackets)
+  const cleanV6 = hostname.replace(/^\[|\]$/g, '')
+  if (cleanV6.includes(':')) {
+    if (isPrivateIp(cleanV6)) {
+      return `Error: URL resolves to a private/internal IP address (${hostname})`
+    }
+    return 'Error: bare IP addresses are not allowed — use a hostname'
+  }
+
+  // Resolve hostname and check every returned address
+  let addresses: string[]
+  try {
+    addresses = await dns.resolve(hostname)
+  } catch {
+    return `Error: DNS resolution failed for "${hostname}"`
+  }
+
+  if (addresses.length === 0) {
+    return `Error: DNS resolution returned no addresses for "${hostname}"`
+  }
+
+  for (const addr of addresses) {
+    if (isPrivateIp(addr)) {
+      return `Error: URL resolves to a private/internal IP address (${addr})`
+    }
+  }
+
+  return null
+}
 
 /** Map "/abs-relative-to-root" → real fs path inside `root`. Lexical jail PLUS a symlink check on the
  *  deepest existing ancestor (so writing through a symlinked parent that escapes the root is rejected). */
@@ -84,6 +176,10 @@ export interface BuildToolsOpts {
    *  Defaults to 'edit'. Unknown values are treated as 'edit'. MCP tools are unaffected by mode;
    *  run_script is dropped in chat mode (it would let a read-only agent mutate the project). */
   permissionMode?: PermissionMode
+  /** Enable web_search and web_fetch tools. Requires HIP_WEBSEARCH_API_KEY env var for web_search. */
+  webSearchEnabled?: boolean
+  /** Enable generate_agent tool that calls generateAgentConfig to produce an AgentConfig JSON. */
+  generateAgentEnabled?: boolean
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -96,7 +192,7 @@ function isApproved(d: ApprovalDecision): boolean {
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
 export function buildTools(
   root: string,
-  spawnSubagent?: (description: string) => Promise<string>,
+  spawnSubagent?: (description: string, mode?: 'foreground' | 'background') => Promise<string>,
   cwd?: string,
   dispatch?: DispatchSpec,
   opts: BuildToolsOpts = {},
@@ -346,7 +442,60 @@ export function buildTools(
         schema: z.object({ branchName: z.string() }),
       },
     )
-    base.push(gitCommitTool, gitCreateBranchTool, gitSwitchBranchTool)
+    const gitWorktreeCreateTool = tool(
+      async ({ branch }) => {
+        try {
+          const worktreePath = path.join(getWorktreesDir(), branch)
+          const r = await createWorktree(cwd, branch, worktreePath)
+          return r.ok ? `Worktree created at ${r.path}` : `Error: ${r.error ?? 'create worktree failed'}`
+        } catch (err) {
+          return `Error: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'git_worktree_create',
+        description:
+          'Create a linked git worktree at the branch `branch` in the managed worktrees directory. ' +
+          'The branch must already exist — create it first with git_create_branch if needed. ' +
+          'Returns the path to the newly created worktree or an error.',
+        schema: z.object({ branch: z.string() }),
+      },
+    )
+    const gitWorktreeListTool = tool(
+      async () => {
+        try {
+          const r = await listWorktrees(cwd)
+          return r.ok ? JSON.stringify(r.worktrees) : `Error: ${r.error ?? 'list worktrees failed'}`
+        } catch (err) {
+          return `Error: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'git_worktree_list',
+        description:
+          'List all linked git worktrees for the current repository. ' +
+          'Returns a JSON array of { path, branch, head } objects.',
+        schema: z.object({}),
+      },
+    )
+    const gitWorktreeRemoveTool = tool(
+      async ({ worktreePath }) => {
+        try {
+          const r = await removeWorktree(cwd, worktreePath)
+          return r.ok ? `Removed worktree at ${worktreePath}` : `Error: ${r.error ?? 'remove worktree failed'}`
+        } catch (err) {
+          return `Error: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'git_worktree_remove',
+        description:
+          'Remove a linked git worktree at `worktreePath`. The path must be inside the managed ' +
+          'worktrees directory. Use git_worktree_list to see available worktrees.',
+        schema: z.object({ worktreePath: z.string() }),
+      },
+    )
+    base.push(gitCommitTool, gitCreateBranchTool, gitSwitchBranchTool, gitWorktreeCreateTool, gitWorktreeListTool, gitWorktreeRemoveTool)
   }
 
   // ── Skill / script / MCP extras (apply on hip's own loop, every assembly path) ──────────────
@@ -383,6 +532,89 @@ export function buildTools(
       },
     )
     extras.push(useSkill)
+  }
+
+  if (opts.webSearchEnabled) {
+    const webSearch = tool(
+      async ({ query }) => {
+        try {
+          const apiKey = process.env.HIP_WEBSEARCH_API_KEY
+          if (!apiKey) return 'Error: web search API key not configured'
+          const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
+          const res = await globalThis.fetch(url, {
+            headers: { 'X-Api-Key': apiKey },
+          })
+          if (!res.ok) return `Error: web search failed with status ${res.status}`
+          const text = await res.text()
+          return clipText(text, WEB_OUTPUT_CAP)
+        } catch (err) {
+          return `Error: web search failed: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'web_search',
+        description:
+          'Search the web for the given query and return results as text. ' +
+          'Requires HIP_WEBSEARCH_API_KEY environment variable to be set.',
+        schema: z.object({ query: z.string() }),
+      },
+    )
+
+    const webFetch = tool(
+      async ({ url }) => {
+        try {
+          const err = await validateFetchUrl(url)
+          if (err) return err
+          const res = await globalThis.fetch(url, {
+            headers: { 'User-Agent': 'hip/0.1.0' },
+            signal: AbortSignal.timeout(30_000),
+          })
+          if (!res.ok) return `Error: fetch failed with status ${res.status}`
+          const text = await res.text()
+          return clipText(text, WEB_OUTPUT_CAP)
+        } catch (err) {
+          const msg = (err as Error).message
+          if (msg.includes('timeout') || (err as Error).name === 'TimeoutError') {
+            return 'Error: fetch timed out after 30s'
+          }
+          return `Error: fetch failed: ${msg}`
+        }
+      },
+      {
+        name: 'web_fetch',
+        description:
+          'Fetch the content of a URL as text. Returns the response body clipped to 64KB. ' +
+          'Useful for reading documentation, articles, or API responses. Has a 30-second timeout.',
+        schema: z.object({ url: z.string() }),
+      },
+    )
+
+    extras.push(webSearch, webFetch)
+  }
+
+  if (opts.generateAgentEnabled) {
+    const generateAgent = tool(
+      async ({ description, model }) => {
+        try {
+          const config = await generateAgentConfig(description, model)
+          return JSON.stringify(config, null, 2)
+        } catch (err) {
+          return `Error: ${(err as Error).message}`
+        }
+      },
+      {
+        name: 'generate_agent',
+        description:
+          'Generate an AgentConfig from a natural-language description by calling generateAgentConfig. ' +
+          'Returns the generated agent config as a JSON object with fields: id, name, description, ' +
+          'kind, command, args, prompt, enabled, and optionally allowedSkills, allowedMcpServers, boundModel.',
+        schema: z.object({
+          description: z.string().describe('natural-language description of the agent role'),
+          model: z.string().optional().describe('optional model ID to use for generation'),
+        }),
+      },
+    )
+    extras.push(generateAgent)
   }
 
   // run_script is dropped in chat (read-only) mode: a shell command would let a "read-only" agent
@@ -454,14 +686,18 @@ export function buildTools(
 
   if (!spawnSubagent) return [...base, ...extras]
   const task = tool(
-    async ({ description }) => spawnSubagent(description),
+    async ({ description, mode }) => spawnSubagent(description, mode),
     {
       name: 'task',
       description:
         'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
         'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
-        'The sub-agent cannot itself delegate.',
-      schema: z.object({ description: z.string() }),
+        'The sub-agent cannot itself delegate. Set mode to "background" to run the sub-agent ' +
+        'without blocking the current turn (max 10 concurrent background tasks).',
+      schema: z.object({
+        description: z.string(),
+        mode: z.enum(['foreground', 'background']).optional(),
+      }),
     },
   )
   const out = [...base, task]

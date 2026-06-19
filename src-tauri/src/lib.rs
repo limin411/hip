@@ -2,6 +2,7 @@ mod sidecar;
 mod paths;
 mod auth;
 mod skills;
+mod plugins;
 mod path_env;
 
 use std::sync::atomic::AtomicU64;
@@ -170,6 +171,120 @@ fn get_mcp_servers_config(app: tauri::AppHandle) -> Result<String, String> {
 fn set_mcp_servers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
     let p = paths::mcp_servers_config_path(&app).ok_or("no config dir")?;
     std::fs::write(&p, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_plugins_config(app: tauri::AppHandle) -> Result<String, String> {
+    match paths::plugins_config_path(&app) {
+        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
+        None => Ok(String::new()),
+    }
+}
+
+#[tauri::command]
+fn set_plugins_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let p = paths::plugins_config_path(&app).ok_or("no config dir")?;
+    std::fs::write(&p, json).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_worktrees(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = paths::worktrees_dir(&app).ok_or("no worktrees dir")?;
+    let mut entries: Vec<String> = Vec::new();
+    if let Ok(read) = std::fs::read_dir(&dir) {
+        for entry in read.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    entries.push(name.to_string());
+                }
+            }
+        }
+    }
+    serde_json::to_string(&entries).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_plugins(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = paths::plugins_dir(&app).ok_or("no plugins dir")?;
+    let metas = plugins::scan_plugins(&dir);
+    serde_json::to_string(&metas).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn install_plugin(app: tauri::AppHandle, zip_path: String) -> Result<String, String> {
+    let plugins_root = paths::plugins_dir(&app).ok_or("no plugins dir")?;
+    let staging = plugins_root.join(format!(".staging-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&staging);
+    std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
+
+    let cleanup = |dir: &std::path::Path| {
+        let _ = std::fs::remove_dir_all(dir);
+    };
+
+    if let Err(e) = skills::extract_zip(std::path::Path::new(&zip_path), &staging) {
+        cleanup(&staging);
+        return Err(format!("解压失败: {e}"));
+    }
+    let root = match plugins::find_plugin_root(&staging) {
+        Some(r) => r,
+        None => {
+            cleanup(&staging);
+            return Err("压缩包内未找到 .plugin/plugin.json".to_string());
+        }
+    };
+    let manifest_path = root.join(".plugin").join("plugin.json");
+    let body = match std::fs::read_to_string(&manifest_path) {
+        Ok(b) => b,
+        Err(e) => {
+            cleanup(&staging);
+            return Err(e.to_string());
+        }
+    };
+    let manifest: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("plugin.json 解析失败: {e}"))?;
+    let name = manifest
+        .get("name")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("plugin.json 缺少 name 字段".to_string())?;
+
+    let base = plugins::slugify_plugin(name);
+    let mut slug = base.clone();
+    let mut n = 2;
+    while plugins_root.join(&slug).exists() {
+        slug = format!("{base}-{n}");
+        n += 1;
+    }
+    let final_dir = plugins_root.join(&slug);
+    if let Err(e) = std::fs::rename(&root, &final_dir) {
+        cleanup(&staging);
+        return Err(format!("安装失败: {e}"));
+    }
+    cleanup(&staging);
+
+    // Register in hip-plugins.json
+    if let Some(config_path) = paths::plugins_config_path(&app) {
+        plugins::register_plugin(&config_path, manifest)?;
+    }
+
+    Ok(slug)
+}
+
+#[tauri::command]
+fn delete_plugin(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("非法 plugin id".to_string());
+    }
+    let dir = paths::plugins_dir(&app).ok_or("no plugins dir")?.join(&id);
+    if !dir.is_dir() {
+        return Err("plugin 不存在".to_string());
+    }
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    if let Some(config_path) = paths::plugins_config_path(&app) {
+        plugins::unregister_plugin(&config_path, &id)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -356,6 +471,12 @@ pub fn run() {
             read_skill_file,
             get_skills_config,
             set_skills_config,
+            get_plugins_config,
+            set_plugins_config,
+            list_plugins,
+            install_plugin,
+            delete_plugin,
+            list_worktrees,
             which_binaries
         ])
         .build(tauri::generate_context!())

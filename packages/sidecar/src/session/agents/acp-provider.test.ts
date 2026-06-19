@@ -17,7 +17,7 @@ function cap() {
   return { emit, out }
 }
 function cfg(extra: any = {}): any {
-  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], transport: 'rich', acceptsModelConfig: false, enabled: true, ...extra }
+  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], enabled: true, ...extra }
 }
 
 describe('AcpAgentProvider', () => {

@@ -12,7 +12,7 @@ const mgr = new AcpConnectionManager()
 afterEach(() => mgr.disposeAll())
 
 function agentCfg(): any {
-  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], transport: 'rich', acceptsModelConfig: false, enabled: true }
+  return { id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], enabled: true }
 }
 
 describe('AcpConnectionManager', () => {

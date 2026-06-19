@@ -18,7 +18,7 @@ describe('external ACP agent through SessionManager', () => {
     const agentsPath = join(dir, 'hip-agents.json')
     writeFileSync(agentsPath, JSON.stringify({ agents: [{
       id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_THINK: '1', MOCK_ACP_TOOL: '1' },
+      enabled: true, env: { MOCK_ACP_THINK: '1', MOCK_ACP_TOOL: '1' },
     }] }))
     process.env.HIP_AGENTS_PATH = agentsPath
 
@@ -41,7 +41,7 @@ describe('external ACP agent through SessionManager', () => {
     const agentsPath = join(dir, 'hip-agents.json')
     writeFileSync(agentsPath, JSON.stringify({ agents: [{
       id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
+      enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
     }] }))
     process.env.HIP_AGENTS_PATH = agentsPath
     const mgr = new SessionManager(undefined, () => undefined, dir)
@@ -68,7 +68,7 @@ describe('external ACP agent through SessionManager', () => {
     const agentsPath = join(dir, 'hip-agents.json')
     writeFileSync(agentsPath, JSON.stringify({ agents: [{
       id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
+      enabled: true, env: { MOCK_ACP_PERMISSION: '1', MOCK_ACP_TOOL: '1' },
     }] }))
     process.env.HIP_AGENTS_PATH = agentsPath
     const mgr = new SessionManager(undefined, () => undefined, dir)
@@ -93,7 +93,7 @@ describe('external ACP agent through SessionManager', () => {
     const agentsPath = join(dir, 'hip-agents.json')
     writeFileSync(agentsPath, JSON.stringify({ agents: [{
       id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],
-      transport: 'rich', acceptsModelConfig: false, enabled: true, env: { MOCK_ACP_SLOW_MS: '200' },
+      enabled: true, env: { MOCK_ACP_SLOW_MS: '200' },
     }] }))
     process.env.HIP_AGENTS_PATH = agentsPath
     const mgr = new SessionManager(undefined, () => undefined, dir)
@@ -119,7 +119,7 @@ describe('external ACP agent through SessionManager', () => {
     const now = Date.now()
     store.insertSession({ id: 's1', title: 't', config: JSON.stringify({ agentId: 'mock', cwd: dir }), createdAt: now, updatedAt: now })
     store.setAcpSessionId('s1', 'mock-sess-1')
-    writeFileSync(join(dir, 'hip-agents.json'), JSON.stringify({ agents: [{ id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], transport: 'rich', acceptsModelConfig: false, enabled: true }] }))
+    writeFileSync(join(dir, 'hip-agents.json'), JSON.stringify({ agents: [{ id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],       enabled: true }] }))
     process.env.HIP_AGENTS_PATH = join(dir, 'hip-agents.json')
     const mgr = new SessionManager(store, () => undefined, dir)
     const out: ServerMessage[] = []
@@ -139,7 +139,7 @@ describe('external ACP agent through SessionManager', () => {
     const now = Date.now()
     store.insertSession({ id: 's1', title: 't', config: JSON.stringify({ agentId: 'mock', cwd: dir }), createdAt: now, updatedAt: now })
     // NOTE: no setAcpSessionId — this is a brand-new conversation.
-    writeFileSync(join(dir, 'hip-agents.json'), JSON.stringify({ agents: [{ id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT], transport: 'rich', acceptsModelConfig: false, enabled: true }] }))
+    writeFileSync(join(dir, 'hip-agents.json'), JSON.stringify({ agents: [{ id: 'mock', name: 'Mock', kind: 'acp', command: 'node', args: [AGENT],       enabled: true }] }))
     process.env.HIP_AGENTS_PATH = join(dir, 'hip-agents.json')
     const mgr = new SessionManager(store, () => undefined, dir)
     const out: ServerMessage[] = []

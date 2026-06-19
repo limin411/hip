@@ -140,7 +140,7 @@ export class AcpConnectionManager {
   private readonly conns = new Map<string, AcpConnection>()
 
   private key(agent: AgentConfig, model: ResolvedModel | null): string {
-    return JSON.stringify([agent.id, agent.authMode ?? 'opencode-self', agent.boundModel ?? null, model ?? null, agent.command, agent.args, agent.env ?? null])
+    return JSON.stringify([agent.id, agent.boundModel ?? null, model ?? null, agent.command, agent.args, agent.env ?? null])
   }
 
   async acquire(agent: AgentConfig, model: ResolvedModel | null): Promise<AcpConnection> {

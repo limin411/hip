@@ -23,12 +23,12 @@ hip/
 │   └── sidecar/            # @hip/sidecar — LangGraph agent runtime + WS server
 │       └── src/
 │           ├── session/    # Core agent loop (904-line Session class) → AGENTS.md
-│           │   └── agents/ # External agent providers (ACP, CLI) → AGENTS.md
+│           │   └── agents/ # External agent providers (ACP) → AGENTS.md
 │           ├── orchestrator/ # DAG workflow engine → AGENTS.md
 │           ├── persistence/  # SQLite + FTS5 + schema migrations → AGENTS.md
 │           └── config/       # Auth, providers, MCP config → AGENTS.md
 ├── src-tauri/              # Rust Tauri shell (7 source files, 20 commands)
-├── scripts/                # dev.sh, make-sidecar-dev-bin.sh, opencode-bridge.mjs
+├── scripts/                # dev.sh, make-sidecar-dev-bin.sh, hip-acp-template.mjs
 ├── e2e/                    # WebdriverIO specs (3 suites)
 └── docs/                   # Design specs + implementation plans
 ```

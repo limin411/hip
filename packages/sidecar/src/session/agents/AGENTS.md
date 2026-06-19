@@ -1,10 +1,10 @@
 # packages/sidecar/src/session/agents/ — AGENTS.md
 
-External agent providers. The factory (`index.ts`) creates an `AgentProvider` for each agent type. Two implementations: **AcpAgentProvider** (native ACP JSON-RPC over stdio) and **LoopAgentProvider** (custom CLI agents with RS-sentinel or rich JSON-line protocol).
+External agent providers. The factory (`index.ts`) creates an `AgentProvider` for each agent type. Primary implementation: **AcpAgentProvider** (native ACP JSON-RPC over stdio).
 
 ## OVERVIEW
 
-Agents are configured in `~/.hip/config/hip-agents.json` (Rust-managed). The sidecar reads this via `HIP_AGENTS_PATH` env var. Each agent can be `kind: 'acp'` (OpenCode/Kimi), `kind: 'opencode'` (community bridge), `kind: 'custom'` (CLI pipe), or `kind: 'internal'` (managed sub-agent).
+Agents are configured in `~/.hip/config/hip-agents.json` (Rust-managed). The sidecar reads this via `HIP_AGENTS_PATH` env var. Each agent can be `kind: 'acp'` (OpenCode/Kimi) or `kind: 'internal'` (managed sub-agent).
 
 ## STRUCTURE
 
@@ -18,21 +18,18 @@ agents/
 ├── acp-connection.ts   # Warm ClientSideConnection pool, init/auth, permission forwarding
 ├── acp-config.ts       # Builds command/args/env for ACP child processes
 ├── acp-quirks.ts       # Per-provider behavioral workarounds (cancel, model defaults)
-├── loop-provider.ts    # CLI agent: long-lived subprocess, RS sentinel or rich JSON-line framing
-├── adapters.ts         # parseRichLine() for the rich JSON-line protocol
-└── __fixtures__/       # 7 mock agent scripts + 1 test for provider testing
+└── __fixtures__/       # Mock agent scripts for provider testing
 ```
 
 ## WHERE TO LOOK
 
 | Task | File | Notes |
 |------|------|-------|
-| Add new agent kind | `index.ts` | Factory dispatch on `agent.kind` |
 | ACP session lifecycle | `acp-provider.ts` | Init → runTurn → dispose; supports resume/reconnect |
 | ACP child spawn | `acp-config.ts` | Self-managed — no model/key injection from hip |
 | Permission forwarding | `acp-provider.ts` | Translates ACP permission:request → GraphEmit |
 | Agent narrowing | `invoker.ts` | Per-agent skills/MCP whitelist from AgentConfig |
-| Mock agents for tests | `__fixtures__/` | echo-thin-agent.mjs, echo-rich-agent.mjs, mock-acp-agent.mjs |
+| Mock agents for tests | `__fixtures__/` | mock-acp-agent.mjs |
 
 ## CONVENTIONS
 

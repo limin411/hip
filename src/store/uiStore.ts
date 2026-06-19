@@ -5,6 +5,7 @@ import type { CheckpointMode } from '@hip/protocol'
 export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
 export type ActiveView = 'chat' | 'code' | 'settings'
+export type ChatTab = 'files' | 'agents'
 
 interface UiState {
   collapsed: boolean
@@ -32,6 +33,9 @@ interface UiState {
   chatPanelOpen: boolean
   toggleChatPanel: () => void
   setChatPanelOpen: (v: boolean) => void
+  chatActiveTab: ChatTab
+  setChatActiveTab: (v: ChatTab) => void
+  resetChatActiveTab: () => void
   selectedArtifactPath: string | null
   setSelectedArtifactPath: (p: string | null) => void
 
@@ -93,6 +97,9 @@ export const useUiStore = create<UiState>()(
       chatPanelOpen: false,
       toggleChatPanel: () => set((s) => ({ chatPanelOpen: !s.chatPanelOpen })),
       setChatPanelOpen: (v) => set((s) => (s.chatPanelOpen === v ? s : { chatPanelOpen: v })),
+      chatActiveTab: 'files',
+      setChatActiveTab: (v) => set((s) => (s.chatActiveTab === v ? s : { chatActiveTab: v })),
+      resetChatActiveTab: () => set((s) => (s.chatActiveTab === 'files' ? s : { chatActiveTab: 'files' })),
       selectedArtifactPath: null,
       setSelectedArtifactPath: (p) => set((s) => (s.selectedArtifactPath === p ? s : { selectedArtifactPath: p })),
 

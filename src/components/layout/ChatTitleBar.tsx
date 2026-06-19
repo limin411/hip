@@ -9,8 +9,6 @@ import {
   sessionService,
 } from '@/domain'
 import { Button } from '@/components/ui/Button'
-import { useProvidersStore } from '@/store/providersStore'
-import { computeCost, formatUsd } from '@/lib/usageCost'
 
 const DOT: Record<string, string> = {
   connected: 'bg-emerald-500',
@@ -33,10 +31,6 @@ export function ChatTitleBar() {
   const status = useConnectionStatus()
   const hasApiKey = useHasApiKey()
   const usageTotal = useActiveUsageTotal()
-  const activeRate = useProvidersStore((s) => {
-    const am = s.config.activeModel
-    return am ? s.catalog[am.providerID]?.models[am.modelID]?.cost : undefined
-  })
 
   return (
     <>
@@ -78,10 +72,6 @@ export function ChatTitleBar() {
           className="ml-3 rounded-full bg-surface-subtle px-2 py-0.5 text-caption text-ink-tertiary"
         >
           {t('chat.usage.tokens', { total: usageTotal.totalTokens })}
-          {(() => {
-            const cost = computeCost(usageTotal, activeRate)
-            return cost === null ? null : ` · ${t('chat.usage.cost', { cost: formatUsd(cost) })}`
-          })()}
         </span>
       )}
 

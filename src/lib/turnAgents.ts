@@ -1,6 +1,13 @@
 import type { AgentRole, Message, TimelineStep, ToolCall } from '@hip/protocol'
 
 /** Per-turn, per-agent activity bucket derived from a Message's timeline + toolCalls + agentRuns. */
+export interface GroupedTurn {
+  messageId: string
+  turnIndex: number
+  timestamp: number
+  agents: TurnAgent[]
+}
+
 export interface TurnAgent {
   agentId: string
   role: AgentRole
@@ -56,4 +63,40 @@ export function groupByAgent(message: Message | null, live: boolean): TurnAgent[
       ...(run?.parentAgentId ? { parentAgentId: run.parentAgentId } : {}),
     }
   })
+}
+
+/**
+ * Group all assistant messages across the conversation into per-turn agent buckets.
+ * Filters to assistant-role messages only; skips those with no agent activity
+ * (no timeline, no toolCalls, and no agentRuns). turnIndex starts at 1 and increments
+ * for each included message. The last assistant message is marked live=true for
+ * groupByAgent only when sessionStatus === 'running'.
+ */
+export function groupAllAgents(messages: Message[], sessionStatus: string): GroupedTurn[] {
+  const assistantMessages = messages.filter((m) => m.role === 'assistant')
+  const result: GroupedTurn[] = []
+  let turnIndex = 1
+
+  for (let i = 0; i < assistantMessages.length; i++) {
+    const msg = assistantMessages[i]
+    const hasTimeline = (msg.timeline?.length ?? 0) > 0
+    const hasToolCalls = (msg.toolCalls?.length ?? 0) > 0
+    const hasAgentRuns = (msg.agentRuns?.length ?? 0) > 0
+
+    if (!hasTimeline && !hasToolCalls && !hasAgentRuns) continue
+
+    const isLast = i === assistantMessages.length - 1
+    const live = isLast && sessionStatus === 'running'
+
+    result.push({
+      messageId: msg.id,
+      turnIndex,
+      timestamp: msg.timestamp,
+      agents: groupByAgent(msg, live),
+    })
+
+    turnIndex++
+  }
+
+  return result
 }

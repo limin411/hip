@@ -14,8 +14,6 @@ import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
-import { useProvidersStore } from '@/store/providersStore'
-import { computeCost, formatUsd } from '@/lib/usageCost'
 
 const REMARK_PLUGINS = [remarkGfm]
 const MD_COMPONENTS: Components = { pre: CodeBlock }
@@ -30,10 +28,6 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const isUser = message.role === 'user'
-  const activeRate = useProvidersStore((s) => {
-    const am = s.config.activeModel
-    return am ? s.catalog[am.providerID]?.models[am.modelID]?.cost : undefined
-  })
 
   // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
   const nested = isUser ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
@@ -93,10 +87,6 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
                 className="text-caption text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
               >
                 {t('chat.usage.tokens', { total: message.usage.totalTokens })}
-                {(() => {
-                  const cost = computeCost(message.usage, activeRate)
-                  return cost === null ? null : ` · ${t('chat.usage.cost', { cost: formatUsd(cost) })}`
-                })()}
               </span>
             )}
           </div>

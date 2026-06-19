@@ -161,3 +161,40 @@ describe('uiStore - code surface', () => {
     expect(useUiStore.getState().codeSessionId).toBe('c1')
   })
 })
+
+describe('uiStore - chatActiveTab (Chat panel tabs)', () => {
+  beforeEach(() => useUiStore.setState({ chatActiveTab: 'files' }))
+
+  it('defaults to files', () => {
+    expect(useUiStore.getState().chatActiveTab).toBe('files')
+  })
+
+  it('setChatActiveTab switches to agents', () => {
+    useUiStore.getState().setChatActiveTab('agents')
+    expect(useUiStore.getState().chatActiveTab).toBe('agents')
+  })
+
+  it('resetChatActiveTab restores files', () => {
+    useUiStore.getState().setChatActiveTab('agents')
+    useUiStore.getState().resetChatActiveTab()
+    expect(useUiStore.getState().chatActiveTab).toBe('files')
+  })
+
+  it('setChatActiveTab to same value is a no-op (same reference)', () => {
+    const before = useUiStore.getState()
+    useUiStore.getState().setChatActiveTab('files')
+    expect(useUiStore.getState()).toBe(before)
+  })
+
+  it('resetChatActiveTab when already files is a no-op', () => {
+    const before = useUiStore.getState()
+    useUiStore.getState().resetChatActiveTab()
+    expect(useUiStore.getState()).toBe(before)
+  })
+
+  it('chatActiveTab is independent of code panel activeTab', () => {
+    useUiStore.getState().setTab('timeline')
+    expect(useUiStore.getState().activeTab).toBe('timeline')
+    expect(useUiStore.getState().chatActiveTab).toBe('files')
+  })
+})

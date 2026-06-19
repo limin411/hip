@@ -3,16 +3,6 @@ import { nanoid } from 'nanoid'
 import type { AgentConfig } from '@hip/protocol'
 import { getAgentsConfig, setAgentsConfig } from '@/ipc/agentsConfig'
 
-const BUILTIN_OPENCODE: AgentConfig = {
-  id: 'opencode', name: 'OpenCode', kind: 'acp', command: 'opencode', args: ['acp', '--pure'],
-  transport: 'thin', acceptsModelConfig: true, authMode: 'opencode-self', quirks: 'opencode', enabled: false,
-}
-
-/** Ensure the built-in OpenCode agent is present exactly once, without clobbering user edits. */
-export function withBuiltinOpencode(agents: AgentConfig[]): AgentConfig[] {
-  return agents.some((a) => a.id === 'opencode') ? agents : [BUILTIN_OPENCODE, ...agents]
-}
-
 interface AgentsStore {
   agents: AgentConfig[]
   loaded: boolean
@@ -27,7 +17,7 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
   loaded: false,
   load: async () => {
     const cfg = await getAgentsConfig()
-    set({ agents: withBuiltinOpencode(cfg.agents), loaded: true })
+    set({ agents: cfg.agents, loaded: true })
   },
   addAgent: async (a) => {
     const id = nanoid()

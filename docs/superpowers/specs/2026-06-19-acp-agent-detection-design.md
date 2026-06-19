@@ -210,3 +210,16 @@ a persisted disabled opencode agent simply shows as 已添加.)
    need tuning — acceptable for v1, flagged as follow-up.
 3. Windows PATH/PATHEXT handling in `which_binaries` — target macOS first; keep the check
    portable but don't over-invest in Windows now.
+
+---
+
+## Addendum (2026-06-19) — revised after GUI acceptance
+
+GUI testing showed all four providers as `未安装` despite being installed. Two root causes, plus one design correction (user: "consider *global*; not all ACP agents are npm-managed"):
+
+1. **Global PATH (business-critical).** Detection (`which_binaries`) read the app process's *inherited* PATH. A macOS app launched from Finder/Dock/an IDE inherits a stripped PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), not the login-shell PATH — so tools in `~/.npm-global/bin`, `/opt/homebrew/bin`, version-manager dirs are invisible. The **sidecar** inherits the same stripped PATH, so a Finder-launched production app couldn't even *spawn* the agents. The original "detect with the inherited PATH for detection↔spawn consistency" was consistent with a *broken* PATH.
+   - **Fix:** `src-tauri/src/path_env.rs::ensure_user_path()`, called at the top of `run()`: merge login-shell PATH (`$SHELL -lic`, 2.5s timeout) + current PATH + a common-global-dirs baseline, then `set_var("PATH", …)`. One fix point → detection, sidecar, and every spawned agent see the real global PATH. (Industry-standard, à la `fix-path-env` / VS Code shell-env.)
+
+2. **Detect the agent, not the npm adapter.** Claude Code / Codex probed the npm ACP-adapter bins (`claude-agent-acp` / `codex-acp`), which users don't have. Detection now targets the **agent's own global command** (`opencode`/`kimi`/`claude`/`codex`), install-method-agnostic, **decoupled** from how hip speaks ACP. Native agents (OpenCode/Kimi) launch the detected binary (`<bin> acp`); adapter agents (Claude Code/Codex) are bridged via `npx` (`npx -y @agentclientprotocol/claude-agent-acp@latest` / `npx -y @zed-industries/codex-acp`; self-contained, needs Node).
+
+**This reverses two earlier locked decisions:** "global-install detection of the adapter" → "detect the agent command"; and "drop npx" → "npx bridge for the two adapters". Also: `legacyBin` removed; `presetInstalled` = `installed[detectBin]`; `installCmd` now installs the agent; `detectBinaries` logs errors instead of swallowing them. Rust changes require a `yarn tauri dev` restart to take effect.

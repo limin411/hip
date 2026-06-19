@@ -118,3 +118,29 @@ describe('internal agents', () => {
     expect(d.boundModel).toEqual({ providerID: 'anthropic', modelID: 'claude-opus-4' })
   })
 })
+
+const acpForm = (over: Partial<AgentForm>): AgentForm => ({
+  name: 'Claude', description: '', kind: 'acp', command: 'claude-agent-acp', args: '',
+  transport: 'thin', acceptsModelConfig: false, boundModelKey: '', authMode: 'opencode-self',
+  quirks: 'claude-code', prompt: '', allowedSkills: [], allowedMcpServers: [], enabled: true,
+  apiKey: '', authEnvVar: 'ANTHROPIC_API_KEY', env: undefined, ...over,
+})
+
+describe('buildAgentDraft env / apiKey', () => {
+  it('writes the api key into env[authEnvVar] when provided', () => {
+    const d = buildAgentDraft(acpForm({ apiKey: 'sk-123' }))
+    expect(d.env).toEqual({ ANTHROPIC_API_KEY: 'sk-123' })
+  })
+  it('omits env entirely when the api key is blank and no other env', () => {
+    const d = buildAgentDraft(acpForm({ apiKey: '   ' }))
+    expect(d.env).toBeUndefined()
+  })
+  it('preserves other env keys and drops a cleared auth key', () => {
+    const d = buildAgentDraft(acpForm({ apiKey: '', env: { ANTHROPIC_API_KEY: 'old', FOO: 'bar' } }))
+    expect(d.env).toEqual({ FOO: 'bar' })
+  })
+  it('native presets (no authEnvVar) never synthesize an auth env', () => {
+    const d = buildAgentDraft(acpForm({ quirks: 'opencode', authEnvVar: undefined, apiKey: 'ignored' }))
+    expect(d.env).toBeUndefined()
+  })
+})

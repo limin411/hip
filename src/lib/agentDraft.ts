@@ -16,6 +16,10 @@ export interface AgentForm {
   allowedSkills: string[]      // skill ids this internal agent may use (use_skill restricted to these)
   allowedMcpServers: string[]  // MCP server ids whose tools this internal agent may use
   enabled: boolean
+  // ACP adapter auth (Claude Code / Codex): the key is stored in the agent's env.
+  apiKey?: string              // value for authEnvVar; blank/undefined ⇒ rely on ambient env
+  authEnvVar?: string          // which env var apiKey maps to; undefined ⇒ no key field
+  env?: Record<string, string> // existing env to preserve across edits
 }
 
 export function isAgentDraftValid(form: AgentForm): boolean {
@@ -58,6 +62,13 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
   // Model rollback: external agents (acp + custom) self-manage. We never push a model, so
   // acceptsModelConfig is always false and no boundModel/authMode is emitted (legacy fields stay
   // inert in the type for back-compat with already-saved configs).
+  const env0 = { ...(form.env ?? {}) }
+  if (form.authEnvVar) {
+    const v = (form.apiKey ?? '').trim()
+    if (v) env0[form.authEnvVar] = v
+    else delete env0[form.authEnvVar]
+  }
+  const env = Object.keys(env0).length ? env0 : undefined
   return {
     name: form.name.trim(),
     description: (form.description ?? '').trim() || undefined,
@@ -67,6 +78,7 @@ export function buildAgentDraft(form: AgentForm): Omit<AgentConfig, 'id'> {
     transport: form.transport,
     acceptsModelConfig: false,
     ...(form.quirks ? { quirks: form.quirks } : {}),
+    ...(env ? { env } : {}),
     enabled: form.enabled,
   }
 }

@@ -113,6 +113,50 @@ fn set_agents_config(app: tauri::AppHandle, json: String) -> Result<(), String> 
     std::fs::write(&p, json).map_err(|e| e.to_string())
 }
 
+/// True if `p` is a file and (on unix) has any execute bit set.
+fn is_executable(p: &std::path::Path) -> bool {
+    if !p.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(p) {
+            Ok(m) => m.permissions().mode() & 0o111 != 0,
+            Err(_) => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+/// For each name, true iff an executable of that name exists in any of `dirs`.
+/// `names` are expected to be bare binary names (from the app's ACP preset list),
+/// not paths — they are joined onto each PATH dir as-is.
+fn find_on_path(
+    names: &[String],
+    dirs: &[std::path::PathBuf],
+) -> std::collections::HashMap<String, bool> {
+    names
+        .iter()
+        .map(|n| (n.clone(), dirs.iter().any(|d| is_executable(&d.join(n)))))
+        .collect()
+}
+
+/// Probe PATH for each requested executable. Uses this process's inherited PATH —
+/// the SAME env the sidecar (and thus spawned ACP agents) inherits — so a `true`
+/// here honestly predicts the agent will be spawnable.
+#[tauri::command]
+fn which_binaries(names: Vec<String>) -> Result<std::collections::HashMap<String, bool>, String> {
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path)
+        .filter(|d| !d.as_os_str().is_empty())
+        .collect();
+    Ok(find_on_path(&names, &dirs))
+}
+
 #[tauri::command]
 fn get_mcp_servers_config(app: tauri::AppHandle) -> Result<String, String> {
     match paths::mcp_servers_config_path(&app) {
@@ -305,7 +349,8 @@ pub fn run() {
             delete_skill,
             read_skill_file,
             get_skills_config,
-            set_skills_config
+            set_skills_config,
+            which_binaries
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -331,4 +376,41 @@ pub fn run() {
         }
         _ => {}
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    #[test]
+    fn find_on_path_detects_executables() {
+        let dir = std::env::temp_dir().join(format!("hip-which-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bin = dir.join("opencode");
+        std::fs::write(&bin, "#!/bin/sh\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let names = vec!["opencode".to_string(), "nope".to_string()];
+        let got = super::find_on_path(&names, &[PathBuf::from(&dir)]);
+        assert_eq!(got.get("opencode"), Some(&true));
+        assert_eq!(got.get("nope"), Some(&false));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn find_on_path_rejects_non_executable_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("hip-which-noexec-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("opencode");
+        std::fs::write(&f, "not executable\n").unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let got = super::find_on_path(&["opencode".to_string()], &[std::path::PathBuf::from(&dir)]);
+        assert_eq!(got.get("opencode"), Some(&false));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

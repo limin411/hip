@@ -2,12 +2,11 @@ import { create } from 'zustand'
 import { detectBinaries } from '@/ipc/detect'
 import { ACP_PRESETS } from '@/lib/acpPresets'
 
-/** All executable names worth probing: each preset's primary + legacy detect binary. */
+/** All executable names worth probing: each preset's detect (agent) command. */
 function detectNames(): string[] {
   const s = new Set<string>()
   for (const p of ACP_PRESETS) {
     if (p.detectBin) s.add(p.detectBin)
-    if (p.legacyBin) s.add(p.legacyBin)
   }
   return [...s]
 }

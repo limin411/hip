@@ -24,12 +24,20 @@ describe('ACP_PRESETS', () => {
     expect(acpPresetById('kimi-code')?.authEnvVar).toBeUndefined()
   })
 
-  it('claude-code keeps a legacy bin fallback', () => {
-    expect(acpPresetById('claude-code')?.legacyBin).toBe('claude-code-acp')
+  it('adapter presets detect the AGENT command and bridge ACP via npx', () => {
+    const cc = acpPresetById('claude-code')!
+    expect(cc.detectBin).toBe('claude')
+    expect(cc.command).toBe('npx')
+    expect(cc.args).toEqual(['-y', '@agentclientprotocol/claude-agent-acp@latest'])
+    const cx = acpPresetById('codex')!
+    expect(cx.detectBin).toBe('codex')
+    expect(cx.command).toBe('npx')
+    expect(cx.args).toEqual(['-y', '@zed-industries/codex-acp'])
   })
 
-  it('preserves OpenCode launch args (acp --pure)', () => {
-    expect(acpPresetById('opencode')).toMatchObject({ command: 'opencode', args: ['acp', '--pure'] })
+  it('native presets launch their detected binary directly (OpenCode keeps acp --pure)', () => {
+    expect(acpPresetById('opencode')).toMatchObject({ detectBin: 'opencode', command: 'opencode', args: ['acp', '--pure'] })
+    expect(acpPresetById('kimi-code')).toMatchObject({ detectBin: 'kimi', command: 'kimi', args: ['acp'] })
   })
 
   it('looks presets up by id', () => {
@@ -43,14 +51,10 @@ const mk = (over: Partial<AcpPreset>): AcpPreset => ({
 })
 
 describe('presetInstalled', () => {
-  it('true when the primary detect binary is present', () => {
-    expect(presetInstalled(mk({ detectBin: 'opencode' }), { opencode: true })).toBe(true)
-    expect(presetInstalled(mk({ detectBin: 'opencode' }), { opencode: false })).toBe(false)
-    expect(presetInstalled(mk({ detectBin: 'opencode' }), {})).toBe(false)
-  })
-  it('true when only the legacy binary is present', () => {
-    const p = mk({ detectBin: 'claude-agent-acp', legacyBin: 'claude-code-acp' })
-    expect(presetInstalled(p, { 'claude-agent-acp': false, 'claude-code-acp': true })).toBe(true)
+  it('true iff the agent detect binary is present', () => {
+    expect(presetInstalled(mk({ detectBin: 'claude' }), { claude: true })).toBe(true)
+    expect(presetInstalled(mk({ detectBin: 'claude' }), { claude: false })).toBe(false)
+    expect(presetInstalled(mk({ detectBin: 'claude' }), {})).toBe(false)
   })
 })
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useUiStore } from '@/store/uiStore'
+import { useProvidersStore } from '@/store/providersStore'
 import { sessionService, useActiveSessionId } from '@/domain'
 import { NewConversation } from '@/components/chat/NewConversation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
@@ -25,6 +26,7 @@ export function AppLayout() {
   const activeSessionId = useActiveSessionId()
 
   useEffect(() => {
+    void useProvidersStore.getState().load()
     sessionService.connect()
     return () => sessionService.disconnect()
   }, [])

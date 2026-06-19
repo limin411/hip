@@ -25,7 +25,7 @@ export function Composer({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="rounded-xl border border-border bg-surface p-2 focus-within:ring-2 focus-within:ring-accent/60">
+    <div className="rounded-xl border border-border bg-surface p-2 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8 transition-shadow">
       <Textarea
         value={value}
         autoFocus={autoFocus}

@@ -64,6 +64,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
         <div
           className={cn(
             'max-w-none text-prose leading-relaxed text-ink',
+            !isUser && 'bg-gradient-to-br from-accent/[0.02] to-accent/[0.04] rounded-lg -mx-2 px-2',
             '[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-meta',
             '[&_code]:font-mono [&_code]:text-meta',
             '[&_table]:my-2 [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',

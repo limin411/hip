@@ -113,7 +113,7 @@ export function ChatPane() {
                 // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
                   'transition-[background-color,box-shadow] duration-700',
-                  isNew && 'animate-message-enter',
+                  isNew && (m.role === 'user' ? 'animate-msg-enter-right' : 'animate-msg-enter-left'),
                   highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
                 )}
               >

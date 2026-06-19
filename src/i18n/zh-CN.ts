@@ -343,7 +343,7 @@ export const zhCN = {
         noToolsDiscovered: '尚未发现工具。请先保存并启用该服务器。',
       },
       agentsLabel: '智能体管理',
-      config: '配置（TOML）',
+      config: '配置',
       configDesc: '直接编辑 hip.toml 原始配置文件。修改保存后即时生效。',
       configLoaded: '已加载',
       configParse: '解析并验证',

@@ -343,7 +343,7 @@ export const en = {
         noToolsDiscovered: 'No tools discovered yet. Save and enable the server first.',
       },
       agentsLabel: 'Agent Management',
-      config: 'Config (TOML)',
+      config: 'Config',
       configDesc: 'Edit the raw hip.toml configuration directly. Changes take effect after saving.',
       configLoaded: 'Loaded',
       configParse: 'Parse & Validate',

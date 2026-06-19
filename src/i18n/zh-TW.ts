@@ -343,7 +343,7 @@ export const zhTW = {
         noToolsDiscovered: '尚未發現工具。請先儲存並啟用該伺服器。',
       },
       agentsLabel: '智能體管理',
-      config: '配置（TOML）',
+      config: '配置',
       configDesc: '直接編輯 hip.toml 原始設定檔。修改儲存後即時生效。',
       configLoaded: '已載入',
       configParse: '解析並驗證',

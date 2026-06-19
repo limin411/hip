@@ -43,8 +43,8 @@ const tmpDirs: string[] = []
 /** Write a one-agent hip-agents.json and point HIP_AGENTS_PATH at it (see registry.test.ts). */
 export function registerAgent(agent: Partial<AgentConfig> = {}): string {
   const full: AgentConfig = {
-    id: 'echo', name: 'Echo', kind: 'custom', command: 'x', args: [],
-    transport: 'thin', acceptsModelConfig: false, enabled: true, ...agent,
+    id: 'echo', name: 'Echo', kind: 'acp', command: 'x', args: [],
+    enabled: true, ...agent,
   }
   const dir = mkdtempSync(join(tmpdir(), 'hip-dispatch-'))
   tmpDirs.push(dir)

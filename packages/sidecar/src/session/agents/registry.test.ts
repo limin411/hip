@@ -15,7 +15,7 @@ afterEach(() => {
   delete process.env.HIP_AGENTS_PATH; delete process.env.HIP_PROVIDERS_PATH; delete process.env.HIP_MODEL_ACME_API_KEY
 })
 
-const baseAgent: AgentConfig = { id: 'a1', name: 'A', kind: 'custom', command: 'x', args: [], transport: 'thin', acceptsModelConfig: false, enabled: true }
+const baseAgent: AgentConfig = { id: 'a1', name: 'A', kind: 'acp', command: 'x', args: [], enabled: true }
 
 describe('readAgentsConfig', () => {
   it('returns [] when HIP_AGENTS_PATH is unset', () => {
@@ -40,7 +40,7 @@ describe('resolveAgentModel', () => {
   it('resolves baseURL (providers file) + apiKey (env) for the bound model', () => {
     process.env.HIP_PROVIDERS_PATH = writeFile('hip-providers.json', { providers: { acme: { enabled: true, baseURL: 'https://acme.test/v1' } } })
     process.env.HIP_MODEL_ACME_API_KEY = 'sk-acme'
-    const agent: AgentConfig = { ...baseAgent, acceptsModelConfig: true, boundModel: { providerID: 'acme', modelID: 'acme-large' } }
+    const agent: AgentConfig = { ...baseAgent, boundModel: { providerID: 'acme', modelID: 'acme-large' } }
     expect(resolveAgentModel(agent)).toEqual({ providerID: 'acme', modelID: 'acme-large', baseURL: 'https://acme.test/v1', apiKey: 'sk-acme' })
   })
 })

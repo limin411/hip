@@ -27,8 +27,8 @@ class FakeProvider implements AgentProvider {
 }
 
 const baseAgent: AgentConfig = {
-  id: 'echo', name: 'Echo', kind: 'custom', command: 'x', args: [],
-  transport: 'thin', acceptsModelConfig: false, enabled: true,
+  id: 'echo', name: 'Echo', kind: 'acp', command: 'x', args: [],
+  enabled: true,
 }
 
 describe('createAgentInvoker', () => {
@@ -64,13 +64,13 @@ describe('createAgentInvoker', () => {
     expect(created).toBe(false)
   })
 
-  it('never resolves a model for a CLI (custom) agent — even with acceptsModelConfig (rollback)', async () => {
-    // Model rollback: custom CLI agents self-manage; hip must not resolve/push a model to them.
+  it('never resolves a model for an ACP agent (rollback)', async () => {
+    // Model rollback: ACP agents self-manage; hip must not resolve/push a model to them.
     const seen: Array<ResolvedModel | null> = []
     let resolved = false
     const model: ResolvedModel = { providerID: 'p', modelID: 'm', baseURL: 'u' }
     const invoker = createAgentInvoker('/tmp', {
-      readAgents: () => [{ ...baseAgent, acceptsModelConfig: true }],
+      readAgents: () => [baseAgent],
       resolveModel: () => { resolved = true; return model },
       createProvider: (_a, _cwd, m) => { seen.push(m); return new FakeProvider(async () => {}) },
     })
@@ -99,8 +99,8 @@ describe('createAgentInvoker', () => {
   it('routes an internal agent to runInternal with the resolved model + persona, returns its text', async () => {
     const seen: { agentId?: string; task?: string; resolved?: unknown; prompt?: string } = {}
     const internalAgent: AgentConfig = {
-      id: 'rev', name: 'Reviewer', kind: 'internal', command: '', args: [], transport: 'thin',
-      acceptsModelConfig: false, enabled: true, prompt: 'review carefully',
+      id: 'rev', name: 'Reviewer', kind: 'internal', command: '', args: [],
+      enabled: true, prompt: 'review carefully',
       boundModel: { providerID: 'p', modelID: 'm' },
     }
     const invoker = createAgentInvoker('/work', {
@@ -119,8 +119,8 @@ describe('createAgentInvoker', () => {
   it('passes resolved=null for an internal agent with no bound model', async () => {
     let seenResolved: unknown = 'unset'
     const internalAgent: AgentConfig = {
-      id: 'sum', name: 'Summarizer', kind: 'internal', command: '', args: [], transport: 'thin',
-      acceptsModelConfig: false, enabled: true, prompt: 'summarize',
+      id: 'sum', name: 'Summarizer', kind: 'internal', command: '', args: [],
+      enabled: true, prompt: 'summarize',
     }
     const invoker = createAgentInvoker('/work', {
       readAgents: () => [internalAgent],

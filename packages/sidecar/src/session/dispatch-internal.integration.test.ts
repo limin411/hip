@@ -9,8 +9,8 @@ import {
 afterEach(() => cleanupAgents())
 
 const internalAgent: AgentConfig = {
-  id: 'reviewer', name: 'Reviewer', kind: 'internal', command: '', args: [], transport: 'thin',
-  acceptsModelConfig: false, enabled: true, prompt: 'You review code.', allowedTools: ['read_file', 'grep'],
+  id: 'reviewer', name: 'Reviewer', kind: 'internal', command: '', args: [],
+  enabled: true, prompt: 'You review code.', allowedTools: ['read_file', 'grep'],
 }
 
 describe('dispatch -> internal managed agent (end-to-end)', () => {

@@ -26,7 +26,7 @@ export function AgentManagement() {
   }, [loaded, load])
 
   const byCat = useMemo(() => {
-    const m: Record<AgentCategory, AgentConfig[]> = { acp: [], cli: [], internal: [] }
+    const m: Record<AgentCategory, AgentConfig[]> = { acp: [], internal: [] }
     for (const a of agents) m[agentCategory(a)].push(a)
     return m
   }, [agents])

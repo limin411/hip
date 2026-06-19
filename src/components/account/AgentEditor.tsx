@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
@@ -52,10 +51,7 @@ export function AgentEditor({
     kind: initial?.kind ?? initialKind ?? 'custom',
     command: initial?.command ?? '',
     args: (initial?.args ?? []).join(' '),
-    transport: initial?.transport ?? 'thin',
-    acceptsModelConfig: initial?.acceptsModelConfig ?? false,
     boundModelKey: initial?.boundModel ? `${initial.boundModel.providerID}/${initial.boundModel.modelID}` : '',
-    authMode: initial?.authMode ?? 'opencode-self',
     quirks: initial?.quirks,
     prompt: initial?.prompt ?? '',
     allowedSkills: initial?.allowedSkills ?? [],
@@ -86,7 +82,7 @@ export function AgentEditor({
     ? t('settings.agents.editTitle')
     : isAcp && acpStep === 'pick'
       ? t('settings.agents.acpPickTitle')
-      : t(isAcp ? 'settings.agents.addAcp' : isInternal ? 'settings.agents.addInternal' : 'settings.agents.addCli')
+      : t(isAcp ? 'settings.agents.addAcp' : 'settings.agents.addInternal')
   const groups = groupModelOptions(catalog, config)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
   const toggleSkill = (id: string, on: boolean) =>
@@ -273,43 +269,6 @@ export function AgentEditor({
                 </Field>
               )}
 
-              {/* CLI-only: thin/rich selects how hip's LoopAgentProvider frames stdin/stdout.
-                  ACP agents speak the structured ACP protocol and ignore this field entirely. */}
-              {!isAcp && (
-                <Section label={t('settings.agents.sectionTransport')}>
-                  <div
-                    role="radiogroup"
-                    aria-label={t('settings.agents.sectionTransport')}
-                    className="flex gap-2"
-                    onKeyDown={(e) => {
-                      const next =
-                        e.key === 'ArrowRight' || e.key === 'ArrowDown'
-                          ? 'rich'
-                          : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
-                            ? 'thin'
-                            : null
-                      if (!next) return
-                      e.preventDefault()
-                      patch({ transport: next })
-                      e.currentTarget.querySelectorAll('button')[next === 'thin' ? 0 : 1]?.focus()
-                    }}
-                  >
-                    <ChoiceCard
-                      selected={form.transport === 'thin'}
-                      title={t('settings.agents.transportThin')}
-                      desc={t('settings.agents.transportThinDesc')}
-                      onClick={() => patch({ transport: 'thin' })}
-                    />
-                    <ChoiceCard
-                      selected={form.transport === 'rich'}
-                      title={t('settings.agents.transportRich')}
-                      desc={t('settings.agents.transportRichDesc')}
-                      onClick={() => patch({ transport: 'rich' })}
-                    />
-                  </div>
-                </Section>
-              )}
-
             </>
           )}
 
@@ -354,45 +313,6 @@ function Section({ label, children }: { label: string; children: React.ReactNode
       <div className="mb-2 text-caption font-medium uppercase tracking-wide text-ink-tertiary">{label}</div>
       <div className="space-y-2">{children}</div>
     </div>
-  )
-}
-
-function ChoiceCard({
-  selected,
-  title,
-  desc,
-  onClick,
-}: {
-  selected: boolean
-  title: string
-  desc: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      tabIndex={selected ? 0 : -1}
-      onClick={onClick}
-      className={cn(
-        'flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-        selected ? 'border-accent bg-accent-subtle' : 'border-border hover:bg-surface-muted',
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <span className={cn('text-body font-medium', selected ? 'text-accent-strong' : 'text-ink')}>{title}</span>
-        <span
-          className={cn(
-            'flex h-4 w-4 items-center justify-center rounded-full border',
-            selected ? 'border-accent bg-accent text-white' : 'border-border',
-          )}
-        >
-          {selected && <Check size={11} />}
-        </span>
-      </div>
-      <div className={cn('mt-1 text-caption', selected ? 'text-accent-strong/80' : 'text-ink-tertiary')}>{desc}</div>
-    </button>
   )
 }
 

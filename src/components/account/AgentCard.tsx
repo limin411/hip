@@ -47,7 +47,7 @@ export function AgentCard({
 }) {
   const { t } = useTranslation()
   const cat = agentCategory(agent)
-  const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : cat === 'internal' ? t('settings.agents.badgeInternal') : t('settings.agents.catCli')
+  const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : t('settings.agents.badgeInternal')
   const cmdline = [agent.command, ...agent.args].join(' ')
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
@@ -56,13 +56,7 @@ export function AgentCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-body font-medium text-ink">{agent.name}</span>
           <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
-          {/* CLI-only: thin/rich is a LoopAgentProvider framing concept. ACP agents ignore it,
-              so don't surface a transport badge for them. */}
-          {cat === 'cli' && (
-            <Badge className={agent.transport === 'rich' ? 'bg-accent-subtle text-accent-strong' : undefined}>
-              {t(agent.transport === 'rich' ? 'settings.agents.transportRich' : 'settings.agents.transportThin')}
-            </Badge>
-          )}
+
           {cat === 'internal' && (
             <Badge>
               <Cpu size={11} />

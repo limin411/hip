@@ -1,13 +1,12 @@
 import { useTranslation } from 'react-i18next'
-import { LayoutGrid, Sparkles, Bot, Terminal, Plug, type LucideIcon } from 'lucide-react'
+import { LayoutGrid, Sparkles, Bot, Plug, type LucideIcon } from 'lucide-react'
 import { AGENT_FILTERS, type AgentFilter, type AgentFilterIcon } from '@/lib/agentFilters'
 import { cn } from '@/lib/utils'
 
-const ICONS: Record<AgentFilterIcon, LucideIcon> = {
+const ICONS: Partial<Record<AgentFilterIcon, LucideIcon>> = {
   'layout-grid': LayoutGrid,
   sparkles: Sparkles,
   bot: Bot,
-  terminal: Terminal,
   plug: Plug,
 }
 
@@ -27,7 +26,6 @@ export function AgentFilterList({
       case 'all': return t('settings.agents.filterAll')
       case 'builtin': return t('settings.agents.filterBuiltin')
       case 'internal': return t('settings.agents.filterInternal')
-      case 'cli': return t('settings.agents.filterCli')
       case 'acp': return t('settings.agents.filterAcp')
     }
   }
@@ -45,7 +43,7 @@ export function AgentFilterList({
               isActive ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink-secondary hover:bg-surface-muted',
             )}
           >
-            <Icon size={16} className="shrink-0" />
+          {Icon && <Icon size={16} className="shrink-0" />}
             <span className="flex-1 truncate">{label(entry.id)}</span>
             <span className={cn('text-caption', isActive ? 'text-accent-strong' : 'text-ink-tertiary')}>{counts[entry.id]}</span>
           </button>

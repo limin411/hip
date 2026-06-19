@@ -8,11 +8,10 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { BuiltinCard, AgentCard } from './AgentCard'
 
-type EmptyKey = 'settings.agents.catInternalEmpty' | 'settings.agents.catCliEmpty' | 'settings.agents.catAcpEmpty'
+type EmptyKey = 'settings.agents.catInternalEmpty' | 'settings.agents.catAcpEmpty'
 
 const SECTIONS = [
   { cat: 'internal' as AgentCategory, titleKey: 'settings.agents.sectionInternal' as const, emptyKey: 'settings.agents.catInternalEmpty' as const, kind: 'internal' as AgentConfig['kind'], addKey: 'settings.agents.addInternal' as const },
-  { cat: 'cli' as AgentCategory, titleKey: 'settings.agents.sectionCli' as const, emptyKey: 'settings.agents.catCliEmpty' as const, kind: 'custom' as AgentConfig['kind'], addKey: 'settings.agents.addCli' as const },
   { cat: 'acp' as AgentCategory, titleKey: 'settings.agents.sectionAcp' as const, emptyKey: 'settings.agents.catAcpEmpty' as const, kind: 'acp' as AgentConfig['kind'], addKey: 'settings.agents.addAcp' as const },
 ]
 
@@ -56,7 +55,7 @@ export function AgentListPane({
     )
   }
 
-  if (filter === 'internal' || filter === 'cli' || filter === 'acp') {
+  if (filter === 'internal' || filter === 'acp') {
     const section = SECTIONS.find((s) => s.cat === filter)!
     const list = byCat[filter]
     return (
@@ -95,7 +94,6 @@ export function AgentListPane({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={() => onAdd('internal')}>{t('settings.agents.addInternal')}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onAdd('custom')}>{t('settings.agents.addCli')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onAdd('acp')}>{t('settings.agents.addAcp')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

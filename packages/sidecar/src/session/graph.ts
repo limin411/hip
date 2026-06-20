@@ -2,9 +2,15 @@ import { StateGraph, Annotation, START, END, messagesStateReducer } from '@langc
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
 import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { TurnUsage } from '@hip/protocol'
+import type { TurnUsage, PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
+import type { ToolPolicy } from './tool-runner/tool-policy.js'
+import type { ApprovalCache } from './tool-runner/approval-cache.js'
+import { SessionApprovalCache } from './tool-runner/approval-cache.js'
+import { ToolRunner } from './tool-runner/tool-runner.js'
+import type { ToolRunnerDeps } from './tool-runner/tool-runner.js'
+import type { ApprovalFn } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -26,6 +32,11 @@ export interface GraphCtx {
   summarizer: Summarizer
   hooks?: HookRegistry
   sessionId?: string
+  toolRunner?: ToolRunner
+  toolPolicy?: ToolPolicy
+  approvalCache?: ApprovalCache
+  requestApproval?: ApprovalFn
+  permissionMode?: PermissionMode
 }
 
 const LoopState = Annotation.Root({
@@ -70,67 +81,42 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { messages: [msg], steps: state.steps + 1 }
   }
 
+  function getOrCreateToolRunner(ctx: GraphCtx): ToolRunner {
+    if (ctx.toolRunner) return ctx.toolRunner
+
+    const byName = new Map(ctx.tools.map((t) => [t.name, t]))
+    const deps: ToolRunnerDeps = {
+      tools: byName,
+      hooks: ctx.hooks,
+      toolPolicy: ctx.toolPolicy ?? { classify: () => ({ risk: 'low', approval: 'auto_allow' }) },
+      approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
+      selfGatedTools: new Set(),
+      permissionMode: ctx.permissionMode ?? 'edit',
+      requestApproval: ctx.requestApproval,
+      sessionId: ctx.sessionId ?? '',
+      onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
+      onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
+    }
+    return new ToolRunner(deps)
+  }
+
   async function toolsNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { tools, emit, hooks, sessionId } = ctxOf(config)
-    const byName = new Map(tools.map((t) => [t.name, t]))
+    const ctx = ctxOf(config)
+    const runner = getOrCreateToolRunner(ctx)
     const last = state.messages[state.messages.length - 1] as AIMessage
     const out: ToolMessage[] = []
     for (const call of last.tool_calls ?? []) {
       const id = call.id ?? call.name
-      emit.toolStarted(call.name, id, call.args)
-      const t = byName.get(call.name)
-      if (!t) {
-        emit.toolFinished(id, 'error', undefined, `unknown tool: ${call.name}`)
-        out.push(new ToolMessage({ content: `Error: unknown tool ${call.name}`, tool_call_id: id, name: call.name }))
-        continue
-      }
-      let invokeArgs = call.args
-      if (hooks) {
-        const preResult = await hooks.fire('PreToolUse', {
-          sessionId: sessionId ?? '',
-          toolName: call.name,
-          toolInput: call.args as Record<string, unknown>,
-        })
-        if (preResult.kind === 'deny') {
-          const reason = preResult.reason ? `: ${preResult.reason}` : ''
-          emit.toolFinished(id, 'error', undefined, `denied by hook${reason}`)
-          out.push(new ToolMessage({ content: `Error: tool execution denied by hook${reason}`, tool_call_id: id, name: call.name }))
-          continue
-        }
-        if (preResult.updatedInput) {
-          invokeArgs = preResult.updatedInput
-        }
-      }
-      try {
-        const result = String(await t.invoke(invokeArgs))
-        emit.toolFinished(id, 'finished', result)
-        if (hooks) {
-          const postResult = await hooks.fire('PostToolUse', {
-            sessionId: sessionId ?? '',
-            toolName: call.name,
-            toolInput: call.args as Record<string, unknown>,
-            toolOutput: result,
-          })
-          if (postResult.updatedInput) {
-            const updatedOutput = String(postResult.updatedInput.output ?? postResult.updatedInput)
-            out.push(new ToolMessage({ content: updatedOutput, tool_call_id: id, name: call.name }))
-            continue
-          }
-        }
-        out.push(new ToolMessage({ content: result, tool_call_id: id, name: call.name }))
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e)
-        emit.toolFinished(id, 'error', undefined, error)
-        if (hooks) {
-          await hooks.fire('PostToolUseFailure', {
-            sessionId: sessionId ?? '',
-            toolName: call.name,
-            toolInput: call.args as Record<string, unknown>,
-            toolError: error,
-          })
-        }
-        out.push(new ToolMessage({ content: `Error: ${error}`, tool_call_id: id, name: call.name }))
-      }
+      const result = await runner.runToolCall({
+        name: call.name,
+        callId: id,
+        args: (call.args as Record<string, unknown>) ?? {},
+      })
+      out.push(new ToolMessage({
+        content: result.content,
+        tool_call_id: result.tool_call_id,
+        name: result.name,
+      }))
     }
     // The Nth identical batch is executed too (keeps tool_calls↔ToolMessage valid); doom-loop is
     // detected post-execution from the trailing signature run.

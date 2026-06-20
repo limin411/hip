@@ -6,11 +6,13 @@ import type { TurnUsage, PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
+import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
 import type { ToolRunnerDeps } from './tool-runner/tool-runner.js'
 import type { ApprovalFn } from './tools.js'
+import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -34,6 +36,7 @@ export interface GraphCtx {
   sessionId?: string
   toolRunner?: ToolRunner
   toolPolicy?: ToolPolicy
+  selfGatedTools?: Set<string>
   approvalCache?: ApprovalCache
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
@@ -85,19 +88,19 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     if (ctx.toolRunner) return ctx.toolRunner
 
     const byName = new Map(ctx.tools.map((t) => [t.name, t]))
-    const deps: ToolRunnerDeps = {
+    ctx.toolRunner = new ToolRunner({
       tools: byName,
       hooks: ctx.hooks,
-      toolPolicy: ctx.toolPolicy ?? { classify: () => ({ risk: 'low', approval: 'auto_allow' }) },
+      toolPolicy: ctx.toolPolicy ?? defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS }),
       approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
-      selfGatedTools: new Set(),
+      selfGatedTools: ctx.selfGatedTools ?? SELF_GATED_TOOLS,
       permissionMode: ctx.permissionMode ?? 'edit',
       requestApproval: ctx.requestApproval,
       sessionId: ctx.sessionId ?? '',
       onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
       onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
-    }
-    return new ToolRunner(deps)
+    })
+    return ctx.toolRunner
   }
 
   async function toolsNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {

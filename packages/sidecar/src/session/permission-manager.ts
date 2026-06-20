@@ -27,9 +27,11 @@ export class PermissionManager {
     this.enableStickyApproval = opts.enableStickyApproval ?? false
   }
 
-  /** Set the per-conversation permission mode. */
+  /** Set the per-conversation permission mode. Clears sticky approval cache on change. */
   setPermissionMode(permissionMode: PermissionMode): boolean {
-    return this.setPermissionModeFn(permissionMode)
+    const changed = this.setPermissionModeFn(permissionMode)
+    if (changed) this.clearApprovedGrants()
+    return changed
   }
 
   /** Complete a pending external-agent permission request with the user's choice. */

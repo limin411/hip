@@ -70,7 +70,6 @@ export class ToolRunner {
       hooks,
       toolPolicy,
       approvalCache,
-      selfGatedTools,
       permissionMode,
       requestApproval,
       sessionId,
@@ -84,7 +83,9 @@ export class ToolRunner {
 
     // ── 2. Classify via ToolPolicy ─────────────────────────────────────────
     const classification = toolPolicy.classify(call.name, permissionMode)
-    this.deps.emitRisk?.(call.name, classification.risk, classification.approval)
+    if (classification.risk === 'medium' || classification.risk === 'high') {
+      this.deps.emitRisk?.(call.name, classification.risk, classification.approval)
+    }
 
     // ── 3. PreToolUse hooks ────────────────────────────────────────────────
     let invokeArgs = call.args
@@ -147,8 +148,8 @@ export class ToolRunner {
       }
 
       // Apply updatedInput from the hook (whether allow or ask-resolved-to-allow).
-      if (preResult.updatedInput) {
-        invokeArgs = preResult.updatedInput
+      if (preResult.updatedInput && typeof preResult.updatedInput === 'object' && !Array.isArray(preResult.updatedInput)) {
+        invokeArgs = preResult.updatedInput as Record<string, unknown>
       }
     }
 

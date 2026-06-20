@@ -55,6 +55,29 @@ function defaultReadProjectAgents(cwd: string): { profiles?: unknown[] } {
  * the profile is invalid. Invalid entries trigger a console warning with the
  * reason.
  */
+function validateToolArray(
+  raw: unknown,
+  profileId: string,
+  fieldName: 'allowedTools' | 'blockedTools',
+): string[] | null {
+  if (!Array.isArray(raw)) {
+    console.warn(`Invalid agent profile "${profileId}": ${fieldName} must be an array`)
+    return null
+  }
+  for (const t of raw) {
+    if (typeof t !== 'string' || !ALL_BUILTIN_TOOLS.includes(t)) {
+      console.warn(`Invalid agent profile "${profileId}": unknown tool "${String(t)}" in ${fieldName}`)
+      return null
+    }
+  }
+  return raw as string[]
+}
+
+/**
+ * Validate a raw profile object and return a typed AgentProfile, or null if
+ * the profile is invalid. Invalid entries trigger a console warning with the
+ * reason.
+ */
 function validateProfile(raw: unknown): AgentProfile | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     console.warn('Invalid agent profile: expected an object')
@@ -64,13 +87,11 @@ function validateProfile(raw: unknown): AgentProfile | null {
   const p = raw as Record<string, unknown>
   const id = p.id
 
-  // id must be a non-empty string
   if (typeof id !== 'string' || id.length === 0) {
     console.warn(`Invalid agent profile: id must be a non-empty string, got ${JSON.stringify(id)}`)
     return null
   }
 
-  // mode must be 'primary' | 'subagent'
   if (p.mode !== 'primary' && p.mode !== 'subagent') {
     console.warn(
       `Invalid agent profile "${id}": mode must be 'primary' | 'subagent', got ${JSON.stringify(p.mode)}`,
@@ -78,37 +99,11 @@ function validateProfile(raw: unknown): AgentProfile | null {
     return null
   }
 
-  // allowedTools, if present, must be an array of strings; every string must
-  // be a known built-in tool name.
-  if (p.allowedTools !== undefined) {
-    if (!Array.isArray(p.allowedTools)) {
-      console.warn(`Invalid agent profile "${id}": allowedTools must be an array`)
-      return null
-    }
-    for (const t of p.allowedTools) {
-      if (typeof t !== 'string' || !ALL_BUILTIN_TOOLS.includes(t)) {
-        console.warn(`Invalid agent profile "${id}": unknown tool "${String(t)}" in allowedTools`)
-        return null
-      }
-    }
-  }
+  const allowedTools = p.allowedTools !== undefined ? validateToolArray(p.allowedTools, id, 'allowedTools') : undefined
+  if (allowedTools === null) return null
+  const blockedTools = p.blockedTools !== undefined ? validateToolArray(p.blockedTools, id, 'blockedTools') : undefined
+  if (blockedTools === null) return null
 
-  // blockedTools, if present, must be an array of strings; every string must
-  // be a known built-in tool name.
-  if (p.blockedTools !== undefined) {
-    if (!Array.isArray(p.blockedTools)) {
-      console.warn(`Invalid agent profile "${id}": blockedTools must be an array`)
-      return null
-    }
-    for (const t of p.blockedTools) {
-      if (typeof t !== 'string' || !ALL_BUILTIN_TOOLS.includes(t)) {
-        console.warn(`Invalid agent profile "${id}": unknown tool "${String(t)}" in blockedTools`)
-        return null
-      }
-    }
-  }
-
-  // modelBinding, if present, must be an object with string providerID and modelID.
   if (p.modelBinding !== undefined && p.modelBinding !== null) {
     if (typeof p.modelBinding !== 'object' || Array.isArray(p.modelBinding)) {
       console.warn(`Invalid agent profile "${id}": modelBinding must be an object`)
@@ -131,12 +126,8 @@ function validateProfile(raw: unknown): AgentProfile | null {
     name: typeof p.name === 'string' && p.name.length > 0 ? p.name : id,
     mode: p.mode as 'primary' | 'subagent',
     ...(typeof p.description === 'string' ? { description: p.description } : {}),
-    ...(Array.isArray(p.allowedTools) && p.allowedTools.length > 0
-      ? { allowedTools: p.allowedTools as string[] }
-      : {}),
-    ...(Array.isArray(p.blockedTools) && p.blockedTools.length > 0
-      ? { blockedTools: p.blockedTools as string[] }
-      : {}),
+    ...(allowedTools && allowedTools.length > 0 ? { allowedTools } : {}),
+    ...(blockedTools && blockedTools.length > 0 ? { blockedTools } : {}),
     ...(p.modelBinding != null && typeof p.modelBinding === 'object' && !Array.isArray(p.modelBinding)
       ? { modelBinding: { providerID: (p.modelBinding as Record<string, string>).providerID, modelID: (p.modelBinding as Record<string, string>).modelID } }
       : {}),

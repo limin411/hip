@@ -39,11 +39,13 @@ function isTerminal(kind: string): boolean {
  * Terminal kinds (`deny`, `ask`) short-circuit immediately.
  * Non-terminal kinds (`allow`, `modify`, `continue`) continue to the next
  * hook, and the final result combines all outcomes:
+ * - Hooks are iterated in registration order; order matters for aggregation.
  * - `modifiedInput` from `modify` hooks is forwarded to subsequent hooks'
- *   toolInput context.
+ *   toolInput context. The last `modify` hook wins for the final result.
  * - `additionalContexts` from all hooks are concatenated.
  * - The final `kind` reflects the strongest non-terminal result seen:
  *   `continue` > `modify` > `allow`.
+ * - The final `reason` comes from the hook that set the strongest kind.
  * - The final `prompt` comes from the last `continue` response that provides one,
  *   falling back to earlier `continue` prompts.
  */
@@ -98,22 +100,22 @@ export class HookRegistry {
           }
         }
 
-        // Track the strongest non-terminal kind.
+        // Track the strongest non-terminal kind and keep the reason from the
+        // hook that set that kind.
         if (result.kind === 'continue') {
           strongestKind = 'continue'
           combinedPrompt = result.prompt ?? combinedPrompt
+          if (result.reason) combinedReason = result.reason
         } else if (result.kind === 'modify' && strongestKind !== 'continue') {
           strongestKind = 'modify'
+          if (result.reason) combinedReason = result.reason
+        } else if (result.kind === 'allow' && strongestKind === 'allow' && result.reason) {
+          combinedReason = result.reason
         }
 
         // Forward modifiedInput to subsequent hooks.
         if (result.kind === 'modify' && result.modifiedInput) {
           currentInput = result.modifiedInput
-        }
-
-        // Capture reason from the first non-trivial result.
-        if (result.reason && !combinedReason) {
-          combinedReason = result.reason
         }
       } catch (err) {
         if (err instanceof ReentrancyError) throw err

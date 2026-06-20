@@ -78,9 +78,14 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     const { runner, tools, emit, systemPrompt } = ctxOf(config)
-    const messages: BaseMessage[] = systemPrompt !== undefined && !(state.messages[0] instanceof SystemMessage && state.messages[0].content === systemPrompt)
-      ? [new SystemMessage(systemPrompt), ...state.messages]
-      : state.messages
+    const messages: BaseMessage[] = [...state.messages]
+    if (systemPrompt !== undefined) {
+      if (messages[0] instanceof SystemMessage) {
+        messages[0] = new SystemMessage(systemPrompt)
+      } else {
+        messages.unshift(new SystemMessage(systemPrompt))
+      }
+    }
     const capped = state.steps >= maxSteps - 1 // last allowed step: no tools, force text
     const msg = await runner.run(messages, {
       tools,
@@ -154,7 +159,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         name: result.name,
       }))
     }
-    const sig = sigOf(calls)
+    const sig = sigOf(last.tool_calls ?? [])
     return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
   }
 
@@ -179,7 +184,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     } else {
       messages.unshift(new SystemMessage(planPrompt))
     }
-    const itemId = `plan-${config.runId ?? Date.now()}`
+    const itemId = `plan-${config.runId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`
     const msg = await runner.run(messages, {
       tools,
       bindTools: true,

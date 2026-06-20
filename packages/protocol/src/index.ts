@@ -494,10 +494,10 @@ export type ServerMessage =
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
 
 export interface AgentProfileInfo {
-  id: string
-  name: string
-  description?: string
-  mode: 'primary' | 'subagent'
+  id: string;
+  name: string;
+  description?: string;
+  mode: 'primary' | 'subagent';
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -509,8 +509,18 @@ export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'Pre
 export type HookResult = {
   kind: 'allow' | 'deny' | 'ask' | 'modify' | 'continue'
   reason?: string
-  updatedInput?: Record<string, unknown>
+  /**
+   * Modified tool input. This is the canonical field for hooks with `kind: 'modify'`.
+   * When present, the runner invokes the tool with these arguments instead of the
+   * original input.
+   */
   modifiedInput?: Record<string, unknown>
+  /**
+   * Legacy alias for `modifiedInput`. Kept for backward compatibility with existing
+   * hooks; prefer `modifiedInput` for new code. If both are present, `modifiedInput`
+   * takes precedence.
+   */
+  updatedInput?: Record<string, unknown>
   prompt?: string
   additionalContexts?: string[]
 }

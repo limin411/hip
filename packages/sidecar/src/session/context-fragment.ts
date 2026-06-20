@@ -6,24 +6,19 @@ import type { SkillMeta } from '@hip/protocol'
 export interface FragmentState {
   /** Token budget pressure: 0..100 where 100 means nearly exhausted. */
   tokenBudgetPercent?: number
-  /** Whether the session currently has subagents (any state). */
-  hasSubagents?: boolean
   /** Subagents that are currently running. */
   pendingSubagents?: Array<{ id: string; description: string; status: 'running' | 'completed' | 'failed' }>
   /** Subagents that have already finished (completed or failed). */
   completedSubagents?: Array<{ id: string; description: string; status: 'running' | 'completed' | 'failed' }>
   /** Set of registered skills (id → metadata). */
   skills?: SkillMeta[]
-  /** Known MCP server names. */
-  mcpCatalog?: string[]
+  mcpCatalog?: string
   /** Current working directory. */
   cwd?: string
   /** Active permission mode. */
   permissionMode?: 'chat' | 'edit' | 'full'
   /** Per-conversation user instructions injected into the system message. */
   customSystemPrompt?: string
-  /** UI language. */
-  language?: 'en' | 'zh-CN' | 'zh-TW'
 }
 
 // ── Fragment ─────────────────────────────────────────────────────────────────

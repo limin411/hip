@@ -33,11 +33,10 @@ describe('SystemPromptFragment', () => {
     expect(text).toContain('NOT sandboxed')
   })
 
-  it('estimates tokens based on render length / 4', () => {
+  it('estimates tokens using a fixed baseline to avoid double-rendering', () => {
     const f = new SystemPromptFragment()
     const state: FragmentState = { cwd: '/test' }
-    const text = f.render(state)
-    expect(f.estimatedTokens(state)).toBe(Math.ceil(text.length / 4))
+    expect(f.estimatedTokens(state)).toBe(1200)
   })
 })
 

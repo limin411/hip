@@ -141,6 +141,18 @@ export class Session {
     })
   }
 
+  private loadSubagentMessages(taskId: string): BaseMessage[] {
+    if (!this.store) return []
+    try {
+      return this.store.getMessages(taskId).map((m) =>
+        m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content),
+      )
+    } catch (err) {
+      console.error(`Failed to load prior messages for subagent ${taskId}:`, err instanceof Error ? err.message : String(err))
+      return []
+    }
+  }
+
   registerHook(hook: Hook): void { this.hooks.register(hook) }
 
   constructor(
@@ -411,7 +423,7 @@ export class Session {
       customSystemPrompt: this._config.systemPrompt,
       skills,
       permissionMode: mode,
-      mcpCatalog: mcpManager.toolCatalog() ? [mcpManager.toolCatalog()] : undefined,
+      mcpCatalog: mcpManager.toolCatalog() || undefined,
       tokenBudgetPercent,
       pendingSubagents: this.backgroundTasks.size > 0
         ? [...this.backgroundTasks.keys()].map((id) => {
@@ -462,15 +474,7 @@ export class Session {
         this.backgroundTasks.set(childId, promise); return `Background task started: ${childId}`
       }
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
-      let existingMessages: BaseMessage[] | undefined
-      if (taskId && this.store) {
-        try {
-          existingMessages = this.store.getMessages(taskId).map((m) => m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
-        } catch (err) {
-          console.error(`Failed to load prior messages for subagent ${taskId}:`, err instanceof Error ? err.message : String(err))
-          existingMessages = undefined
-        }
-      }
+      const existingMessages = taskId ? this.loadSubagentMessages(taskId) : undefined
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
       const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text); return text
@@ -683,6 +687,7 @@ export class Session {
           await rename(tmpFile, filePath)
         } catch (err) {
           console.error('Failed to persist approved plan:', err instanceof Error ? err.message : String(err))
+          send({ type: 'agent:notification', sessionId: this.id, taskId: 'plan-persist', description: 'Plan was approved but could not be saved to disk.', status: 'failed' })
         }
         const base = {
           messages: this.paused.messages,
@@ -734,17 +739,7 @@ export class Session {
     if (!this.spawnedSubagentIds.has(taskId)) return
     this.running = true
 
-    let priorMessages: Message[] = []
-    if (this.store) {
-      try {
-        priorMessages = this.store.getMessages(taskId)
-      } catch (err) {
-        console.error(`Failed to load prior messages for subagent ${taskId}:`, err instanceof Error ? err.message : String(err))
-      }
-    }
-    const existingMessages: BaseMessage[] = priorMessages.map((m) =>
-      m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content),
-    )
+    const existingMessages = this.loadSubagentMessages(taskId)
 
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner()

@@ -15,11 +15,14 @@ export class SystemPromptFragment implements ContextFragment {
       userInstructions: state.customSystemPrompt,
       skills: state.skills,
       permissionMode: state.permissionMode,
-      mcpCatalog: state.mcpCatalog?.join('\n'),
+      mcpCatalog: state.mcpCatalog,
     })
   }
 
-  estimatedTokens(state: FragmentState): number {
-    return Math.ceil(this.render(state).length / 4)
+  estimatedTokens(_state: FragmentState): number {
+    // buildSystemPrompt can perform filesystem scans (skillsBlock uses globSync);
+    // avoid double-rendering by using a fixed baseline consistent with the
+    // typical system prompt size (~2-5k characters).
+    return 1200
   }
 }

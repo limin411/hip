@@ -1,4 +1,4 @@
-import type { ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
+import type { AgentProfileInfo, ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
 import { Session } from './session.js'
@@ -60,12 +60,25 @@ export class SessionManager {
       case 'message:resume':
         await this.ensureSession(msg.sessionId).resume(msg.content, send)
         break
+      case 'subagent:resume':
+        await this.ensureSession(msg.sessionId).resumeSubagent(msg.taskId, msg.message, send)
+        break
       case 'plan:respond':
         await this.ensureSession(msg.sessionId).handlePlanResponse(msg.action, send, msg.amendContent)
         break
       case 'agent:setConfigOption':
         await this.ensureSession(msg.sessionId).setAgentConfigOption(msg.configId, msg.value)
         break
+      case 'agent:setProfile': {
+        const s = this.ensureSession(msg.sessionId)
+        const ok = s.setAgentProfile(msg.id)
+        if (ok) {
+          send({ type: 'agent:profiles', sessionId: msg.sessionId, profiles: this.profileListFor(s) })
+        } else {
+          send({ type: 'error', sessionId: msg.sessionId, code: 'INVALID_PROFILE', message: 'Unknown agent profile id' })
+        }
+        break
+      }
       case 'permission:respond':
         this.sessions.get(msg.sessionId)?.respondPermission(msg.requestId, msg.cancelled ? { cancelled: true } : { optionId: msg.optionId! })
         break
@@ -330,6 +343,10 @@ export class SessionManager {
     const raw = this.store?.getSession(id)?.config
     if (!raw) return undefined
     try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
+  }
+
+  private profileListFor(session: Session): AgentProfileInfo[] {
+    return session.listProfiles().map((p) => ({ id: p.id, name: p.name, description: p.description, mode: p.mode }))
   }
 
   private async destroySession(id: string): Promise<void> {

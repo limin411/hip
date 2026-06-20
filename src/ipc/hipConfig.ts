@@ -29,5 +29,5 @@ export async function getHipConfig(): Promise<HipConfig> {
  * Throws on IPC failure so the caller can surface an error.
  */
 export async function setHipConfig(config: HipConfig): Promise<void> {
-  await invoke<void>('set_hip_config', { config })
+  await invoke<void>('set_hip_config', { json: JSON.stringify(config) })
 }

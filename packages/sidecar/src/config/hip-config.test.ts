@@ -143,6 +143,273 @@ enabled = true
 })
 
 // ──────────────────────────────────────────────────────────────
+// snake_case → camelCase normalization
+// ──────────────────────────────────────────────────────────────
+
+describe('snake_case TOML normalization', () => {
+  it('normalizes provider base_url and api_key to camelCase', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[providers]]
+id = "deepseek"
+name = "DeepSeek"
+base_url = "https://api.deepseek.com/v1"
+api_key = "sk-test"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.providers).toHaveLength(1)
+    expect(cfg.providers![0]).toMatchObject({
+      id: 'deepseek',
+      name: 'DeepSeek',
+      baseUrl: 'https://api.deepseek.com/v1',
+      apiKey: 'sk-test',
+    })
+  })
+
+  it('normalizes mcpServer enabled_tools and disabled_tools to camelCase', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[mcpServers]]
+id = "srv"
+name = "Test MCP"
+transport = "stdio"
+command = "npx"
+enabled_tools = ["read", "write"]
+disabled_tools = ["delete"]
+enabled = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.mcpServers).toHaveLength(1)
+    expect(cfg.mcpServers![0]).toMatchObject({
+      id: 'srv',
+      enabledTools: ['read', 'write'],
+      disabledTools: ['delete'],
+    })
+  })
+
+  it('normalizes agent bound_model, allowed_skills, allowed_mcp_servers, allowed_tools', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[agents]]
+id = "agent1"
+name = "Test Agent"
+kind = "internal"
+command = ""
+args = []
+bound_model = "deepseek-reasoner"
+allowed_skills = ["code-review"]
+allowed_mcp_servers = ["filesystem"]
+allowed_tools = ["read_file", "write_file"]
+enabled = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agents).toHaveLength(1)
+    expect(cfg.agents![0]).toMatchObject({
+      id: 'agent1',
+      boundModel: 'deepseek-reasoner',
+      allowedSkills: ['code-review'],
+      allowedMcpServers: ['filesystem'],
+      allowedTools: ['read_file', 'write_file'],
+    })
+  })
+
+  it('normalizes permission coarse_mode, tool_permissions, and nested default_mode', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[permissions]
+coarse_mode = "edit"
+[permissions.tool_permissions]
+default_mode = "ask"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.permissions).toMatchObject({
+      coarseMode: 'edit',
+      toolPermissions: {
+        defaultMode: 'ask',
+      },
+    })
+  })
+
+  it('accepts snake_case top-level key mcp_servers as alias for mcpServers', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[mcp_servers]]
+id = "srv"
+name = "Snake MCP"
+transport = "http"
+url = "https://example.test/mcp"
+enabled = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.mcpServers).toHaveLength(1)
+    expect(cfg.mcpServers![0]).toMatchObject({ id: 'srv', name: 'Snake MCP' })
+  })
+
+  it('camelCase TOML still works unchanged (backward compatibility)', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[providers]]
+id = "openai"
+name = "OpenAI"
+baseUrl = "https://api.openai.com/v1"
+apiKey = "sk-original"
+
+[[mcpServers]]
+id = "cam1"
+name = "Camel MCP"
+transport = "stdio"
+command = "cam-cmd"
+enabledTools = ["tool-a"]
+disabledTools = ["tool-b"]
+enabled = true
+
+[permissions]
+coarseMode = "full"
+toolPermissions = { defaultMode = "allow" }
+
+[[agents]]
+id = "ag-camel"
+name = "Camel Agent"
+kind = "internal"
+command = ""
+args = []
+boundModel = "gpt-4"
+allowedSkills = ["refactor"]
+allowedMcpServers = ["cam1"]
+enabled = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+
+    expect(cfg.providers![0]).toMatchObject({
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: 'sk-original',
+    })
+    expect(cfg.mcpServers![0]).toMatchObject({
+      enabledTools: ['tool-a'],
+      disabledTools: ['tool-b'],
+    })
+    expect(cfg.permissions).toMatchObject({
+      coarseMode: 'full',
+      toolPermissions: { defaultMode: 'allow' },
+    })
+    expect(cfg.agents![0]).toMatchObject({
+      boundModel: 'gpt-4',
+      allowedSkills: ['refactor'],
+      allowedMcpServers: ['cam1'],
+    })
+  })
+
+  it('when both camelCase and snake_case are present, camelCase wins', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[[providers]]
+id = "test"
+name = "Test"
+baseUrl = "https://camel.example.com"
+base_url = "https://snake.example.com"
+apiKey = "camel-key"
+api_key = "snake-key"
+
+[[mcpServers]]
+id = "both"
+name = "Both"
+transport = "http"
+url = "https://example.test/mcp"
+enabledTools = ["camel-tool"]
+enabled_tools = ["snake-tool"]
+enabled = true
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+
+    expect(cfg.providers![0]).toMatchObject({
+      baseUrl: 'https://camel.example.com',
+      apiKey: 'camel-key',
+    })
+    expect(cfg.mcpServers![0]).toMatchObject({
+      enabledTools: ['camel-tool'],
+    })
+  })
+
+  it('snake_case and camelCase TOML produce identical HipConfig objects', () => {
+    const dir = tmpDir()
+    const snakeFile = writeToml(dir, 'snake.toml', `version = 1
+[[providers]]
+id = "p1"
+name = "Provider"
+base_url = "https://api.test.com"
+api_key = "key-123"
+
+[[mcpServers]]
+id = "m1"
+name = "MCP"
+transport = "http"
+url = "https://mcp.test.com"
+enabled_tools = ["t1"]
+disabled_tools = ["t2"]
+enabled = true
+
+[[agents]]
+id = "a1"
+name = "Agent"
+kind = "internal"
+command = ""
+args = []
+bound_model = "model-1"
+allowed_skills = ["s1"]
+allowed_mcp_servers = ["m1"]
+enabled = true
+
+[permissions]
+coarse_mode = "edit"
+tool_permissions = { default_mode = "ask" }
+`)
+
+    const camelFile = writeToml(dir, 'camel.toml', `version = 1
+[[providers]]
+id = "p1"
+name = "Provider"
+baseUrl = "https://api.test.com"
+apiKey = "key-123"
+
+[[mcpServers]]
+id = "m1"
+name = "MCP"
+transport = "http"
+url = "https://mcp.test.com"
+enabledTools = ["t1"]
+disabledTools = ["t2"]
+enabled = true
+
+[[agents]]
+id = "a1"
+name = "Agent"
+kind = "internal"
+command = ""
+args = []
+boundModel = "model-1"
+allowedSkills = ["s1"]
+allowedMcpServers = ["m1"]
+enabled = true
+
+[permissions]
+coarseMode = "edit"
+toolPermissions = { defaultMode = "ask" }
+`)
+
+    const snakeCfg = readHipConfig(snakeFile)
+    const camelCfg = readHipConfig(camelFile)
+    expect(snakeCfg).toEqual(camelCfg)
+  })
+})
+
+// ──────────────────────────────────────────────────────────────
 // resolveEffectiveConfig
 // ──────────────────────────────────────────────────────────────
 

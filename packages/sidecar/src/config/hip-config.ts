@@ -17,6 +17,74 @@ import type {
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
 
+// ── Field-level normalization helpers ──────────────────────────────
+// TOML preserves snake_case keys as-is. These helpers copy snake_case
+// values to their camelCase counterparts before the object is cast to
+// the typed interface. Only copies when the camelCase field is unset,
+// so camelCase TOML files continue to work unchanged.
+// ────────────────────────────────────────────────────────────────────
+
+function normalizeProviderEntry(raw: Record<string, unknown>): ProviderEntry {
+  if (raw.base_url !== undefined && raw.baseUrl === undefined) {
+    raw.baseUrl = raw.base_url
+  }
+  if (raw.api_key !== undefined && raw.apiKey === undefined) {
+    raw.apiKey = raw.api_key
+  }
+  delete raw.base_url
+  delete raw.api_key
+  return raw as unknown as ProviderEntry
+}
+
+function normalizeMcpServerEntry(raw: Record<string, unknown>): McpServerConfig {
+  if (raw.enabled_tools !== undefined && raw.enabledTools === undefined) {
+    raw.enabledTools = raw.enabled_tools
+  }
+  if (raw.disabled_tools !== undefined && raw.disabledTools === undefined) {
+    raw.disabledTools = raw.disabled_tools
+  }
+  delete raw.enabled_tools
+  delete raw.disabled_tools
+  return raw as unknown as McpServerConfig
+}
+
+function normalizeAgentEntry(raw: Record<string, unknown>): AgentConfig {
+  if (raw.bound_model !== undefined && raw.boundModel === undefined) {
+    raw.boundModel = raw.bound_model
+  }
+  if (raw.allowed_skills !== undefined && raw.allowedSkills === undefined) {
+    raw.allowedSkills = raw.allowed_skills
+  }
+  if (raw.allowed_mcp_servers !== undefined && raw.allowedMcpServers === undefined) {
+    raw.allowedMcpServers = raw.allowed_mcp_servers
+  }
+  if (raw.allowed_tools !== undefined && raw.allowedTools === undefined) {
+    raw.allowedTools = raw.allowed_tools
+  }
+  delete raw.bound_model
+  delete raw.allowed_skills
+  delete raw.allowed_mcp_servers
+  delete raw.allowed_tools
+  return raw as unknown as AgentConfig
+}
+
+function normalizePermissionEntry(raw: Record<string, unknown>): PermissionEntry {
+  if (raw.coarse_mode !== undefined && raw.coarseMode === undefined) {
+    raw.coarseMode = raw.coarse_mode
+  }
+  if (raw.tool_permissions !== undefined && raw.toolPermissions === undefined) {
+    raw.toolPermissions = raw.tool_permissions
+  }
+  delete raw.coarse_mode
+  delete raw.tool_permissions
+  const tp = raw.toolPermissions as Record<string, unknown> | undefined
+  if (tp && tp.default_mode !== undefined && tp.defaultMode === undefined) {
+    tp.defaultMode = tp.default_mode
+  }
+  if (tp) delete tp.default_mode
+  return raw as unknown as PermissionEntry
+}
+
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
   if (!parsed || typeof parsed !== 'object') {
@@ -32,20 +100,29 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
 
   const config: HipConfig = { version: obj.version as number }
 
-  if (Array.isArray(obj.providers)) {
-    config.providers = obj.providers as ProviderEntry[]
+  // Accept both camelCase and snake_case top-level keys (Rust writes snake_case TOML)
+  const providers = obj.providers ?? obj.providers
+  if (Array.isArray(providers)) {
+    config.providers = (providers as Record<string, unknown>[]).map(normalizeProviderEntry)
   }
-  if (Array.isArray(obj.mcpServers)) {
-    config.mcpServers = obj.mcpServers as McpServerConfig[]
+
+  const mcpServers = obj.mcpServers ?? obj.mcp_servers
+  if (Array.isArray(mcpServers)) {
+    config.mcpServers = (mcpServers as Record<string, unknown>[]).map(normalizeMcpServerEntry)
   }
+
   if (Array.isArray(obj.skills)) {
     config.skills = obj.skills as SkillEntry[]
   }
-  if (Array.isArray(obj.agents)) {
-    config.agents = obj.agents as AgentConfig[]
+
+  const agents = obj.agents ?? obj.agents
+  if (Array.isArray(agents)) {
+    config.agents = (agents as Record<string, unknown>[]).map(normalizeAgentEntry)
   }
-  if (obj.permissions && typeof obj.permissions === 'object') {
-    config.permissions = obj.permissions as PermissionEntry
+
+  const permissions = obj.permissions ?? obj.permissions
+  if (permissions && typeof permissions === 'object') {
+    config.permissions = normalizePermissionEntry(permissions as Record<string, unknown>)
   }
 
   return config

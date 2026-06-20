@@ -141,6 +141,342 @@ struct HipConfig {
     permissions: Option<PermissionEntry>,
 }
 
+// ── Legacy JSON deletion result types ──
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct DeleteLegacySkip {
+    file: String,
+    reason: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct DeleteLegacyResult {
+    deleted: Vec<String>,
+    skipped: Vec<DeleteLegacySkip>,
+}
+
+// ── TOML mirror structs (snake_case with camelCase aliases for backward compat) ──
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlBoundModel {
+    #[serde(alias = "providerId")]
+    provider_id: String,
+    #[serde(alias = "modelId")]
+    model_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlProviderEntry {
+    id: String,
+    name: String,
+    #[serde(alias = "baseUrl")]
+    base_url: String,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "apiKey")]
+    api_key: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlMcpServerEntry {
+    id: String,
+    name: String,
+    transport: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    headers: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabledTools")]
+    enabled_tools: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "disabledTools")]
+    disabled_tools: Option<Vec<String>>,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlAgentEntry {
+    id: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    kind: String,
+    command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    args: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "boundModel")]
+    bound_model: Option<TomlBoundModel>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    quirks: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    env: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedTools")]
+    allowed_tools: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedSkills")]
+    allowed_skills: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedMcpServers")]
+    allowed_mcp_servers: Option<Vec<String>>,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlSkillEntry {
+    id: String,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlToolPermissionConfig {
+    #[serde(alias = "defaultMode")]
+    default_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    overrides: Option<HashMap<String, String>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlPermissionEntry {
+    #[serde(alias = "coarseMode")]
+    coarse_mode: String,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "toolPermissions")]
+    tool_permissions: Option<TomlToolPermissionConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+struct TomlHipConfig {
+    version: u32,
+    #[serde(default)]
+    providers: Vec<TomlProviderEntry>,
+    #[serde(default, alias = "mcpServers")]
+    mcp_servers: Vec<TomlMcpServerEntry>,
+    #[serde(default)]
+    skills: Vec<TomlSkillEntry>,
+    #[serde(default)]
+    agents: Vec<TomlAgentEntry>,
+    #[serde(default)]
+    permissions: Option<TomlPermissionEntry>,
+}
+
+// ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
+
+impl From<BoundModel> for TomlBoundModel {
+    fn from(b: BoundModel) -> Self {
+        TomlBoundModel {
+            provider_id: b.provider_id,
+            model_id: b.model_id,
+        }
+    }
+}
+
+impl From<TomlBoundModel> for BoundModel {
+    fn from(b: TomlBoundModel) -> Self {
+        BoundModel {
+            provider_id: b.provider_id,
+            model_id: b.model_id,
+        }
+    }
+}
+
+impl From<ProviderEntry> for TomlProviderEntry {
+    fn from(p: ProviderEntry) -> Self {
+        TomlProviderEntry {
+            id: p.id,
+            name: p.name,
+            base_url: p.base_url,
+            api_key: p.api_key,
+        }
+    }
+}
+
+impl From<TomlProviderEntry> for ProviderEntry {
+    fn from(p: TomlProviderEntry) -> Self {
+        ProviderEntry {
+            id: p.id,
+            name: p.name,
+            base_url: p.base_url,
+            api_key: p.api_key,
+        }
+    }
+}
+
+impl From<McpServerEntry> for TomlMcpServerEntry {
+    fn from(s: McpServerEntry) -> Self {
+        TomlMcpServerEntry {
+            id: s.id,
+            name: s.name,
+            transport: s.transport,
+            command: s.command,
+            args: s.args,
+            env: s.env,
+            url: s.url,
+            headers: s.headers,
+            enabled_tools: s.enabled_tools,
+            disabled_tools: s.disabled_tools,
+            enabled: s.enabled,
+        }
+    }
+}
+
+impl From<TomlMcpServerEntry> for McpServerEntry {
+    fn from(s: TomlMcpServerEntry) -> Self {
+        McpServerEntry {
+            id: s.id,
+            name: s.name,
+            transport: s.transport,
+            command: s.command,
+            args: s.args,
+            env: s.env,
+            url: s.url,
+            headers: s.headers,
+            enabled_tools: s.enabled_tools,
+            disabled_tools: s.disabled_tools,
+            enabled: s.enabled,
+        }
+    }
+}
+
+impl From<AgentEntry> for TomlAgentEntry {
+    fn from(a: AgentEntry) -> Self {
+        TomlAgentEntry {
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            kind: a.kind,
+            command: a.command,
+            args: a.args,
+            bound_model: a.bound_model.map(|x| x.into()),
+            quirks: a.quirks,
+            env: a.env,
+            prompt: a.prompt,
+            allowed_tools: a.allowed_tools,
+            allowed_skills: a.allowed_skills,
+            allowed_mcp_servers: a.allowed_mcp_servers,
+            enabled: a.enabled,
+        }
+    }
+}
+
+impl From<TomlAgentEntry> for AgentEntry {
+    fn from(a: TomlAgentEntry) -> Self {
+        AgentEntry {
+            id: a.id,
+            name: a.name,
+            description: a.description,
+            kind: a.kind,
+            command: a.command,
+            args: a.args,
+            bound_model: a.bound_model.map(|x| x.into()),
+            quirks: a.quirks,
+            env: a.env,
+            prompt: a.prompt,
+            allowed_tools: a.allowed_tools,
+            allowed_skills: a.allowed_skills,
+            allowed_mcp_servers: a.allowed_mcp_servers,
+            enabled: a.enabled,
+        }
+    }
+}
+
+impl From<SkillEntry> for TomlSkillEntry {
+    fn from(s: SkillEntry) -> Self {
+        TomlSkillEntry {
+            id: s.id,
+            enabled: s.enabled,
+        }
+    }
+}
+
+impl From<TomlSkillEntry> for SkillEntry {
+    fn from(s: TomlSkillEntry) -> Self {
+        SkillEntry {
+            id: s.id,
+            enabled: s.enabled,
+        }
+    }
+}
+
+impl From<ToolPermissionConfig> for TomlToolPermissionConfig {
+    fn from(t: ToolPermissionConfig) -> Self {
+        TomlToolPermissionConfig {
+            default_mode: t.default_mode,
+            overrides: t.overrides,
+        }
+    }
+}
+
+impl From<TomlToolPermissionConfig> for ToolPermissionConfig {
+    fn from(t: TomlToolPermissionConfig) -> Self {
+        ToolPermissionConfig {
+            default_mode: t.default_mode,
+            overrides: t.overrides,
+        }
+    }
+}
+
+impl From<PermissionEntry> for TomlPermissionEntry {
+    fn from(p: PermissionEntry) -> Self {
+        TomlPermissionEntry {
+            coarse_mode: p.coarse_mode,
+            tool_permissions: p.tool_permissions.map(|x| x.into()),
+        }
+    }
+}
+
+impl From<TomlPermissionEntry> for PermissionEntry {
+    fn from(p: TomlPermissionEntry) -> Self {
+        PermissionEntry {
+            coarse_mode: p.coarse_mode,
+            tool_permissions: p.tool_permissions.map(|x| x.into()),
+        }
+    }
+}
+
+impl From<HipConfig> for TomlHipConfig {
+    fn from(cfg: HipConfig) -> Self {
+        TomlHipConfig {
+            version: cfg.version,
+            providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
+            mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
+            skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
+            agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
+            permissions: cfg.permissions.map(|x| x.into()),
+        }
+    }
+}
+
+impl From<TomlHipConfig> for HipConfig {
+    fn from(cfg: TomlHipConfig) -> Self {
+        HipConfig {
+            version: cfg.version,
+            providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
+            mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
+            skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
+            agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
+            permissions: cfg.permissions.map(|x| x.into()),
+        }
+    }
+}
+
 // ── Legacy JSON deserialization helpers (read-only migration) ──
 
 #[derive(Deserialize)]
@@ -269,19 +605,18 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
     let path = paths::hip_config_path(&app).ok_or("no config dir")?;
     match std::fs::read_to_string(&path) {
         Ok(raw) => {
-            let cfg: HipConfig =
+            let toml_cfg: TomlHipConfig =
                 toml::from_str(&raw).map_err(|e| format!("TOML parse error: {e}"))?;
+            let cfg: HipConfig = toml_cfg.into();
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let cfg = HipConfig {
-                version: 1,
-                providers: vec![],
-                mcp_servers: vec![],
-                skills: vec![],
-                agents: vec![],
-                permissions: None,
-            };
+            let cfg = from_legacy_json(&app);
+            // One-time auto-migration: write TOML for future reads
+            let toml_cfg: TomlHipConfig = cfg.clone().into();
+            let toml_str = toml::to_string_pretty(&toml_cfg)
+                .map_err(|e| format!("TOML serialize error: {e}"))?;
+            std::fs::write(&path, toml_str).map_err(|e| e.to_string())?;
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
         Err(e) => Err(e.to_string()),
@@ -292,10 +627,150 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
 fn set_hip_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
     let cfg: HipConfig =
         serde_json::from_str(&json).map_err(|e| format!("JSON parse error: {e}"))?;
+    let toml_cfg: TomlHipConfig = cfg.into();
     let toml_str =
-        toml::to_string_pretty(&cfg).map_err(|e| format!("TOML serialize error: {e}"))?;
+        toml::to_string_pretty(&toml_cfg).map_err(|e| format!("TOML serialize error: {e}"))?;
     let path = paths::hip_config_path(&app).ok_or("no config dir")?;
     std::fs::write(&path, toml_str).map_err(|e| e.to_string())
+}
+
+/// Pure logic for deleting legacy JSON config files when TOML is complete.
+/// Takes explicit paths so it can be unit-tested without an AppHandle.
+fn delete_legacy_json_core(
+    toml_path: Option<&std::path::Path>,
+    legacy_files: &[(&str, Option<&std::path::Path>)],
+) -> DeleteLegacyResult {
+    // ── Step 1: Read and parse hip.toml ──
+    let toml_path = match toml_path {
+        Some(p) => p,
+        None => {
+            return DeleteLegacyResult {
+                deleted: vec![],
+                skipped: legacy_files
+                    .iter()
+                    .map(|(name, _)| DeleteLegacySkip {
+                        file: name.to_string(),
+                        reason: "no config directory available".to_string(),
+                    })
+                    .collect(),
+            };
+        }
+    };
+
+    let toml_str = match std::fs::read_to_string(toml_path) {
+        Ok(s) => s,
+        Err(e) => {
+            return DeleteLegacyResult {
+                deleted: vec![],
+                skipped: legacy_files
+                    .iter()
+                    .map(|(name, _)| DeleteLegacySkip {
+                        file: name.to_string(),
+                        reason: format!("cannot read hip.toml: {e}"),
+                    })
+                    .collect(),
+            };
+        }
+    };
+
+    let cfg: TomlHipConfig = match toml::from_str(&toml_str) {
+        Ok(c) => c,
+        Err(e) => {
+            return DeleteLegacyResult {
+                deleted: vec![],
+                skipped: legacy_files
+                    .iter()
+                    .map(|(name, _)| DeleteLegacySkip {
+                        file: name.to_string(),
+                        reason: format!("cannot parse hip.toml: {e}"),
+                    })
+                    .collect(),
+            };
+        }
+    };
+
+    // ── Step 2: Safety gate — all 4 sections must be non-empty ──
+    let mut empty_sections: Vec<&str> = Vec::new();
+    if cfg.providers.is_empty() {
+        empty_sections.push("providers");
+    }
+    if cfg.mcp_servers.is_empty() {
+        empty_sections.push("mcp_servers");
+    }
+    if cfg.skills.is_empty() {
+        empty_sections.push("skills");
+    }
+    if cfg.agents.is_empty() {
+        empty_sections.push("agents");
+    }
+
+    if !empty_sections.is_empty() {
+        let reason = format!(
+            "safety gate: section(s) {} empty in hip.toml",
+            empty_sections.join(", ")
+        );
+        return DeleteLegacyResult {
+            deleted: vec![],
+            skipped: legacy_files
+                .iter()
+                .map(|(name, _)| DeleteLegacySkip {
+                    file: name.to_string(),
+                    reason: reason.clone(),
+                })
+                .collect(),
+        };
+    }
+
+    // ── Step 3: All checks passed — delete the legacy JSON files ──
+    let mut deleted = Vec::new();
+    let mut skipped = Vec::new();
+
+    for (name, path_opt) in legacy_files {
+        match path_opt {
+            Some(p) if p.exists() => match std::fs::remove_file(p) {
+                Ok(()) => deleted.push(name.to_string()),
+                Err(e) => skipped.push(DeleteLegacySkip {
+                    file: name.to_string(),
+                    reason: format!("failed to delete: {e}"),
+                }),
+            },
+            Some(_) => skipped.push(DeleteLegacySkip {
+                file: name.to_string(),
+                reason: "file does not exist".to_string(),
+            }),
+            None => skipped.push(DeleteLegacySkip {
+                file: name.to_string(),
+                reason: "cannot determine config directory".to_string(),
+            }),
+        }
+    }
+
+    DeleteLegacyResult { deleted, skipped }
+}
+
+/// Safety-gated legacy JSON deletion. Only deletes when hip.toml has all 4
+/// non-empty array sections (providers, mcp_servers, skills, agents).
+/// Never touches auth.json or hip-plugins.json.
+fn delete_legacy_json_if_config_complete(app: &tauri::AppHandle) -> DeleteLegacyResult {
+    let toml = paths::hip_config_path(app);
+    let prov = paths::providers_config_path(app);
+    let mcp = paths::mcp_servers_config_path(app);
+    let agt = paths::agents_config_path(app);
+    let skl = paths::skills_config_path(app);
+
+    let files: [(&str, Option<&std::path::Path>); 4] = [
+        ("hip-providers.json", prov.as_deref()),
+        ("hip-mcp-servers.json", mcp.as_deref()),
+        ("hip-agents.json", agt.as_deref()),
+        ("hip-skills.json", skl.as_deref()),
+    ];
+
+    delete_legacy_json_core(toml.as_deref(), &files)
+}
+
+#[tauri::command]
+fn delete_legacy_json(app: tauri::AppHandle) -> Result<DeleteLegacyResult, String> {
+    Ok(delete_legacy_json_if_config_complete(&app))
 }
 
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
@@ -726,7 +1201,8 @@ pub fn run() {
             install_plugin,
             delete_plugin,
             list_worktrees,
-            which_binaries
+            which_binaries,
+            delete_legacy_json
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -842,8 +1318,12 @@ mod tests {
     fn toml_roundtrip_preserves_all_sections() {
         let cfg = sample_config();
 
-        let toml_str = toml::to_string_pretty(&cfg).unwrap();
-        let from_toml: super::HipConfig = toml::from_str(&toml_str).unwrap();
+        let toml_cfg: super::TomlHipConfig = cfg.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(toml_str.contains("mcp_servers"), "TOML should use snake_case keys");
+        assert!(!toml_str.contains("mcpServers"), "TOML should not contain camelCase keys");
+        let from_toml_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let from_toml: super::HipConfig = from_toml_toml.into();
 
         assert_eq!(from_toml.version, 1);
         assert_eq!(from_toml.providers.len(), 1);
@@ -872,13 +1352,371 @@ mod tests {
         let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(from_json.providers[0].id, "openai");
 
-        let toml_str = toml::to_string_pretty(&from_json).unwrap();
-        let from_toml: super::HipConfig = toml::from_str(&toml_str).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(toml_str.contains("mcp_servers"), "TOML should use snake_case keys");
+        assert!(!toml_str.contains("mcpServers"), "TOML should not contain camelCase keys");
+        let from_toml_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let from_toml: super::HipConfig = from_toml_toml.into();
 
         let json2 = serde_json::to_string(&from_toml).unwrap();
         let from_json2: super::HipConfig = serde_json::from_str(&json2).unwrap();
         assert_eq!(from_json2.version, 1);
         assert_eq!(from_json2.mcp_servers[0].id, "srv-1");
+    }
+
+    #[test]
+    fn legacy_to_toml_roundtrip_preserves_all_fields() {
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![
+                super::ProviderEntry {
+                    id: "openai".into(),
+                    name: "OpenAI".into(),
+                    base_url: "https://api.openai.com/v1".into(),
+                    api_key: Some("sk-openai".into()),
+                },
+                super::ProviderEntry {
+                    id: "anthropic".into(),
+                    name: "Anthropic".into(),
+                    base_url: "https://api.anthropic.com".into(),
+                    api_key: Some("sk-ant".into()),
+                },
+            ],
+            agents: vec![
+                super::AgentEntry {
+                    id: "assistant".into(),
+                    name: "Assistant".into(),
+                    description: None,
+                    kind: "internal".into(),
+                    command: "".into(),
+                    args: vec![],
+                    bound_model: None,
+                    quirks: None,
+                    env: None,
+                    prompt: Some("You are a helpful assistant.".into()),
+                    allowed_tools: None,
+                    allowed_skills: None,
+                    allowed_mcp_servers: None,
+                    enabled: true,
+                },
+                super::AgentEntry {
+                    id: "coder".into(),
+                    name: "Coder".into(),
+                    description: None,
+                    kind: "external".into(),
+                    command: "codex".into(),
+                    args: vec!["--model".into(), "gpt-5".into()],
+                    bound_model: None,
+                    quirks: None,
+                    env: None,
+                    prompt: Some("Write code.".into()),
+                    allowed_tools: None,
+                    allowed_skills: None,
+                    allowed_mcp_servers: None,
+                    enabled: true,
+                },
+            ],
+            mcp_servers: vec![
+                super::McpServerEntry {
+                    id: "filesystem".into(),
+                    name: "Filesystem".into(),
+                    transport: "stdio".into(),
+                    command: Some("npx".into()),
+                    args: vec!["-y".into(), "@modelcontextprotocol/server-filesystem".into()],
+                    env: None,
+                    url: None,
+                    headers: None,
+                    enabled_tools: None,
+                    disabled_tools: None,
+                    enabled: true,
+                },
+                super::McpServerEntry {
+                    id: "github".into(),
+                    name: "GitHub".into(),
+                    transport: "stdio".into(),
+                    command: Some("npx".into()),
+                    args: vec!["-y".into(), "@modelcontextprotocol/server-github".into()],
+                    env: None,
+                    url: None,
+                    headers: None,
+                    enabled_tools: None,
+                    disabled_tools: None,
+                    enabled: false,
+                },
+            ],
+            skills: vec![
+                super::SkillEntry { id: "pdf-tools".into(), enabled: true },
+                super::SkillEntry { id: "image-gen".into(), enabled: false },
+            ],
+            permissions: Some(super::PermissionEntry {
+                coarse_mode: "allow".into(),
+                tool_permissions: None,
+            }),
+        };
+
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        let from_toml: super::HipConfig = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(from_toml.version, 1);
+
+        assert_eq!(from_toml.providers.len(), 2);
+        assert_eq!(from_toml.providers[0].id, "openai");
+        assert_eq!(from_toml.providers[0].name, "OpenAI");
+        assert_eq!(from_toml.providers[0].base_url, "https://api.openai.com/v1");
+        assert_eq!(from_toml.providers[0].api_key.as_deref(), Some("sk-openai"));
+        assert_eq!(from_toml.providers[1].id, "anthropic");
+        assert_eq!(from_toml.providers[1].name, "Anthropic");
+        assert_eq!(from_toml.providers[1].base_url, "https://api.anthropic.com");
+        assert_eq!(from_toml.providers[1].api_key.as_deref(), Some("sk-ant"));
+
+        assert_eq!(from_toml.agents.len(), 2);
+        assert_eq!(from_toml.agents[0].id, "assistant");
+        assert_eq!(from_toml.agents[0].name, "Assistant");
+        assert_eq!(from_toml.agents[0].kind, "internal");
+        assert_eq!(from_toml.agents[0].command, "");
+        assert!(from_toml.agents[0].enabled);
+        assert_eq!(from_toml.agents[1].id, "coder");
+        assert_eq!(from_toml.agents[1].name, "Coder");
+        assert_eq!(from_toml.agents[1].kind, "external");
+        assert_eq!(from_toml.agents[1].command, "codex");
+        assert!(from_toml.agents[1].enabled);
+
+        assert_eq!(from_toml.mcp_servers.len(), 2);
+        assert_eq!(from_toml.mcp_servers[0].id, "filesystem");
+        assert_eq!(from_toml.mcp_servers[0].name, "Filesystem");
+        assert_eq!(from_toml.mcp_servers[0].transport, "stdio");
+        assert!(from_toml.mcp_servers[0].enabled);
+        assert_eq!(from_toml.mcp_servers[1].id, "github");
+        assert_eq!(from_toml.mcp_servers[1].name, "GitHub");
+        assert_eq!(from_toml.mcp_servers[1].transport, "stdio");
+        assert!(!from_toml.mcp_servers[1].enabled);
+
+        assert_eq!(from_toml.skills.len(), 2);
+        assert_eq!(from_toml.skills[0].id, "pdf-tools");
+        assert!(from_toml.skills[0].enabled);
+        assert_eq!(from_toml.skills[1].id, "image-gen");
+        assert!(!from_toml.skills[1].enabled);
+
+        assert_eq!(
+            from_toml.permissions.as_ref().unwrap().coarse_mode,
+            "allow"
+        );
+
+        let json1 = serde_json::to_string(&cfg).unwrap();
+        let from_json: super::HipConfig = serde_json::from_str(&json1).unwrap();
+        let toml2 = toml::to_string_pretty(&from_json).unwrap();
+        let from_toml2: super::HipConfig = toml::from_str(&toml2).unwrap();
+        let json2 = serde_json::to_string(&from_toml2).unwrap();
+        assert_eq!(json1, json2);
+    }
+
+    #[test]
+    fn toml_mirror_roundtrip_preserves_all_fields() {
+        let cfg = super::TomlHipConfig {
+            version: 1,
+            providers: vec![
+                super::TomlProviderEntry {
+                    id: "openai".into(),
+                    name: "OpenAI".into(),
+                    base_url: "https://api.openai.com/v1".into(),
+                    api_key: Some("sk-test-openai".into()),
+                },
+                super::TomlProviderEntry {
+                    id: "deepseek".into(),
+                    name: "DeepSeek".into(),
+                    base_url: "https://api.deepseek.com/v1".into(),
+                    api_key: Some("sk-test-deepseek".into()),
+                },
+            ],
+            mcp_servers: vec![
+                super::TomlMcpServerEntry {
+                    id: "filesystem".into(),
+                    name: "Filesystem".into(),
+                    transport: "stdio".into(),
+                    command: Some("npx".into()),
+                    args: vec!["-y".into(), "@modelcontextprotocol/server-filesystem".into()],
+                    env: None,
+                    url: None,
+                    headers: None,
+                    enabled_tools: Some(vec!["read_file".into(), "write_file".into()]),
+                    disabled_tools: None,
+                    enabled: true,
+                },
+                super::TomlMcpServerEntry {
+                    id: "github".into(),
+                    name: "GitHub".into(),
+                    transport: "stdio".into(),
+                    command: Some("npx".into()),
+                    args: vec!["-y".into(), "@modelcontextprotocol/server-github".into()],
+                    env: Some({
+                        let mut m = std::collections::HashMap::new();
+                        m.insert("GITHUB_TOKEN".into(), "ghp-test123".into());
+                        m
+                    }),
+                    url: None,
+                    headers: None,
+                    enabled_tools: None,
+                    disabled_tools: Some(vec!["delete_repo".into()]),
+                    enabled: true,
+                },
+            ],
+            skills: vec![
+                super::TomlSkillEntry { id: "pdf-tools".into(), enabled: true },
+                super::TomlSkillEntry { id: "image-gen".into(), enabled: false },
+            ],
+            agents: vec![
+                super::TomlAgentEntry {
+                    id: "explorer".into(),
+                    name: "Explorer".into(),
+                    description: Some("Explores and answers questions about the codebase".into()),
+                    kind: "internal".into(),
+                    command: "".into(),
+                    args: vec![],
+                    bound_model: Some(super::TomlBoundModel {
+                        provider_id: "deepseek".into(),
+                        model_id: "deepseek-chat".into(),
+                    }),
+                    quirks: None,
+                    env: None,
+                    prompt: Some("You are a codebase explorer.".into()),
+                    allowed_tools: Some(vec!["read".into(), "grep".into(), "glob".into()]),
+                    allowed_skills: Some(vec!["ast-grep".into()]),
+                    allowed_mcp_servers: Some(vec!["filesystem".into()]),
+                    enabled: true,
+                },
+                super::TomlAgentEntry {
+                    id: "coder".into(),
+                    name: "Coder".into(),
+                    description: None,
+                    kind: "external".into(),
+                    command: "codex".into(),
+                    args: vec!["--model".into(), "gpt-5".into()],
+                    bound_model: None,
+                    quirks: Some("must-use-yolo-mode".into()),
+                    env: Some({
+                        let mut m = std::collections::HashMap::new();
+                        m.insert("NODE_ENV".into(), "production".into());
+                        m
+                    }),
+                    prompt: None,
+                    allowed_tools: None,
+                    allowed_skills: None,
+                    allowed_mcp_servers: None,
+                    enabled: false,
+                },
+            ],
+            permissions: Some(super::TomlPermissionEntry {
+                coarse_mode: "allow".into(),
+                tool_permissions: Some(super::TomlToolPermissionConfig {
+                    default_mode: "ask".into(),
+                    overrides: Some({
+                        let mut m = std::collections::HashMap::new();
+                        m.insert("bash".into(), "allow".into());
+                        m.insert("write".into(), "deny".into());
+                        m
+                    }),
+                }),
+            }),
+        };
+
+        let toml_str = toml::to_string_pretty(&cfg).unwrap();
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+
+        assert_eq!(from_toml.version, 1);
+
+        // providers
+        assert_eq!(from_toml.providers.len(), 2);
+        assert_eq!(from_toml.providers[0].id, "openai");
+        assert_eq!(from_toml.providers[0].name, "OpenAI");
+        assert_eq!(from_toml.providers[0].base_url, "https://api.openai.com/v1");
+        assert_eq!(from_toml.providers[0].api_key.as_deref(), Some("sk-test-openai"));
+        assert_eq!(from_toml.providers[1].id, "deepseek");
+        assert_eq!(from_toml.providers[1].name, "DeepSeek");
+        assert_eq!(from_toml.providers[1].base_url, "https://api.deepseek.com/v1");
+        assert_eq!(from_toml.providers[1].api_key.as_deref(), Some("sk-test-deepseek"));
+
+        // mcp_servers
+        assert_eq!(from_toml.mcp_servers.len(), 2);
+        assert_eq!(from_toml.mcp_servers[0].id, "filesystem");
+        assert_eq!(from_toml.mcp_servers[0].name, "Filesystem");
+        assert_eq!(from_toml.mcp_servers[0].transport, "stdio");
+        assert_eq!(from_toml.mcp_servers[0].command.as_deref(), Some("npx"));
+        assert_eq!(
+            from_toml.mcp_servers[0].args,
+            vec!["-y".to_string(), "@modelcontextprotocol/server-filesystem".to_string()]
+        );
+        assert!(from_toml.mcp_servers[0].enabled);
+        assert_eq!(
+            from_toml.mcp_servers[0].enabled_tools.as_deref(),
+            Some(&["read_file".to_string(), "write_file".to_string()][..])
+        );
+        assert_eq!(from_toml.mcp_servers[1].id, "github");
+        assert_eq!(from_toml.mcp_servers[1].name, "GitHub");
+        assert_eq!(
+            from_toml.mcp_servers[1].disabled_tools.as_deref(),
+            Some(&["delete_repo".to_string()][..])
+        );
+        let github_env = from_toml.mcp_servers[1].env.as_ref().unwrap();
+        assert_eq!(github_env.get("GITHUB_TOKEN").map(String::as_str), Some("ghp-test123"));
+
+        // skills
+        assert_eq!(from_toml.skills.len(), 2);
+        assert_eq!(from_toml.skills[0].id, "pdf-tools");
+        assert!(from_toml.skills[0].enabled);
+        assert_eq!(from_toml.skills[1].id, "image-gen");
+        assert!(!from_toml.skills[1].enabled);
+
+        // agents
+        assert_eq!(from_toml.agents.len(), 2);
+        assert_eq!(from_toml.agents[0].id, "explorer");
+        assert_eq!(from_toml.agents[0].name, "Explorer");
+        assert_eq!(
+            from_toml.agents[0].description.as_deref(),
+            Some("Explores and answers questions about the codebase")
+        );
+        assert_eq!(from_toml.agents[0].kind, "internal");
+        assert_eq!(from_toml.agents[0].command, "");
+        assert!(from_toml.agents[0].args.is_empty());
+        assert!(from_toml.agents[0].enabled);
+        let bm = from_toml.agents[0].bound_model.as_ref().unwrap();
+        assert_eq!(bm.provider_id, "deepseek");
+        assert_eq!(bm.model_id, "deepseek-chat");
+        assert_eq!(from_toml.agents[0].prompt.as_deref(), Some("You are a codebase explorer."));
+        assert_eq!(
+            from_toml.agents[0].allowed_tools.as_deref(),
+            Some(&["read".to_string(), "grep".to_string(), "glob".to_string()][..])
+        );
+        assert_eq!(
+            from_toml.agents[0].allowed_skills.as_deref(),
+            Some(&["ast-grep".to_string()][..])
+        );
+        assert_eq!(
+            from_toml.agents[0].allowed_mcp_servers.as_deref(),
+            Some(&["filesystem".to_string()][..])
+        );
+        assert_eq!(from_toml.agents[1].id, "coder");
+        assert_eq!(from_toml.agents[1].name, "Coder");
+        assert_eq!(from_toml.agents[1].kind, "external");
+        assert_eq!(from_toml.agents[1].command, "codex");
+        assert_eq!(
+            from_toml.agents[1].args,
+            vec!["--model".to_string(), "gpt-5".to_string()]
+        );
+        assert!(from_toml.agents[1].bound_model.is_none());
+        assert_eq!(from_toml.agents[1].quirks.as_deref(), Some("must-use-yolo-mode"));
+        let coder_env = from_toml.agents[1].env.as_ref().unwrap();
+        assert_eq!(coder_env.get("NODE_ENV").map(String::as_str), Some("production"));
+        assert!(!from_toml.agents[1].enabled);
+
+        // permissions
+        let perms = from_toml.permissions.as_ref().unwrap();
+        assert_eq!(perms.coarse_mode, "allow");
+        let tp = perms.tool_permissions.as_ref().unwrap();
+        assert_eq!(tp.default_mode, "ask");
+        let overrides = tp.overrides.as_ref().unwrap();
+        assert_eq!(overrides.get("bash").map(String::as_str), Some("allow"));
+        assert_eq!(overrides.get("write").map(String::as_str), Some("deny"));
     }
 
     #[test]
@@ -1069,5 +1907,359 @@ mod tests {
         assert!(cfg.skills.is_empty());
         assert!(cfg.agents.is_empty());
         assert!(cfg.permissions.is_none());
+    }
+
+    #[test]
+    fn legacy_fallback_returns_merged_config_when_toml_missing() {
+        // Simulate: hip.toml is missing, but legacy JSON files exist.
+        // Test that we can parse legacy providers and agents separately,
+        // then assemble a HipConfig that a caller could use (round-trip).
+
+        // ── Parse legacy providers JSON ──
+        let providers_json = r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"},"disabled-one":{"enabled":false,"baseURL":"https://x.com"}}}"#;
+        let legacy_p: super::LegacyProvidersConfig =
+            serde_json::from_str(providers_json).unwrap();
+        assert_eq!(legacy_p.providers.len(), 2);
+        assert!(legacy_p.providers.contains_key("openai"));
+        assert!(legacy_p.providers.contains_key("disabled-one"));
+
+        let providers: Vec<super::ProviderEntry> = legacy_p
+            .providers
+            .into_iter()
+            .filter(|(_, v)| v.enabled)
+            .map(|(id, v)| super::ProviderEntry {
+                id: id.clone(),
+                name: id,
+                base_url: v.base_url.unwrap_or_default(),
+                api_key: None,
+            })
+            .collect();
+        assert_eq!(providers.len(), 1);
+        assert_eq!(providers[0].id, "openai");
+        assert_eq!(providers[0].base_url, "https://api.openai.com/v1");
+
+        // ── Parse legacy agents JSON ──
+        let agents_json = r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."},{"id":"reviewer","name":"Reviewer","kind":"internal","command":"","args":[],"enabled":false,"prompt":"Review code."}]}"#;
+        let legacy_a: super::LegacyAgentsConfig =
+            serde_json::from_str(agents_json).unwrap();
+        assert_eq!(legacy_a.agents.len(), 2);
+        assert_eq!(legacy_a.agents[0].id, "helper");
+        assert!(legacy_a.agents[0].enabled);
+        assert_eq!(legacy_a.agents[1].id, "reviewer");
+        assert!(!legacy_a.agents[1].enabled);
+
+        let agents: Vec<super::AgentEntry> = legacy_a
+            .agents
+            .into_iter()
+            .filter(|a| a.enabled)
+            .collect();
+        assert_eq!(agents.len(), 1);
+        assert_eq!(agents[0].id, "helper");
+        assert_eq!(agents[0].prompt.as_deref(), Some("You help."));
+
+        // ── Assemble HipConfig from legacy data and round-trip through JSON ──
+        let cfg = super::HipConfig {
+            version: 1,
+            providers,
+            agents,
+            mcp_servers: vec![],
+            skills: vec![],
+            permissions: None,
+        };
+
+        let json_out = serde_json::to_string(&cfg).unwrap();
+        let from_json: super::HipConfig = serde_json::from_str(&json_out).unwrap();
+        assert_eq!(from_json.version, 1);
+        assert_eq!(from_json.providers.len(), 1);
+        assert_eq!(from_json.providers[0].id, "openai");
+        assert_eq!(from_json.agents.len(), 1);
+        assert_eq!(from_json.agents[0].id, "helper");
+        assert!(from_json.mcp_servers.is_empty());
+        assert!(from_json.skills.is_empty());
+        assert!(from_json.permissions.is_none());
+    }
+
+    #[test]
+    fn toml_mirror_accepts_camelcase_keys() {
+        // Simulate a TOML file written with camelCase keys (e.g. by older Rust
+        // structs that used `#[serde(rename_all = "camelCase")]`). The
+        // TomlHipConfig mirror struct should accept these via serde aliases and
+        // re-serialize them as snake_case.
+        let camel_toml = r#"
+version = 1
+
+[[providers]]
+id = "openai"
+name = "OpenAI"
+baseUrl = "https://api.openai.com/v1"
+apiKey = "sk-abc"
+
+[[mcpServers]]
+id = "srv-1"
+name = "Local"
+transport = "stdio"
+command = "npx"
+enabledTools = ["read_file", "search"]
+enabled = true
+
+[[agents]]
+id = "helper"
+name = "Helper"
+kind = "internal"
+command = ""
+allowedTools = ["read"]
+allowedSkills = ["pdf-tools"]
+allowedMcpServers = ["srv-1"]
+prompt = "You help."
+enabled = true
+
+[[agents]]
+id = "coder"
+name = "Coder"
+kind = "external"
+command = "codex"
+args = ["--model", "gpt-5"]
+enabled = true
+
+[agents.boundModel]
+providerId = "openai"
+modelId = "gpt-4o"
+
+[permissions]
+coarseMode = "edit"
+
+[permissions.toolPermissions]
+defaultMode = "prompt"
+"#;
+
+        let cfg: super::TomlHipConfig =
+            toml::from_str(camel_toml).expect("should parse camelCase TOML");
+
+        // Verify data was populated correctly
+        assert_eq!(cfg.version, 1);
+        assert_eq!(cfg.providers.len(), 1);
+        assert_eq!(cfg.providers[0].id, "openai");
+        assert_eq!(cfg.providers[0].name, "OpenAI");
+        assert_eq!(cfg.providers[0].base_url, "https://api.openai.com/v1");
+        assert_eq!(cfg.providers[0].api_key.as_deref(), Some("sk-abc"));
+
+        assert_eq!(cfg.mcp_servers.len(), 1);
+        assert_eq!(cfg.mcp_servers[0].id, "srv-1");
+        let expected_tools: Vec<String> = vec!["read_file".into(), "search".into()];
+        assert_eq!(cfg.mcp_servers[0].enabled_tools.as_deref(), Some(expected_tools.as_slice()));
+        assert!(cfg.mcp_servers[0].enabled);
+
+        assert_eq!(cfg.agents.len(), 2);
+        assert_eq!(cfg.agents[0].id, "helper");
+        assert_eq!(cfg.agents[0].allowed_tools.as_deref(), Some(&["read".into()][..]));
+        assert_eq!(cfg.agents[0].allowed_skills.as_deref(), Some(&["pdf-tools".into()][..]));
+        assert_eq!(cfg.agents[0].allowed_mcp_servers.as_deref(), Some(&["srv-1".into()][..]));
+        assert!(cfg.agents[0].enabled);
+
+        assert_eq!(cfg.agents[1].id, "coder");
+        let bm = cfg.agents[1].bound_model.as_ref().expect("coder should have boundModel");
+        assert_eq!(bm.provider_id, "openai");
+        assert_eq!(bm.model_id, "gpt-4o");
+
+        let perm = cfg.permissions.as_ref().expect("should have permissions");
+        assert_eq!(perm.coarse_mode, "edit");
+        let tp = perm.tool_permissions.as_ref().expect("should have toolPermissions");
+        assert_eq!(tp.default_mode, "prompt");
+
+        // Re-serialize and assert output uses snake_case keys only
+        let out = toml::to_string_pretty(&cfg).expect("should re-serialize");
+        assert!(out.contains("mcp_servers"), "re-serialized TOML must use snake_case: mcp_servers");
+        assert!(!out.contains("mcpServers"), "re-serialized TOML must NOT contain camelCase: mcpServers");
+        assert!(out.contains("enabled_tools"), "re-serialized TOML must use snake_case: enabled_tools");
+        assert!(!out.contains("enabledTools"), "re-serialized TOML must NOT contain camelCase: enabledTools");
+        assert!(out.contains("allowed_tools"), "re-serialized TOML must use snake_case: allowed_tools");
+        assert!(!out.contains("allowedTools"), "re-serialized TOML must NOT contain camelCase: allowedTools");
+        assert!(out.contains("allowed_skills"), "re-serialized TOML must use snake_case: allowed_skills");
+        assert!(!out.contains("allowedSkills"), "re-serialized TOML must NOT contain camelCase: allowedSkills");
+        assert!(out.contains("allowed_mcp_servers"), "re-serialized TOML must use snake_case: allowed_mcp_servers");
+        assert!(!out.contains("allowedMcpServers"), "re-serialized TOML must NOT contain camelCase: allowedMcpServers");
+        assert!(out.contains("base_url"), "re-serialized TOML must use snake_case: base_url");
+        assert!(!out.contains("baseUrl"), "re-serialized TOML must NOT contain camelCase: baseUrl");
+        assert!(out.contains("api_key"), "re-serialized TOML must use snake_case: api_key");
+        assert!(!out.contains("apiKey"), "re-serialized TOML must NOT contain camelCase: apiKey");
+        assert!(out.contains("provider_id"), "re-serialized TOML must use snake_case: provider_id");
+        assert!(!out.contains("providerId"), "re-serialized TOML must NOT contain camelCase: providerId");
+        assert!(out.contains("model_id"), "re-serialized TOML must use snake_case: model_id");
+        assert!(!out.contains("modelId"), "re-serialized TOML must NOT contain camelCase: modelId");
+        assert!(out.contains("coarse_mode"), "re-serialized TOML must use snake_case: coarse_mode");
+        assert!(!out.contains("coarseMode"), "re-serialized TOML must NOT contain camelCase: coarseMode");
+        assert!(out.contains("tool_permissions"), "re-serialized TOML must use snake_case: tool_permissions");
+        assert!(!out.contains("toolPermissions"), "re-serialized TOML must NOT contain camelCase: toolPermissions");
+        assert!(out.contains("default_mode"), "re-serialized TOML must use snake_case: default_mode");
+        assert!(!out.contains("defaultMode"), "re-serialized TOML must NOT contain camelCase: defaultMode");
+
+        // Also verify that a mixed TOML (some camelCase, some snake_case) can deserialize
+        let mixed_toml = r#"
+version = 1
+
+[[providers]]
+id = "openai"
+name = "OpenAI"
+base_url = "https://api.openai.com/v1"
+
+[[mcpServers]]
+id = "srv-2"
+name = "Remote"
+transport = "sse"
+url = "https://example.com/mcp"
+enabled = false
+"#;
+        let cfg2: super::TomlHipConfig =
+            toml::from_str(mixed_toml).expect("should parse mixed-case TOML");
+        assert_eq!(cfg2.providers[0].base_url, "https://api.openai.com/v1");
+        assert_eq!(cfg2.mcp_servers[0].id, "srv-2");
+        assert_eq!(cfg2.mcp_servers[0].url.as_deref(), Some("https://example.com/mcp"));
+    }
+
+    fn toml_with(providers: bool, mcp: bool, skills: bool, agents: bool) -> String {
+        let mut s = String::from("version = 1\n");
+        if providers {
+            s.push_str("\n[[providers]]\nid = \"p1\"\nname = \"P1\"\nbase_url = \"https://p1.example.com\"\n");
+        }
+        if mcp {
+            s.push_str("\n[[mcp_servers]]\nid = \"m1\"\nname = \"M1\"\ntransport = \"stdio\"\ncommand = \"echo\"\nenabled = true\n");
+        }
+        if skills {
+            s.push_str("\n[[skills]]\nid = \"s1\"\nenabled = true\n");
+        }
+        if agents {
+            s.push_str("\n[[agents]]\nid = \"a1\"\nname = \"A1\"\nkind = \"internal\"\ncommand = \"\"\nenabled = true\n");
+        }
+        s
+    }
+
+    #[test]
+    fn delete_legacy_json_safety_gate() {
+        {
+            let dir = std::env::temp_dir()
+                .join(format!("hip-delete-ok-{}", std::process::id()));
+            let cfg_dir = dir.join("config");
+            std::fs::create_dir_all(&cfg_dir).unwrap();
+
+            let toml_p = cfg_dir.join("hip.toml");
+            let prov_p = cfg_dir.join("hip-providers.json");
+            let mcp_p = cfg_dir.join("hip-mcp-servers.json");
+            let agt_p = cfg_dir.join("hip-agents.json");
+            let skl_p = cfg_dir.join("hip-skills.json");
+
+            std::fs::write(&toml_p, toml_with(true, true, true, true)).unwrap();
+            for p in [&prov_p, &mcp_p, &agt_p, &skl_p] {
+                std::fs::write(p, "{}").unwrap();
+            }
+
+            let files: [(&str, Option<&std::path::Path>); 4] = [
+                ("hip-providers.json", Some(prov_p.as_path())),
+                ("hip-mcp-servers.json", Some(mcp_p.as_path())),
+                ("hip-agents.json", Some(agt_p.as_path())),
+                ("hip-skills.json", Some(skl_p.as_path())),
+            ];
+
+            let result = super::delete_legacy_json_core(Some(&toml_p), &files);
+
+            assert_eq!(result.deleted.len(), 4, "all 4 files should be deleted");
+            assert!(result.skipped.is_empty(), "no files should be skipped");
+            assert!(!prov_p.exists(), "providers JSON should be gone");
+            assert!(!mcp_p.exists(), "mcp-servers JSON should be gone");
+            assert!(!agt_p.exists(), "agents JSON should be gone");
+            assert!(!skl_p.exists(), "skills JSON should be gone");
+            assert!(toml_p.exists(), "TOML file must never be deleted");
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+
+        {
+            let dir = std::env::temp_dir()
+                .join(format!("hip-delete-skip-{}", std::process::id()));
+            let cfg_dir = dir.join("config");
+            std::fs::create_dir_all(&cfg_dir).unwrap();
+
+            let toml_p = cfg_dir.join("hip.toml");
+            let prov_p = cfg_dir.join("hip-providers.json");
+            let mcp_p = cfg_dir.join("hip-mcp-servers.json");
+            let agt_p = cfg_dir.join("hip-agents.json");
+            let skl_p = cfg_dir.join("hip-skills.json");
+
+            std::fs::write(&toml_p, toml_with(true, true, false, true)).unwrap();
+            for p in [&prov_p, &mcp_p, &agt_p, &skl_p] {
+                std::fs::write(p, "{}").unwrap();
+            }
+
+            let files: [(&str, Option<&std::path::Path>); 4] = [
+                ("hip-providers.json", Some(prov_p.as_path())),
+                ("hip-mcp-servers.json", Some(mcp_p.as_path())),
+                ("hip-agents.json", Some(agt_p.as_path())),
+                ("hip-skills.json", Some(skl_p.as_path())),
+            ];
+
+            let result = super::delete_legacy_json_core(Some(&toml_p), &files);
+
+            assert!(result.deleted.is_empty(), "nothing should be deleted");
+            assert_eq!(result.skipped.len(), 4, "all 4 files should be skipped");
+            for skip in &result.skipped {
+                assert!(
+                    skip.reason.contains("safety gate"),
+                    "skip reason must mention safety gate: {}",
+                    skip.reason
+                );
+                assert!(
+                    skip.reason.contains("skills"),
+                    "skip reason must name the empty section: {}",
+                    skip.reason
+                );
+            }
+            assert!(prov_p.exists());
+            assert!(mcp_p.exists());
+            assert!(agt_p.exists());
+            assert!(skl_p.exists());
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+
+        {
+            let dir = std::env::temp_dir()
+                .join(format!("hip-delete-notoml-{}", std::process::id()));
+            let cfg_dir = dir.join("config");
+            std::fs::create_dir_all(&cfg_dir).unwrap();
+
+            let toml_p = cfg_dir.join("hip.toml");
+            let prov_p = cfg_dir.join("hip-providers.json");
+            let mcp_p = cfg_dir.join("hip-mcp-servers.json");
+            let agt_p = cfg_dir.join("hip-agents.json");
+            let skl_p = cfg_dir.join("hip-skills.json");
+
+            for p in [&prov_p, &mcp_p, &agt_p, &skl_p] {
+                std::fs::write(p, "{}").unwrap();
+            }
+
+            let files: [(&str, Option<&std::path::Path>); 4] = [
+                ("hip-providers.json", Some(prov_p.as_path())),
+                ("hip-mcp-servers.json", Some(mcp_p.as_path())),
+                ("hip-agents.json", Some(agt_p.as_path())),
+                ("hip-skills.json", Some(skl_p.as_path())),
+            ];
+
+            let result = super::delete_legacy_json_core(Some(&toml_p), &files);
+
+            assert!(result.deleted.is_empty(), "nothing should be deleted");
+            assert_eq!(result.skipped.len(), 4, "all 4 files should be skipped");
+            for skip in &result.skipped {
+                assert!(
+                    skip.reason.contains("cannot read"),
+                    "skip reason must mention unreadable TOML: {}",
+                    skip.reason
+                );
+            }
+            assert!(prov_p.exists());
+            assert!(mcp_p.exists());
+            assert!(agt_p.exists());
+            assert!(skl_p.exists());
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
     }
 }

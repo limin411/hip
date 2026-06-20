@@ -56,7 +56,7 @@ describe('hipConfig IPC', () => {
       providers: [{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' }],
     }
     await setHipConfig(config)
-    expect(invoke).toHaveBeenCalledWith('set_hip_config', { config })
+    expect(invoke).toHaveBeenCalledWith('set_hip_config', { json: JSON.stringify(config) })
   })
 
   it('setHipConfig propagates IPC errors', async () => {

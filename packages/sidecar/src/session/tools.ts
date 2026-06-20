@@ -162,8 +162,10 @@ export interface DispatchSpec {
 export type ApprovalDecision = { kind: string } | { cancelled: true }
 
 /** HITL approval seam for run_script. session.ts supplies a closure that registers a pending
- *  permission and resolves on the user's choice (as an ApprovalDecision); tests supply a fake. */
-export type ApprovalFn = (req: { title: string; kind: string; content?: string }) => Promise<ApprovalDecision>
+ *  permission and resolves on the user's choice (as an ApprovalDecision); tests supply a fake.
+ *  `toolName` is the canonical tool identifier (e.g. 'run_script') for hook matching; `title` is the
+ *  user-facing prompt title. */
+export type ApprovalFn = (req: { title: string; toolName?: string; kind: string; content?: string }) => Promise<ApprovalDecision>
 
 export interface BuildToolsOpts {
   /** Namespaced MCP tools (mcp__<server>__<tool>) merged onto hip's own loop. */
@@ -183,6 +185,10 @@ export interface BuildToolsOpts {
   generateAgentEnabled?: boolean
   /** Session ID for skill body substitution (${HIP_SESSION_ID}). */
   sessionId?: string
+  /** When non-empty, keep only tools whose name is in this list (applied after PermissionMode). */
+  allowedTools?: string[]
+  /** When non-empty, remove tools whose name is in this list (applied after PermissionMode). */
+  blockedTools?: string[]
 }
 
 function splitArgs(input: string): { positional: string[]; named: Record<string, string> } {
@@ -732,6 +738,7 @@ export function buildTools(
       async ({ command, reason }) => {
         const decision = await requestApproval({
           title: 'Run script',
+          toolName: 'run_script',
           kind: 'execute',
           content: reason ? `${command}\n\n# ${reason}` : command,
         })
@@ -789,45 +796,64 @@ export function buildTools(
 
   if (opts.mcpTools && opts.mcpTools.length > 0) extras.push(...opts.mcpTools)
 
-  if (!spawnSubagent) return [...base, ...extras]
-  const task = tool(
-    async ({ description, mode }) => spawnSubagent(description, mode),
-    {
-      name: 'task',
-      description:
-        'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
-        'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
-        'The sub-agent cannot itself delegate. Set mode to "background" to run the sub-agent ' +
-        'without blocking the current turn (max 10 concurrent background tasks).',
-      schema: z.object({
-        description: z.string(),
-        mode: z.enum(['foreground', 'background']).optional(),
-      }),
-    },
-  )
-  const out = [...base, task]
+  // Build the full tool set, then apply profile-based filtering
+  let result: StructuredToolInterface[]
+  if (!spawnSubagent) {
+    result = [...base, ...extras]
+  } else {
+    const task = tool(
+      async ({ description, mode }) => spawnSubagent(description, mode),
+      {
+        name: 'task',
+        description:
+          'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
+          'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
+          'The sub-agent cannot itself delegate. Set mode to "background" to run the sub-agent ' +
+          'without blocking the current turn (max 10 concurrent background tasks).',
+        schema: z.object({
+          description: z.string(),
+          mode: z.enum(['foreground', 'background']).optional(),
+        }),
+      },
+    )
+    if (!dispatch || dispatch.agents.length === 0) {
+      result = [...base, task, ...extras]
+    } else {
+      const roster = dispatch.agents
+        .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
+        .join('\n')
+      const ids = dispatch.agents.map((a) => a.id) as [string, ...string[]]
+      const dispatchAgent = tool(
+        async ({ agent, task: t }) => dispatch.run(agent, t),
+        {
+          name: 'dispatch_agent',
+          description:
+            'Delegate a focused, self-contained task to a specialized sub-agent and return its result. ' +
+            'Pick the agent best matched to the task. Available agents:\n' +
+            roster,
+          schema: z.object({
+            agent: z.enum(ids).describe('id of the sub-agent to delegate to'),
+            task: z.string().describe('the complete, self-contained instruction for the sub-agent'),
+          }),
+        },
+      )
+      result = [...base, task, dispatchAgent, ...extras]
+    }
+  }
 
-  if (!dispatch || dispatch.agents.length === 0) return [...out, ...extras]
+  // Apply profile-based filtering AFTER PermissionMode (PermissionMode gates first,
+  // then allowedTools/blockedTools further restrict). MCP tools are managed by MCP
+  // server enablement and are not narrowed by allowedTools; they can still be blocked.
+  if (opts.allowedTools && opts.allowedTools.length > 0) {
+    const allowed = new Set(opts.allowedTools)
+    result = result.filter((t) => allowed.has(t.name) || t.name.startsWith('mcp__'))
+  }
+  if (opts.blockedTools && opts.blockedTools.length > 0) {
+    const blocked = new Set(opts.blockedTools)
+    result = result.filter((t) => !blocked.has(t.name))
+  }
 
-  const roster = dispatch.agents
-    .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
-    .join('\n')
-  const ids = dispatch.agents.map((a) => a.id) as [string, ...string[]]
-  const dispatchAgent = tool(
-    async ({ agent, task: t }) => dispatch.run(agent, t),
-    {
-      name: 'dispatch_agent',
-      description:
-        'Delegate a focused, self-contained task to a specialized sub-agent and return its result. ' +
-        'Pick the agent best matched to the task. Available agents:\n' +
-        roster,
-      schema: z.object({
-        agent: z.enum(ids).describe('id of the sub-agent to delegate to'),
-        task: z.string().describe('the complete, self-contained instruction for the sub-agent'),
-      }),
-    },
-  )
-  return [...out, dispatchAgent, ...extras]
+  return result
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

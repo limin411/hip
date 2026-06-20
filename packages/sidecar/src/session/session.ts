@@ -124,7 +124,7 @@ export class Session {
     this.permissions = new PermissionManager(
       () => this._config.permissionMode ?? 'edit',
       (mode) => { if (this.running) return false; this._config = { ...this._config, permissionMode: mode }; return true },
-      { enableStickyApproval: false },
+      { enableStickyApproval: this._config.enableStickyApproval ?? true },
     )
     this.permissions.setApprovalCache(this.approvalCache)
     this.agentProv = new AgentProviderManager(id, store, () => this._config, this.invokerFactory)

@@ -23,6 +23,7 @@ export interface GraphEmit {
   toolStarted(name: string, callId: string, input: unknown): void
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
   usage(u: TurnUsage): void
+  planDelta(itemId: string, delta: string): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -38,6 +39,10 @@ export interface GraphCtx {
   approvalCache?: ApprovalCache
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
+  allowedTools?: string[]
+  blockedTools?: string[]
+  systemPrompt?: string
+  activeProfileId?: string
 }
 
 const LoopState = Annotation.Root({
@@ -72,9 +77,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   }
 
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { runner, tools, emit } = ctxOf(config)
+    const { runner, tools, emit, systemPrompt } = ctxOf(config)
+    const messages: BaseMessage[] = systemPrompt !== undefined && !(state.messages[0] instanceof SystemMessage && state.messages[0].content === systemPrompt)
+      ? [new SystemMessage(systemPrompt), ...state.messages]
+      : state.messages
     const capped = state.steps >= maxSteps - 1 // last allowed step: no tools, force text
-    const msg = await runner.run(state.messages, {
+    const msg = await runner.run(messages, {
       tools,
       bindTools: !capped,
       signal: config.signal,
@@ -108,8 +116,32 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const ctx = ctxOf(config)
     const runner = getOrCreateToolRunner(ctx)
     const last = state.messages[state.messages.length - 1] as AIMessage
-    const out: ToolMessage[] = []
+    const blockedCalls: ToolMessage[] = []
+    const calls: typeof last.tool_calls = []
     for (const call of last.tool_calls ?? []) {
+      const isMcp = call.name.startsWith('mcp__')
+      if (ctx.allowedTools && ctx.allowedTools.length > 0 && !isMcp && !ctx.allowedTools.includes(call.name)) {
+        console.warn(`Blocked tool call "${call.name}" by allowedTools profile filter`)
+        blockedCalls.push(new ToolMessage({
+          content: `Error: Tool "${call.name}" is not available in the current agent profile.`,
+          tool_call_id: call.id ?? call.name,
+          name: call.name,
+        }))
+        continue
+      }
+      if (ctx.blockedTools && ctx.blockedTools.length > 0 && ctx.blockedTools.includes(call.name)) {
+        console.warn(`Blocked tool call "${call.name}" by blockedTools profile filter`)
+        blockedCalls.push(new ToolMessage({
+          content: `Error: Tool "${call.name}" is blocked in the current agent profile.`,
+          tool_call_id: call.id ?? call.name,
+          name: call.name,
+        }))
+        continue
+      }
+      calls.push(call)
+    }
+    const out: ToolMessage[] = []
+    for (const call of calls) {
       const id = call.id ?? call.name
       const result = await runner.runToolCall({
         name: call.name,
@@ -122,10 +154,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         name: result.name,
       }))
     }
-    // The Nth identical batch is executed too (keeps tool_calls↔ToolMessage valid); doom-loop is
-    // detected post-execution from the trailing signature run.
-    const sig = sigOf(last.tool_calls ?? [])
-    return { messages: out, recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
+    const sig = sigOf(calls)
+    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
   }
 
   /** Corrective note after the Nth identical batch; recorded against the offending signature. */
@@ -141,19 +171,23 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   const PLANNING_SYSTEM_PROMPT = `You are a planning assistant. Analyze the user's request and break it into concrete, ordered steps. Call the write_todos tool with the plan, then output a one-sentence summary of the plan.`
 
   async function planNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { runner, tools, emit } = ctxOf(config)
+    const { runner, tools, emit, systemPrompt } = ctxOf(config)
     const messages: BaseMessage[] = [...state.messages]
+    const planPrompt = systemPrompt ? `${PLANNING_SYSTEM_PROMPT}\n\n${systemPrompt}` : PLANNING_SYSTEM_PROMPT
     if (messages[0] instanceof SystemMessage) {
-      const original = typeof messages[0].content === 'string' ? messages[0].content : JSON.stringify(messages[0].content)
-      messages[0] = new SystemMessage(`${PLANNING_SYSTEM_PROMPT}\n\n${original}`)
+      messages[0] = new SystemMessage(planPrompt)
     } else {
-      messages.unshift(new SystemMessage(PLANNING_SYSTEM_PROMPT))
+      messages.unshift(new SystemMessage(planPrompt))
     }
+    const itemId = `plan-${config.runId ?? Date.now()}`
     const msg = await runner.run(messages, {
       tools,
       bindTools: true,
       signal: config.signal,
-      onText: (d) => emit.token(d),
+      onText: (d) => {
+        emit.token(d)
+        emit.planDelta(itemId, d)
+      },
       onReasoning: (d) => emit.reasoning(d),
     })
     const u = msg.usage_metadata
@@ -166,7 +200,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
   }
 
-  function routeAfterCompact(state: State): 'plan' | 'agent' {
+  function routeAfterCompact(state: State, _config: LangGraphRunnableConfig): 'plan' | 'agent' {
     if (state.planningMode === 'plan' && state.planStatus !== 'approved') return 'plan'
     return 'agent'
   }

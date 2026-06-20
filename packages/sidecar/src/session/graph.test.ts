@@ -20,7 +20,7 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-graph-'))
@@ -240,6 +240,44 @@ describe('agent loop graph', () => {
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.pendingQuestion).toBeTruthy()
+    })
+  })
+
+  it('plan node streams deltas via planDelta before publishing', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const deltas: { itemId: string; delta: string }[] = []
+      const planDeltaEmit: GraphEmit = { ...noopEmit, planDelta: (itemId, delta) => deltas.push({ itemId, delta }) }
+      const runner: ModelRunner = {
+        async run(messages, opts) {
+          opts.onText('analyze req')
+          opts.onText('uirements ')
+          opts.onText('and make plan')
+          const msg = new AIMessage({
+            content: 'analyze requirements and make plan',
+            tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'step one', status: 'pending' }] }, id: 'd1' }],
+          })
+          return msg
+        },
+      }
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('make a big plan')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: planDeltaEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.plan).toEqual([{ content: 'step one', status: 'pending' }])
+      expect(deltas.length).toBe(3)
+      expect(deltas[0].delta).toBe('analyze req')
+      expect(deltas[1].delta).toBe('uirements ')
+      expect(deltas[2].delta).toBe('and make plan')
+      expect(deltas[0].itemId).toBeTruthy()
+      expect(deltas[0].itemId).toBe(deltas[1].itemId)
+      expect(deltas[0].itemId).toBe(deltas[2].itemId)
     })
   })
 

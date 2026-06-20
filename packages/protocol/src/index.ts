@@ -561,17 +561,6 @@ export type OrchestratorEvent =
   | { type: 'run:finished'; status: RunStatus }
 
 // ──────────────────────────────────────────────────────────────────
-// Per-tool permission granularity (Todo 35)
-// ──────────────────────────────────────────────────────────────────
-
-export type ToolPermissionMode = 'auto' | 'prompt' | 'approve' | 'deny'
-
-export interface ToolPermissionConfig {
-  defaultMode: ToolPermissionMode
-  overrides?: Record<string, ToolPermissionMode>
-}
-
-// ──────────────────────────────────────────────────────────────────
 // MCP resources & prompts types (Todo 28)
 // ──────────────────────────────────────────────────────────────────
 
@@ -628,16 +617,10 @@ export interface SkillEntry {
   enabled: boolean
 }
 
-export interface PermissionEntry {
-  coarseMode: PermissionMode
-  toolPermissions?: ToolPermissionConfig
-}
-
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
   mcpServers?: McpServerConfig[]
   skills?: SkillEntry[]
   agents?: AgentConfig[]
-  permissions?: PermissionEntry
 }

@@ -3,9 +3,6 @@ import type {
   HipConfig,
   ProviderEntry,
   SkillEntry,
-  PermissionEntry,
-  ToolPermissionMode,
-  ToolPermissionConfig,
   SkillScope,
   SkillMeta,
   McpServerConfig,
@@ -23,9 +20,6 @@ import type {
 // TYPE GUARDS (checked only by tsc, NOT by vitest)
 // ──────────────────────────────────────────────────────────────────
 
-const _toolPermissionModes = (['auto', 'prompt', 'approve', 'deny'] as const) satisfies readonly ToolPermissionMode[]
-void _toolPermissionModes
-
 const _skillScopes = (['global', 'project', 'plugin'] as const) satisfies readonly SkillScope[]
 void _skillScopes
 
@@ -41,14 +35,12 @@ describe('protocol: HipConfig (Todo 1)', () => {
       mcpServers: [{ id: 'srv-1', name: 'Local', transport: 'stdio', command: 'npx', args: [], enabled: true }],
       skills: [{ id: 'pdf-tools', enabled: true }],
       agents: [{ id: 'helper', name: 'Helper', kind: 'internal', command: '', args: [], enabled: true, prompt: 'You help.' }],
-      permissions: { coarseMode: 'edit' },
     }
     expect(cfg.version).toBe(1)
     expect(cfg.providers).toHaveLength(1)
     expect(cfg.mcpServers).toHaveLength(1)
     expect(cfg.skills).toHaveLength(1)
     expect(cfg.agents).toHaveLength(1)
-    expect(cfg.permissions?.coarseMode).toBe('edit')
   })
 
   it('allows all top-level sections to be absent', () => {
@@ -58,7 +50,6 @@ describe('protocol: HipConfig (Todo 1)', () => {
     expect(cfg.mcpServers).toBeUndefined()
     expect(cfg.skills).toBeUndefined()
     expect(cfg.agents).toBeUndefined()
-    expect(cfg.permissions).toBeUndefined()
   })
 
   it('round-trips HipConfig through JSON', () => {
@@ -111,31 +102,6 @@ describe('protocol: SkillEntry (Todo 1)', () => {
     const round = JSON.parse(JSON.stringify(s)) as SkillEntry
     expect(round.id).toBe('git-tools')
     expect(round.enabled).toBe(false)
-  })
-})
-
-describe('protocol: PermissionEntry (Todo 1)', () => {
-  it('models coarseMode only', () => {
-    const p: PermissionEntry = { coarseMode: 'chat' }
-    expect(p.coarseMode).toBe('chat')
-    expect(p.toolPermissions).toBeUndefined()
-  })
-
-  it('models coarseMode + toolPermissions', () => {
-    const tpc: ToolPermissionConfig = {
-      defaultMode: 'prompt',
-      overrides: { 'write_file': 'auto', 'run_script': 'approve' },
-    }
-    const p: PermissionEntry = { coarseMode: 'full', toolPermissions: tpc }
-    expect(p.coarseMode).toBe('full')
-    expect(p.toolPermissions?.defaultMode).toBe('prompt')
-    expect(p.toolPermissions?.overrides).toEqual({ 'write_file': 'auto', 'run_script': 'approve' })
-  })
-
-  it('round-trips through JSON', () => {
-    const p: PermissionEntry = { coarseMode: 'edit' }
-    const round = JSON.parse(JSON.stringify(p)) as PermissionEntry
-    expect(round.coarseMode).toBe('edit')
   })
 })
 
@@ -453,44 +419,6 @@ describe('protocol: SkillMeta extended frontmatter fields (Todo 14)', () => {
     expect(round.disableShellExecution).toBe(true)
     expect(round.hasReferences).toBe(true)
     expect(round.hasAssets).toBe(false)
-  })
-})
-
-// ──────────────────────────────────────────────────────────────────
-// Todo 35 — Per-tool Permission Types
-// ──────────────────────────────────────────────────────────────────
-
-describe('protocol: ToolPermissionMode + ToolPermissionConfig (Todo 35)', () => {
-  it('ToolPermissionMode admits exactly four literals', () => {
-    const modes: ToolPermissionMode[] = ['auto', 'prompt', 'approve', 'deny']
-    expect(modes).toEqual(['auto', 'prompt', 'approve', 'deny'])
-  })
-
-  it('ToolPermissionConfig defaultMode only', () => {
-    const cfg: ToolPermissionConfig = { defaultMode: 'prompt' }
-    expect(cfg.defaultMode).toBe('prompt')
-    expect(cfg.overrides).toBeUndefined()
-  })
-
-  it('ToolPermissionConfig with overrides', () => {
-    const cfg: ToolPermissionConfig = {
-      defaultMode: 'approve',
-      overrides: { 'read_file': 'auto', 'write_file': 'approve', 'run_script': 'deny' },
-    }
-    expect(cfg.defaultMode).toBe('approve')
-    expect(cfg.overrides!['read_file']).toBe('auto')
-    expect(cfg.overrides!['write_file']).toBe('approve')
-    expect(cfg.overrides!['run_script']).toBe('deny')
-  })
-
-  it('ToolPermissionConfig round-trips through JSON', () => {
-    const cfg: ToolPermissionConfig = {
-      defaultMode: 'prompt',
-      overrides: { 'edit_file': 'auto' },
-    }
-    const round = JSON.parse(JSON.stringify(cfg)) as ToolPermissionConfig
-    expect(round.defaultMode).toBe('prompt')
-    expect(round.overrides).toEqual({ 'edit_file': 'auto' })
   })
 })
 

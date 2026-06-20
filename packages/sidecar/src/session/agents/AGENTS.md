@@ -6,6 +6,8 @@ External agent providers. The factory (`index.ts`) creates an `AgentProvider` fo
 
 Agents are configured in `~/.hip/config/hip-agents.json` (Rust-managed). The sidecar reads this via `HIP_AGENTS_PATH` env var. Each agent can be `kind: 'acp'` (OpenCode/Kimi) or `kind: 'internal'` (managed sub-agent).
 
+> **Note: AgentProfiles are a separate concept.** `hip-agents.json` defines *agent instances* (dispatch targets). Agent *profiles* — the built-in supervisor/plan/explore/worker tool-permission configurations — live in `~/.hip/config/agents.json` and per-project `.hip/agents.json`, and are loaded by `agent-profile-manager.ts`. Do not confuse the two files.
+
 ## STRUCTURE
 
 ```

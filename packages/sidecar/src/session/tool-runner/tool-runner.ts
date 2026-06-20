@@ -1,5 +1,6 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { PermissionMode } from '@hip/protocol'
+import type { RiskLevel } from './tool-policy.js'
 import type { HookRegistry } from '../hooks/registry.js'
 import type { HookResult } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from '../tools.js'
@@ -37,7 +38,7 @@ export interface ToolRunnerDeps {
   onToolStarted?: (name: string, callId: string, input: unknown) => void
   onToolFinished?: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
   /** Optional emit for guardian risk classification (emitted for medium/high risk tools). */
-  emitRisk?: (toolName: string, risk: string, approval: string) => void
+  emitRisk?: (toolName: string, risk: RiskLevel, approval: string) => void
 }
 
 /** Result of a tool execution, feeds exactly one ToolMessage via `content` + metadata. */
@@ -162,22 +163,22 @@ export class ToolRunner {
       // ── 5. PostToolUse hooks ─────────────────────────────────────────────
       let finalContent = result
       if (hooks) {
-      let postResult: HookResult
-      try {
-        postResult = await hooks.fire('PostToolUse', {
-          sessionId,
-          toolName: call.name,
-          toolInput: call.args,
-          toolOutput: result,
-        })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        console.warn(`PostToolUse hook error for ${call.name}: ${msg}`)
-        postResult = { kind: 'allow' }
-      }
+        let postResult: HookResult
+        try {
+          postResult = await hooks.fire('PostToolUse', {
+            sessionId,
+            toolName: call.name,
+            toolInput: call.args,
+            toolOutput: result,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn(`PostToolUse hook error for ${call.name}: ${msg}`)
+          postResult = { kind: 'allow' }
+        }
         if (postResult.updatedInput) {
           const ui = postResult.updatedInput
-          if (ui !== null && typeof ui === 'object' && 'output' in ui) {
+          if (ui !== null && typeof ui === 'object' && !Array.isArray(ui) && 'output' in ui) {
             const out = ui.output
             if (typeof out === 'string') {
               finalContent = out

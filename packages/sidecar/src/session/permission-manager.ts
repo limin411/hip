@@ -95,9 +95,6 @@ export class PermissionManager {
         this.pendingPermissions.set(requestId, (choice) => {
           if ('cancelled' in choice) { resolve({ cancelled: true }); return }
           const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? 'reject_once'
-          if (this.enableStickyApproval && this.approvalCache && (kind === 'allow_always' || kind === 'reject_always')) {
-            this.approvalCache.set(req.title, undefined, { kind } as ApprovalDecision)
-          }
           resolve({ kind })
         })
         send({

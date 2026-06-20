@@ -403,9 +403,7 @@ export class Session {
       onToolStarted: (name, callId, input) => emit.toolStarted(name, callId, input),
       onToolFinished: (callId, status, output, error) => emit.toolFinished(callId, status, output, error),
       emitRisk: (toolName, risk, approval) => {
-        if (risk === 'medium' || risk === 'high') {
-          send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
-        }
+        send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
       },
     })
     const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode }

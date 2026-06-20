@@ -166,24 +166,24 @@ describe('PermissionManager — buildHitlApproval with sticky enabled', () => {
     expect(kinds).toEqual(['allow_once', 'reject_once', 'allow_always', 'reject_always'])
   })
 
-  it('selecting allow_always writes to the cache', async () => {
+  it('selecting allow_always returns allow_always but does NOT write to the cache (ToolRunner owns caching)', async () => {
     const cache = new SessionApprovalCache()
     const mgr = new PermissionManager(makePermissionMode, setPermissionMode, { enableStickyApproval: true })
     mgr.setApprovalCache(cache)
 
     const decision = await driveApproval(mgr, 'allow_always')
     expect(decision).toEqual({ kind: 'allow_always' })
-    expect(cache.lookup('test-tool', undefined)).toBe('allow')
+    expect(cache.lookup('test-tool', undefined)).toBeUndefined()
   })
 
-  it('selecting reject_always writes to the cache', async () => {
+  it('selecting reject_always returns reject_always but does NOT write to the cache (ToolRunner owns caching)', async () => {
     const cache = new SessionApprovalCache()
     const mgr = new PermissionManager(makePermissionMode, setPermissionMode, { enableStickyApproval: true })
     mgr.setApprovalCache(cache)
 
     const decision = await driveApproval(mgr, 'reject_always')
     expect(decision).toEqual({ kind: 'reject_always' })
-    expect(cache.lookup('test-tool', undefined)).toBe('reject')
+    expect(cache.lookup('test-tool', undefined)).toBeUndefined()
   })
 
   it('selecting allow_once does NOT write to the cache', async () => {

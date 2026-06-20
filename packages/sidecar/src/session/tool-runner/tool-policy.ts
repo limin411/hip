@@ -46,7 +46,7 @@ const MEDIUM_RISK_NONE: ToolClassification = { risk: 'medium', approval: 'none' 
 export function defaultToolPolicy(opts: {
   selfGatedTools: Set<string>
 }): ToolPolicy {
-  const selfGated = opts.selfGatedTools
+  const selfGated = opts?.selfGatedTools ?? new Set<string>()
 
   return {
     classify(toolName: string, mode: PermissionMode): ToolClassification {

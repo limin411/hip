@@ -96,9 +96,6 @@ enabled = true
 [[skills]]
 id = "my-skill"
 enabled = true
-
-[permissions]
-coarseMode = "edit"
 `)
     process.env.HIP_CONFIG_PATH = p
 
@@ -110,7 +107,6 @@ coarseMode = "edit"
     expect(cfg.mcpServers![0]).toMatchObject({ id: 'mcp1', name: 'Filesystem' })
     expect(cfg.skills).toHaveLength(1)
     expect(cfg.skills![0]).toMatchObject({ id: 'my-skill', enabled: true })
-    expect(cfg.permissions).toMatchObject({ coarseMode: 'edit' })
   })
 
   it('accepts an explicit configPath parameter', () => {
@@ -216,24 +212,6 @@ enabled = true
     })
   })
 
-  it('normalizes permission coarse_mode, tool_permissions, and nested default_mode', () => {
-    const dir = tmpDir()
-    const p = writeToml(dir, 'hip.toml', `version = 1
-[permissions]
-coarse_mode = "edit"
-[permissions.tool_permissions]
-default_mode = "ask"
-`)
-    process.env.HIP_CONFIG_PATH = p
-    const cfg = readHipConfig()
-    expect(cfg.permissions).toMatchObject({
-      coarseMode: 'edit',
-      toolPermissions: {
-        defaultMode: 'ask',
-      },
-    })
-  })
-
   it('accepts snake_case top-level key mcp_servers as alias for mcpServers', () => {
     const dir = tmpDir()
     const p = writeToml(dir, 'hip.toml', `version = 1
@@ -268,10 +246,6 @@ enabledTools = ["tool-a"]
 disabledTools = ["tool-b"]
 enabled = true
 
-[permissions]
-coarseMode = "full"
-toolPermissions = { defaultMode = "allow" }
-
 [[agents]]
 id = "ag-camel"
 name = "Camel Agent"
@@ -293,10 +267,6 @@ enabled = true
     expect(cfg.mcpServers![0]).toMatchObject({
       enabledTools: ['tool-a'],
       disabledTools: ['tool-b'],
-    })
-    expect(cfg.permissions).toMatchObject({
-      coarseMode: 'full',
-      toolPermissions: { defaultMode: 'allow' },
     })
     expect(cfg.agents![0]).toMatchObject({
       boundModel: 'gpt-4',
@@ -365,10 +335,6 @@ bound_model = "model-1"
 allowed_skills = ["s1"]
 allowed_mcp_servers = ["m1"]
 enabled = true
-
-[permissions]
-coarse_mode = "edit"
-tool_permissions = { default_mode = "ask" }
 `)
 
     const camelFile = writeToml(dir, 'camel.toml', `version = 1
@@ -397,10 +363,6 @@ boundModel = "model-1"
 allowedSkills = ["s1"]
 allowedMcpServers = ["m1"]
 enabled = true
-
-[permissions]
-coarseMode = "edit"
-toolPermissions = { defaultMode = "ask" }
 `)
 
     const snakeCfg = readHipConfig(snakeFile)
@@ -471,24 +433,6 @@ enabled = true
     // Global providers should survive (project didn't set providers)
     expect(cfg.providers).toHaveLength(1)
     expect(cfg.providers![0]).toMatchObject({ id: 'openai' })
-  })
-
-  it('project permissions shallow-merge over global permissions', () => {
-    const dir = tmpDir()
-    const globalFile = writeToml(dir, 'global.toml', `version = 1
-[permissions]
-coarseMode = "chat"
-`)
-    process.env.HIP_CONFIG_PATH = globalFile
-
-    const { root } = setupProjectDir()
-    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
-[permissions]
-coarseMode = "full"
-`)
-
-    const cfg = resolveEffectiveConfig(root)
-    expect(cfg.permissions).toMatchObject({ coarseMode: 'full' })
   })
 
   it('falls back to legacy JSON readers when no TOML exists', () => {

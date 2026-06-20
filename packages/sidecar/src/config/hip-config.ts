@@ -7,7 +7,6 @@ import type {
   AgentConfig,
   ProviderEntry,
   SkillEntry,
-  PermissionEntry,
   McpServersConfig,
   AgentsConfig,
   ProvidersConfig,
@@ -80,23 +79,6 @@ function normalizeAgentEntry(raw: Record<string, unknown>): AgentConfig {
   return raw as unknown as AgentConfig
 }
 
-function normalizePermissionEntry(raw: Record<string, unknown>): PermissionEntry {
-  if (raw.coarse_mode !== undefined && raw.coarseMode === undefined) {
-    raw.coarseMode = raw.coarse_mode
-  }
-  if (raw.tool_permissions !== undefined && raw.toolPermissions === undefined) {
-    raw.toolPermissions = raw.tool_permissions
-  }
-  delete raw.coarse_mode
-  delete raw.tool_permissions
-  const tp = raw.toolPermissions as Record<string, unknown> | undefined
-  if (tp && tp.default_mode !== undefined && tp.defaultMode === undefined) {
-    tp.defaultMode = tp.default_mode
-  }
-  if (tp) delete tp.default_mode
-  return raw as unknown as PermissionEntry
-}
-
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
   if (!parsed || typeof parsed !== 'object') {
@@ -130,11 +112,6 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const agents = obj.agents
   if (Array.isArray(agents)) {
     config.agents = (agents as Record<string, unknown>[]).map(normalizeAgentEntry)
-  }
-
-  const permissions = obj.permissions
-  if (permissions && typeof permissions === 'object') {
-    config.permissions = normalizePermissionEntry(permissions as Record<string, unknown>)
   }
 
   return config
@@ -188,9 +165,6 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   }
   if (project.agents !== undefined) {
     merged.agents = project.agents
-  }
-  if (project.permissions !== undefined) {
-    merged.permissions = { ...global.permissions, ...project.permissions } as PermissionEntry
   }
 
   return merged

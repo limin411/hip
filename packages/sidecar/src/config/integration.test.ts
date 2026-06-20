@@ -81,9 +81,6 @@ enabled = true
 [[skills]]
 id = "linter"
 enabled = false
-
-[permissions]
-coarseMode = "edit"
 `
     const configPath = writeToml(dir, 'hip.toml', toml)
     const cfg = readHipConfig(configPath)
@@ -97,7 +94,6 @@ coarseMode = "edit"
     expect(cfg.skills).toHaveLength(2)
     expect(cfg.skills![0]).toMatchObject({ id: 'code-formatter', enabled: true })
     expect(cfg.skills![1]).toMatchObject({ id: 'linter', enabled: false })
-    expect(cfg.permissions).toMatchObject({ coarseMode: 'edit' })
   })
 
   it('reads a minimal TOML with only version', () => {
@@ -291,24 +287,6 @@ baseUrl = "https://project.api/v1"
     const cfg = resolveEffectiveConfig(root)
     expect(cfg.providers).toHaveLength(1)
     expect(cfg.providers![0]).toMatchObject({ id: 'project-prov', name: 'Project Provider' })
-  })
-
-  it('permissions shallow-merge: project coarseMode overrides global', () => {
-    const dir = tmpDir()
-    const globalFile = writeToml(dir, 'global.toml', `version = 1
-[permissions]
-coarseMode = "chat"
-`)
-    process.env.HIP_CONFIG_PATH = globalFile
-
-    const { root } = setupProjectDir()
-    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
-[permissions]
-coarseMode = "edit"
-`)
-
-    const cfg = resolveEffectiveConfig(root)
-    expect(cfg.permissions).toMatchObject({ coarseMode: 'edit' })
   })
 
   it('project skills REPLACE global skills', () => {

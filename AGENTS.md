@@ -1,6 +1,6 @@
 # hip — PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-06-19 | **Commit:** `7d703ec` | **Branch:** `main`
+**Generated:** 2026-06-20 | **Commit:** `df6c6fc` | **Branch:** `main`
 
 ## OVERVIEW
 
@@ -71,7 +71,7 @@ hip/
 - **ANTI_PHANTOM**: Agent MUST NOT claim a file was created/written without actually calling the write tool (enforced in system prompt + verification)
 - **IDENTITY**: Agent identifies as "hip" only. Never Claude/ChatGPT/Gemini
 - **path_env.rs macOS PATH fix**: Must run `ensure_user_path()` at startup before spawning sidecar — GUI-launched apps have sanitized PATH
-- **Protocol deprecation**: 5 fields in `@hip/protocol` marked `@deprecated` — kept for back-compat, ignored at runtime. New code must use `allowedSkills`/`allowedMcpServers`
+- **Protocol deprecation**: `toolPermissions` field in `@hip/protocol` marked `@deprecated` — kept for back-compat, ignored at runtime. Use `allowedSkills`/`allowedMcpServers` instead
 - **Git safety**: `workspace-git.ts` NEVER touches HEAD/index. Never `reset --hard`. Checkpoint restore writes to temp index first
 - **Config plaintext**: `~/.hip/config/auth.json` holds API keys. Do NOT sync to cloud drives or dotfile repos
 - **Sidecar dev wrapper**: `make-sidecar-dev-bin.sh` bakes absolute node path. Must re-run after Node.js version changes

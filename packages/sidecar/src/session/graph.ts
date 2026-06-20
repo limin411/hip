@@ -35,7 +35,6 @@ export interface GraphCtx {
   sessionId?: string
   toolRunner?: ToolRunner
   toolPolicy?: ToolPolicy
-  selfGatedTools?: Set<string>
   approvalCache?: ApprovalCache
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
@@ -92,7 +91,6 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       hooks: ctx.hooks,
       toolPolicy: ctx.toolPolicy ?? defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS }),
       approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
-      selfGatedTools: ctx.selfGatedTools ?? SELF_GATED_TOOLS,
       permissionMode: ctx.permissionMode ?? 'edit',
       requestApproval: ctx.requestApproval,
       sessionId: ctx.sessionId ?? '',

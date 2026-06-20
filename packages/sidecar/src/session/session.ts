@@ -396,7 +396,6 @@ export class Session {
       hooks: this.hooks,
       toolPolicy: this.toolPolicy,
       approvalCache: this.approvalCache,
-      selfGatedTools: SELF_GATED_TOOLS,
       requestApproval,
       permissionMode: mode,
       sessionId: this.id,

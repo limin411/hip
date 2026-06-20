@@ -26,8 +26,6 @@ export interface ToolRunnerDeps {
   toolPolicy: ToolPolicy
   /** Per-session HITL decision cache. */
   approvalCache: ApprovalCache
-  /** Tools whose approval is handled internally (e.g. run_script). */
-  selfGatedTools: Set<string>
   /** Active permission mode. */
   permissionMode: PermissionMode
   /** Approval transport for runner-level prompts (undefined ⇒ ask is denied). */
@@ -136,7 +134,7 @@ export class ToolRunner {
               })
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err)
-              approvalCache.set(call.name, call.args, { kind: 'reject_always' })
+              // Do not cache on transport failure — the error may be transient.
               return this.errorResult(call, `approval transport failed: ${msg}`)
             }
             approvalCache.set(call.name, call.args, decision)

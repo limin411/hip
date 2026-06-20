@@ -49,9 +49,8 @@ function makeDeps(overrides: Partial<ToolRunnerDeps> = {}): ToolRunnerDeps {
   const tools = overrides.tools ?? new Map<string, StructuredToolInterface>()
   return {
     tools,
-    toolPolicy: overrides.toolPolicy ?? defaultToolPolicy({ selfGatedTools: overrides.selfGatedTools ?? new Set<string>() }),
+    toolPolicy: overrides.toolPolicy ?? defaultToolPolicy({ selfGatedTools: new Set<string>() }),
     approvalCache: overrides.approvalCache ?? new SessionApprovalCache(),
-    selfGatedTools: overrides.selfGatedTools ?? new Set<string>(),
     permissionMode: overrides.permissionMode ?? 'edit',
     sessionId: overrides.sessionId ?? 'test-session',
     ...overrides,
@@ -538,7 +537,6 @@ describe('ToolRunner', () => {
         tools: new Map([['run_script', t]]),
         hooks,
         requestApproval: fn,
-        selfGatedTools: selfGated,
         toolPolicy: defaultToolPolicy({ selfGatedTools: selfGated }),
       })
       const runner = new ToolRunner(deps)
@@ -568,7 +566,6 @@ describe('ToolRunner', () => {
         hooks,
         requestApproval: fn,
         permissionMode: 'full',
-        selfGatedTools: selfGated,
         toolPolicy: defaultToolPolicy({ selfGatedTools: selfGated }),
       })
       const runner = new ToolRunner(deps)

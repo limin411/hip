@@ -7,8 +7,6 @@ export type ApprovalKind = 'none' | 'self' | 'auto_allow'
 export type ToolClassification = {
   risk: RiskLevel
   approval: ApprovalKind
-  /** True when the tool delegates to another agent. */
-  delegate?: boolean
 }
 
 export interface ToolPolicy {
@@ -45,10 +43,10 @@ const MEDIUM_TOOLS = new Set(['generate_agent'])
 const LOW_RISK_NONE: ToolClassification = { risk: 'low', approval: 'none' }
 const MEDIUM_RISK_NONE: ToolClassification = { risk: 'medium', approval: 'none' }
 
-export function defaultToolPolicy(opts?: {
-  selfGatedTools?: Set<string>
+export function defaultToolPolicy(opts: {
+  selfGatedTools: Set<string>
 }): ToolPolicy {
-  const selfGated = opts?.selfGatedTools ?? new Set<string>()
+  const selfGated = opts.selfGatedTools
 
   return {
     classify(toolName: string, mode: PermissionMode): ToolClassification {
@@ -72,7 +70,7 @@ export function defaultToolPolicy(opts?: {
       }
 
       if (DELEGATE_TOOLS.has(toolName)) {
-        return { risk: 'medium', approval: 'none', delegate: true }
+        return MEDIUM_RISK_NONE
       }
 
       if (toolName.startsWith('mcp__')) {

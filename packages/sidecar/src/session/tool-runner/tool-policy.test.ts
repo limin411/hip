@@ -3,7 +3,7 @@ import { defaultToolPolicy } from './tool-policy.js'
 import type { ToolPolicy } from './tool-policy.js'
 import { SELF_GATED_TOOLS } from '../tools.js'
 
-function makePolicy(selfGated?: Set<string>): ToolPolicy {
+function makePolicy(selfGated: Set<string> = new Set<string>()): ToolPolicy {
   return defaultToolPolicy({ selfGatedTools: selfGated })
 }
 
@@ -85,14 +85,14 @@ describe('defaultToolPolicy', () => {
   describe('task and dispatch_agent (delegate)', () => {
     const policy = makePolicy(SELF_GATED_TOOLS)
 
-    it('classifies task as medium risk, approval none, delegate true', () => {
+    it('classifies task as medium risk, approval none', () => {
       const c = policy.classify('task', 'edit')
-      expect(c).toEqual({ risk: 'medium', approval: 'none', delegate: true })
+      expect(c).toEqual({ risk: 'medium', approval: 'none' })
     })
 
-    it('classifies dispatch_agent as medium risk, approval none, delegate true', () => {
+    it('classifies dispatch_agent as medium risk, approval none', () => {
       const c = policy.classify('dispatch_agent', 'edit')
-      expect(c).toEqual({ risk: 'medium', approval: 'none', delegate: true })
+      expect(c).toEqual({ risk: 'medium', approval: 'none' })
     })
   })
 

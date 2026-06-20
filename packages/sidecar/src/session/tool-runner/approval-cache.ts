@@ -1,9 +1,12 @@
 import type { ApprovalDecision } from '../tools.js'
 
+const MAX_CACHE_ENTRIES = 1000
+
 /**
  * Per-session cache for HITL approval decisions.
  * Stores allow_always / reject_always so repeated tool calls
  * with the same args (or the same tool) can skip the HITL prompt.
+ * Bounded to MAX_CACHE_ENTRIES to avoid unbounded growth in long sessions.
  */
 export interface ApprovalCache {
   /**
@@ -56,16 +59,16 @@ export function keyFor(
 }
 
 /** Recursively sort object keys for deterministic JSON output. */
-function sortKeys(obj: Record<string, unknown>): Record<string, unknown> {
+function sortKeys(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value
+  if (Array.isArray(value)) return value.map(sortKeys)
+  const obj = value as Record<string, unknown>
   const result: Record<string, unknown> = {}
   const keys = Object.keys(obj).sort()
   for (const key of keys) {
     const val = obj[key]
     if (val !== undefined) {
-      result[key] =
-        val !== null && typeof val === 'object' && !Array.isArray(val)
-          ? sortKeys(val as Record<string, unknown>)
-          : val
+      result[key] = sortKeys(val)
     }
   }
   return result
@@ -87,6 +90,11 @@ export class SessionApprovalCache implements ApprovalCache {
     const { kind } = decision
     if (kind !== 'allow_always' && kind !== 'reject_always') return
     const key = keyFor(toolName, args)
+    // Evict oldest entry if at capacity (simple FIFO bound).
+    if (this.map.size >= MAX_CACHE_ENTRIES && !this.map.has(key)) {
+      const first = this.map.keys().next().value
+      if (first !== undefined) this.map.delete(first)
+    }
     this.map.set(key, kind === 'allow_always' ? 'allow' : 'reject')
   }
 

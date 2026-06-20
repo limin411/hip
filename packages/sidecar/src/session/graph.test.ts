@@ -135,4 +135,132 @@ describe('agent loop graph', () => {
       expect(out.messages.some((m) => m instanceof SystemMessage && typeof m.content === 'string' && m.content.includes('早期摘要'))).toBe(true)
     })
   })
+
+  it('plan node generates a plan and pauses for approval', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'create foo', status: 'pending' }] }, id: 'p1' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('create a project with multiple files')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.planningMode).toBe('plan')
+      expect(out.planStatus).toBe('ready')
+      expect(out.plan).toEqual([{ content: 'create foo', status: 'pending' }])
+    })
+  })
+
+  it('plan node regenerates plan on amendment', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'amended step', status: 'pending' }] }, id: 'p2' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('plan something'), new HumanMessage('add more detail')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'generating',
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.plan).toEqual([{ content: 'amended step', status: 'pending' }])
+      expect(out.messages.some((m) => m instanceof HumanMessage && m.content === 'add more detail')).toBe(true)
+    })
+  })
+
+  it('fast path skips the plan node', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([new AIMessage('hi there')])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('hello')],
+          steps: 0,
+          planningMode: 'fast',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.planningMode).toBe('fast')
+      expect(out.planStatus).toBe('none')
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('hi there')
+    })
+  })
+
+  it('verify routing continues execution when plan is approved but incomplete', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'v1' }] }),
+        new AIMessage('done'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do planned work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'pending' }],
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.planningMode).toBe('plan')
+      expect(out.steps).toBeGreaterThanOrEqual(2)
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('done')
+    })
+  })
+
+  it('verify routing pauses on tool failure in plan mode', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'missing_tool', args: {}, id: 'v2' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do planned work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'pending' }],
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.pendingQuestion).toBeTruthy()
+    })
+  })
+
+  it('verify routing ends the turn when all plan items are completed', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'v3' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('finish the plan')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'completed' }],
+        },
+        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
+      )
+      expect(out.status).toBe('running')
+      expect(out.steps).toBe(1)
+    })
+  })
 })

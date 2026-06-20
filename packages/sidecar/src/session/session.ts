@@ -88,7 +88,6 @@ export class Session {
     planningMode?: 'fast' | 'plan'
     planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
     plan?: PlanItem[]
-    planAmendContent?: string
   } | null = null
   private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
@@ -295,7 +294,6 @@ export class Session {
     planningMode?: 'fast' | 'plan'
     planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
     plan?: PlanItem[]
-    planAmendContent?: string
   }): Promise<string> {
     this.abortController = new AbortController(); this.running = true
     let timedOut = false
@@ -455,7 +453,6 @@ export class Session {
             planningMode: initialPlanningMode,
             planStatus: base?.planStatus ?? 'none',
             plan: base?.plan,
-            planAmendContent: base?.planAmendContent,
             verifyMemo: undefined,
           },
           { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
@@ -468,7 +465,6 @@ export class Session {
             planningMode: finalState.planningMode,
             planStatus: finalState.planStatus,
             plan: finalState.plan,
-            planAmendContent: finalState.planAmendContent,
           }
           this.awaitingResume = true
           const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
@@ -573,17 +569,16 @@ export class Session {
         break
       }
       case 'amend': {
+        const content = amendContent ?? 'Please revise the plan.'
         const base = {
-          messages: this.paused.messages,
+          messages: [...this.paused.messages, new HumanMessage(content)],
           steps: this.paused.steps,
           planningMode: 'plan' as const,
           planStatus: 'generating' as const,
           plan: this.paused.plan,
-          planAmendContent: amendContent,
         }
         this.awaitingResume = false; this.paused = null
         const ts = Date.now()
-        const content = amendContent ?? 'Please revise the plan.'
         if (this.store) {
           this.store.insertMessage({ id: `u-${ts}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: ts })
           this.store.touchSession(this.id, ts)

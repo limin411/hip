@@ -1,6 +1,6 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
-import type { AcpConfigOption, AgentFrame, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import type { AcpConfigOption, AgentFrame, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, PlanItem, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
@@ -30,6 +30,8 @@ export interface SessionVM {
   interrupt?: { turnId: string; question: string; context?: string } | null  // pending HITL question; null/absent = none
   configOptions?: AcpConfigOption[]  // agent-advertised model/mode selectors (ACP agents only); absent = none
   pendingPermission?: PendingPermission | null  // pending HITL tool-permission request (ACP agents only); null/absent = none
+  activeTurnPlan?: PlanItem[] | null  // authoritative plan snapshot from plan:published
+  planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
 }
 
 /** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
@@ -224,11 +226,24 @@ export function applyServerMessage(
 
     case 'message:complete': {
       const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', messages: finalizeAssistant(s.messages, finalized) }))
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', activeTurnPlan: null, planApprovalPending: false, messages: finalizeAssistant(s.messages, finalized) }))
     }
 
     case 'agent:interrupt':
-      return update(msg.sessionId, (s) => ({ ...s, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context } }))
+      return update(msg.sessionId, (s) => {
+        let planApprovalPending = false
+        if (msg.context) {
+          try {
+            planApprovalPending = JSON.parse(msg.context).kind === 'plan_approval'
+          } catch {
+            planApprovalPending = false
+          }
+        }
+        return { ...s, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context }, planApprovalPending }
+      })
+
+    case 'plan:published':
+      return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan }))
 
     case 'agent:configOptions':
       return update(msg.sessionId, (s) => ({ ...s, configOptions: msg.options }))
@@ -254,8 +269,8 @@ export function applyServerMessage(
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
-      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, messages: finalizeCancelledMessage(s.messages) }))
-      return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message } }))
+      if (msg.code === 'CANCELLED') return update(msg.sessionId, (s) => ({ ...s, status: 'idle', error: null, activeTurnPlan: null, planApprovalPending: false, messages: finalizeCancelledMessage(s.messages) }))
+      return update(msg.sessionId, (s) => ({ ...s, status: 'error', error: { code: msg.code, message: msg.message }, activeTurnPlan: null, planApprovalPending: false }))
 
     case 'session:list:result': {
       const incoming = msg.sessions.map(summaryToVM)
@@ -312,7 +327,7 @@ export function clearPermission(state: { sessions: SessionVM[] }, requestId: str
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planApprovalPending: false }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -391,7 +406,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
         sess.id !== sessionId
           ? sess
           // Clear any prior error: appending a user message means a retry is underway.
-          : { ...sess, status: 'running' as const, error: null, interrupt: null, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+          : { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
       ),
     })),
 
@@ -401,7 +416,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
         if (sess.id !== sessionId) return sess
         const last = sess.messages[sess.messages.length - 1]
         const messages = last && last.role === 'assistant' ? sess.messages.slice(0, -1) : sess.messages
-        return { ...sess, messages, status: 'running' as const, error: null }
+        return { ...sess, messages, status: 'running' as const, error: null, activeTurnPlan: null, planApprovalPending: false }
       }),
     })),
 

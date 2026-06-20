@@ -50,7 +50,6 @@ const LoopState = Annotation.Root({
   planningMode: Annotation<'fast' | 'plan'>({ reducer: (_prev, next) => next, default: () => 'fast' }),
   planStatus: Annotation<'none' | 'generating' | 'ready' | 'approved' | 'rejected'>({ reducer: (_prev, next) => next, default: () => 'none' }),
   plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
-  planAmendContent: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
 })
 
@@ -143,9 +142,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
   async function planNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     const { runner, tools, emit } = ctxOf(config)
-    const messages: BaseMessage[] = [new SystemMessage(PLANNING_SYSTEM_PROMPT), ...state.messages]
-    if (state.planStatus === 'generating' && state.planAmendContent) {
-      messages.push(new HumanMessage(state.planAmendContent))
+    const messages: BaseMessage[] = [...state.messages]
+    if (messages[0] instanceof SystemMessage) {
+      const original = typeof messages[0].content === 'string' ? messages[0].content : JSON.stringify(messages[0].content)
+      messages[0] = new SystemMessage(`${PLANNING_SYSTEM_PROMPT}\n\n${original}`)
+    } else {
+      messages.unshift(new SystemMessage(PLANNING_SYSTEM_PROMPT))
     }
     const msg = await runner.run(messages, {
       tools,

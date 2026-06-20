@@ -7,10 +7,13 @@ import { cn } from '@/lib/utils'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
+import { PlanApprovalCard } from './PlanApprovalCard'
+import { hasPlanApproval } from './planApproval'
 
 export function ChatPane() {
   const { t } = useTranslation()
   const session = useActiveSession()
+  const showPlanApproval = hasPlanApproval(session)
   const activeSessionId = useActiveSessionId()
   const messages = useActiveMessages()
   const error = useActiveSessionError()
@@ -126,11 +129,19 @@ export function ChatPane() {
             )
           })}
           {showThinking && <ThinkingBubble />}
-          {interrupt && (
+          {interrupt && !showPlanApproval && (
             <div className="rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 text-body text-ink" data-testid="chat-interrupt">
               <p className="flex items-start gap-2"><span aria-hidden>⏸</span><span>{interrupt.question}</span></p>
               <p className="mt-1 text-meta text-ink-secondary">{t('chat.interruptHint')}</p>
             </div>
+          )}
+          {showPlanApproval && session?.activeTurnPlan && (
+            <PlanApprovalCard
+              plan={session.activeTurnPlan}
+              onApprove={() => sessionService.respondPlan('approve')}
+              onReject={() => sessionService.respondPlan('reject')}
+              onAmend={(content) => sessionService.respondPlan('amend', content)}
+            />
           )}
           {error && (
             <div

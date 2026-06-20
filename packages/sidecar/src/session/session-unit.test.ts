@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
-import type { BaseMessage } from '@langchain/core/messages'
+import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ChatGenerationChunk } from '@langchain/core/outputs'
 import { Session, resolveModel } from './session.js'
 import { setActiveModel, DEEPSEEK_DEFAULT } from '../config/providers.js'
+import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 
 type Ev = { type: string; [k: string]: unknown }
 
@@ -222,5 +223,111 @@ describe('Session idle-timeout watchdog', () => {
     await session.sendMessage('hi', (m) => sent.push(m as Ev))
     expect(sent.some((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT')).toBe(false)
     expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+  })
+})
+
+function planRunner(script: { content?: string; toolCalls?: Array<{ name: string; args: Record<string, unknown>; id: string }> }[]): ModelRunner {
+  let i = 0
+  return {
+    async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+      const step = script[Math.min(i, script.length - 1)]
+      i++
+      const msg = new AIMessage({ content: step.content ?? '', tool_calls: step.toolCalls })
+      if (step.content) opts.onText(step.content)
+      return msg
+    },
+  }
+}
+
+describe('Session plan orchestration', () => {
+  it('emits plan:published and plan-context agent:interrupt for complex messages', async () => {
+    const sent: Ev[] = []
+    const runner = planRunner([{ toolCalls: [{ name: 'write_todos', args: { todos: [{ content: 'create files', status: 'pending' }] }, id: 'p1' }] }])
+    const session = new Session(
+      't-plan',
+      { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] },
+      undefined,
+      undefined,
+      undefined,
+      10_000,
+      runner,
+    )
+    await session.sendMessage('first create src/index.ts, then add tests, and finally run the build. Plan this out step by step.', (m) => sent.push(m as Ev))
+
+    const published = sent.find((m) => m.type === 'plan:published')
+    expect(published).toBeDefined()
+    expect((published as Ev).plan).toEqual([{ content: 'create files', status: 'pending' }])
+
+    const interrupt = sent.find((m) => m.type === 'agent:interrupt')
+    expect(interrupt).toBeDefined()
+    expect((interrupt as Ev).context).toContain('plan_approval')
+  })
+
+  it('handlePlanResponse approve resumes execution', async () => {
+    const sent: Ev[] = []
+    const runner = planRunner([
+      { toolCalls: [{ name: 'write_todos', args: { todos: [{ content: 'step one', status: 'pending' }] }, id: 'p2' }] },
+      { content: 'done' },
+    ])
+    const session = new Session(
+      't-plan-approve',
+      { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] },
+      undefined,
+      undefined,
+      undefined,
+      10_000,
+      runner,
+    )
+    await session.sendMessage('first create src/index.ts, then add tests, and finally run the build. Plan this out step by step.', (m) => sent.push(m as Ev))
+    expect(sent.some((m) => m.type === 'agent:interrupt')).toBe(true)
+
+    await session.handlePlanResponse('approve', (m) => sent.push(m as Ev))
+    const completes = sent.filter((m) => m.type === 'message:complete') as Array<{ message?: { content?: string; stopped?: boolean } }>
+    expect(completes.length).toBeGreaterThanOrEqual(1)
+    const final = completes[completes.length - 1]
+    expect(final.message!.content).toBe('done')
+  })
+
+  it('handlePlanResponse reject emits PLAN_REJECTED', async () => {
+    const sent: Ev[] = []
+    const runner = planRunner([{ toolCalls: [{ name: 'write_todos', args: { todos: [{ content: 'step one', status: 'pending' }] }, id: 'p3' }] }])
+    const session = new Session(
+      't-plan-reject',
+      { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] },
+      undefined,
+      undefined,
+      undefined,
+      10_000,
+      runner,
+    )
+    await session.sendMessage('first create src/index.ts, then add tests, and finally run the build. Plan this out step by step.', (m) => sent.push(m as Ev))
+    await session.handlePlanResponse('reject', (m) => sent.push(m as Ev))
+    const err = sent.find((m) => m.type === 'error')
+    expect(err).toBeDefined()
+    expect((err as Ev).code).toBe('PLAN_REJECTED')
+  })
+
+  it('handlePlanResponse amend re-runs the plan node', async () => {
+    const sent: Ev[] = []
+    const runner = planRunner([
+      { toolCalls: [{ name: 'write_todos', args: { todos: [{ content: 'first draft', status: 'pending' }] }, id: 'p4' }] },
+      { toolCalls: [{ name: 'write_todos', args: { todos: [{ content: 'revised draft', status: 'pending' }] }, id: 'p5' }] },
+    ])
+    const session = new Session(
+      't-plan-amend',
+      { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] },
+      undefined,
+      undefined,
+      undefined,
+      10_000,
+      runner,
+    )
+    await session.sendMessage('first create src/index.ts, then add tests, and finally run the build. Plan this out step by step.', (m) => sent.push(m as Ev))
+    await session.handlePlanResponse('amend', (m) => sent.push(m as Ev), 'add more detail')
+
+    const plans = sent.filter((m) => m.type === 'plan:published')
+    expect(plans.length).toBe(2)
+    expect((plans[1] as Ev).plan).toEqual([{ content: 'revised draft', status: 'pending' }])
+    expect(sent.filter((m) => m.type === 'agent:interrupt').length).toBe(2)
   })
 })

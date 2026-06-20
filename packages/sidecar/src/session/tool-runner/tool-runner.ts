@@ -1,6 +1,7 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { PermissionMode } from '@hip/protocol'
 import type { HookRegistry } from '../hooks/registry.js'
+import type { HookResult } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from '../tools.js'
 import type { ApprovalCache } from './approval-cache.js'
 import type { ToolPolicy } from './tool-policy.js'
@@ -89,11 +90,17 @@ export class ToolRunner {
     let invokeArgs = call.args
 
     if (hooks) {
-      const preResult = await hooks.fire('PreToolUse', {
-        sessionId,
-        toolName: call.name,
-        toolInput: call.args,
-      })
+      let preResult: HookResult
+      try {
+        preResult = await hooks.fire('PreToolUse', {
+          sessionId,
+          toolName: call.name,
+          toolInput: call.args,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return this.errorResult(call, `PreToolUse hook error: ${msg}`)
+      }
 
       if (preResult.kind === 'deny') {
         const reason = preResult.reason ? `: ${preResult.reason}` : ''
@@ -154,21 +161,33 @@ export class ToolRunner {
       // ── 5. PostToolUse hooks ─────────────────────────────────────────────
       let finalContent = result
       if (hooks) {
-        const postResult = await hooks.fire('PostToolUse', {
+      let postResult: HookResult
+      try {
+        postResult = await hooks.fire('PostToolUse', {
           sessionId,
           toolName: call.name,
           toolInput: call.args,
           toolOutput: result,
         })
-        if (postResult.updatedInput) {
-          const ui = postResult.updatedInput
-          if (ui !== null && typeof ui === 'object' && 'output' in ui) {
-            finalContent = String(ui.output)
-          } else if (typeof ui === 'string') {
-            finalContent = ui
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`PostToolUse hook error for ${call.name}: ${msg}`)
+        postResult = { kind: 'allow' }
+      }
+      if (postResult.updatedInput) {
+        const ui = postResult.updatedInput
+        if (ui !== null && typeof ui === 'object' && 'output' in ui) {
+          const out = ui.output
+          if (typeof out === 'string') {
+            finalContent = out
+          } else if (out !== undefined && out !== null) {
+            finalContent = JSON.stringify(out)
           }
-          // Otherwise keep original result to avoid '[object Object]'.
+        } else if (typeof ui === 'string') {
+          finalContent = ui
         }
+        // Otherwise keep original result to avoid '[object Object]'.
+      }
       }
 
       return {
@@ -181,12 +200,17 @@ export class ToolRunner {
       this.emitFinished(call.callId, 'error', undefined, error)
 
       if (hooks) {
-        await hooks.fire('PostToolUseFailure', {
-          sessionId,
-          toolName: call.name,
-          toolInput: call.args,
-          toolError: error,
-        })
+        try {
+          await hooks.fire('PostToolUseFailure', {
+            sessionId,
+            toolName: call.name,
+            toolInput: call.args,
+            toolError: error,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.warn(`PostToolUseFailure hook error for ${call.name}: ${msg}`)
+        }
       }
 
       return {

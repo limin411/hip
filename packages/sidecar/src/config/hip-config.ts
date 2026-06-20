@@ -52,6 +52,18 @@ function normalizeAgentEntry(raw: Record<string, unknown>): AgentConfig {
   if (raw.bound_model !== undefined && raw.boundModel === undefined) {
     raw.boundModel = raw.bound_model
   }
+  // Normalize nested BoundModel fields (provider_id→providerID, model_id→modelID)
+  const bm = raw.boundModel as Record<string, unknown> | undefined
+  if (bm) {
+    if (bm.provider_id !== undefined && bm.providerID === undefined) {
+      bm.providerID = bm.provider_id
+    }
+    if (bm.model_id !== undefined && bm.modelID === undefined) {
+      bm.modelID = bm.model_id
+    }
+    delete bm.provider_id
+    delete bm.model_id
+  }
   if (raw.allowed_skills !== undefined && raw.allowedSkills === undefined) {
     raw.allowedSkills = raw.allowed_skills
   }
@@ -101,7 +113,7 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const config: HipConfig = { version: obj.version as number }
 
   // Accept both camelCase and snake_case top-level keys (Rust writes snake_case TOML)
-  const providers = obj.providers ?? obj.providers
+  const providers = obj.providers
   if (Array.isArray(providers)) {
     config.providers = (providers as Record<string, unknown>[]).map(normalizeProviderEntry)
   }
@@ -115,12 +127,12 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.skills = obj.skills as SkillEntry[]
   }
 
-  const agents = obj.agents ?? obj.agents
+  const agents = obj.agents
   if (Array.isArray(agents)) {
     config.agents = (agents as Record<string, unknown>[]).map(normalizeAgentEntry)
   }
 
-  const permissions = obj.permissions ?? obj.permissions
+  const permissions = obj.permissions
   if (permissions && typeof permissions === 'object') {
     config.permissions = normalizePermissionEntry(permissions as Record<string, unknown>)
   }

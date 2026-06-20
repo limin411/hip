@@ -96,3 +96,25 @@ describe.skipIf(!hasKey)('Session with real DeepSeek API', () => {
     }
   })
 })
+
+describe('Session profile delegation', () => {
+  const testConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
+
+  it('setAgentProfile returns true for valid builtin profile id', () => {
+    const session = new Session('test-profile', testConfig)
+    expect(session.setAgentProfile('worker')).toBe(true)
+    expect(session.getActiveProfile().id).toBe('worker')
+  })
+
+  it('setAgentProfile returns false for unknown profile id', () => {
+    const session = new Session('test-profile', testConfig)
+    expect(session.setAgentProfile('nonexistent')).toBe(false)
+  })
+
+  it('getActiveProfile defaults to supervisor', () => {
+    const session = new Session('test-profile', testConfig)
+    const profile = session.getActiveProfile()
+    expect(profile.id).toBe('supervisor')
+    expect(profile.mode).toBe('primary')
+  })
+})

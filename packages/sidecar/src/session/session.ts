@@ -1,4 +1,6 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem } from '@hip/protocol'
+import { mkdir, writeFile, rename } from 'node:fs/promises'
+import { join, dirname } from 'node:path'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -15,13 +17,20 @@ import { buildTools, SELF_GATED_TOOLS } from './tools.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import type { ApprovalFn } from './tools.js'
-import { buildSystemPrompt } from './system-prompt.js'
+import { FragmentRegistry } from './context-fragment.js'
+import {
+  SystemPromptFragment,
+  SkillsFragment,
+  TokenBudgetFragment,
+  CurrentTimeFragment,
+  SubagentNotificationFragment,
+} from './fragments/index.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
 import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
 import { addUsage, sumUsage } from './usage.js'
-import type { Summarizer } from './compaction.js'
+import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import type { ExternalAgentHooks } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
@@ -36,6 +45,8 @@ import { ConfigManager } from './config-manager.js'
 import { deriveTitle, sanitizeTitle, buildDefaultTitleGenerator, type TitleGenerator } from './title-generator.js'
 import { runWorkflowTurn as runWorkflowTurnFn } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
+import { AgentProfileManager } from './agent-profile-manager.js'
+import type { AgentProfile } from './agent-profile.js'
 
 export { sanitizeTitle } from './title-generator.js'
 export type { TitleGenerator } from './title-generator.js'
@@ -58,15 +69,19 @@ function lastUserText(messages: BaseMessage[]): string {
 export function resolveModelChoice(
   config: Pick<SessionConfig, 'llmProvider' | 'model' | 'baseURL'>,
   fallback: { providerID: string; modelID: string; baseURL: string },
+  profileBinding?: { providerID: string; modelID: string },
 ): { providerID: string; modelID: string; baseURL: string } {
+  if (profileBinding) {
+    return { providerID: profileBinding.providerID, modelID: profileBinding.modelID, baseURL: config.baseURL || fallback.baseURL }
+  }
   if (config.model) {
     return { providerID: config.llmProvider || fallback.providerID, modelID: config.model, baseURL: config.baseURL || fallback.baseURL }
   }
   return fallback
 }
 
-function buildModel(config: SessionConfig): ChatOpenAI {
-  return buildChatModel(resolveModelChoice(config, getActiveModel()))
+function buildModel(config: SessionConfig, profileBinding?: { providerID: string; modelID: string }): ChatOpenAI {
+  return buildChatModel(resolveModelChoice(config, getActiveModel(), profileBinding))
 }
 
 const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
@@ -80,6 +95,7 @@ export class Session {
   private readonly injectedModel?: BaseLanguageModel
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
+  private resumeAbortController: AbortController | null = null
   private running = false
   private awaitingResume = false
   private paused: {
@@ -92,20 +108,39 @@ export class Session {
   private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
   private turnSeq = 0
+  private stopContinued = false
   readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
   private readonly invokerFactory: (cwd: string) => AgentInvoker
   readonly backgroundTasks: Map<string, Promise<void>> = new Map()
+  private readonly backgroundTaskMeta: Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }> = new Map()
+  private readonly spawnedSubagentIds = new Set<string>()
   static readonly MAX_BACKGROUND_TASKS = 10
 
   readonly git: GitOperations
   readonly permissions: PermissionManager
   readonly agentProv: AgentProviderManager
   readonly configMgr: ConfigManager
+  private readonly profileMgr = new AgentProfileManager()
   readonly approvalCache = new SessionApprovalCache()
   readonly toolPolicy = defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS })
 
   listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
+
+  private notifyBackgroundResult(taskId: string, send: SendFn): void {
+    const meta = this.backgroundTaskMeta.get(taskId)
+    if (!meta || meta.status === 'running') return
+    send({
+      type: 'agent:notification',
+      sessionId: this.id,
+      taskId,
+      description: meta.description,
+      status: meta.status,
+      ...(meta.result !== undefined ? { result: meta.result } : {}),
+      ...(meta.error !== undefined ? { error: meta.error } : {}),
+    })
+  }
+
   registerHook(hook: Hook): void { this.hooks.register(hook) }
 
   constructor(
@@ -149,7 +184,7 @@ export class Session {
 
   private modelRunner(): ModelRunner {
     if (this.injectedRunner) return this.injectedRunner
-    return new RealModelRunner((this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config))
+    return new RealModelRunner((this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config, this.getActiveProfile().modelBinding))
   }
 
   private summarizer(): Summarizer {
@@ -186,6 +221,11 @@ export class Session {
   setSystemPrompt(systemPrompt: string | null): boolean { return this.configMgr.setSystemPrompt(systemPrompt) }
   applyActiveModel(): boolean { return this.configMgr.applyActiveModel() }
   reloadPlugins(): void { this.configMgr.reloadPlugins() }
+
+  // ── Profile delegation ──
+  setAgentProfile(id: string): boolean { return this.profileMgr.setActiveProfile(id) }
+  getActiveProfile(): AgentProfile { return this.profileMgr.getActiveProfile() }
+  listProfiles(): AgentProfile[] { return this.profileMgr.listProfiles(this._config.cwd) }
 
   // ── FS helpers ──
   async lsDir(absPath: string): Promise<{ entries?: FsEntry[]; error?: string }> {
@@ -326,10 +366,10 @@ export class Session {
     const closeReasoning = (agentId: string) => {
       const burst = reasoning.close(agentId); if (burst) { const r = trajectory.get(agentId); if (r) r.reasoningBursts.push(burst) }
     }
-    const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
+    const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string, agentTaskId?: string) => {
       if (started.has(agentId)) return; started.add(agentId)
       trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
-      send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}) })
     }
     const ensureFinished = (agentId: string, output: string) => {
       if (!started.has(agentId)) return; closeReasoning(agentId)
@@ -357,36 +397,88 @@ export class Session {
     const rawMode = this._config.permissionMode
     const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
     const mcpTools = mcpManager.tools(this.usesEnvModel ? { lazyThreshold: DEFAULT_LAZY_THRESHOLD } : undefined)
-    const system = buildSystemPrompt({ cwd, userInstructions: this._config.systemPrompt, skills, permissionMode: mode, mcpCatalog: mcpManager.toolCatalog() })
+    const registry = new FragmentRegistry()
+    registry.register(new SystemPromptFragment())
+    registry.register(new SkillsFragment())
+    registry.register(new TokenBudgetFragment())
+    registry.register(new CurrentTimeFragment())
+    registry.register(new SubagentNotificationFragment())
+    const usedTokens = estimateTokens(this.messages)
+    const usedPercent = (usedTokens / COMPACT_BUDGET_TOKENS) * 100
+    const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - usedPercent)))
+    const fragmentState = {
+      cwd,
+      customSystemPrompt: this._config.systemPrompt,
+      skills,
+      permissionMode: mode,
+      mcpCatalog: mcpManager.toolCatalog() ? [mcpManager.toolCatalog()] : undefined,
+      tokenBudgetPercent,
+      pendingSubagents: this.backgroundTasks.size > 0
+        ? [...this.backgroundTasks.keys()].map((id) => {
+            const meta = this.backgroundTaskMeta.get(id)
+            return { id, description: meta?.description ?? id, status: 'running' as const }
+          })
+        : undefined,
+      completedSubagents: (() => {
+        const entries = [...this.backgroundTaskMeta.entries()].filter(([, m]) => m.status !== 'running')
+        return entries.length > 0 ? entries.map(([id, m]) => ({ id, description: m.description, status: m.status })) : undefined
+      })(),
+    }
+    const assembled = registry.assemble(fragmentState)
+    const system = assembled.text
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => { if (!delta) return; if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
       reasoning: (delta) => reasoningDelta(agentId, role, delta),
       toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }) },
       toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }) },
       usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
+      planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: this.id, turnId, itemId, delta }) },
     })
     const emit = makeEmit('supervisor', 'supervisor')
     let subagentSeq = 0
-    const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground'): Promise<string> => {
-      const childId = `worker-${++subagentSeq}`
+    const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground', taskId?: string): Promise<string> => {
+      const childId = taskId ?? `worker-${++subagentSeq}`
+      this.spawnedSubagentIds.add(childId)
       if (subagentMode === 'background') {
+        if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
         if (this.backgroundTasks.size >= Session.MAX_BACKGROUND_TASKS) return `Error: maximum ${Session.MAX_BACKGROUND_TASKS} concurrent background tasks reached`
-        ensureStarted(childId, 'worker', 'supervisor', description)
+        ensureStarted(childId, 'worker', 'supervisor', description, taskId)
+        this.backgroundTaskMeta.set(childId, { description, status: 'running' })
         const promise = (async () => {
-          try { ensureFinished(childId, await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval })) }
-          catch (err) { const msg = err instanceof Error ? err.message : String(err); console.error(`Background task ${childId} failed:`, msg); ensureFinished(childId, `Error: ${msg}`) }
-          finally { this.backgroundTasks.delete(childId) }
+          try {
+            const result = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval })
+            const meta = this.backgroundTaskMeta.get(childId)
+            if (meta) { meta.result = result; meta.status = 'completed' }
+            ensureFinished(childId, result)
+          }
+          catch (err) {
+            const msg = err instanceof Error ? err.message : String(err); console.error(`Background task ${childId} failed:`, msg)
+            const meta = this.backgroundTaskMeta.get(childId)
+            if (meta) { meta.error = msg; meta.status = 'failed' }
+            ensureFinished(childId, `Error: ${msg}`)
+          }
+          finally { this.backgroundTasks.delete(childId); this.notifyBackgroundResult(childId, send); this.backgroundTaskMeta.delete(childId) }
         })()
         this.backgroundTasks.set(childId, promise); return `Background task started: ${childId}`
       }
-      ensureStarted(childId, 'worker', 'supervisor', description)
-      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval })
+      if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
+      let existingMessages: BaseMessage[] | undefined
+      if (taskId && this.store) {
+        try {
+          existingMessages = this.store.getMessages(taskId).map((m) => m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+        } catch (err) {
+          console.error(`Failed to load prior messages for subagent ${taskId}:`, err instanceof Error ? err.message : String(err))
+          existingMessages = undefined
+        }
+      }
+      ensureStarted(childId, 'worker', 'supervisor', description, taskId)
+      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text); return text
     }
 
     const enabledAgents = [...readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
     const invoker = this.agentProv.invoker(cwd)
-    const requestApproval = this.permissions.buildRequestApproval(send, this.id, turnId, nextSeq, mode)
+    const requestApproval = this.permissions.buildRequestApproval(send, this.id, turnId, nextSeq, mode, this.hooks)
 
     const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
       const cfg = enabledAgents.find((a) => a.id === agentId)
@@ -406,9 +498,10 @@ export class Session {
       }
     }
 
+    const activeProfile = this.getActiveProfile()
     const tools = buildTools(cwd, spawnSubagent, this._config.cwd,
       enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
-      { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id },
+      { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools },
     )
     const toolRunner = new ToolRunner({
       tools: new Map(tools.map((t) => [t.name, t])),
@@ -424,7 +517,7 @@ export class Session {
         send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
       },
     })
-    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode }
+    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id }
 
     try {
       if (this.agentProv.isExternalAgent()) {
@@ -442,7 +535,7 @@ export class Session {
           forcePlan: this._config.forcePlan,
           disablePlan: this._config.disablePlan,
         })
-        const initialPlanningMode = base?.planningMode ?? (usePlan ? 'plan' : 'fast')
+        const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
         const finalState = await this.app.invoke(
           {
             messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)],
@@ -501,6 +594,27 @@ export class Session {
     }
 
     const finalText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, false, usageByAgent)
+
+    // Stop hook: if a hook returns { kind: 'continue', prompt }, inject the prompt
+    // as a HumanMessage and loop once. Guarded by stopContinued to prevent infinite loops.
+    const stopResult = await this.hooks.fire('Stop', { sessionId: this.id, turnId }).catch(() => ({ kind: 'allow' as const }))
+    if (stopResult.kind === 'continue' && stopResult.prompt && !this.stopContinued) {
+      this.stopContinued = true
+      this.messages.push(new HumanMessage(stopResult.prompt))
+      if (stopResult.additionalContexts) {
+        for (const ctx of stopResult.additionalContexts) {
+          this.messages.push(new SystemMessage(ctx))
+        }
+      }
+      void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+      try {
+        const continuedText = await this.runTurn(rawSend)
+        return continuedText
+      } finally {
+        this.stopContinued = false
+      }
+    }
+
     void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
     const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
     void this.captureCheckpoint(turnId, ckptLabel, send).catch(() => {})
@@ -552,6 +666,24 @@ export class Session {
     if (!this.awaitingResume || !this.paused) return
     switch (action) {
       case 'approve': {
+        // Persist the approved plan to .hip/plans/<sessionId>.json atomically
+        try {
+          const cwd = this._config.cwd ?? process.cwd()
+          const safeId = this.id.replace(/[^a-zA-Z0-9_-]/g, '_')
+          const filePath = join(cwd, '.hip', 'plans', `${safeId}.json`)
+          const dir = dirname(filePath)
+          await mkdir(dir, { recursive: true })
+          const tmpFile = `${filePath}.tmp-${Date.now()}`
+          const planPayload = {
+            sessionId: this.id,
+            plan: this.paused?.plan ?? [],
+            approvedAt: Date.now(),
+          }
+          await writeFile(tmpFile, JSON.stringify(planPayload, null, 2), 'utf8')
+          await rename(tmpFile, filePath)
+        } catch (err) {
+          console.error('Failed to persist approved plan:', err instanceof Error ? err.message : String(err))
+        }
         const base = {
           messages: this.paused.messages,
           steps: this.paused.steps,
@@ -593,6 +725,72 @@ export class Session {
   cancel(): void {
     if (this.awaitingResume) { this.awaitingResume = false; this.paused = null; return }
     this.abortController?.abort()
+    this.resumeAbortController?.abort()
+  }
+
+  async resumeSubagent(taskId: string, content: string, send: SendFn): Promise<void> {
+    if (this.running || this.awaitingResume) return
+    if (this.backgroundTasks.has(taskId)) return
+    if (!this.spawnedSubagentIds.has(taskId)) return
+    this.running = true
+
+    let priorMessages: Message[] = []
+    if (this.store) {
+      try {
+        priorMessages = this.store.getMessages(taskId)
+      } catch (err) {
+        console.error(`Failed to load prior messages for subagent ${taskId}:`, err instanceof Error ? err.message : String(err))
+      }
+    }
+    const existingMessages: BaseMessage[] = priorMessages.map((m) =>
+      m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content),
+    )
+
+    const cwd = this._config.cwd ?? process.cwd()
+    const runner = this.modelRunner()
+    const summarizer = this.summarizer()
+    const rawMode = this._config.permissionMode
+    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const requestApproval = this.permissions.buildRequestApproval(send, this.id, '', () => 0, mode, this.hooks)
+
+    const turnId = `asst-${taskId}-${Date.now()}-${this.turnSeq++}`
+    const ac = new AbortController()
+    this.resumeAbortController = ac
+    const role: AgentRole = 'worker'
+    send({ type: 'agent:started', sessionId: this.id, turnId, agentId: taskId, role, taskId, taskInput: content })
+
+    let output = ''
+    const emit: GraphEmit = {
+      token: (delta) => { if (delta) { output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId: taskId, delta }) } },
+      reasoning: () => {},
+      toolStarted: (name, callId, input) => { const inClip = clip(stringify(input)); send({ type: 'tool:started', sessionId: this.id, turnId, agentId: taskId, role, callId, name, input: inClip.text, seq: 0, ...(inClip.truncated ? { truncated: true } : {}) }) },
+      toolFinished: (callId, status, resOutput, error) => { const outClip = resOutput !== undefined ? clip(stringify(resOutput)) : undefined; send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: taskId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }) },
+      usage: () => {},
+      planDelta: () => {},
+    }
+
+    try {
+      const text = await runSubagent({
+        runner, root: cwd, summarizer, emit, signal: ac.signal,
+        description: content, childMaxSteps: CHILD_MAX_STEPS,
+        permissionMode: mode, requestApproval,
+        existingMessages: [...existingMessages, new HumanMessage(content)],
+      })
+      send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
+      const ts = Date.now()
+      send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: text, agentId: taskId, timestamp: ts } })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
+      } else {
+        const msg = err instanceof Error ? err.message : String(err)
+        send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
+        send({ type: 'error', sessionId: this.id, code: 'AGENT_ERROR', message: msg })
+      }
+    } finally {
+      this.running = false
+      this.resumeAbortController = null
+    }
   }
 
   async destroy(): Promise<void> {
@@ -601,7 +799,9 @@ export class Session {
       const timeout = new Promise<'timed_out'>((resolve) => setTimeout(() => resolve('timed_out'), 5_000))
       await Promise.race([Promise.allSettled([...this.backgroundTasks.values()]).then(() => 'settled' as const), timeout])
       this.backgroundTasks.clear()
+      this.backgroundTaskMeta.clear()
     }
+    this.spawnedSubagentIds.clear()
     this.agentProv.dispose()
   }
 }

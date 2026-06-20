@@ -84,7 +84,10 @@ export function configToToml(config: HipConfig): string {
     }
   }
 
-  // permissions: inline table (single section)
+  // permissions: 细粒度工具权限控制（不在设置页面中展示，仅可在本 raw TOML 编辑器中配置）。
+  // Fine-grained tool permissions (not surfaced in the Settings UI — configure here in raw TOML).
+  // 粗粒度权限（chat / edit / full）通过对话输入框内的权限选择器控制，优先级高于此处细粒度配置。
+  // Coarse permission modes (chat/edit/full) are set via the PermissionModePicker in the composer and take priority.
   if (config.permissions) {
     lines.push('[permissions]')
     lines.push(`coarse_mode = ${tomlStr(config.permissions.coarseMode)}`)

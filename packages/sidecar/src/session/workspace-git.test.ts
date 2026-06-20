@@ -497,6 +497,22 @@ describe('collectCommitLog', () => {
   it('reports not_a_repo for a plain folder', async () => {
     expect((await collectCommitLog(root, null)).state).toBe('not_a_repo')
   })
+  it('caps full-history results to 100 with --max-count', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), '0\n')
+    await makeRepo(root)
+    await git(root, 'config', 'user.name', 'test')
+    await git(root, 'config', 'user.email', 'test@test')
+    for (let i = 0; i < 105; i++) {
+      await fs.writeFile(path.join(root, 'a.txt'), `commit-${i}\n`)
+      await git(root, 'add', '-A')
+      await git(root, 'commit', '-m', `commit-${i}`)
+    }
+    const r = await collectCommitLog(root, null)
+    expect(r.state).toBe('ok')
+    expect(r.commits!.length).toBe(100)
+    expect(r.commits![0].message).toBe('commit-104')
+    expect(r.commits![99].message).toBe('commit-5')
+  }, { timeout: 30000 })
 })
 
 describe('listBranches + switchBranch', () => {

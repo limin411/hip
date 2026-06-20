@@ -51,7 +51,7 @@ export class SessionStore {
     this.db.prepare(`UPDATE sessions SET current_branch=? WHERE id=?`).run(branch, id)
   }
 
-  /** Record the session-start commit (commit-log lower bound; NULL on unborn HEAD). */
+  /** Record the session-start commit (checkpoint seed / session-start marker; NULL on unborn HEAD). */
   setSessionStartCommit(id: string, sha: string | null): void {
     this.db.prepare(`UPDATE sessions SET session_start_commit=? WHERE id=?`).run(sha, id)
   }

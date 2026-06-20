@@ -136,7 +136,7 @@ export class GitOperations {
   /** Commit log session-start..HEAD. */
   async commitLog(cwd: string | undefined): Promise<{ state: DiffState; commits?: CommitLogEntry[]; error?: string }> {
     if (!cwd) return { state: 'no_cwd' }
-    const start = this.store?.getSessionGitMeta(this.sessionId).sessionStartCommit ?? null
+    const start = null
     return workspaceGit.collectCommitLog(cwd, start)
   }
 

@@ -330,7 +330,9 @@ export async function collectCommitLog(cwd: string, startCommit: string | null, 
     // %x1f = unit-sep (field), %x1e = record-sep (commit). %ct = committer unix time.
     const FMT = '--format=%H%x1f%h%x1f%an%x1f%ct%x1f%s%x1e'
     const range = startCommit ? `${startCommit}..HEAD` : 'HEAD'
-    const out = (await runGit(cwd, ['log', FMT, range], gitBin)).stdout
+    const args = ['log', FMT, range]
+    if (startCommit === null) args.push('--max-count=100')
+    const out = (await runGit(cwd, args, gitBin)).stdout
     const commits: CommitLogEntry[] = []
     for (const rec of out.split('\x1e')) {
       const r = rec.replace(/^\n+/, '')

@@ -1,7 +1,7 @@
 // src/domain/hooks.ts
 import type { AcpConfigOption, Message, SearchHit, TurnUsage } from '@hip/protocol'
 import { useShallow } from 'zustand/react/shallow'
-import { useDomainStore, type PendingPermission, type SessionError, type SessionVM } from './sessionStore'
+import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
 
 const EMPTY_MESSAGES: Message[] = []
 const EMPTY_CONFIG_OPTIONS: AcpConfigOption[] = []
@@ -81,4 +81,8 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
  *  useShallow caches by value, so the snapshot stays referentially stable until the totals change. */
 export function useActiveUsageTotal(): TurnUsage | null {
   return useDomainStore(useShallow(selectUsageTotal))
+}
+
+export function useMcpStatuses(): McpServerStatusVM[] {
+  return useDomainStore((s) => s.mcpStatuses)
 }

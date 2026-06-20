@@ -9,6 +9,8 @@ import * as workspaceGit from './workspace-git.js'
 import { getWorktreesDir } from './worktree-config.js'
 import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { mcpManager } from './mcp/manager.js'
+import { promptRegistry } from './mcp/prompt-registry.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -262,6 +264,34 @@ export class SessionManager {
       case 'workflow:run':
         await this.ensureSession(msg.sessionId).runWorkflowTurn(msg.def, send)
         break
+      case 'mcp:listResources': {
+        const resources = mcpManager.allResources().filter((r) => r.serverId === msg.serverId)
+        send({ type: 'mcp:listResources:result', serverId: msg.serverId, resources })
+        break
+      }
+      case 'mcp:readResource': {
+        const r = await mcpManager.readResource(msg.serverId, msg.uri)
+        send(
+          r.error
+            ? { type: 'mcp:readResource:result', serverId: msg.serverId, uri: msg.uri, contents: [], error: r.error }
+            : { type: 'mcp:readResource:result', serverId: msg.serverId, uri: msg.uri, contents: r.contents },
+        )
+        break
+      }
+      case 'mcp:listPrompts': {
+        const prompts = promptRegistry.listAll().filter((p) => p.serverId === msg.serverId)
+        send({ type: 'mcp:listPrompts:result', serverId: msg.serverId, prompts })
+        break
+      }
+      case 'mcp:getPrompt': {
+        const r = await promptRegistry.execute(msg.serverId, msg.name, msg.arguments)
+        send(
+          r.error
+            ? { type: 'mcp:getPrompt:result', serverId: msg.serverId, name: msg.name, messages: [], error: r.error }
+            : { type: 'mcp:getPrompt:result', serverId: msg.serverId, name: msg.name, messages: r.messages },
+        )
+        break
+      }
     }
   }
 

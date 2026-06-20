@@ -4,6 +4,9 @@
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::{Component, Path, PathBuf};
+use tauri::AppHandle;
+
+use crate::paths;
 
 /// Resolve a zip entry's relative path against `dest`, rejecting anything that
 /// would escape `dest` (zip-slip). Returns `None` for absolute paths, paths with
@@ -51,6 +54,16 @@ pub fn slugify(name: &str) -> String {
     }
 }
 
+/// Named argument a skill accepts (frontmatter `arguments` list item).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillArgument {
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
+}
+
 /// Mirrors the protocol `SkillMeta` shape (camelCase over the wire to the renderer).
 /// Serialized as the JSON array returned by `list_skills`.
 #[derive(Serialize)]
@@ -61,13 +74,73 @@ pub struct SkillMeta {
     pub description: String,
     pub dir: String,
     pub has_scripts: bool,
+    pub scope: String,
+    // ── extended fields (mirrors TS SkillMeta) ──
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_invoke: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_invocable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allowed_tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disallowed_tools: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paths: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<Vec<SkillArgument>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shell: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disable_shell_execution: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_references: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_assets: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
 }
 
 /// The subset of `SKILL.md` YAML frontmatter we read. Extra keys are ignored.
+/// Accepts snake_case, kebab-case, and camelCase YAML keys via serde aliases.
 #[derive(Deserialize)]
 pub struct Frontmatter {
     pub name: Option<String>,
     pub description: Option<String>,
+    #[allow(dead_code)]
+    pub scope: Option<String>,
+    #[allow(dead_code)]
+    #[serde(alias = "autoInvoke", alias = "auto-invoke")]
+    pub auto_invoke: Option<bool>,
+    #[allow(dead_code)]
+    #[serde(alias = "userInvocable", alias = "user-invocable")]
+    pub user_invocable: Option<bool>,
+    #[allow(dead_code)]
+    #[serde(alias = "allowedTools", alias = "allowed-tools")]
+    pub allowed_tools: Option<Vec<String>>,
+    #[allow(dead_code)]
+    #[serde(alias = "disallowedTools", alias = "disallowed-tools")]
+    pub disallowed_tools: Option<Vec<String>>,
+    #[allow(dead_code)]
+    pub context: Option<String>,
+    #[allow(dead_code)]
+    pub paths: Option<Vec<String>>,
+    #[allow(dead_code)]
+    pub model: Option<String>,
+    #[allow(dead_code)]
+    pub effort: Option<String>,
+    #[allow(dead_code)]
+    pub arguments: Option<Vec<SkillArgument>>,
+    #[allow(dead_code)]
+    pub shell: Option<String>,
+    #[allow(dead_code)]
+    #[serde(alias = "disableShellExecution", alias = "disable-shell-execution")]
+    pub disable_shell_execution: Option<bool>,
 }
 
 /// Parse the leading `---\n...\n---` YAML block of a `SKILL.md` body.
@@ -86,10 +159,10 @@ pub fn parse_frontmatter(body: &str) -> Option<Frontmatter> {
     serde_yaml::from_str::<Frontmatter>(yaml).ok()
 }
 
-/// Scan `<root>/*/SKILL.md`, parse frontmatter, and build a `SkillMeta` per valid
-/// skill. Directories without a parseable `SKILL.md` (or missing a `name`) are
-/// skipped. Never panics; a missing/unreadable root yields an empty list.
-pub fn scan_skills(root: &Path) -> Vec<SkillMeta> {
+/// Scan a single skill directory, parsing `SKILL.md` frontmatter for every
+/// subdirectory. Directories without a parseable `SKILL.md` (or missing a `name`)
+/// are skipped. Never panics; a missing/unreadable root yields an empty list.
+fn scan_one_dir(root: &Path, scope: &str) -> Vec<SkillMeta> {
     let mut out = Vec::new();
     let entries = match std::fs::read_dir(root) {
         Ok(e) => e,
@@ -118,15 +191,62 @@ pub fn scan_skills(root: &Path) -> Vec<SkillMeta> {
             None => continue,
         };
         let has_scripts = dir.join("scripts").is_dir();
+        let has_references = dir.join("references").is_dir();
+        let has_assets = dir.join("assets").is_dir();
         out.push(SkillMeta {
             id,
             name,
             description: fm.description.unwrap_or_default(),
             dir: dir.to_string_lossy().into_owned(),
             has_scripts,
+            scope: scope.to_string(),
+            auto_invoke: fm.auto_invoke,
+            user_invocable: fm.user_invocable,
+            allowed_tools: fm.allowed_tools,
+            disallowed_tools: fm.disallowed_tools,
+            context: fm.context,
+            paths: fm.paths,
+            model: fm.model,
+            effort: fm.effort,
+            arguments: fm.arguments,
+            shell: fm.shell,
+            disable_shell_execution: fm.disable_shell_execution,
+            has_references: Some(has_references),
+            has_assets: Some(has_assets),
+            plugin_id: None,
         });
     }
     out
+}
+
+/// Pure core: scan from explicit directories. Testable without AppHandle.
+fn scan_skills_from_dirs(global_root: Option<&Path>, project_root: Option<&Path>) -> Vec<SkillMeta> {
+    let mut metas: Vec<SkillMeta> = if let Some(dir) = global_root {
+        scan_one_dir(dir, "global")
+    } else {
+        Vec::new()
+    };
+
+    if let Some(root) = project_root {
+        let project_skills_dir = root.join(".hip").join("skills");
+        let project = scan_one_dir(&project_skills_dir, "project");
+        for ps in &project {
+            metas.retain(|g| g.id != ps.id);
+        }
+        metas.extend(project);
+    }
+
+    metas.sort_by(|a, b| a.id.cmp(&b.id));
+    metas
+}
+
+/// Scan global skills (`~/.hip/skills`) and optionally project skills
+/// (`<project_root>/.hip/skills`). When both exist, project skills with the
+/// same id overwrite global ones. Never panics; a missing root yields an empty
+/// list for that level.
+pub fn scan_skills(app: &AppHandle, project_root: Option<&Path>) -> Vec<SkillMeta> {
+    let global_dir = paths::skills_dir(app);
+    scan_skills_from_dirs(global_dir.as_deref(), project_root)
 }
 
 /// Extract every entry of `zip_path` into `dest`, skipping any entry whose
@@ -179,6 +299,13 @@ mod tests {
     use super::{safe_join, slugify};
     use std::io::Write;
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static TID: AtomicUsize = AtomicUsize::new(0);
+    fn unique_dir(label: &str) -> PathBuf {
+        let n = TID.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("hip-{label}-{}-{n}", std::process::id()))
+    }
 
     #[test]
     fn safe_join_allows_nested_normal_paths() {
@@ -234,9 +361,149 @@ mod tests {
     }
 
     #[test]
-    fn scan_skills_lists_valid_dirs_and_flags_scripts() {
-        let root = std::env::temp_dir()
-            .join(format!("hip-skills-scan-{}", std::process::id()));
+    fn parse_frontmatter_reads_extended_fields() {
+        let md = "\
+---
+name: PDF Tools
+description: Work with PDFs
+auto_invoke: true
+user_invocable: false
+allowed_tools:
+  - read_file
+  - write_file
+disallowed_tools:
+  - delete_file
+context: fork
+paths:
+  - \"*.pdf\"
+  - \"*.docx\"
+model: claude-sonnet-4-20250514
+effort: high
+arguments:
+  - name: input_file
+    description: The input file path
+    required: true
+  - name: output_dir
+    description: Where to save output
+shell: bash
+disable_shell_execution: true
+---
+# Body
+";
+        let fm = super::parse_frontmatter(md).unwrap();
+        assert_eq!(fm.name.as_deref(), Some("PDF Tools"));
+        assert_eq!(fm.description.as_deref(), Some("Work with PDFs"));
+        assert_eq!(fm.auto_invoke, Some(true));
+        assert_eq!(fm.user_invocable, Some(false));
+        assert_eq!(
+            fm.allowed_tools.as_deref(),
+            Some(&["read_file".to_string(), "write_file".to_string()][..]),
+        );
+        assert_eq!(
+            fm.disallowed_tools.as_deref(),
+            Some(&["delete_file".to_string()][..]),
+        );
+        assert_eq!(fm.context.as_deref(), Some("fork"));
+        assert_eq!(
+            fm.paths.as_deref(),
+            Some(&["*.pdf".to_string(), "*.docx".to_string()][..]),
+        );
+        assert_eq!(fm.model.as_deref(), Some("claude-sonnet-4-20250514"));
+        assert_eq!(fm.effort.as_deref(), Some("high"));
+        let args = fm.arguments.as_ref().unwrap();
+        assert_eq!(args.len(), 2);
+        assert_eq!(args[0].name, "input_file");
+        assert_eq!(args[0].description, "The input file path");
+        assert_eq!(args[0].required, Some(true));
+        assert_eq!(args[1].name, "output_dir");
+        assert_eq!(args[1].description, "Where to save output");
+        assert_eq!(args[1].required, None); // not specified → None
+        assert_eq!(fm.shell.as_deref(), Some("bash"));
+        assert_eq!(fm.disable_shell_execution, Some(true));
+    }
+
+    #[test]
+    fn parse_frontmatter_missing_fields_default_to_none() {
+        let md = "---\nname: Minimal\ndescription: Just basics\n---\n# Body\n";
+        let fm = super::parse_frontmatter(md).unwrap();
+        assert_eq!(fm.name.as_deref(), Some("Minimal"));
+        assert_eq!(fm.description.as_deref(), Some("Just basics"));
+        assert!(fm.auto_invoke.is_none());
+        assert!(fm.user_invocable.is_none());
+        assert!(fm.allowed_tools.is_none());
+        assert!(fm.disallowed_tools.is_none());
+        assert!(fm.context.is_none());
+        assert!(fm.paths.is_none());
+        assert!(fm.model.is_none());
+        assert!(fm.effort.is_none());
+        assert!(fm.arguments.is_none());
+        assert!(fm.shell.is_none());
+        assert!(fm.disable_shell_execution.is_none());
+    }
+
+    #[test]
+    fn scan_one_dir_reads_extended_fields_and_flags_dirs() {
+        let root = unique_dir("skills-extended");
+        let _ = std::fs::remove_dir_all(&root);
+        let dir = root.join("my-skill");
+        std::fs::create_dir_all(dir.join("scripts")).unwrap();
+        std::fs::create_dir_all(dir.join("references")).unwrap();
+        // No assets/ dir — should be flagged as false.
+        std::fs::write(
+            dir.join("SKILL.md"),
+            "\
+---
+name: Extended Skill
+description: A skill with all fields
+auto_invoke: false
+user_invocable: true
+allowed_tools:
+  - read_file
+context: inline
+paths:
+  - \"*.ts\"
+model: gpt-5
+effort: medium
+shell: powershell
+disable_shell_execution: false
+---
+body
+",
+        )
+        .unwrap();
+
+        let metas = super::scan_one_dir(&root, "global");
+        assert_eq!(metas.len(), 1);
+        let m = &metas[0];
+        assert_eq!(m.id, "my-skill");
+        assert_eq!(m.name, "Extended Skill");
+        assert_eq!(m.description, "A skill with all fields");
+        assert!(m.has_scripts);
+        assert_eq!(m.scope, "global");
+        assert_eq!(m.auto_invoke, Some(false));
+        assert_eq!(m.user_invocable, Some(true));
+        assert_eq!(
+            m.allowed_tools.as_deref(),
+            Some(&["read_file".to_string()][..]),
+        );
+        assert_eq!(m.context.as_deref(), Some("inline"));
+        assert_eq!(
+            m.paths.as_deref(),
+            Some(&["*.ts".to_string()][..]),
+        );
+        assert_eq!(m.model.as_deref(), Some("gpt-5"));
+        assert_eq!(m.effort.as_deref(), Some("medium"));
+        assert_eq!(m.shell.as_deref(), Some("powershell"));
+        assert_eq!(m.disable_shell_execution, Some(false));
+        assert_eq!(m.has_references, Some(true));
+        assert_eq!(m.has_assets, Some(false));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scan_one_dir_lists_valid_dirs_and_flags_scripts() {
+        let root = unique_dir("skills-scan");
         let _ = std::fs::remove_dir_all(&root);
         // Valid skill with a scripts/ dir.
         let a = root.join("pdf-tools");
@@ -258,25 +525,103 @@ mod tests {
         // A non-skill dir (no SKILL.md) — must be skipped.
         std::fs::create_dir_all(root.join("junk")).unwrap();
 
-        let mut metas = super::scan_skills(&root);
+        let mut metas = super::scan_one_dir(&root, "global");
         metas.sort_by(|x, y| x.id.cmp(&y.id));
         assert_eq!(metas.len(), 2);
         let notes = metas.iter().find(|m| m.id == "notes").unwrap();
         assert_eq!(notes.name, "Notes");
         assert_eq!(notes.description, "Take notes");
         assert!(!notes.has_scripts);
+        assert_eq!(notes.scope, "global");
         let pdf = metas.iter().find(|m| m.id == "pdf-tools").unwrap();
         assert_eq!(pdf.name, "PDF Tools");
         assert!(pdf.has_scripts);
+        assert_eq!(pdf.scope, "global");
 
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
-    fn scan_skills_missing_root_is_empty() {
-        let root = std::env::temp_dir().join("hip-skills-does-not-exist-xyz");
+    fn scan_one_dir_missing_root_is_empty() {
+        let root = unique_dir("does-not-exist");
         let _ = std::fs::remove_dir_all(&root);
-        assert!(super::scan_skills(&root).is_empty());
+        assert!(super::scan_one_dir(&root, "global").is_empty());
+    }
+
+    /// Helper: write a minimal skill SKILL.md into a subdir of `root`.
+    fn write_skill(root: &Path, id: &str, name: &str, description: &str) {
+        let dir = root.join(id);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: {description}\n---\nbody"),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn scan_skills_from_dirs_no_project_returns_only_global() {
+        let global = unique_dir("skills-global");
+        let _ = std::fs::remove_dir_all(&global);
+        write_skill(&global, "pdf-tools", "PDF Tools", "Work with PDFs");
+        write_skill(&global, "notes", "Notes", "Take notes");
+
+        let metas = super::scan_skills_from_dirs(Some(&global), None);
+        assert_eq!(metas.len(), 2);
+        assert_eq!(metas[0].id, "notes");
+        assert_eq!(metas[1].id, "pdf-tools");
+        assert!(metas.iter().all(|m| m.scope == "global"));
+
+        let _ = std::fs::remove_dir_all(&global);
+    }
+
+    #[test]
+    fn scan_skills_from_dirs_project_empty_returns_only_global() {
+        let global = unique_dir("skills-global");
+        let _ = std::fs::remove_dir_all(&global);
+        write_skill(&global, "pdf-tools", "PDF Tools", "Work with PDFs");
+
+        // Project root exists but has no .hip/skills/ dir.
+        let project = unique_dir("skills-project-empty");
+        let _ = std::fs::remove_dir_all(&project);
+        std::fs::create_dir_all(&project).unwrap();
+
+        let metas = super::scan_skills_from_dirs(Some(&global), Some(&project));
+        assert_eq!(metas.len(), 1);
+        assert_eq!(metas[0].id, "pdf-tools");
+        assert_eq!(metas[0].scope, "global");
+
+        let _ = std::fs::remove_dir_all(&global);
+        let _ = std::fs::remove_dir_all(&project);
+    }
+
+    #[test]
+    fn scan_skills_from_dirs_project_overrides_global() {
+        let global = unique_dir("skills-global");
+        let _ = std::fs::remove_dir_all(&global);
+        write_skill(&global, "pdf-tools", "PDF Tools (global)", "Global version");
+        write_skill(&global, "notes", "Notes", "Take notes");
+
+        let project = unique_dir("skills-project");
+        let _ = std::fs::remove_dir_all(&project);
+        let project_skills = project.join(".hip").join("skills");
+        write_skill(&project_skills, "pdf-tools", "PDF Tools (project)", "Project override");
+        // Also add a project-only skill.
+        write_skill(&project_skills, "my-project-tool", "My Tool", "Project tool");
+
+        let metas = super::scan_skills_from_dirs(Some(&global), Some(&project));
+        // Expect: my-project-tool (project), notes (global), pdf-tools (project overrides global)
+        assert_eq!(metas.len(), 3);
+        assert_eq!(metas[0].id, "my-project-tool");
+        assert_eq!(metas[0].scope, "project");
+        assert_eq!(metas[1].id, "notes");
+        assert_eq!(metas[1].scope, "global");
+        assert_eq!(metas[2].id, "pdf-tools");
+        assert_eq!(metas[2].scope, "project");
+        assert_eq!(metas[2].name, "PDF Tools (project)");
+
+        let _ = std::fs::remove_dir_all(&global);
+        let _ = std::fs::remove_dir_all(&project);
     }
 
     fn make_zip(entries: &[(&str, &[u8])]) -> PathBuf {

@@ -10,6 +10,8 @@ const base: McpForm = {
   url: '',
   headers: [],
   enabled: true,
+  enabledTools: [],
+  disabledTools: [],
 }
 
 describe('isMcpDraftValid', () => {
@@ -85,6 +87,8 @@ describe('mcpConfigToForm', () => {
       url: '',
       headers: [],
       enabled: false,
+      enabledTools: [],
+      disabledTools: [],
     })
   })
 })

@@ -14,6 +14,8 @@ export interface McpForm {
   url: string
   headers: KvPair[]
   enabled: boolean
+  enabledTools: string[]
+  disabledTools: string[]
 }
 
 export const EMPTY_MCP_FORM: McpForm = {
@@ -25,6 +27,8 @@ export const EMPTY_MCP_FORM: McpForm = {
   url: '',
   headers: [],
   enabled: true,
+  enabledTools: [],
+  disabledTools: [],
 }
 
 /** stdio needs a command; sse/http need a url. Name is always required. */
@@ -52,11 +56,15 @@ function kvToRecord(pairs: KvPair[]): Record<string, string> | undefined {
 /** Form → the persisted McpServerConfig minus id (the store mints the id). */
 export function buildMcpDraft(f: McpForm): Omit<McpServerConfig, 'id'> {
   const base = { name: f.name.trim(), transport: f.transport, enabled: f.enabled }
+  const extras: Partial<McpServerConfig> = {}
+  if (f.enabledTools.length > 0) extras.enabledTools = f.enabledTools
+  if (f.disabledTools.length > 0) extras.disabledTools = f.disabledTools
   if (f.transport === 'stdio') {
     const args = splitArgs(f.args)
     const env = kvToRecord(f.env)
     return {
       ...base,
+      ...extras,
       command: f.command.trim(),
       ...(args.length ? { args } : {}),
       ...(env ? { env } : {}),
@@ -65,6 +73,7 @@ export function buildMcpDraft(f: McpForm): Omit<McpServerConfig, 'id'> {
   const headers = kvToRecord(f.headers)
   return {
     ...base,
+    ...extras,
     url: f.url.trim(),
     ...(headers ? { headers } : {}),
   }
@@ -83,5 +92,7 @@ export function mcpConfigToForm(c: McpServerConfig): McpForm {
     url: c.url ?? '',
     headers: toPairs(c.headers),
     enabled: c.enabled,
+    enabledTools: c.enabledTools ?? [],
+    disabledTools: c.disabledTools ?? [],
   }
 }

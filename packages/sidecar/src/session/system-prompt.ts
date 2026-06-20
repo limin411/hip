@@ -1,4 +1,38 @@
+import { globSync } from 'node:fs'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
+
+// ── Skill budget & LRU eviction ─────────────────────────────────────────
+
+/** Tracks skill invocation counts per session. Used by LRU eviction to determine
+ *  which skills are least-used when the skill block exceeds the context budget. */
+export class SkillUsageTracker {
+  private counts = new Map<string, number>()
+
+  /** Record that a skill was invoked (called whenever use_skill succeeds). */
+  recordInvocation(skillId: string): void {
+    this.counts.set(skillId, (this.counts.get(skillId) ?? 0) + 1)
+  }
+
+  /** Get the invocation count for a skill (0 if never used). */
+  getCount(skillId: string): number {
+    return this.counts.get(skillId) ?? 0
+  }
+
+  /** Snapshot of all tracked counts (for debugging). */
+  snapshot(): ReadonlyMap<string, number> {
+    return new Map(this.counts)
+  }
+}
+
+/** Budget for the "## Skills" block in the system prompt.
+ *  @param contextWindowTokens The model's context window size in tokens (e.g. 128000 for 128k).
+ *    When not provided, defaults to 128000 (a typical modern model).
+ *  @returns Character budget capped at 2000 — 1% of the token window, assuming ~4 chars/token. */
+export function getSkillsBudget(contextWindowTokens?: number): number {
+  const tokens = contextWindowTokens ?? 128_000
+  const charBudget = Math.floor(tokens * 0.01 * 4)
+  return Math.min(charBudget, 2000)
+}
 
 const ANTI_PHANTOM =
   'You MUST NOT claim, state, or imply any file was created, written, saved, or modified ' +
@@ -56,14 +90,102 @@ function cwdBlock(cwd: string, permissionMode?: PermissionMode): string {
   )
 }
 
-/** A short "## 可用 Skills" block listing each enabled skill, instructing the model to call use_skill. */
-function skillsBlock(skills: SkillMeta[]): string {
-  const lines = skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
-  return (
-    '## 可用 Skills\n' +
-    '以下技能可按需加载。当任务匹配某技能时，调用 use_skill 工具（参数 name）把其完整说明读入上下文，再据此操作。\n' +
-    lines
-  )
+/** Options for the skills block builder. */
+export interface SkillsBlockOptions {
+  /** Max character budget for the entire "## Skills" block (default: no limit). */
+  budget?: number
+  /** Tracker to determine which skills are least-used for LRU eviction. */
+  tracker?: SkillUsageTracker
+}
+
+/** A short "## Skills" block listing auto-invoke-eligible skills with descriptions,
+ *  instructing the model to call use_skill when a task matches. Skills where
+ *  autoInvoke === false are omitted. Skills with a `paths` glob are only included
+ *  when the cwd contains at least one file matching a pattern.
+ *
+ *  When `budget` is set, the block is trimmed to fit: descriptions are truncated
+ *  (min 50 chars each), then least-invoked skills are LRU-evicted until the block
+ *  fits. A warning is logged when skills are evicted. */
+export function skillsBlock(skills: SkillMeta[], cwd?: string, opts?: SkillsBlockOptions): string {
+  const eligible = skills.filter((s) => s.autoInvoke !== false)
+
+  const filtered = eligible.filter((s) => {
+    if (!s.paths || s.paths.length === 0) return true
+    if (!cwd) return false
+    try {
+      const matches = globSync(s.paths, { cwd })
+      return matches.length > 0
+    } catch {
+      return false
+    }
+  })
+
+  if (filtered.length === 0) return ''
+
+  const scopeTag = (s: SkillMeta) => (s.scope === 'project' ? ' (project)' : s.scope === 'plugin' ? ' (plugin)' : '')
+
+  const header =
+    '## Skills\n' +
+    'When a user\'s task matches a skill\'s description, call use_skill({ name }) to load its full instructions. ' +
+    'Only use skills listed below.\n'
+
+  if (!opts?.budget || opts.budget <= 0) {
+    const lines = filtered.map((s) => `- ${s.name}${scopeTag(s)}: ${s.description}`).join('\n')
+    return header + lines
+  }
+
+  // Budget-aware mode: build lines, truncate descriptions, then LRU-evict
+  const budget = opts.budget
+  const tracker = opts.tracker
+
+  // Phase 1: Truncate descriptions to save space (min 50 chars)
+  const makeLine = (s: SkillMeta): string => {
+    const desc = s.description.length > 100 ? s.description.slice(0, 97) + '...' : s.description
+    return `- ${s.name}${scopeTag(s)}: ${desc}`
+  }
+
+  let linesWithMeta = filtered.map((s) => ({ skill: s, line: makeLine(s) }))
+
+  // Phase 2: If still over budget, further truncate descriptions (min 50 chars)
+  const MIN_DESC = 50
+  const tightenLine = (s: SkillMeta): string => {
+    const desc = s.description.slice(0, MIN_DESC) + (s.description.length > MIN_DESC ? '...' : '')
+    return `- ${s.name}${scopeTag(s)}: ${desc}`
+  }
+
+  let currentBlock = header + linesWithMeta.map((l) => l.line).join('\n')
+  if (currentBlock.length > budget) {
+    linesWithMeta = linesWithMeta.map((l) => ({ ...l, line: tightenLine(l.skill) }))
+    currentBlock = header + linesWithMeta.map((l) => l.line).join('\n')
+  }
+
+  // Phase 3: LRU-evict least-used skills until block fits
+  const evicted: string[] = []
+  if (currentBlock.length > budget) {
+    // Sort: least-invoked first (tie-break: alphabetically for determinism)
+    linesWithMeta.sort((a, b) => {
+      const countA = tracker?.getCount(a.skill.id) ?? 0
+      const countB = tracker?.getCount(b.skill.id) ?? 0
+      if (countA !== countB) return countA - countB
+      return a.skill.id.localeCompare(b.skill.id)
+    })
+
+    while (currentBlock.length > budget && linesWithMeta.length > 0) {
+      const evictedMeta = linesWithMeta.shift()!
+      evicted.push(evictedMeta.skill.id)
+      currentBlock = header + linesWithMeta.map((l) => l.line).join('\n')
+    }
+
+    if (evicted.length > 0) {
+      console.warn(
+        `[system-prompt] Skills block exceeded budget (${budget} chars). ` +
+        `Evicted ${evicted.length} least-used skill(s): ${evicted.join(', ')}`
+      )
+    }
+  }
+
+  if (linesWithMeta.length === 0) return ''
+  return header + linesWithMeta.map((l) => l.line).join('\n')
 }
 
 export interface SystemPromptInput {
@@ -71,12 +193,19 @@ export interface SystemPromptInput {
   userInstructions?: string
   skills?: SkillMeta[]
   permissionMode?: PermissionMode
+  mcpCatalog?: string
 }
 
-/** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions). */
-export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode }: SystemPromptInput): string {
+/** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions, MCP catalog). */
+export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog }: SystemPromptInput): string {
   let base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
-  if (skills && skills.length > 0) base = `${base}\n\n${skillsBlock(skills)}`
+  if (skills && skills.length > 0) {
+    const block = skillsBlock(skills, cwd)
+    if (block) base = `${base}\n\n${block}`
+  }
+  if (mcpCatalog) {
+    base = `${base}\n\n## MCP Tools\n${mcpCatalog}\nUse \`mcp_search\` to find tools by keyword, then call them by their namespaced name (\`mcp__<server>__<tool>\`).`
+  }
   const extra = userInstructions?.trim()
   return extra
     ? `${base}\n\n## Additional instructions from the user (for this conversation)\n${extra}`
@@ -104,13 +233,14 @@ export interface ManagedAgentPromptInput {
   toolNames: string[]
   skills?: SkillMeta[]
   permissionMode?: PermissionMode
+  mcpCatalog?: string
 }
 
 /** System prompt for an internal managed sub-agent: identity guard + an operating preamble that
  *  enumerates the agent's ACTUAL granted tools + cwd convention + anti-phantom + the persona, framed
  *  as a focused, non-delegating sub-agent. Git guidance only when a git tool is granted; skills block
- *  only when use_skill is granted AND skills are supplied. */
-export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills, permissionMode }: ManagedAgentPromptInput): string {
+ *  only when use_skill is granted AND skills are supplied. MCP catalog when mcp_search is available. */
+export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills, permissionMode, mcpCatalog }: ManagedAgentPromptInput): string {
   const toolList = toolNames.length ? toolNames.join(', ') : '(no tools — answer from reasoning only)'
   const base =
     'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
@@ -121,7 +251,13 @@ export function buildManagedAgentPrompt({ cwd, persona, toolNames, skills, permi
   const hasGit = toolNames.some((n) => n.startsWith('git_'))
   const parts = [IDENTITY, base, cwdBlock(cwd, permissionMode)]
   if (hasGit) parts.push(GIT_GUIDANCE)
-  if (toolNames.includes('use_skill') && skills && skills.length > 0) parts.push(skillsBlock(skills))
+  if (toolNames.includes('use_skill') && skills && skills.length > 0) {
+    const block = skillsBlock(skills, cwd)
+    if (block) parts.push(block)
+  }
+  if (mcpCatalog && toolNames.includes('mcp_search')) {
+    parts.push(`## MCP Tools\n${mcpCatalog}\nUse \`mcp_search\` to find tools by keyword, then call them by their namespaced name (\`mcp__<server>__<tool>\`).`)
+  }
   parts.push(ANTI_PHANTOM, `## Your role and instructions\n${persona.trim()}`)
   return parts.join('\n\n')
 }

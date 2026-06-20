@@ -129,6 +129,7 @@ export class ToolRunner {
             try {
               decision = await requestApproval({
                 title: `Run ${call.name}`,
+                toolName: call.name,
                 kind: 'execute',
                 content: preResult.reason ?? undefined,
               })
@@ -146,8 +147,10 @@ export class ToolRunner {
         }
       }
 
-      // Apply updatedInput from the hook (whether allow or ask-resolved-to-allow).
-      if (preResult.updatedInput && typeof preResult.updatedInput === 'object' && !Array.isArray(preResult.updatedInput)) {
+      // Apply modifiedInput from modify hooks, falling back to updatedInput for back-compat.
+      if (preResult.kind === 'modify' && preResult.modifiedInput && typeof preResult.modifiedInput === 'object' && !Array.isArray(preResult.modifiedInput)) {
+        invokeArgs = preResult.modifiedInput
+      } else if (preResult.updatedInput && typeof preResult.updatedInput === 'object' && !Array.isArray(preResult.updatedInput)) {
         invokeArgs = preResult.updatedInput as Record<string, unknown>
       }
     }

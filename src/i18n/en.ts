@@ -438,21 +438,7 @@ export const en = {
         acpAdapterNote: 'No native ACP — bridged via the community adapter {{pkg}}',
         backToProviders: '← Back to providers',
       },
-      permissionsLabel: 'Permissions',
-      permissions: {
-        title: 'Tool Permissions',
-        description: 'Set per-tool permission granularity: auto-run, prompt each time, approve once then remember, or deny completely. Coarse permission modes (chat/edit/full) take priority.',
-        defaultMode: 'Default mode',
-        modeAuto: 'Auto',
-        modePrompt: 'Prompt',
-        modeApprove: 'Approve',
-        modeDeny: 'Deny',
-        fileTools: 'File tools',
-        execTools: 'Execution tools',
-        gitTools: 'Git tools',
-        otherTools: 'Other tools',
-        inherit: 'Inherit',
-      },
+
     },
     login: {
       slogan: 'Nobody knows slacking better than me',

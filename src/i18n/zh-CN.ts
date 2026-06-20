@@ -438,21 +438,7 @@ export const zhCN = {
         acpAdapterNote: '无官方 ACP，经社区适配器 {{pkg}} 接入',
         backToProviders: '← 返回选择提供方',
       },
-      permissionsLabel: '权限控制',
-      permissions: {
-        title: '工具权限',
-        description: '为每个工具设置细粒度权限：自动执行、每次提示确认、批准一次后记住、或完全禁止。粗粒度权限模式（聊天/编辑/完全）拥有更高优先级。',
-        defaultMode: '默认模式',
-        modeAuto: '自动',
-        modePrompt: '提示',
-        modeApprove: '批准',
-        modeDeny: '禁止',
-        fileTools: '文件工具',
-        execTools: '执行工具',
-        gitTools: 'Git 工具',
-        otherTools: '其它工具',
-        inherit: '继承',
-      },
+
     },
     login: {
       slogan: '没有人比我更懂摸鱼',

@@ -8,7 +8,10 @@ import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
-import { buildTools } from './tools.js'
+import { SessionApprovalCache } from './tool-runner/approval-cache.js'
+import { defaultToolPolicy } from './tool-runner/tool-policy.js'
+import { ToolRunner } from './tool-runner/tool-runner.js'
+import { buildTools, SELF_GATED_TOOLS } from './tools.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import type { ApprovalFn } from './tools.js'
@@ -92,6 +95,8 @@ export class Session {
   readonly permissions: PermissionManager
   readonly agentProv: AgentProviderManager
   readonly configMgr: ConfigManager
+  readonly approvalCache = new SessionApprovalCache()
+  readonly toolPolicy = defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS })
 
   listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
   registerHook(hook: Hook): void { this.hooks.register(hook) }
@@ -119,7 +124,9 @@ export class Session {
     this.permissions = new PermissionManager(
       () => this._config.permissionMode ?? 'edit',
       (mode) => { if (this.running) return false; this._config = { ...this._config, permissionMode: mode }; return true },
+      { enableStickyApproval: false },
     )
+    this.permissions.setApprovalCache(this.approvalCache)
     this.agentProv = new AgentProviderManager(id, store, () => this._config, this.invokerFactory)
     this.configMgr = new ConfigManager(
       () => this._config, (cfg) => { this._config = cfg }, () => this.running,
@@ -384,7 +391,24 @@ export class Session {
       enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
       { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id },
     )
-    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id }
+    const toolRunner = new ToolRunner({
+      tools: new Map(tools.map((t) => [t.name, t])),
+      hooks: this.hooks,
+      toolPolicy: this.toolPolicy,
+      approvalCache: this.approvalCache,
+      selfGatedTools: SELF_GATED_TOOLS,
+      requestApproval,
+      permissionMode: mode,
+      sessionId: this.id,
+      onToolStarted: (name, callId, input) => emit.toolStarted(name, callId, input),
+      onToolFinished: (callId, status, output, error) => emit.toolFinished(callId, status, output, error),
+      emitRisk: (toolName, risk, approval) => {
+        if (risk === 'medium' || risk === 'high') {
+          send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
+        }
+      },
+    })
+    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode }
 
     try {
       if (this.agentProv.isExternalAgent()) {

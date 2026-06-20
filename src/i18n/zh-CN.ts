@@ -116,6 +116,16 @@ export const zhCN = {
         in_progress: '进行中',
         completed: '已完成',
       },
+      planApproval: {
+        title: '计划审批',
+        hint: '请审阅以下计划并选择操作。',
+        approve: '批准',
+        reject: '拒绝',
+        amend: '修改',
+        submitAmend: '提交修改意见',
+        amendPlaceholder: '请描述你希望如何修改计划…',
+        reviewAbove: '请审阅上方的计划以继续。',
+      },
       usage: {
         tokens: '{{total}} tokens',
         io: '{{input}} 输入 · {{output}} 输出',

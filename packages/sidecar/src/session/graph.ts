@@ -1,10 +1,17 @@
 import { StateGraph, Annotation, START, END, messagesStateReducer } from '@langchain/langgraph'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
-import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { TurnUsage } from '@hip/protocol'
+import type { TurnUsage, PermissionMode, PlanItem } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
+import type { ToolPolicy } from './tool-runner/tool-policy.js'
+import { defaultToolPolicy } from './tool-runner/tool-policy.js'
+import type { ApprovalCache } from './tool-runner/approval-cache.js'
+import { SessionApprovalCache } from './tool-runner/approval-cache.js'
+import { ToolRunner } from './tool-runner/tool-runner.js'
+import type { ApprovalFn } from './tools.js'
+import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -26,6 +33,11 @@ export interface GraphCtx {
   summarizer: Summarizer
   hooks?: HookRegistry
   sessionId?: string
+  toolRunner?: ToolRunner
+  toolPolicy?: ToolPolicy
+  approvalCache?: ApprovalCache
+  requestApproval?: ApprovalFn
+  permissionMode?: PermissionMode
 }
 
 const LoopState = Annotation.Root({
@@ -35,6 +47,10 @@ const LoopState = Annotation.Root({
   nudgedSig: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   status: Annotation<'running' | 'awaiting_user'>({ reducer: (_prev, next) => next, default: () => 'running' }),
   pendingQuestion: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  planningMode: Annotation<'fast' | 'plan'>({ reducer: (_prev, next) => next, default: () => 'fast' }),
+  planStatus: Annotation<'none' | 'generating' | 'ready' | 'approved' | 'rejected'>({ reducer: (_prev, next) => next, default: () => 'none' }),
+  plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
 })
 
 type State = typeof LoopState.State
@@ -70,67 +86,41 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { messages: [msg], steps: state.steps + 1 }
   }
 
+  function getOrCreateToolRunner(ctx: GraphCtx): ToolRunner {
+    if (ctx.toolRunner) return ctx.toolRunner
+
+    const byName = new Map(ctx.tools.map((t) => [t.name, t]))
+    ctx.toolRunner = new ToolRunner({
+      tools: byName,
+      hooks: ctx.hooks,
+      toolPolicy: ctx.toolPolicy ?? defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS }),
+      approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
+      permissionMode: ctx.permissionMode ?? 'edit',
+      requestApproval: ctx.requestApproval,
+      sessionId: ctx.sessionId ?? '',
+      onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
+      onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
+    })
+    return ctx.toolRunner
+  }
+
   async function toolsNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { tools, emit, hooks, sessionId } = ctxOf(config)
-    const byName = new Map(tools.map((t) => [t.name, t]))
+    const ctx = ctxOf(config)
+    const runner = getOrCreateToolRunner(ctx)
     const last = state.messages[state.messages.length - 1] as AIMessage
     const out: ToolMessage[] = []
     for (const call of last.tool_calls ?? []) {
       const id = call.id ?? call.name
-      emit.toolStarted(call.name, id, call.args)
-      const t = byName.get(call.name)
-      if (!t) {
-        emit.toolFinished(id, 'error', undefined, `unknown tool: ${call.name}`)
-        out.push(new ToolMessage({ content: `Error: unknown tool ${call.name}`, tool_call_id: id, name: call.name }))
-        continue
-      }
-      let invokeArgs = call.args
-      if (hooks) {
-        const preResult = await hooks.fire('PreToolUse', {
-          sessionId: sessionId ?? '',
-          toolName: call.name,
-          toolInput: call.args as Record<string, unknown>,
-        })
-        if (preResult.kind === 'deny') {
-          const reason = preResult.reason ? `: ${preResult.reason}` : ''
-          emit.toolFinished(id, 'error', undefined, `denied by hook${reason}`)
-          out.push(new ToolMessage({ content: `Error: tool execution denied by hook${reason}`, tool_call_id: id, name: call.name }))
-          continue
-        }
-        if (preResult.updatedInput) {
-          invokeArgs = preResult.updatedInput
-        }
-      }
-      try {
-        const result = String(await t.invoke(invokeArgs))
-        emit.toolFinished(id, 'finished', result)
-        if (hooks) {
-          const postResult = await hooks.fire('PostToolUse', {
-            sessionId: sessionId ?? '',
-            toolName: call.name,
-            toolInput: call.args as Record<string, unknown>,
-            toolOutput: result,
-          })
-          if (postResult.updatedInput) {
-            const updatedOutput = String(postResult.updatedInput.output ?? postResult.updatedInput)
-            out.push(new ToolMessage({ content: updatedOutput, tool_call_id: id, name: call.name }))
-            continue
-          }
-        }
-        out.push(new ToolMessage({ content: result, tool_call_id: id, name: call.name }))
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e)
-        emit.toolFinished(id, 'error', undefined, error)
-        if (hooks) {
-          await hooks.fire('PostToolUseFailure', {
-            sessionId: sessionId ?? '',
-            toolName: call.name,
-            toolInput: call.args as Record<string, unknown>,
-            toolError: error,
-          })
-        }
-        out.push(new ToolMessage({ content: `Error: ${error}`, tool_call_id: id, name: call.name }))
-      }
+      const result = await runner.runToolCall({
+        name: call.name,
+        callId: id,
+        args: (call.args as Record<string, unknown>) ?? {},
+      })
+      out.push(new ToolMessage({
+        content: result.content,
+        tool_call_id: result.tool_call_id,
+        name: result.name,
+      }))
     }
     // The Nth identical batch is executed too (keeps tool_calls↔ToolMessage valid); doom-loop is
     // detected post-execution from the trailing signature run.
@@ -148,13 +138,57 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { status: 'awaiting_user', pendingQuestion: PAUSE_QUESTION }
   }
 
+  const PLANNING_SYSTEM_PROMPT = `You are a planning assistant. Analyze the user's request and break it into concrete, ordered steps. Call the write_todos tool with the plan, then output a one-sentence summary of the plan.`
+
+  async function planNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
+    const { runner, tools, emit } = ctxOf(config)
+    const messages: BaseMessage[] = [...state.messages]
+    if (messages[0] instanceof SystemMessage) {
+      const original = typeof messages[0].content === 'string' ? messages[0].content : JSON.stringify(messages[0].content)
+      messages[0] = new SystemMessage(`${PLANNING_SYSTEM_PROMPT}\n\n${original}`)
+    } else {
+      messages.unshift(new SystemMessage(PLANNING_SYSTEM_PROMPT))
+    }
+    const msg = await runner.run(messages, {
+      tools,
+      bindTools: true,
+      signal: config.signal,
+      onText: (d) => emit.token(d),
+      onReasoning: (d) => emit.reasoning(d),
+    })
+    const u = msg.usage_metadata
+    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+    const plan = extractPlanFromMessages([...messages, msg])
+    return { messages: [msg], steps: state.steps + 1, planningMode: 'plan', planStatus: 'ready', plan }
+  }
+
+  function planPause(state: State): Partial<State> {
+    return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
+  }
+
+  function routeAfterCompact(state: State): 'plan' | 'agent' {
+    if (state.planningMode === 'plan' && state.planStatus !== 'approved') return 'plan'
+    return 'agent'
+  }
+
   function routeAfterAgent(state: State): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
     return wantsTools && state.steps < maxSteps ? 'tools' : END
   }
 
-  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' {
+  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | typeof END {
+    if (state.planningMode === 'plan' && state.planStatus === 'approved') {
+      const hasToolFailure = state.messages.some((m) => m instanceof ToolMessage && m.content.toString().startsWith('Error'))
+      if (hasToolFailure) {
+        return 'pause'
+      }
+      const plan = state.plan ?? []
+      const allCompleted = plan.length > 0 && plan.every((item) => item.status === 'completed')
+      if (allCompleted) {
+        return END
+      }
+    }
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     if (lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N) {
       return state.nudgedSig === lastSig ? 'pause' : 'nudge'
@@ -168,11 +202,42 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addNode('tools', toolsNode)
     .addNode('nudge', nudge)
     .addNode('pause', pause)
+    .addNode('planner', planNode)
+    .addNode('planPause', planPause)
     .addEdge(START, 'compact')
-    .addEdge('compact', 'agent')
+    .addConditionalEdges('compact', routeAfterCompact, { plan: 'planner', agent: 'agent' })
+    .addEdge('planner', 'planPause')
+    .addEdge('planPause', END)
     .addConditionalEdges('agent', routeAfterAgent, { tools: 'tools', [END]: END })
-    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact' })
+    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact', [END]: END })
     .addEdge('nudge', 'agent')
     .addEdge('pause', END)
     .compile()
+}
+
+function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg instanceof AIMessage) {
+      const calls = msg.tool_calls ?? []
+      for (const call of calls) {
+        if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+          const todos = (call.args as Record<string, unknown>).todos
+          if (Array.isArray(todos)) {
+            return todos.map((item) => {
+              if (typeof item === 'string') {
+                return { content: item, status: 'pending' as const }
+              }
+              if (item && typeof item === 'object') {
+                const content = (item as Record<string, unknown>).content
+                return { content: typeof content === 'string' ? content : String(content), status: 'pending' as const }
+              }
+              return { content: String(item), status: 'pending' as const }
+            })
+          }
+        }
+      }
+    }
+  }
+  return undefined
 }

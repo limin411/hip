@@ -204,8 +204,9 @@ describe('SessionManager persistence', () => {
       turnSend,
     )
 
-    // Give it a tick to actually start running.
-    await Promise.resolve()
+    // Give the turn enough time to reach the model call (necessary for the abort
+    // signal to have an effect — one microtask tick is insufficient).
+    await new Promise((r) => setTimeout(r, 0))
 
     // Cancel all running turns (simulates ws close).
     hangingMgr.cancelAllRunning()

@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -8,7 +8,10 @@ import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
-import { buildTools } from './tools.js'
+import { SessionApprovalCache } from './tool-runner/approval-cache.js'
+import { defaultToolPolicy } from './tool-runner/tool-policy.js'
+import { ToolRunner } from './tool-runner/tool-runner.js'
+import { buildTools, SELF_GATED_TOOLS } from './tools.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import type { ApprovalFn } from './tools.js'
@@ -32,6 +35,7 @@ import { AgentProviderManager } from './agent-provider.js'
 import { ConfigManager } from './config-manager.js'
 import { deriveTitle, sanitizeTitle, buildDefaultTitleGenerator, type TitleGenerator } from './title-generator.js'
 import { runWorkflowTurn as runWorkflowTurnFn } from './workflow-runner.js'
+import { shouldPlan } from './plan.js'
 
 export { sanitizeTitle } from './title-generator.js'
 export type { TitleGenerator } from './title-generator.js'
@@ -78,7 +82,13 @@ export class Session {
   private abortController: AbortController | null = null
   private running = false
   private awaitingResume = false
-  private paused: { messages: BaseMessage[]; steps: number } | null = null
+  private paused: {
+    messages: BaseMessage[]
+    steps: number
+    planningMode?: 'fast' | 'plan'
+    planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
+    plan?: PlanItem[]
+  } | null = null
   private readonly injectedSummarizer?: Summarizer
   private modelDirty = false
   private turnSeq = 0
@@ -92,6 +102,8 @@ export class Session {
   readonly permissions: PermissionManager
   readonly agentProv: AgentProviderManager
   readonly configMgr: ConfigManager
+  readonly approvalCache = new SessionApprovalCache()
+  readonly toolPolicy = defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS })
 
   listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
   registerHook(hook: Hook): void { this.hooks.register(hook) }
@@ -119,7 +131,9 @@ export class Session {
     this.permissions = new PermissionManager(
       () => this._config.permissionMode ?? 'edit',
       (mode) => { if (this.running) return false; this._config = { ...this._config, permissionMode: mode }; return true },
+      { enableStickyApproval: this._config.enableStickyApproval ?? true },
     )
+    this.permissions.setApprovalCache(this.approvalCache)
     this.agentProv = new AgentProviderManager(id, store, () => this._config, this.invokerFactory)
     this.configMgr = new ConfigManager(
       () => this._config, (cfg) => { this._config = cfg }, () => this.running,
@@ -257,7 +271,13 @@ export class Session {
 
   async resume(content: string, send: SendFn): Promise<void> {
     if (!this.awaitingResume || !this.paused || this.running) return
-    const base = { messages: [...this.paused.messages, new HumanMessage(content)], steps: this.paused.steps }
+    const base = {
+      messages: [...this.paused.messages, new HumanMessage(content)],
+      steps: this.paused.steps,
+      planningMode: this.paused.planningMode,
+      planStatus: this.paused.planStatus,
+      plan: this.paused.plan,
+    }
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
@@ -268,7 +288,13 @@ export class Session {
     await this.runTurn(send, base)
   }
 
-  private async runTurn(rawSend: SendFn, base?: { messages: BaseMessage[]; steps: number }): Promise<string> {
+  private async runTurn(rawSend: SendFn, base?: {
+    messages: BaseMessage[]
+    steps: number
+    planningMode?: 'fast' | 'plan'
+    planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
+    plan?: PlanItem[]
+  }): Promise<string> {
     this.abortController = new AbortController(); this.running = true
     let timedOut = false
     const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
@@ -384,7 +410,21 @@ export class Session {
       enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
       { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id },
     )
-    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id }
+    const toolRunner = new ToolRunner({
+      tools: new Map(tools.map((t) => [t.name, t])),
+      hooks: this.hooks,
+      toolPolicy: this.toolPolicy,
+      approvalCache: this.approvalCache,
+      requestApproval,
+      permissionMode: mode,
+      sessionId: this.id,
+      onToolStarted: (name, callId, input) => emit.toolStarted(name, callId, input),
+      onToolFinished: (callId, status, output, error) => emit.toolFinished(callId, status, output, error),
+      emitRisk: (toolName, risk, approval) => {
+        send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
+      },
+    })
+    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode }
 
     try {
       if (this.agentProv.isExternalAgent()) {
@@ -397,16 +437,52 @@ export class Session {
         closeReasoning('supervisor'); finishRemaining()
         const acpId = this.agentProv.acpSessionId; if (acpId && this.store) this.store.setAcpSessionId(this.id, acpId)
       } else {
+        const userText = lastUserText(base?.messages ?? this.messages)
+        const usePlan = shouldPlan(userText, {
+          forcePlan: this._config.forcePlan,
+          disablePlan: this._config.disablePlan,
+        })
+        const initialPlanningMode = base?.planningMode ?? (usePlan ? 'plan' : 'fast')
         const finalState = await this.app.invoke(
-          { messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)], steps: base?.steps ?? 0, recentSigs: [], nudgedSig: undefined, status: 'running' },
+          {
+            messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)],
+            steps: base?.steps ?? 0,
+            recentSigs: [],
+            nudgedSig: undefined,
+            status: 'running',
+            planningMode: initialPlanningMode,
+            planStatus: base?.planStatus ?? 'none',
+            plan: base?.plan,
+            verifyMemo: undefined,
+          },
           { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
         )
         closeReasoning('supervisor'); finishRemaining()
         if (finalState.status === 'awaiting_user') {
-          this.paused = { messages: finalState.messages.slice(1), steps: finalState.steps }; this.awaitingResume = true
+          this.paused = {
+            messages: finalState.messages.slice(1),
+            steps: finalState.steps,
+            planningMode: finalState.planningMode,
+            planStatus: finalState.planStatus,
+            plan: finalState.plan,
+          }
+          this.awaitingResume = true
           const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
           void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
-          send({ type: 'agent:interrupt', sessionId: this.id, turnId, agentId: 'supervisor', question: finalState.pendingQuestion ?? PAUSE_QUESTION })
+          if (finalState.planningMode === 'plan' && finalState.plan) {
+            send({ type: 'plan:published', sessionId: this.id, turnId, plan: finalState.plan })
+          }
+          const interruptContext = finalState.planningMode === 'plan'
+            ? JSON.stringify({ kind: 'plan_approval', plan: finalState.plan })
+            : undefined
+          send({
+            type: 'agent:interrupt',
+            sessionId: this.id,
+            turnId,
+            agentId: 'supervisor',
+            question: finalState.pendingQuestion ?? PAUSE_QUESTION,
+            ...(interruptContext ? { context: interruptContext } : {}),
+          })
           return stoppedText
         }
       }
@@ -470,6 +546,48 @@ export class Session {
     if (tail instanceof AIMessage) { this.messages.pop(); this.store?.deleteLastAssistantMessage(this.id) }
     if (!(this.messages[this.messages.length - 1] instanceof HumanMessage)) return
     await this.runTurn(send)
+  }
+
+  async handlePlanResponse(action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
+    if (!this.awaitingResume || !this.paused) return
+    switch (action) {
+      case 'approve': {
+        const base = {
+          messages: this.paused.messages,
+          steps: this.paused.steps,
+          planningMode: 'plan' as const,
+          planStatus: 'approved' as const,
+          plan: this.paused.plan,
+        }
+        this.awaitingResume = false; this.paused = null
+        await this.runTurn(send, base)
+        break
+      }
+      case 'reject': {
+        this.awaitingResume = false; this.paused = null
+        send({ type: 'error', sessionId: this.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
+        break
+      }
+      case 'amend': {
+        const content = amendContent ?? 'Please revise the plan.'
+        const base = {
+          messages: [...this.paused.messages, new HumanMessage(content)],
+          steps: this.paused.steps,
+          planningMode: 'plan' as const,
+          planStatus: 'generating' as const,
+          plan: this.paused.plan,
+        }
+        this.awaitingResume = false; this.paused = null
+        const ts = Date.now()
+        if (this.store) {
+          this.store.insertMessage({ id: `u-${ts}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: ts })
+          this.store.touchSession(this.id, ts)
+        }
+        this.messages.push(new HumanMessage(content))
+        await this.runTurn(send, base)
+        break
+      }
+    }
   }
 
   cancel(): void {

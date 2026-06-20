@@ -116,6 +116,16 @@ export const zhTW = {
         in_progress: '進行中',
         completed: '已完成',
       },
+      planApproval: {
+        title: '計畫審批',
+        hint: '請審閱以下計畫並選擇操作。',
+        approve: '批准',
+        reject: '拒絕',
+        amend: '修改',
+        submitAmend: '提交修改意見',
+        amendPlaceholder: '請描述你希望如何修改計畫…',
+        reviewAbove: '請審閱上方的計畫以繼續。',
+      },
       usage: {
         tokens: '{{total}} tokens',
         io: '{{input}} 輸入 · {{output}} 輸出',

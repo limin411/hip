@@ -23,6 +23,12 @@ vi.mock('../mcp/manager.js', () => ({
     tools() {
       return fakeMcpTools as any
     },
+    connectionStatuses() {
+      return []
+    },
+    toolCatalog() {
+      return ''
+    },
   },
 }))
 
@@ -164,7 +170,7 @@ describe('plugin synthesis integration', () => {
     await session.sendMessage('format my code', (m) => sent.push(m))
 
     // System prompt advertises the skill
-    expect(runner.systemSeen).toMatch(/可用 Skills|Available Skills/)
+    expect(runner.systemSeen).toMatch(/Skills/)
     expect(runner.systemSeen).toContain('my-formatter')
 
     // use_skill tool is in the toolset

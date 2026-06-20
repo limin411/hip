@@ -116,6 +116,16 @@ export const en = {
         in_progress: 'In progress',
         completed: 'Done',
       },
+      planApproval: {
+        title: 'Plan approval',
+        hint: 'Review the plan below and choose an action.',
+        approve: 'Approve',
+        reject: 'Reject',
+        amend: 'Amend',
+        submitAmend: 'Submit amendment',
+        amendPlaceholder: 'Describe what you\'d like to change…',
+        reviewAbove: 'Review the plan above to continue.',
+      },
       usage: {
         tokens: '{{total}} tokens',
         io: '{{input}} in · {{output}} out',

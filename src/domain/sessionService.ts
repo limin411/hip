@@ -386,6 +386,13 @@ export class SessionService {
     this.transport.send({ type: 'message:resume', sessionId: activeSessionId, content: text })
   }
 
+  /** Respond to a plan approval interrupt (approve / reject / amend). */
+  respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string): void {
+    const { activeSessionId } = useDomainStore.getState()
+    if (!activeSessionId) return
+    this.transport.send({ type: 'plan:respond', sessionId: activeSessionId, action, amendContent })
+  }
+
   cancel(): void {
     const { activeSessionId } = useDomainStore.getState()
     if (activeSessionId) this.transport.send({ type: 'message:cancel', sessionId: activeSessionId })

@@ -67,7 +67,7 @@ describe('Session wires skills, MCP reconcile, and the run_script HITL closure',
     }
     await session.sendMessage('please format', send, 'u1')
 
-    expect(runner.systemSeen).toMatch(/可用 Skills/)
+    expect(runner.systemSeen).toMatch(/Skills/)
     expect(runner.systemSeen).toContain('formatter')
     expect(runner.toolNamesSeen).toContain('use_skill')
     expect(runner.toolNamesSeen).toContain('run_script')

@@ -1,23 +1,41 @@
 import type { ServerMessage, PermissionMode, PermissionOption } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
+import type { ApprovalCache } from './tool-runner/approval-cache.js'
 
 type SendFn = (msg: ServerMessage) => void
+
+export interface PermissionManagerOptions {
+  /** When true, buildHitlApproval() adds allow_always/reject_always options.
+   *  Sticky decisions are recorded by ToolRunner; PermissionManager only
+   *  resolves the user's choice. Default false. */
+  enableStickyApproval?: boolean
+}
 
 export class PermissionManager {
   /** Pending HITL permission requests from the external agent, keyed by requestId. */
   readonly pendingPermissions = new Map<string, (c: { optionId: string } | { cancelled: true }) => void>()
 
-  /** Per-session sticky 'approve' grants: toolName → true once user approves via 'approve' mode. */
-  private readonly approvedGrants = new Set<string>()
+  /** Session-level approval cache (shared with ToolRunner). Set via setApprovalCache. */
+  private approvalCache?: ApprovalCache
+
+  private readonly enableStickyApproval: boolean
 
   constructor(
     private readonly getPermissionMode: () => PermissionMode,
     private readonly setPermissionModeFn: (mode: PermissionMode) => boolean,
-  ) {}
+    opts: PermissionManagerOptions = {},
+  ) {
+    this.enableStickyApproval = opts.enableStickyApproval ?? false
+  }
 
-  /** Set the per-conversation permission mode. */
+  /** Set the per-conversation permission mode. Clears sticky approval cache when the mode value actually changes. */
   setPermissionMode(permissionMode: PermissionMode): boolean {
-    return this.setPermissionModeFn(permissionMode)
+    const oldMode = this.getPermissionMode()
+    const accepted = this.setPermissionModeFn(permissionMode)
+    if (accepted && oldMode !== permissionMode) {
+      this.clearApprovedGrants()
+    }
+    return accepted
   }
 
   /** Complete a pending external-agent permission request with the user's choice. */
@@ -28,17 +46,22 @@ export class PermissionManager {
 
   /** Clear sticky 'approve' grants (called on new session). */
   clearApprovedGrants(): void {
-    this.approvedGrants.clear()
+    this.approvalCache?.clear()
   }
 
-  /** Record a tool as approved after 'approve' mode HITL. */
+  /** Share the session-level ApprovalCache so ToolRunner and PermissionManager converge. */
+  setApprovalCache(cache: ApprovalCache): void {
+    this.approvalCache = cache
+  }
+
+  /** Record a tool as approved after 'approve' mode HITL (legacy broad scope). */
   recordApproved(toolName: string): void {
-    this.approvedGrants.add(toolName)
+    this.approvalCache?.set(toolName, undefined, { kind: 'allow_always' })
   }
 
   /** Check if a tool has been previously approved in this session. */
   isApproved(toolName: string): boolean {
-    return this.approvedGrants.has(toolName)
+    return this.approvalCache?.lookup(toolName, undefined) === 'allow'
   }
 
   /** Settle all pending HITL requests (on turn end / abort). */
@@ -61,6 +84,12 @@ export class PermissionManager {
       { optionId: 'allow_once', name: '允许', kind: 'allow_once' },
       { optionId: 'reject_once', name: '拒绝', kind: 'reject_once' },
     ]
+    if (this.enableStickyApproval) {
+      options.push(
+        { optionId: 'allow_always', name: '始终允许', kind: 'allow_always' },
+        { optionId: 'reject_always', name: '始终拒绝', kind: 'reject_always' },
+      )
+    }
     return (req) =>
       new Promise((resolve) => {
         const requestId = `run-script-${turnId}-${nextSeqFn()}`

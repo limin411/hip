@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -15,6 +16,7 @@ import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
+import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 
 const REMARK_PLUGINS = [remarkGfm]
 const MD_COMPONENTS: Components = {
@@ -54,6 +56,11 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
   const nestedIds = new Set(nested.map((a) => a.agentId))
   const flatSteps = (message.timeline ?? []).filter((s) => !nestedIds.has(s.agentId))
 
+  const displayContent = useMemo(
+    () => (isUser ? message.content : normalizeMessageContent(message.content)),
+    [isUser, message.content],
+  )
+
   return (
     <div className="group flex gap-3">
       {isUser ? (
@@ -91,7 +98,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
               {nested.map((a) => <SubAgentCard key={a.agentId} agent={a} />)}
             </>
           )}
-          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{message.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{displayContent}</ReactMarkdown>
           {streaming && <StreamingCursor />}
         </div>
         {!streaming && message.role === 'assistant' && (

@@ -133,6 +133,11 @@ export class SessionStore {
     }
   }
 
+  /** Public alias for loadMessages — used by subagent continuation to load prior context. */
+  getMessages(sessionId: string): Message[] {
+    return this.loadMessages(sessionId)
+  }
+
   loadMessages(sessionId: string): Message[] {
     const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped,timeline FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
       { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number; timeline: string | null }[]

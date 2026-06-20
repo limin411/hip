@@ -1,8 +1,8 @@
 import { StateGraph, Annotation, START, END, messagesStateReducer } from '@langchain/langgraph'
 import type { LangGraphRunnableConfig } from '@langchain/langgraph'
-import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, SystemMessage, ToolMessage, RemoveMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { TurnUsage, PermissionMode } from '@hip/protocol'
+import type { TurnUsage, PermissionMode, PlanItem } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
@@ -47,6 +47,11 @@ const LoopState = Annotation.Root({
   nudgedSig: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   status: Annotation<'running' | 'awaiting_user'>({ reducer: (_prev, next) => next, default: () => 'running' }),
   pendingQuestion: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  planningMode: Annotation<'fast' | 'plan'>({ reducer: (_prev, next) => next, default: () => 'fast' }),
+  planStatus: Annotation<'none' | 'generating' | 'ready' | 'approved' | 'rejected'>({ reducer: (_prev, next) => next, default: () => 'none' }),
+  plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  planAmendContent: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
 })
 
 type State = typeof LoopState.State
@@ -134,13 +139,54 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { status: 'awaiting_user', pendingQuestion: PAUSE_QUESTION }
   }
 
+  const PLANNING_SYSTEM_PROMPT = `You are a planning assistant. Analyze the user's request and break it into concrete, ordered steps. Call the write_todos tool with the plan, then output a one-sentence summary of the plan.`
+
+  async function planNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
+    const { runner, tools, emit } = ctxOf(config)
+    const messages: BaseMessage[] = [new SystemMessage(PLANNING_SYSTEM_PROMPT), ...state.messages]
+    if (state.planStatus === 'generating' && state.planAmendContent) {
+      messages.push(new HumanMessage(state.planAmendContent))
+    }
+    const msg = await runner.run(messages, {
+      tools,
+      bindTools: true,
+      signal: config.signal,
+      onText: (d) => emit.token(d),
+      onReasoning: (d) => emit.reasoning(d),
+    })
+    const u = msg.usage_metadata
+    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+    const plan = extractPlanFromMessages([...messages, msg])
+    return { messages: [msg], steps: state.steps + 1, planningMode: 'plan', planStatus: 'ready', plan }
+  }
+
+  function planPause(state: State): Partial<State> {
+    return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
+  }
+
+  function routeAfterCompact(state: State): 'plan' | 'agent' {
+    if (state.planningMode === 'plan' && state.planStatus !== 'approved') return 'plan'
+    return 'agent'
+  }
+
   function routeAfterAgent(state: State): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
     return wantsTools && state.steps < maxSteps ? 'tools' : END
   }
 
-  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' {
+  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | typeof END {
+    if (state.planningMode === 'plan' && state.planStatus === 'approved') {
+      const hasToolFailure = state.messages.some((m) => m instanceof ToolMessage && m.content.toString().startsWith('Error'))
+      if (hasToolFailure) {
+        return 'pause'
+      }
+      const plan = state.plan ?? []
+      const allCompleted = plan.length > 0 && plan.every((item) => item.status === 'completed')
+      if (allCompleted) {
+        return END
+      }
+    }
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     if (lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N) {
       return state.nudgedSig === lastSig ? 'pause' : 'nudge'
@@ -154,11 +200,42 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addNode('tools', toolsNode)
     .addNode('nudge', nudge)
     .addNode('pause', pause)
+    .addNode('planner', planNode)
+    .addNode('planPause', planPause)
     .addEdge(START, 'compact')
-    .addEdge('compact', 'agent')
+    .addConditionalEdges('compact', routeAfterCompact, { plan: 'planner', agent: 'agent' })
+    .addEdge('planner', 'planPause')
+    .addEdge('planPause', END)
     .addConditionalEdges('agent', routeAfterAgent, { tools: 'tools', [END]: END })
-    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact' })
+    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact', [END]: END })
     .addEdge('nudge', 'agent')
     .addEdge('pause', END)
     .compile()
+}
+
+function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg instanceof AIMessage) {
+      const calls = msg.tool_calls ?? []
+      for (const call of calls) {
+        if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+          const todos = (call.args as Record<string, unknown>).todos
+          if (Array.isArray(todos)) {
+            return todos.map((item) => {
+              if (typeof item === 'string') {
+                return { content: item, status: 'pending' as const }
+              }
+              if (item && typeof item === 'object') {
+                const content = (item as Record<string, unknown>).content
+                return { content: typeof content === 'string' ? content : String(content), status: 'pending' as const }
+              }
+              return { content: String(item), status: 'pending' as const }
+            })
+          }
+        }
+      }
+    }
+  }
+  return undefined
 }

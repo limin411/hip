@@ -10,6 +10,12 @@ export type AgentRole = 'supervisor' | 'planner' | 'coder' | 'reviewer' | 'worke
  */
 export type PermissionMode = 'chat' | 'edit' | 'full'
 
+/** One item in a plan produced by the planning node. */
+export interface PlanItem {
+  content: string
+  status: 'pending' | 'in_progress' | 'completed'
+}
+
 export interface SessionConfig {
   llmProvider: string          // provider id (was the 'deepseek' literal)
   model: string
@@ -24,6 +30,10 @@ export interface SessionConfig {
   /** When true, HITL approval prompts include "always allow/always reject" sticky options.
    *  Defaults to true for new sessions; undefined ⇒ treated as true. */
   enableStickyApproval?: boolean
+  /** When true, always run the plan/execute/verify loop for this session. */
+  forcePlan?: boolean
+  /** When true, never run the plan/execute/verify loop (always fast path). Overrides forcePlan. */
+  disablePlan?: boolean
   /** Which top-level surface owns this conversation. 'chat' = sandboxed conversation-only;
    *  'code' = conversation + directory tree + git. undefined on a legacy row ⇒ inferred from
    *  the cwd (a scratch cwd ⇒ 'chat', else 'code'); see surfaceOf in the sidecar. */
@@ -423,6 +433,7 @@ export type ClientMessage =
   | { type: 'mcp:readResource'; serverId: string; uri: string }
   | { type: 'mcp:listPrompts'; serverId: string }
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
+  | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -475,6 +486,7 @@ export type ServerMessage =
   | { type: 'mcp:listPrompts:result'; serverId: string; prompts: McpPrompt[]; error?: string }
   | { type: 'mcp:getPrompt:result'; serverId: string; name: string; messages: McpPromptMessage[]; error?: string }
   | { type: 'mcp:status'; servers: Array<{ id: string; name: string; status: 'connected' | 'connecting' | 'disconnected' | 'error'; toolCount: number; toolNames: string[]; lastError?: string }> }
+  | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
 
 // ──────────────────────────────────────────────────────────────────
 // Lifecycle hooks (tool interception, safety gating, turn lifecycle)

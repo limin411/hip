@@ -60,6 +60,9 @@ export class SessionManager {
       case 'message:resume':
         await this.ensureSession(msg.sessionId).resume(msg.content, send)
         break
+      case 'plan:respond':
+        await this.ensureSession(msg.sessionId).handlePlanResponse(msg.action, send, msg.amendContent)
+        break
       case 'agent:setConfigOption':
         await this.ensureSession(msg.sessionId).setAgentConfigOption(msg.configId, msg.value)
         break

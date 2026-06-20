@@ -119,6 +119,14 @@ export class SessionService {
         // Failure → record the error so the confirm modal can clear its 'reverting' spinner + surface it.
         useDiffStore.getState().setRevertError(msg.sessionId, msg.error ?? 'revert_failed')
       }
+    } else if (msg.type === 'session:created') {
+      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
+    } else if (msg.type === 'session:cwd') {
+      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
+      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
+      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
     } else if (msg.type === 'message:complete') {
       // The agent may have written files this turn — re-pull every loaded dir + the open file.
       const fsState = useFsStore.getState().bySession[msg.sessionId]

@@ -448,6 +448,20 @@ describe('checkpoints + commit log', () => {
     t.push({ type: 'message:complete', sessionId: 's1', message: { id: 'm', role: 'assistant', content: '', timestamp: 0 } as any })
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
   })
+
+  it('session:cwd result refreshes the checkpoint list and diff summary', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'session:cwd', sessionId: 's1', cwd: '/proj' })
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+  })
+
+  it('session:created refreshes the checkpoint list and diff summary', () => {
+    const t = new FakeTransport(); new SessionService(t)
+    t.push({ type: 'session:created', sessionId: 's1' })
+    expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+  })
 })
 
 describe('branches + revert', () => {

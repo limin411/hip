@@ -86,7 +86,7 @@ export class SessionApprovalCache implements ApprovalCache {
     args: Record<string, unknown> | undefined,
     decision: ApprovalDecision,
   ): void {
-    if (decision == null || !('kind' in decision)) return
+    if (decision === null || decision === undefined || !('kind' in decision)) return
     const { kind } = decision
     if (kind !== 'allow_always' && kind !== 'reject_always') return
     const key = keyFor(toolName, args)

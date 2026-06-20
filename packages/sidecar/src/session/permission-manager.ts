@@ -5,8 +5,9 @@ import type { ApprovalCache } from './tool-runner/approval-cache.js'
 type SendFn = (msg: ServerMessage) => void
 
 export interface PermissionManagerOptions {
-  /** When true, buildHitlApproval() adds allow_always/reject_always options and records
-   *  sticky decisions into the ApprovalCache. Default false. */
+  /** When true, buildHitlApproval() adds allow_always/reject_always options.
+   *  Sticky decisions are recorded by ToolRunner; PermissionManager only
+   *  resolves the user's choice. Default false. */
   enableStickyApproval?: boolean
 }
 

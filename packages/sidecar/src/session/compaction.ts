@@ -8,6 +8,10 @@ export const COMPACT_BUDGET_TOKENS = 48_000
 /** Turns kept verbatim at the tail. A turn = a user message and everything up to the next one. */
 export const KEEP_RECENT_TURNS = 3
 
+/** Token budget for the summarizer model output. Kept generous so the 8-section structured
+ *  summary has room for full context preservation. */
+export const SUMMARY_OUTPUT_TOKENS = 4096
+
 /** No tokenizer in-stack → char heuristic. /3 over-estimates English (≈4 ch/tok) but fits dense
  *  CJK/code, so it triggers a little early rather than too late. */
 const CHARS_PER_TOKEN = 3

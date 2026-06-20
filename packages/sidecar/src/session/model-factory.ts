@@ -2,7 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
-import type { Summarizer } from './compaction.js'
+import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
 
 /** Stable content-block index for the re-projected reasoning block — distinct from text (0)
  *  and tool-call chunk indices so it accumulates as its own block in convertChunksToEvents. */
@@ -86,17 +86,46 @@ export function buildChatModel(choice: { providerID: string; modelID: string; ba
   })
 }
 
-const SUMMARY_SYSTEM_PROMPT =
-  '你是对话压缩器。把给定的较早对话片段压成一段简洁中文摘要，保留：任务目标、关键决策、约束、' +
-  '已写入或修改的文件、近期工具结果与未决事项；丢弃：中间推理、被否方案、冗长输出。只输出摘要正文。'
+export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较早的对话片段中提取结构化摘要，以便后续模型能够准确理解已发生的事情。严格按以下结构输出：
+
+## Goal
+用户原始任务目标和意图。
+
+## Constraints & Preferences
+会话中明确提到的约束、模式或偏好。
+
+## Progress
+### Done
+已完成的工作。
+### In Progress
+当前正在进行的工作。
+### Blocked
+被阻塞、等待反馈或搁置的事项。
+
+## Key Decisions
+对话中的重要决策和选择。
+
+## Next Steps
+仍需完成的后续步骤。
+
+## Critical Context
+必须原样保留的路径、命令、错误信息或事实。包含完整文本，不得截断。
+
+## Relevant Files
+对话中提及的文件路径。
+
+## Files Modified
+根据工具结果实际写入或编辑的文件。
+
+保留精确的路径、命令和错误消息原文。使用简洁的列表形式。只输出结构化摘要。`
 
 /** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
 class RealSummarizer implements Summarizer {
   async summarize(messages: BaseMessage[]): Promise<string> {
     const { providerID, modelID, baseURL } = getActiveModel()
-    const model = new ChatOpenAI({ model: cheapModelFor(providerID, modelID), apiKey: activeKey(providerID), configuration: { baseURL }, maxTokens: 512, temperature: 0.2 })
+    const model = new ChatOpenAI({ model: cheapModelFor(providerID, modelID), apiKey: activeKey(providerID), configuration: { baseURL }, maxTokens: SUMMARY_OUTPUT_TOKENS, temperature: 0.2 })
     const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
-    const res = await model.invoke([new SystemMessage(SUMMARY_SYSTEM_PROMPT), new HumanMessage(transcript)])
+    const res = await model.invoke([new SystemMessage(SUMMARY_TEMPLATE), new HumanMessage(transcript)])
     return typeof res.content === 'string' ? res.content : ''
   }
 }

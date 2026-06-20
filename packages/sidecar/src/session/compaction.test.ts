@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { estimateTokens, compactMessages, type Summarizer } from './compaction.js'
+import { SUMMARY_TEMPLATE } from './model-factory.js'
 
 const fakeSummarizer = (capture?: (m: BaseMessage[]) => void): Summarizer => ({
   async summarize(m) { capture?.(m); return '摘要内容' },
@@ -40,5 +41,27 @@ describe('compactMessages', () => {
       new AIMessage({ id: 'a1', content: 'reply' }),
     ]
     expect(await compactMessages(few, { keepRecentTurns: 3, summarizer: fakeSummarizer() })).toBeNull()
+  })
+})
+
+describe('SUMMARY_TEMPLATE', () => {
+  const requiredSections = [
+    '## Goal',
+    '## Constraints & Preferences',
+    '## Progress',
+    '### Done',
+    '### In Progress',
+    '### Blocked',
+    '## Key Decisions',
+    '## Next Steps',
+    '## Critical Context',
+    '## Relevant Files',
+    '## Files Modified',
+  ]
+
+  it('contains all 8 structured section headers', () => {
+    for (const section of requiredSections) {
+      expect(SUMMARY_TEMPLATE, `missing section: ${section}`).toContain(section)
+    }
   })
 })

@@ -13,7 +13,7 @@ afterEach(() => { while (dirs.length) { try { rmSync(dirs.pop()!, { recursive: t
 
 function collectingEmit() {
   const tokens: string[] = []
-  const emit: GraphEmit = { token: (d) => tokens.push(d), reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {} }
+  const emit: GraphEmit = { token: (d) => tokens.push(d), reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
   return { emit, tokens }
 }
 

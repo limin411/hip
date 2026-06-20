@@ -175,20 +175,24 @@ export class ToolRunner {
         console.warn(`PostToolUse hook error for ${call.name}: ${msg}`)
         postResult = { kind: 'allow' }
       }
-      if (postResult.updatedInput) {
-        const ui = postResult.updatedInput
-        if (ui !== null && typeof ui === 'object' && 'output' in ui) {
-          const out = ui.output
-          if (typeof out === 'string') {
-            finalContent = out
-          } else if (out !== undefined && out !== null) {
-            finalContent = JSON.stringify(out)
+        if (postResult.updatedInput) {
+          const ui = postResult.updatedInput
+          if (ui !== null && typeof ui === 'object' && 'output' in ui) {
+            const out = ui.output
+            if (typeof out === 'string') {
+              finalContent = out
+            } else if (out !== undefined && out !== null) {
+              try {
+                finalContent = JSON.stringify(out)
+              } catch {
+                finalContent = String(out)
+              }
+            }
+          } else if (typeof ui === 'string') {
+            finalContent = ui
           }
-        } else if (typeof ui === 'string') {
-          finalContent = ui
+          // Otherwise keep original result to avoid '[object Object]'.
         }
-        // Otherwise keep original result to avoid '[object Object]'.
-      }
       }
 
       return {

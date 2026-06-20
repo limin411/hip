@@ -29,8 +29,9 @@ export class PermissionManager {
 
   /** Set the per-conversation permission mode. Clears sticky approval cache when the mode value actually changes. */
   setPermissionMode(permissionMode: PermissionMode): boolean {
+    const oldMode = this.getPermissionMode()
     const accepted = this.setPermissionModeFn(permissionMode)
-    if (accepted && this.getPermissionMode() !== permissionMode) {
+    if (accepted && oldMode !== permissionMode) {
       this.clearApprovedGrants()
     }
     return accepted

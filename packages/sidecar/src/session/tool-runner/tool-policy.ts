@@ -46,7 +46,7 @@ const MEDIUM_RISK_NONE: ToolClassification = { risk: 'medium', approval: 'none' 
 export function defaultToolPolicy(opts: {
   selfGatedTools: Set<string>
 }): ToolPolicy {
-  const selfGated = opts?.selfGatedTools ?? new Set<string>()
+  const selfGated = opts.selfGatedTools
 
   return {
     classify(toolName: string, mode: PermissionMode): ToolClassification {
@@ -64,12 +64,9 @@ export function defaultToolPolicy(opts: {
       if (
         WRITE_TOOLS.has(toolName) ||
         GIT_TOOLS.has(toolName) ||
-        MEDIUM_TOOLS.has(toolName)
+        MEDIUM_TOOLS.has(toolName) ||
+        DELEGATE_TOOLS.has(toolName)
       ) {
-        return MEDIUM_RISK_NONE
-      }
-
-      if (DELEGATE_TOOLS.has(toolName)) {
         return MEDIUM_RISK_NONE
       }
 

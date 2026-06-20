@@ -401,6 +401,67 @@ describe('applyServerMessage', () => {
     } as any, 0)
     expect(next.sessions[0].pendingPermission?.agentFrame?.name).toBe('OpenCode')
   })
+
+  it('agent:notification appends a synthetic assistant message for completed background tasks', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-1', description: 'format code', status: 'completed' }, 1000)
+    expect(next.sessions[0].messages).toHaveLength(1)
+    expect(next.sessions[0].messages[0]).toMatchObject({
+      id: 'notif-bg-1',
+      role: 'assistant',
+      content: '[Background task "format code" completed]',
+      agentId: 'bg-1',
+    })
+  })
+
+  it('agent:notification appends a synthetic assistant message for failed background tasks', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-2', description: 'build', status: 'failed', error: 'exit 1' }, 1000)
+    expect(next.sessions[0].messages).toHaveLength(1)
+    expect(next.sessions[0].messages[0].content).toBe('[Background task "build" failed: exit 1]')
+  })
+
+  it('agent:notification for an unknown session is a no-op', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 'nope', taskId: 'bg-1', description: 'x', status: 'completed' }, 1000)
+    expect(next).toBe(s0)
+  })
+
+  it('plan:delta accumulates streaming plan text by itemId', () => {
+    const s0 = { sessions: [baseSession()] }
+    let s = applyServerMessage(s0, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'Step 1' }, 100)
+    s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: ' and step 2' }, 101)
+    expect(s.sessions[0].planDeltaDraft).toEqual({ p1: 'Step 1 and step 2' })
+  })
+
+  it('plan:delta accumulates separate drafts for different itemIds', () => {
+    const s0 = { sessions: [baseSession()] }
+    let s = applyServerMessage(s0, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'A' }, 100)
+    s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p2', delta: 'B' }, 101)
+    expect(s.sessions[0].planDeltaDraft).toEqual({ p1: 'A', p2: 'B' })
+  })
+
+  it('plan:published clears the delta draft and sets the authoritative plan', () => {
+    const plan = [{ id: 'p1', description: 'Step 1', content: 'Do step 1', status: 'pending' as const }]
+    let s = { sessions: [baseSession()] }
+    s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'draft' }, 100)
+    const next = applyServerMessage(s, { type: 'plan:published', sessionId: 's1', turnId: 't1', plan }, 101)
+    expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+    expect(next.sessions[0].planDeltaDraft).toEqual({})
+  })
+
+  it('message:complete clears the plan delta draft', () => {
+    let s = { sessions: [baseSession()] }
+    s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'draft' }, 100)
+    const next = applyServerMessage(s, { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } }, 102)
+    expect(next.sessions[0].planDeltaDraft).toEqual({})
+  })
+
+  it('plan:delta for an unknown session is a no-op', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'plan:delta', sessionId: 'nope', turnId: 't1', itemId: 'p1', delta: 'x' }, 100)
+    expect(next).toBe(s0)
+  })
 })
 
 function reset() {
@@ -529,5 +590,27 @@ describe('sessionStore surface', () => {
     const start = applyServerMessage({ sessions: [] }, { type: 'session:list:result', sessions: [summary('a', 'chat')] }, 1)
     const loaded = applyServerMessage(start, { type: 'session:loaded', sessionId: 'a', messages: [], config: { llmProvider: 'd', model: 'm', tools: [] } }, 2)
     expect(loaded.sessions.find((s) => s.id === 'a')!.config.surface).toBe('chat')
+  })
+})
+
+describe('agent:profiles reducer', () => {
+  it('stores profile list on the session', () => {
+    const s0 = { sessions: [baseSession()] }
+    const profiles = [
+      { id: 'supervisor', name: 'Supervisor', mode: 'primary' as const },
+      { id: 'worker', name: 'Worker', mode: 'subagent' as const },
+    ]
+    const next = applyServerMessage(s0, { type: 'agent:profiles', sessionId: 's1', profiles }, 1)
+    expect(next.sessions[0].agentProfiles).toEqual(profiles)
+  })
+
+  it('updates profile list on existing session', () => {
+    const s0 = { sessions: [baseSession({ agentProfiles: [{ id: 'supervisor', name: 'Supervisor', mode: 'primary' as const }] })] }
+    const profiles = [
+      { id: 'supervisor', name: 'Supervisor', mode: 'primary' as const },
+      { id: 'plan', name: 'Plan', mode: 'primary' as const },
+    ]
+    const next = applyServerMessage(s0, { type: 'agent:profiles', sessionId: 's1', profiles }, 1)
+    expect(next.sessions[0].agentProfiles).toEqual(profiles)
   })
 })

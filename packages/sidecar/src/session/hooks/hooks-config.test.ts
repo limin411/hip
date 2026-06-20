@@ -812,7 +812,7 @@ describe('HookRegistry — edge cases', () => {
     expect(calls).toEqual(['write-matcher', 'no-matcher'])
   })
 
-  it('allow hook with reason field — final result strips reason', async () => {
+  it('allow hook with reason field — final result preserves reason', async () => {
     const registry = new HookRegistry()
     registry.register({
       event: 'PreToolUse',
@@ -820,7 +820,7 @@ describe('HookRegistry — edge cases', () => {
     })
 
     const result = await registry.fire('PreToolUse', ctx())
-    expect(result).toEqual({ kind: 'allow' })
+    expect(result).toEqual({ kind: 'allow', reason: 'looks fine' })
   })
 
   it('deny with reason propagates reason', async () => {

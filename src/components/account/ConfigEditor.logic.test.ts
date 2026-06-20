@@ -37,13 +37,6 @@ const SAMPLE_CONFIG: HipConfig = {
       allowedMcpServers: ['abc123'],
     },
   ],
-  permissions: {
-    coarseMode: 'edit',
-    toolPermissions: {
-      defaultMode: 'prompt',
-      overrides: { run_script: 'approve' },
-    },
-  },
 }
 
 describe('configToToml', () => {
@@ -68,7 +61,6 @@ describe('configToToml', () => {
     expect(result.config.agents?.length).toBe(1)
     expect(result.config.agents![0].allowedSkills).toEqual(['skill-1'])
     expect(result.config.agents![0].allowedMcpServers).toEqual(['abc123'])
-    expect(result.config.permissions?.coarseMode).toBe('edit')
   })
 
   it('handles empty config gracefully', () => {
@@ -100,12 +92,6 @@ describe('configToToml', () => {
     expect(toml).toContain('allowed_mcp_servers = ["abc123"]')
   })
 
-  it('produces permissions section with tool_permissions', () => {
-    const toml = configToToml(SAMPLE_CONFIG)
-    expect(toml).toContain('[permissions]')
-    expect(toml).toContain('coarse_mode = "edit"')
-    expect(toml).toContain('tool_permissions.default_mode = "prompt"')
-  })
 })
 
 describe('parseConfigToml', () => {
@@ -225,10 +211,6 @@ enabled = true
 allowed_skills = ["s1"]
 allowed_mcp_servers = ["m1"]
 bound_model = "{\\"provider\\":\\"openai\\"}"
-
-[permissions]
-coarse_mode = "full"
-tool_permissions.default_mode = "prompt"
 `)
     expect('config' in result).toBe(true)
     if (!('config' in result)) return
@@ -236,8 +218,6 @@ tool_permissions.default_mode = "prompt"
     expect(result.config.mcpServers![0].disabledTools).toEqual(['tool-b'])
     expect(result.config.agents![0].allowedSkills).toEqual(['s1'])
     expect(result.config.agents![0].allowedMcpServers).toEqual(['m1'])
-    expect(result.config.permissions!.coarseMode).toBe('full')
-    expect(result.config.permissions!.toolPermissions!.defaultMode).toBe('prompt')
   })
 
   it('round-trips empty config (version only)', () => {
@@ -252,7 +232,6 @@ tool_permissions.default_mode = "prompt"
     expect(result.config.mcpServers).toBeUndefined()
     expect(result.config.skills).toBeUndefined()
     expect(result.config.agents).toBeUndefined()
-    expect(result.config.permissions).toBeUndefined()
   })
 
   it('round-trips config with all sections populated', () => {
@@ -277,9 +256,6 @@ tool_permissions.default_mode = "prompt"
     // agents round-trip
     expect(parsed.agents![0].allowedSkills).toEqual(['skill-1'])
     expect(parsed.agents![0].allowedMcpServers).toEqual(['abc123'])
-    // permissions round-trip
-    expect(parsed.permissions!.coarseMode).toBe('edit')
-    expect(parsed.permissions!.toolPermissions!.defaultMode).toBe('prompt')
   })
 
   it('returns errors for providers with missing required fields', () => {
@@ -315,7 +291,6 @@ id = "no-transport"
       mcpServers: null,
       skills: null,
       agents: null,
-      permissions: null,
     }))
     expect('config' in result).toBe(true)
     if (!('config' in result)) return

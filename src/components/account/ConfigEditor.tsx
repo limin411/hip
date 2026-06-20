@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FileCode, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import type { HipConfig, ProviderEntry, McpServerConfig, SkillEntry, AgentConfig, PermissionEntry } from '@hip/protocol'
+import type { HipConfig, ProviderEntry, McpServerConfig, SkillEntry, AgentConfig } from '@hip/protocol'
 
 // ── Pure-logic exports (tested in ConfigEditor.logic.test.ts) ────
 
@@ -82,23 +82,6 @@ export function configToToml(config: HipConfig): string {
       if (a.allowedMcpServers?.length) lines.push(`allowed_mcp_servers = ${tomlArr(a.allowedMcpServers)}`)
       lines.push('')
     }
-  }
-
-  // permissions: 细粒度工具权限控制（不在设置页面中展示，仅可在本 raw TOML 编辑器中配置）。
-  // Fine-grained tool permissions (not surfaced in the Settings UI — configure here in raw TOML).
-  // 粗粒度权限（chat / edit / full）通过对话输入框内的权限选择器控制，优先级高于此处细粒度配置。
-  // Coarse permission modes (chat/edit/full) are set via the PermissionModePicker in the composer and take priority.
-  if (config.permissions) {
-    lines.push('[permissions]')
-    lines.push(`coarse_mode = ${tomlStr(config.permissions.coarseMode)}`)
-    if (config.permissions.toolPermissions) {
-      const tp = config.permissions.toolPermissions
-      lines.push(`tool_permissions.default_mode = ${tomlStr(tp.defaultMode)}`)
-      if (tp.overrides && Object.keys(tp.overrides).length > 0) {
-        lines.push(`tool_permissions.overrides = ${tomlStr(JSON.stringify(tp.overrides))}`)
-      }
-    }
-    lines.push('')
   }
 
   // Remove trailing blank line
@@ -271,11 +254,8 @@ function mapKey(key: string): string {
   if (key === 'bound_model') return 'boundModel'
   if (key === 'allowed_skills') return 'allowedSkills'
   if (key === 'allowed_mcp_servers') return 'allowedMcpServers'
-  if (key === 'coarse_mode') return 'coarseMode'
-  if (key === 'tool_permissions') return 'toolPermissions'
   if (key === 'enabled_tools') return 'enabledTools'
   if (key === 'disabled_tools') return 'disabledTools'
-  if (key === 'default_mode') return 'defaultMode'
   return key
 }
 
@@ -472,18 +452,6 @@ function validateConfigShape(raw: unknown): { config: HipConfig } | { errors: st
     }
   }
 
-  if (obj.permissions !== undefined && obj.permissions !== null) {
-    const p = obj.permissions as Record<string, unknown>
-    if (typeof p !== 'object') {
-      errors.push('permissions must be an object')
-    } else {
-      if (typeof p.coarseMode !== 'string' && typeof p.coarse_mode !== 'string')
-        errors.push('permissions.coarseMode (or coarse_mode) must be a string')
-      if (p.coarse_mode !== undefined && p.coarseMode === undefined) p.coarseMode = p.coarse_mode
-      if (p.tool_permissions !== undefined && p.toolPermissions === undefined) p.toolPermissions = p.tool_permissions
-    }
-  }
-
   if (errors.length > 0) return { errors }
 
   // Build clean HipConfig
@@ -494,7 +462,6 @@ function validateConfigShape(raw: unknown): { config: HipConfig } | { errors: st
   if (obj.mcpServers) cfg.mcpServers = obj.mcpServers as McpServerConfig[]
   if (obj.skills) cfg.skills = obj.skills as SkillEntry[]
   if (obj.agents) cfg.agents = obj.agents as AgentConfig[]
-  if (obj.permissions) cfg.permissions = obj.permissions as PermissionEntry
 
   return { config: cfg }
 }

@@ -43,3 +43,4 @@ src-tauri/gen
 tsconfig.node.tsbuildinfo
 .omo/
 .claude/
+.hip/

@@ -1,6 +1,7 @@
 import type { ServerMessage, PermissionMode, PermissionOption } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
+import type { HookRegistry } from './hooks/registry.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -73,12 +74,18 @@ export class PermissionManager {
   }
 
   /** Build the HITL closure for run_script (and dispatched agents). Registers a pending permission
-   *  and resolves on the user's permission:respond. */
+   *  and resolves on the user's permission:respond.
+   *
+   *  When `hooks` is provided, the PermissionRequest hook fires before the prompt.
+   *  - allow → resolve allow_once immediately (no prompt)
+   *  - deny  → resolve reject_once immediately (no prompt)
+   *  - ask or no hooks → normal HITL flow */
   buildHitlApproval(
     send: SendFn,
     sessionId: string,
     turnId: string,
     nextSeqFn: () => number,
+    hooks?: HookRegistry,
   ): ApprovalFn {
     const options: PermissionOption[] = [
       { optionId: 'allow_once', name: '允许', kind: 'allow_once' },
@@ -90,36 +97,61 @@ export class PermissionManager {
         { optionId: 'reject_always', name: '始终拒绝', kind: 'reject_always' },
       )
     }
-    return (req) =>
-      new Promise((resolve) => {
-        const requestId = `run-script-${turnId}-${nextSeqFn()}`
-        this.pendingPermissions.set(requestId, (choice) => {
-          if ('cancelled' in choice) { resolve({ cancelled: true }); return }
-          const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? 'reject_once'
-          resolve({ kind })
-        })
-        send({
-          type: 'permission:request',
+    return (req) => {
+      const toolName = req.toolName ?? req.title
+      const resolveFromHook = async (): Promise<ApprovalDecision | null> => {
+        if (!hooks || !hooks.hasMatchingHook('PermissionRequest', toolName)) return null
+        const hookResult = await hooks.fire('PermissionRequest', {
           sessionId,
           turnId,
-          requestId,
-          tool: { title: req.title, kind: req.kind, content: req.content },
-          options,
+          toolName,
+          toolInput: { kind: req.kind, content: req.content },
+        })
+        if (hookResult.kind === 'allow') return { kind: 'allow_once' }
+        if (hookResult.kind === 'deny') return { kind: 'reject_once' }
+        // 'ask' or other non-terminal: proceed with HITL
+        return null
+      }
+      return new Promise((resolve) => {
+        void resolveFromHook().then((hookDecision) => {
+          if (hookDecision !== null) { resolve(hookDecision); return }
+          const requestId = `run-script-${turnId}-${nextSeqFn()}`
+          this.pendingPermissions.set(requestId, (choice) => {
+            if ('cancelled' in choice) { resolve({ cancelled: true }); return }
+            const kind = options.find((o) => o.optionId === choice.optionId)?.kind ?? 'reject_once'
+            resolve({ kind })
+          })
+          send({
+            type: 'permission:request',
+            sessionId,
+            turnId,
+            requestId,
+            tool: { title: req.title, kind: req.kind, content: req.content },
+            options,
+          })
+        }).catch((err) => {
+          // Hook errors (including re-entrancy) must fail closed rather than leaving the
+          // approval promise hanging forever.
+          console.warn('PermissionRequest hook failed:', err instanceof Error ? err.message : String(err))
+          resolve({ kind: 'reject_once' })
         })
       })
+    }
   }
 
-  /** Build the per-mode run_script gate: chat ⇒ undefined (no run_script); edit ⇒ HITL; full ⇒ auto-approve. */
+  /** Build the per-mode run_script gate: chat ⇒ undefined (no run_script); edit ⇒ HITL; full ⇒ auto-approve.
+   *  When `hooks` is provided and mode is 'edit', fires PermissionRequest hook before the prompt. */
   buildRequestApproval(
     send: SendFn,
     sessionId: string,
     turnId: string,
     nextSeqFn: () => number,
     mode: PermissionMode,
+    hooks?: HookRegistry,
   ): ApprovalFn | undefined {
     if (mode === 'chat') return undefined
     if (mode === 'full') return () => Promise.resolve({ kind: 'allow_once' })
-    return this.buildHitlApproval(send, sessionId, turnId, nextSeqFn)
+    return this.buildHitlApproval(send, sessionId, turnId, nextSeqFn, hooks)
   }
 
 }

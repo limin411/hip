@@ -839,3 +839,9 @@ function toGlobRegex(pattern: string): RegExp {
     .replace(/ /g, '.*')
   return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`)
 }
+
+/** Tools whose approval logic is embedded in the tool implementation itself
+ *  (via requestApproval), rather than being gated by a pre-execution policy
+ *  check. Currently only run_script — the tool fires, asks the user, and
+ *  respects the answer. */
+export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script'])

@@ -390,4 +390,82 @@ describe('background subagent integration', () => {
     expect(session.backgroundTasks.size).toBe(0)
     expect(session.listBackgroundTasks()).toEqual([])
   })
+
+  it('emits agent:notification after background task completes successfully', async () => {
+    class NotifyRunner implements ModelRunner {
+      private call = 0
+      async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({
+            content: '',
+            tool_calls: [
+              { name: 'task', args: { description: 'notify success', mode: 'background' }, id: 'c1', type: 'tool_call' as const },
+            ],
+          })
+        }
+        if (!hasToolMessages(msgs)) {
+          opts.onText?.('bg result')
+          return new AIMessage('bg result')
+        }
+        opts.onText?.('main done')
+        return new AIMessage('main done')
+      }
+    }
+
+    const session = sessionWithRunner('s-int-notify', new NotifyRunner())
+    const events: ServerMessage[] = []
+    await session.sendMessage('test notification', (m) => events.push(m))
+
+    // Wait for background task to finish
+    await Promise.allSettled(session.backgroundTasks.values())
+
+    // Verify agent:notification was emitted
+    const notification = events.find((e) => e.type === 'agent:notification')
+    expect(notification).toBeTruthy()
+    expect((notification as { status?: string }).status).toBe('completed')
+    expect((notification as { description?: string }).description).toBe('notify success')
+    expect((notification as { sessionId?: string }).sessionId).toBe('s-int-notify')
+    expect((notification as { taskId?: string }).taskId).toMatch(/^worker-\d+$/)
+    expect((notification as { result?: string }).result).toBe('bg result')
+  })
+
+  it('emits agent:notification with failed status on background task error', async () => {
+    class ErrorNotifyRunner implements ModelRunner {
+      private call = 0
+      async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({
+            content: '',
+            tool_calls: [
+              { name: 'task', args: { description: 'error notify test', mode: 'background' }, id: 'c1', type: 'tool_call' as const },
+            ],
+          })
+        }
+        if (!hasToolMessages(msgs)) {
+          throw new Error('simulated bg crash')
+        }
+        opts.onText?.('main done')
+        return new AIMessage('main done')
+      }
+    }
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const session = sessionWithRunner('s-int-err-notify', new ErrorNotifyRunner())
+    const events: ServerMessage[] = []
+    await session.sendMessage('test error notification', (m) => events.push(m))
+
+    // Wait for background task to finish
+    await Promise.allSettled(session.backgroundTasks.values())
+
+    // Verify agent:notification with failed status
+    const notification = events.find((e) => e.type === 'agent:notification')
+    expect(notification).toBeTruthy()
+    expect((notification as { status?: string }).status).toBe('failed')
+    expect((notification as { description?: string }).description).toBe('error notify test')
+    expect((notification as { error?: string }).error).toContain('simulated bg crash')
+
+    consoleSpy.mockRestore()
+  })
 })

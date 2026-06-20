@@ -78,12 +78,7 @@ export class ToolRunner {
     // ── 1. Resolve tool by name ────────────────────────────────────────────
     const tool = tools.get(call.name)
     if (!tool) {
-      this.emitError(call.callId, call.name, `unknown tool: ${call.name}`)
-      return {
-        content: `Error: unknown tool ${call.name}`,
-        tool_call_id: call.callId,
-        name: call.name,
-      }
+      return this.errorResult(call, `unknown tool: ${call.name}`)
     }
 
     // ── 2. Classify via ToolPolicy ─────────────────────────────────────────
@@ -102,12 +97,7 @@ export class ToolRunner {
 
       if (preResult.kind === 'deny') {
         const reason = preResult.reason ? `: ${preResult.reason}` : ''
-        this.emitError(call.callId, call.name, `denied by hook${reason}`)
-        return {
-          content: `Error: tool execution denied by hook${reason}`,
-          tool_call_id: call.callId,
-          name: call.name,
-        }
+        return this.errorResult(call, `tool execution denied by hook${reason}`)
       }
 
       if (preResult.kind === 'ask') {
@@ -119,39 +109,31 @@ export class ToolRunner {
           // Auto-allow — pass through.
         } else if (!requestApproval) {
           // F1: ask with no approval transport → deny.
-          this.emitError(call.callId, call.name, 'approval required but no approval transport available')
-          return {
-            content: 'Error: approval required but no approval transport available',
-            tool_call_id: call.callId,
-            name: call.name,
-          }
+          return this.errorResult(call, 'approval required but no approval transport available')
         } else {
           // Runner approval flow (cache-aware).
           const cached = approvalCache.lookup(call.name, call.args)
           if (cached === 'reject') {
-            this.emitError(call.callId, call.name, 'rejected (cached)')
-            return {
-              content: 'Error: tool execution rejected (cached)',
-              tool_call_id: call.callId,
-              name: call.name,
-            }
+            return this.errorResult(call, 'tool execution rejected (cached)')
           }
 
           if (cached !== 'allow') {
-            const decision = await requestApproval({
-              title: `Run ${call.name}`,
-              kind: 'execute',
-              content: preResult.reason ?? undefined,
-            })
+            let decision: ApprovalDecision
+            try {
+              decision = await requestApproval({
+                title: `Run ${call.name}`,
+                kind: 'execute',
+                content: preResult.reason ?? undefined,
+              })
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              approvalCache.set(call.name, call.args, { kind: 'reject_always' })
+              return this.errorResult(call, `approval transport failed: ${msg}`)
+            }
             approvalCache.set(call.name, call.args, decision)
 
             if (!isApproved(decision)) {
-              this.emitError(call.callId, call.name, 'rejected by user')
-              return {
-                content: 'Error: tool execution rejected by user',
-                tool_call_id: call.callId,
-                name: call.name,
-              }
+              return this.errorResult(call, 'tool execution rejected by user')
             }
           }
         }
@@ -179,9 +161,13 @@ export class ToolRunner {
           toolOutput: result,
         })
         if (postResult.updatedInput) {
-          finalContent = String(
-            postResult.updatedInput.output ?? postResult.updatedInput,
-          )
+          const ui = postResult.updatedInput
+          if (ui !== null && typeof ui === 'object' && 'output' in ui) {
+            finalContent = String(ui.output)
+          } else if (typeof ui === 'string') {
+            finalContent = ui
+          }
+          // Otherwise keep original result to avoid '[object Object]'.
         }
       }
 
@@ -222,6 +208,15 @@ export class ToolRunner {
     error?: string,
   ): void {
     this.deps.onToolFinished?.(callId, status, output, error)
+  }
+
+  private errorResult(call: { name: string; callId: string }, reason: string): ToolCallResult {
+    this.emitError(call.callId, call.name, reason)
+    return {
+      content: `Error: ${reason}`,
+      tool_call_id: call.callId,
+      name: call.name,
+    }
   }
 
   private emitError(

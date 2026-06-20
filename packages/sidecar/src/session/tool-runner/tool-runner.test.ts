@@ -49,7 +49,7 @@ function makeDeps(overrides: Partial<ToolRunnerDeps> = {}): ToolRunnerDeps {
   const tools = overrides.tools ?? new Map<string, StructuredToolInterface>()
   return {
     tools,
-    toolPolicy: overrides.toolPolicy ?? defaultToolPolicy({ selfGatedTools: overrides.selfGatedTools }),
+    toolPolicy: overrides.toolPolicy ?? defaultToolPolicy({ selfGatedTools: overrides.selfGatedTools ?? new Set<string>() }),
     approvalCache: overrides.approvalCache ?? new SessionApprovalCache(),
     selfGatedTools: overrides.selfGatedTools ?? new Set<string>(),
     permissionMode: overrides.permissionMode ?? 'edit',
@@ -86,7 +86,7 @@ describe('ToolRunner', () => {
         args: {},
       })
 
-      expect(result.content).toBe('Error: unknown tool nonexistent')
+      expect(result.content).toBe('Error: unknown tool: nonexistent')
       expect(result.tool_call_id).toBe('call-1')
       expect(result.name).toBe('nonexistent')
     })
@@ -149,7 +149,7 @@ describe('ToolRunner', () => {
       await runner.runToolCall({ name: 'read_file', callId: 'c2', args: {} })
 
       expect(onToolStarted).toHaveBeenCalledWith('read_file', 'c2', undefined)
-      expect(onToolFinished).toHaveBeenCalledWith('c2', 'error', undefined, 'denied by hook')
+      expect(onToolFinished).toHaveBeenCalledWith('c2', 'error', undefined, 'tool execution denied by hook')
     })
   })
 
@@ -615,7 +615,7 @@ describe('ToolRunner', () => {
       })
 
       expect(result).toEqual({
-        content: 'Error: unknown tool ghost',
+        content: 'Error: unknown tool: ghost',
         tool_call_id: 'error-call',
         name: 'ghost',
       })

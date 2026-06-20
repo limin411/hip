@@ -1,4 +1,4 @@
-import type { ServerMessage, PermissionMode, PermissionOption, ToolPermissionConfig } from '@hip/protocol'
+import type { ServerMessage, PermissionMode, PermissionOption } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from './tools.js'
 
 type SendFn = (msg: ServerMessage) => void
@@ -93,46 +93,5 @@ export class PermissionManager {
     return this.buildHitlApproval(send, sessionId, turnId, nextSeqFn)
   }
 
-  /** Resolve effective permission mode for a tool given ToolPermissionConfig and the coarse mode.
-   *  Coarse mode always wins over per-tool auto (safety). */
-  resolveToolMode(
-    toolName: string,
-    coarseMode: PermissionMode,
-    toolPermissions?: ToolPermissionConfig,
-  ): 'auto' | 'prompt' | 'approve' | 'deny' | 'coarse' {
-    if (!toolPermissions) return 'coarse'
-
-    // Check overrides first
-    const override = toolPermissions.overrides?.[toolName]
-    if (override === 'auto') {
-      // Coarse mode safety: chat mode blocks write/edit/run_script regardless
-      if (coarseMode === 'chat' && (toolName === 'write_file' || toolName === 'edit_file' || toolName === 'run_script')) {
-        return 'deny'
-      }
-      return 'auto'
-    }
-    if (override === 'deny') return 'deny'
-    if (override === 'prompt') return 'prompt'
-    if (override === 'approve') {
-      if (this.isApproved(toolName)) return 'auto' // sticky grant
-      return 'approve'
-    }
-
-    // Check defaultMode
-    const def = toolPermissions.defaultMode
-    if (def === 'auto') {
-      if (coarseMode === 'chat' && (toolName === 'write_file' || toolName === 'edit_file' || toolName === 'run_script')) {
-        return 'deny'
-      }
-      return 'auto'
-    }
-    if (def === 'deny') return 'deny'
-    if (def === 'prompt') return 'prompt'
-    if (def === 'approve') {
-      if (this.isApproved(toolName)) return 'auto'
-      return 'approve'
-    }
-
-    return 'coarse'
-  }
 }
+

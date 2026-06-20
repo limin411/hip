@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, ToolPermissionConfig } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig } from '@hip/protocol'
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
@@ -87,7 +87,6 @@ export class Session {
   private readonly invokerFactory: (cwd: string) => AgentInvoker
   readonly backgroundTasks: Map<string, Promise<void>> = new Map()
   static readonly MAX_BACKGROUND_TASKS = 10
-  private _toolPermissions?: ToolPermissionConfig
 
   readonly git: GitOperations
   readonly permissions: PermissionManager
@@ -107,7 +106,6 @@ export class Session {
     runner?: ModelRunner,
     summarizer?: Summarizer,
     invokerFactory?: (cwd: string) => AgentInvoker,
-    toolPermissions?: ToolPermissionConfig,
   ) {
     this._config = config
     this.injectedModel = model
@@ -116,7 +114,6 @@ export class Session {
     this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd))
     this.usesEnvModel = !model && !runner
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
-    if (toolPermissions) this._toolPermissions = toolPermissions
 
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
@@ -385,7 +382,7 @@ export class Session {
 
     const tools = buildTools(cwd, spawnSubagent, this._config.cwd,
       enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
-      { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id, toolPermissions: this._toolPermissions, recordApproved: (name) => this.permissions.recordApproved(name), isApproved: (name) => this.permissions.isApproved(name) },
+      { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id },
     )
     const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id }
 

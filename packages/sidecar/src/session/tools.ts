@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import type { SkillMeta, PermissionMode, ToolPermissionConfig } from '@hip/protocol'
+import type { SkillMeta, PermissionMode } from '@hip/protocol'
 import { resolveWithin } from './workspace-fs.js'
 import { gitCommit, gitCreateBranch, gitSwitchBranch, createWorktree, listWorktrees, removeWorktree } from './workspace-git.js'
 import { getWorktreesDir } from './worktree-config.js'
@@ -183,12 +183,6 @@ export interface BuildToolsOpts {
   generateAgentEnabled?: boolean
   /** Session ID for skill body substitution (${HIP_SESSION_ID}). */
   sessionId?: string
-  /** Per-tool permission config: auto/prompt/approve/deny per tool name. */
-  toolPermissions?: ToolPermissionConfig
-  /** Callback to record a sticky 'approve' grant for a tool (used when mode='approve'). */
-  recordApproved?: (toolName: string) => void
-  /** Callback to check if a tool has a sticky 'approve' grant. */
-  isApproved?: (toolName: string) => boolean
 }
 
 function splitArgs(input: string): { positional: string[]; named: Record<string, string> } {
@@ -282,68 +276,6 @@ export function substituteSkillBody(
  *  Anything that is not an explicit allow_* (reject_*, cancel, or an unknown kind) ⇒ false. */
 function isApproved(d: ApprovalDecision): boolean {
   return 'kind' in d && d.kind.startsWith('allow')
-}
-
-/** Resolve the effective permission mode for a tool given the ToolPermissionConfig. */
-function resolveEffectiveMode(
-  toolName: string,
-  permissions: ToolPermissionConfig,
-  requestApproval: ApprovalFn | undefined,
-  recordApproved: ((name: string) => void) | undefined,
-  isStickyApproved: ((name: string) => boolean) | undefined,
-): 'auto' | 'prompt' | 'approve' | 'deny' | 'none' {
-  const override = permissions.overrides?.[toolName]
-  const mode = override ?? permissions.defaultMode
-  if (mode === 'approve' && isStickyApproved?.(toolName)) return 'auto'
-  if (mode === 'prompt' && !requestApproval) return 'deny'
-  if (mode === 'approve' && !requestApproval) return 'deny'
-  return mode
-}
-
-/** Wrap a tool with per-tool permission gating. Returns the original tool if no gating needed. */
-function wrapWithPermission(
-  t: StructuredToolInterface,
-  toolName: string,
-  permissions: ToolPermissionConfig,
-  requestApproval: ApprovalFn | undefined,
-  recordApproved: ((name: string) => void) | undefined,
-  isStickyApproved: ((name: string) => boolean) | undefined,
-): StructuredToolInterface {
-  const mode = resolveEffectiveMode(toolName, permissions, requestApproval, recordApproved, isStickyApproved)
-  if (mode === 'auto' || mode === 'none') return t
-
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const origInvoke = t.invoke.bind(t) as StructuredToolInterface['invoke']
-  const wrapped = Object.create(Object.getPrototypeOf(t))
-  Object.assign(wrapped, t, {
-    invoke: async (input: unknown, config?: unknown) => {
-      if (mode === 'deny') return `Error: tool "${toolName}" is blocked by permission policy`
-
-      if (mode === 'approve') {
-        const decision = await requestApproval!({
-          title: `Approve ${toolName}`,
-          kind: 'execute',
-          content: `Allow ${toolName}? Once approved, it will be auto-allowed for the rest of this session.`,
-        })
-        if (!isApproved(decision)) return '用户拒绝了该工具执行'
-        recordApproved?.(toolName)
-        return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
-      }
-
-      if (mode === 'prompt') {
-        const decision = await requestApproval!({
-          title: `Run ${toolName}`,
-          kind: 'execute',
-          content: `Allow ${toolName}?`,
-        })
-        if (!isApproved(decision)) return '用户拒绝了该工具执行'
-        return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
-      }
-
-      return (origInvoke as (input: unknown, config?: unknown) => Promise<string>)(input, config)
-    },
-  })
-  return wrapped
 }
 
 /** Build the file-tool set sandboxed to `root`. Each returns a short string result for the model. */
@@ -857,13 +789,7 @@ export function buildTools(
 
   if (opts.mcpTools && opts.mcpTools.length > 0) extras.push(...opts.mcpTools)
 
-  const applyPermissions = (tools: StructuredToolInterface[]): StructuredToolInterface[] => {
-    if (!opts.toolPermissions) return tools
-    const tp = opts.toolPermissions
-    return tools.map((t) => wrapWithPermission(t, t.name, tp, opts.requestApproval, opts.recordApproved, opts.isApproved))
-  }
-
-  if (!spawnSubagent) return applyPermissions([...base, ...extras])
+  if (!spawnSubagent) return [...base, ...extras]
   const task = tool(
     async ({ description, mode }) => spawnSubagent(description, mode),
     {
@@ -881,7 +807,7 @@ export function buildTools(
   )
   const out = [...base, task]
 
-  if (!dispatch || dispatch.agents.length === 0) return applyPermissions([...out, ...extras])
+  if (!dispatch || dispatch.agents.length === 0) return [...out, ...extras]
 
   const roster = dispatch.agents
     .map((a) => `- ${a.id} (${a.name})${a.description ? `: ${a.description}` : ''}`)
@@ -901,7 +827,7 @@ export function buildTools(
       }),
     },
   )
-  return applyPermissions([...out, dispatchAgent, ...extras])
+  return [...out, dispatchAgent, ...extras]
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */

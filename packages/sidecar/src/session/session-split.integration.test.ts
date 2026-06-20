@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 import { Session } from './session.js'
-import type { SessionConfig, ToolPermissionConfig } from '@hip/protocol'
+import type { SessionConfig } from '@hip/protocol'
 
 function makeConfig(overrides: Partial<SessionConfig> = {}): SessionConfig {
   return { llmProvider: 'test', model: 'test-model', tools: [], cwd: '/tmp/test-cwd', ...overrides }
@@ -89,13 +89,6 @@ describe('Session with extracted modules', () => {
   it('hydrate + reseedLastCheckpoint works after extraction', () => {
     const s = new Session('test-14', makeConfig())
     s.hydrate([{ id: 'm1', role: 'user', content: 'hello', timestamp: Date.now() }])
-  })
-
-  it('toolPermissions are stored on session', () => {
-    const tp: ToolPermissionConfig = { defaultMode: 'prompt' }
-    const s = new Session('test-15', makeConfig(), undefined, undefined, undefined, undefined, undefined, undefined, undefined, tp)
-    // Verify session stored it (indirectly through buildTools in runTurn)
-    expect(s).toBeDefined()
   })
 
   it('workspaceDiff delegates to git module', async () => {

@@ -13,6 +13,7 @@ function collectingEmit() {
     toolStarted: () => {},
     toolFinished: () => {},
     usage: () => {},
+    planDelta: () => {},
   }
   return { emit, tokens }
 }

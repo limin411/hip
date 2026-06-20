@@ -434,10 +434,12 @@ export type ClientMessage =
   | { type: 'mcp:listPrompts'; serverId: string }
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
+  | { type: 'agent:setProfile'; sessionId: string; id: string }
+  | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
-  | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string }
+  | { type: 'agent:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; parentAgentId?: string; taskInput?: string; taskId?: string }
   | { type: 'token:stream'; sessionId: string; turnId: string; agentId: string; delta: string }
   | { type: 'agent:finished'; sessionId: string; turnId: string; agentId: string }
   | { type: 'reasoning:delta'; sessionId: string; turnId: string; agentId: string; role: AgentRole; stepSeq: number; delta: string }
@@ -486,15 +488,32 @@ export type ServerMessage =
   | { type: 'mcp:listPrompts:result'; serverId: string; prompts: McpPrompt[]; error?: string }
   | { type: 'mcp:getPrompt:result'; serverId: string; name: string; messages: McpPromptMessage[]; error?: string }
   | { type: 'mcp:status'; servers: Array<{ id: string; name: string; status: 'connected' | 'connecting' | 'disconnected' | 'error'; toolCount: number; toolNames: string[]; lastError?: string }> }
+  | { type: 'plan:delta'; sessionId: string; turnId: string; itemId: string; delta: string }
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
+  | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
+  | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
+
+export interface AgentProfileInfo {
+  id: string
+  name: string
+  description?: string
+  mode: 'primary' | 'subagent'
+}
 
 // ──────────────────────────────────────────────────────────────────
 // Lifecycle hooks (tool interception, safety gating, turn lifecycle)
 // ──────────────────────────────────────────────────────────────────
 
-export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete'
+export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete' | 'Stop' | 'PermissionRequest'
 
-export type HookResult = { kind: 'allow' | 'deny' | 'ask'; reason?: string; updatedInput?: Record<string, unknown> }
+export type HookResult = {
+  kind: 'allow' | 'deny' | 'ask' | 'modify' | 'continue'
+  reason?: string
+  updatedInput?: Record<string, unknown>
+  modifiedInput?: Record<string, unknown>
+  prompt?: string
+  additionalContexts?: string[]
+}
 
 export type HookMatcher = string | string[]
 

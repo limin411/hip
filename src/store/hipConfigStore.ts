@@ -3,7 +3,6 @@ import type {
   HipConfig,
   McpServerConfig,
   SkillEntry,
-  PermissionEntry,
   ProviderEntry,
   AgentConfig,
 } from '@hip/protocol'
@@ -62,10 +61,6 @@ export const useMcpServers = (): McpServerConfig[] =>
 /** Select skill enable/disable entries. */
 export const useSkills = (): SkillEntry[] =>
   useHipConfigStore((s) => s.config.skills ?? [])
-
-/** Select the permission entry (coarse mode + per-tool overrides). */
-export const usePermissions = (): PermissionEntry | undefined =>
-  useHipConfigStore((s) => s.config.permissions)
 
 /** Select provider entries. */
 export const useProviders = (): ProviderEntry[] =>

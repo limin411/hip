@@ -27,7 +27,6 @@ describe('hipConfigStore', () => {
       agents: [
         { id: 'a1', name: 'Helper', kind: 'custom', command: 'echo', args: [], enabled: true },
       ],
-      permissions: { coarseMode: 'edit' as const },
     })
 
     const { useHipConfigStore } = await import('./hipConfigStore.js')
@@ -41,7 +40,6 @@ describe('hipConfigStore', () => {
     expect(state.config.mcpServers).toHaveLength(1)
     expect(state.config.skills).toHaveLength(1)
     expect(state.config.agents).toHaveLength(1)
-    expect(state.config.permissions).toMatchObject({ coarseMode: 'edit' })
   })
 
   it('load() sets error on IPC failure', async () => {
@@ -93,22 +91,6 @@ describe('hipConfigStore', () => {
     expect(useHipConfigStore.getState().config.mcpServers).toEqual(newMcp)
   })
 
-  it('updateSection() merges new section with existing config', async () => {
-    const { useHipConfigStore } = await import('./hipConfigStore.js')
-    useHipConfigStore.setState({
-      config: {
-        version: 1,
-        providers: [{ id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' }],
-      },
-    })
-
-    await useHipConfigStore.getState().updateSection('permissions', { coarseMode: 'full' as const })
-
-    const cfg = useHipConfigStore.getState().config
-    expect(cfg.providers).toHaveLength(1)
-    expect(cfg.permissions).toMatchObject({ coarseMode: 'full' })
-  })
-
   it('selectors extract correct sections', async () => {
     getHipConfig.mockResolvedValueOnce({
       version: 1,
@@ -120,7 +102,6 @@ describe('hipConfigStore', () => {
       agents: [
         { id: 'a1', name: 'Helper', kind: 'custom', command: 'echo', args: [], enabled: true },
       ],
-      permissions: { coarseMode: 'chat' as const },
     })
 
     const { useHipConfigStore } = await import('./hipConfigStore.js')
@@ -132,7 +113,6 @@ describe('hipConfigStore', () => {
     expect(state.config.skills ?? []).toHaveLength(1)
     expect(state.config.providers ?? []).toHaveLength(1)
     expect(state.config.agents ?? []).toHaveLength(1)
-    expect(state.config.permissions).toMatchObject({ coarseMode: 'chat' })
   })
 
   it('selectors return empty arrays/undefined when section is absent', async () => {
@@ -146,6 +126,5 @@ describe('hipConfigStore', () => {
     expect(state.config.skills ?? []).toEqual([])
     expect(state.config.providers ?? []).toEqual([])
     expect(state.config.agents ?? []).toEqual([])
-    expect(state.config.permissions).toBeUndefined()
   })
 })

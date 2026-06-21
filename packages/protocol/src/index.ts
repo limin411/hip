@@ -144,7 +144,7 @@ export interface PluginComponentRef {
   componentId: string
 }
 
-export interface PluginsConfig { plugins: PluginManifest[] }
+export interface PluginsConfig { plugins: string[] }
 
 /** One installed plugin, scanned from ~/.hip/plugins/<id>/.plugin/plugin.json. */
 export interface PluginMeta {

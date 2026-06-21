@@ -49,6 +49,19 @@ describe('file tools', () => {
     expect(out).toContain('sub')
   })
 
+  it('ls accepts an absolute path under the root', async () => {
+    const sub = mkdtempSync(join(tmpdir(), 'hip-ls-abs-'))
+    writeFileSync(join(sub, 'inside.txt'), '')
+    try {
+      const tools = buildTools(sub)
+      const ls = tools.find((t) => t.name === 'ls')!
+      const out = String(await ls.invoke({ path: sub }))
+      expect(out).toContain('inside.txt')
+    } finally {
+      rmSync(sub, { recursive: true, force: true })
+    }
+  })
+
   it('rejects a path that escapes the root', async () => {
     await expect(byName(root, 'write_file').invoke({ path: '/../escape.txt', content: 'x' }))
       .resolves.toMatch(/escape|outside|root/i)

@@ -111,9 +111,23 @@ async function validateFetchUrl(rawUrl: string): Promise<string | null> {
 /** Map "/abs-relative-to-root" → real fs path inside `root`. Lexical jail PLUS a symlink check on the
  *  deepest existing ancestor (so writing through a symlinked parent that escapes the root is rejected). */
 async function real(root: string, p: string): Promise<string> {
-  const rel = p.replace(/^\/+/, '')
-  const lexical = resolveWithin(root, path.join(root, rel)) // throws on lexical (..) escape
   const realRoot = await fs.realpath(root)
+  const normalizedP = path.normalize(p)
+  // The model can pass either the documented root-relative form ("/index.html")
+  // or an absolute path that is already under the project root. On macOS the
+  // temporary directory is a symlink (/var/folders/... -> /private/var/folders/...),
+  // so compare against the *real* root after realpath, not the lexical root.
+  let realInput: string | undefined
+  try { realInput = await fs.realpath(normalizedP) } catch { realInput = undefined }
+  const isRootRelative = normalizedP.startsWith('/')
+  const isAbsoluteUnderRoot = path.isAbsolute(p) && realInput !== undefined &&
+    (realInput === realRoot || realInput.startsWith(realRoot + path.sep))
+  const candidate = isAbsoluteUnderRoot
+    ? normalizedP
+    : isRootRelative
+      ? path.join(root, normalizedP.replace(/^[\/]+/, ''))
+      : path.join(root, normalizedP)
+  const lexical = resolveWithin(root, candidate)
   let probe = lexical
   // find the deepest existing ancestor (the leaf may not exist yet for writes)
   for (;;) {

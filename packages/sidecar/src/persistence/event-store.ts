@@ -37,6 +37,41 @@ export class EventStore {
   constructor(private readonly db: DatabaseSync) {}
 
   /**
+   * Append an event to the aggregate's log. Reserves and persists the next
+   * sequence number, but does NOT open a SQLite transaction — the caller is
+   * responsible for transaction boundaries. Used by Session.emit() so that
+   * legacy persistence and the event log are committed in a single transaction.
+   */
+  append(sessionId: string, type: string, data: Record<string, unknown>): SessionEvent {
+    const current = this.db
+      .prepare('SELECT seq FROM event_sequence WHERE aggregate_id = ?')
+      .get(sessionId) as EventSequenceRow | undefined
+    const seq = (current?.seq ?? 0) + 1
+
+    if (current == null) {
+      this.db
+        .prepare('INSERT INTO event_sequence(aggregate_id, seq) VALUES (?, ?)')
+        .run(sessionId, seq)
+    } else {
+      this.db
+        .prepare('UPDATE event_sequence SET seq = ? WHERE aggregate_id = ?')
+        .run(seq, sessionId)
+    }
+
+    const event: SessionEvent = {
+      id: `${sessionId}:${seq}`,
+      aggregateId: sessionId,
+      seq,
+      type,
+      data,
+    }
+    this.db
+      .prepare('INSERT INTO event(id, aggregate_id, seq, type, data) VALUES (?, ?, ?, ?, ?)')
+      .run(event.id, sessionId, seq, type, JSON.stringify(data))
+    return event
+  }
+
+  /**
    * Append an event to the aggregate's log. Atomically reserves and persists the
    * next sequence number under a single SQLite transaction, so the sequence counter
    * and the event row can never diverge — even on crash mid-write.
@@ -44,27 +79,9 @@ export class EventStore {
   publish(sessionId: string, type: string, data: Record<string, unknown>): { seq: number } {
     this.db.exec('BEGIN')
     try {
-      const current = this.db
-        .prepare('SELECT seq FROM event_sequence WHERE aggregate_id = ?')
-        .get(sessionId) as EventSequenceRow | undefined
-      const seq = (current?.seq ?? 0) + 1
-
-      if (current == null) {
-        this.db
-          .prepare('INSERT INTO event_sequence(aggregate_id, seq) VALUES (?, ?)')
-          .run(sessionId, seq)
-      } else {
-        this.db
-          .prepare('UPDATE event_sequence SET seq = ? WHERE aggregate_id = ?')
-          .run(seq, sessionId)
-      }
-
-      this.db
-        .prepare('INSERT INTO event(id, aggregate_id, seq, type, data) VALUES (?, ?, ?, ?, ?)')
-        .run(`${sessionId}:${seq}`, sessionId, seq, type, JSON.stringify(data))
-
+      const event = this.append(sessionId, type, data)
       this.db.exec('COMMIT')
-      return { seq }
+      return { seq: event.seq }
     } catch (e) {
       this.db.exec('ROLLBACK')
       throw e

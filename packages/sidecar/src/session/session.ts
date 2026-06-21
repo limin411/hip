@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { ChatOpenAI } from '@langchain/openai'
@@ -37,6 +37,8 @@ import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
+import { EventStore } from '../persistence/event-store.js'
+import { projectEvent } from '../persistence/message-projector.js'
 import * as workspaceFs from './workspace-fs.js'
 import { GitOperations } from './git-operations.js'
 import { PermissionManager } from './permission-manager.js'
@@ -117,6 +119,9 @@ export class Session {
   private readonly spawnedSubagentIds = new Set<string>()
   static readonly MAX_BACKGROUND_TASKS = 10
 
+  readonly eventStore?: EventStore
+  private readonly activeSteps = new Map<string, string>()
+
   readonly git: GitOperations
   readonly permissions: PermissionManager
   readonly agentProv: AgentProviderManager
@@ -173,6 +178,8 @@ export class Session {
     this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd))
     this.usesEnvModel = !model && !runner
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
+
+    this.eventStore = store ? new EventStore(store.getDb()) : undefined
 
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
@@ -293,9 +300,8 @@ export class Session {
     const userTs = Date.now()
     let isFirstTurn = false
     if (this.store) {
-      const seq = this.store.insertMessage({ id: userMessageId ?? `u-${userTs}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: userTs })
-      this.store.touchSession(this.id, userTs)
-      isFirstTurn = seq === 1
+      isFirstTurn = !this.store.hasMessages(this.id)
+      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: userMessageId ?? `u-${userTs}`, timestamp: userTs })
       if (isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(content)) === 1) {
         _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(content) })
       }
@@ -333,8 +339,7 @@ export class Session {
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
-      this.store.insertMessage({ id: `u-${ts}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: ts })
-      this.store.touchSession(this.id, ts)
+      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts })
     }
     this.messages.push(new HumanMessage(content))
     await this.runTurn(send, base)
@@ -380,13 +385,22 @@ export class Session {
     }
     const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string, agentTaskId?: string) => {
       if (started.has(agentId)) return; started.add(agentId)
+      const stepId = agentId === 'supervisor' ? turnId : agentId
+      this.activeSteps.set(agentId, stepId)
       trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
       send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}) })
+      this.emit({ type: 'step_started', sessionId: this.id, turnId: stepId, agentId, timestamp: Date.now() })
+      this.emit({ type: 'text_started', sessionId: this.id, messageId: stepId, timestamp: Date.now() })
     }
     const ensureFinished = (agentId: string, output: string) => {
       if (!started.has(agentId)) return; closeReasoning(agentId)
       const r = trajectory.get(agentId); if (r) { r.output = output; r.finishedAt = Date.now() }
       started.delete(agentId); send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+      const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId)
+      this.emit({ type: 'text_ended', sessionId: this.id, messageId: stepId, content: output, timestamp: Date.now() })
+      if (agentId !== 'supervisor') {
+        this.emit({ type: 'step_ended', sessionId: this.id, turnId: stepId, agentId, timestamp: Date.now() })
+      }
     }
     const finishRemaining = () => {
       for (const id of started) { closeReasoning(id); const r = trajectory.get(id); if (r) r.finishedAt = Date.now(); send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: id }) }
@@ -441,8 +455,8 @@ export class Session {
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => { if (!delta) return; if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
       reasoning: (delta) => reasoningDelta(agentId, role, delta),
-      toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }) },
-      toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }) },
+      toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); this.emit({ type: 'tool_called', sessionId: this.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }) },
+      toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { this.emit({ type: 'tool_success', sessionId: this.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { this.emit({ type: 'tool_failed', sessionId: this.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) } },
       usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
       planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: this.id, turnId, itemId, delta }) },
     })
@@ -639,6 +653,36 @@ export class Session {
     )
   }
 
+  /** Dual-write helper: persists the legacy representation AND publishes a durable
+   *  event (plus its session_message projection) inside a single SQLite transaction.
+   *  On error, ROLLBACK leaves both stores consistent. */
+  private emit(event: SessionEvent, context?: { stepId?: string; usage?: TurnUsage; runs?: AgentRun[]; assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null }): void {
+    if (!this.store || !this.eventStore) return
+    const db = this.store.getDb()
+    db.exec('BEGIN')
+    try {
+      switch (event.type) {
+        case 'user_message':
+          this.store.insertMessage({ id: event.messageId, sessionId: event.sessionId, role: 'user', agentId: null, content: event.content, timestamp: event.timestamp })
+          this.store.touchSession(event.sessionId, event.timestamp)
+          break
+        case 'step_ended':
+          if (event.agentId === 'supervisor' && context?.assistant !== undefined) {
+            this.store.insertTurnBody(context.assistant, event.sessionId, context.runs ?? [])
+          }
+          break
+      }
+
+      const data = sessionEventToEventData(event, context)
+      const published = this.eventStore.append(event.sessionId, event.type, data)
+      projectEvent(db, published)
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
   private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>): string {
     const { correction } = verifyWrites(trajectory, supervisorText, this._config.language ?? 'en')
     const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
@@ -649,7 +693,12 @@ export class Session {
     const timeline = trajectoryToTimeline(trajectory)
     const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
     if (this.store) {
-      this.store.insertTurn(finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null, this.id, runs)
+      this.emit({ type: 'text_ended', sessionId: this.id, messageId: turnId, content: finalText, timestamp: ts })
+      this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: 'supervisor', timestamp: ts }, {
+        usage: turnUsage,
+        runs,
+        assistant: finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null,
+      })
       this.store.touchSession(this.id, ts)
     }
     send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}), ...(stopped ? { stopped: true } : {}) } })
@@ -717,8 +766,7 @@ export class Session {
         this.awaitingResume = false; this.paused = null
         const ts = Date.now()
         if (this.store) {
-          this.store.insertMessage({ id: `u-${ts}`, sessionId: this.id, role: 'user', agentId: null, content, timestamp: ts })
-          this.store.touchSession(this.id, ts)
+          this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts })
         }
         this.messages.push(new HumanMessage(content))
         await this.runTurn(send, base)
@@ -798,5 +846,47 @@ export class Session {
     }
     this.spawnedSubagentIds.clear()
     this.agentProv.dispose()
+  }
+}
+
+/** Map a protocol SessionEvent into the internal event payload that the
+ *  message projector expects. Protocol identifiers (`turnId`, `messageId`)
+ *  map to the projector's `stepId`; tool events use the caller-supplied stepId. */
+function sessionEventToEventData(
+  event: SessionEvent,
+  context?: {
+    stepId?: string
+    usage?: TurnUsage
+    runs?: AgentRun[]
+    assistant?: {
+      id: string
+      sessionId: string
+      agentId: string
+      content: string
+      timestamp: number
+      stopped?: boolean
+      timeline?: TimelineStep[]
+    } | null
+  },
+): Record<string, unknown> {
+  switch (event.type) {
+    case 'user_message':
+      return { messageId: event.messageId, content: event.content, timestamp: event.timestamp }
+    case 'step_started':
+      return { stepId: event.turnId, agentId: event.agentId, startedAt: event.timestamp }
+    case 'step_ended':
+      return { stepId: event.turnId, agentId: event.agentId, finishedAt: event.timestamp, ...(context?.usage ? { usage: context.usage } : {}) }
+    case 'text_started':
+      return { stepId: event.messageId }
+    case 'text_ended':
+      return { stepId: event.messageId, content: event.content }
+    case 'tool_called':
+      return { callId: event.callId, stepId: context?.stepId, name: event.name, input: event.input, seq: event.timestamp }
+    case 'tool_success':
+      return { callId: event.callId, stepId: context?.stepId, output: event.output }
+    case 'tool_failed':
+      return { callId: event.callId, stepId: context?.stepId, error: event.error }
+    case 'compaction_ended':
+      return { summary: event.summary, timestamp: event.timestamp }
   }
 }

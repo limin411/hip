@@ -9,6 +9,11 @@ const PREVIEW_LEN = 80
 export class SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly ftsEnabled: boolean) {}
 
+  /** Expose the database handle for callers that need to share a transaction. */
+  getDb(): DatabaseSync {
+    return this.db
+  }
+
   insertSession(r: { id: string; title: string; config: string; createdAt: number; updatedAt: number }): void {
     this.db.prepare(`INSERT INTO sessions(id,title,config,created_at,updated_at) VALUES(?,?,?,?,?)`)
       .run(r.id, r.title, r.config, r.createdAt, r.updatedAt)
@@ -108,24 +113,7 @@ export class SessionStore {
   ): void {
     this.db.exec('BEGIN')
     try {
-      if (assistant) {
-        this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
-        const tl = assistant.timeline && assistant.timeline.length ? JSON.stringify(assistant.timeline) : null
-        this.db.prepare(`UPDATE messages SET timeline=? WHERE id=?`).run(tl, assistant.id)
-      }
-      const runStmt = this.db.prepare(
-        `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      const toolStmt = this.db.prepare(
-        `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      for (const run of runs) {
-        const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null, run.usage?.inputTokens ?? null, run.usage?.outputTokens ?? null, run.usage?.totalTokens ?? null)
-        const runId = info.lastInsertRowid
-        for (const tc of run.toolCalls ?? []) {
-          toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
-        }
-      }
+      this.insertTurnBody(assistant, sessionId, runs)
       this.db.exec('COMMIT')
     } catch (e) {
       this.db.exec('ROLLBACK')
@@ -133,9 +121,41 @@ export class SessionStore {
     }
   }
 
+  /** Same writes as insertTurn, but without transaction management. Used by
+   *  Session.emit() so legacy persistence and new events share one transaction. */
+  insertTurnBody(
+    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null,
+    sessionId: string,
+    runs: AgentRun[],
+  ): void {
+    if (assistant) {
+      this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
+      const tl = assistant.timeline && assistant.timeline.length ? JSON.stringify(assistant.timeline) : null
+      this.db.prepare(`UPDATE messages SET timeline=? WHERE id=?`).run(tl, assistant.id)
+    }
+    const runStmt = this.db.prepare(
+      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    const toolStmt = this.db.prepare(
+      `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    for (const run of runs) {
+      const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null, run.usage?.inputTokens ?? null, run.usage?.outputTokens ?? null, run.usage?.totalTokens ?? null)
+      const runId = info.lastInsertRowid
+      for (const tc of run.toolCalls ?? []) {
+        toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
+      }
+    }
+  }
+
   /** Public alias for loadMessages — used by subagent continuation to load prior context. */
   getMessages(sessionId: string): Message[] {
     return this.loadMessages(sessionId)
+  }
+
+  hasMessages(sessionId: string): boolean {
+    const row = this.db.prepare(`SELECT EXISTS(SELECT 1 FROM messages WHERE session_id=?) AS has`).get(sessionId) as { has: number }
+    return row.has === 1
   }
 
   loadMessages(sessionId: string): Message[] {

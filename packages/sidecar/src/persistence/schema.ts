@@ -288,6 +288,34 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 13) {
+    db.exec('BEGIN')
+    try {
+      // Pending user inputs (Wave 3, Todo 15 of agent-design-remediation).
+      // `delivery` is 'queue' for normal messages and 'steer' for steering
+      // inputs that interrupt the current turn. `admitted_seq` preserves
+      // admission order; `promoted_seq` is set when an input is popped for
+      // processing (or dropped by a steer promotion).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_input (
+          id            TEXT PRIMARY KEY,
+          session_id    TEXT NOT NULL,
+          prompt        TEXT NOT NULL,
+          delivery      TEXT NOT NULL CHECK(delivery IN ('steer','queue')),
+          admitted_seq  INTEGER NOT NULL,
+          promoted_seq  INTEGER,
+          time_created  INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_input_session ON session_input(session_id, admitted_seq);
+        CREATE INDEX IF NOT EXISTS idx_session_input_session_promoted ON session_input(session_id, promoted_seq);
+      `)
+      db.exec('PRAGMA user_version = 13')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

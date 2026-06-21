@@ -1,0 +1,52 @@
+import type { SessionStore, PendingInputRow } from '../persistence/store.js'
+
+/** In-memory shape of a queued input. */
+export interface SessionInput {
+  type: 'message' | 'steer'
+  content: string
+  messageId?: string
+}
+
+/** Thin facade over `SessionStore` for the durable input queue. */
+export class SessionInputQueue {
+  constructor(
+    private readonly store: SessionStore,
+    private readonly sessionId: string,
+  ) {}
+
+  admit(input: SessionInput): string {
+    const id = input.messageId ?? `iq-${Date.now()}-${this.nextSuffix()}`
+    this.store.admitSessionInput({
+      id,
+      sessionId: this.sessionId,
+      prompt: input.content,
+      delivery: input.type === 'steer' ? 'steer' : 'queue',
+      timeCreated: Date.now(),
+    })
+    return id
+  }
+
+  restore(): SessionInput[] {
+    return this.store.listPendingSessionInputs(this.sessionId).map((r) => rowToInput(r))
+  }
+
+  promoteSteer(): PendingInputRow | undefined {
+    return this.store.promoteSteerSessionInput(this.sessionId)
+  }
+
+  promoteNextQueued(): PendingInputRow | undefined {
+    return this.store.promoteNextQueuedSessionInput(this.sessionId)
+  }
+
+  promoteById(id: string): void {
+    this.store.promoteSessionInputById(this.sessionId, id)
+  }
+
+  private nextSuffix(): string {
+    return Math.random().toString(36).slice(2, 8)
+  }
+}
+
+function rowToInput(r: PendingInputRow): SessionInput {
+  return { type: r.delivery === 'steer' ? 'steer' : 'message', content: r.prompt, messageId: r.id }
+}

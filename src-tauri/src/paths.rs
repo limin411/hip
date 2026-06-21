@@ -78,6 +78,11 @@ pub fn hip_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip.toml"))
 }
 
+/// Canonical path of the network-policy config inside `config/`.
+pub fn network_policy_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("network.json"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")

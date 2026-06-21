@@ -697,3 +697,14 @@ export interface HipConfig {
   skills?: SkillEntry[]
   agents?: AgentConfig[]
 }
+
+/** User-configurable network policy persisted to ~/.hip/config/network.json.
+ *  All fields optional — empty config means "allow all https" (the SSRF layer still
+ *  rejects private IPs and non-https URLs). */
+export interface NetworkPolicyConfig {
+  allowlist?: string[]
+  denylist?: string[]
+  maxRequestsPerMinute?: number
+  maxResponseBytes?: number
+}
+

@@ -141,6 +141,19 @@ struct HipConfig {
     permissions: Option<PermissionEntry>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct NetworkPolicyConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allowlist: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    denylist: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_requests_per_minute: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_response_bytes: Option<u64>,
+}
+
 // ── TOML mirror structs (snake_case with camelCase aliases for backward compat) ──
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -620,6 +633,26 @@ fn set_hip_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
     std::fs::write(&path, toml_str).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn get_network_policy(app: tauri::AppHandle) -> Result<String, String> {
+    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
+    match std::fs::read_to_string(&path) {
+        Ok(contents) => Ok(contents),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn set_network_policy(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let _cfg: NetworkPolicyConfig =
+        serde_json::from_str(&json).map_err(|e| format!("JSON parse error: {e}"))?;
+    let pretty =
+        serde_json::to_string_pretty(&_cfg).map_err(|e| format!("JSON serialize error: {e}"))?;
+    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
+    std::fs::write(&path, pretty).map_err(|e| e.to_string())
+}
+
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
 fn auth_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     paths::auth_json_path(app).ok_or_else(|| "no config dir".to_string())
@@ -1036,6 +1069,8 @@ pub fn run() {
             set_mcp_servers_config,
             get_hip_config,
             set_hip_config,
+            get_network_policy,
+            set_network_policy,
             list_skills,
             install_skill_zip,
             delete_skill,

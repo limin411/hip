@@ -51,6 +51,7 @@ import { prepareSessionContext, type SessionContextState } from './session-conte
 import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
+import { logInfo, logDebug, logDebugEveryN } from '../debug-logger.js'
 
 export { sanitizeTitle } from './title-generator.js'
 export type { TitleGenerator } from './title-generator.js'
@@ -636,6 +637,7 @@ export class Session {
     const send: SendFn = (msg) => { watchdog.kick(); rawSend(msg) }
 
     const turnId = `asst-supervisor-${Date.now()}-${this.turnSeq++}`
+    logInfo('session', 'turn:start', { sessionId: this.id, turnId })
     const trajectory = new Map<string, TraceRun>()
     let agentSeq = 0; let stepSeq = 0
     const nextSeq = () => stepSeq++
@@ -666,6 +668,7 @@ export class Session {
       const stepId = agentId === 'supervisor' ? turnId : agentId
       this.activeSteps.set(agentId, stepId)
       trajectory.set(agentId, { role, output: '', startedAt: Date.now(), finishedAt: null, seq: agentSeq++, toolCalls: new Map(), reasoningBursts: [], ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}) })
+      logInfo('session', 'agent:started', { sessionId: this.id, turnId, agentId, role })
       send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role, ...(parentAgentId ? { parentAgentId } : {}), ...(taskInput ? { taskInput } : {}), ...(agentTaskId ? { taskId: agentTaskId } : {}) })
       this.emit({ type: 'step_started', sessionId: this.id, turnId: stepId, agentId, timestamp: Date.now() })
       this.emit({ type: 'text_started', sessionId: this.id, messageId: stepId, timestamp: Date.now() })
@@ -699,8 +702,9 @@ export class Session {
     const usedTokens = estimateTokens(this.messages)
     const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - (usedTokens / COMPACT_BUDGET_TOKENS) * 100)))
 
+    const logToken = logDebugEveryN('session', 10, 'token:stream', { sessionId: this.id, turnId, agentId: 'supervisor' })
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
-      token: (delta) => { if (!delta) return; if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
+      token: (delta) => { if (!delta) return; logToken(); if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
       reasoning: (delta) => reasoningDelta(agentId, role, delta),
       toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); this.emit({ type: 'tool_called', sessionId: this.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }); this.checkSteerPromotion() },
       toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { this.emit({ type: 'tool_success', sessionId: this.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { this.emit({ type: 'tool_failed', sessionId: this.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; this.checkSteerPromotion() },
@@ -882,6 +886,7 @@ export class Session {
         this.messages.push(...nextMessages)
       }
     } catch (err) {
+      logInfo('session', 'turn:error', { sessionId: this.id, turnId, error: err instanceof Error ? err.message : String(err), isAbort: err instanceof Error && err.name === 'AbortError' })
       const isAbort = err instanceof Error && err.name === 'AbortError'; finishRemaining()
       const isSteerAbort = this.steerAbortFlag
       if (isSteerAbort) this.steerAbortFlag = false
@@ -1012,6 +1017,7 @@ export class Session {
         })
       }
     }
+    logInfo('session', 'message:complete', { sessionId: this.id, turnId, textLen: finalText.length, stopped })
     send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}), ...(stopped ? { stopped: true } : {}) } })
     return finalText
   }

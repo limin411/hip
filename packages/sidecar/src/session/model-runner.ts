@@ -5,6 +5,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ChatOpenAI } from '@langchain/openai'
 import { MAX_STEPS_NOTE } from './loop-control.js'
 import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
+import { logInfo, logDebug } from '../debug-logger.js'
 
 /** Per-step run options: the streaming sinks + whether tools are bound (off on the final, capped step). */
 export interface ModelRunOptions {
@@ -51,15 +52,22 @@ export class RealModelRunner implements ModelRunner {
     const input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
     let emitted = false
     const attempt = async (): Promise<AIMessage> => {
+      const t0 = Date.now()
+      logDebug('model', 'stream:start', { model: (bound as any).model ?? 'unknown' })
       const stream = await bound.stream(input, { signal: opts.signal })
       let gathered: AIMessageChunk | undefined
+      let firstToken = true
       for await (const chunk of stream) {
         gathered = gathered ? (concat(gathered, chunk) as AIMessageChunk) : chunk
         const t = textDelta(chunk)
-        if (t) { emitted = true; opts.onText(t) }
+        if (t) {
+          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0 }) }
+          emitted = true; opts.onText(t)
+        }
         const r = reasoningDelta(chunk)
         if (r) { emitted = true; opts.onReasoning(r) }
       }
+      logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')
       return gathered as AIMessage
     }

@@ -12,6 +12,7 @@ import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
 import { promptRegistry } from './mcp/prompt-registry.js'
 import { safeErrorMessage } from './error.js'
+import { logDebug } from '../debug-logger.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -42,6 +43,8 @@ export class SessionManager {
   }
 
   async handleAsync(msg: ClientMessage, send: SendFn): Promise<void> {
+    const t0 = Date.now()
+    logDebug('mgr', 'msg:handle', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined })
     switch (msg.type) {
       case 'session:create':
         this.createSession(msg.id, msg.config, send)
@@ -328,6 +331,7 @@ export class SessionManager {
         break
       }
     }
+    logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }
 
   private createSession(id: string, config: SessionConfig, send: SendFn): void {

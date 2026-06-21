@@ -1,4 +1,5 @@
 use crate::SidecarState;
+use crate::tauri_info;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -18,6 +19,7 @@ pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
 }
 
 pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
+    tauri_info!("tauri", "sidecar:spawn");
     let mut cmd = app.shell().sidecar("sidecar").map_err(|e| e.to_string())?;
     // Inject each configured provider's API key as HIP_MODEL_<ID>_API_KEY
     // (empty string when absent → overrides any inherited env so a cleared key
@@ -97,6 +99,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
                             if let Some(tx) = info_tx_slot.take() {
                                 let _ = tx.send(info);
                             }
+                            tauri_info!("tauri", "sidecar:ready");
                             continue;
                         }
                     }
@@ -112,6 +115,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
                     eprint!("[sidecar] {}", String::from_utf8_lossy(&bytes));
                 }
                 CommandEvent::Terminated(payload) => {
+                    tauri_info!("tauri", "sidecar:exit");
                     eprintln!("[sidecar] terminated: {payload:?}");
                     let state = app_handle.state::<SidecarState>();
                     // Only clear if we're still the current generation — a restart that

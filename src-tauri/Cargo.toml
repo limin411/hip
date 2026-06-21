@@ -35,4 +35,5 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 serde_yaml = "0.9"
 # Unified TOML config I/O (skill-mcp-overhaul wave 1).
 toml = "0.8"
+dirs = "6"
 

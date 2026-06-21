@@ -6,6 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { jsonSchemaToZod, type JsonSchema } from './json-schema-to-zod.js'
+import { ToolRegistry, type Scope } from '../tool-registry.js'
 
 /** Connection status for UI display. */
 export type McpConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error'
@@ -85,15 +86,53 @@ export interface ToolsOptions {
   lazyThresholdPct?: number
 }
 
+/** One tracked ToolRegistry binding: the registry plus the Session scope used for all MCP tools. */
+interface RegistryBinding {
+  readonly registry: ToolRegistry
+  readonly scope: Scope
+}
+
 /** A resident pool of MCP clients. Reconciled per turn against the configured server list. */
 export class McpManager {
   private conns = new Map<string, Connection>()
+  private readonly registryBindings = new Map<symbol, RegistryBinding>()
 
   private readonly BACKOFF_INITIAL = 500
   private readonly BACKOFF_MAX = 10_000
 
   /** Per-server backoff state for exponential reconnect. Epoch cancels stale retries on disconnect. */
   private backoffs = new Map<string, { delay: number; epoch: number; timer: ReturnType<typeof setTimeout> | null; server: McpServerConfig; fingerprint: string }>()
+
+  /**
+   * Register this manager's current and future MCP tools with a {@link ToolRegistry}
+   * under the supplied Session scope. Future reconnects refresh the scope
+   * automatically, so stale tool calls are rejected by the registry.
+   */
+  registerWithRegistry(registry: ToolRegistry, scope: Scope): void {
+    this.registryBindings.set(scope.id, { registry, scope })
+    this.registerCurrentToolsWithRegistry(registry, scope)
+  }
+
+  /** Register the currently-connected MCP tools into a single registry scope. */
+  private registerCurrentToolsWithRegistry(registry: ToolRegistry, scope: Scope): void {
+    for (const t of this.tools()) {
+      registry.register(t, scope)
+    }
+  }
+
+  /**
+   * Refresh all tracked registry bindings: close every scope (removing stale
+   * registrations) and re-register the currently-connected tools. Called after
+   * any connection change so registrations reflect the live pool.
+   */
+  private refreshRegistrations(): void {
+    for (const { registry, scope } of this.registryBindings.values()) {
+      registry.unregisterScope(scope)
+    }
+    for (const { registry, scope } of this.registryBindings.values()) {
+      this.registerCurrentToolsWithRegistry(registry, scope)
+    }
+  }
 
   /** Stable fingerprint for change detection — any field change forces reconnect. */
   protected fingerprint(server: McpServerConfig): string {
@@ -162,6 +201,8 @@ export class McpManager {
       const ok = await this.connectOne(server)
       if (!ok) this.scheduleReconnect(server, id)
     }
+
+    this.refreshRegistrations()
   }
 
   /** Full connect+listTools+listResources+listPrompts flow. Returns true on success, false on failure. */
@@ -197,6 +238,7 @@ export class McpManager {
         prompts,
       })
       this.resetBackoff(server.id)
+      this.refreshRegistrations()
       return true
     } catch (err) {
       await client.close().catch(() => {})

@@ -12,19 +12,10 @@ import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { defaultToolPolicy } from './tool-runner/tool-policy.js'
-import { ToolRunner } from './tool-runner/tool-runner.js'
-import { buildTools, SELF_GATED_TOOLS } from './tools.js'
-import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
+import { mcpManager } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import type { ApprovalFn } from './tools.js'
-import { FragmentRegistry } from './context-fragment.js'
-import {
-  SystemPromptFragment,
-  SkillsFragment,
-  TokenBudgetFragment,
-  CurrentTimeFragment,
-  SubagentNotificationFragment,
-} from './fragments/index.js'
+import { SELF_GATED_TOOLS } from './tools.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
@@ -52,18 +43,20 @@ import { runWorkflowTurn as runWorkflowTurnFn } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
 import { AgentProfileManager } from './agent-profile-manager.js'
 import type { AgentProfile } from './agent-profile.js'
+import { ToolOutputStore } from './tool-output-store.js'
+import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
+import { GuardianReviewer } from './guardian.js'
+import { SessionInputQueue, type SessionInput } from './session-input.js'
+import { prepareSessionContext, type SessionContextState } from './session-context.js'
+import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
+import { safeErrorMessage } from './error.js'
 
 export { sanitizeTitle } from './title-generator.js'
 export type { TitleGenerator } from './title-generator.js'
+export type { SessionInput } from './session-input.js'
 
 type SendFn = (msg: ServerMessage) => void
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
-
-export interface SessionInput {
-  type: 'message' | 'steer'
-  content: string
-  messageId?: string
-}
 
 export function resolveModel(config: SessionConfig): string {
   return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
@@ -75,6 +68,10 @@ function lastUserText(messages: BaseMessage[]): string {
     if (m.getType() === 'human') return typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
   }
   return ''
+}
+
+function logNonCritical(label: string, err: unknown): void {
+  console.warn(`[session:${label}]`, err instanceof Error ? err.message : String(err))
 }
 
 export function resolveModelChoice(
@@ -128,7 +125,11 @@ export class Session {
   readonly backgroundTasks: Map<string, Promise<void>> = new Map()
   private readonly backgroundTaskMeta: Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }> = new Map()
   private readonly spawnedSubagentIds = new Set<string>()
+  private readonly toolOutputStore = new ToolOutputStore()
+  private readonly networkPolicy = new NetworkPolicy(loadNetworkPolicyConfig())
+  private readonly inputQueueStore?: SessionInputQueue
   static readonly MAX_BACKGROUND_TASKS = 10
+  private static readonly MAX_RETAINED_BACKGROUND_META = 50
 
   readonly eventStore?: EventStore
   private readonly snapshotStore?: SnapshotStore
@@ -144,6 +145,13 @@ export class Session {
   readonly toolPolicy = defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS })
 
   listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
+
+  private trimBackgroundTaskMeta(): void {
+    if (this.backgroundTaskMeta.size <= Session.MAX_RETAINED_BACKGROUND_META) return
+    for (const [id, m] of this.backgroundTaskMeta) {
+      if (m.status !== 'running') { this.backgroundTaskMeta.delete(id); break }
+    }
+  }
 
   /**
    * Run a sub-agent detached from the parent turn. When it completes, its final text is:
@@ -182,13 +190,23 @@ export class Session {
         permissionMode: mode,
         requestApproval,
         mode: 'background',
+        sessionId: this.id,
+        networkPolicy: this.networkPolicy,
+        toolOutputStore: this.toolOutputStore,
+        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`Background task ${taskId} failed:`, msg)
+      const msg = safeErrorMessage(err)
+      console.error(`Background task ${taskId} failed:`, err instanceof Error ? err.message : String(err))
       result = `Error: ${msg}`
       status = 'failed'
       error = msg
+    }
+
+    const meta = this.backgroundTaskMeta.get(taskId)
+    if (meta) {
+      meta.status = status
+      if (error === undefined) { meta.result = result } else { meta.error = error }
     }
 
     const ts = Date.now()
@@ -233,7 +251,7 @@ export class Session {
       totalSteps,
     )
     this.activeActivity = activity
-    void this.hooks.fire('ActivityStart', { sessionId: this.id, activityId: activity.id }).catch(() => {})
+    void this.hooks.fire('ActivityStart', { sessionId: this.id, activityId: activity.id }).catch((err) => logNonCritical('ActivityStart', err))
     return activity
   }
 
@@ -256,7 +274,7 @@ export class Session {
     const activity = this.activeActivity
     if (!activity) return
     this.activeActivity = undefined
-    void this.hooks.fire('ActivityEnd', { sessionId: this.id, activityId: activity.id }).catch(() => {})
+    void this.hooks.fire('ActivityEnd', { sessionId: this.id, activityId: activity.id }).catch((err) => logNonCritical('ActivityEnd', err))
   }
 
   private consumeActivitySteps(steps: number): void {
@@ -284,6 +302,10 @@ export class Session {
 
     this.eventStore = store ? new EventStore(store.getDb()) : undefined
     this.snapshotStore = store ? new SnapshotStore(store.getDb()) : undefined
+    this.inputQueueStore = store ? new SessionInputQueue(store, id) : undefined
+    if (this.inputQueueStore) {
+      this.inputQueue.push(...this.inputQueueStore.restore())
+    }
 
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
@@ -485,7 +507,7 @@ export class Session {
       _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
       return ''
     }
-    if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch(() => {})
+    if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch((err) => logNonCritical('SessionStart', err))
 
     if (input.type === 'message') {
       if (this.activeActivity) this.endActivity()
@@ -501,12 +523,22 @@ export class Session {
         if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
           _send({ type: 'session:title', sessionId: this.id, title: refined })
         }
-      } catch { /* non-critical */ }
+      } catch (err) {
+        console.warn(`Title generation failed for session ${this.id}:`, err instanceof Error ? err.message : String(err))
+      }
     }
     return supervisorText
   }
 
+  restorePendingInputs(): void {
+    if (!this.inputQueueStore) return
+    this.inputQueue.length = 0
+    this.inputQueue.push(...this.inputQueueStore.restore())
+  }
+
   enqueueInput(input: SessionInput): void {
+    const id = this.inputQueueStore?.admit(input)
+    if (id && !input.messageId) input.messageId = id
     this.inputQueue.push(input)
     if (input.type === 'steer' && this.running && this.abortController) {
       this.steerAbortFlag = true
@@ -515,6 +547,7 @@ export class Session {
   }
 
   promoteSteerInput(): SessionInput | undefined {
+    this.inputQueueStore?.promoteSteer()
     let idx = -1
     for (let i = this.inputQueue.length - 1; i >= 0; i--) {
       if (this.inputQueue[i].type === 'steer') {
@@ -533,6 +566,9 @@ export class Session {
       const steer = this.promoteSteerInput()
       const input = steer ?? this.inputQueue.shift()
       if (!input) return
+      if (input.type === 'message' && input.messageId) {
+        this.inputQueueStore?.promoteById(input.messageId)
+      }
       await this.processInput(input, _send)
     }
   }
@@ -574,6 +610,13 @@ export class Session {
     plan?: PlanItem[]
   }): Promise<string> {
     this.abortController = new AbortController(); this.running = true
+
+    // Reload network policy config at the top of each turn so that
+    // edits to ~/.hip/config/network.json take effect without restart.
+    const networkCfg = loadNetworkPolicyConfig()
+    if (networkCfg) {
+      this.networkPolicy.updateConfig(networkCfg)
+    }
 
     if (!base && this._config.useEventSource !== false && this.eventStore) {
       const rebuilt = this.rebuildMessagesFromEvents(this.id)
@@ -646,42 +689,11 @@ export class Session {
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner(); const summarizer = this.summarizer()
     const skills = this.configMgr.skills; const pluginAgents = this.configMgr.pluginAgents
-    if (!this.agentProv.isExternalAgent()) {
-      try { await mcpManager.reconcile(this.configMgr.mcpConfigs) } catch { /* degrade */ }
-      send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(this.configMgr.mcpConfigs) })
-    }
     const rawMode = this._config.permissionMode
     const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
-    const mcpTools = mcpManager.tools(this.usesEnvModel ? { lazyThreshold: DEFAULT_LAZY_THRESHOLD } : undefined)
-    const registry = new FragmentRegistry()
-    registry.register(new SystemPromptFragment())
-    registry.register(new SkillsFragment())
-    registry.register(new TokenBudgetFragment())
-    registry.register(new CurrentTimeFragment())
-    registry.register(new SubagentNotificationFragment())
     const usedTokens = estimateTokens(this.messages)
-    const usedPercent = (usedTokens / COMPACT_BUDGET_TOKENS) * 100
-    const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - usedPercent)))
-    const fragmentState = {
-      cwd,
-      customSystemPrompt: this._config.systemPrompt,
-      skills,
-      permissionMode: mode,
-      mcpCatalog: mcpManager.toolCatalog() || undefined,
-      tokenBudgetPercent,
-      pendingSubagents: this.backgroundTasks.size > 0
-        ? [...this.backgroundTasks.keys()].map((id) => {
-            const meta = this.backgroundTaskMeta.get(id)
-            return { id, description: meta?.description ?? id, status: 'running' as const }
-          })
-        : undefined,
-      completedSubagents: (() => {
-        const entries = [...this.backgroundTaskMeta.entries()].filter(([, m]) => m.status !== 'running')
-        return entries.length > 0 ? entries.map(([id, m]) => ({ id, description: m.description, status: m.status })) : undefined
-      })(),
-    }
-    const assembled = registry.assemble(fragmentState)
-    const system = assembled.text
+    const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - (usedTokens / COMPACT_BUDGET_TOKENS) * 100)))
+
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => { if (!delta) return; if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
       reasoning: (delta) => reasoningDelta(agentId, role, delta),
@@ -701,14 +713,14 @@ export class Session {
         if (this.backgroundTasks.size >= Session.MAX_BACKGROUND_TASKS) return `Error: maximum ${Session.MAX_BACKGROUND_TASKS} concurrent background tasks reached`
         this.backgroundTaskMeta.set(childId, { description, status: 'running' })
         const promise = this.runBackgroundSubagent(childId, description, this.abortController!.signal, send)
-          .finally(() => { this.backgroundTasks.delete(childId); this.backgroundTaskMeta.delete(childId) })
+          .finally(() => { this.backgroundTasks.delete(childId); this.trimBackgroundTaskMeta() })
         this.backgroundTasks.set(childId, promise)
         return `Background task started: ${childId}`
       }
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
       const existingMessages = taskId ? this.loadSubagentMessages(taskId) : undefined
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
-      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
+      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text)
       return text
     }
@@ -716,6 +728,11 @@ export class Session {
     const enabledAgents = [...readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
     const invoker = this.agentProv.invoker(cwd)
     const requestApproval = this.permissions.buildRequestApproval(send, this.id, turnId, nextSeq, mode, this.hooks)
+
+    const activeProfile = this.getActiveProfile()
+    let tooling: SessionTooling | undefined = undefined
+    let contextMessages: BaseMessage[] = []
+    let system = ''
 
     const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
       const cfg = enabledAgents.find((a) => a.id === agentId)
@@ -727,35 +744,66 @@ export class Session {
         configOptions: () => {},
       }
       try {
-        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools, skills, requestApproval, permissionMode: mode })
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
         ensureFinished(childId, text); return text || '(sub-agent produced no output)'
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') throw err
-        const msg = err instanceof Error ? err.message : String(err); ensureFinished(childId, `Error: ${msg}`); return `Error: ${msg}`
+        const msg = safeErrorMessage(err); ensureFinished(childId, `Error: ${msg}`); return `Error: ${msg}`
       }
     }
 
-    const activeProfile = this.getActiveProfile()
-    const tools = buildTools(cwd, spawnSubagent, this._config.cwd,
-      enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
-      { mcpTools, skills, requestApproval, permissionMode: mode, webSearchEnabled: true, generateAgentEnabled: true, sessionId: this.id, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools },
-    )
-    const toolRunner = new ToolRunner({
-      tools: new Map(tools.map((t) => [t.name, t])),
-      hooks: this.hooks,
-      toolPolicy: this.toolPolicy,
-      approvalCache: this.approvalCache,
-      requestApproval,
-      permissionMode: mode,
-      sessionId: this.id,
-      onToolStarted: (name, callId, input) => emit.toolStarted(name, callId, input),
-      onToolFinished: (callId, status, output, error) => emit.toolFinished(callId, status, output, error),
-      emitRisk: (toolName, risk, approval) => {
-        send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
-      },
-    })
+    if (!this.agentProv.isExternalAgent()) {
+      const contextState: SessionContextState = {
+        cwd,
+        customSystemPrompt: this._config.systemPrompt,
+        skills,
+        permissionMode: mode,
+        mcpCatalog: mcpManager.toolCatalog() || undefined,
+        tokenBudgetPercent,
+        pendingSubagents: this.backgroundTasks.size > 0
+          ? [...this.backgroundTasks.keys()].map((id) => {
+              const meta = this.backgroundTaskMeta.get(id)
+              return { id, description: meta?.description ?? id, status: 'running' as const }
+            })
+          : undefined,
+        completedSubagents: (() => {
+          const entries = [...this.backgroundTaskMeta.entries()].filter(([, m]) => m.status !== 'running')
+          return entries.length > 0 ? entries.map(([id, m]) => ({ id, description: m.description, status: m.status })) : undefined
+        })(),
+      }
+      const prepared = await prepareSessionContext(this.id, 'supervisor', contextState, this.store)
+      system = prepared.system
+      contextMessages = prepared.contextMessages
+      send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(this.configMgr.mcpConfigs) })
+      tooling = await buildSessionTooling({
+        cwd,
+        sessionId: this.id,
+        mode,
+        skills,
+        mcpConfigs: this.configMgr.mcpConfigs,
+        enabledAgents,
+        dispatch: enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
+        spawnSubagent,
+        hooks: this.hooks,
+        approvalCache: this.approvalCache,
+        requestApproval,
+        allowedTools: activeProfile.allowedTools,
+        blockedTools: activeProfile.blockedTools,
+        usesEnvModel: this.usesEnvModel,
+        runner,
+        toolOutputStore: this.toolOutputStore,
+        networkPolicy: this.networkPolicy,
+        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+        onToolStarted: (name, callId, input) => emit.toolStarted(name, callId, input),
+        onToolFinished: (callId, status, output, error) => emit.toolFinished(callId, status, output, error),
+        emitRisk: (toolName, risk, approval) => {
+          send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
+        },
+      })
+    }
+
     const maxSteps = this.activeActivity?.stepsRemaining ?? MAX_STEPS
-    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps }
+    const ctx: GraphCtx = { runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner: tooling?.toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps }
 
     let finalState: LoopState | undefined
     try {
@@ -778,7 +826,7 @@ export class Session {
         const stepsBefore = base?.steps ?? 0
         finalState = await this.app.invoke(
           {
-            messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)],
+            messages: [new SystemMessage(system), ...contextMessages, ...(base?.messages ?? this.messages)],
             steps: base?.steps ?? 0,
             recentSigs: [],
             nudgedSig: undefined,
@@ -802,7 +850,7 @@ export class Session {
           }
           this.awaitingResume = true
           const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
-          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
           if (finalState.planningMode === 'plan' && finalState.plan) {
             send({ type: 'plan:published', sessionId: this.id, turnId, plan: finalState.plan })
           }
@@ -827,20 +875,21 @@ export class Session {
       if (isSteerAbort) {
         if (supervisorText) {
           const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
-          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
           return text
         }
         return ''
       }
       if (isAbort && supervisorText) {
         const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
-        void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+        void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
         if (timedOut) rawSend({ type: 'error', sessionId: this.id, code: 'TIMEOUT', message: '' })
         return text
       }
-      rawSend({ type: 'error', sessionId: this.id, code: timedOut ? 'TIMEOUT' : isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: timedOut ? '' : isAbort ? 'User cancelled the request' : err instanceof Error ? err.message : String(err) })
+      rawSend({ type: 'error', sessionId: this.id, code: timedOut ? 'TIMEOUT' : isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: timedOut ? '' : isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
       return ''
     } finally {
+      tooling?.cleanup()
       watchdog.stop(); this.running = false; this.abortController = null; this.permissions.cancelAll()
     }
 
@@ -857,7 +906,7 @@ export class Session {
           this.messages.push(new SystemMessage(ctx))
         }
       }
-      void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+      void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
       try {
         const continuedText = await this.runTurn(rawSend)
         return continuedText
@@ -866,9 +915,9 @@ export class Session {
       }
     }
 
-    void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+    void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
     const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
-    void this.captureCheckpoint(turnId, ckptLabel, send).catch(() => {})
+    void this.captureCheckpoint(turnId, ckptLabel, send).catch((err) => logNonCritical('captureCheckpoint', err))
     return finalText
   }
 
@@ -880,6 +929,9 @@ export class Session {
         invokerFactory: this.agentProv.invoker, store: this.store,
         idleTimeoutMs: this.idleTimeoutMs, pendingPermissions: this.permissions.pendingPermissions,
         orchestratorRunner: this.orchestratorRunner,
+        networkPolicy: this.networkPolicy,
+        toolOutputStore: this.toolOutputStore,
+        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
       },
       def, send,
       (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
@@ -1060,6 +1112,7 @@ export class Session {
         description: content, childMaxSteps: CHILD_MAX_STEPS,
         permissionMode: mode, requestApproval,
         existingMessages: [...existingMessages, new HumanMessage(content)],
+        sessionId: this.id,
       })
       send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
       const ts = Date.now()
@@ -1068,7 +1121,7 @@ export class Session {
       if (err instanceof Error && err.name === 'AbortError') {
         send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
       } else {
-        const msg = err instanceof Error ? err.message : String(err)
+        const msg = safeErrorMessage(err)
         send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: taskId })
         send({ type: 'error', sessionId: this.id, code: 'AGENT_ERROR', message: msg })
       }
@@ -1106,7 +1159,7 @@ function parseToolInput(input: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(input)
     if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
-  } catch { }
+  } catch (err) { logNonCritical('parseToolInput', err) }
   return {}
 }
 

@@ -12,6 +12,7 @@ import { getWorktreesDir } from './worktree-config.js'
 import { readSkillBody, listSkillFiles } from './skills/registry.js'
 import { resolveDynamicContext } from './skills/dynamic-context.js'
 import { generateAgentConfig } from './agents/generate.js'
+import { NetworkPolicy } from './network-policy.js'
 
 const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
 const MAX_SCAN_FILE_BYTES = 256 * 1024
@@ -189,6 +190,8 @@ export interface BuildToolsOpts {
   allowedTools?: string[]
   /** When non-empty, remove tools whose name is in this list (applied after PermissionMode). */
   blockedTools?: string[]
+  /** Optional network policy applied to web_fetch/web_search before the SSRF check. */
+  networkPolicy?: NetworkPolicy
 }
 
 function splitArgs(input: string): { positional: string[]; named: Record<string, string> } {
@@ -652,12 +655,21 @@ export function buildTools(
           const apiKey = process.env.HIP_WEBSEARCH_API_KEY
           if (!apiKey) return 'Error: web search API key not configured'
           const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`
+          const policyCheck = opts.networkPolicy?.checkUrl(url)
+          if (policyCheck && !policyCheck.allowed) {
+            return `Error: network policy blocked web_search: ${policyCheck.reason ?? 'blocked'}`
+          }
+          const rateLimitCheck = opts.networkPolicy?.checkRateLimit(opts.sessionId ?? '')
+          if (rateLimitCheck && !rateLimitCheck.allowed) {
+            return `Error: network policy rate limit exceeded: ${rateLimitCheck.reason ?? 'too many requests'}`
+          }
           const res = await globalThis.fetch(url, {
             headers: { 'X-Api-Key': apiKey },
           })
           if (!res.ok) return `Error: web search failed with status ${res.status}`
           const text = await res.text()
-          return clipText(text, WEB_OUTPUT_CAP)
+          const cap = Math.min(WEB_OUTPUT_CAP, opts.networkPolicy?.getResponseSizeCap() ?? WEB_OUTPUT_CAP)
+          return clipText(text, cap)
         } catch (err) {
           return `Error: web search failed: ${(err as Error).message}`
         }
@@ -674,6 +686,14 @@ export function buildTools(
     const webFetch = tool(
       async ({ url }) => {
         try {
+          const policyCheck = opts.networkPolicy?.checkUrl(url)
+          if (policyCheck && !policyCheck.allowed) {
+            return `Error: network policy blocked web_fetch: ${policyCheck.reason ?? 'blocked'}`
+          }
+          const rateLimitCheck = opts.networkPolicy?.checkRateLimit(opts.sessionId ?? '')
+          if (rateLimitCheck && !rateLimitCheck.allowed) {
+            return `Error: network policy rate limit exceeded: ${rateLimitCheck.reason ?? 'too many requests'}`
+          }
           const err = await validateFetchUrl(url)
           if (err) return err
           const res = await globalThis.fetch(url, {
@@ -682,7 +702,8 @@ export function buildTools(
           })
           if (!res.ok) return `Error: fetch failed with status ${res.status}`
           const text = await res.text()
-          return clipText(text, WEB_OUTPUT_CAP)
+          const cap = Math.min(WEB_OUTPUT_CAP, opts.networkPolicy?.getResponseSizeCap() ?? WEB_OUTPUT_CAP)
+          return clipText(text, cap)
         } catch (err) {
           const msg = (err as Error).message
           if (msg.includes('timeout') || (err as Error).name === 'TimeoutError') {

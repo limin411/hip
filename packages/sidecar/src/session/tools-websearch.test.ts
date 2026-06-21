@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promises as dns } from 'node:dns'
 import { buildTools } from './tools.js'
+import { NetworkPolicy } from './network-policy.js'
 
 vi.mock('node:dns', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:dns')>()
@@ -103,6 +104,48 @@ describe('web_search tool', () => {
     const out = String(await byName(tools, 'web_search').invoke({ query: 'test' }))
     expect(out).toMatch(/status 429/)
   })
+
+  it('rate-limits when policy maxRequestsPerMinute is exceeded (N+1th call)', async () => {
+    process.env.HIP_WEBSEARCH_API_KEY = 'test-key'
+    const fixedTime = 1_000_000
+    const policy = new NetworkPolicy(
+      { maxRequestsPerMinute: 2 },
+      { now: () => fixedTime },
+    )
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'search result',
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true, networkPolicy: policy })
+    // First 2 calls succeed
+    const out1 = String(await byName(tools, 'web_search').invoke({ query: 'q1' }))
+    expect(out1).toBe('search result')
+    const out2 = String(await byName(tools, 'web_search').invoke({ query: 'q2' }))
+    expect(out2).toBe('search result')
+
+    // 3rd call (N+1) rate-limited
+    const out3 = String(await byName(tools, 'web_search').invoke({ query: 'q3' }))
+    expect(out3).toMatch(/rate limit exceeded/i)
+  })
+
+  it('clips response to policy maxResponseBytes when smaller than default', async () => {
+    process.env.HIP_WEBSEARCH_API_KEY = 'test-key'
+    const responseText = 'x'.repeat(5000)
+    const policy = new NetworkPolicy({ maxResponseBytes: 200 })
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => responseText,
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true, networkPolicy: policy })
+    const out = String(await byName(tools, 'web_search').invoke({ query: 'test' }))
+    expect(out.length).toBeLessThanOrEqual(200 + 60)
+    expect(out).toContain('truncated')
+    expect(out).toContain('0KB')
+  })
 })
 
 describe('web_fetch tool', () => {
@@ -169,6 +212,60 @@ describe('web_fetch tool', () => {
     const callSignal = mockFetch.mock.calls[0][1].signal
     expect(callSignal).toBeInstanceOf(AbortSignal)
     expect(callSignal.aborted).toBe(false)
+  })
+
+  it('succeeds when networkPolicy is present', async () => {
+    mockResolve.mockResolvedValue(['1.1.1.1'])
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '<html>hello</html>',
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const policy = new NetworkPolicy()
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true, networkPolicy: policy })
+    const out = String(await byName(tools, 'web_fetch').invoke({ url: 'https://example.com' }))
+    expect(out).toBe('<html>hello</html>')
+  })
+
+  it('rate-limits N+1th call when maxRequestsPerMinute is 1', async () => {
+    mockResolve.mockResolvedValue(['1.1.1.1'])
+    const fixedTime = 1_000_000
+    const policy = new NetworkPolicy(
+      { maxRequestsPerMinute: 1 },
+      { now: () => fixedTime },
+    )
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => 'content',
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true, networkPolicy: policy })
+    // 1st call (N) succeeds
+    const out1 = String(await byName(tools, 'web_fetch').invoke({ url: 'https://example.com' }))
+    expect(out1).toBe('content')
+
+    // 2nd call (N+1) rate-limited
+    const out2 = String(await byName(tools, 'web_fetch').invoke({ url: 'https://example2.com' }))
+    expect(out2).toMatch(/rate limit exceeded/i)
+  })
+
+  it('clips response to maxResponseBytes when smaller than WEB_OUTPUT_CAP', async () => {
+    mockResolve.mockResolvedValue(['1.1.1.1'])
+    const responseText = 'y'.repeat(5000)
+    const policy = new NetworkPolicy({ maxResponseBytes: 150 })
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => responseText,
+    })
+    vi.stubGlobal('fetch', mockFetch)
+
+    const tools = buildTools(root, undefined, undefined, undefined, { webSearchEnabled: true, networkPolicy: policy })
+    const out = String(await byName(tools, 'web_fetch').invoke({ url: 'https://example.com' }))
+    expect(out.length).toBeLessThanOrEqual(150 + 60)
+    expect(out).toContain('truncated')
+    expect(out).toContain('0KB')
   })
 })
 

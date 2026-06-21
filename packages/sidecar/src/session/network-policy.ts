@@ -1,8 +1,28 @@
+import { readFileSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
+import type { NetworkPolicyConfig } from '@hip/protocol'
+
 // NetworkPolicy — domain allowlist/denylist + per-session rate limiting +
-// response-size cap. Layered ON TOP of the existing SSRF check in
+// response-size cap. Layered ON TOP OF the existing SSRF check in
 // `validateFetchUrl` (tools.ts:58-108). The SSRF check runs first; this module
 // is the second gate and does NOT re-implement private-IP detection, https-only
 // enforcement, or DNS resolution.
+
+/** Load network policy config from `~/.hip/config/network.json`, if present. */
+export function loadNetworkPolicyConfig(): NetworkPolicyConfig | undefined {
+  const path = join(homedir(), '.hip', 'config', 'network.json')
+  if (!existsSync(path)) return undefined
+  try {
+    const raw = readFileSync(path, 'utf8')
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+    return parsed as NetworkPolicyConfig
+  } catch (err) {
+    console.warn('[network-policy] failed to load config:', err instanceof Error ? err.message : String(err))
+    return undefined
+  }
+}
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -12,18 +32,7 @@ export interface NetworkCheckResult {
   reason?: string
 }
 
-/** User-configurable network policy. All fields optional — empty config means
- *  "allow all https" (the SSRF layer still rejects private IPs and non-https). */
-export interface NetworkPolicyConfig {
-  /** Domain patterns, exact (`api.openai.com`) or wildcard (`*.github.com`). */
-  allowlist?: string[]
-  /** Blocked domains. Takes precedence over the allowlist. */
-  denylist?: string[]
-  /** Per-session fetch budget per 60-second window. Default: 10. */
-  maxRequestsPerMinute?: number
-  /** Hard cap on response body size, in bytes. Default: 10 MB. */
-  maxResponseBytes?: number
-}
+export type { NetworkPolicyConfig } from '@hip/protocol'
 
 /** Constructor options. The `now` injector exists for deterministic tests. */
 export interface NetworkPolicyOpts {

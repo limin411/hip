@@ -1,11 +1,11 @@
 // packages/sidecar/src/session/plugins/synthesizer.test.ts
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { PluginManifest, McpServerConfig, AgentConfig } from '@hip/protocol'
+import type { PluginManifest, McpServerConfig, AgentConfig, Hook } from '@hip/protocol'
 import { synthesizePlugin } from './synthesizer.js'
-import type { SynthesizedSkillEntry, SynthesizedMcpEntry, SynthesizedAgentEntry } from './synthesizer.js'
+import type { SynthesizedSkillEntry, SynthesizedMcpEntry, SynthesizedAgentEntry, SynthesizedHookEntry } from './synthesizer.js'
 
 const dirs: string[] = []
 
@@ -45,6 +45,7 @@ describe('synthesizePlugin — empty manifest', () => {
     expect(r.skills).toEqual([])
     expect(r.mcpServers).toEqual([])
     expect(r.agents).toEqual([])
+    expect(r.hooks).toEqual([])
   })
 
   it('returns empty arrays when all component fields are undefined', () => {
@@ -57,6 +58,7 @@ describe('synthesizePlugin — empty manifest', () => {
     expect(r.skills).toEqual([])
     expect(r.mcpServers).toEqual([])
     expect(r.agents).toEqual([])
+    expect(r.hooks).toEqual([])
   })
 })
 
@@ -353,6 +355,219 @@ describe('synthesizePlugin — agents external file', () => {
   })
 })
 
+// ─── Hooks — CJS file (happy path) ─────────────────────────────────────
+
+describe('synthesizePlugin — hooks from CJS file', () => {
+  it('synthesizes hooks from a CJS file with default export of Hook[]', () => {
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(
+      pluginDir,
+      'hooks.cjs',
+      [
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        '  {',
+        '    event: "PreToolUse",',
+        '    matcher: "Bash",',
+        '    handler: async (ctx) => ({ kind: "deny", reason: "blocked" })',
+        '  },',
+        ']',
+      ].join('\n'),
+    )
+
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toHaveLength(1)
+    expect(r.hooks[0].pluginId).toBe('test-plugin')
+    expect(r.hooks[0].hooks).toHaveLength(2)
+    expect(r.hooks[0].hooks[0].event).toBe('TurnStart')
+    expect(typeof r.hooks[0].hooks[0].handler).toBe('function')
+    expect(r.hooks[0].hooks[1].event).toBe('PreToolUse')
+    expect(r.hooks[0].hooks[1].matcher).toBe('Bash')
+    expect(typeof r.hooks[0].hooks[1].handler).toBe('function')
+  })
+
+  it('synthesizes hooks with all fields present', () => {
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(
+      pluginDir,
+      'hooks-full.cjs',
+      [
+        'module.exports = [',
+        '  {',
+        '    event: "PostToolUse",',
+        '    matcher: "read_file",',
+        '    handler: async (ctx) => ({ kind: "modify", modifiedInput: { path: ctx.toolInput?.path } })',
+        '  },',
+        ']',
+      ].join('\n'),
+    )
+
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks[0].event).toBe('PostToolUse')
+    expect(r.hooks[0].hooks[0].matcher).toBe('read_file')
+    expect(typeof r.hooks[0].hooks[0].handler).toBe('function')
+  })
+})
+
+// ─── Hooks — missing file ──────────────────────────────────────────────
+
+describe('synthesizePlugin — hooks missing file', () => {
+  it('returns empty hooks array when the CJS file does not exist', () => {
+    const m = makeManifest({ hooks: '/nonexistent/hooks.cjs' })
+    const r = synthesizePlugin(m)
+    expect(r.hooks).toEqual([])
+  })
+
+  it('returns empty hooks when the CJS file is not valid JS', () => {
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(pluginDir, 'bad-hooks.cjs', 'this is not valid javascript {{{')
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+    expect(r.hooks).toEqual([])
+  })
+})
+
+// ─── Hooks — invalid entries ───────────────────────────────────────────
+
+describe('synthesizePlugin — hooks invalid entries', () => {
+  it('skips hooks with invalid event string (not a HookEvent)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(
+      pluginDir,
+      'bad-event.cjs',
+      [
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        '  {',
+        '    event: "NotAHookEvent",',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        ']',
+      ].join('\n'),
+    )
+
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks[0].event).toBe('TurnStart')
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('skips hooks with non-function handler', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(
+      pluginDir,
+      'bad-handler.cjs',
+      [
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: "not a function"',
+        '  },',
+        '  {',
+        '    event: "TurnComplete",',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        ']',
+      ].join('\n'),
+    )
+
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks[0].event).toBe('TurnComplete')
+    expect(typeof r.hooks[0].hooks[0].handler).toBe('function')
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('skips entries without event field', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const pluginDir = tempDir('plugin')
+    const hooksPath = makeFile(
+      pluginDir,
+      'no-event.cjs',
+      [
+        'module.exports = [',
+        '  {',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        '  {',
+        '    event: "SessionStart",',
+        '    handler: async (ctx) => ({ kind: "allow" })',
+        '  },',
+        ']',
+      ].join('\n'),
+    )
+
+    const m = makeManifest({ hooks: resolve(pluginDir, hooksPath) })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks).toHaveLength(1)
+    expect(r.hooks[0].hooks[0].event).toBe('SessionStart')
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+})
+
+// ─── Hooks — inline array (warning, empty result) ──────────────────────
+
+describe('synthesizePlugin — hooks inline array', () => {
+  it('logs warning and returns empty for inline Hook[] arrays', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = makeManifest({
+      hooks: [
+        { event: 'TurnStart', handler: async () => ({ kind: 'allow' }) },
+      ],
+    })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toEqual([])
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('inline'))
+    warnSpy.mockRestore()
+  })
+
+  it('logs warning and returns empty for empty inline Hook[] array', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const m = makeManifest({ hooks: [] })
+    const r = synthesizePlugin(m)
+
+    expect(r.hooks).toEqual([])
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('inline'))
+    warnSpy.mockRestore()
+  })
+})
+
+// ─── Hooks — undefined ─────────────────────────────────────────────────
+
+describe('synthesizePlugin — hooks undefined', () => {
+  it('returns empty hooks array when hooks is undefined', () => {
+    const m = makeManifest({ hooks: undefined })
+    const r = synthesizePlugin(m)
+    expect(r.hooks).toEqual([])
+  })
+})
+
 // ─── Full manifest ──────────────────────────────────────────────────────
 
 describe('synthesizePlugin — full manifest', () => {
@@ -393,6 +608,7 @@ describe('synthesizePlugin — full manifest', () => {
     expect(r.mcpServers[0].config.id).toBe('mcp-full')
     expect(r.agents).toHaveLength(1)
     expect(r.agents[0].config.id).toBe('agent-full')
+    expect(r.hooks).toEqual([])
   })
 
   it('pluginId matches the manifest id (not name)', () => {

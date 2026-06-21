@@ -1,7 +1,8 @@
 // packages/sidecar/src/session/plugins/synthesizer.ts
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename } from 'node:path'
-import type { PluginManifest, McpServerConfig, AgentConfig } from '@hip/protocol'
+import type { PluginManifest, McpServerConfig, AgentConfig, Hook, HookEvent } from '@hip/protocol'
 
 /** A skill config entry synthesized from a plugin manifest, with pluginId provenance. */
 export interface SynthesizedSkillEntry {
@@ -25,15 +26,38 @@ export interface SynthesizedAgentEntry {
   pluginId: string
 }
 
+/** A hook entry synthesized from a plugin manifest, with pluginId provenance. */
+export interface SynthesizedHookEntry {
+  pluginId: string
+  hooks: Hook[]
+}
+
 /** Complete synthesized output for one plugin manifest. */
 export interface SynthesizedPlugin {
   pluginId: string
   skills: SynthesizedSkillEntry[]
   mcpServers: SynthesizedMcpEntry[]
   agents: SynthesizedAgentEntry[]
+  hooks: SynthesizedHookEntry[]
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+/** The set of valid HookEvent values for validation. */
+const VALID_HOOK_EVENTS: ReadonlySet<string> = new Set([
+  'SessionStart',
+  'TurnStart',
+  'UserPromptSubmit',
+  'PreToolUse',
+  'PostToolUse',
+  'PostToolUseFailure',
+  'TurnComplete',
+  'Stop',
+  'PermissionRequest',
+  'ActivityStart',
+  'ActivityEnd',
+  'ActivityBudgetRequest',
+])
 
 /** Read and parse a JSON file. Returns null on any failure (missing, invalid JSON, etc.). */
 function readJsonFile(path: string): unknown {
@@ -126,6 +150,81 @@ function synthesizeAgents(manifest: PluginManifest): SynthesizedAgentEntry[] {
   return out
 }
 
+// ─── hooks ──────────────────────────────────────────────────────────────────
+
+function synthesizeHooks(manifest: PluginManifest): SynthesizedHookEntry[] {
+  const hooks = manifest.hooks
+  if (hooks === undefined) return []
+
+  if (Array.isArray(hooks)) {
+    console.warn(
+      `[synthesizer] Plugin "${manifest.id}" declares hooks as inline array — ` +
+        'inline hook arrays cannot contain function handlers. ' +
+        'Use a string path to a CJS module instead.',
+    )
+    return []
+  }
+
+  // hooks is a string (absolute path to a CJS module resolved by the parser)
+  try {
+    const nodeRequire = createRequire(import.meta.url)
+    const raw: unknown = nodeRequire(hooks)
+
+    // Support both module.exports = [...] and module.exports.default = [...]
+    const arr: unknown = Array.isArray(raw) ? raw : (raw as Record<string, unknown> | null)?.default
+    if (!Array.isArray(arr)) {
+      console.warn(
+        `[synthesizer] Plugin "${manifest.id}" hooks module must export an array of hooks, got ${typeof raw}`,
+      )
+      return []
+    }
+
+    const validHooks: Hook[] = []
+    for (let i = 0; i < arr.length; i++) {
+      const entry = arr[i]
+      if (typeof entry !== 'object' || entry === null) {
+        console.warn(`[synthesizer] Plugin "${manifest.id}" hook[${i}]: expected an object, got ${typeof entry}`)
+        continue
+      }
+      const e = entry as Record<string, unknown>
+
+      if (typeof e.event !== 'string') {
+        console.warn(
+          `[synthesizer] Plugin "${manifest.id}" hook[${i}]: missing or invalid "event" field`,
+        )
+        continue
+      }
+      if (!VALID_HOOK_EVENTS.has(e.event)) {
+        console.warn(
+          `[synthesizer] Plugin "${manifest.id}" hook[${i}]: "${e.event}" is not a valid HookEvent`,
+        )
+        continue
+      }
+      if (typeof e.handler !== 'function') {
+        console.warn(
+          `[synthesizer] Plugin "${manifest.id}" hook[${i}] (event: ${e.event}): ` +
+            `"handler" must be a function, got ${typeof e.handler}`,
+        )
+        continue
+      }
+
+      validHooks.push({
+        event: e.event as HookEvent,
+        matcher: typeof e.matcher === 'string' || Array.isArray(e.matcher) ? e.matcher as Hook['matcher'] : undefined,
+        handler: e.handler as Hook['handler'],
+      })
+    }
+
+    return validHooks.length > 0 ? [{ pluginId: manifest.id, hooks: validHooks }] : []
+  } catch (err) {
+    console.warn(
+      `[synthesizer] Plugin "${manifest.id}" failed to load hooks from ${hooks}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    )
+    return []
+  }
+}
+
 // ─── public API ─────────────────────────────────────────────────────────────
 
 /**
@@ -142,5 +241,6 @@ export function synthesizePlugin(manifest: PluginManifest): SynthesizedPlugin {
     skills: synthesizeSkills(manifest),
     mcpServers: synthesizeMcpServers(manifest),
     agents: synthesizeAgents(manifest),
+    hooks: synthesizeHooks(manifest),
   }
 }

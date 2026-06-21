@@ -188,6 +188,46 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 10) {
+    db.exec('BEGIN')
+    try {
+      // Event-sourced persistence foundation (Wave 1 of agent-design-remediation).
+      // `event_sequence` tracks the per-aggregate monotonic sequence number; `event`
+      // is the append-only log; `snapshots` stores periodic aggregate state for fast
+      // crash recovery. These are the source of truth — session_message (added in a
+      // later todo) is a denormalized projection. No FK to sessions(id): events must
+      // survive a sessions-row delete (the event log is the source of truth).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS event_sequence (
+          aggregate_id TEXT PRIMARY KEY,
+          seq          INTEGER NOT NULL,
+          owner_id     TEXT
+        );
+        CREATE TABLE IF NOT EXISTS event (
+          id           TEXT PRIMARY KEY,
+          aggregate_id TEXT NOT NULL,
+          seq          INTEGER NOT NULL,
+          type         TEXT NOT NULL,
+          data         TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_event_aggregate_seq
+          ON event(aggregate_id, seq);
+        CREATE INDEX IF NOT EXISTS idx_event_aggregate_type_seq
+          ON event(aggregate_id, type, seq);
+        CREATE TABLE IF NOT EXISTS snapshots (
+          session_id TEXT PRIMARY KEY,
+          seq        INTEGER NOT NULL,
+          state      TEXT NOT NULL,
+          timestamp  INTEGER NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 10')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

@@ -21,7 +21,7 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(9)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {
@@ -46,6 +46,28 @@ describe('migrate', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('acp_session_id')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(9)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
+  })
+
+  it('v10 adds event_sequence + event + snapshots tables and reaches user_version 10', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    expect(columns(db, 'event_sequence')).toEqual(expect.arrayContaining(['aggregate_id', 'seq', 'owner_id']))
+    expect(columns(db, 'event')).toEqual(
+      expect.arrayContaining(['id', 'aggregate_id', 'seq', 'type', 'data']),
+    )
+    expect(columns(db, 'snapshots')).toEqual(
+      expect.arrayContaining(['session_id', 'seq', 'state', 'timestamp']),
+    )
+    const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='event'`).all() as { name: string }[]).map((r) => r.name)
+    expect(indexes).toEqual(expect.arrayContaining(['idx_event_aggregate_seq', 'idx_event_aggregate_type_seq']))
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
+  })
+
+  it('v10 migration preserves all pre-existing tables (no drop / no rename)', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    const tables = (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as { name: string }[]).map((t) => t.name)
+    expect(tables).toEqual(expect.arrayContaining(['sessions', 'messages', 'agent_runs', 'tool_calls', 'checkpoints']))
   })
 })

@@ -10,10 +10,10 @@ Each `Session` instance manages one AI agent conversation: LangGraph loop, model
 
 ```
 session/
-├── session.ts                  # Session class (904 lines) — central orchestrator
+├── session.ts                  # Session class (1236 lines) — central orchestrator
 ├── session-manager.ts          # Message router: processes all ClientMessage types
 ├── graph.ts                    # LangGraph StateGraph: compact → agent → tools → nudge/pause
-├── tools.ts                    # Tool definitions (500 lines): file ops, bash, git, task, dispatch_agent, MCP tools
+├── tools.ts                    # Tool definitions (908 lines): file ops, bash, git, task, dispatch_agent, MCP tools
 ├── agent-profile.ts            # AgentProfile interface + built-in profiles (supervisor/plan/explore/worker)
 ├── agent-profile-manager.ts    # Dual-layer agent profile config: ~/.hip/config/agents.json + .hip/agents.json
 ├── context-fragment.ts         # ContextFragment interface + FragmentRegistry for composable prompt assembly
@@ -27,7 +27,7 @@ session/
 ├── subagent.ts                 # runSubagent(): depth-1 worker, same tools minus task/dispatch
 ├── internal-runner.ts          # runManagedAgent(): dispatched internal agent with narrowed tools
 ├── workspace-fs.ts             # File system: lsDir, readForPreview, path jail + symlink guard
-├── workspace-git.ts            # Git operations (516 lines): diff parsing, checkpoints, branches, revert
+├── workspace-git.ts            # Git operations (604 lines): diff parsing, checkpoints, branches, revert
 ├── system-prompt.ts            # System prompt builder: supervisor, child, managed agent variants
 ├── compaction.ts               # Context summarization when token budget exceeded
 ├── doom-loop.ts                # Detect repeating tool-call batches → nudge → pause
@@ -63,6 +63,6 @@ session/
 
 ## ANTI-PATTERNS
 
-- **Session.ts is a god file** (904 lines, 30+ methods). Couples 15+ subsystems. Refactor target — extract concerns (git, permissions, title generation) into separate modules
+- **Session.ts is a god file** (1236 lines, 30+ methods). Couples 15+ subsystems. Refactor target — extract concerns (git, permissions, title generation) into separate modules
 - **NEVER touches HEAD/index** — `workspace-git.ts` checkpoint restore writes to temp index first
 - **Never throws** — Most public methods return `{ ok: false, error }` instead of throwing

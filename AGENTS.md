@@ -1,6 +1,6 @@
 # hip — PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-06-20 | **Commit:** `df6c6fc` | **Branch:** `main`
+**Generated:** 2026-06-21 | **Commit:** `e063429` | **Branch:** `main`
 
 ## OVERVIEW
 
@@ -22,16 +22,31 @@ hip/
 │   ├── protocol/           # @hip/protocol — shared WS message types (single file, no build)
 │   └── sidecar/            # @hip/sidecar — LangGraph agent runtime + WS server
 │       └── src/
-│           ├── session/    # Core agent loop (904-line Session class) → AGENTS.md
+│           ├── session/    # Core agent loop (1236-line Session class) → AGENTS.md
 │           │   └── agents/ # External agent providers (ACP) → AGENTS.md
 │           ├── orchestrator/ # DAG workflow engine → AGENTS.md
 │           ├── persistence/  # SQLite + FTS5 + schema migrations → AGENTS.md
 │           └── config/       # Auth, providers, MCP config → AGENTS.md
-├── src-tauri/              # Rust Tauri shell (7 source files, 20 commands)
+├── src-tauri/              # Rust Tauri shell (8 source files, ~30 commands)
 ├── scripts/                # dev.sh, make-sidecar-dev-bin.sh, hip-acp-template.mjs
 ├── e2e/                    # WebdriverIO specs (3 suites)
 └── docs/                   # Design specs + implementation plans
 ```
+
+## CODE MAP
+
+Key symbols by blast radius. Ref counts are callers found in this repo.
+
+| Symbol | Type | Location | Refs | Role |
+|--------|------|----------|------|------|
+| `Session` | class | `packages/sidecar/src/session/session.ts:99` | 20+ | Sidecar session lifecycle hub |
+| `applyServerMessage` | function | `src/domain/sessionStore.ts:143` | 2 | Frontend server-message reducer |
+| `SessionService` | class | `src/domain/sessionService.ts:23` | 1 | Frontend WebSocket orchestrator singleton |
+| `WsClient` | class | `src/ipc/ws-client.ts:11` | 1 | Frontend WebSocket client with backoff |
+| `WsServer` | class | `packages/sidecar/src/server/ws-server.ts:18` | 0 | Sidecar WebSocket server entry |
+| `buildTools` | function | `packages/sidecar/src/session/tools.ts:305` | 15 | Permission-gated tool factory |
+| `buildGraph` | function | `packages/sidecar/src/session/graph.ts:89` | — | LangGraph StateGraph compiler |
+| `projectEvent` | function | `packages/sidecar/src/persistence/message-projector.ts:44` | 10 | Event-sourced message projection |
 
 ## WHERE TO LOOK
 
@@ -40,12 +55,12 @@ hip/
 | Add WS message type | `packages/protocol/src/index.ts` | Single truth for ClientMessage/ServerMessage unions |
 | Route new client message | `packages/sidecar/src/session/session-manager.ts` | Exhaustive switch on msg.type |
 | Handle WS message in frontend | `src/domain/sessionStore.ts` → `applyServerMessage()` | Pure reducer, 150 lines |
-| Add Tauri command | `src-tauri/src/lib.rs` | All 20 commands here |
+| Add Tauri command | `src-tauri/src/lib.rs` | All ~30 commands here |
 | Add provider/model config | `src-tauri/src/lib.rs` + `src/ipc/providersConfig.ts` + `packages/sidecar/src/config/providers.ts` | Three places must agree |
 | Add agent tool | `packages/sidecar/src/session/tools.ts` | buildTools() — permission-gated |
 | Add external agent provider | `packages/sidecar/src/session/agents/index.ts` | Factory pattern |
 | Add Zustand store | `src/store/` | Follow existing pattern: create + selectors + optional persist |
-| Understand session lifecycle | `packages/sidecar/src/session/session.ts` | 904-line god file, read top-down |
+| Understand session lifecycle | `packages/sidecar/src/session/session.ts` | 1236-line god file, read top-down |
 | Debug WebSocket connection | `src/ipc/ws-client.ts` (frontend) + `packages/sidecar/src/server/ws-server.ts` (sidecar) | Exponential backoff reconnect |
 | API key management | `src-tauri/src/auth.rs` (atomic write, 0600) + `src/ipc/secrets.ts` + `packages/sidecar/src/config/auth-file.ts` | ~/.hip/config/auth.json |
 
@@ -65,6 +80,10 @@ hip/
 - **i18n**: All user-visible strings via `t('domain.key')`. 3 locales: zh-CN (default), zh-TW, en
 - **Named exports only**: Zero `export default` in entire codebase
 - **Rust**: Edition 2021, no unsafe, no .rustfmt.toml — standard defaults. `#[cfg(test)]` inline tests in lib.rs
+- **Vitest environment**: `node` (not jsdom/happy-dom)
+- **No dark mode**: Only light design tokens currently defined
+- **Rust reqwest**: Pinned to 0.12 — 0.13's rustls requires unavailable `aws-lc-rs`
+- **Default export exception**: Only `src/i18n/index.ts` uses `export default` (i18next bootstrap pattern)
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -76,6 +95,8 @@ hip/
 - **Config plaintext**: `~/.hip/config/auth.json` holds API keys. Do NOT sync to cloud drives or dotfile repos
 - **Sidecar dev wrapper**: `make-sidecar-dev-bin.sh` bakes absolute node path. Must re-run after Node.js version changes
 - **Mock auth**: `authStore.ts` is demo-only (localStorage boolean). No real OAuth implemented yet
+- **Deprecated stores**: Individual per-domain Zustand stores (`mcpServersStore`, `skillsStore`, `providersStore`) are `@deprecated` — prefer `hipConfigStore` selectors
+- **Windows console guard**: `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` in `src-tauri/src/main.rs` must not be removed
 
 ## COMMANDS
 

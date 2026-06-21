@@ -15,16 +15,16 @@ src/
 ├── server/
 │   └── ws-server.ts     # WebSocket server: token auth, origin check, → SessionManager
 ├── session/             # Core agent runtime → AGENTS.md
-│   ├── session.ts       # Session class (904 lines — the heart)
+│   ├── session.ts       # Session class (1236 lines — the heart)
 │   ├── session-manager.ts # Message router: exhaustive switch on ClientMessage.type
 │   ├── graph.ts         # LangGraph StateGraph: compact → agent → tools → nudge/pause
-│   ├── tools.ts         # Tool definitions: file ops, bash, git, task, dispatch_agent
+│   ├── tools.ts         # Tool definitions (908 lines): file ops, bash, git, task, dispatch_agent
 │   ├── model-factory.ts # buildChatModel(), ReasoningChatOpenAI for DeepSeek reasoning
 │   ├── model-runner.ts  # RealModelRunner: streams deltas, retries transient failures
 │   ├── subagent.ts      # Depth-1 worker agent (same tools minus task/dispatch)
 │   ├── internal-runner.ts # Managed dispatched agent runner
 │   ├── workspace-fs.ts  # File system: lsDir, readForPreview, jail + symlink guard
-│   ├── workspace-git.ts # Git: diff parsing, checkpoints, branches, revert (516 lines)
+│   ├── workspace-git.ts # Git: diff parsing, checkpoints, branches, revert (604 lines)
 │   ├── system-prompt.ts # System prompt builder (supervisor, child, managed agent)
 │   ├── compaction.ts    # Context summarization when token budget exceeded
 │   ├── doom-loop.ts     # Detect repeating tool-call batches, nudge then pause

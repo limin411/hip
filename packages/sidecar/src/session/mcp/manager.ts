@@ -2,7 +2,6 @@ import { tool, type StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
-import { existsSync } from 'node:fs'
 import * as path from 'node:path'
 import type { McpServerConfig } from '@hip/protocol'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -167,21 +166,21 @@ export class McpManager {
     return client as unknown as ClientLike
   }
 
-  /** Validate a stdio command against the absolute-path allowlist. */
+  /** Validate a stdio command against the absolute-path allowlist, resolving symlinks. */
   protected async validateStdioCommand(command: string | undefined): Promise<string | undefined> {
     if (!command) return 'MCP stdio server is missing a command'
     if (!path.isAbsolute(command)) return `MCP stdio command must be an absolute path: ${command}`
     const normalized = path.normalize(command)
     const allowedDirs = ['/usr/bin', '/usr/local/bin', '/opt', path.join(os.homedir(), '.hip', 'bin')]
-    for (const dir of allowedDirs) {
-      if (normalized === dir || normalized.startsWith(dir + path.sep)) return undefined
+    let real: string
+    try {
+      real = await fs.realpath(normalized)
+    } catch {
+      return `MCP stdio command does not exist or cannot be resolved: ${command}`
     }
-    if (existsSync(normalized)) {
-      try {
-        await fs.stat(normalized)
-      } catch (err) {
-        console.error(`validateStdioCommand: stat failed for "${normalized}":`, err)
-      }
+    const resolved = path.normalize(real)
+    for (const dir of allowedDirs) {
+      if (resolved === dir || resolved.startsWith(dir + path.sep)) return undefined
     }
     return `MCP stdio command is not in the allowed directory list: ${command}`
   }

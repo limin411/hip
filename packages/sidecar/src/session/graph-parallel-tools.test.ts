@@ -82,7 +82,7 @@ describe('toolsNode parallel execution', () => {
     const start = Date.now()
     await buildGraph().invoke(
       { messages: [new HumanMessage('read lots')], steps: 0 },
-      { configurable: { ctx: { runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
     )
     const elapsed = Date.now() - start
     expect(log.length).toBe(3)
@@ -110,7 +110,7 @@ describe('toolsNode parallel execution', () => {
     ])
     await buildGraph().invoke(
       { messages: [new HumanMessage('write then edit')], steps: 0 },
-      { configurable: { ctx: { runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
     )
     expect(log.length).toBe(2)
     const sorted = [...log].sort((a, b) => a.start - b.start)
@@ -137,7 +137,7 @@ describe('toolsNode parallel execution', () => {
     ])
     await buildGraph().invoke(
       { messages: [new HumanMessage('read then write')], steps: 0 },
-      { configurable: { ctx: { runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
     )
     const reads = log.filter((l) => l.name !== 'write_file')
     expect(reads.length).toBe(2)
@@ -167,7 +167,7 @@ describe('toolsNode parallel execution', () => {
     ])
     const out = await buildGraph().invoke(
       { messages: [new HumanMessage('preserve order')], steps: 0 },
-      { configurable: { ctx: { runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
     )
     const toolMsgs = out.messages.filter((m) => m instanceof ToolMessage)
     expect(toolMsgs.map((m) => m.tool_call_id)).toEqual(['o1', 'o2'])
@@ -184,7 +184,7 @@ describe('toolsNode parallel execution', () => {
       { messages: [new HumanMessage('loop')], steps: 0 },
       {
         configurable: {
-          ctx: { runner: fakeRunner([loop(), loop(), loop(), loop()]), tools, emit: noopEmit, summarizer: noopSummarizer },
+          ctx: { sessionId: 'test-session', runner: fakeRunner([loop(), loop(), loop(), loop()]), tools, emit: noopEmit, summarizer: noopSummarizer },
         },
         recursionLimit: 90,
       },
@@ -218,7 +218,7 @@ describe('toolsNode parallel execution', () => {
     ])
     const out = await buildGraph().invoke(
       { messages: [new HumanMessage('one fails')], steps: 0 },
-      { configurable: { ctx: { runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
     )
     const toolMsgs = out.messages.filter((m) => m instanceof ToolMessage)
     expect(toolMsgs.length).toBe(3)
@@ -251,6 +251,7 @@ describe('toolsNode parallel execution', () => {
       {
         configurable: {
           ctx: {
+            sessionId: 'test-session',
             runner,
             tools,
             emit: noopEmit,

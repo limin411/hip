@@ -107,7 +107,7 @@ describe('plan profile', () => {
         },
         {
           configurable: {
-            ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'plan' },
+            ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'plan' },
           },
         },
       )
@@ -132,7 +132,7 @@ describe('plan profile', () => {
         },
         {
           configurable: {
-            ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'plan' },
+            ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'plan' },
           },
           recursionLimit: 20,
         },
@@ -157,7 +157,7 @@ describe('plan profile', () => {
         },
         {
           configurable: {
-            ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'supervisor' },
+            ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'supervisor' },
           },
           recursionLimit: 20,
         },
@@ -181,7 +181,7 @@ describe('plan profile', () => {
         },
         {
           configurable: {
-            ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'supervisor' },
+            ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer, activeProfileId: 'supervisor' },
           },
         },
       )

@@ -71,7 +71,7 @@ describe('plan persistence', () => {
         planningMode: 'plan',
         planStatus: 'none',
       },
-      { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
     )
 
     expect(planOut.plan).toEqual([{ content: 'step a', status: 'pending' }, { content: 'step b', status: 'pending' }])

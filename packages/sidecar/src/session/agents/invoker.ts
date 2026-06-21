@@ -2,6 +2,9 @@ import type { AgentConfig, SkillMeta, PermissionMode } from '@hip/protocol'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ApprovalFn } from '../tools.js'
 import type { GraphEmit } from '../graph.js'
+import type { NetworkPolicy } from '../network-policy.js'
+import type { ToolOutputStore } from '../tool-output-store.js'
+import type { GuardianReviewer } from '../guardian.js'
 import { runManagedAgent } from '../internal-runner.js'
 import { CHILD_MAX_STEPS } from '../loop-control.js'
 import { createAgentProvider } from './index.js'
@@ -19,6 +22,10 @@ export interface InvokerExtras {
   skills?: SkillMeta[]
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
+  sessionId?: string
+  networkPolicy?: NetworkPolicy
+  toolOutputStore?: ToolOutputStore
+  guardianReviewer?: GuardianReviewer
 }
 
 export interface AgentInvoker {
@@ -39,6 +46,10 @@ export interface RunInternalArgs {
   skills?: SkillMeta[]
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
+  sessionId?: string
+  networkPolicy?: NetworkPolicy
+  toolOutputStore?: ToolOutputStore
+  guardianReviewer?: GuardianReviewer
 }
 
 export interface InvokerDeps {
@@ -75,6 +86,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, task: a.task,
       emit: a.emit, signal: a.signal, childMaxSteps: CHILD_MAX_STEPS,
       mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval, permissionMode: a.permissionMode,
+      sessionId: a.sessionId, networkPolicy: a.networkPolicy,
+      toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
     }))
   return {
     async invoke(agentId, task, emit, signal, hooks, extras) {
@@ -95,6 +108,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,
           requestApproval: extras?.requestApproval, permissionMode: extras?.permissionMode,
+          sessionId: extras?.sessionId, networkPolicy: extras?.networkPolicy,
+          toolOutputStore: extras?.toolOutputStore, guardianReviewer: extras?.guardianReviewer,
         })
       }
 

@@ -76,9 +76,11 @@ export interface MultiAgentApp {
 
 /** Filter the shared tool pool by a profile's `allowedTools`/`blockedTools`. */
 function filterToolsByProfile(tools: StructuredToolInterface[], profile: AgentProfile): StructuredToolInterface[] {
-  if (!profile.allowedTools || profile.allowedTools.length === 0) return tools
-  const allowed = new Set(profile.allowedTools)
-  let filtered = tools.filter((t) => allowed.has(t.name))
+  let filtered = tools
+  if (profile.allowedTools && profile.allowedTools.length > 0) {
+    const allowed = new Set(profile.allowedTools)
+    filtered = filtered.filter((t) => allowed.has(t.name))
+  }
   if (profile.blockedTools && profile.blockedTools.length > 0) {
     const blocked = new Set(profile.blockedTools)
     filtered = filtered.filter((t) => !blocked.has(t.name))

@@ -1,15 +1,58 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
-import type { GraphEmit } from './graph.js'
+import type { GraphEmit, GraphCtx } from './graph.js'
 import { runManagedAgent } from './internal-runner.js'
+import { NetworkPolicy } from './network-policy.js'
+import { ToolOutputStore } from './tool-output-store.js'
+import { GuardianReviewer } from './guardian.js'
+
+// ── Safety-dep wiring test harness (vi.mock calls are hoisted by vitest) ───
+const { capturedBuildToolsOpts, capturedGraphCtxs } = vi.hoisted(() => ({
+  capturedBuildToolsOpts: [] as Array<Record<string, unknown> | undefined>,
+  capturedGraphCtxs: [] as Array<GraphCtx>,
+}))
+
+vi.mock('./tools.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tools.js')>()
+  const origBuildTools = actual.buildTools
+  return {
+    ...actual,
+    buildTools: (root: string, spawnSubagent?: unknown, cwd?: string, dispatch?: unknown, opts?: Record<string, unknown>) => {
+      capturedBuildToolsOpts.push(opts)
+      return origBuildTools(root, spawnSubagent as Parameters<typeof origBuildTools>[1], cwd, dispatch as Parameters<typeof origBuildTools>[3], opts as Parameters<typeof origBuildTools>[4])
+    },
+  }
+})
+
+vi.mock('./graph.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./graph.js')>()
+  const origBuildGraph = actual.buildGraph
+  return {
+    ...actual,
+    buildGraph: (maxSteps?: number, compactBudget?: number) => {
+      const g = origBuildGraph(maxSteps, compactBudget)
+      const origInvoke: typeof g.invoke = g.invoke.bind(g)
+      g.invoke = (state, options) => {
+        const ctx = (options as { configurable?: { ctx?: GraphCtx } }).configurable?.ctx
+        if (ctx) capturedGraphCtxs.push(ctx)
+        return origInvoke(state, options)
+      }
+      return g
+    },
+  }
+})
 
 const dirs: string[] = []
 function tmp() { const d = mkdtempSync(join(tmpdir(), 'hip-internal-')); dirs.push(d); return d }
 afterEach(() => { while (dirs.length) { try { rmSync(dirs.pop()!, { recursive: true, force: true }) } catch { /* ignore */ } } })
+beforeEach(() => {
+  capturedBuildToolsOpts.length = 0
+  capturedGraphCtxs.length = 0
+})
 
 function collectingEmit() {
   const tokens: string[] = []
@@ -127,5 +170,72 @@ describe('runManagedAgent skills + run_script wiring (no allow-list gate anymore
       runner, summarizer: { async summarize() { return '' } },
     })
     expect(seen()).not.toContain('run_script')
+  })
+})
+
+describe('runManagedAgent safety-dependency wiring (C3 — sessionId, networkPolicy, toolOutputStore, guardianReviewer)', () => {
+  const makeNetworkPolicy = (): NetworkPolicy => new NetworkPolicy()
+  const makeToolOutputStore = (): ToolOutputStore => new ToolOutputStore({ outputDir: join(tmpdir(), 'hip-tos-int') })
+  const makeGuardianReviewer = (): GuardianReviewer => new GuardianReviewer({ modelRunner: new TextRunner('ok') })
+
+  it('threads sessionId and networkPolicy into buildTools opts', async () => {
+    const cwd = tmp()
+    const policy = makeNetworkPolicy()
+    const store = makeToolOutputStore()
+    const guardian = makeGuardianReviewer()
+
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner: new TextRunner('done'),
+      summarizer: { async summarize() { return '' } },
+      sessionId: 'mgr-sess-1',
+      networkPolicy: policy,
+      toolOutputStore: store,
+      guardianReviewer: guardian,
+    })
+
+    const lastOpts = capturedBuildToolsOpts.at(-1)
+    expect(lastOpts).toBeDefined()
+    expect(lastOpts?.sessionId).toBe('mgr-sess-1')
+    expect(lastOpts?.networkPolicy).toBe(policy)
+  })
+
+  it('threads sessionId, toolOutputStore, and guardianReviewer into GraphCtx', async () => {
+    const cwd = tmp()
+    const policy = makeNetworkPolicy()
+    const store = makeToolOutputStore()
+    const guardian = makeGuardianReviewer()
+
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner: new TextRunner('done'),
+      summarizer: { async summarize() { return '' } },
+      sessionId: 'mgr-sess-2',
+      networkPolicy: policy,
+      toolOutputStore: store,
+      guardianReviewer: guardian,
+    })
+
+    const ctx = capturedGraphCtxs.at(-1)
+    expect(ctx).toBeDefined()
+    expect(ctx?.sessionId).toBe('mgr-sess-2')
+    expect(ctx?.toolOutputStore).toBe(store)
+    expect(ctx?.guardianReviewer).toBe(guardian)
+  })
+
+  it('defaults sessionId to "managed-agent" when not provided', async () => {
+    const cwd = tmp()
+
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: 't', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner: new TextRunner('done'),
+      summarizer: { async summarize() { return '' } },
+    })
+
+    const ctx = capturedGraphCtxs.at(-1)
+    expect(ctx?.sessionId).toBe('managed-agent')
   })
 })

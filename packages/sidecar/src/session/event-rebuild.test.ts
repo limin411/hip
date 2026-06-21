@@ -10,7 +10,6 @@ import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import { EventStore } from '../persistence/event-store.js'
 import { projectEvent } from '../persistence/message-projector.js'
-import { tokenCounter } from './compaction.js'
 
 const baseCfg: SessionConfig = { llmProvider: 'openai', model: 'gpt-4', tools: [], useEventSource: true }
 
@@ -79,7 +78,6 @@ describe('LangGraph ↔ event-store boundary', () => {
     eventStore = new EventStore(db)
     st.insertSession({ id: 's1', title: 't', config: JSON.stringify(baseCfg), createdAt: 1, updatedAt: 1 })
     root = mkdtempSync(join(tmpdir(), 'hip-rebuild-'))
-    ;(tokenCounter as unknown as { countMessages: () => Promise<number> }).countMessages = async () => 0
   })
 
   afterEach(() => {

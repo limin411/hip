@@ -51,6 +51,18 @@ export class SessionManager {
       case 'message:send':
         await this.ensureSession(msg.sessionId).sendMessage(msg.content, send, msg.id)
         break
+      case 'input:enqueue': {
+        const s = this.ensureSession(msg.sessionId)
+        s.enqueueInput({ type: 'message', content: msg.content, messageId: msg.id })
+        await s.drainInputQueue(send)
+        break
+      }
+      case 'input:steer': {
+        const s = this.ensureSession(msg.sessionId)
+        s.enqueueInput({ type: 'steer', content: msg.content, messageId: msg.id })
+        await s.drainInputQueue(send)
+        break
+      }
       case 'message:cancel':
         this.sessions.get(msg.sessionId)?.cancel()
         break

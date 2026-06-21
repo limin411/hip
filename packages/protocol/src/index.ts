@@ -396,6 +396,8 @@ export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
   | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
+  | { type: 'input:enqueue'; sessionId: string; id: string; content: string }
+  | { type: 'input:steer'; sessionId: string; id: string; content: string }
   | { type: 'message:cancel'; sessionId: string }
   | { type: 'message:regenerate'; sessionId: string }
   | { type: 'message:resume'; sessionId: string; content: string }

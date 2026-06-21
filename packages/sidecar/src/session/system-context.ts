@@ -140,6 +140,11 @@ export class SystemContext {
     this.sources = [...sources].sort(byKey)
   }
 
+  /** Expose the registered sources in deterministic key order. */
+  getSources(): readonly Source<unknown>[] {
+    return this.sources
+  }
+
   /**
    * First load of every source. Available sources contribute to the baseline
    * (joined with "\n\n") and the snapshot; unavailable ones are simply skipped.

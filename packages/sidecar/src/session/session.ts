@@ -37,9 +37,10 @@ import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
-import { EventStore } from '../persistence/event-store.js'
+import { EventStore, SnapshotStore, saveSessionSnapshot, loadSessionSnapshot } from '../persistence/event-store.js'
 import { loadProjection, projectEvent } from '../persistence/message-projector.js'
 import type { SessionMessageData, ProjectedToolCall } from '../persistence/message-types.js'
+import { isAssistantStep } from '../persistence/message-types.js'
 import * as workspaceFs from './workspace-fs.js'
 import { GitOperations } from './git-operations.js'
 import { PermissionManager } from './permission-manager.js'
@@ -56,6 +57,12 @@ export type { TitleGenerator } from './title-generator.js'
 
 type SendFn = (msg: ServerMessage) => void
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
+
+export interface SessionInput {
+  type: 'message' | 'steer'
+  content: string
+  messageId?: string
+}
 
 export function resolveModel(config: SessionConfig): string {
   return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
@@ -101,6 +108,8 @@ export class Session {
   private resumeAbortController: AbortController | null = null
   private running = false
   private awaitingResume = false
+  private readonly inputQueue: SessionInput[] = []
+  private steerAbortFlag = false
   private paused: {
     messages: BaseMessage[]
     steps: number
@@ -121,6 +130,7 @@ export class Session {
   static readonly MAX_BACKGROUND_TASKS = 10
 
   readonly eventStore?: EventStore
+  private readonly snapshotStore?: SnapshotStore
   private readonly activeSteps = new Map<string, string>()
 
   readonly git: GitOperations
@@ -181,6 +191,7 @@ export class Session {
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
 
     this.eventStore = store ? new EventStore(store.getDb()) : undefined
+    this.snapshotStore = store ? new SnapshotStore(store.getDb()) : undefined
 
     this.git = new GitOperations(id, store)
     this.permissions = new PermissionManager(
@@ -197,6 +208,7 @@ export class Session {
     )
     this.buildAgent()
     this.configMgr.loadPluginComponents()
+    this.recoverFromCrash()
   }
 
   get config(): SessionConfig { return this._config }
@@ -261,9 +273,52 @@ export class Session {
   }
 
   // ── Lifecycle ──
+  /**
+   * Silent crash recovery: mark any tool calls that were still running when the
+   * previous sidecar process died as failed, then warm-start the in-memory
+   * message list from the latest snapshot if one exists. Emits durable events
+   * but never sends WebSocket messages — recovery must be invisible to the UI.
+   */
+  private recoverFromCrash(): void {
+    if (!this.store || !this.eventStore || !this.snapshotStore) return
+
+    const running = this.findRunningToolCalls()
+    for (const { callId, stepId } of running) {
+      this.emit(
+        { type: 'tool_failed', sessionId: this.id, callId, error: 'interrupted by sidecar crash', timestamp: Date.now() },
+        { stepId },
+      )
+    }
+
+    const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
+    if (snapshot != null && snapshot.messages.length > 0) {
+      this.messages.length = 0
+      this.messages.push(...snapshot.messages)
+    }
+  }
+
+  private findRunningToolCalls(): Array<{ callId: string; stepId: string }> {
+    if (!this.store) return []
+    const rows = loadProjection(this.store.getDb(), this.id)
+    const running: Array<{ callId: string; stepId: string }> = []
+    for (const row of rows) {
+      if (!isAssistantStep(row.data)) continue
+      for (const tc of row.data.toolCalls) {
+        if (tc.status === 'running') running.push({ callId: tc.callId, stepId: row.data.stepId })
+      }
+    }
+    return running
+  }
+
   /** Rebuild the in-memory message list from the event-sourced projection.
-   *  Falls back to the legacy messages table when the projection is empty. */
+   *  Falls back to the legacy messages table when the projection is empty.
+   *  If crash recovery already warm-started messages from a snapshot, skip
+   *  rebuilding so the snapshot remains the source of truth. */
   hydrate(messages?: Message[]): void {
+    if (this.messages.length > 0) {
+      this.reseedLastCheckpoint()
+      return
+    }
     this.messages.length = 0
     const rebuilt = this.rebuildMessagesFromEvents(this.id)
     if (rebuilt.length > 0) {
@@ -313,38 +368,86 @@ export class Session {
   }
 
   async sendMessage(content: string, _send: SendFn, userMessageId?: string): Promise<void> {
+    this.enqueueInput({ type: 'message', content, messageId: userMessageId })
     if (this.running || this.awaitingResume) return
+    await this.drainInputQueue(_send)
+  }
+
+  private async processInput(input: SessionInput, _send: SendFn): Promise<string> {
     if (this.modelDirty) { this.buildAgent(); this.modelDirty = false }
-    if (!this.requireCompatibleModel(_send)) return
-    if (!this.requireApiKey(_send)) return
+    if (!this.requireCompatibleModel(_send)) return ''
+    if (!this.requireApiKey(_send)) return ''
 
     const userTs = Date.now()
     let isFirstTurn = false
     if (this.store) {
       isFirstTurn = !this.store.hasMessages(this.id)
-      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: userMessageId ?? `u-${userTs}`, timestamp: userTs })
-      if (isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(content)) === 1) {
-        _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(content) })
+      this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs })
+      if (isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(input.content)) === 1) {
+        _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(input.content) })
       }
     }
 
     const promptResult = await this.hooks.fire('UserPromptSubmit', { sessionId: this.id }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
     if (promptResult.kind !== 'allow') {
       _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
-      return
+      return ''
     }
     if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch(() => {})
 
-    this.messages.push(new HumanMessage(content))
+    this.messages.push(new HumanMessage(input.content))
     const supervisorText = await this.runTurn(_send)
 
     if (isFirstTurn && this.titleGenerator && supervisorText && this.store) {
       try {
-        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: content, firstReply: supervisorText }))
+        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: supervisorText }))
         if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
           _send({ type: 'session:title', sessionId: this.id, title: refined })
         }
       } catch { /* non-critical */ }
+    }
+    return supervisorText
+  }
+
+  enqueueInput(input: SessionInput): void {
+    this.inputQueue.push(input)
+    if (input.type === 'steer' && this.running && this.abortController) {
+      this.steerAbortFlag = true
+      this.abortController.abort()
+    }
+  }
+
+  promoteSteerInput(): SessionInput | undefined {
+    let idx = -1
+    for (let i = this.inputQueue.length - 1; i >= 0; i--) {
+      if (this.inputQueue[i].type === 'steer') {
+        idx = i
+        break
+      }
+    }
+    if (idx === -1) return undefined
+    const [steer] = this.inputQueue.splice(idx, 1)
+    this.inputQueue.splice(0, idx)
+    return steer
+  }
+
+  async drainInputQueue(_send: SendFn): Promise<void> {
+    while (!this.running && !this.awaitingResume) {
+      const steer = this.promoteSteerInput()
+      const input = steer ?? this.inputQueue.shift()
+      if (!input) return
+      await this.processInput(input, _send)
+    }
+  }
+
+  private hasSteerInput(): boolean {
+    return this.inputQueue.some((i) => i.type === 'steer')
+  }
+
+  private checkSteerPromotion(): void {
+    if (this.running && this.abortController && this.hasSteerInput()) {
+      this.steerAbortFlag = true
+      this.abortController.abort()
     }
   }
 
@@ -485,8 +588,8 @@ export class Session {
     const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
       token: (delta) => { if (!delta) return; if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: this.id, turnId, agentId, delta }) },
       reasoning: (delta) => reasoningDelta(agentId, role, delta),
-      toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); this.emit({ type: 'tool_called', sessionId: this.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }) },
-      toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { this.emit({ type: 'tool_success', sessionId: this.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { this.emit({ type: 'tool_failed', sessionId: this.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) } },
+      toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: this.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); this.emit({ type: 'tool_called', sessionId: this.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }); this.checkSteerPromotion() },
+      toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { this.emit({ type: 'tool_success', sessionId: this.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { this.emit({ type: 'tool_failed', sessionId: this.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; this.checkSteerPromotion() },
       usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
       planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: this.id, turnId, itemId, delta }) },
       compaction: (summary: string) => { this.emit({ type: 'compaction_ended', sessionId: this.id, summary, timestamp: Date.now() }) },
@@ -630,6 +733,16 @@ export class Session {
       }
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'; finishRemaining()
+      const isSteerAbort = this.steerAbortFlag
+      if (isSteerAbort) this.steerAbortFlag = false
+      if (isSteerAbort) {
+        if (supervisorText) {
+          const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
+          void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
+          return text
+        }
+        return ''
+      }
       if (isAbort && supervisorText) {
         const text = this.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
         void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch(() => {})
@@ -731,6 +844,14 @@ export class Session {
         assistant: finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null,
       })
       this.store.touchSession(this.id, ts)
+      if (this.snapshotStore) {
+        const latestSeq = this.eventStore?.latestSeq(this.id) ?? 0
+        saveSessionSnapshot(this.snapshotStore, this.id, latestSeq, {
+          messages: this.messages,
+          config: this._config,
+          usageByAgent: usageByAgent ? Object.fromEntries(usageByAgent) : undefined,
+        })
+      }
     }
     send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}), ...(stopped ? { stopped: true } : {}) } })
     return finalText

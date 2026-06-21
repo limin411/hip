@@ -1,5 +1,9 @@
 import { tool, type StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import { existsSync } from 'node:fs'
+import * as path from 'node:path'
 import type { McpServerConfig } from '@hip/protocol'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -7,6 +11,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { jsonSchemaToZod, type JsonSchema } from './json-schema-to-zod.js'
 import { ToolRegistry, type Scope } from '../tool-registry.js'
+import { safeErrorMessage } from '../error.js'
 
 /** Connection status for UI display. */
 export type McpConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error'
@@ -113,6 +118,15 @@ export class McpManager {
     this.registerCurrentToolsWithRegistry(registry, scope)
   }
 
+  /** Remove a previously registered scope from the manager and the underlying registry. */
+  deregisterScope(scope: Scope): void {
+    const binding = this.registryBindings.get(scope.id)
+    if (binding) {
+      binding.registry.unregisterScope(scope)
+      this.registryBindings.delete(scope.id)
+    }
+  }
+
   /** Register the currently-connected MCP tools into a single registry scope. */
   private registerCurrentToolsWithRegistry(registry: ToolRegistry, scope: Scope): void {
     for (const t of this.tools()) {
@@ -144,9 +158,32 @@ export class McpManager {
    * Overridden in tests to inject a Fake client (no real process/network).
    */
   protected async connect(server: McpServerConfig): Promise<ClientLike> {
+    if (server.transport === 'stdio') {
+      const error = await this.validateStdioCommand(server.command)
+      if (error) throw new Error(error)
+    }
     const client = new Client({ name: 'hip', version: '0.1.0' })
     await client.connect(this.buildTransport(server))
     return client as unknown as ClientLike
+  }
+
+  /** Validate a stdio command against the absolute-path allowlist. */
+  protected async validateStdioCommand(command: string | undefined): Promise<string | undefined> {
+    if (!command) return 'MCP stdio server is missing a command'
+    if (!path.isAbsolute(command)) return `MCP stdio command must be an absolute path: ${command}`
+    const normalized = path.normalize(command)
+    const allowedDirs = ['/usr/bin', '/usr/local/bin', '/opt', path.join(os.homedir(), '.hip', 'bin')]
+    for (const dir of allowedDirs) {
+      if (normalized === dir || normalized.startsWith(dir + path.sep)) return undefined
+    }
+    if (existsSync(normalized)) {
+      try {
+        await fs.stat(normalized)
+      } catch (err) {
+        console.error(`validateStdioCommand: stat failed for "${normalized}":`, err)
+      }
+    }
+    return `MCP stdio command is not in the allowed directory list: ${command}`
   }
 
   /** Map a server config to the matching MCP transport. */
@@ -222,10 +259,14 @@ export class McpManager {
       let prompts: Connection['prompts'] = undefined
       const caps = client.getServerCapabilities?.()
       if (caps?.resources && client.listResources) {
-        try { const r = await client.listResources(); resources = r.resources } catch { /* optional */ }
+        try { const r = await client.listResources(); resources = r.resources } catch (err) {
+          console.debug(`[mcp] optional listResources failed for ${server.id}: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
       if (caps?.prompts && client.listPrompts) {
-        try { const r = await client.listPrompts(); prompts = r.prompts } catch { /* optional */ }
+        try { const r = await client.listPrompts(); prompts = r.prompts } catch (err) {
+          console.debug(`[mcp] optional listPrompts failed for ${server.id}: ${err instanceof Error ? err.message : String(err)}`)
+        }
       }
       this.conns.set(server.id, {
         id: server.id,
@@ -293,13 +334,14 @@ export class McpManager {
 
   /** Store a transient error against a server id for UI display. */
   private storeError(id: string, name: string, message: string): void {
+    const sanitized = safeErrorMessage(message)
     const existing = this.conns.get(id)
     if (existing) {
-      existing.lastError = message
+      existing.lastError = sanitized
       return
     }
     if (!this._transientErrors) this._transientErrors = new Map()
-    this._transientErrors.set(id, { id, name, status: 'error' as const, toolCount: 0, toolNames: [], lastError: message })
+    this._transientErrors.set(id, { id, name, status: 'error' as const, toolCount: 0, toolNames: [], lastError: sanitized })
   }
   private _transientErrors?: Map<string, McpServerStatus>
 
@@ -382,7 +424,7 @@ export class McpManager {
         status: 'connected',
         toolCount: filtered.length,
         toolNames: filtered.map((t) => t.name),
-        lastError: conn.lastError,
+        lastError: conn.lastError != null ? safeErrorMessage(conn.lastError) : undefined,
       })
     }
 

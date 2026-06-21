@@ -228,6 +228,66 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 11) {
+    db.exec('BEGIN')
+    try {
+      // session_message: denormalized projection of the event log into per-message
+      // rows (Wave 1, Todo 2 of agent-design-remediation). The event table is the
+      // source of truth; this table is a read-optimized view rebuilt by the
+      // SessionMessageUpdater. `seq` mirrors the event's seq for replay idempotency.
+      // `data` is JSON carrying role/content/toolCalls/usage/etc. No FK to sessions
+      // or event: a rebuilt projection must survive source-table lifecycle changes.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_message (
+          id           TEXT PRIMARY KEY,
+          session_id   TEXT NOT NULL,
+          type         TEXT NOT NULL,
+          seq          INTEGER NOT NULL,
+          time_created INTEGER NOT NULL,
+          time_updated INTEGER NOT NULL,
+          data         TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_message_session_seq
+          ON session_message(session_id, seq);
+        CREATE INDEX IF NOT EXISTS idx_session_message_session_type_seq
+          ON session_message(session_id, type, seq);
+      `)
+      db.exec('PRAGMA user_version = 11')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+  if (version < 12) {
+    db.exec('BEGIN')
+    try {
+      // Context epoch (Wave 3, Todo 9 of agent-design-remediation). One row per
+      // session, holding the durable SystemContext baseline + snapshot with
+      // revision-based optimistic concurrency fencing. `revision` is bumped on
+      // every mutation; callers guard writes with `WHERE revision = expected`
+      // to detect races. `replacement_seq` (non-NULL) flags the next prepare()
+      // to do a full replace — set by agent switch, model switch, or compaction.
+      // `location` stores the cwd at initialize() time for the session-move fence.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_context_epoch (
+          session_id      TEXT PRIMARY KEY,
+          baseline        TEXT NOT NULL,
+          agent           TEXT NOT NULL DEFAULT 'builtin',
+          snapshot        TEXT NOT NULL,
+          baseline_seq    INTEGER NOT NULL,
+          replacement_seq INTEGER,
+          revision        INTEGER NOT NULL DEFAULT 0,
+          location        TEXT NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 12')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

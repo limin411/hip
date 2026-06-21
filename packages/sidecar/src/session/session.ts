@@ -2,7 +2,7 @@ import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntr
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { ChatOpenAI } from '@langchain/openai'
-import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, AIMessageChunk, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
@@ -48,6 +48,7 @@ import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
+import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
 
@@ -844,16 +845,21 @@ export class Session {
         )
         this.consumeActivitySteps(finalState.steps - stepsBefore)
         closeReasoning('supervisor'); finishRemaining()
+
+        const ephemeralPrefix = 1 + contextMessages.length
+        if (finalState.compacted && this.store) {
+          new ContextEpoch(this.store.getDb()).requestReplacement(this.id, 0)
+        }
         if (finalState.status === 'awaiting_user') {
           this.paused = {
-            messages: finalState.messages.slice(1),
+            messages: finalState.messages.slice(ephemeralPrefix),
             steps: finalState.steps,
             planningMode: finalState.planningMode,
             planStatus: finalState.planStatus,
             plan: finalState.plan,
           }
           this.awaitingResume = true
-          const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent)
+          const stoppedText = this.finalizeAndPersist(send, turnId, supervisorText, trajectory, true, usageByAgent, this.paused.messages)
           void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
           if (finalState.planningMode === 'plan' && finalState.plan) {
             send({ type: 'plan:published', sessionId: this.id, turnId, plan: finalState.plan })
@@ -871,6 +877,9 @@ export class Session {
           })
           return stoppedText
         }
+        const nextMessages = finalState.messages.slice(ephemeralPrefix)
+        this.messages.length = 0
+        this.messages.push(...nextMessages)
       }
     } catch (err) {
       const isAbort = err instanceof Error && err.name === 'AbortError'; finishRemaining()
@@ -972,10 +981,15 @@ export class Session {
     }
   }
 
-  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>): string {
+  private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>, targetMessages: BaseMessage[] = this.messages): string {
     const { correction } = verifyWrites(trajectory, supervisorText, this._config.language ?? 'en')
     const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
-    if (finalText) this.messages.push(new AIMessage(finalText))
+    const last = targetMessages[targetMessages.length - 1]
+    if ((last instanceof AIMessage || last instanceof AIMessageChunk) && typeof last.content === 'string' && last.content === supervisorText && finalText) {
+      targetMessages[targetMessages.length - 1] = new AIMessage(finalText)
+    } else if (finalText) {
+      targetMessages.push(new AIMessage(finalText))
+    }
     const ts = Date.now()
     const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => { const u = usageByAgent?.get(r.agentId); return { ...r, messageId: turnId, ...(u ? { usage: u } : {}) } })
     const turnUsage = sumUsage(runs.map((r) => r.usage))
@@ -992,7 +1006,7 @@ export class Session {
       if (this.snapshotStore) {
         const latestSeq = this.eventStore?.latestSeq(this.id) ?? 0
         saveSessionSnapshot(this.snapshotStore, this.id, latestSeq, {
-          messages: this.messages,
+          messages: targetMessages,
           config: this._config,
           usageByAgent: usageByAgent ? Object.fromEntries(usageByAgent) : undefined,
         })

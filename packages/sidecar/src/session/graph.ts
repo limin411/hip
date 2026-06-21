@@ -347,7 +347,7 @@ function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefine
     if (msg instanceof AIMessage) {
       const calls = msg.tool_calls ?? []
       for (const call of calls) {
-        if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+    if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
           const todos = (call.args as Record<string, unknown>).todos
           if (Array.isArray(todos)) {
             return todos.map((item) => todoToPlanItem(item))
@@ -378,7 +378,7 @@ function todoToPlanItem(item: unknown): PlanItem {
  *  The tool replaces the whole plan, so we map its todos directly to PlanItems. */
 function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
   for (const call of toolCalls ?? []) {
-    if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+    if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
       const todos = (call.args as Record<string, unknown>).todos
       if (Array.isArray(todos)) {
         return todos.map((item) => todoToPlanItem(item))

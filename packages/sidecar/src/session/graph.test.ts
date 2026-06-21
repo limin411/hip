@@ -349,4 +349,48 @@ describe('agent loop graph', () => {
       expect(out.plan![0].status).toBe('pending')
     })
   })
+
+  it('deriveUpdatedPlan: ignores write_todos with args as array, keeps original plan', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const originalPlan = [{ content: 'original plan', status: 'pending' as const }]
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: ['not-an-object'], id: 'bad1' }] }),
+        new AIMessage('done'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: originalPlan,
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.plan).toEqual(originalPlan)
+    })
+  })
+
+  it('deriveUpdatedPlan: ignores non-write_todos tool calls, keeps original plan', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const originalPlan = [{ content: 'original plan', status: 'pending' as const }]
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'ls1' }] }),
+        new AIMessage('done'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: originalPlan,
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.plan).toEqual(originalPlan)
+    })
+  })
 })

@@ -99,14 +99,19 @@ describe('defaultToolPolicy', () => {
   describe('mcp tools', () => {
     const policy = makePolicy(SELF_GATED_TOOLS)
 
-    it('classifies mcp__server__tool as medium risk, approval none', () => {
+    it('classifies mcp__server__tool as medium risk, approval ask in edit mode', () => {
       const c = policy.classify('mcp__github__search_repos', 'edit')
-      expect(c).toEqual({ risk: 'medium', approval: 'none' })
+      expect(c).toEqual({ risk: 'medium', approval: 'ask' })
     })
 
-    it('classifies mcp__another__get_data as medium risk, approval none', () => {
+    it('classifies mcp__server__tool as medium risk, approval ask in chat mode', () => {
+      const c = policy.classify('mcp__github__search_repos', 'chat')
+      expect(c).toEqual({ risk: 'medium', approval: 'ask' })
+    })
+
+    it('classifies mcp__another__get_data as medium risk, approval auto_allow in full mode', () => {
       const c = policy.classify('mcp__another__get_data', 'full')
-      expect(c).toEqual({ risk: 'medium', approval: 'none' })
+      expect(c).toEqual({ risk: 'medium', approval: 'auto_allow' })
     })
   })
 
@@ -167,8 +172,13 @@ describe('defaultToolPolicy', () => {
   describe('unknown tools', () => {
     const policy = makePolicy(SELF_GATED_TOOLS)
 
-    it('classifies unknown tool as medium risk, approval none', () => {
+    it('classifies unknown tool as medium risk, approval ask in edit mode', () => {
       const c = policy.classify('some_unknown_tool', 'edit')
+      expect(c).toEqual({ risk: 'medium', approval: 'ask' })
+    })
+
+    it('classifies unknown tool as medium risk, approval none in full mode', () => {
+      const c = policy.classify('some_unknown_tool', 'full')
       expect(c).toEqual({ risk: 'medium', approval: 'none' })
     })
   })

@@ -1,14 +1,54 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AIMessage, SystemMessage, type AIMessage as AIMsg, type BaseMessage } from '@langchain/core/messages'
 import { runSubagent } from './subagent.js'
 import { buildTools } from './tools.js'
-import type { GraphEmit } from './graph.js'
+import type { GraphEmit, GraphCtx } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { ApprovalFn } from './tools.js'
+import { NetworkPolicy } from './network-policy.js'
+import { ToolOutputStore } from './tool-output-store.js'
+import { GuardianReviewer } from './guardian.js'
+
+// ── Safety-dep wiring test harness ────────────────────────────────────────
+// vi.mock calls are hoisted by vitest. Shared state lives in vi.hoisted.
+const { capturedBuildToolsOpts, capturedGraphCtxs } = vi.hoisted(() => ({
+  capturedBuildToolsOpts: [] as Array<Record<string, unknown> | undefined>,
+  capturedGraphCtxs: [] as Array<GraphCtx>,
+}))
+
+vi.mock('./tools.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tools.js')>()
+  const origBuildTools = actual.buildTools
+  return {
+    ...actual,
+    buildTools: (root: string, spawnSubagent?: unknown, cwd?: string, dispatch?: unknown, opts?: Record<string, unknown>) => {
+      capturedBuildToolsOpts.push(opts)
+      return origBuildTools(root, spawnSubagent as Parameters<typeof origBuildTools>[1], cwd, dispatch as Parameters<typeof origBuildTools>[3], opts as Parameters<typeof origBuildTools>[4])
+    },
+  }
+})
+
+vi.mock('./graph.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./graph.js')>()
+  const origBuildGraph = actual.buildGraph
+  return {
+    ...actual,
+    buildGraph: (maxSteps?: number, compactBudget?: number) => {
+      const g = origBuildGraph(maxSteps, compactBudget)
+      const origInvoke: typeof g.invoke = g.invoke.bind(g)
+      g.invoke = (state, options) => {
+        const ctx = (options as { configurable?: { ctx?: GraphCtx } }).configurable?.ctx
+        if (ctx) capturedGraphCtxs.push(ctx)
+        return origInvoke(state, options)
+      }
+      return g
+    },
+  }
+})
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -22,12 +62,17 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-subagent-'))
   try { await fn(root) } finally { rmSync(root, { recursive: true, force: true }) }
 }
+
+beforeEach(() => {
+  capturedBuildToolsOpts.length = 0
+  capturedGraphCtxs.length = 0
+})
 
 describe('runSubagent', () => {
   it('returns the child final assistant text', async () => {
@@ -179,6 +224,72 @@ describe('runSubagent permissionMode cascade (FIX 1 — task worker honors the c
       expect(runner.toolNames).toContain('write_file')
       expect(runner.toolNames).toContain('edit_file')
       expect(runner.systemPrompt).toMatch(/sandboxed to it/i)
+    })
+  })
+})
+
+describe('runSubagent safety-dependency wiring (C3 — sessionId, networkPolicy, toolOutputStore, guardianReviewer)', () => {
+  const makeNetworkPolicy = (): NetworkPolicy => new NetworkPolicy()
+  const makeToolOutputStore = (): ToolOutputStore => new ToolOutputStore({ outputDir: join(tmpdir(), 'hip-tos-test') })
+  const makeGuardianReviewer = (): GuardianReviewer => new GuardianReviewer({ modelRunner: fakeRunner([new AIMessage('ok')]) })
+
+  it('threads sessionId and networkPolicy into buildTools opts', async () => {
+    await withTmp(async (root) => {
+      const policy = makeNetworkPolicy()
+      const store = makeToolOutputStore()
+      const guardian = makeGuardianReviewer()
+
+      await runSubagent({
+        runner: fakeRunner([new AIMessage('done')]),
+        root, summarizer: noopSummarizer, emit: noopEmit,
+        signal: new AbortController().signal, description: 'wire-check', childMaxSteps: 5,
+        sessionId: 'sess-42',
+        networkPolicy: policy,
+        toolOutputStore: store,
+        guardianReviewer: guardian,
+      })
+
+      const lastOpts = capturedBuildToolsOpts.at(-1)
+      expect(lastOpts).toBeDefined()
+      expect(lastOpts?.sessionId).toBe('sess-42')
+      expect(lastOpts?.networkPolicy).toBe(policy)
+    })
+  })
+
+  it('threads sessionId, toolOutputStore, and guardianReviewer into GraphCtx', async () => {
+    await withTmp(async (root) => {
+      const policy = makeNetworkPolicy()
+      const store = makeToolOutputStore()
+      const guardian = makeGuardianReviewer()
+
+      await runSubagent({
+        runner: fakeRunner([new AIMessage('done')]),
+        root, summarizer: noopSummarizer, emit: noopEmit,
+        signal: new AbortController().signal, description: 'ctx-wire', childMaxSteps: 5,
+        sessionId: 'sess-99',
+        networkPolicy: policy,
+        toolOutputStore: store,
+        guardianReviewer: guardian,
+      })
+
+      const ctx = capturedGraphCtxs.at(-1)
+      expect(ctx).toBeDefined()
+      expect(ctx?.sessionId).toBe('sess-99')
+      expect(ctx?.toolOutputStore).toBe(store)
+      expect(ctx?.guardianReviewer).toBe(guardian)
+    })
+  })
+
+  it('defaults sessionId to "subagent" when not provided', async () => {
+    await withTmp(async (root) => {
+      await runSubagent({
+        runner: fakeRunner([new AIMessage('done')]),
+        root, summarizer: noopSummarizer, emit: noopEmit,
+        signal: new AbortController().signal, description: 'default-id', childMaxSteps: 5,
+      })
+
+      const ctx = capturedGraphCtxs.at(-1)
+      expect(ctx?.sessionId).toBe('subagent')
     })
   })
 })

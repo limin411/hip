@@ -22,6 +22,21 @@
 
 set -euo pipefail
 
+# Parse --debug flag
+DEBUG_MODE=0
+POSITIONAL=()
+for arg in "$@"; do
+  case "$arg" in
+    --debug) DEBUG_MODE=1 ;;
+    *) POSITIONAL+=("$arg") ;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
+if [ "$DEBUG_MODE" -eq 1 ]; then
+  export HIP_DEBUG=1
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="$ROOT/logs"
 WEB_PORT=1420
@@ -84,6 +99,7 @@ start_app() {
   echo "[dev] 桌面应用从「设置」面板读取 Key（写入 ~/.hip/config/auth.json）；首次启动需在应用内填入一次。"
   free_port "$WEB_PORT"   # tauri 的 beforeDevCommand 会在该端口起 vite
   echo "[dev] 启动桌面应用 (yarn tauri dev)… 改动过 Rust 时需编译，窗口会稍后弹出。"
+  [ "$DEBUG_MODE" -eq 1 ] && echo "[dev] 🔍 DEBUG 模式已启用 — 详细日志 → ~/.hip/logs/{sidecar-debug,tauri-debug}.log"
   # exec 让记录的 PID 就是真正的进程（而非临时子 shell），停止时 kill_tree 才能命中整棵树
   ( cd "$ROOT" && exec nohup yarn tauri dev ) </dev/null >"$(log_file app)" 2>&1 &
   echo $! >"$(pid_file app)"
@@ -106,7 +122,8 @@ start_sidecar() {
   if is_running sidecar; then echo "[dev] sidecar 已在运行 (pid $(cat "$(pid_file sidecar)"))"; return 0; fi
   warn_missing_key
   echo "[dev] 启动 sidecar (DeepSeek WebSocket 后端)…"
-  ( cd "$ROOT/packages/sidecar" && exec nohup "$ROOT/node_modules/.bin/tsx" src/main.ts ) </dev/null >"$(log_file sidecar)" 2>&1 &
+  [ "$DEBUG_MODE" -eq 1 ] && echo "[dev] 🔍 DEBUG 模式已启用 — 详细日志 → ~/.hip/logs/sidecar-debug.log"
+  ( cd "$ROOT/packages/sidecar" && exec env HIP_DEBUG="${HIP_DEBUG:-0}" nohup "$ROOT/node_modules/.bin/tsx" src/main.ts ) </dev/null >"$(log_file sidecar)" 2>&1 &
   echo $! >"$(pid_file sidecar)"
   sleep 1.2
   local port; port="$(grep -o '"port":[0-9]*' "$(log_file sidecar)" 2>/dev/null | tail -1 | grep -o '[0-9]*' || true)"

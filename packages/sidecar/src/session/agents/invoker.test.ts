@@ -14,6 +14,7 @@ function collectingEmit() {
     toolFinished: () => {},
     usage: () => {},
     planDelta: () => {},
+    compaction: () => {},
   }
   return { emit, tokens }
 }

@@ -82,6 +82,7 @@ export function buildChatModel(choice: { providerID: string; modelID: string; ba
     model: choice.modelID,
     apiKey: activeKey(choice.providerID),
     configuration: { baseURL: choice.baseURL },
+    streaming: true,
     streamUsage: true,
   })
 }

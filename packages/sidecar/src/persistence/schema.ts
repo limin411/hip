@@ -188,6 +188,134 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 10) {
+    db.exec('BEGIN')
+    try {
+      // Event-sourced persistence foundation (Wave 1 of agent-design-remediation).
+      // `event_sequence` tracks the per-aggregate monotonic sequence number; `event`
+      // is the append-only log; `snapshots` stores periodic aggregate state for fast
+      // crash recovery. These are the source of truth — session_message (added in a
+      // later todo) is a denormalized projection. No FK to sessions(id): events must
+      // survive a sessions-row delete (the event log is the source of truth).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS event_sequence (
+          aggregate_id TEXT PRIMARY KEY,
+          seq          INTEGER NOT NULL,
+          owner_id     TEXT
+        );
+        CREATE TABLE IF NOT EXISTS event (
+          id           TEXT PRIMARY KEY,
+          aggregate_id TEXT NOT NULL,
+          seq          INTEGER NOT NULL,
+          type         TEXT NOT NULL,
+          data         TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_event_aggregate_seq
+          ON event(aggregate_id, seq);
+        CREATE INDEX IF NOT EXISTS idx_event_aggregate_type_seq
+          ON event(aggregate_id, type, seq);
+        CREATE TABLE IF NOT EXISTS snapshots (
+          session_id TEXT PRIMARY KEY,
+          seq        INTEGER NOT NULL,
+          state      TEXT NOT NULL,
+          timestamp  INTEGER NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 10')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+  if (version < 11) {
+    db.exec('BEGIN')
+    try {
+      // session_message: denormalized projection of the event log into per-message
+      // rows (Wave 1, Todo 2 of agent-design-remediation). The event table is the
+      // source of truth; this table is a read-optimized view rebuilt by the
+      // SessionMessageUpdater. `seq` mirrors the event's seq for replay idempotency.
+      // `data` is JSON carrying role/content/toolCalls/usage/etc. No FK to sessions
+      // or event: a rebuilt projection must survive source-table lifecycle changes.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_message (
+          id           TEXT PRIMARY KEY,
+          session_id   TEXT NOT NULL,
+          type         TEXT NOT NULL,
+          seq          INTEGER NOT NULL,
+          time_created INTEGER NOT NULL,
+          time_updated INTEGER NOT NULL,
+          data         TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_message_session_seq
+          ON session_message(session_id, seq);
+        CREATE INDEX IF NOT EXISTS idx_session_message_session_type_seq
+          ON session_message(session_id, type, seq);
+      `)
+      db.exec('PRAGMA user_version = 11')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+  if (version < 12) {
+    db.exec('BEGIN')
+    try {
+      // Context epoch (Wave 3, Todo 9 of agent-design-remediation). One row per
+      // session, holding the durable SystemContext baseline + snapshot with
+      // revision-based optimistic concurrency fencing. `revision` is bumped on
+      // every mutation; callers guard writes with `WHERE revision = expected`
+      // to detect races. `replacement_seq` (non-NULL) flags the next prepare()
+      // to do a full replace — set by agent switch, model switch, or compaction.
+      // `location` stores the cwd at initialize() time for the session-move fence.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_context_epoch (
+          session_id      TEXT PRIMARY KEY,
+          baseline        TEXT NOT NULL,
+          agent           TEXT NOT NULL DEFAULT 'builtin',
+          snapshot        TEXT NOT NULL,
+          baseline_seq    INTEGER NOT NULL,
+          replacement_seq INTEGER,
+          revision        INTEGER NOT NULL DEFAULT 0,
+          location        TEXT NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 12')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+  if (version < 13) {
+    db.exec('BEGIN')
+    try {
+      // Pending user inputs (Wave 3, Todo 15 of agent-design-remediation).
+      // `delivery` is 'queue' for normal messages and 'steer' for steering
+      // inputs that interrupt the current turn. `admitted_seq` preserves
+      // admission order; `promoted_seq` is set when an input is popped for
+      // processing (or dropped by a steer promotion).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_input (
+          id            TEXT PRIMARY KEY,
+          session_id    TEXT NOT NULL,
+          prompt        TEXT NOT NULL,
+          delivery      TEXT NOT NULL CHECK(delivery IN ('steer','queue')),
+          admitted_seq  INTEGER NOT NULL,
+          promoted_seq  INTEGER,
+          time_created  INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_input_session ON session_input(session_id, admitted_seq);
+        CREATE INDEX IF NOT EXISTS idx_session_input_session_promoted ON session_input(session_id, promoted_seq);
+      `)
+      db.exec('PRAGMA user_version = 13')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

@@ -3,6 +3,9 @@ import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messag
 import type { ServerMessage } from '@hip/protocol'
 import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
+import { openDatabase } from '../persistence/open.js'
+import { SessionStore } from '../persistence/store.js'
+import { loadProjection } from '../persistence/message-projector.js'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -15,6 +18,16 @@ function makeRunnerSession(id: string, runner: ModelRunner, cwd?: string): Sessi
     undefined, undefined, undefined, undefined,
     runner,
   )
+}
+
+function inMemoryStore(): SessionStore {
+  const { db, ftsEnabled } = openDatabase(':memory:')
+  return new SessionStore(db, ftsEnabled)
+}
+
+function makeRunnerSessionWithStore(id: string, runner: ModelRunner, store: SessionStore): Session {
+  store.insertSession({ id, title: 'test', config: JSON.stringify({ llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd() }), createdAt: Date.now(), updatedAt: Date.now() })
+  return new Session(id, { llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd() }, undefined, store, undefined, undefined, runner)
 }
 
 function collect(session: Session, text: string): Promise<ServerMessage[]> {
@@ -231,5 +244,93 @@ describe('background subagent mode', () => {
 
     expect(session.backgroundTasks.size).toBe(0)
     expect(session.listBackgroundTasks()).toEqual([])
+  })
+
+  it('injects a synthetic AIMessage when the background task completes', async () => {
+    class FastBgRunner implements ModelRunner {
+      private call = 0
+      async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'research', mode: 'background' }, id: 'c1', type: 'tool_call' }] })
+        }
+        opts.onText?.('bg result')
+        return new AIMessage('bg result')
+      }
+    }
+    const session = makeRunnerSession('s-inject', new FastBgRunner())
+    await collect(session, 'do background research')
+    await Promise.allSettled(session.backgroundTasks.values())
+
+    const aiMessages = (session as unknown as { messages: BaseMessage[] }).messages.filter((m) => m instanceof AIMessage)
+    expect(aiMessages.some((m) => m.content === 'bg result')).toBe(true)
+  })
+
+  it('persists the synthetic message as a session_message projection', async () => {
+    const st = inMemoryStore()
+    class FastBgRunner implements ModelRunner {
+      private call = 0
+      async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'research', mode: 'background' }, id: 'c1', type: 'tool_call' }] })
+        }
+        opts.onText?.('persisted result')
+        return new AIMessage('persisted result')
+      }
+    }
+    const session = makeRunnerSessionWithStore('s-persist', new FastBgRunner(), st)
+    await collect(session, 'do background research')
+    await Promise.allSettled(session.backgroundTasks.values())
+
+    const rows = loadProjection(st.getDb(), 's-persist')
+    const assistantContents = rows
+      .filter((r) => r.data.role === 'assistant' && !('kind' in r.data))
+      .map((r) => (r.data as { role: 'assistant'; content: string }).content)
+    expect(assistantContents).toContain('persisted result')
+  })
+
+  it('sends agent:notification when the background task completes', async () => {
+    class FastBgRunner implements ModelRunner {
+      private call = 0
+      async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'research', mode: 'background' }, id: 'c1', type: 'tool_call' }] })
+        }
+        opts.onText?.('notified result')
+        return new AIMessage('notified result')
+      }
+    }
+    const session = makeRunnerSession('s-notify', new FastBgRunner())
+    const events: ServerMessage[] = []
+    await session.sendMessage('do background research', (m) => events.push(m))
+    await Promise.allSettled(session.backgroundTasks.values())
+
+    const notification = events.find((e) => e.type === 'agent:notification')
+    expect(notification).toBeTruthy()
+    expect((notification as { status?: string }).status).toBe('completed')
+    expect((notification as { result?: string }).result).toBe('notified result')
+  })
+
+  it('runBackgroundSubagent can be invoked directly and persists a synthetic message', async () => {
+    const st = inMemoryStore()
+    class DirectRunner implements ModelRunner {
+      async run(): Promise<AIMessage> { return new AIMessage('direct bg') }
+    }
+    const session = makeRunnerSessionWithStore('s-direct', new DirectRunner(), st)
+    const events: ServerMessage[] = []
+    const ac = new AbortController()
+    await session.runBackgroundSubagent('direct-1', 'direct task', ac.signal, (m) => events.push(m))
+
+    const notification = events.find((e) => e.type === 'agent:notification')
+    expect(notification).toBeTruthy()
+    expect((notification as { result?: string }).result).toBe('direct bg')
+
+    const rows = loadProjection(st.getDb(), 's-direct')
+    const assistantContents = rows
+      .filter((r) => r.data.role === 'assistant' && !('kind' in r.data))
+      .map((r) => (r.data as { role: 'assistant'; content: string }).content)
+    expect(assistantContents).toContain('direct bg')
   })
 })

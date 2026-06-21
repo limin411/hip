@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync, mkdirSync, existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,9 +8,14 @@ import { buildTools } from './tools.js'
 import { buildGraph, type GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
+import { setActiveModel } from '../config/providers.js'
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 describe('plan persistence', () => {
   let root: string
@@ -66,7 +71,7 @@ describe('plan persistence', () => {
         planningMode: 'plan',
         planStatus: 'none',
       },
-      { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
     )
 
     expect(planOut.plan).toEqual([{ content: 'step a', status: 'pending' }, { content: 'step b', status: 'pending' }])

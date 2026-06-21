@@ -5,16 +5,20 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { TurnUsage, PermissionMode, PlanItem } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
+import { READ_TOOLS, defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
-import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
+import type { ToolCallResult } from './tool-runner/tool-runner.js'
+import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
-import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
+import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
+import type { ToolOutputStore } from './tool-output-store.js'
+import type { GuardianReviewer } from './guardian.js'
 
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
 export interface GraphEmit {
@@ -24,6 +28,7 @@ export interface GraphEmit {
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
   usage(u: TurnUsage): void
   planDelta(itemId: string, delta: string): void
+  compaction(summary: string): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -33,7 +38,9 @@ export interface GraphCtx {
   emit: GraphEmit
   summarizer: Summarizer
   hooks?: HookRegistry
-  sessionId?: string
+  sessionId: string
+  toolOutputStore?: ToolOutputStore
+  guardianReviewer?: GuardianReviewer
   toolRunner?: ToolRunner
   toolPolicy?: ToolPolicy
   approvalCache?: ApprovalCache
@@ -43,6 +50,9 @@ export interface GraphCtx {
   blockedTools?: string[]
   systemPrompt?: string
   activeProfileId?: string
+  toolParallelism?: number
+  /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
+  maxSteps?: number
 }
 
 const LoopState = Annotation.Root({
@@ -56,9 +66,11 @@ const LoopState = Annotation.Root({
   planStatus: Annotation<'none' | 'generating' | 'ready' | 'approved' | 'rejected'>({ reducer: (_prev, next) => next, default: () => 'none' }),
   plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  compacted: Annotation<boolean>({ reducer: (_prev, next) => next, default: () => false }),
 })
 
 type State = typeof LoopState.State
+export type LoopState = State
 
 function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   const ctx = (config.configurable as { ctx?: GraphCtx } | undefined)?.ctx
@@ -66,37 +78,81 @@ function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   return ctx
 }
 
+function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): BaseMessage[] {
+  const removeSet = new Set(result.removeIds)
+  return stateMessages
+    .filter((m) => !m.id || !removeSet.has(m.id))
+    .map((m) => (m.id === result.summary.id ? result.summary : m))
+}
+
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
-  /** Pre-turn + mid-loop context shrink: summarize the middle when over budget (≤ once per visit). */
-  async function compact(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    if (estimateTokens(state.messages) <= compactBudget) return {}
-    const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctxOf(config).summarizer })
+/** Pre-turn compaction: shrink the middle when over budget (≤ once per invoke). */
+  async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
+    if (state.compacted) return {}
+    const ctx = ctxOf(config)
+    const overBudget = estimateTokens(state.messages) > compactBudget
+    if (!overBudget) return {}
+    const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
     if (!result) return {}
-    return { messages: [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))] }
+    const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+    ctx.emit.compaction(summaryText)
+    return {
+      messages: [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
+      compacted: true,
+    }
   }
 
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { runner, tools, emit, systemPrompt } = ctxOf(config)
-    const messages: BaseMessage[] = [...state.messages]
-    if (systemPrompt !== undefined) {
-      if (messages[0] instanceof SystemMessage) {
-        messages[0] = new SystemMessage(systemPrompt)
-      } else {
-        messages.unshift(new SystemMessage(systemPrompt))
+    const ctx = ctxOf(config)
+    const { runner, tools, emit, systemPrompt } = ctx
+    const stepCap = ctx.maxSteps ?? maxSteps
+    const capped = state.steps >= stepCap - 1
+
+    function prepareMessages(list: BaseMessage[]): BaseMessage[] {
+      const next = [...list]
+      if (systemPrompt !== undefined) {
+        if (next[0] instanceof SystemMessage) {
+          next[0] = new SystemMessage(systemPrompt)
+        } else {
+          next.unshift(new SystemMessage(systemPrompt))
+        }
       }
+      return next
     }
-    const capped = state.steps >= maxSteps - 1 // last allowed step: no tools, force text
-    const msg = await runner.run(messages, {
-      tools,
-      bindTools: !capped,
-      signal: config.signal,
-      onText: (d) => emit.token(d),
-      onReasoning: (d) => emit.reasoning(d),
-    })
-    const u = msg.usage_metadata
-    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
-    return { messages: [msg], steps: state.steps + 1 }
+
+    async function runModel(input: BaseMessage[]): Promise<AIMessage> {
+      return runner.run(input, {
+        tools,
+        bindTools: !capped,
+        signal: config.signal,
+        onText: (d) => emit.token(d),
+        onReasoning: (d) => emit.reasoning(d),
+      })
+    }
+
+    async function execute(input: BaseMessage[]): Promise<Partial<State>> {
+      const msg = await runModel(input)
+      const u = msg.usage_metadata
+      if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+      return { messages: [msg], steps: state.steps + 1 }
+    }
+
+    const messages = prepareMessages(state.messages)
+    try {
+      return await execute(messages)
+    } catch (err) {
+      if (state.compacted || !isOverflowError(err)) throw err
+      const result = await compactMessages(messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer, overflowRecovery: true })
+      if (!result) throw err
+      const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+      emit.compaction(summaryText)
+      const compactedMessages = [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))]
+      const compactedState = applyCompaction(state.messages, result)
+      const retryMessages = prepareMessages(compactedState)
+      const msgResult = await execute(retryMessages)
+      return { ...msgResult, messages: [...compactedMessages, ...(msgResult.messages ?? [])], compacted: true }
+    }
   }
 
   function getOrCreateToolRunner(ctx: GraphCtx): ToolRunner {
@@ -110,7 +166,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
       permissionMode: ctx.permissionMode ?? 'edit',
       requestApproval: ctx.requestApproval,
-      sessionId: ctx.sessionId ?? '',
+      sessionId: ctx.sessionId,
+      toolOutputStore: ctx.toolOutputStore,
+      guardianReviewer: ctx.guardianReviewer,
       onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
       onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
     })
@@ -145,22 +203,50 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
       calls.push(call)
     }
-    const out: ToolMessage[] = []
-    for (const call of calls) {
+
+    const parallelism = ctx.toolParallelism ?? 5
+    const parallelIndices: number[] = []
+    const sequentialIndices: number[] = []
+    for (let i = 0; i < calls.length; i++) {
+      if (READ_TOOLS.has(calls[i].name)) {
+        parallelIndices.push(i)
+      } else {
+        sequentialIndices.push(i)
+      }
+    }
+
+    const results: ToolCallResult[] = new Array(calls.length)
+
+    await runWithConcurrency(parallelIndices, parallelism, async (index) => {
+      const call = calls[index]
       const id = call.id ?? call.name
-      const result = await runner.runToolCall({
+      results[index] = await runner.runToolCall({
         name: call.name,
         callId: id,
         args: (call.args as Record<string, unknown>) ?? {},
       })
-      out.push(new ToolMessage({
-        content: result.content,
-        tool_call_id: result.tool_call_id,
-        name: result.name,
-      }))
+    })
+
+    for (const index of sequentialIndices) {
+      const call = calls[index]
+      const id = call.id ?? call.name
+      results[index] = await runner.runToolCall({
+        name: call.name,
+        callId: id,
+        args: (call.args as Record<string, unknown>) ?? {},
+      })
     }
+
+    const out: ToolMessage[] = results.map((result) => new ToolMessage({
+      content: result.content,
+      tool_call_id: result.tool_call_id,
+      name: result.name,
+    }))
+
+    const updatedPlan = deriveUpdatedPlan(state.plan, last.tool_calls ?? [])
+
     const sig = sigOf(last.tool_calls ?? [])
-    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
+    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
   }
 
   /** Corrective note after the Nth identical batch; recorded against the offending signature. */
@@ -210,10 +296,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return 'agent'
   }
 
-  function routeAfterAgent(state: State): 'tools' | typeof END {
+  function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
-    return wantsTools && state.steps < maxSteps ? 'tools' : END
+    const stepCap = ctxOf(config).maxSteps ?? maxSteps
+    return wantsTools && state.steps < stepCap ? 'tools' : END
   }
 
   function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | typeof END {
@@ -236,7 +323,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   }
 
   return new StateGraph(LoopState)
-    .addNode('compact', compact)
+    .addNode('compact', compactNode)
     .addNode('agent', agent)
     .addNode('tools', toolsNode)
     .addNode('nudge', nudge)
@@ -260,23 +347,43 @@ function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefine
     if (msg instanceof AIMessage) {
       const calls = msg.tool_calls ?? []
       for (const call of calls) {
-        if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+    if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
           const todos = (call.args as Record<string, unknown>).todos
           if (Array.isArray(todos)) {
-            return todos.map((item) => {
-              if (typeof item === 'string') {
-                return { content: item, status: 'pending' as const }
-              }
-              if (item && typeof item === 'object') {
-                const content = (item as Record<string, unknown>).content
-                return { content: typeof content === 'string' ? content : String(content), status: 'pending' as const }
-              }
-              return { content: String(item), status: 'pending' as const }
-            })
+            return todos.map((item) => todoToPlanItem(item))
           }
         }
       }
     }
   }
   return undefined
+}
+
+function todoToPlanItem(item: unknown): PlanItem {
+  if (typeof item === 'string') {
+    return { content: item, status: 'pending' as const }
+  }
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const content = (item as Record<string, unknown>).content
+    const status = (item as Record<string, unknown>).status
+    return {
+      content: typeof content === 'string' ? content : String(content ?? ''),
+      status: status === 'in_progress' || status === 'completed' ? status : 'pending',
+    }
+  }
+  return { content: String(item), status: 'pending' as const }
+}
+
+/** Update the plan when the agent publishes a new todo list via write_todos.
+ *  The tool replaces the whole plan, so we map its todos directly to PlanItems. */
+function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
+  for (const call of toolCalls ?? []) {
+    if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
+      const todos = (call.args as Record<string, unknown>).todos
+      if (Array.isArray(todos)) {
+        return todos.map((item) => todoToPlanItem(item))
+      }
+    }
+  }
+  return plan
 }

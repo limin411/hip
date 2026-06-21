@@ -6,12 +6,76 @@ mod plugins;
 mod path_env;
 
 use std::collections::HashMap;
+use std::io::Write;
+use std::sync::OnceLock;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
+
+const LOG_MAX_SIZE: u64 = 5 * 1024 * 1024; // 5 MB
+const LOG_MAX_FILES: u32 = 5;
+
+fn log_is_debug() -> bool {
+    static V: OnceLock<bool> = OnceLock::new();
+    *V.get_or_init(|| std::env::var("HIP_DEBUG").as_deref() == Ok("1"))
+}
+
+fn log_base_name() -> &'static str {
+    if log_is_debug() { "tauri-debug" } else { "tauri" }
+}
+
+fn log_dir() -> &'static std::path::PathBuf {
+    static V: OnceLock<std::path::PathBuf> = OnceLock::new();
+    V.get_or_init(|| {
+        let dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".hip").join("logs");
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    })
+}
+
+fn log_file_path(suffix: &str) -> std::path::PathBuf {
+    log_dir().join(format!("{}{}.log", log_base_name(), suffix))
+}
+
+fn log_rotate() {
+    for i in (0..LOG_MAX_FILES).rev() {
+        let suffix = if i == 0 { String::new() } else { format!(".{i}") };
+        let src = log_file_path(&suffix);
+        if !src.exists() { continue }
+        if i >= LOG_MAX_FILES - 1 { let _ = std::fs::remove_file(&src); continue }
+        let dst = log_file_path(&format!(".{}", i + 1));
+        let _ = std::fs::rename(&src, &dst);
+    }
+}
+
+fn log_write(level: &str, tag: &str, msg: &str) {
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let line = format!("[{ms}] [{level}] [{tag}] {msg}\n");
+    let p = log_file_path("");
+    if let Ok(meta) = std::fs::metadata(&p) {
+        if meta.len() >= LOG_MAX_SIZE { log_rotate() }
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&p) {
+        let _ = f.write_all(line.as_bytes());
+    }
+}
+
+#[macro_export]
+macro_rules! tauri_info {
+    ($tag:expr, $msg:expr) => { $crate::log_write("INFO", $tag, $msg) };
+}
+#[macro_export]
+macro_rules! tauri_debug {
+    ($tag:expr, $msg:expr) => { if $crate::log_is_debug() { $crate::log_write("DEBUG", $tag, $msg) } };
+}
 
 pub struct SidecarState {
     pub port: Mutex<Option<u16>>,
@@ -139,6 +203,19 @@ struct HipConfig {
     agents: Vec<AgentEntry>,
     #[serde(default)]
     permissions: Option<PermissionEntry>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct NetworkPolicyConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    allowlist: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    denylist: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_requests_per_minute: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_response_bytes: Option<u64>,
 }
 
 // ── TOML mirror structs (snake_case with camelCase aliases for backward compat) ──
@@ -504,6 +581,7 @@ struct LegacySkillsConfig {
 
 #[tauri::command]
 fn get_sidecar_info(state: tauri::State<SidecarState>) -> Option<sidecar::SidecarInfo> {
+    tauri_debug!("tauri", "cmd:get_sidecar_info");
     let port = (*state.port.lock().unwrap())?;
     let token = (*state.token.lock().unwrap()).clone()?;
     Some(sidecar::SidecarInfo { port, token })
@@ -618,6 +696,34 @@ fn set_hip_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
         toml::to_string_pretty(&toml_cfg).map_err(|e| format!("TOML serialize error: {e}"))?;
     let path = paths::hip_config_path(&app).ok_or("no config dir")?;
     std::fs::write(&path, toml_str).map_err(|e| e.to_string())
+}
+
+fn read_network_policy(path: &std::path::Path) -> Result<String, String> {
+    match std::fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn write_network_policy(path: &std::path::Path, json: &str) -> Result<(), String> {
+    let cfg: NetworkPolicyConfig =
+        serde_json::from_str(json).map_err(|e| format!("JSON parse error: {e}"))?;
+    let pretty =
+        serde_json::to_string_pretty(&cfg).map_err(|e| format!("JSON serialize error: {e}"))?;
+    std::fs::write(path, pretty).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_network_policy(app: tauri::AppHandle) -> Result<String, String> {
+    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
+    read_network_policy(&path)
+}
+
+#[tauri::command]
+fn set_network_policy(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
+    write_network_policy(&path, &json)
 }
 
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
@@ -1036,6 +1142,8 @@ pub fn run() {
             set_mcp_servers_config,
             get_hip_config,
             set_hip_config,
+            get_network_policy,
+            set_network_policy,
             list_skills,
             install_skill_zip,
             delete_skill,
@@ -1960,5 +2068,56 @@ enabled = false
         assert_eq!(cfg2.providers[0].base_url, "https://api.openai.com/v1");
         assert_eq!(cfg2.mcp_servers[0].id, "srv-2");
         assert_eq!(cfg2.mcp_servers[0].url.as_deref(), Some("https://example.com/mcp"));
+    }
+
+    #[test]
+    fn read_network_policy_returns_default_when_missing() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-missing-{}", std::process::id()));
+        let path = dir.join("network.json");
+        let result = super::read_network_policy(&path);
+        assert_eq!(result.unwrap(), "{}");
+    }
+
+    #[test]
+    fn write_network_policy_rejects_invalid_json() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-invalid-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("network.json");
+        let result = super::write_network_policy(&path, "not json");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("JSON parse error"));
+    }
+
+    #[test]
+    fn network_policy_roundtrip_pretty_json() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-roundtrip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("network.json");
+
+        let input = r#"{"allowlist":["https://example.com"],"maxRequestsPerMinute":100}"#;
+        super::write_network_policy(&path, input).unwrap();
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("allowlist"));
+        assert!(contents.contains("https://example.com"));
+        assert!(contents.contains("maxRequestsPerMinute"));
+
+        let read_back = super::read_network_policy(&path).unwrap();
+        let cfg: super::NetworkPolicyConfig = serde_json::from_str(&read_back).unwrap();
+        assert_eq!(cfg.allowlist.as_deref(), Some(&["https://example.com".to_string()][..]));
+        assert_eq!(cfg.max_requests_per_minute, Some(100));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn network_policy_write_creates_parent_dirs() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-nested-{}", std::process::id()));
+        let nested = dir.join("a").join("b");
+        let path = nested.join("network.json");
+
+        let input = r#"{"denylist":["https://evil.com"]}"#;
+        let result = super::write_network_policy(&path, input);
+        assert!(result.is_err());
     }
 }

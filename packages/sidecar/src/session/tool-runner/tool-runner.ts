@@ -6,6 +6,9 @@ import type { HookResult } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from '../tools.js'
 import type { ApprovalCache } from './approval-cache.js'
 import type { ToolPolicy } from './tool-policy.js'
+import { ToolOutputStore } from '../tool-output-store.js'
+import { GuardianReviewer, FAIL_OPEN_REVIEW } from '../guardian.js'
+import { safeErrorMessage } from '../error.js'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,10 @@ export interface ToolRunnerDeps {
   requestApproval?: ApprovalFn
   /** Session identifier passed to hook contexts. */
   sessionId: string
+  /** Optional store that bounds oversized tool outputs before returning them. */
+  toolOutputStore?: ToolOutputStore
+  /** Optional guardian that reviews medium/high-risk tools before execution. */
+  guardianReviewer?: GuardianReviewer
   /** Optional emit for tool lifecycle events (mirrors GraphEmit subset). */
   onToolStarted?: (name: string, callId: string, input: unknown) => void
   onToolFinished?: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
@@ -50,11 +57,13 @@ export interface ToolCallResult {
 
 /**
  * Executes a single tool call through a pipeline of:
- *   resolve → classify → PreToolUse hooks → approval gate → invoke → PostToolUse hooks.
+ *   resolve → classify → PreToolUse hooks → approval gate → guardian review → invoke → PostToolUse hooks.
  *
  * The `ask` hook result triggers a runner-level approval prompt (cache-aware).
  * Self-gated tools (e.g. run_script) skip runner approval — their embedded
  * ApprovalFn handles it internally.
+ * Guardian review runs for medium/high-risk tools (skipped in full permission mode)
+ * and can suppress invocation with a safety warning.
  */
 export class ToolRunner {
   constructor(private readonly deps: ToolRunnerDeps) {}
@@ -81,13 +90,15 @@ export class ToolRunner {
     }
 
     // ── 2. Classify via ToolPolicy ─────────────────────────────────────────
-    const classification = toolPolicy.classify(call.name, permissionMode)
+    const classification = toolPolicy.classify(call.name, permissionMode, new Set(tools.keys()))
     if (classification.risk === 'medium' || classification.risk === 'high') {
       this.deps.emitRisk?.(call.name, classification.risk, classification.approval)
     }
 
     // ── 3. PreToolUse hooks ────────────────────────────────────────────────
     let invokeArgs = call.args
+    let needsApproval = classification.approval === 'ask' && permissionMode !== 'full'
+    let approvalReason: string | undefined
 
     if (hooks) {
       let preResult: HookResult
@@ -108,43 +119,8 @@ export class ToolRunner {
       }
 
       if (preResult.kind === 'ask') {
-        // Self-gated tools skip runner approval — the tool's own ApprovalFn
-        // handles it, and we must not double-prompt.
-        if (classification.approval === 'self') {
-          // Pass through to tool invocation.
-        } else if (classification.approval === 'auto_allow') {
-          // Auto-allow — pass through.
-        } else if (!requestApproval) {
-          // F1: ask with no approval transport → deny.
-          return this.errorResult(call, 'approval required but no approval transport available')
-        } else {
-          // Runner approval flow (cache-aware).
-          const cached = approvalCache.lookup(call.name, call.args)
-          if (cached === 'reject') {
-            return this.errorResult(call, 'tool execution rejected (cached)')
-          }
-
-          if (cached !== 'allow') {
-            let decision: ApprovalDecision
-            try {
-              decision = await requestApproval({
-                title: `Run ${call.name}`,
-                toolName: call.name,
-                kind: 'execute',
-                content: preResult.reason ?? undefined,
-              })
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err)
-              // Do not cache on transport failure — the error may be transient.
-              return this.errorResult(call, `approval transport failed: ${msg}`)
-            }
-            approvalCache.set(call.name, call.args, decision)
-
-            if (!isApproved(decision)) {
-              return this.errorResult(call, 'tool execution rejected by user')
-            }
-          }
-        }
+        needsApproval = true
+        approvalReason = preResult.reason
       }
 
       // Apply modifiedInput from modify hooks, falling back to updatedInput for back-compat.
@@ -155,13 +131,81 @@ export class ToolRunner {
       }
     }
 
-    // ── 4. Invoke tool ─────────────────────────────────────────────────────
+    if (needsApproval) {
+      // Self-gated tools skip runner approval — their embedded ApprovalFn handles it.
+      if (classification.approval === 'self') {
+        // Pass through to tool invocation.
+      } else if (classification.approval === 'auto_allow') {
+        // Auto-allow — pass through.
+      } else if (!requestApproval) {
+        return this.errorResult(call, 'approval required but no approval transport available')
+      } else {
+        const cached = approvalCache.lookup(call.name, call.args)
+        if (cached === 'reject') {
+          return this.errorResult(call, 'tool execution rejected (cached)')
+        }
+
+        if (cached !== 'allow') {
+          let decision: ApprovalDecision
+          try {
+            decision = await requestApproval({
+              title: `Run ${call.name}`,
+              toolName: call.name,
+              kind: 'execute',
+              content: approvalReason,
+            })
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            return this.errorResult(call, `approval transport failed: ${msg}`)
+          }
+          approvalCache.set(call.name, call.args, decision)
+
+          if (!isApproved(decision)) {
+            return this.errorResult(call, 'tool execution rejected by user')
+          }
+        }
+      }
+    }
+
+    // ── 4. Guardian review for medium/high-risk tools ──────────────────────
+    if (
+      classification.risk !== 'low' &&
+      permissionMode !== 'full' &&
+      this.deps.guardianReviewer
+    ) {
+      let review
+      try {
+        review = await this.deps.guardianReviewer.review({
+          toolName: call.name,
+          toolInput: invokeArgs,
+          riskLevel: classification.risk,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`[ToolRunner] guardian review threw for ${call.name} — fail-open: ${msg}`)
+        review = FAIL_OPEN_REVIEW
+      }
+      if (review.decision === 'deny') {
+        const reason = `Guardian denied ${call.name}: ${review.reasoning}`
+        return this.errorResult(call, reason)
+      }
+    }
+
+    // ── 5. Invoke tool ─────────────────────────────────────────────────────
     this.emitStarted(call.name, call.callId, invokeArgs)
     try {
-      const result = String(await tool.invoke(invokeArgs))
+      const rawResult = String(await tool.invoke(invokeArgs))
+      const bound = this.deps.toolOutputStore
+        ? await this.deps.toolOutputStore.bound({
+            sessionId,
+            toolCallId: call.callId,
+            output: rawResult,
+          })
+        : undefined
+      const result = bound?.output ?? rawResult
       this.emitFinished(call.callId, 'finished', result)
 
-      // ── 5. PostToolUse hooks ─────────────────────────────────────────────
+      // ── 6. PostToolUse hooks ─────────────────────────────────────────────
       let finalContent = result
       if (hooks) {
         let postResult: HookResult
@@ -203,7 +247,7 @@ export class ToolRunner {
         name: call.name,
       }
     } catch (e) {
-      const error = e instanceof Error ? e.message : String(e)
+      const error = safeErrorMessage(e)
       this.emitFinished(call.callId, 'error', undefined, error)
 
       if (hooks) {
@@ -242,9 +286,10 @@ export class ToolRunner {
   }
 
   private errorResult(call: { name: string; callId: string }, reason: string): ToolCallResult {
-    this.emitError(call.callId, call.name, reason)
+    const sanitized = safeErrorMessage(reason)
+    this.emitError(call.callId, call.name, sanitized)
     return {
-      content: `Error: ${reason}`,
+      content: `Error: ${sanitized}`,
       tool_call_id: call.callId,
       name: call.name,
     }

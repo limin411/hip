@@ -11,6 +11,8 @@ import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
 import { promptRegistry } from './mcp/prompt-registry.js'
+import { safeErrorMessage } from './error.js'
+import { logDebug } from '../debug-logger.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -36,11 +38,13 @@ export class SessionManager {
     this.handleAsync(msg, send).catch((err) => {
       console.error('[session-manager] handler error', err)
       const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
-      send({ type: 'error', sessionId, code: 'INTERNAL', message: err instanceof Error ? err.message : String(err) })
+      send({ type: 'error', sessionId, code: 'INTERNAL', message: safeErrorMessage(err) })
     })
   }
 
   async handleAsync(msg: ClientMessage, send: SendFn): Promise<void> {
+    const t0 = Date.now()
+    logDebug('mgr', 'msg:handle', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined })
     switch (msg.type) {
       case 'session:create':
         this.createSession(msg.id, msg.config, send)
@@ -51,6 +55,18 @@ export class SessionManager {
       case 'message:send':
         await this.ensureSession(msg.sessionId).sendMessage(msg.content, send, msg.id)
         break
+      case 'input:enqueue': {
+        const s = this.ensureSession(msg.sessionId)
+        s.enqueueInput({ type: 'message', content: msg.content, messageId: msg.id })
+        await s.drainInputQueue(send)
+        break
+      }
+      case 'input:steer': {
+        const s = this.ensureSession(msg.sessionId)
+        s.enqueueInput({ type: 'steer', content: msg.content, messageId: msg.id })
+        await s.drainInputQueue(send)
+        break
+      }
       case 'message:cancel':
         this.sessions.get(msg.sessionId)?.cancel()
         break
@@ -60,6 +76,12 @@ export class SessionManager {
       case 'message:resume':
         await this.ensureSession(msg.sessionId).resume(msg.content, send)
         break
+      case 'subagent:background': {
+        const s = this.ensureSession(msg.sessionId)
+        const ac = new AbortController()
+        void s.runBackgroundSubagent(msg.taskId, msg.description, ac.signal, send)
+        break
+      }
       case 'subagent:resume':
         await this.ensureSession(msg.sessionId).resumeSubagent(msg.taskId, msg.message, send)
         break
@@ -309,6 +331,7 @@ export class SessionManager {
         break
       }
     }
+    logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }
 
   private createSession(id: string, config: SessionConfig, send: SendFn): void {
@@ -317,7 +340,7 @@ export class SessionManager {
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
     this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store))
-    void this.sessions.get(id)!.captureSnapshot().catch(() => {})
+    void this.sessions.get(id)!.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
     if (!config.cwd) send({ type: 'session:cwd', sessionId: id, cwd: cfg.cwd! })

@@ -29,6 +29,12 @@ vi.mock('../mcp/manager.js', () => ({
     toolCatalog() {
       return ''
     },
+    registerWithRegistry(registry: any, scope: any) {
+      for (const t of fakeMcpTools) {
+        registry.register(t, scope)
+      }
+    },
+    deregisterScope() {},
   },
 }))
 

@@ -10,6 +10,10 @@ import { CHILD_MAX_STEPS } from './loop-control.js'
 import type { OrchestratorEventSink, AgentRunner } from '../orchestrator/ports.js'
 import type { AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
+import type { NetworkPolicy } from './network-policy.js'
+import type { ToolOutputStore } from './tool-output-store.js'
+import type { GuardianReviewer } from './guardian.js'
+import { safeErrorMessage } from './error.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -23,6 +27,9 @@ export interface WorkflowRunDeps {
   idleTimeoutMs: number
   pendingPermissions: Map<string, (c: { optionId: string } | { cancelled: true }) => void>
   orchestratorRunner?: AgentRunner
+  networkPolicy?: NetworkPolicy
+  toolOutputStore?: ToolOutputStore
+  guardianReviewer?: GuardianReviewer
 }
 
 export async function runWorkflowTurn(
@@ -77,12 +84,15 @@ export async function runWorkflowTurn(
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
-          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} },
+          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
           signal,
           description: input,
           childMaxSteps: CHILD_MAX_STEPS,
           permissionMode: 'full',
           requestApproval: undefined,
+          networkPolicy: deps.networkPolicy,
+          toolOutputStore: deps.toolOutputStore,
+          guardianReviewer: deps.guardianReviewer,
         })
       },
     )
@@ -134,12 +144,15 @@ export async function runWorkflowTurn(
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
-          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} },
+          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
           signal: abortController.signal,
           description: `You are an aggregator. Merge these subagent results into one coherent summary:\n\n${rawTexts.join('\n\n---\n\n')}`,
           childMaxSteps: CHILD_MAX_STEPS,
           permissionMode: 'chat',
           requestApproval: undefined,
+          networkPolicy: deps.networkPolicy,
+          toolOutputStore: deps.toolOutputStore,
+          guardianReviewer: deps.guardianReviewer,
         }) || fallback
       } catch {
         finalText = fallback
@@ -163,7 +176,7 @@ export async function runWorkflowTurn(
       type: 'error',
       sessionId: deps.id,
       code: timedOut ? 'TIMEOUT' : 'AGENT_ERROR',
-      message: timedOut ? '' : err instanceof Error ? err.message : String(err),
+      message: timedOut ? '' : safeErrorMessage(err),
     })
     return ''
   } finally {

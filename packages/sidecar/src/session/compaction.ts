@@ -12,13 +12,38 @@ export const KEEP_RECENT_TURNS = 3
  *  summary has room for full context preservation. */
 export const SUMMARY_OUTPUT_TOKENS = 4096
 
-/** No tokenizer in-stack → char heuristic. /3 over-estimates English (≈4 ch/tok) but fits dense
- *  CJK/code, so it triggers a little early rather than too late. */
-const CHARS_PER_TOKEN = 3
+/** Industry-standard heuristic for context-budget checks (Codex/OpenCode both use ≈4 chars/byte per token). */
+const CHARS_PER_TOKEN = 4
 
 /** Summarizes a span of messages into a short note. Injected so compaction is unit-testable. */
 export interface Summarizer {
   summarize(messages: BaseMessage[]): Promise<string>
+}
+
+/** Options for compactMessages. */
+export interface CompactOptions {
+  /** Turns kept verbatim at the tail (see KEEP_RECENT_TURNS). */
+  keepRecentTurns: number
+  /** Summarizer that produces the summary text from the middle span. */
+  summarizer: Summarizer
+  /** When true, keep fewer recent turns so the summary covers more history — used after a
+   *  provider context-overflow error to aggressively shrink the prompt. */
+  overflowRecovery?: boolean
+}
+
+/** Detect provider context-length / maximum-token errors so the graph can compact and retry. */
+export function isOverflowError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const text = `${err.message} ${(err as { code?: string; status?: number; statusCode?: number }).code ?? ''} ${(err as { response?: { status?: number } }).response?.status ?? ''}`.toLowerCase()
+  return (
+    text.includes('context length') ||
+    text.includes('context_length_exceeded') ||
+    text.includes('maximum context length') ||
+    text.includes('string above max length') ||
+    text.includes('too many tokens') ||
+    text.includes('input length') ||
+    text.includes('token limit')
+  )
 }
 
 function textOf(m: BaseMessage): string {
@@ -27,6 +52,7 @@ function textOf(m: BaseMessage): string {
   return ''
 }
 
+/** Synchronous chars/4 estimate. This is the only token estimate used for context-window checks. */
 export function estimateTokens(messages: readonly BaseMessage[]): number {
   let chars = 0
   for (const m of messages) chars += textOf(m).length
@@ -46,14 +72,15 @@ export interface CompactResult {
  *  must have ids (LangGraph assigns them in state). */
 export async function compactMessages(
   messages: BaseMessage[],
-  opts: { keepRecentTurns: number; summarizer: Summarizer },
+  opts: CompactOptions,
 ): Promise<CompactResult | null> {
   const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
   if (firstHumanIdx === -1) return null
   const humanIdxs: number[] = []
   messages.forEach((m, i) => { if (m instanceof HumanMessage) humanIdxs.push(i) })
-  if (humanIdxs.length <= opts.keepRecentTurns) return null
-  const recentStart = humanIdxs[humanIdxs.length - opts.keepRecentTurns]
+  const keepRecentTurns = opts.overflowRecovery ? Math.max(1, Math.floor(opts.keepRecentTurns / 2)) : opts.keepRecentTurns
+  if (humanIdxs.length <= keepRecentTurns) return null
+  const recentStart = humanIdxs[humanIdxs.length - keepRecentTurns]
   const middle = messages.slice(firstHumanIdx + 1, recentStart)
   if (middle.length === 0) return null
   const headId = middle[0].id

@@ -15,6 +15,9 @@ The hook system allows plugins and external code to intercept lifecycle events d
 | 7 | `TurnComplete` | After a turn finishes (fire-and-forget) | `sessionId`, `turnId` | any (result is ignored) |
 | 8 | `Stop` | After user requests session stop | `sessionId`, `turnId` | `allow` (proceed), `deny` (cancel stop) |
 | 9 | `PermissionRequest` | Before presenting a HITL permission prompt to the user | `sessionId`, `turnId`, `toolName`, `toolInput` | `allow` (auto-allow, skip prompt), `deny` (auto-deny, skip prompt), `ask` (proceed with prompt) |
+| 10 | `ActivityStart` | When a new activity is started for a user goal | `sessionId`, `activityId` | any (result is ignored) |
+| 11 | `ActivityEnd` | When the current activity ends | `sessionId`, `activityId` | any (result is ignored) |
+| 12 | `ActivityBudgetRequest` | When something requests an extension of the current activity's step budget | `sessionId`, `activityId`, `stepsRequested` | `allow` (extend), `deny` (keep current budget); `steps` can override the requested amount |
 
 ## PermissionRequest Hook
 

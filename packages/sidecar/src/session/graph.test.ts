@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,7 @@ import { buildGraph, type GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { TurnUsage } from '@hip/protocol'
+import { setActiveModel } from '../config/providers.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -20,12 +21,16 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-graph-'))
   try { await fn(root) } finally { rmSync(root, { recursive: true, force: true }) }
 }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 describe('agent loop graph', () => {
   it('stops immediately when the model returns a plain text answer', async () => {
@@ -34,7 +39,7 @@ describe('agent loop graph', () => {
       const runner = fakeRunner([new AIMessage('你好，我是助手')])
       const out = await app.invoke(
         { messages: [new HumanMessage('你是谁')], steps: 0 },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
       expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('你好，我是助手')
       expect(out.steps).toBe(1)
@@ -50,7 +55,7 @@ describe('agent loop graph', () => {
       const seen: Array<{ inputTokens: number; outputTokens: number; totalTokens: number }> = []
       await app.invoke(
         { messages: [new HumanMessage('hi')], steps: 0 },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
       )
       expect(seen).toEqual([{ inputTokens: 12, outputTokens: 5, totalTokens: 17 }])
     })
@@ -62,7 +67,7 @@ describe('agent loop graph', () => {
       const seen: unknown[] = []
       await app.invoke(
         { messages: [new HumanMessage('hi')], steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([new AIMessage('done')]), tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('done')]), tools: buildTools(root), emit: { ...noopEmit, usage: (u: TurnUsage) => seen.push(u) }, summarizer: noopSummarizer } } },
       )
       expect(seen).toEqual([])
     })
@@ -78,7 +83,7 @@ describe('agent loop graph', () => {
       const started: string[] = []
       const out = await app.invoke(
         { messages: [new HumanMessage('做个 HTML 自我介绍')], steps: 0 },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: { ...noopEmit, toolStarted: (n: string) => started.push(n) }, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: { ...noopEmit, toolStarted: (n: string) => started.push(n) }, summarizer: noopSummarizer } } },
       )
       expect(readFileSync(join(root, 'index.html'), 'utf8')).toBe('<h1>me</h1>')
       expect(started).toContain('write_file')
@@ -93,7 +98,7 @@ describe('agent loop graph', () => {
       const loopMsg = new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
       const out = await app.invoke(
         { messages: [new HumanMessage('spin')], steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([loopMsg]), tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 50 },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([loopMsg]), tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 50 },
       )
       expect(out.steps).toBeLessThanOrEqual(2)
     })
@@ -105,7 +110,7 @@ describe('agent loop graph', () => {
       const loop = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
       const out = await app.invoke(
         { messages: [new HumanMessage('一直 ls')], steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([loop(), loop(), loop(), loop()]), tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 90 },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([loop(), loop(), loop(), loop()]), tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 90 },
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.pendingQuestion).toBeTruthy()
@@ -129,7 +134,7 @@ describe('agent loop graph', () => {
       ]
       const out = await app.invoke(
         { messages: msgs, steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
       )
       expect(summarizeCalled).toBeGreaterThan(0)
       expect(out.messages.some((m) => m instanceof SystemMessage && typeof m.content === 'string' && m.content.includes('早期摘要'))).toBe(true)
@@ -149,7 +154,7 @@ describe('agent loop graph', () => {
           planningMode: 'plan',
           planStatus: 'none',
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.planningMode).toBe('plan')
@@ -171,7 +176,7 @@ describe('agent loop graph', () => {
           planningMode: 'plan',
           planStatus: 'generating',
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.plan).toEqual([{ content: 'amended step', status: 'pending' }])
@@ -190,7 +195,7 @@ describe('agent loop graph', () => {
           planningMode: 'fast',
           planStatus: 'none',
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
       expect(out.planningMode).toBe('fast')
       expect(out.planStatus).toBe('none')
@@ -214,7 +219,7 @@ describe('agent loop graph', () => {
           planStatus: 'approved',
           plan: [{ content: 'step one', status: 'pending' }],
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
       )
       expect(out.planningMode).toBe('plan')
       expect(out.steps).toBeGreaterThanOrEqual(2)
@@ -236,7 +241,7 @@ describe('agent loop graph', () => {
           planStatus: 'approved',
           plan: [{ content: 'step one', status: 'pending' }],
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.pendingQuestion).toBeTruthy()
@@ -267,7 +272,7 @@ describe('agent loop graph', () => {
           planningMode: 'plan',
           planStatus: 'none',
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: planDeltaEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: planDeltaEmit, summarizer: noopSummarizer } } },
       )
       expect(out.status).toBe('awaiting_user')
       expect(out.plan).toEqual([{ content: 'step one', status: 'pending' }])
@@ -295,10 +300,97 @@ describe('agent loop graph', () => {
           planStatus: 'approved',
           plan: [{ content: 'step one', status: 'completed' }],
         },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
       )
       expect(out.status).toBe('running')
       expect(out.steps).toBe(1)
+    })
+  })
+
+  it('todoToPlanItem: guards against array items (no "undefined" content)', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [[{ content: 'x' }]] }, id: 'arr1' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('plan something')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.plan).toBeDefined()
+      expect(out.plan!.length).toBeGreaterThan(0)
+      expect(out.plan![0].content).not.toBe('undefined')
+    })
+  })
+
+  it('todoToPlanItem: missing content in object todo becomes empty string', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ status: 'pending' }] }, id: 'miss1' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('plan something')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+      )
+      expect(out.plan).toBeDefined()
+      expect(out.plan!.length).toBe(1)
+      expect(out.plan![0].content).toBe('')
+      expect(out.plan![0].status).toBe('pending')
+    })
+  })
+
+  it('deriveUpdatedPlan: ignores write_todos with args as array, keeps original plan', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const originalPlan = [{ content: 'original plan', status: 'pending' as const }]
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: ['not-an-object'], id: 'bad1' }] }),
+        new AIMessage('done'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: originalPlan,
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.plan).toEqual(originalPlan)
+    })
+  })
+
+  it('deriveUpdatedPlan: ignores non-write_todos tool calls, keeps original plan', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const originalPlan = [{ content: 'original plan', status: 'pending' as const }]
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'ls1' }] }),
+        new AIMessage('done'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('do work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: originalPlan,
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.plan).toEqual(originalPlan)
     })
   })
 })

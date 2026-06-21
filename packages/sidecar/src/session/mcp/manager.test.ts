@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { symlinkSync, unlinkSync, existsSync } from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import type { McpServerConfig } from '@hip/protocol'
 import { McpManager, type ClientLike } from './manager.js'
 
@@ -38,6 +41,10 @@ class TestManager extends McpManager {
     )
     this.lastClients.set(server.id, client)
     return client
+  }
+
+  async testValidate(command: string | undefined): Promise<string | undefined> {
+    return this.validateStdioCommand(command)
   }
 }
 
@@ -170,5 +177,77 @@ describe('McpManager.tools', () => {
 
   it('returns [] when nothing is connected', () => {
     expect(mgr.tools()).toEqual([])
+  })
+})
+
+describe('McpManager.validateStdioCommand', () => {
+  it('accepts /usr/bin/env (allowed directory)', async () => {
+    const result = await mgr.testValidate('/usr/bin/env')
+    expect(result).toBeUndefined()
+  })
+
+  it('rejects /tmp/malicious (not in allowed directories)', async () => {
+    const result = await mgr.testValidate('/tmp/malicious')
+    expect(result).toMatch(/does not exist or cannot be resolved/)
+  })
+
+  it('rejects a relative path like npx (requires absolute)', async () => {
+    const result = await mgr.testValidate('npx')
+    expect(result).toMatch(/must be an absolute path/)
+  })
+
+  it('rejects path traversal like /usr/bin/../tmp/malicious', async () => {
+    const result = await mgr.testValidate('/usr/bin/../tmp/malicious')
+    expect(result).toMatch(/does not exist or cannot be resolved/)
+  })
+
+  it('accepts a symlink whose realpath falls inside an allowed directory', async () => {
+    const target = '/usr/bin/env'
+    const link = path.join(os.tmpdir(), 'hip-test-allowed-link')
+    try { symlinkSync(target, link) } catch { /* may already exist */ }
+    try {
+      const result = await mgr.testValidate(link)
+      expect(result).toBeUndefined()
+    } finally {
+      try { unlinkSync(link) } catch { /* best-effort cleanup */ }
+    }
+  })
+
+  it('rejects a symlink whose realpath falls outside allowed directories', async () => {
+    const target = path.join(os.tmpdir(), 'hip-test-evil-target')
+    // Create a real file outside allowed dirs so realpath succeeds but the check fails
+    try {
+      const { writeFileSync } = await import('node:fs')
+      writeFileSync(target, '#!/bin/sh\necho pwned\n', { mode: 0o755 })
+    } catch { /* ok if exists */ }
+    const link = path.join(os.tmpdir(), 'hip-test-malicious-link')
+    try { symlinkSync(target, link) } catch { /* may already exist */ }
+    try {
+      const result = await mgr.testValidate(link)
+      expect(result).toMatch(/not in the allowed directory list/)
+    } finally {
+      try { unlinkSync(link) } catch { /* best-effort */ }
+      try { unlinkSync(target) } catch { /* best-effort */ }
+    }
+  })
+})
+
+class RedactionTestManager extends McpManager {
+  errorMsg = ''
+  protected async connect(_server: McpServerConfig): Promise<ClientLike> {
+    throw new Error(this.errorMsg)
+  }
+}
+
+describe('McpManager.connectionStatuses error redaction', () => {
+  it('redacts API keys from lastError', async () => {
+    const rmgr = new RedactionTestManager()
+    rmgr.errorMsg = 'Auth failed: invalid key sk-abc12345678901234567890 in config'
+    await rmgr.reconcile([stdio({ id: 'err-svr', name: 'Err' })])
+    const statuses = rmgr.connectionStatuses([stdio({ id: 'err-svr', name: 'Err' })])
+    expect(statuses).toHaveLength(1)
+    expect(statuses[0].status).toBe('error')
+    expect(statuses[0].lastError).toContain('[REDACTED]')
+    expect(statuses[0].lastError).not.toContain('sk-abc12345678901234567890')
   })
 })

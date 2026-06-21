@@ -4,8 +4,21 @@ import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools, type ApprovalFn } from './tools.js'
+import type { NetworkPolicy } from './network-policy.js'
+import type { ToolOutputStore } from './tool-output-store.js'
+import type { GuardianReviewer } from './guardian.js'
 import { recursionLimit } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
+
+const NOOP_EMIT: GraphEmit = {
+  token: () => {},
+  reasoning: () => {},
+  toolStarted: () => {},
+  toolFinished: () => {},
+  usage: () => {},
+  planDelta: () => {},
+  compaction: () => {},
+}
 
 export interface RunSubagentArgs {
   runner: ModelRunner
@@ -27,6 +40,14 @@ export interface RunSubagentArgs {
   /** Prior messages to continue from (subagent session continuation). When non-empty, the subagent
    *  starts with these messages + a new HumanMessage(description) instead of a fresh [system, human] pair. */
   existingMessages?: BaseMessage[]
+  /** Passed through to GraphCtx; defaults to 'subagent' when absent. */
+  sessionId?: string
+  /** Network policy from the parent session, applied to web_fetch/web_search. */
+  networkPolicy?: NetworkPolicy
+  /** Tool output store from the parent session for bound output management. */
+  toolOutputStore?: ToolOutputStore
+  /** Guardian reviewer for approval escalation; created per-turn with the parent model. */
+  guardianReviewer?: GuardianReviewer
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
@@ -53,12 +74,12 @@ export function lastAiText(messages: BaseMessage[]): string {
  *   partial assistant text with the pending question appended as context (P3-D3, no agent:interrupt).
  */
 export async function runSubagent(args: RunSubagentArgs): Promise<string> {
-  const { runner, root, summarizer, emit, signal, description, childMaxSteps, permissionMode, requestApproval, existingMessages } = args
+  const { runner, root, summarizer, emit, signal, description, childMaxSteps, permissionMode, requestApproval, existingMessages, mode, sessionId, networkPolicy, toolOutputStore, guardianReviewer } = args
   // depth-1: no task tool (no spawn closure). Cascade the conversation's permission mode + approval
   // seam so a chat worker is read-only, an edit worker can write + HITL-gate run_script, and a full
   // worker un-jails files + auto-approves — mirroring how dispatch_agent cascades the same mode.
-  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true })
-  const ctx: GraphCtx = { runner, tools, emit, summarizer }
+  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true, sessionId, networkPolicy })
+  const ctx: GraphCtx = { runner, tools, emit: mode === 'background' ? NOOP_EMIT : emit, summarizer, sessionId: sessionId ?? 'subagent', toolOutputStore, guardianReviewer }
   const app = buildGraph(childMaxSteps)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0
     ? [...existingMessages, new HumanMessage(description)]

@@ -38,6 +38,10 @@ export interface SessionConfig {
    *  'code' = conversation + directory tree + git. undefined on a legacy row ⇒ inferred from
    *  the cwd (a scratch cwd ⇒ 'chat', else 'code'); see surfaceOf in the sidecar. */
   surface?: 'chat' | 'code'
+  /** When true (default), Session rebuilds its message history from the event-sourced
+   *  session_message projection instead of relying on LangGraph checkpointing or the legacy
+   *  messages table. Set to false to opt out during the dual-write transition. */
+  useEventSource?: boolean
 }
 
 /** Global current model the whole app uses. */
@@ -392,6 +396,8 @@ export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
   | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
+  | { type: 'input:enqueue'; sessionId: string; id: string; content: string }
+  | { type: 'input:steer'; sessionId: string; id: string; content: string }
   | { type: 'message:cancel'; sessionId: string }
   | { type: 'message:regenerate'; sessionId: string }
   | { type: 'message:resume'; sessionId: string; content: string }
@@ -435,6 +441,7 @@ export type ClientMessage =
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
   | { type: 'agent:setProfile'; sessionId: string; id: string }
+  | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
 
 export type ServerMessage =
@@ -504,7 +511,7 @@ export interface AgentProfileInfo {
 // Lifecycle hooks (tool interception, safety gating, turn lifecycle)
 // ──────────────────────────────────────────────────────────────────
 
-export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete' | 'Stop' | 'PermissionRequest'
+export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete' | 'Stop' | 'PermissionRequest' | 'ActivityStart' | 'ActivityEnd' | 'ActivityBudgetRequest'
 
 export type HookResult = {
   kind: 'allow' | 'deny' | 'ask' | 'modify' | 'continue'
@@ -523,6 +530,11 @@ export type HookResult = {
   updatedInput?: Record<string, unknown>
   prompt?: string
   additionalContexts?: string[]
+  /**
+   * For `ActivityBudgetRequest` hooks, the number of steps the hook is willing
+   * to grant. When omitted, the requested amount is granted.
+   */
+  steps?: number
 }
 
 export type HookMatcher = string | string[]
@@ -530,6 +542,8 @@ export type HookMatcher = string | string[]
 export interface HookContext {
   sessionId: string
   turnId?: string
+  activityId?: string
+  stepsRequested?: number
   toolName?: string
   toolInput?: Record<string, unknown>
   toolOutput?: string
@@ -646,6 +660,21 @@ export interface McpResourceContent {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Durable session events (sidecar-internal event sourcing)
+// ──────────────────────────────────────────────────────────────────
+
+export type SessionEvent =
+  | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number }
+  | { type: 'step_started'; sessionId: string; turnId: string; agentId: string; timestamp: number }
+  | { type: 'step_ended'; sessionId: string; turnId: string; agentId: string; timestamp: number }
+  | { type: 'text_started'; sessionId: string; messageId: string; timestamp: number }
+  | { type: 'text_ended'; sessionId: string; messageId: string; content: string; timestamp: number }
+  | { type: 'tool_called'; sessionId: string; callId: string; name: string; input: string; timestamp: number }
+  | { type: 'tool_success'; sessionId: string; callId: string; output: string; timestamp: number }
+  | { type: 'tool_failed'; sessionId: string; callId: string; error: string; timestamp: number }
+  | { type: 'compaction_ended'; sessionId: string; summary: string; timestamp: number }
+
+// ──────────────────────────────────────────────────────────────────
 // Unified TOML config types (Todo 1)
 // ──────────────────────────────────────────────────────────────────
 
@@ -668,3 +697,14 @@ export interface HipConfig {
   skills?: SkillEntry[]
   agents?: AgentConfig[]
 }
+
+/** User-configurable network policy persisted to ~/.hip/config/network.json.
+ *  All fields optional — empty config means "allow all https" (the SSRF layer still
+ *  rejects private IPs and non-https URLs). */
+export interface NetworkPolicyConfig {
+  allowlist?: string[]
+  denylist?: string[]
+  maxRequestsPerMinute?: number
+  maxResponseBytes?: number
+}
+

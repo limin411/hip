@@ -78,6 +78,11 @@ pub fn hip_config_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("hip.toml"))
 }
 
+/// Canonical path of the network-policy config inside `config/`.
+pub fn network_policy_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(config_dir(app)?.join("network.json"))
+}
+
 /// Directory holding installed plugins (`<dir>/<plugin-id>/.plugin/plugin.json`).
 pub fn plugins_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "plugins")
@@ -122,6 +127,16 @@ mod tests {
         assert_eq!(
             base.join("config").join("hip-skills.json"),
             PathBuf::from("/Users/x/.hip/config/hip-skills.json"),
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn network_policy_path_lives_under_config() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("config").join("network.json"),
+            PathBuf::from("/Users/x/.hip/config/network.json"),
         );
     }
 

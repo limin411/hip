@@ -14,6 +14,9 @@ import type { Summarizer } from './compaction.js'
 import type { ResolvedModel } from './agents/registry.js'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
 import type { ApprovalFn } from './tools.js'
+import type { NetworkPolicy } from './network-policy.js'
+import type { ToolOutputStore } from './tool-output-store.js'
+import type { GuardianReviewer } from './guardian.js'
 
 export interface RunManagedAgentArgs {
   resolved: ResolvedModel | null      // the agent's bound model; null ⇒ global active model
@@ -29,6 +32,10 @@ export interface RunManagedAgentArgs {
   skills?: SkillMeta[]                  // skills ALREADY narrowed to the agent's allowedSkills by the caller (use_skill candidate)
   requestApproval?: ApprovalFn          // HITL closure threaded from the parent session (run_script); presence decides registration
   permissionMode?: PermissionMode       // cascaded from the parent conversation; default 'edit'
+  sessionId?: string                    // passed through to GraphCtx; defaults to 'managed-agent' when absent
+  networkPolicy?: NetworkPolicy         // parent session's network policy (rate limits, SSRF guard)
+  toolOutputStore?: ToolOutputStore     // parent session's tool output store (bound large outputs to files)
+  guardianReviewer?: GuardianReviewer   // parent session's guardian reviewer (reads files before write)
 }
 
 /**
@@ -40,14 +47,14 @@ export interface RunManagedAgentArgs {
  * through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode } = args
+  const { resolved, cwd, prompt, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
   // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
-  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true })
+  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
   const toolNames = tools.map((t) => t.name)
-  const ctx: GraphCtx = { runner, tools, emit, summarizer }
+  const ctx: GraphCtx = { runner, tools, emit, summarizer, sessionId: args.sessionId ?? 'managed-agent', toolOutputStore, guardianReviewer }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {

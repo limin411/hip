@@ -5,9 +5,24 @@ import { surfaceOf } from '../session/surface.js'
 
 const PREVIEW_LEN = 80
 
+/** One pending input row from `session_input`. */
+export interface PendingInputRow {
+  id: string
+  sessionId: string
+  prompt: string
+  delivery: 'steer' | 'queue'
+  admittedSeq: number
+  timeCreated: number
+}
+
 /** All persisted reads/writes for sessions. Synchronous (node:sqlite). */
 export class SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly ftsEnabled: boolean) {}
+
+  /** Expose the database handle for callers that need to share a transaction. */
+  getDb(): DatabaseSync {
+    return this.db
+  }
 
   insertSession(r: { id: string; title: string; config: string; createdAt: number; updatedAt: number }): void {
     this.db.prepare(`INSERT INTO sessions(id,title,config,created_at,updated_at) VALUES(?,?,?,?,?)`)
@@ -108,24 +123,7 @@ export class SessionStore {
   ): void {
     this.db.exec('BEGIN')
     try {
-      if (assistant) {
-        this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
-        const tl = assistant.timeline && assistant.timeline.length ? JSON.stringify(assistant.timeline) : null
-        this.db.prepare(`UPDATE messages SET timeline=? WHERE id=?`).run(tl, assistant.id)
-      }
-      const runStmt = this.db.prepare(
-        `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      const toolStmt = this.db.prepare(
-        `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-      )
-      for (const run of runs) {
-        const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null, run.usage?.inputTokens ?? null, run.usage?.outputTokens ?? null, run.usage?.totalTokens ?? null)
-        const runId = info.lastInsertRowid
-        for (const tc of run.toolCalls ?? []) {
-          toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
-        }
-      }
+      this.insertTurnBody(assistant, sessionId, runs)
       this.db.exec('COMMIT')
     } catch (e) {
       this.db.exec('ROLLBACK')
@@ -133,9 +131,41 @@ export class SessionStore {
     }
   }
 
+  /** Same writes as insertTurn, but without transaction management. Used by
+   *  Session.emit() so legacy persistence and new events share one transaction. */
+  insertTurnBody(
+    assistant: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null,
+    sessionId: string,
+    runs: AgentRun[],
+  ): void {
+    if (assistant) {
+      this.insertMessage({ id: assistant.id, sessionId, role: 'assistant', agentId: assistant.agentId, content: assistant.content, timestamp: assistant.timestamp, stopped: assistant.stopped })
+      const tl = assistant.timeline && assistant.timeline.length ? JSON.stringify(assistant.timeline) : null
+      this.db.prepare(`UPDATE messages SET timeline=? WHERE id=?`).run(tl, assistant.id)
+    }
+    const runStmt = this.db.prepare(
+      `INSERT INTO agent_runs(session_id,message_id,seq,agent_id,role,output,started_at,finished_at,task_input,parent_agent_id,prompt_tokens,completion_tokens,total_tokens) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    const toolStmt = this.db.prepare(
+      `INSERT INTO tool_calls(session_id,agent_run_id,call_id,agent_id,name,input,output,status,error,seq,truncated) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    for (const run of runs) {
+      const info = runStmt.run(sessionId, assistant?.id ?? null, run.seq, run.agentId, run.role, run.output, run.startedAt, run.finishedAt, run.taskInput ?? null, run.parentAgentId ?? null, run.usage?.inputTokens ?? null, run.usage?.outputTokens ?? null, run.usage?.totalTokens ?? null)
+      const runId = info.lastInsertRowid
+      for (const tc of run.toolCalls ?? []) {
+        toolStmt.run(sessionId, runId, tc.callId, tc.agentId, tc.name, tc.input, tc.output ?? null, tc.status, tc.error ?? null, tc.seq, tc.truncated ? 1 : 0)
+      }
+    }
+  }
+
   /** Public alias for loadMessages — used by subagent continuation to load prior context. */
   getMessages(sessionId: string): Message[] {
     return this.loadMessages(sessionId)
+  }
+
+  hasMessages(sessionId: string): boolean {
+    const row = this.db.prepare(`SELECT EXISTS(SELECT 1 FROM messages WHERE session_id=?) AS has`).get(sessionId) as { has: number }
+    return row.has === 1
   }
 
   loadMessages(sessionId: string): Message[] {
@@ -252,5 +282,63 @@ export class SessionStore {
 
   deleteSession(id: string): void {
     this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
+  }
+
+  /** Admit a pending input into the durable queue. */
+  admitSessionInput(r: { id: string; sessionId: string; prompt: string; delivery: 'steer' | 'queue'; timeCreated: number }): void {
+    const seq = this.nextInputSeq(r.sessionId)
+    this.db.prepare(
+      `INSERT INTO session_input(id, session_id, prompt, delivery, admitted_seq, promoted_seq, time_created) VALUES(?,?,?,?,?,NULL,?)`,
+    ).run(r.id, r.sessionId, r.prompt, r.delivery, seq, r.timeCreated)
+  }
+
+  private nextInputSeq(sessionId: string): number {
+    const row = this.db.prepare(`SELECT COALESCE(MAX(admitted_seq),0)+1 AS n FROM session_input WHERE session_id=?`).get(sessionId) as { n: number }
+    return row.n
+  }
+
+  private nextInputPromotedSeq(sessionId: string): number {
+    const row = this.db.prepare(`SELECT COALESCE(MAX(promoted_seq),0)+1 AS n FROM session_input WHERE session_id=?`).get(sessionId) as { n: number }
+    return row.n
+  }
+
+  /** Pending inputs for a session, in admission order. */
+  listPendingSessionInputs(sessionId: string): PendingInputRow[] {
+    const rows = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND promoted_seq IS NULL ORDER BY admitted_seq`,
+    ).all(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number }[]
+    return rows.map((r) => ({ id: r.id, sessionId: r.session_id, prompt: r.prompt, delivery: r.delivery, admittedSeq: r.admitted_seq, timeCreated: r.time_created }))
+  }
+
+  /** Promote the most recent steer and drop all older inputs. Returns the steer. */
+  promoteSteerSessionInput(sessionId: string): PendingInputRow | undefined {
+    const row = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND delivery='steer' AND promoted_seq IS NULL ORDER BY admitted_seq DESC LIMIT 1`,
+    ).get(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number } | undefined
+    if (!row) return undefined
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(
+      `UPDATE session_input SET promoted_seq=? WHERE session_id=? AND promoted_seq IS NULL AND admitted_seq <= ?`,
+    ).run(promotedSeq, sessionId, row.admitted_seq)
+    return { id: row.id, sessionId: row.session_id, prompt: row.prompt, delivery: row.delivery, admittedSeq: row.admitted_seq, timeCreated: row.time_created }
+  }
+
+  /** Promote the oldest queued (non-steer) input. */
+  promoteNextQueuedSessionInput(sessionId: string): PendingInputRow | undefined {
+    const row = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND delivery='queue' AND promoted_seq IS NULL ORDER BY admitted_seq LIMIT 1`,
+    ).get(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number } | undefined
+    if (!row) return undefined
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(
+      `UPDATE session_input SET promoted_seq=? WHERE session_id=? AND id=?`,
+    ).run(promotedSeq, sessionId, row.id)
+    return { id: row.id, sessionId: row.session_id, prompt: row.prompt, delivery: row.delivery, admittedSeq: row.admitted_seq, timeCreated: row.time_created }
+  }
+
+  /** Mark a specific input as promoted (popped for processing). */
+  promoteSessionInputById(sessionId: string, id: string): void {
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(`UPDATE session_input SET promoted_seq=? WHERE session_id=? AND id=? AND promoted_seq IS NULL`).run(promotedSeq, sessionId, id)
   }
 }

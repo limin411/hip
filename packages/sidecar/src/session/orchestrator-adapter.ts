@@ -63,6 +63,7 @@ export function createSessionAgentRunner(
         toolFinished: () => {},
         usage: () => {},
         planDelta: () => {},
+        compaction: () => {},
       }
 
       // Auto-reject HITL — orchestrator nodes cannot block waiting for user feedback.

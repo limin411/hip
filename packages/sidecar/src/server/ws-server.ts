@@ -6,6 +6,7 @@ import { SessionManager } from '../session/session-manager.js'
 import type { SessionStore } from '../persistence/store.js'
 import { getActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { logInfo, logDebug } from '../debug-logger.js'
 
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:1420',
@@ -44,6 +45,8 @@ export class WsServer {
       return
     }
 
+    logInfo('ws', 'client:connected')
+
     const send = (msg: ServerMessage) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
     }
@@ -53,6 +56,7 @@ export class WsServer {
     ws.on('message', (data) => {
       try {
         const msg = JSON.parse(data.toString()) as ClientMessage
+        logDebug('ws', 'msg:received', { type: (msg as any).type, sessionId: (msg as any).sessionId })
         this.sessionManager.handle(msg, send)
       } catch (err) {
         send({ type: 'error', code: 'PARSE_ERROR', message: String(err) })

@@ -17,6 +17,8 @@ import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokensAsync, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
+import type { ToolOutputStore } from './tool-output-store.js'
+import type { GuardianReviewer } from './guardian.js'
 
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
 export interface GraphEmit {
@@ -36,7 +38,9 @@ export interface GraphCtx {
   emit: GraphEmit
   summarizer: Summarizer
   hooks?: HookRegistry
-  sessionId?: string
+  sessionId: string
+  toolOutputStore?: ToolOutputStore
+  guardianReviewer?: GuardianReviewer
   toolRunner?: ToolRunner
   toolPolicy?: ToolPolicy
   approvalCache?: ApprovalCache
@@ -162,7 +166,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       approvalCache: ctx.approvalCache ?? new SessionApprovalCache(),
       permissionMode: ctx.permissionMode ?? 'edit',
       requestApproval: ctx.requestApproval,
-      sessionId: ctx.sessionId ?? '',
+      sessionId: ctx.sessionId,
+      toolOutputStore: ctx.toolOutputStore,
+      guardianReviewer: ctx.guardianReviewer,
       onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
       onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
     })
@@ -237,8 +243,10 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       name: result.name,
     }))
 
+    const updatedPlan = deriveUpdatedPlan(state.plan, last.tool_calls ?? [])
+
     const sig = sigOf(last.tool_calls ?? [])
-    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
+    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
   }
 
   /** Corrective note after the Nth identical batch; recorded against the offending signature. */
@@ -342,20 +350,40 @@ function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefine
         if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
           const todos = (call.args as Record<string, unknown>).todos
           if (Array.isArray(todos)) {
-            return todos.map((item) => {
-              if (typeof item === 'string') {
-                return { content: item, status: 'pending' as const }
-              }
-              if (item && typeof item === 'object') {
-                const content = (item as Record<string, unknown>).content
-                return { content: typeof content === 'string' ? content : String(content), status: 'pending' as const }
-              }
-              return { content: String(item), status: 'pending' as const }
-            })
+            return todos.map((item) => todoToPlanItem(item))
           }
         }
       }
     }
   }
   return undefined
+}
+
+function todoToPlanItem(item: unknown): PlanItem {
+  if (typeof item === 'string') {
+    return { content: item, status: 'pending' as const }
+  }
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    const content = (item as Record<string, unknown>).content
+    const status = (item as Record<string, unknown>).status
+    return {
+      content: typeof content === 'string' ? content : String(content ?? ''),
+      status: status === 'in_progress' || status === 'completed' ? status : 'pending',
+    }
+  }
+  return { content: String(item), status: 'pending' as const }
+}
+
+/** Update the plan when the agent publishes a new todo list via write_todos.
+ *  The tool replaces the whole plan, so we map its todos directly to PlanItems. */
+function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
+  for (const call of toolCalls ?? []) {
+    if (call.name === 'write_todos' && call.args && typeof call.args === 'object') {
+      const todos = (call.args as Record<string, unknown>).todos
+      if (Array.isArray(todos)) {
+        return todos.map((item) => todoToPlanItem(item))
+      }
+    }
+  }
+  return plan
 }

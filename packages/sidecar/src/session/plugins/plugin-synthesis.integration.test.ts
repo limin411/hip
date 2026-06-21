@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
@@ -278,5 +279,221 @@ describe('plugin synthesis integration', () => {
 
     // Turn completed cleanly
     expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+  }, 30_000)
+
+  // ═════════════════════════════════════════════════════════════════════
+  // Plugin hook lifecycle tests
+  // ═════════════════════════════════════════════════════════════════════
+
+  function writeHooksModule(hooksDir: string, content: string): string {
+    const p = join(hooksDir, 'hooks.cjs')
+    writeFileSync(p, content, 'utf8')
+    return p
+  }
+
+  function readHookModuleState(hooksPath: string): { getTurnStartCalls(): number } {
+    const req = createRequire(import.meta.url)
+    // Re-require returns the cached module — the sidecar's synthesizeHooks
+    // loaded it into the shared Node.js Module._cache, so we see live state.
+    return req(hooksPath) as { getTurnStartCalls(): number }
+  }
+
+  function overwriteManifestWithHooks(hooksValue: string) {
+    const manifestPath = join(pluginDir, '.plugin', 'plugin.json')
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        id: 'test-plugin',
+        name: 'Test Plugin',
+        version: '1.0.0',
+        skills: 'skills/my-formatter',
+        mcpServers: [
+          {
+            id: 'test_mcp',
+            name: 'Test MCP Server',
+            transport: 'stdio' as const,
+            command: 'node',
+            args: ['fake.js'],
+            enabled: true,
+          },
+        ],
+        hooks: hooksValue,
+      }),
+      'utf8',
+    )
+  }
+
+  it('valid TurnStart hook from plugin CJS module fires during turn', async () => {
+    const hooksPath = writeHooksModule(
+      pluginDir,
+      [
+        'let turnStartCalls = 0;',
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: async function(ctx) {',
+        '      turnStartCalls++;',
+        '      return { kind: "allow" };',
+        '    },',
+        '  },',
+        '];',
+        'module.exports.getTurnStartCalls = function() { return turnStartCalls; };',
+      ].join('\n'),
+    )
+
+    overwriteManifestWithHooks('./hooks.cjs')
+
+    const runner = new SkillCheckRunner()
+    const session = new Session(
+      'ps-hook-valid',
+      makeConfig(root),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runner,
+    )
+
+    const sent: ServerMessage[] = []
+    await session.sendMessage('test hook fire', (m) => sent.push(m))
+
+    // Turn completed cleanly (hook returned 'allow')
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+
+    // Skills still loaded from the plugin
+    expect(runner.systemSeen).toContain('my-formatter')
+
+    // Hook was called exactly once
+    const state = readHookModuleState(hooksPath)
+    expect(state.getTurnStartCalls()).toBe(1)
+  }, 30_000)
+
+  it('non-function handler in hook entry → skipped gracefully, skills still load', async () => {
+    writeHooksModule(
+      pluginDir,
+      [
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: "not-a-function",',
+        '  },',
+        '];',
+      ].join('\n'),
+    )
+
+    overwriteManifestWithHooks('./hooks.cjs')
+
+    const runner = new SkillCheckRunner()
+    const session = new Session(
+      'ps-hook-nonfn',
+      makeConfig(root),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runner,
+    )
+
+    const sent: ServerMessage[] = []
+    await session.sendMessage('test nonfn handler', (m) => sent.push(m))
+
+    // Turn completed cleanly — no crash from invalid handler
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+
+    // Skills still loaded despite invalid hook handler
+    expect(runner.systemSeen).toContain('my-formatter')
+  }, 30_000)
+
+  it('bad/missing hook file → no crash, plugin skills and MCP still load', async () => {
+    // Hook file referenced in manifest does not exist on disk
+    overwriteManifestWithHooks('./nonexistent-hooks.cjs')
+
+    fakeMcpTools.push({ name: 'mcp__test_mcp__hello', description: 'Say hello' })
+
+    const runner = new SkillCheckRunner()
+    const session = new Session(
+      'ps-hook-missing',
+      makeConfig(root),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      runner,
+    )
+
+    const sent: ServerMessage[] = []
+    await session.sendMessage('test missing hook file', (m) => sent.push(m))
+
+    // Turn completed cleanly
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+
+    // Skills still loaded
+    expect(runner.systemSeen).toContain('my-formatter')
+
+    // MCP tools still loaded
+    expect(runner.toolNamesSeen).toContain('mcp__test_mcp__hello')
+  }, 30_000)
+
+  it('reloadPlugins() clears old hook registrations and re-registers exactly once', async () => {
+    const hooksPath = writeHooksModule(
+      pluginDir,
+      [
+        'let turnStartCalls = 0;',
+        'module.exports = [',
+        '  {',
+        '    event: "TurnStart",',
+        '    handler: async function(ctx) {',
+        '      turnStartCalls++;',
+        '      return { kind: "allow" };',
+        '    },',
+        '  },',
+        '];',
+        'module.exports.getTurnStartCalls = function() { return turnStartCalls; };',
+      ].join('\n'),
+    )
+
+    overwriteManifestWithHooks('./hooks.cjs')
+
+    // A runner that always returns a simple text response.
+    const makeSimpleRunner = (): ModelRunner => ({
+      async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        opts.onText('done')
+        return new AIMessage('done')
+      },
+    })
+
+    const session = new Session(
+      'ps-hook-reload',
+      makeConfig(root),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      makeSimpleRunner(),
+    )
+
+    // ── Turn 1 ────────────────────────────────────────────────────────
+    let sent: ServerMessage[] = []
+    await session.sendMessage('turn 1', (m) => sent.push(m))
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+
+    let state = readHookModuleState(hooksPath)
+    expect(state.getTurnStartCalls()).toBe(1)
+
+    // ── Reload plugins on the same session ────────────────────────────
+    session.reloadPlugins()
+
+    // Counter unchanged — reload doesn't execute turns
+    state = readHookModuleState(hooksPath)
+    expect(state.getTurnStartCalls()).toBe(1)
+
+    // ── Turn 2 on the same session ────────────────────────────────────
+    sent = []
+    await session.sendMessage('turn 2', (m) => sent.push(m))
+    expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
+
+    // Counter = 2: one call per turn, no duplicates from re-registration
+    state = readHookModuleState(hooksPath)
+    expect(state.getTurnStartCalls()).toBe(2)
   }, 30_000)
 })

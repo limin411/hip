@@ -72,6 +72,12 @@ export class SessionManager {
       case 'message:resume':
         await this.ensureSession(msg.sessionId).resume(msg.content, send)
         break
+      case 'subagent:background': {
+        const s = this.ensureSession(msg.sessionId)
+        const ac = new AbortController()
+        void s.runBackgroundSubagent(msg.taskId, msg.description, ac.signal, send)
+        break
+      }
       case 'subagent:resume':
         await this.ensureSession(msg.sessionId).resumeSubagent(msg.taskId, msg.message, send)
         break

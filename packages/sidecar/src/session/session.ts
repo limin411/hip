@@ -9,7 +9,7 @@ import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
-import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
+import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
@@ -28,7 +28,8 @@ import {
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
-import { recursionLimit, CHILD_MAX_STEPS } from './loop-control.js'
+import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
+import { Activity, ActivityTracker } from './activity.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
@@ -132,6 +133,7 @@ export class Session {
   readonly eventStore?: EventStore
   private readonly snapshotStore?: SnapshotStore
   private readonly activeSteps = new Map<string, string>()
+  private activeActivity?: ActivityTracker
 
   readonly git: GitOperations
   readonly permissions: PermissionManager
@@ -143,18 +145,68 @@ export class Session {
 
   listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
 
-  private notifyBackgroundResult(taskId: string, send: SendFn): void {
-    const meta = this.backgroundTaskMeta.get(taskId)
-    if (!meta || meta.status === 'running') return
+  /**
+   * Run a sub-agent detached from the parent turn. When it completes, its final text is:
+   *  1. persisted as a synthetic assistant turn (step_started/text_started/text_ended/step_ended),
+   *  2. injected into the in-memory message list so the next parent turn sees it, and
+   *  3. delivered to the client as an agent:notification.
+   *
+   * Errors are caught and injected as a failed synthetic message; they never propagate to the
+   * caller, so background tasks are fire-and-forget from the parent turn's perspective.
+   */
+  async runBackgroundSubagent(taskId: string, description: string, signal: AbortSignal, send: SendFn): Promise<void> {
+    const cwd = this._config.cwd ?? process.cwd()
+    const runner = this.modelRunner()
+    const summarizer = this.summarizer()
+    const rawMode = this._config.permissionMode
+    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const requestApproval = this.permissions.buildRequestApproval(send, this.id, '', () => 0, mode, this.hooks)
+
+    send({ type: 'agent:started', sessionId: this.id, turnId: `bg-turn-${taskId}`, agentId: taskId, role: 'worker', taskId, taskInput: description })
+
+    const syntheticAgentId = `bg-${taskId}`
+    const syntheticTurnId = `bg-turn-${taskId}`
+    let result = ''
+    let status: 'completed' | 'failed' = 'completed'
+    let error: string | undefined
+
+    try {
+      result = await runSubagent({
+        runner,
+        root: cwd,
+        summarizer,
+        emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
+        signal,
+        description,
+        childMaxSteps: CHILD_MAX_STEPS,
+        permissionMode: mode,
+        requestApproval,
+        mode: 'background',
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`Background task ${taskId} failed:`, msg)
+      result = `Error: ${msg}`
+      status = 'failed'
+      error = msg
+    }
+
+    const ts = Date.now()
+    this.emit({ type: 'step_started', sessionId: this.id, turnId: syntheticTurnId, agentId: syntheticAgentId, timestamp: ts })
+    this.emit({ type: 'text_started', sessionId: this.id, messageId: syntheticTurnId, timestamp: ts })
+    this.emit({ type: 'text_ended', sessionId: this.id, messageId: syntheticTurnId, content: result, timestamp: ts })
+    this.emit({ type: 'step_ended', sessionId: this.id, turnId: syntheticTurnId, agentId: syntheticAgentId, timestamp: ts })
+    this.messages.push(new AIMessage(result))
+
     send({
       type: 'agent:notification',
       sessionId: this.id,
       taskId,
-      description: meta.description,
-      status: meta.status,
-      ...(meta.result !== undefined ? { result: meta.result } : {}),
-      ...(meta.error !== undefined ? { error: meta.error } : {}),
+      description,
+      status,
+      ...(error === undefined ? { result } : { error }),
     })
+    send({ type: 'agent:finished', sessionId: this.id, turnId: syntheticTurnId, agentId: taskId })
   }
 
   private loadSubagentMessages(taskId: string): BaseMessage[] {
@@ -170,6 +222,46 @@ export class Session {
   }
 
   registerHook(hook: Hook): void { this.hooks.register(hook) }
+
+  startActivity(description: string, totalSteps: number = MAX_STEPS): Activity {
+    if (this.activeActivity) {
+      this.endActivity()
+    }
+    const activity = new ActivityTracker(
+      `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      description,
+      totalSteps,
+    )
+    this.activeActivity = activity
+    void this.hooks.fire('ActivityStart', { sessionId: this.id, activityId: activity.id }).catch(() => {})
+    return activity
+  }
+
+  currentActivity(): Activity | undefined {
+    return this.activeActivity
+  }
+
+  async extendActivity(steps: number): Promise<boolean> {
+    const activity = this.activeActivity
+    if (!activity) return false
+    const result = await this.hooks
+      .fire('ActivityBudgetRequest', { sessionId: this.id, activityId: activity.id, stepsRequested: steps })
+      .catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+    if (result.kind !== 'allow') return false
+    activity.extend(result.steps ?? steps)
+    return true
+  }
+
+  endActivity(): void {
+    const activity = this.activeActivity
+    if (!activity) return
+    this.activeActivity = undefined
+    void this.hooks.fire('ActivityEnd', { sessionId: this.id, activityId: activity.id }).catch(() => {})
+  }
+
+  private consumeActivitySteps(steps: number): void {
+    this.activeActivity?.consume(steps)
+  }
 
   constructor(
     readonly id: string,
@@ -395,6 +487,11 @@ export class Session {
     }
     if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch(() => {})
 
+    if (input.type === 'message') {
+      if (this.activeActivity) this.endActivity()
+      this.startActivity(input.content)
+    }
+
     this.messages.push(new HumanMessage(input.content))
     const supervisorText = await this.runTurn(_send)
 
@@ -602,30 +699,18 @@ export class Session {
       if (subagentMode === 'background') {
         if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
         if (this.backgroundTasks.size >= Session.MAX_BACKGROUND_TASKS) return `Error: maximum ${Session.MAX_BACKGROUND_TASKS} concurrent background tasks reached`
-        ensureStarted(childId, 'worker', 'supervisor', description, taskId)
         this.backgroundTaskMeta.set(childId, { description, status: 'running' })
-        const promise = (async () => {
-          try {
-            const result = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval })
-            const meta = this.backgroundTaskMeta.get(childId)
-            if (meta) { meta.result = result; meta.status = 'completed' }
-            ensureFinished(childId, result)
-          }
-          catch (err) {
-            const msg = err instanceof Error ? err.message : String(err); console.error(`Background task ${childId} failed:`, msg)
-            const meta = this.backgroundTaskMeta.get(childId)
-            if (meta) { meta.error = msg; meta.status = 'failed' }
-            ensureFinished(childId, `Error: ${msg}`)
-          }
-          finally { this.backgroundTasks.delete(childId); this.notifyBackgroundResult(childId, send); this.backgroundTaskMeta.delete(childId) }
-        })()
-        this.backgroundTasks.set(childId, promise); return `Background task started: ${childId}`
+        const promise = this.runBackgroundSubagent(childId, description, this.abortController!.signal, send)
+          .finally(() => { this.backgroundTasks.delete(childId); this.backgroundTaskMeta.delete(childId) })
+        this.backgroundTasks.set(childId, promise)
+        return `Background task started: ${childId}`
       }
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
       const existingMessages = taskId ? this.loadSubagentMessages(taskId) : undefined
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
       const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
-      ensureFinished(childId, text); return text
+      ensureFinished(childId, text)
+      return text
     }
 
     const enabledAgents = [...readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
@@ -669,8 +754,10 @@ export class Session {
         send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
       },
     })
-    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id }
+    const maxSteps = this.activeActivity?.stepsRemaining ?? MAX_STEPS
+    const ctx: GraphCtx = { runner, tools, emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps }
 
+    let finalState: LoopState | undefined
     try {
       if (this.agentProv.isExternalAgent()) {
         const userText = lastUserText(base?.messages ?? this.messages)
@@ -688,7 +775,8 @@ export class Session {
           disablePlan: this._config.disablePlan,
         })
         const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
-        const finalState = await this.app.invoke(
+        const stepsBefore = base?.steps ?? 0
+        finalState = await this.app.invoke(
           {
             messages: [new SystemMessage(system), ...(base?.messages ?? this.messages)],
             steps: base?.steps ?? 0,
@@ -700,8 +788,9 @@ export class Session {
             plan: base?.plan,
             verifyMemo: undefined,
           },
-          { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit() },
+          { configurable: { ctx }, signal: this.abortController.signal, recursionLimit: recursionLimit(maxSteps) },
         )
+        this.consumeActivitySteps(finalState.steps - stepsBefore)
         closeReasoning('supervisor'); finishRemaining()
         if (finalState.status === 'awaiting_user') {
           this.paused = {

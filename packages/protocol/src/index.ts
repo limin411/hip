@@ -441,6 +441,7 @@ export type ClientMessage =
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
   | { type: 'agent:setProfile'; sessionId: string; id: string }
+  | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
 
 export type ServerMessage =
@@ -510,7 +511,7 @@ export interface AgentProfileInfo {
 // Lifecycle hooks (tool interception, safety gating, turn lifecycle)
 // ──────────────────────────────────────────────────────────────────
 
-export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete' | 'Stop' | 'PermissionRequest'
+export type HookEvent = 'SessionStart' | 'TurnStart' | 'UserPromptSubmit' | 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure' | 'TurnComplete' | 'Stop' | 'PermissionRequest' | 'ActivityStart' | 'ActivityEnd' | 'ActivityBudgetRequest'
 
 export type HookResult = {
   kind: 'allow' | 'deny' | 'ask' | 'modify' | 'continue'
@@ -529,6 +530,11 @@ export type HookResult = {
   updatedInput?: Record<string, unknown>
   prompt?: string
   additionalContexts?: string[]
+  /**
+   * For `ActivityBudgetRequest` hooks, the number of steps the hook is willing
+   * to grant. When omitted, the requested amount is granted.
+   */
+  steps?: number
 }
 
 export type HookMatcher = string | string[]
@@ -536,6 +542,8 @@ export type HookMatcher = string | string[]
 export interface HookContext {
   sessionId: string
   turnId?: string
+  activityId?: string
+  stepsRequested?: number
   toolName?: string
   toolInput?: Record<string, unknown>
   toolOutput?: string

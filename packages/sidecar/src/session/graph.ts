@@ -47,6 +47,8 @@ export interface GraphCtx {
   systemPrompt?: string
   activeProfileId?: string
   toolParallelism?: number
+  /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
+  maxSteps?: number
 }
 
 const LoopState = Annotation.Root({
@@ -64,6 +66,7 @@ const LoopState = Annotation.Root({
 })
 
 type State = typeof LoopState.State
+export type LoopState = State
 
 function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   const ctx = (config.configurable as { ctx?: GraphCtx } | undefined)?.ctx
@@ -99,7 +102,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     const ctx = ctxOf(config)
     const { runner, tools, emit, systemPrompt } = ctx
-    const capped = state.steps >= maxSteps - 1
+    const stepCap = ctx.maxSteps ?? maxSteps
+    const capped = state.steps >= stepCap - 1
 
     function prepareMessages(list: BaseMessage[]): BaseMessage[] {
       const next = [...list]
@@ -284,10 +288,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return 'agent'
   }
 
-  function routeAfterAgent(state: State): 'tools' | typeof END {
+  function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
-    return wantsTools && state.steps < maxSteps ? 'tools' : END
+    const stepCap = ctxOf(config).maxSteps ?? maxSteps
+    return wantsTools && state.steps < stepCap ? 'tools' : END
   }
 
   function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | typeof END {

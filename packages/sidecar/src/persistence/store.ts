@@ -5,6 +5,16 @@ import { surfaceOf } from '../session/surface.js'
 
 const PREVIEW_LEN = 80
 
+/** One pending input row from `session_input`. */
+export interface PendingInputRow {
+  id: string
+  sessionId: string
+  prompt: string
+  delivery: 'steer' | 'queue'
+  admittedSeq: number
+  timeCreated: number
+}
+
 /** All persisted reads/writes for sessions. Synchronous (node:sqlite). */
 export class SessionStore {
   constructor(private readonly db: DatabaseSync, private readonly ftsEnabled: boolean) {}
@@ -272,5 +282,63 @@ export class SessionStore {
 
   deleteSession(id: string): void {
     this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
+  }
+
+  /** Admit a pending input into the durable queue. */
+  admitSessionInput(r: { id: string; sessionId: string; prompt: string; delivery: 'steer' | 'queue'; timeCreated: number }): void {
+    const seq = this.nextInputSeq(r.sessionId)
+    this.db.prepare(
+      `INSERT INTO session_input(id, session_id, prompt, delivery, admitted_seq, promoted_seq, time_created) VALUES(?,?,?,?,?,NULL,?)`,
+    ).run(r.id, r.sessionId, r.prompt, r.delivery, seq, r.timeCreated)
+  }
+
+  private nextInputSeq(sessionId: string): number {
+    const row = this.db.prepare(`SELECT COALESCE(MAX(admitted_seq),0)+1 AS n FROM session_input WHERE session_id=?`).get(sessionId) as { n: number }
+    return row.n
+  }
+
+  private nextInputPromotedSeq(sessionId: string): number {
+    const row = this.db.prepare(`SELECT COALESCE(MAX(promoted_seq),0)+1 AS n FROM session_input WHERE session_id=?`).get(sessionId) as { n: number }
+    return row.n
+  }
+
+  /** Pending inputs for a session, in admission order. */
+  listPendingSessionInputs(sessionId: string): PendingInputRow[] {
+    const rows = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND promoted_seq IS NULL ORDER BY admitted_seq`,
+    ).all(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number }[]
+    return rows.map((r) => ({ id: r.id, sessionId: r.session_id, prompt: r.prompt, delivery: r.delivery, admittedSeq: r.admitted_seq, timeCreated: r.time_created }))
+  }
+
+  /** Promote the most recent steer and drop all older inputs. Returns the steer. */
+  promoteSteerSessionInput(sessionId: string): PendingInputRow | undefined {
+    const row = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND delivery='steer' AND promoted_seq IS NULL ORDER BY admitted_seq DESC LIMIT 1`,
+    ).get(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number } | undefined
+    if (!row) return undefined
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(
+      `UPDATE session_input SET promoted_seq=? WHERE session_id=? AND promoted_seq IS NULL AND admitted_seq <= ?`,
+    ).run(promotedSeq, sessionId, row.admitted_seq)
+    return { id: row.id, sessionId: row.session_id, prompt: row.prompt, delivery: row.delivery, admittedSeq: row.admitted_seq, timeCreated: row.time_created }
+  }
+
+  /** Promote the oldest queued (non-steer) input. */
+  promoteNextQueuedSessionInput(sessionId: string): PendingInputRow | undefined {
+    const row = this.db.prepare(
+      `SELECT id, session_id, prompt, delivery, admitted_seq, time_created FROM session_input WHERE session_id=? AND delivery='queue' AND promoted_seq IS NULL ORDER BY admitted_seq LIMIT 1`,
+    ).get(sessionId) as { id: string; session_id: string; prompt: string; delivery: 'steer' | 'queue'; admitted_seq: number; time_created: number } | undefined
+    if (!row) return undefined
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(
+      `UPDATE session_input SET promoted_seq=? WHERE session_id=? AND id=?`,
+    ).run(promotedSeq, sessionId, row.id)
+    return { id: row.id, sessionId: row.session_id, prompt: row.prompt, delivery: row.delivery, admittedSeq: row.admitted_seq, timeCreated: row.time_created }
+  }
+
+  /** Mark a specific input as promoted (popped for processing). */
+  promoteSessionInputById(sessionId: string, id: string): void {
+    const promotedSeq = this.nextInputPromotedSeq(sessionId)
+    this.db.prepare(`UPDATE session_input SET promoted_seq=? WHERE session_id=? AND id=? AND promoted_seq IS NULL`).run(promotedSeq, sessionId, id)
   }
 }

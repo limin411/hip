@@ -11,6 +11,7 @@ import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
 import { promptRegistry } from './mcp/prompt-registry.js'
+import { safeErrorMessage } from './error.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -36,7 +37,7 @@ export class SessionManager {
     this.handleAsync(msg, send).catch((err) => {
       console.error('[session-manager] handler error', err)
       const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
-      send({ type: 'error', sessionId, code: 'INTERNAL', message: err instanceof Error ? err.message : String(err) })
+      send({ type: 'error', sessionId, code: 'INTERNAL', message: safeErrorMessage(err) })
     })
   }
 
@@ -335,7 +336,7 @@ export class SessionManager {
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
     this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store))
-    void this.sessions.get(id)!.captureSnapshot().catch(() => {})
+    void this.sessions.get(id)!.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
     if (!config.cwd) send({ type: 'session:cwd', sessionId: id, cwd: cfg.cwd! })

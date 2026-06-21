@@ -339,6 +339,16 @@ describe('SessionStore', () => {
       expect(store.getAcpSessionId('s1')).toBe('ses_abc')
     })
   })
+
+  it('promoteSessionInputById is idempotent — second call does not overwrite promoted_seq', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.admitSessionInput({ id: 'in1', sessionId: 's1', prompt: 'hello', delivery: 'queue', timeCreated: 1 })
+    store.promoteSessionInputById('s1', 'in1')
+    const firstSeq = (store.getDb().prepare(`SELECT promoted_seq FROM session_input WHERE id=?`).get('in1') as { promoted_seq: number }).promoted_seq
+    store.promoteSessionInputById('s1', 'in1')
+    const secondSeq = (store.getDb().prepare(`SELECT promoted_seq FROM session_input WHERE id=?`).get('in1') as { promoted_seq: number }).promoted_seq
+    expect(secondSeq).toBe(firstSeq)
+  })
 })
 
 describe('SessionStore listSessions surface', () => {

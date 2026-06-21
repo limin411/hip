@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
+import { SystemContext } from './system-context.js'
 import { prepareSessionContext } from './session-context.js'
 
 function freshStore(): SessionStore {
@@ -84,5 +85,21 @@ describe('prepareSessionContext', () => {
       .prepare('SELECT location FROM session_context_epoch WHERE session_id = ?')
       .get('s1') as { location: string }
     expect(row.location).toBe('/tmp/other')
+  })
+
+  it('returns safe fallback when SystemContext.initialize() throws', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const initSpy = vi.spyOn(SystemContext.prototype, 'initialize').mockRejectedValue(new Error('init failed'))
+
+    const prepared = await prepareSessionContext('s1', 'supervisor', baseState)
+
+    expect(prepared).toEqual({ system: '', contextMessages: [] })
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[session-context] failed to prepare context:',
+      expect.objectContaining({ message: 'init failed' }),
+    )
+
+    initSpy.mockRestore()
+    errorSpy.mockRestore()
   })
 })

@@ -35,6 +35,8 @@ export interface PreparedContext {
   contextMessages: BaseMessage[]
 }
 
+const INITIAL_SEQ = 0
+
 export async function prepareSessionContext(
   sessionId: string,
   agent: string,
@@ -42,33 +44,38 @@ export async function prepareSessionContext(
   store?: SessionStore,
   requestReplace?: boolean,
 ): Promise<PreparedContext> {
-  const input = buildFragmentInput(state)
-  const registry = createFragmentSourceRegistry(input)
-  const systemContext = new SystemContext(registry.sources())
-  const generation = await systemContext.initialize()
+  try {
+    const input = buildFragmentInput(state)
+    const registry = createFragmentSourceRegistry(input)
+    const systemContext = new SystemContext(registry.sources())
+    const generation = await systemContext.initialize()
 
-  if (!store) {
-    return { system: generation.baseline, contextMessages: [] }
-  }
-
-  const epoch = new ContextEpoch(store.getDb())
-  if (requestReplace) {
-    epoch.requestReplacement(sessionId, 0)
-  }
-  const result = await ensureEpochPrepared(epoch, sessionId, agent, systemContext, state.cwd, generation)
-
-  if (result.action === 'replace') {
-    return { system: result.generation.baseline, contextMessages: [] }
-  }
-
-  if (result.action === 'updated') {
-    return {
-      system: generation.baseline,
-      contextMessages: result.messages.map((m) => new SystemMessage(m)),
+    if (!store) {
+      return { system: generation.baseline, contextMessages: [] }
     }
-  }
 
-  return { system: generation.baseline, contextMessages: [] }
+    const epoch = new ContextEpoch(store.getDb())
+    if (requestReplace) {
+      epoch.requestReplacement(sessionId, INITIAL_SEQ)
+    }
+    const result = await ensureEpochPrepared(epoch, sessionId, agent, systemContext, state.cwd, generation)
+
+    if (result.action === 'replace') {
+      return { system: result.generation.baseline, contextMessages: [] }
+    }
+
+    if (result.action === 'updated') {
+      return {
+        system: generation.baseline,
+        contextMessages: result.messages.map((m) => new SystemMessage(m)),
+      }
+    }
+
+    return { system: generation.baseline, contextMessages: [] }
+  } catch (err) {
+    console.error('[session-context] failed to prepare context:', err)
+    return { system: '', contextMessages: [] }
+  }
 }
 
 async function ensureEpochPrepared(
@@ -81,7 +88,7 @@ async function ensureEpochPrepared(
 ): Promise<PrepareResult> {
   let exists = false
   try {
-    epoch.initialize(sessionId, agent, { cwd }, generation.baseline, generation.snapshot, 0)
+    epoch.initialize(sessionId, agent, { cwd }, generation.baseline, generation.snapshot, INITIAL_SEQ)
   } catch (err) {
     if (err instanceof EpochAlreadyExistsError) {
       exists = true
@@ -99,7 +106,7 @@ async function ensureEpochPrepared(
   } catch (err) {
     if (err instanceof LocationMismatchError) {
       epoch.reset(sessionId)
-      epoch.initialize(sessionId, agent, { cwd }, generation.baseline, generation.snapshot, 0)
+      epoch.initialize(sessionId, agent, { cwd }, generation.baseline, generation.snapshot, INITIAL_SEQ)
       return { action: 'unchanged' }
     }
     throw err

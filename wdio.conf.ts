@@ -27,7 +27,7 @@ export const config: Options.Testrunner = {
 
   services: [
     ['@wdio/tauri-service', {
-      appBinaryPath: './src-tauri/target/debug/bundle/macos/hip.app/Contents/MacOS/hip',
+      appBinaryPath: './src-tauri/target/release/bundle/macos/hip.app/Contents/MacOS/hip',
       driverProvider: 'embedded',
     }],
   ],
@@ -35,7 +35,7 @@ export const config: Options.Testrunner = {
   capabilities: [{
     browserName: 'tauri',
     'tauri:options': {
-      application: './src-tauri/target/debug/bundle/macos/hip.app/Contents/MacOS/hip',
+      application: './src-tauri/target/release/bundle/macos/hip.app/Contents/MacOS/hip',
     },
   }],
 

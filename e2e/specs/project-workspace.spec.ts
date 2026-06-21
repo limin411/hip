@@ -5,32 +5,46 @@ const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const entry = (suffix: string) => browser.$(`[data-testid="tree-entry"][data-path$="${suffix}"]`)
 const sessionItems = () => browser.$$('[data-testid="session-item"]')
 
+async function skipLoginIfPresent(): Promise<void> {
+  const skip = await browser.$('button=跳过登录')
+  if (await skip.isExisting()) {
+    await skip.click()
+    await browser.waitUntil(async () => (await browser.getUrl()).includes('#/app'), { timeout: 10000, interval: 200 })
+  }
+}
+
+async function switchToCodeSurface(): Promise<void> {
+  // The folder picker only exists in the code surface. The rail uses an aria-label
+  // equal to the localized "代码" label (default locale is zh-CN).
+  const codeBtn = await browser.$('[aria-label="代码"]')
+  await codeBtn.waitForClickable({ timeout: 10000 })
+  await codeBtn.click()
+  await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 30000 })
+}
+
 describe('new conversation', () => {
   before(async () => {
     await browser.pause(2500)
-    const skip = await browser.$('button=跳过登录')
-    if (await skip.isExisting()) {
-      await browser.execute((el: HTMLElement) => el.click(), (await skip) as unknown as HTMLElement)
-      await browser.waitUntil(async () => (await browser.getUrl()).includes('#/app'), { timeout: 10000, interval: 200 })
-    }
+    await skipLoginIfPresent()
     // Seam: native folder dialog can't be driven by wdio — return the fixture path.
     await browser.execute((dir: string) => {
       ;(window as unknown as { __hipPickDir?: () => Promise<string> }).__hipPickDir = () => Promise.resolve(dir)
     }, FIXTURE)
+    await switchToCodeSurface()
   })
 
-  it('a new chat shows the centered composer landing', async () => {
-    // The sidecar cold-starts (tsx compiles on first launch); wsClient buffers sends
-    // until connected, so we wait generously for the first paint.
+  it('a new code conversation shows the centered composer landing with a folder picker', async () => {
+    // The sidecar cold-starts on first launch; wsClient buffers sends until connected,
+    // so we wait generously for the first paint.
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 120000 })
     expect(await (await browser.$('[data-testid="pick-folder"]')).isExisting()).toBe(true)
   })
 
   it('picking a folder opens the tree without creating a sidebar row', async () => {
-    const before = (await sessionItems()).length
+    const before = await (await sessionItems()).length
     await (await browser.$('[data-testid="pick-folder"]')).click()
     await (await entry('/README.md')).waitForExist({ timeout: 60000 })
-    expect((await sessionItems()).length).toBe(before) // still a draft — no row
+    expect(await (await sessionItems()).length).toBe(before) // still a draft — no row
   })
 
   it('the composer chip ✕ returns to pure-chat (then re-pick restores the tree)', async () => {
@@ -82,7 +96,7 @@ describe('new conversation', () => {
   })
 
   it('sending the first message commits the session and replaces the landing', async () => {
-    const before = (await sessionItems()).length
+    const before = await (await sessionItems()).length
     // Focus + browser.keys (not setValue, whose clearValue() desyncs a React-controlled
     // textarea and can leave draft.text empty). Waiting for the send button to enable
     // confirms the composer's onChange propagated to the draft store.
@@ -95,6 +109,6 @@ describe('new conversation', () => {
     // Landing disappears (a committed session is now active)…
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ reverse: true, timeout: 30000 })
     // …and exactly one sidebar row appears.
-    await browser.waitUntil(async () => (await sessionItems()).length === before + 1, { timeout: 30000, interval: 500 })
+    await browser.waitUntil(async () => await (await sessionItems()).length === before + 1, { timeout: 30000, interval: 500 })
   })
 })

@@ -633,24 +633,32 @@ fn set_hip_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
     std::fs::write(&path, toml_str).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn get_network_policy(app: tauri::AppHandle) -> Result<String, String> {
-    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
-    match std::fs::read_to_string(&path) {
+fn read_network_policy(path: &std::path::Path) -> Result<String, String> {
+    match std::fs::read_to_string(path) {
         Ok(contents) => Ok(contents),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
         Err(e) => Err(e.to_string()),
     }
 }
 
+fn write_network_policy(path: &std::path::Path, json: &str) -> Result<(), String> {
+    let cfg: NetworkPolicyConfig =
+        serde_json::from_str(json).map_err(|e| format!("JSON parse error: {e}"))?;
+    let pretty =
+        serde_json::to_string_pretty(&cfg).map_err(|e| format!("JSON serialize error: {e}"))?;
+    std::fs::write(path, pretty).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_network_policy(app: tauri::AppHandle) -> Result<String, String> {
+    let path = paths::network_policy_path(&app).ok_or("no config dir")?;
+    read_network_policy(&path)
+}
+
 #[tauri::command]
 fn set_network_policy(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let _cfg: NetworkPolicyConfig =
-        serde_json::from_str(&json).map_err(|e| format!("JSON parse error: {e}"))?;
-    let pretty =
-        serde_json::to_string_pretty(&_cfg).map_err(|e| format!("JSON serialize error: {e}"))?;
     let path = paths::network_policy_path(&app).ok_or("no config dir")?;
-    std::fs::write(&path, pretty).map_err(|e| e.to_string())
+    write_network_policy(&path, &json)
 }
 
 /// Path to the file-backed secret store (`~/.hip/config/auth.json`).
@@ -1995,5 +2003,56 @@ enabled = false
         assert_eq!(cfg2.providers[0].base_url, "https://api.openai.com/v1");
         assert_eq!(cfg2.mcp_servers[0].id, "srv-2");
         assert_eq!(cfg2.mcp_servers[0].url.as_deref(), Some("https://example.com/mcp"));
+    }
+
+    #[test]
+    fn read_network_policy_returns_default_when_missing() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-missing-{}", std::process::id()));
+        let path = dir.join("network.json");
+        let result = super::read_network_policy(&path);
+        assert_eq!(result.unwrap(), "{}");
+    }
+
+    #[test]
+    fn write_network_policy_rejects_invalid_json() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-invalid-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("network.json");
+        let result = super::write_network_policy(&path, "not json");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("JSON parse error"));
+    }
+
+    #[test]
+    fn network_policy_roundtrip_pretty_json() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-roundtrip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("network.json");
+
+        let input = r#"{"allowlist":["https://example.com"],"maxRequestsPerMinute":100}"#;
+        super::write_network_policy(&path, input).unwrap();
+
+        let contents = std::fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("allowlist"));
+        assert!(contents.contains("https://example.com"));
+        assert!(contents.contains("maxRequestsPerMinute"));
+
+        let read_back = super::read_network_policy(&path).unwrap();
+        let cfg: super::NetworkPolicyConfig = serde_json::from_str(&read_back).unwrap();
+        assert_eq!(cfg.allowlist.as_deref(), Some(&["https://example.com".to_string()][..]));
+        assert_eq!(cfg.max_requests_per_minute, Some(100));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn network_policy_write_creates_parent_dirs() {
+        let dir = std::env::temp_dir().join(format!("hip-netpol-nested-{}", std::process::id()));
+        let nested = dir.join("a").join("b");
+        let path = nested.join("network.json");
+
+        let input = r#"{"denylist":["https://evil.com"]}"#;
+        let result = super::write_network_policy(&path, input);
+        assert!(result.is_err());
     }
 }

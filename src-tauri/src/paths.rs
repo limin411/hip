@@ -131,6 +131,16 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(windows))]
+    fn network_policy_path_lives_under_config() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(
+            base.join("config").join("network.json"),
+            PathBuf::from("/Users/x/.hip/config/network.json"),
+        );
+    }
+
+    #[test]
     #[cfg(windows)]
     fn windows_uses_app_data() {
         let base = hip_base_from(

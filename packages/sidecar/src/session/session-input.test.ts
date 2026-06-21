@@ -4,6 +4,7 @@ import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
+import { SessionInputQueue } from './session-input.js'
 
 type Ev = { type: string; [k: string]: unknown }
 
@@ -155,6 +156,81 @@ describe('Session input queue', () => {
       expect(raw.inputQueue).toHaveLength(0)
       const completes = sent.filter((m) => m.type === 'message:complete')
       expect(completes.length).toBe(2)
+    })
+  })
+
+  describe('messageId collision', () => {
+    it('uses the original ID when no collision exists', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-1', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-1')
+
+      const id = queue.admit({ type: 'message', content: 'hello', messageId: 'unique-1' })
+      expect(id).toBe('unique-1')
+    })
+
+    it('appends a counter suffix when an explicit messageId collides', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-2', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-2')
+
+      const id1 = queue.admit({ type: 'message', content: 'first', messageId: 'dup' })
+      const id2 = queue.admit({ type: 'message', content: 'second', messageId: 'dup' })
+      expect(id1).toBe('dup')
+      expect(id2).toBe('dup-1')
+    })
+
+    it('increments the suffix for multiple collisions', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-3', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-3')
+
+      const id1 = queue.admit({ type: 'message', content: 'a', messageId: 'dup' })
+      const id2 = queue.admit({ type: 'message', content: 'b', messageId: 'dup' })
+      const id3 = queue.admit({ type: 'message', content: 'c', messageId: 'dup' })
+      expect(id1).toBe('dup')
+      expect(id2).toBe('dup-1')
+      expect(id3).toBe('dup-2')
+    })
+
+    it('handles collisions against already-suffixed IDs', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-4', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-4')
+
+      queue.admit({ type: 'message', content: 'a', messageId: 'dup' })
+      queue.admit({ type: 'message', content: 'b', messageId: 'dup' })
+      const id3 = queue.admit({ type: 'message', content: 'c', messageId: 'dup-1' })
+      expect(id3).toBe('dup-1-1')
+    })
+
+    it('avoids collisions for auto-generated IDs when many inputs are admitted rapidly', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-5', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-5')
+
+      const ids = new Set<string>()
+      for (let i = 0; i < 100; i++) {
+        const id = queue.admit({ type: 'message', content: String(i) })
+        ids.add(id)
+      }
+      expect(ids.size).toBe(100)
+    })
+
+    it('returns distinct IDs when admitting many inputs with the same messageId', () => {
+      const st = store()
+      st.insertSession({ id: 's-col-6', title: 'test', config: JSON.stringify(cfg), createdAt: 1, updatedAt: 1 })
+      const queue = new SessionInputQueue(st, 's-col-6')
+
+      const ids = new Set<string>()
+      for (let i = 0; i < 50; i++) {
+        const id = queue.admit({ type: 'message', content: String(i), messageId: 'bulk' })
+        ids.add(id)
+      }
+      expect(ids.size).toBe(50)
+      expect(ids.has('bulk')).toBe(true)
+      expect(ids.has('bulk-1')).toBe(true)
+      expect(ids.has('bulk-49')).toBe(true)
     })
   })
 })

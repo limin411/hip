@@ -15,7 +15,8 @@ export class SessionInputQueue {
   ) {}
 
   admit(input: SessionInput): string {
-    const id = input.messageId ?? `iq-${Date.now()}-${this.nextSuffix()}`
+    const baseId = input.messageId ?? `iq-${Date.now()}-${this.nextSuffix()}`
+    const id = this.ensureUniqueId(baseId)
     this.store.admitSessionInput({
       id,
       sessionId: this.sessionId,
@@ -24,6 +25,20 @@ export class SessionInputQueue {
       timeCreated: Date.now(),
     })
     return id
+  }
+
+  private ensureUniqueId(baseId: string): string {
+    const pendingIds = new Set(
+      this.store.listPendingSessionInputs(this.sessionId).map((r) => r.id),
+    )
+    if (!pendingIds.has(baseId)) return baseId
+    let counter = 1
+    let candidate = `${baseId}-${counter}`
+    while (pendingIds.has(candidate)) {
+      counter++
+      candidate = `${baseId}-${counter}`
+    }
+    return candidate
   }
 
   restore(): SessionInput[] {

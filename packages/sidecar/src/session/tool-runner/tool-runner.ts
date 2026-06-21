@@ -57,11 +57,13 @@ export interface ToolCallResult {
 
 /**
  * Executes a single tool call through a pipeline of:
- *   resolve → classify → PreToolUse hooks → approval gate → invoke → PostToolUse hooks.
+ *   resolve → classify → PreToolUse hooks → approval gate → guardian review → invoke → PostToolUse hooks.
  *
  * The `ask` hook result triggers a runner-level approval prompt (cache-aware).
  * Self-gated tools (e.g. run_script) skip runner approval — their embedded
  * ApprovalFn handles it internally.
+ * Guardian review runs for medium/high-risk tools (skipped in full permission mode)
+ * and can suppress invocation with a safety warning.
  */
 export class ToolRunner {
   constructor(private readonly deps: ToolRunnerDeps) {}
@@ -118,7 +120,7 @@ export class ToolRunner {
 
       if (preResult.kind === 'ask') {
         needsApproval = true
-        approvalReason = preResult.reason ?? approvalReason
+        approvalReason = preResult.reason
       }
 
       // Apply modifiedInput from modify hooks, falling back to updatedInput for back-compat.

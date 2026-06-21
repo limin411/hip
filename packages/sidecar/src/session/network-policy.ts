@@ -102,6 +102,7 @@ export class NetworkPolicy {
   private maxResponseBytes: number
   private readonly now: () => number
   private readonly buckets: Map<string, RateBucket> = new Map()
+  private _hasLoadedCustomConfig = false
 
   constructor(config?: NetworkPolicyConfig, opts?: NetworkPolicyOpts) {
     this.allowlist = config?.allowlist ? [...config.allowlist] : []
@@ -188,5 +189,24 @@ export class NetworkPolicy {
     if (config.maxResponseBytes !== undefined) {
       this.maxResponseBytes = config.maxResponseBytes
     }
+    this._hasLoadedCustomConfig = true
+  }
+
+  /** Whether a custom config has ever been applied via `updateConfig`. */
+  hasLoadedCustomConfig(): boolean {
+    return this._hasLoadedCustomConfig
+  }
+
+  /**
+   * Restore all network-policy fields to their hard-coded defaults.
+   * Rate-limit buckets are intentionally preserved so in-flight budget
+   * tracking is not lost on a config rollback.
+   */
+  reset(): void {
+    this.allowlist = []
+    this.denylist = []
+    this.maxRequestsPerMinute = DEFAULT_MAX_REQUESTS_PER_MINUTE
+    this.maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES
+    this._hasLoadedCustomConfig = false
   }
 }

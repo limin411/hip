@@ -613,9 +613,13 @@ export class Session {
 
     // Reload network policy config at the top of each turn so that
     // edits to ~/.hip/config/network.json take effect without restart.
+    // When the file is deleted after previously being loaded, reset to
+    // factory defaults.
     const networkCfg = loadNetworkPolicyConfig()
     if (networkCfg) {
       this.networkPolicy.updateConfig(networkCfg)
+    } else if (this.networkPolicy.hasLoadedCustomConfig()) {
+      this.networkPolicy.reset()
     }
 
     if (!base && this._config.useEventSource !== false && this.eventStore) {

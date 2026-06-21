@@ -258,4 +258,33 @@ describe.skipIf(!hasKey)('NetworkPolicy config reload between turns', () => {
     expect(events.some((e) => e.type === 'message:complete')).toBe(true)
     expect(events.some((e) => e.type === 'error')).toBe(false)
   })
+
+  it('resets to defaults when network.json is deleted after being loaded', async () => {
+    // Ensure no leftover config
+    if (existsSync(networkJsonPath)) unlinkSync(networkJsonPath)
+
+    // Write initial config
+    writeConfig({
+      allowlist: ['only.example'],
+      maxResponseBytes: 5000,
+    })
+
+    const session = new Session('test-reset-on-delete', testConfig, createModel())
+    const np = (session as any).networkPolicy as NetworkPolicy
+
+    // Turn 1 — picks up custom config
+    await collectEvents(session, 'hello')
+    expect(np.checkUrl('https://only.example/path').allowed).toBe(true)
+    expect(np.checkUrl('https://other.example/path').allowed).toBe(false)
+    expect(np.getResponseSizeCap()).toBe(5000)
+
+    // Delete the config file
+    unlinkSync(networkJsonPath)
+
+    // Turn 2 — should reset to defaults
+    await collectEvents(session, 'hello again')
+    expect(np.checkUrl('https://only.example/path').allowed).toBe(true)
+    expect(np.checkUrl('https://other.example/path').allowed).toBe(true)
+    expect(np.getResponseSizeCap()).toBe(10 * 1024 * 1024)
+  })
 })

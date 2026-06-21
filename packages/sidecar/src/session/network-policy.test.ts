@@ -162,4 +162,82 @@ describe('NetworkPolicy', () => {
     const policy = new NetworkPolicy({ allowlist: [] })
     expect(policy.checkUrl('https://anything.example/').allowed).toBe(true)
   })
+
+  // ── 17. hasLoadedCustomConfig tracks updateConfig calls ─────────────────────
+  it('returns false before updateConfig and true after', () => {
+    const policy = new NetworkPolicy()
+    expect(policy.hasLoadedCustomConfig()).toBe(false)
+    policy.updateConfig({ allowlist: ['a.com'] })
+    expect(policy.hasLoadedCustomConfig()).toBe(true)
+  })
+
+  it('returns false after reset even when updateConfig was called before', () => {
+    const policy = new NetworkPolicy()
+    policy.updateConfig({ allowlist: ['a.com'] })
+    expect(policy.hasLoadedCustomConfig()).toBe(true)
+    policy.reset()
+    expect(policy.hasLoadedCustomConfig()).toBe(false)
+  })
+
+  // ── 18. reset() restores factory defaults ───────────────────────────────────
+  it('restores allowlist to empty after reset', () => {
+    const policy = new NetworkPolicy({ allowlist: ['only.com'] })
+    expect(policy.checkUrl('https://only.com/').allowed).toBe(true)
+    expect(policy.checkUrl('https://other.com/').allowed).toBe(false)
+
+    policy.reset()
+    // empty allowlist → allow all
+    expect(policy.checkUrl('https://only.com/').allowed).toBe(true)
+    expect(policy.checkUrl('https://other.com/').allowed).toBe(true)
+  })
+
+  it('restores denylist to empty after reset', () => {
+    const policy = new NetworkPolicy({ denylist: ['blocked.com'] })
+    expect(policy.checkUrl('https://blocked.com/').allowed).toBe(false)
+
+    policy.reset()
+    expect(policy.checkUrl('https://blocked.com/').allowed).toBe(true)
+  })
+
+  it('restores maxRequestsPerMinute to default 10 after reset', () => {
+    const policy = new NetworkPolicy({ maxRequestsPerMinute: 3 })
+    for (let i = 0; i < 3; i++) {
+      expect(policy.checkRateLimit('s').allowed).toBe(true)
+    }
+    expect(policy.checkRateLimit('s').allowed).toBe(false) // exceeded custom cap, bucket at 4
+
+    policy.reset()
+    // Bucket is preserved at count=4, default cap is now 10 → 6 more before block
+    for (let i = 0; i < 6; i++) {
+      expect(policy.checkRateLimit('s').allowed).toBe(true)
+    }
+    // 11th request (4 pre-reset + 6 post-reset + this one = 11) should be blocked
+    expect(policy.checkRateLimit('s').allowed).toBe(false)
+  })
+
+  it('restores maxResponseBytes to default 10MB after reset', () => {
+    const policy = new NetworkPolicy({ maxResponseBytes: 2048 })
+    expect(policy.getResponseSizeCap()).toBe(2048)
+
+    policy.reset()
+    expect(policy.getResponseSizeCap()).toBe(10 * 1024 * 1024)
+  })
+
+  // ── 19. reset() preserves rate-limit buckets ────────────────────────────────
+  it('preserves existing rate-limit bucket state across reset', () => {
+    const policy = new NetworkPolicy({ maxRequestsPerMinute: 2 })
+    // Exhaust the custom budget of 2
+    expect(policy.checkRateLimit('s').allowed).toBe(true)
+    expect(policy.checkRateLimit('s').allowed).toBe(true)
+    expect(policy.checkRateLimit('s').allowed).toBe(false) // exceeded
+
+    policy.reset() // default cap is 10, but bucket is NOT cleared
+
+    // The bucket still has count=3; default cap is 10, so 10 - 3 = 7 more allowed
+    for (let i = 0; i < 7; i++) {
+      expect(policy.checkRateLimit('s').allowed).toBe(true)
+    }
+    // 11th total → blocked
+    expect(policy.checkRateLimit('s').allowed).toBe(false)
+  })
 })

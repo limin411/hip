@@ -227,7 +227,8 @@ export class ToolRegistry {
       if (list.length === 0) continue
       const latest = list[list.length - 1]!
       const name = latest.tool.name
-      if (hasAllowed && !allowed!.includes(name)) continue
+      const isMcp = name.startsWith('mcp__')
+      if (hasAllowed && !isMcp && !allowed!.includes(name)) continue
       if (blocked !== undefined && blocked.length > 0 && blocked.includes(name)) continue
       out.push(latest.tool)
     }

@@ -2,7 +2,7 @@ import type { PermissionMode } from '@hip/protocol'
 
 export type RiskLevel = 'low' | 'medium' | 'high'
 
-export type ApprovalKind = 'none' | 'self' | 'auto_allow'
+export type ApprovalKind = 'none' | 'self' | 'auto_allow' | 'ask'
 
 export type ToolClassification = {
   risk: RiskLevel
@@ -10,7 +10,7 @@ export type ToolClassification = {
 }
 
 export interface ToolPolicy {
-  classify(toolName: string, mode: PermissionMode): ToolClassification
+  classify(toolName: string, mode: PermissionMode, registeredTools?: Set<string>): ToolClassification
 }
 
 export const READ_TOOLS = new Set([
@@ -27,6 +27,8 @@ const WRITE_TOOLS = new Set(['write_file', 'edit_file'])
 
 const PLAN_TOOLS = new Set(['write_todos'])
 
+const SCRIPT_TOOLS = new Set(['run_script'])
+
 const GIT_TOOLS = new Set([
   'git_commit',
   'git_create_branch',
@@ -42,6 +44,7 @@ const MEDIUM_TOOLS = new Set(['generate_agent'])
 
 const LOW_RISK_NONE: ToolClassification = { risk: 'low', approval: 'none' }
 const MEDIUM_RISK_NONE: ToolClassification = { risk: 'medium', approval: 'none' }
+const MEDIUM_RISK_ASK: ToolClassification = { risk: 'medium', approval: 'ask' }
 
 export function defaultToolPolicy(opts: {
   selfGatedTools: Set<string>
@@ -49,7 +52,7 @@ export function defaultToolPolicy(opts: {
   const selfGated = opts.selfGatedTools
 
   return {
-    classify(toolName: string, mode: PermissionMode): ToolClassification {
+    classify(toolName: string, mode: PermissionMode, registeredTools?: Set<string>): ToolClassification {
       if (selfGated.has(toolName)) {
         if (mode === 'full') {
           return { risk: 'high', approval: 'auto_allow' }
@@ -63,6 +66,7 @@ export function defaultToolPolicy(opts: {
 
       if (
         WRITE_TOOLS.has(toolName) ||
+        SCRIPT_TOOLS.has(toolName) ||
         GIT_TOOLS.has(toolName) ||
         MEDIUM_TOOLS.has(toolName) ||
         DELEGATE_TOOLS.has(toolName)
@@ -71,10 +75,14 @@ export function defaultToolPolicy(opts: {
       }
 
       if (toolName.startsWith('mcp__')) {
+        return mode === 'full' ? { risk: 'medium', approval: 'auto_allow' } : MEDIUM_RISK_ASK
+      }
+
+      if (registeredTools?.has(toolName)) {
         return MEDIUM_RISK_NONE
       }
 
-      return MEDIUM_RISK_NONE
+      return mode === 'full' ? MEDIUM_RISK_NONE : MEDIUM_RISK_ASK
     },
   }
 }

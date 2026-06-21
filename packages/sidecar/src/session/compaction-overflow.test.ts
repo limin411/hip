@@ -67,7 +67,7 @@ describe('compaction overflow behavior', () => {
       const summarizer: Summarizer = { async summarize() { summarizeCalled++; return '摘要' } }
       const out = await app.invoke(
         { messages: build(), steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([new AIMessage('ok')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('ok')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
       )
       expect(summarizeCalled).toBe(0)
       expect(out.compacted).toBe(false)
@@ -81,7 +81,7 @@ describe('compaction overflow behavior', () => {
       const summarizer: Summarizer = { async summarize() { return '早期摘要' } }
       const out = await app.invoke(
         { messages: build(), steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit: noopEmit, summarizer } } },
       )
       expect(out.compacted).toBe(true)
       const ids = out.messages.map((m) => m.id)
@@ -104,7 +104,7 @@ describe('compaction overflow behavior', () => {
       const emit: GraphEmit = { ...noopEmit, compaction: (s) => summaries.push(s) }
       await app.invoke(
         { messages: build(), steps: 0 },
-        { configurable: { ctx: { runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit, summarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([new AIMessage('最终答复')]), tools: buildTools(root), emit, summarizer } } },
       )
       expect(summaries).toEqual(['[对话摘要] emit-test-summary'])
     })
@@ -128,7 +128,7 @@ describe('compaction overflow behavior', () => {
       const runner = overflowRunner(overflow, new AIMessage('recovered'))
       const out = await app.invoke(
         { messages: build(), steps: 0 },
-        { configurable: { ctx: { runner, tools: buildTools(root), emit: noopEmit, summarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer } } },
       )
       expect(summarizeCalls).toBeGreaterThanOrEqual(1)
       expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('recovered')
@@ -145,7 +145,7 @@ describe('compaction overflow behavior', () => {
       await app.invoke(
         { messages: build(), steps: 0 },
         {
-          configurable: { ctx: { runner: fakeRunner([loop(), new AIMessage('done')]), tools: buildTools(root), emit: noopEmit, summarizer } },
+          configurable: { ctx: { sessionId: 'test-session', runner: fakeRunner([loop(), new AIMessage('done')]), tools: buildTools(root), emit: noopEmit, summarizer } },
           recursionLimit: 50,
         },
       )

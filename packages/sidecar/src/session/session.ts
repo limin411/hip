@@ -761,6 +761,8 @@ export class Session {
       }
     }
 
+    const t0 = Date.now()
+
     if (!this.agentProv.isExternalAgent()) {
       const contextState: SessionContextState = {
         cwd,
@@ -780,9 +782,11 @@ export class Session {
           return entries.length > 0 ? entries.map(([id, m]) => ({ id, description: m.description, status: m.status })) : undefined
         })(),
       }
+      logDebug('session', 'phase:prepareContext', { sessionId: this.id, elapsedMs: Date.now() - t0 })
       const prepared = await prepareSessionContext(this.id, 'supervisor', contextState, this.store)
       system = prepared.system
       contextMessages = prepared.contextMessages
+      logDebug('session', 'phase:contextDone', { sessionId: this.id, elapsedMs: Date.now() - t0, contextMsgCount: prepared.contextMessages.length })
       send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(this.configMgr.mcpConfigs) })
       tooling = await buildSessionTooling({
         cwd,
@@ -809,6 +813,7 @@ export class Session {
           send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
         },
       })
+      logDebug('session', 'phase:toolingDone', { sessionId: this.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
     }
 
     const maxSteps = this.activeActivity?.stepsRemaining ?? MAX_STEPS
@@ -833,6 +838,7 @@ export class Session {
         })
         const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
         const stepsBefore = base?.steps ?? 0
+        logDebug('session', 'phase:invokeGraph', { sessionId: this.id, elapsedMs: Date.now() - t0, msgCount: base?.messages.length ?? this.messages.length })
         finalState = await this.app.invoke(
           {
             messages: [new SystemMessage(system), ...contextMessages, ...(base?.messages ?? this.messages)],

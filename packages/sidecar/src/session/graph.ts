@@ -5,11 +5,13 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { TurnUsage, PermissionMode, PlanItem } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
+import { READ_TOOLS, defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
-import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
+import type { ToolCallResult } from './tool-runner/tool-runner.js'
+import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
@@ -43,6 +45,7 @@ export interface GraphCtx {
   blockedTools?: string[]
   systemPrompt?: string
   activeProfileId?: string
+  toolParallelism?: number
 }
 
 const LoopState = Annotation.Root({
@@ -145,20 +148,46 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
       calls.push(call)
     }
-    const out: ToolMessage[] = []
-    for (const call of calls) {
+
+    const parallelism = ctx.toolParallelism ?? 5
+    const parallelIndices: number[] = []
+    const sequentialIndices: number[] = []
+    for (let i = 0; i < calls.length; i++) {
+      if (READ_TOOLS.has(calls[i].name)) {
+        parallelIndices.push(i)
+      } else {
+        sequentialIndices.push(i)
+      }
+    }
+
+    const results: ToolCallResult[] = new Array(calls.length)
+
+    await runWithConcurrency(parallelIndices, parallelism, async (index) => {
+      const call = calls[index]
       const id = call.id ?? call.name
-      const result = await runner.runToolCall({
+      results[index] = await runner.runToolCall({
         name: call.name,
         callId: id,
         args: (call.args as Record<string, unknown>) ?? {},
       })
-      out.push(new ToolMessage({
-        content: result.content,
-        tool_call_id: result.tool_call_id,
-        name: result.name,
-      }))
+    })
+
+    for (const index of sequentialIndices) {
+      const call = calls[index]
+      const id = call.id ?? call.name
+      results[index] = await runner.runToolCall({
+        name: call.name,
+        callId: id,
+        args: (call.args as Record<string, unknown>) ?? {},
+      })
     }
+
+    const out: ToolMessage[] = results.map((result) => new ToolMessage({
+      content: result.content,
+      tool_call_id: result.tool_call_id,
+      name: result.name,
+    }))
+
     const sig = sigOf(last.tool_calls ?? [])
     return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW) }
   }

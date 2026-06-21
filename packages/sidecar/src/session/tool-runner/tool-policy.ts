@@ -13,7 +13,7 @@ export interface ToolPolicy {
   classify(toolName: string, mode: PermissionMode): ToolClassification
 }
 
-const READ_TOOLS = new Set([
+export const READ_TOOLS = new Set([
   'read_file',
   'ls',
   'glob',

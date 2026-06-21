@@ -128,7 +128,7 @@ export class TokenCounter {
     this.detect = providerDetection
     this.cacheDir = opts.cacheDir ?? defaultCacheDir()
     this.loadModule = opts.loadModule ?? ((name) => import(name) as Promise<unknown>)
-    this.loadTimeoutMs = opts.loadTimeoutMs ?? TOKENIZER_LOAD_TIMEOUT_MS
+    this.loadTimeoutMs = opts.loadTimeoutMs ?? (process.env.VITEST === 'true' ? 0 : TOKENIZER_LOAD_TIMEOUT_MS)
   }
 
   /**

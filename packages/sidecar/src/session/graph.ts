@@ -15,7 +15,7 @@ import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
-import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
+import { estimateTokensAsync, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
 
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
@@ -26,6 +26,7 @@ export interface GraphEmit {
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
   usage(u: TurnUsage): void
   planDelta(itemId: string, delta: string): void
+  compaction(summary: string): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -59,6 +60,7 @@ const LoopState = Annotation.Root({
   planStatus: Annotation<'none' | 'generating' | 'ready' | 'approved' | 'rejected'>({ reducer: (_prev, next) => next, default: () => 'none' }),
   plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
+  compacted: Annotation<boolean>({ reducer: (_prev, next) => next, default: () => false }),
 })
 
 type State = typeof LoopState.State
@@ -69,37 +71,80 @@ function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   return ctx
 }
 
+function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): BaseMessage[] {
+  const removeSet = new Set(result.removeIds)
+  return stateMessages
+    .filter((m) => !m.id || !removeSet.has(m.id))
+    .map((m) => (m.id === result.summary.id ? result.summary : m))
+}
+
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
-  /** Pre-turn + mid-loop context shrink: summarize the middle when over budget (≤ once per visit). */
-  async function compact(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    if (estimateTokens(state.messages) <= compactBudget) return {}
-    const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctxOf(config).summarizer })
+/** Pre-turn compaction: shrink the middle when over budget (≤ once per invoke). */
+  async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
+    if (state.compacted) return {}
+    const ctx = ctxOf(config)
+    const overBudget = await estimateTokensAsync(state.messages) > compactBudget
+    if (!overBudget) return {}
+    const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
     if (!result) return {}
-    return { messages: [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))] }
+    const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+    ctx.emit.compaction(summaryText)
+    return {
+      messages: [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
+      compacted: true,
+    }
   }
 
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { runner, tools, emit, systemPrompt } = ctxOf(config)
-    const messages: BaseMessage[] = [...state.messages]
-    if (systemPrompt !== undefined) {
-      if (messages[0] instanceof SystemMessage) {
-        messages[0] = new SystemMessage(systemPrompt)
-      } else {
-        messages.unshift(new SystemMessage(systemPrompt))
+    const ctx = ctxOf(config)
+    const { runner, tools, emit, systemPrompt } = ctx
+    const capped = state.steps >= maxSteps - 1
+
+    function prepareMessages(list: BaseMessage[]): BaseMessage[] {
+      const next = [...list]
+      if (systemPrompt !== undefined) {
+        if (next[0] instanceof SystemMessage) {
+          next[0] = new SystemMessage(systemPrompt)
+        } else {
+          next.unshift(new SystemMessage(systemPrompt))
+        }
       }
+      return next
     }
-    const capped = state.steps >= maxSteps - 1 // last allowed step: no tools, force text
-    const msg = await runner.run(messages, {
-      tools,
-      bindTools: !capped,
-      signal: config.signal,
-      onText: (d) => emit.token(d),
-      onReasoning: (d) => emit.reasoning(d),
-    })
-    const u = msg.usage_metadata
-    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
-    return { messages: [msg], steps: state.steps + 1 }
+
+    async function runModel(input: BaseMessage[]): Promise<AIMessage> {
+      return runner.run(input, {
+        tools,
+        bindTools: !capped,
+        signal: config.signal,
+        onText: (d) => emit.token(d),
+        onReasoning: (d) => emit.reasoning(d),
+      })
+    }
+
+    async function execute(input: BaseMessage[]): Promise<Partial<State>> {
+      const msg = await runModel(input)
+      const u = msg.usage_metadata
+      if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
+      return { messages: [msg], steps: state.steps + 1 }
+    }
+
+    const messages = prepareMessages(state.messages)
+    try {
+      return await execute(messages)
+    } catch (err) {
+      if (state.compacted || !isOverflowError(err)) throw err
+      const result = await compactMessages(messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer, overflowRecovery: true })
+      if (!result) throw err
+      const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+      emit.compaction(summaryText)
+      const compactedMessages = [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))]
+      const compactedState = applyCompaction(state.messages, result)
+      const retryMessages = prepareMessages(compactedState)
+      const msgResult = await execute(retryMessages)
+      return { ...msgResult, messages: [...compactedMessages, ...(msgResult.messages ?? [])], compacted: true }
+    }
   }
 
   function getOrCreateToolRunner(ctx: GraphCtx): ToolRunner {
@@ -265,7 +310,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   }
 
   return new StateGraph(LoopState)
-    .addNode('compact', compact)
+    .addNode('compact', compactNode)
     .addNode('agent', agent)
     .addNode('tools', toolsNode)
     .addNode('nudge', nudge)

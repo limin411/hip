@@ -8,7 +8,7 @@ import type { GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-subagent-cont-'))

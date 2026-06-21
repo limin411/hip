@@ -5,7 +5,7 @@ import type { GraphEmit } from '../graph.js'
 import { createAgentInvoker, type RunInternalArgs } from './invoker.js'
 import type { ApprovalFn } from '../tools.js'
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const approval: ApprovalFn = async () => ({ kind: 'allow_once' })
 
 const skills: SkillMeta[] = [

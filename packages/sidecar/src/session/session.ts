@@ -38,7 +38,8 @@ import type { AgentRunner } from '../orchestrator/ports.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
 import { EventStore } from '../persistence/event-store.js'
-import { projectEvent } from '../persistence/message-projector.js'
+import { loadProjection, projectEvent } from '../persistence/message-projector.js'
+import type { SessionMessageData, ProjectedToolCall } from '../persistence/message-types.js'
 import * as workspaceFs from './workspace-fs.js'
 import { GitOperations } from './git-operations.js'
 import { PermissionManager } from './permission-manager.js'
@@ -260,11 +261,31 @@ export class Session {
   }
 
   // ── Lifecycle ──
-  hydrate(messages: Message[]): void {
-    for (const m of messages) {
-      this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+  /** Rebuild the in-memory message list from the event-sourced projection.
+   *  Falls back to the legacy messages table when the projection is empty. */
+  hydrate(messages?: Message[]): void {
+    this.messages.length = 0
+    const rebuilt = this.rebuildMessagesFromEvents(this.id)
+    if (rebuilt.length > 0) {
+      this.messages.push(...rebuilt)
+    } else if (messages && messages.length > 0) {
+      for (const m of messages) {
+        this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+      }
+    } else if (this.store) {
+      for (const m of this.store.loadMessages(this.id)) {
+        this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+      }
     }
     this.reseedLastCheckpoint()
+  }
+
+  /** Load session_message rows and map them back to LangGraph BaseMessages.
+   *  This is the boundary where events become the source of truth for LoopState. */
+  rebuildMessagesFromEvents(sessionId: string): BaseMessage[] {
+    if (!this.store) return []
+    const rows = loadProjection(this.store.getDb(), sessionId)
+    return rows.map((r) => rowToBaseMessage(r.data))
   }
 
   private requireCompatibleModel(send: SendFn): boolean {
@@ -353,6 +374,15 @@ export class Session {
     plan?: PlanItem[]
   }): Promise<string> {
     this.abortController = new AbortController(); this.running = true
+
+    if (!base && this._config.useEventSource !== false && this.eventStore) {
+      const rebuilt = this.rebuildMessagesFromEvents(this.id)
+      if (this.messages.length === 0 || rebuilt.length === this.messages.length) {
+        this.messages.length = 0
+        this.messages.push(...rebuilt)
+      }
+    }
+
     let timedOut = false
     const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
     const send: SendFn = (msg) => { watchdog.kick(); rawSend(msg) }
@@ -459,6 +489,7 @@ export class Session {
       toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: this.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { this.emit({ type: 'tool_success', sessionId: this.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { this.emit({ type: 'tool_failed', sessionId: this.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) } },
       usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
       planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: this.id, turnId, itemId, delta }) },
+      compaction: (summary: string) => { this.emit({ type: 'compaction_ended', sessionId: this.id, summary, timestamp: Date.now() }) },
     })
     const emit = makeEmit('supervisor', 'supervisor')
     let subagentSeq = 0
@@ -810,6 +841,7 @@ export class Session {
       toolFinished: (callId, status, resOutput, error) => { const outClip = resOutput !== undefined ? clip(stringify(resOutput)) : undefined; send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: taskId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }) },
       usage: () => {},
       planDelta: () => {},
+      compaction: () => {},
     }
 
     try {
@@ -847,6 +879,25 @@ export class Session {
     this.spawnedSubagentIds.clear()
     this.agentProv.dispose()
   }
+}
+
+function rowToBaseMessage(d: SessionMessageData): BaseMessage {
+  if (d.role === 'user') return new HumanMessage(d.content)
+  if (d.role === 'assistant' && 'kind' in d) return new SystemMessage(d.summary)
+  const toolCalls = d.toolCalls.length > 0 ? d.toolCalls.map(projectedToolCallToToolCall) : undefined
+  return new AIMessage({ content: d.content, ...(toolCalls ? { tool_calls: toolCalls } : {}) })
+}
+
+function projectedToolCallToToolCall(t: ProjectedToolCall) {
+  return { name: t.name, args: parseToolInput(t.input), id: t.callId, type: 'tool_call' as const }
+}
+
+function parseToolInput(input: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(input)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
+  } catch { }
+  return {}
 }
 
 /** Map a protocol SessionEvent into the internal event payload that the

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,6 +10,7 @@ import { AgentProfileManager } from './agent-profile-manager.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { SkillMeta } from '@hip/protocol'
+import { setActiveModel } from '../config/providers.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -22,12 +23,16 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-plan-profile-'))
   try { await fn(root) } finally { rmSync(root, { recursive: true, force: true }) }
 }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 describe('plan profile', () => {
   it('AgentProfileManager plan profile has the expected allowed tools', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +8,7 @@ import { buildGraph, type GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { TurnUsage } from '@hip/protocol'
+import { setActiveModel } from '../config/providers.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -20,12 +21,16 @@ function fakeRunner(script: AIMsg[]): ModelRunner {
   }
 }
 
-const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {} }
+const noopEmit: GraphEmit = { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 const withTmp = async (fn: (root: string) => Promise<void>) => {
   const root = mkdtempSync(join(tmpdir(), 'hip-graph-'))
   try { await fn(root) } finally { rmSync(root, { recursive: true, force: true }) }
 }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 describe('agent loop graph', () => {
   it('stops immediately when the model returns a plain text answer', async () => {

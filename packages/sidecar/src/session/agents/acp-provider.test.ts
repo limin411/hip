@@ -13,7 +13,7 @@ afterEach(() => acpConnections.disposeAll())
 function cap() {
   const out = { text: '', reasoning: '', tools: [] as string[][], toolEnds: [] as string[][] }
   const emit: GraphEmit = { token: (d) => { out.text += d }, reasoning: (d) => { out.reasoning += d },
-    toolStarted: (n, id) => { out.tools.push([id, n]) }, toolFinished: (id, s) => { out.toolEnds.push([id, s]) }, usage: () => {}, planDelta: () => {} }
+    toolStarted: (n, id) => { out.tools.push([id, n]) }, toolFinished: (id, s) => { out.toolEnds.push([id, s]) }, usage: () => {}, planDelta: () => {}, compaction: () => {} }
   return { emit, out }
 }
 function cfg(extra: any = {}): any {

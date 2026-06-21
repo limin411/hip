@@ -219,7 +219,7 @@ export class SessionMessageUpdater {
 
   private onTextEnded(event: SessionEvent): void {
     const stepId = reqString(event.data, 'text_ended', 'stepId')
-    const content = reqString(event.data, 'text_ended', 'content')
+    const content = optString(event.data, 'content') ?? ''
     this.patchStep(event.aggregateId, stepId, event.seq, (d) => ({
       ...d,
       content: d.content.length === 0 ? content : d.content + content,

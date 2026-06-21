@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { AIMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { buildGraph } from './graph.js'
 import { buildMultiAgentGraph, type MultiAgentCtx, type MultiAgentApp, HANDOFF_TOOL_PREFIX } from './multi-agent-graph.js'
@@ -8,6 +8,7 @@ import type { GraphEmit } from './graph.js'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
+import { setActiveModel } from '../config/providers.js'
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -20,7 +21,12 @@ const noopEmit: GraphEmit = {
   toolFinished: () => {},
   usage: () => {},
   planDelta: () => {},
+  compaction: () => {},
 }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 /** Fake runner that replays a per-call script. Advances one message per call. */
 function scriptedRunner(scripts: Map<string, AIMessage[]>): ModelRunner & { callsByAgent: string[] } {

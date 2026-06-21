@@ -114,6 +114,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         toolFinished: emit.toolFinished,
         usage: emit.usage,
         planDelta: emit.planDelta,
+        compaction: emit.compaction,
       }
       try {
         await provider.runTurn(task, teed, signal, hooks)

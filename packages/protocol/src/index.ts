@@ -38,6 +38,10 @@ export interface SessionConfig {
    *  'code' = conversation + directory tree + git. undefined on a legacy row ⇒ inferred from
    *  the cwd (a scratch cwd ⇒ 'chat', else 'code'); see surfaceOf in the sidecar. */
   surface?: 'chat' | 'code'
+  /** When true (default), Session rebuilds its message history from the event-sourced
+   *  session_message projection instead of relying on LangGraph checkpointing or the legacy
+   *  messages table. Set to false to opt out during the dual-write transition. */
+  useEventSource?: boolean
 }
 
 /** Global current model the whole app uses. */

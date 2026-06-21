@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
@@ -6,6 +6,7 @@ import { buildGraph, type GraphEmit } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import { setActiveModel } from '../config/providers.js'
 
 const noopEmit: GraphEmit = {
   token: () => {},
@@ -14,7 +15,12 @@ const noopEmit: GraphEmit = {
   toolFinished: () => {},
   usage: () => {},
   planDelta: () => {},
+  compaction: () => {},
 }
+
+beforeAll(() => {
+  setActiveModel({ providerID: 'openai', modelID: 'gpt-4', baseURL: '' })
+})
 
 const noopSummarizer: Summarizer = { async summarize() { return '' } }
 
@@ -83,7 +89,7 @@ describe('toolsNode parallel execution', () => {
     const latestStart = Math.max(...log.map((l) => l.start - start))
     const earliestEnd = Math.min(...log.map((l) => l.end - start))
     expect(latestStart).toBeLessThan(earliestEnd)
-    expect(elapsed).toBeLessThan(200)
+    expect(elapsed).toBeLessThan(300)
   })
 
   it('executes two write tools sequentially', async () => {

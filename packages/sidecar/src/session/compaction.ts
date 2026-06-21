@@ -1,6 +1,4 @@
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
-import { getActiveModel } from '../config/providers.js'
-import { TokenCounter } from './token-counter.js'
 
 /** Compact when the estimated prompt exceeds this. Conservative: the sidecar cannot read the active
  *  model's real context window (config/providers.ts carries none), so assume a ~64k floor and keep
@@ -14,10 +12,8 @@ export const KEEP_RECENT_TURNS = 3
  *  summary has room for full context preservation. */
 export const SUMMARY_OUTPUT_TOKENS = 4096
 
-/** No tokenizer in-stack → char heuristic. /3 over-estimates English (≈4 ch/tok) but fits dense
- *  CJK/code, so it triggers a little early rather than too late. Kept as a synchronous fallback
- *  for tests and for paths where loading a tokenizer is undesirable. */
-const CHARS_PER_TOKEN = 3
+/** Industry-standard heuristic for context-budget checks (Codex/OpenCode both use ≈4 chars/byte per token). */
+const CHARS_PER_TOKEN = 4
 
 /** Summarizes a span of messages into a short note. Injected so compaction is unit-testable. */
 export interface Summarizer {
@@ -56,26 +52,11 @@ function textOf(m: BaseMessage): string {
   return ''
 }
 
-/** Synchronous chars/3 estimate. Retained as the backward-compatible fallback; the existing test
- *  `expect(estimateTokens([new HumanMessage('123456')])).toBe(2)` pins this exact behavior. */
+/** Synchronous chars/4 estimate. This is the only token estimate used for context-window checks. */
 export function estimateTokens(messages: readonly BaseMessage[]): number {
   let chars = 0
   for (const m of messages) chars += textOf(m).length
   return Math.ceil(chars / CHARS_PER_TOKEN)
-}
-
-/** Process-wide singleton. Provider-aware: OpenAI → gpt-tokenizer BPE, DeepSeek → HF transformers
- *  with lazy tokenizer download, others → chars/4 + per-message overhead. */
-export const tokenCounter = new TokenCounter(() => getActiveModel())
-
-/** Provider-aware token estimate (async). Falls back to the chars/3 sync estimate above if the
- *  underlying counter throws. Callers on the hot path may use estimateTokens() instead. */
-export async function estimateTokensAsync(messages: readonly BaseMessage[]): Promise<number> {
-  try {
-    return await tokenCounter.countMessages(messages)
-  } catch {
-    return estimateTokens(messages)
-  }
 }
 
 export interface CompactResult {

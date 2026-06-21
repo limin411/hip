@@ -15,7 +15,7 @@ import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
-import { estimateTokensAsync, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
+import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
@@ -91,7 +91,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
   async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     if (state.compacted) return {}
     const ctx = ctxOf(config)
-    const overBudget = await estimateTokensAsync(state.messages) > compactBudget
+    const overBudget = estimateTokens(state.messages) > compactBudget
     if (!overBudget) return {}
     const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
     if (!result) return {}

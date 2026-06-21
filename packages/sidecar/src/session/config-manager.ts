@@ -7,6 +7,7 @@ import { readEnabledSkills, mergeSkills, extractSkillMetaFromData } from './skil
 import { parseFrontmatter } from './skills/frontmatter.js'
 import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
 import { synthesizePlugin } from './plugins/synthesizer.js'
+import { HookRegistry } from './hooks/registry.js'
 
 /** Read a plugin skill directory's SKILL.md and build a SkillMeta entry. */
 function skillMetaFromDir(dir: string, id: string): SkillMeta | null {
@@ -38,6 +39,7 @@ export class ConfigManager {
     private readonly isExternalAgent: () => boolean,
     private getModelDirty: () => boolean,
     private setModelDirty: (v: boolean) => void,
+    private readonly hookRegistry: HookRegistry,
   ) {}
 
   get skills(): SkillMeta[] { return this.cachedSkills ?? [] }
@@ -52,13 +54,14 @@ export class ConfigManager {
       this.cachedPluginAgents = []
       return
     }
+    this.hookRegistry.clear()
     try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd) } catch { this.cachedSkills = [] }
     this.cachedMcpConfigs = readMcpServersConfig()
     const pluginAgents: AgentConfig[] = []
     try {
       for (const pluginDir of readPluginsConfig().plugins) {
         try {
-          const manifest = parsePluginManifest(pluginDir as unknown as string)
+          const manifest = parsePluginManifest(pluginDir)
           const synth = synthesizePlugin(manifest)
           const pluginSkills: SkillMeta[] = []
           for (const se of synth.skills) {
@@ -68,6 +71,11 @@ export class ConfigManager {
           if (pluginSkills.length > 0) this.cachedSkills = mergeSkills(this.cachedSkills!, pluginSkills)
           for (const mcp of synth.mcpServers) this.cachedMcpConfigs!.push(mcp.config)
           for (const agent of synth.agents) pluginAgents.push(agent.config)
+          for (const hookEntry of synth.hooks) {
+            for (const hook of hookEntry.hooks) {
+              this.hookRegistry.register(hook)
+            }
+          }
         } catch (e) {
           if (e instanceof PluginManifestError) {
             console.warn(`Skipping invalid plugin: ${e.message}`)

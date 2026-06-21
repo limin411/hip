@@ -321,6 +321,7 @@ export class Session {
       () => this._config, (cfg) => { this._config = cfg }, () => this.running,
       this.usesEnvModel, () => this.buildAgent(),
       () => this.agentProv.isExternalAgent(), () => this.modelDirty, (v) => { this.modelDirty = v },
+      this.hooks,
     )
     this.buildAgent()
     this.configMgr.loadPluginComponents()

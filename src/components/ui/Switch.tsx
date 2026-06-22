@@ -4,13 +4,14 @@ interface SwitchProps {
   checked: boolean
   onCheckedChange: (next: boolean) => void
   disabled?: boolean
+  ariaDisabled?: boolean
   id?: string
   ariaLabel?: string
   className?: string
 }
 
 /** Controlled on/off toggle. Native <button role="switch"> → Space/Enter toggle for free. */
-export function Switch({ checked, onCheckedChange, disabled, id, ariaLabel, className }: SwitchProps) {
+export function Switch({ checked, onCheckedChange, disabled, ariaDisabled, id, ariaLabel, className }: SwitchProps) {
   return (
     <button
       type="button"
@@ -18,6 +19,7 @@ export function Switch({ checked, onCheckedChange, disabled, id, ariaLabel, clas
       id={id}
       aria-checked={checked}
       aria-label={ariaLabel}
+      aria-disabled={ariaDisabled}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(

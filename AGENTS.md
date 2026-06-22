@@ -15,6 +15,7 @@ Before implementing:
 - If multiple interpretations exist, present them.
 - If a simpler approach exists, say so.
 - If something is unclear, stop. Name what's confusing.
+- Look up information online promptly; never trust your own knowledge.
 
 ## 2. Simplicity First
 Minimum code that solves the problem. Nothing speculative.
@@ -40,3 +41,4 @@ Transform tasks into verifiable goals:
 - “Add validation” → “Write tests, then make them pass”
 - “Fix the bug” → “Reproduce it in a test, then fix”
 - “Refactor X” → “Ensure tests pass before and after”
+- Commit code promptly after completing each phase of work.

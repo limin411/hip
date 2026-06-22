@@ -153,6 +153,34 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].status).toBe('idle')
   })
 
+  it('session:loaded clears stale transient state from a previous session instance', () => {
+    const s0 = {
+      sessions: [baseSession({
+        id: 's1',
+        loaded: false,
+        status: 'running',
+        interrupt: { turnId: 't1', question: 'q' },
+        pendingPermission: { turnId: 't1', requestId: 'r1', tool: { title: 'x', kind: 'execute' }, options: [] },
+        configOptions: [{ id: 'c1', name: 'n', currentValue: 'v1', options: [] }],
+        agentProfiles: [{ id: 'p1', name: 'n', mode: 'primary' }],
+        activeTurnPlan: [{ content: 'step', status: 'pending' as const }],
+        planDeltaDraft: { i1: 'delta' },
+        planApprovalPending: true,
+      })],
+    }
+    const next = applyServerMessage(s0, { type: 'session:loaded', sessionId: 's1', messages: [
+      { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+    ] }, 0)
+    expect(next.sessions[0].status).toBe('error')
+    expect(next.sessions[0].interrupt).toBeNull()
+    expect(next.sessions[0].pendingPermission).toBeNull()
+    expect(next.sessions[0].configOptions).toBeUndefined()
+    expect(next.sessions[0].agentProfiles).toBeUndefined()
+    expect(next.sessions[0].activeTurnPlan).toBeNull()
+    expect(next.sessions[0].planDeltaDraft).toEqual({})
+    expect(next.sessions[0].planApprovalPending).toBe(false)
+  })
+
   it('session:deleted removes the session', () => {
     const base = { sessions: [emptySession('s1'), emptySession('s2')] }
     const next = applyServerMessage(base, { type: 'session:deleted', sessionId: 's1' }, 0)
@@ -358,6 +386,14 @@ describe('applyServerMessage', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'agent:interrupt', sessionId: 's1', turnId: 't1', agentId: 'supervisor', question: '我该怎么做？' }, 1)
     expect(next.sessions[0].interrupt).toEqual({ turnId: 't1', question: '我该怎么做？', context: undefined })
+    expect(next.sessions[0].status).toBe('idle')
+  })
+
+  it('agent:interrupt resets status from running to idle so regenerate is not blocked', () => {
+    const s0 = { sessions: [baseSession({ status: 'running' })] }
+    const next = applyServerMessage(s0, { type: 'agent:interrupt', sessionId: 's1', turnId: 't1', agentId: 'supervisor', question: 'waiting' }, 1)
+    expect(next.sessions[0].interrupt).toEqual({ turnId: 't1', question: 'waiting', context: undefined })
+    expect(next.sessions[0].status).toBe('idle')
   })
 
   it('agent:configOptions stores the agent-advertised config options on the session', () => {
@@ -548,11 +584,15 @@ describe('applyServerMessage session:cwd', () => {
 })
 
 describe('regenerateLastTurn', () => {
-  it('drops a trailing assistant message and resets to running', () => {
+  it('drops all trailing assistant messages and resets to running', () => {
     useDomainStore.setState({
       sessions: [baseSession({
-        messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 0 }, { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 }],
-        status: 'idle', error: { code: 'X', message: 'y' },
+        messages: [
+          { id: 'u1', role: 'user', content: 'hi', timestamp: 0 },
+          { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 },
+          { id: 'a2', role: 'assistant', content: 'extra', timestamp: 2 },
+        ],
+        status: 'idle', error: { code: 'X', message: 'y' }, interrupt: { turnId: 't1', question: 'q' }, pendingPermission: { turnId: 't1', requestId: 'r1', tool: { title: 'x', kind: 'other' }, options: [] },
       })],
       activeSessionId: 's1',
     })
@@ -561,6 +601,8 @@ describe('regenerateLastTurn', () => {
     expect(s.messages.map((m) => m.id)).toEqual(['u1'])
     expect(s.status).toBe('running')
     expect(s.error).toBeNull()
+    expect(s.interrupt).toBeNull()
+    expect(s.pendingPermission).toBeNull()
   })
 
   it('keeps a trailing user message (retry-after-error path)', () => {

@@ -249,7 +249,7 @@ export function applyServerMessage(
             planApprovalPending = false
           }
         }
-        return { ...s, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context }, planApprovalPending }
+        return { ...s, status: s.status === 'running' ? 'idle' : s.status, interrupt: { turnId: msg.turnId, question: msg.question, context: msg.context }, planApprovalPending }
       })
 
     case 'plan:delta':
@@ -315,6 +315,16 @@ export function applyServerMessage(
           messages: msg.messages,
           status: interrupted ? 'error' : 'idle',
           error: interrupted ? { code: 'INTERRUPTED', message: '' } : null,
+          // Loading persisted state resets any transient UI state from a previous session
+          // instance (e.g. after reconnect). Without this, stale interrupts or pending
+          // permissions can block regenerate and leave the pause button unreachable.
+          interrupt: null,
+          pendingPermission: null,
+          configOptions: undefined,
+          agentProfiles: undefined,
+          activeTurnPlan: null,
+          planDeltaDraft: {},
+          planApprovalPending: false,
         }
       })
 
@@ -467,9 +477,11 @@ export const useDomainStore = create<DomainStore>((set) => ({
     set((s) => ({
       sessions: s.sessions.map((sess) => {
         if (sess.id !== sessionId) return sess
-        const last = sess.messages[sess.messages.length - 1]
-        const messages = last && last.role === 'assistant' ? sess.messages.slice(0, -1) : sess.messages
-        return { ...sess, messages, status: 'running' as const, error: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
+        const messages = [...sess.messages]
+        while (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+          messages.pop()
+        }
+        return { ...sess, messages, status: 'running' as const, error: null, interrupt: null, pendingPermission: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
       }),
     })),
 

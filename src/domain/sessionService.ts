@@ -410,9 +410,8 @@ export class SessionService {
     const { activeSessionId, sessions } = useDomainStore.getState()
     if (!activeSessionId) return
     const sess = sessions.find((x) => x.id === activeSessionId)
-    // While a turn is paused for input, the sidecar's regenerate() is a no-op (awaitingResume); bail
-    // here too so we don't flip the UI into a stuck "running" state. The user answers via the composer.
-    if (!sess || sess.status === 'running' || sess.interrupt) return
+    if (!sess) return
+    if (sess.status === 'running' && !sess.interrupt) return
     useDomainStore.getState().regenerateLastTurn(activeSessionId)
     this.transport.send({ type: 'message:regenerate', sessionId: activeSessionId })
   }

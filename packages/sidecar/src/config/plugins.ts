@@ -1,13 +1,24 @@
 import { readFileSync } from 'node:fs'
 import type { PluginsConfig } from '@hip/protocol'
 
-/** Read the configured plugins from HIP_PLUGINS_PATH. Missing/corrupt file → { plugins: [] }. */
+/** Read the configured plugins from HIP_PLUGINS_PATH. Missing/corrupt file → { plugins: [] }.
+ *  Non-string entries in the plugins array are filtered out with a console.warn. */
 export function readPluginsConfig(): PluginsConfig {
   const file = process.env.HIP_PLUGINS_PATH?.trim()
   if (!file) return { plugins: [] }
   try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as PluginsConfig
-    return { plugins: Array.isArray(cfg?.plugins) ? cfg.plugins : [] }
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    const arr = raw?.plugins
+    if (!Array.isArray(arr)) return { plugins: [] }
+    const plugins: string[] = []
+    for (const entry of arr) {
+      if (typeof entry === 'string') {
+        plugins.push(entry)
+      } else {
+        console.warn(`Skipping non-string plugin entry (${typeof entry}):`, entry)
+      }
+    }
+    return { plugins }
   } catch {
     return { plugins: [] }
   }

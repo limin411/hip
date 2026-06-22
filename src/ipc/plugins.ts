@@ -5,7 +5,7 @@ export async function listPlugins(): Promise<PluginMeta[]> {
   const raw = await invoke<string>('list_plugins')
   if (!raw.trim()) return []
   try {
-    const parsed = JSON.parse(raw) as PluginMeta[]
+    const parsed: PluginMeta[] = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []

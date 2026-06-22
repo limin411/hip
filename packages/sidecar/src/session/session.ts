@@ -2,7 +2,7 @@ import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntr
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { ChatOpenAI } from '@langchain/openai'
-import { HumanMessage, AIMessage, AIMessageChunk, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
@@ -321,6 +321,7 @@ export class Session {
       () => this._config, (cfg) => { this._config = cfg }, () => this.running,
       this.usesEnvModel, () => this.buildAgent(),
       () => this.agentProv.isExternalAgent(), () => this.modelDirty, (v) => { this.modelDirty = v },
+      this.hooks,
     )
     this.buildAgent()
     this.configMgr.loadPluginComponents()
@@ -689,10 +690,16 @@ export class Session {
     }
 
     let supervisorText = ''
-    ensureStarted('supervisor', 'supervisor')
 
     const turnStartResult = await this.hooks.fire('TurnStart', { sessionId: this.id, turnId }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
-    if (turnStartResult.kind !== 'allow') { rawSend({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `Turn start rejected: ${turnStartResult.reason ?? 'blocked by hook'}` }); return '' }
+    if (turnStartResult.kind !== 'allow') {
+      this.running = false
+      this.abortController = null
+      rawSend({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `Turn start rejected: ${turnStartResult.reason ?? 'blocked by hook'}` })
+      return ''
+    }
+
+    ensureStarted('supervisor', 'supervisor')
 
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner(); const summarizer = this.summarizer()
@@ -1029,13 +1036,26 @@ export class Session {
   }
 
   async regenerate(send: SendFn): Promise<void> {
-    if (this.running || this.awaitingResume) return
+    if (this.running) {
+      send({ type: 'error', sessionId: this.id, code: 'BUSY', message: 'A turn is already running' })
+      return
+    }
+    if (this.awaitingResume) {
+      this.awaitingResume = false
+      this.paused = null
+    }
     if (!this.requireCompatibleModel(send)) return
     if (!this.requireApiKey(send)) return
+    while (this.messages[this.messages.length - 1] instanceof AIMessage) {
+      this.messages.pop()
+      this.store?.deleteLastAssistantMessage(this.id)
+    }
     const tail = this.messages[this.messages.length - 1]
-    if (tail instanceof AIMessage) { this.messages.pop(); this.store?.deleteLastAssistantMessage(this.id) }
-    if (!(this.messages[this.messages.length - 1] instanceof HumanMessage)) return
-    await this.runTurn(send)
+    if (tail instanceof HumanMessage || tail instanceof ToolMessage) {
+      await this.runTurn(send)
+      return
+    }
+    send({ type: 'error', sessionId: this.id, code: 'CANNOT_REGENERATE', message: 'No user turn to regenerate from' })
   }
 
   async handlePlanResponse(action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {

@@ -141,4 +141,29 @@ describe('HookRegistry', () => {
     const result = await registry.fire('PreToolUse', ctx('Bash'))
     expect(result).toEqual({ kind: 'allow' })
   })
+
+  it('clear() removes all registered hooks', () => {
+    const registry = new HookRegistry()
+    registry.register({
+      event: 'PreToolUse',
+      handler: async () => ({ kind: 'allow' }),
+    })
+    registry.register({
+      event: 'TurnStart',
+      handler: async () => ({ kind: 'allow' }),
+    })
+    expect(registry.hasMatchingHook('PreToolUse')).toBe(true)
+    expect(registry.hasMatchingHook('TurnStart')).toBe(true)
+
+    registry.clear()
+    expect(registry.hasMatchingHook('PreToolUse')).toBe(false)
+    expect(registry.hasMatchingHook('TurnStart')).toBe(false)
+  })
+
+  it('clear() on empty registry is idempotent', () => {
+    const registry = new HookRegistry()
+    registry.clear()
+    registry.clear()
+    expect(registry.hasMatchingHook('PreToolUse')).toBe(false)
+  })
 })

@@ -1,6 +1,7 @@
 import type { AgentProfileInfo, ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { Session } from './session.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
@@ -13,6 +14,8 @@ import { mcpManager } from './mcp/manager.js'
 import { promptRegistry } from './mcp/prompt-registry.js'
 import { safeErrorMessage } from './error.js'
 import { logDebug } from '../debug-logger.js'
+import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js'
+import { buildTools } from './tools.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -330,6 +333,9 @@ export class SessionManager {
         )
         break
       }
+      case 'plugin:install:url':
+        await this.handlePluginInstallUrl(msg.url, send)
+        break
     }
     logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }
@@ -400,5 +406,81 @@ export class SessionManager {
     if (!path.isAbsolute(cwd)) return { error: 'cwd must be an absolute path' }
     try { return await workspaceFs.readForPreview(cwd, p) }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) } }
+  }
+
+  /**
+   * Handle a plugin:install:url message — a global operation that does NOT
+   * require an existing session. Validates the URL, creates a temporary session
+   * with an isolated scratch cwd, invokes the plugin_install tool directly, and
+   * streams progress + result back.
+   */
+  private async handlePluginInstallUrl(url: string, send: SendFn): Promise<void> {
+    if (!url || typeof url !== 'string' || url.trim().length === 0) {
+      send({ type: 'plugin:install:result', ok: false, error: 'URL is required' })
+      return
+    }
+
+    const urlErr = validatePluginUrl(url)
+    if (urlErr) {
+      send({ type: 'plugin:install:result', ok: false, error: urlErr })
+      return
+    }
+
+    const sessionId = `plugin-install-${randomUUID()}`
+    const cwd = ensureScratchDir(sessionId, this.scratchRoot)
+
+    const tempConfig: SessionConfig = {
+      llmProvider: 'deepseek',
+      model: '',
+      tools: [],
+      cwd,
+      permissionMode: 'edit',
+      surface: 'chat',
+    }
+
+    const tempSession = new Session(sessionId, tempConfig)
+    this.sessions.set(sessionId, tempSession)
+
+    try {
+      const tools = buildTools(cwd, undefined, undefined, undefined, { permissionMode: 'edit' })
+      const pluginInstallTool = tools.find((t) => t.name === 'plugin_install')
+      if (!pluginInstallTool) {
+        send({ type: 'plugin:install:result', ok: false, error: 'plugin_install tool is not available' })
+        return
+      }
+
+      send({ type: 'plugin:install:progress', status: 'cloning', message: 'Cloning plugin repository...' })
+      send({ type: 'plugin:install:progress', status: 'scanning', message: 'Scanning plugin manifest...' })
+
+      const raw = String(await pluginInstallTool.invoke({ url }))
+      const result: PluginInstallResult = JSON.parse(raw) as PluginInstallResult
+
+      if (result.ok) {
+        send({
+          type: 'plugin:install:progress',
+          status: 'registering',
+          message: `Registering plugin "${result.pluginId}"...`,
+          pluginId: result.pluginId,
+        })
+        send({
+          type: 'plugin:install:progress',
+          status: 'done',
+          message: `Plugin "${result.pluginId}" installed successfully`,
+          pluginId: result.pluginId,
+          components: result.components,
+        })
+        send({ type: 'plugin:install:result', ok: true, pluginId: result.pluginId })
+      } else {
+        send({ type: 'plugin:install:progress', status: 'error', message: result.error })
+        send({ type: 'plugin:install:result', ok: false, error: result.error })
+      }
+    } catch (err) {
+      const message = safeErrorMessage(err)
+      send({ type: 'plugin:install:progress', status: 'error', message })
+      send({ type: 'plugin:install:result', ok: false, error: message })
+    } finally {
+      this.sessions.delete(sessionId)
+      removeScratchDir(sessionId, this.scratchRoot)
+    }
   }
 }

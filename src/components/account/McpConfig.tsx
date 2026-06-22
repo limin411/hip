@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw } from 'lucide-react'
-import type { McpServerConfig } from '@hip/protocol'
+import type { McpServerConfig, PluginMeta } from '@hip/protocol'
 import { useMcpServersStore } from '@/store/mcpServersStore'
+import { usePluginsStore } from '@/store/pluginsStore'
 import { useMcpStatuses, type McpServerStatusVM } from '@/domain'
 import { cn } from '@/lib/utils'
 import { Modal } from '@/components/ui/Modal'
@@ -82,9 +83,28 @@ export function toggleTool(
   return { enabledTools, disabledTools: disabledTools.filter((t) => t !== toolName) }
 }
 
+/** Pure helper: derive read-only plugin-contributed MCP servers, excluding duplicates already owned by standalone configs or earlier plugins. */
+export function derivePluginMcpServers(
+  plugins: PluginMeta[],
+  standaloneIds: Set<string>,
+): Array<McpServerConfig & { pluginId: string; pluginName: string }> {
+  const seen = new Set<string>()
+  const out: Array<McpServerConfig & { pluginId: string; pluginName: string }> = []
+  for (const plugin of plugins) {
+    for (const server of plugin.mcpServers) {
+      if (standaloneIds.has(server.id)) continue
+      if (seen.has(server.id)) continue
+      seen.add(server.id)
+      out.push({ ...server, pluginId: plugin.id, pluginName: plugin.name })
+    }
+  }
+  return out
+}
+
 export function McpConfig() {
   const { t } = useTranslation()
   const { servers, loaded, load, addServer, updateServer, removeServer } = useMcpServersStore()
+  const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
   const mcpStatuses = useMcpStatuses()
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<McpServerConfig | null>(null)
@@ -93,7 +113,12 @@ export function McpConfig() {
     if (!loaded) void load()
   }, [loaded, load])
 
+  useEffect(() => {
+    if (!pluginsLoaded) void loadPlugins()
+  }, [pluginsLoaded, loadPlugins])
+
   const statusByServer = new Map(mcpStatuses.map((s) => [s.id, s]))
+  const pluginMcpServers = derivePluginMcpServers(plugins, new Set(servers.map((s) => s.id)))
 
   return (
     <div className="p-6">
@@ -124,6 +149,22 @@ export function McpConfig() {
           <Plus size={15} /> {t('settings.mcp.add')}
         </button>
       </div>
+
+      {pluginMcpServers.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.pluginSectionTitle')}</h3>
+          <div className="mt-2 space-y-2">
+            {pluginMcpServers.map((s) => (
+              <PluginMcpServerRow
+                key={s.id}
+                server={s}
+                pluginName={s.pluginName}
+                status={statusByServer.get(s.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {editing && (
         <McpServerEditor
@@ -243,6 +284,68 @@ function McpServerRow({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+function PluginMcpServerRow({
+  server,
+  pluginName,
+  status,
+}: {
+  server: McpServerConfig
+  pluginName: string
+  status?: McpServerStatusVM
+}) {
+  const { t } = useTranslation()
+  const transportLabel =
+    server.transport === 'stdio'
+      ? t('settings.mcp.transportStdio')
+      : server.transport === 'sse'
+        ? t('settings.mcp.transportSse')
+        : t('settings.mcp.transportHttp')
+  const detail =
+    server.transport === 'stdio' ? [server.command, ...(server.args ?? [])].join(' ') : (server.url ?? '')
+  const statusEmojiStr = status ? statusEmoji(status.status) : null
+  const statusLabel = status
+    ? status.status === 'connected' ? t('settings.mcp.statusConnected')
+    : status.status === 'connecting' ? t('settings.mcp.statusConnecting')
+    : status.status === 'disconnected' ? t('settings.mcp.statusDisconnected')
+    : t('settings.mcp.statusError')
+    : null
+  const toolCount = status?.toolCount
+
+  return (
+    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
+      <span
+        className={cn(
+          'flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
+          !server.enabled && 'opacity-60',
+        )}
+      >
+        <Plug size={18} />
+      </span>
+      <div className={cn('min-w-0 flex-1', !server.enabled && 'opacity-60')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-body font-medium text-ink">{server.name}</span>
+          <Badge>{transportLabel}</Badge>
+          <Badge className="bg-accent-subtle text-accent-strong">{t('settings.mcp.via', { name: pluginName })}</Badge>
+          {statusEmojiStr && statusLabel && (
+            <span
+              className="text-caption"
+              title={status?.lastError ? `${String(statusLabel)}: ${status.lastError}` : String(statusLabel)}
+            >
+              {statusEmojiStr} {statusLabel}
+            </span>
+          )}
+          {toolCount !== undefined && (
+            <span className="text-caption text-ink-tertiary">
+              {toolCount} tool{toolCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
       </div>
     </div>
   )

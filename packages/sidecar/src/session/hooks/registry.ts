@@ -57,6 +57,11 @@ export class HookRegistry {
     this.hooks.push(hook)
   }
 
+  /** Remove all registered hooks. Idempotent. */
+  clear(): void {
+    this.hooks = []
+  }
+
   /** Returns true if at least one registered hook matches the event and optional tool name. */
   hasMatchingHook(event: HookEvent, toolName?: string): boolean {
     return this.hooks.some((h) => h.event === event && matcherMatches(h.matcher, toolName))

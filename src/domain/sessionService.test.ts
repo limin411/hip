@@ -240,13 +240,13 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
   })
 
-  it('regenerate is a no-op while an interrupt is pending (avoids a stuck running state)', () => {
+  it('regenerate sends message:regenerate when an interrupt is pending (user retries paused turn)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], interrupt: { turnId: 't1', question: 'q' } }] })
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], status: 'running', interrupt: { turnId: 't1', question: 'q' } }] })
     svc.regenerate()
-    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(false)
-    expect(useDomainStore.getState().sessions[0].status).toBe('idle')
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(true)
+    expect(useDomainStore.getState().sessions[0].status).toBe('running') // regenerateLastTurn sets running
   })
 
   it('on ready, resyncs the active session when its turn was running', () => {

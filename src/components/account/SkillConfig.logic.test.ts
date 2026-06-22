@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import type { SkillMeta } from '@hip/protocol'
+import type { PluginMeta, SkillMeta } from '@hip/protocol'
 import {
   badgeForAutoInvoke,
   badgeForContext,
   refCountLabel,
   toolAllowlistPreview,
+  derivePluginSkills,
 } from './SkillConfig'
 
 function baseSkill(overrides: Partial<SkillMeta> = {}): SkillMeta {
@@ -14,6 +15,21 @@ function baseSkill(overrides: Partial<SkillMeta> = {}): SkillMeta {
     description: 'A test skill',
     dir: '/tmp/skills/test',
     hasScripts: false,
+    ...overrides,
+  }
+}
+
+function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
+  return {
+    id: 'test-plugin',
+    name: 'Test Plugin',
+    version: '1.0.0',
+    description: 'A test plugin',
+    dir: '/tmp/plugins/test-plugin',
+    skills: [],
+    mcpServers: [],
+    agents: [],
+    hookCount: 0,
     ...overrides,
   }
 }
@@ -99,5 +115,49 @@ describe('toolAllowlistPreview', () => {
       2,
     )
     expect(result).toBe('read_file, write_file +2')
+  })
+})
+
+describe('derivePluginSkills', () => {
+  it('maps plugin skill ids to read-only SkillMeta entries', () => {
+    const plugins = [basePlugin({ skills: ['skill-a', 'skill-b'] })]
+    const result = derivePluginSkills(plugins, new Set())
+    expect(result).toHaveLength(2)
+    expect(result[0].skill.id).toBe('skill-a')
+    expect(result[0].skill.name).toBe('skill-a')
+    expect(result[0].skill.hasScripts).toBe(false)
+    expect(result[0].skill.pluginId).toBe('test-plugin')
+    expect(result[0].skill.scope).toBe('plugin')
+    expect(result[0].pluginName).toBe('Test Plugin')
+    expect(result[1].skill.id).toBe('skill-b')
+  })
+
+  it('hides plugin skills whose id matches a standalone skill', () => {
+    const plugins = [basePlugin({ skills: ['skill-a', 'skill-b'] })]
+    const result = derivePluginSkills(plugins, new Set(['skill-a']))
+    expect(result).toHaveLength(1)
+    expect(result[0].skill.id).toBe('skill-b')
+  })
+
+  it('lets the first plugin win when two plugins export the same skill id', () => {
+    const plugins = [
+      basePlugin({ id: 'plugin-a', name: 'Plugin A', skills: ['shared'] }),
+      basePlugin({ id: 'plugin-b', name: 'Plugin B', skills: ['shared'] }),
+    ]
+    const result = derivePluginSkills(plugins, new Set())
+    expect(result).toHaveLength(1)
+    expect(result[0].skill.pluginId).toBe('plugin-a')
+    expect(result[0].pluginName).toBe('Plugin A')
+  })
+
+  it('ignores standalone match precedence across plugins', () => {
+    const plugins = [
+      basePlugin({ id: 'plugin-a', skills: ['shared'] }),
+      basePlugin({ id: 'plugin-b', skills: ['shared', 'unique'] }),
+    ]
+    const result = derivePluginSkills(plugins, new Set(['shared']))
+    expect(result).toHaveLength(1)
+    expect(result[0].skill.id).toBe('unique')
+    expect(result[0].skill.pluginId).toBe('plugin-b')
   })
 })

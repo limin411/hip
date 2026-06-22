@@ -314,6 +314,40 @@ describe('hooks integration with Session graph', () => {
     expect(agentStarted).toBeUndefined()
   })
 
+  // ─── TurnStart deny stops turn and resets running flag ─────────────
+
+  it('TurnStart deny stops turn before model runs and leaves session idle', async () => {
+    const session = new Session('s11', { llmProvider: 'deepseek', model: '', tools: [], cwd: root } as any, undefined, undefined, undefined, undefined, fakeRunner([new AIMessage('should not run')]))
+
+    let hookCalled = false
+    session.registerHook({
+      event: 'TurnStart',
+      handler: async (ctx) => {
+        hookCalled = true
+        expect(ctx.sessionId).toBe('s11')
+        return { kind: 'deny', reason: 'turn rejected by policy' }
+      },
+    })
+
+    const sent: ServerMessage[] = []
+    await session.sendMessage('trigger', (m) => sent.push(m))
+
+    expect(hookCalled).toBe(true)
+
+    const errorMsg = sent.find((m) => m.type === 'error') as Extract<ServerMessage, { type: 'error' }> | undefined
+    expect(errorMsg).toBeTruthy()
+    expect(errorMsg!.code).toBe('HOOK_DENIED')
+    expect(errorMsg!.message).toContain('turn rejected by policy')
+
+    const agentStarted = sent.find((m) => m.type === 'agent:started')
+    expect(agentStarted).toBeUndefined()
+
+    // Regression guard: the earlier deny must not leave running=true, otherwise
+    // a later regenerate/cancel would be silently ignored.
+    const sessionAny = session as unknown as { running: boolean }
+    expect(sessionAny.running).toBe(false)
+  })
+
   // ─── Multiple hooks chain ─────────────────────────────────────────
 
   it('multiple hooks chain: allow then deny stops correctly', async () => {

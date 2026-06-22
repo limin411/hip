@@ -115,6 +115,8 @@ export interface McpServerConfig {
   enabledTools?: string[]            // allowlist of tool names (if set, only these are exposed)
   disabledTools?: string[]           // denylist of tool names (applied after enabledTools)
   enabled: boolean
+  /** Set when this server is contributed by a plugin, linking it back to the owning plugin. */
+  pluginId?: string
 }
 
 /** Durable MCP server config persisted to ~/.hip/config/hip-mcp-servers.json. */
@@ -153,6 +155,10 @@ export interface PluginMeta {
   version: string                     // manifest `version`
   description: string                 // manifest `description`
   dir: string                         // absolute plugin directory
+  skills: string[]                    // skill IDs extracted from manifest
+  mcpServers: McpServerConfig[]       // MCP server configs extracted from manifest
+  agents: string[]                    // agent IDs extracted from manifest
+  hookCount: number                   // number of hook entries declared
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -428,9 +434,7 @@ export type ClientMessage =
   | { type: 'git:revert'; sessionId: string; checkpointId: string }
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
-  | { type: 'plugin:install'; manifest: PluginManifest }
-  | { type: 'plugin:delete'; pluginId: string }
-  | { type: 'plugin:list' }
+  | { type: 'plugin:install:url'; url: string }
   | { type: 'git:worktree:create'; sessionId: string; branch: string }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
@@ -499,6 +503,8 @@ export type ServerMessage =
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
+  | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
+  | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
 
 export interface AgentProfileInfo {
   id: string;

@@ -5,6 +5,8 @@ import type {
   McpServersConfig,
   SkillMeta,
   SkillsConfig,
+  ClientMessage,
+  ServerMessage,
 } from './index.js'
 
 describe('protocol: MCP server types', () => {
@@ -75,5 +77,82 @@ describe('protocol: Skill types', () => {
     expect(cfg.enabled['pdf-tools']).toBe(false)
     // a missing id is treated as enabled at the read sites; the type only stores explicit overrides
     expect(cfg.enabled['other']).toBeUndefined()
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────
+// Plugin install ClientMessage/ServerMessage variants
+// ──────────────────────────────────────────────────────────────────
+
+describe('protocol: plugin install messages', () => {
+  it('plugin:install:url ClientMessage round-trips', () => {
+    const m: ClientMessage = {
+      type: 'plugin:install:url',
+      url: 'https://github.com/example/plugin.git',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ClientMessage, { type: 'plugin:install:url' }>
+    expect(rt.type).toBe('plugin:install:url')
+    expect(rt.url).toBe('https://github.com/example/plugin.git')
+  })
+
+  it('plugin:install:progress ServerMessage round-trips (cloning)', () => {
+    const m: ServerMessage = {
+      type: 'plugin:install:progress',
+      status: 'cloning',
+      message: 'Cloning repository...',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'plugin:install:progress' }>
+    expect(rt.type).toBe('plugin:install:progress')
+    expect(rt.status).toBe('cloning')
+    expect(rt.message).toBe('Cloning repository...')
+  })
+
+  it('plugin:install:progress ServerMessage round-trips (done with components)', () => {
+    const m: ServerMessage = {
+      type: 'plugin:install:progress',
+      status: 'done',
+      message: 'Install complete',
+      pluginId: 'my-plugin',
+      components: { skills: 2, mcpServers: 1, agents: 0, hooks: 3 },
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'plugin:install:progress' }>
+    expect(rt.status).toBe('done')
+    expect(rt.pluginId).toBe('my-plugin')
+    expect(rt.components).toEqual({ skills: 2, mcpServers: 1, agents: 0, hooks: 3 })
+  })
+
+  it('plugin:install:progress ServerMessage round-trips (error)', () => {
+    const m: ServerMessage = {
+      type: 'plugin:install:progress',
+      status: 'error',
+      message: 'Clone failed: network error',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'plugin:install:progress' }>
+    expect(rt.status).toBe('error')
+    expect(rt.message).toBe('Clone failed: network error')
+  })
+
+  it('plugin:install:result ServerMessage round-trips (success)', () => {
+    const m: ServerMessage = {
+      type: 'plugin:install:result',
+      ok: true,
+      pluginId: 'my-plugin',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'plugin:install:result' }>
+    expect(rt.type).toBe('plugin:install:result')
+    expect(rt.ok).toBe(true)
+    expect(rt.pluginId).toBe('my-plugin')
+  })
+
+  it('plugin:install:result ServerMessage round-trips (failure)', () => {
+    const m: ServerMessage = {
+      type: 'plugin:install:result',
+      ok: false,
+      error: 'Manifest validation failed',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'plugin:install:result' }>
+    expect(rt.ok).toBe(false)
+    expect(rt.error).toBe('Manifest validation failed')
+    expect(rt.pluginId).toBeUndefined()
   })
 })

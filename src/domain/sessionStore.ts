@@ -139,12 +139,20 @@ function summaryToVM(s: SessionSummary): SessionVM {
   return { id: s.id, config: { ...DEFAULT_CONFIG, surface: s.surface }, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null }
 }
 
+/** Surface state for a plugin installation driven by WebSocket messages. */
+export interface PluginInstallState {
+  status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'
+  message: string
+  pluginId?: string
+  result?: { ok: boolean; error?: string }
+}
+
 /** 把一条 ServerMessage 归并进状态。纯函数：now 由调用方注入。 */
 export function applyServerMessage(
-  state: { sessions: SessionVM[] },
+  state: { sessions: SessionVM[]; pluginInstall?: PluginInstallState | null },
   msg: ServerMessage,
   now: number,
-): { sessions: SessionVM[] } {
+): { sessions: SessionVM[]; pluginInstall?: PluginInstallState | null } {
   const update = (sessionId: string, fn: (s: SessionVM) => SessionVM): { sessions: SessionVM[] } => {
     if (!state.sessions.some((s) => s.id === sessionId)) return state
     return { sessions: state.sessions.map((s) => (s.id === sessionId ? fn(s) : s)) }
@@ -336,6 +344,20 @@ export function applyServerMessage(
         ],
       }))
 
+    case 'plugin:install:progress':
+      return { ...state, pluginInstall: { status: msg.status, message: msg.message, pluginId: msg.pluginId } }
+
+    case 'plugin:install:result':
+      return {
+        ...state,
+        pluginInstall: {
+          status: msg.ok ? 'done' : 'error',
+          message: msg.ok ? '' : (msg.error ?? ''),
+          pluginId: msg.pluginId,
+          result: { ok: msg.ok, error: msg.error },
+        },
+      }
+
     default:
       return state
   }
@@ -376,6 +398,7 @@ interface DomainStore {
   hasApiKey: boolean
   searchHits: SearchHit[]
   mcpStatuses: McpServerStatusVM[]
+  pluginInstall: PluginInstallState | null
 
   apply: (msg: ServerMessage) => void
   createSession: (id: string, config: SessionConfig) => string
@@ -387,6 +410,7 @@ interface DomainStore {
   regenerateLastTurn: (sessionId: string) => void
   clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
+  clearPluginInstall: () => void
 }
 
 export const useDomainStore = create<DomainStore>((set) => ({
@@ -397,6 +421,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
   hasApiKey: true,
   searchHits: [],
   mcpStatuses: [],
+  pluginInstall: null,
 
   apply: (msg) =>
     set((s) => {
@@ -433,8 +458,8 @@ export const useDomainStore = create<DomainStore>((set) => ({
       sessions: s.sessions.map((sess) =>
         sess.id !== sessionId
           ? sess
-          // Clear any prior error: appending a user message means a retry is underway.
-          : { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+          : // Clear any prior error: appending a user message means a retry is underway.
+            { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
       ),
     })),
 
@@ -451,4 +476,6 @@ export const useDomainStore = create<DomainStore>((set) => ({
   clearPermission: (requestId) => set((s) => clearPermission(s, requestId)),
 
   setConnection: (connection) => set({ connection }),
+
+  clearPluginInstall: () => set({ pluginInstall: null }),
 }))

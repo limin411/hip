@@ -1,0 +1,297 @@
+// Pure helpers for the plugin_install tool, extracted from tools.ts so the tool body
+// stays focused on orchestration and the helpers are independently testable.
+import { existsSync, readdirSync, writeFileSync, mkdirSync, renameSync, rmSync, readFileSync } from 'node:fs'
+import { join, basename, extname } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { createRequire } from 'node:module'
+import type { PluginManifest } from '@hip/protocol'
+import { parsePluginManifest } from './plugins/parser.js'
+
+/**
+ * Validate a git clone URL for the plugin_install tool.
+ * Rejects non-HTTPS schemes, embedded credentials, and dangerous URL types.
+ * Returns null if valid, or an error string describing the rejection reason.
+ */
+export function validatePluginUrl(url: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return 'Invalid URL'
+  }
+  const scheme = parsed.protocol.replace(/:$/, '')
+  if (parsed.protocol !== 'https:') {
+    return `Only https:// URLs are permitted, got "${scheme}"`
+  }
+  // Reject embedded credentials in the URL (e.g. https://user:pass@host)
+  if (parsed.username || parsed.password) {
+    return 'URL must not contain embedded credentials'
+  }
+  return null
+}
+
+/**
+ * Slugify a plugin name using the same logic as Rust's `slugify_plugin()`
+ * in `src-tauri/src/plugins.rs`. Converts to lowercase, replaces non-alphanumeric
+ * chars with dashes, collapses consecutive dashes, and strips trailing dashes.
+ */
+export function slugifyPlugin(name: string): string {
+  let out = ''
+  let prevDash = false
+  for (const ch of name) {
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) {
+      out += ch.toLowerCase()
+      prevDash = false
+    } else if (!prevDash && out.length > 0) {
+      out += '-'
+      prevDash = true
+    }
+  }
+  while (out.endsWith('-')) {
+    out = out.slice(0, -1)
+  }
+  return out || 'plugin'
+}
+
+/**
+ * Auto-generate a minimal plugin.json manifest by scanning common plugin layouts
+ * inside `stagingDir`. This is used when the cloned repo has no `.plugin/plugin.json`.
+ *
+ * Scanning rules:
+ * - `skills/** /SKILL.md` → `skills: ["./skills/<dirname>", ...]`
+ * - `.mcp.json` at root → `mcpServers: "./.mcp.json"`
+ * - `hooks/**` (any files) → `hooks: "./hooks/hooks.cjs"`
+ * - `agents/**` (any files) → `agents: "./agents.json"`
+ */
+export function generatePluginManifest(stagingDir: string): Record<string, unknown> {
+  const skills: string[] = []
+  const skillsDir = join(stagingDir, 'skills')
+  if (existsSync(skillsDir)) {
+    try {
+      for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && existsSync(join(skillsDir, entry.name, 'SKILL.md'))) {
+          skills.push(`./skills/${entry.name}`)
+        }
+      }
+    } catch {
+      /* readdir may fail on permission — ignore and continue */
+    }
+  }
+
+  let mcpServers: string | undefined
+  if (existsSync(join(stagingDir, '.mcp.json'))) {
+    mcpServers = './.mcp.json'
+  }
+
+  let hooks: string | undefined
+  const hooksDir = join(stagingDir, 'hooks')
+  if (existsSync(hooksDir)) {
+    try {
+      if (readdirSync(hooksDir).length > 0) {
+        hooks = './hooks/hooks.cjs'
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  let agents: string | undefined
+  const agentsDir = join(stagingDir, 'agents')
+  if (existsSync(agentsDir)) {
+    try {
+      if (readdirSync(agentsDir).length > 0) {
+        agents = './agents.json'
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const generated: Record<string, unknown> = {
+    name: basename(stagingDir),
+    version: '0.0.0',
+  }
+  if (skills.length > 0) generated.skills = skills
+  if (mcpServers !== undefined) generated.mcpServers = mcpServers
+  if (hooks !== undefined) generated.hooks = hooks
+  if (agents !== undefined) generated.agents = agents
+  return generated
+}
+
+/**
+ * Resolve the final install slug for a plugin, handling collisions.
+ *
+ * 1. Slugify `name` → `base`.
+ * 2. If `pluginsDir/<base>` does NOT exist → return `base`.
+ * 3. If it DOES exist AND the path is in `existingPaths` → reject (already installed).
+ * 4. If it DOES exist but NOT in `existingPaths` → append `-2`, `-3`, ... until
+ *    the directory does not exist.
+ *
+ * Returns the resolved slug string. Throws if the plugin is already installed.
+ */
+export function resolveInstallSlug(
+  name: string,
+  pluginsDir: string,
+  existingPaths: ReadonlySet<string>,
+): string {
+  const base = slugifyPlugin(name)
+  const candidate = join(pluginsDir, base)
+  if (!existsSync(candidate)) return base
+
+  if (existingPaths.has(candidate)) {
+    throw new Error(`Plugin is already installed (directory "${base}" exists and is registered)`)
+  }
+
+  // Directory collision with something not in hip-plugins.json — suffix it
+  let n = 2
+  while (true) {
+    const suffix = `${base}-${n}`
+    if (!existsSync(join(pluginsDir, suffix))) return suffix
+    n += 1
+  }
+}
+
+/** The directory staging lifecycle step. Separated so tests can skip git clone. */
+export interface StagingResult {
+  stagingDir: string
+  /** True when the staging dir was created by this call (needs cleanup on error). */
+  owned: boolean
+}
+
+/**
+ * Create a staging directory and optionally clone a git repo into it.
+ * When `providedStagingDir` is given (test seam), skips mkdir + git clone.
+ */
+export function prepareStaging(
+  url: string,
+  pluginsDir: string,
+  providedStagingDir?: string,
+): StagingResult {
+  if (providedStagingDir) {
+    return { stagingDir: providedStagingDir, owned: false }
+  }
+  const stagingDir = join(pluginsDir, `.staging-${randomUUID()}`)
+  mkdirSync(stagingDir, { recursive: true })
+  try {
+    execFileSync('git', ['clone', '--depth', '1', url, stagingDir], {
+      timeout: 60_000,
+      stdio: 'pipe',
+    })
+    return { stagingDir, owned: true }
+  } catch (err) {
+    // Clean up the staging dir on clone failure
+    try {
+      rmSync(stagingDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+    const msg = (err as Error).message
+    if (msg.includes('ETIMEDOUT') || msg.toLowerCase().includes('timed out')) {
+      throw new Error('git clone timed out after 60s')
+    }
+    throw new Error(`git clone failed: ${msg}`)
+  }
+}
+
+/**
+ * Read or generate the plugin manifest from `stagingDir`.
+ * Returns the parsed PluginManifest. Throws on invalid manifest.
+ */
+export function readOrGenerateManifest(stagingDir: string): PluginManifest {
+  const manifestDir = join(stagingDir, '.plugin')
+  const manifestPath = join(manifestDir, 'plugin.json')
+
+  if (existsSync(manifestPath)) {
+    return parsePluginManifest(stagingDir)
+  }
+
+  // Auto-generate
+  const generated = generatePluginManifest(stagingDir)
+  mkdirSync(manifestDir, { recursive: true })
+  writeFileSync(manifestPath, JSON.stringify(generated, null, 2), 'utf8')
+  return parsePluginManifest(stagingDir)
+}
+
+/** Convenience: remove a directory tree, ignoring missing/errors. */
+export function cleanupStagingDir(dir: string): void {
+  try {
+    rmSync(dir, { recursive: true, force: true })
+  } catch {
+    /* already gone or permission error — best-effort */
+  }
+}
+
+/**
+ * Count the entries in a JSON or CJS file referenced by a plugin manifest.
+ * Returns the array length for a top-level array, or the length of the first
+ * array-valued property for an object wrapper. Returns 0 on any failure.
+ */
+export function countFileEntries(filePath: string): number {
+  try {
+    const ext = extname(filePath).toLowerCase()
+    if (ext === '.cjs' || ext === '.js') {
+      const req = createRequire(import.meta.url)
+      // Clear require cache so repeated test runs see fresh files.
+      delete req.cache[req.resolve(filePath)]
+      const mod = req(filePath)
+      const arr = Array.isArray(mod) ? mod : mod.default
+      return Array.isArray(arr) ? arr.length : 0
+    }
+    const raw = JSON.parse(readFileSync(filePath, 'utf8'))
+    if (Array.isArray(raw)) return raw.length
+    if (raw && typeof raw === 'object') {
+      for (const key of Object.keys(raw)) {
+        const value = (raw as Record<string, unknown>)[key]
+        if (Array.isArray(value)) return value.length
+      }
+    }
+    return 0
+  } catch {
+    return 0
+  }
+}
+
+/** Count the components declared in a parsed plugin manifest. */
+export function countComponents(manifest: PluginManifest): { skills: number; mcpServers: number; agents: number; hooks: number } {
+  const skills =
+    manifest.skills === undefined
+      ? 0
+      : Array.isArray(manifest.skills)
+        ? manifest.skills.length
+        : 1
+
+  const countOptional = (value: string | unknown[] | undefined): number => {
+    if (value === undefined) return 0
+    if (Array.isArray(value)) return value.length
+    if (typeof value === 'string') return countFileEntries(value)
+    return 0
+  }
+
+  return {
+    skills,
+    mcpServers: countOptional(manifest.mcpServers),
+    agents: countOptional(manifest.agents),
+    hooks: countOptional(manifest.hooks),
+  }
+}
+
+/** The shape returned by the plugin_install tool on success. */
+export interface PluginInstallSuccess {
+  ok: true
+  pluginId: string
+  components: {
+    skills: number
+    mcpServers: number
+    agents: number
+    hooks: number
+  }
+}
+
+/** The shape returned by the plugin_install tool on failure. */
+export interface PluginInstallFailure {
+  ok: false
+  error: string
+}
+
+export type PluginInstallResult = PluginInstallSuccess | PluginInstallFailure

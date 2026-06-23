@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
@@ -26,11 +28,13 @@ export function AgentEditor({
   initialKind,
   onSave,
   onCancel,
+  variant = 'modal',
 }: {
   initial: AgentConfig | null
   initialKind?: AgentConfig['kind']
   onSave: (draft: Omit<AgentConfig, 'id'>) => Promise<void>
   onCancel: () => void
+  variant?: 'modal' | 'drawer'
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
@@ -68,6 +72,15 @@ export function AgentEditor({
     void useSkillsStore.getState().load()
     void refreshDetection()
   }, [refreshDetection])
+
+  useEffect(() => {
+    if (variant !== 'drawer') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [variant, onCancel])
 
   const isNewAcp = !initial && initialKind === 'acp'
   const [acpStep, setAcpStep] = useState<'pick' | 'form'>(isNewAcp ? 'pick' : 'form')
@@ -107,6 +120,216 @@ export function AgentEditor({
     }
   }
 
+  const body = (
+    <div className="flex flex-col">
+      {isAcp && acpStep === 'pick' ? (
+        <>
+          <div className="p-5">
+            <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
+          </div>
+          <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
+            <Button variant="outline" size="sm" onClick={onCancel}>
+              {t('settings.agents.cancel')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="space-y-5 p-5">
+            {isNewAcp && (
+              <button type="button" onClick={() => setAcpStep('pick')} className="text-meta text-accent-strong transition-colors hover:underline">
+                {t('settings.agents.backToProviders')}
+              </button>
+            )}
+            <Field label={t('settings.agents.name')}>
+              <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
+            </Field>
+
+            <Field label={t('settings.agents.description')}>
+              <textarea
+                className={cn(inputCls, 'min-h-[64px] resize-y')}
+                value={form.description ?? ''}
+                onChange={(e) => patch({ description: e.target.value })}
+                placeholder={t('settings.agents.descriptionPlaceholder')}
+                rows={3}
+              />
+            </Field>
+
+            {isInternal ? (
+              <>
+                <Field label={t('settings.agents.prompt')}>
+                  <textarea
+                    className={cn(inputCls, 'min-h-[140px] resize-y font-mono')}
+                    value={form.prompt}
+                    onChange={(e) => patch({ prompt: e.target.value })}
+                    placeholder={t('settings.agents.promptPlaceholder')}
+                    rows={7}
+                  />
+                </Field>
+
+                <Section label={t('settings.agents.sectionModel')}>
+                  <select className={inputCls} value={form.boundModelKey} onChange={(e) => patch({ boundModelKey: e.target.value })}>
+                    <option value="">{t('settings.agents.modelGlobal')}</option>
+                    {groups.map((g) => (
+                      <optgroup key={g.providerID} label={g.providerName}>
+                        {g.models.map((m) => (
+                          <option key={m.key} value={m.key}>{m.modelID}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </Section>
+
+                <Section label={t('settings.agents.sectionTools')}>
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
+                    {t('settings.agents.toolBuiltinNote')}
+                  </div>
+                </Section>
+
+                <Section label={t('settings.agents.toolSkillsSection')}>
+                  <div className="text-caption text-ink-tertiary">{t('settings.agents.toolSkillsSectionDesc')}</div>
+                  {skills.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
+                      {t('settings.agents.toolSkillsEmpty')}
+                    </div>
+                  ) : (
+                    skills.map((s) => (
+                      <ToolToggle
+                        key={s.id}
+                        label={s.name}
+                        desc={s.description}
+                        checked={form.allowedSkills.includes(s.id)}
+                        onChange={(v) => toggleSkill(s.id, v)}
+                      />
+                    ))
+                  )}
+                </Section>
+
+                <Section label={t('settings.agents.toolMcpServers')}>
+                  <div className="text-caption text-ink-tertiary">{t('settings.agents.toolMcpServersDesc')}</div>
+                  {mcpServers.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
+                      {t('settings.agents.toolMcpServersEmpty')}
+                    </div>
+                  ) : (
+                    mcpServers.map((s) => (
+                      <ToolToggle
+                        key={s.id}
+                        label={s.name}
+                        desc={s.id}
+                        checked={form.allowedMcpServers.includes(s.id)}
+                        onChange={(v) => toggleMcpServer(s.id, v)}
+                      />
+                    ))
+                  )}
+                </Section>
+              </>
+            ) : (
+              <>
+                <Section label={t('settings.agents.sectionCommand')}>
+                  <Field label={t('settings.agents.command')}>
+                    <input
+                      className={cn(inputCls, 'font-mono')}
+                      value={form.command}
+                      onChange={(e) => patch({ command: e.target.value })}
+                      placeholder="/usr/local/bin/my-agent"
+                    />
+                  </Field>
+                  <Field label={t('settings.agents.args')}>
+                    <input
+                      className={cn(inputCls, 'font-mono')}
+                      value={form.args}
+                      onChange={(e) => patch({ args: e.target.value })}
+                      placeholder="--loop --json"
+                    />
+                  </Field>
+                </Section>
+
+                {adapterPkg && (
+                  <div className="rounded-lg border border-dashed border-border px-3 py-2 text-caption text-ink-tertiary">
+                    {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
+                  </div>
+                )}
+
+                {isAcp && (
+                  <Field label={t('settings.agents.quirks')}>
+                    <input
+                      className={cn(inputCls, 'font-mono')}
+                      value={form.quirks ?? ''}
+                      onChange={(e) => patch({ quirks: e.target.value || undefined })}
+                      placeholder={t('settings.agents.quirksPlaceholder')}
+                    />
+                  </Field>
+                )}
+
+                {isAcp && form.authEnvVar && (
+                  <Field label={t('settings.agents.apiKey')}>
+                    <input
+                      className={cn(inputCls, 'font-mono')}
+                      type="password"
+                      value={form.apiKey ?? ''}
+                      onChange={(e) => patch({ apiKey: e.target.value })}
+                      placeholder={form.authEnvVar}
+                    />
+                    <div className="mt-1 text-caption text-ink-tertiary">{t('settings.agents.apiKeyHint', { env: form.authEnvVar })}</div>
+                  </Field>
+                )}
+
+              </>
+            )}
+
+            {error && <div className="text-meta text-danger">{error}</div>}
+          </div>
+
+          <div className="flex items-center gap-2 border-t border-border bg-surface-subtle px-5 py-3">
+            <div className="flex flex-1 items-center gap-2">
+              <Switch
+                checked={form.enabled}
+                onCheckedChange={(v) => patch({ enabled: v })}
+                ariaLabel={t('settings.agents.enableThis')}
+              />
+              <span className="text-body text-ink-secondary">{t('settings.agents.enableThis')}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={onCancel}>
+              {t('settings.agents.cancel')}
+            </Button>
+            <Button variant="primary" size="sm" disabled={busy || !isAgentDraftValid(form)} onClick={() => void submit()}>
+              {t('settings.agents.save')}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+
+  if (variant === 'drawer') {
+    return createPortal(
+      <div className="fixed inset-0 z-50">
+        <div className="absolute inset-0 bg-ink/40" onClick={onCancel} />
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="absolute inset-y-0 right-0 flex w-full max-w-[480px] animate-panel-in flex-col border-l border-border bg-surface shadow-overlay outline-none"
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+            <div className="text-title font-bold tracking-tight text-ink">{title}</div>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              title={t('common.close')}
+              aria-label={t('common.close')}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto">{body}</div>
+        </div>
+      </div>,
+      document.body,
+    )
+  }
+
   return (
     <Modal
       open
@@ -115,185 +338,7 @@ export function AgentEditor({
       }}
       title={title}
     >
-      <div className="flex flex-col">
-        {isAcp && acpStep === 'pick' ? (
-          <>
-            <div className="p-5">
-              <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-              <Button variant="outline" size="sm" onClick={onCancel}>
-                {t('settings.agents.cancel')}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-        <div className="space-y-5 p-5">
-          {isNewAcp && (
-            <button type="button" onClick={() => setAcpStep('pick')} className="text-meta text-accent-strong transition-colors hover:underline">
-              {t('settings.agents.backToProviders')}
-            </button>
-          )}
-          <Field label={t('settings.agents.name')}>
-            <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
-          </Field>
-
-          <Field label={t('settings.agents.description')}>
-            <textarea
-              className={cn(inputCls, 'min-h-[64px] resize-y')}
-              value={form.description ?? ''}
-              onChange={(e) => patch({ description: e.target.value })}
-              placeholder={t('settings.agents.descriptionPlaceholder')}
-              rows={3}
-            />
-          </Field>
-
-          {isInternal ? (
-            <>
-              <Field label={t('settings.agents.prompt')}>
-                <textarea
-                  className={cn(inputCls, 'min-h-[140px] resize-y font-mono')}
-                  value={form.prompt}
-                  onChange={(e) => patch({ prompt: e.target.value })}
-                  placeholder={t('settings.agents.promptPlaceholder')}
-                  rows={7}
-                />
-              </Field>
-
-              <Section label={t('settings.agents.sectionModel')}>
-                <select className={inputCls} value={form.boundModelKey} onChange={(e) => patch({ boundModelKey: e.target.value })}>
-                  <option value="">{t('settings.agents.modelGlobal')}</option>
-                  {groups.map((g) => (
-                    <optgroup key={g.providerID} label={g.providerName}>
-                      {g.models.map((m) => (
-                        <option key={m.key} value={m.key}>{m.modelID}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </Section>
-
-              <Section label={t('settings.agents.sectionTools')}>
-                <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                  {t('settings.agents.toolBuiltinNote')}
-                </div>
-              </Section>
-
-              <Section label={t('settings.agents.toolSkillsSection')}>
-                <div className="text-caption text-ink-tertiary">{t('settings.agents.toolSkillsSectionDesc')}</div>
-                {skills.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                    {t('settings.agents.toolSkillsEmpty')}
-                  </div>
-                ) : (
-                  skills.map((s) => (
-                    <ToolToggle
-                      key={s.id}
-                      label={s.name}
-                      desc={s.description}
-                      checked={form.allowedSkills.includes(s.id)}
-                      onChange={(v) => toggleSkill(s.id, v)}
-                    />
-                  ))
-                )}
-              </Section>
-
-              <Section label={t('settings.agents.toolMcpServers')}>
-                <div className="text-caption text-ink-tertiary">{t('settings.agents.toolMcpServersDesc')}</div>
-                {mcpServers.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                    {t('settings.agents.toolMcpServersEmpty')}
-                  </div>
-                ) : (
-                  mcpServers.map((s) => (
-                    <ToolToggle
-                      key={s.id}
-                      label={s.name}
-                      desc={s.id}
-                      checked={form.allowedMcpServers.includes(s.id)}
-                      onChange={(v) => toggleMcpServer(s.id, v)}
-                    />
-                  ))
-                )}
-              </Section>
-            </>
-          ) : (
-            <>
-              <Section label={t('settings.agents.sectionCommand')}>
-                <Field label={t('settings.agents.command')}>
-                  <input
-                    className={cn(inputCls, 'font-mono')}
-                    value={form.command}
-                    onChange={(e) => patch({ command: e.target.value })}
-                    placeholder="/usr/local/bin/my-agent"
-                  />
-                </Field>
-                <Field label={t('settings.agents.args')}>
-                  <input
-                    className={cn(inputCls, 'font-mono')}
-                    value={form.args}
-                    onChange={(e) => patch({ args: e.target.value })}
-                    placeholder="--loop --json"
-                  />
-                </Field>
-              </Section>
-
-              {adapterPkg && (
-                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-caption text-ink-tertiary">
-                  {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
-                </div>
-              )}
-
-              {isAcp && (
-                <Field label={t('settings.agents.quirks')}>
-                  <input
-                    className={cn(inputCls, 'font-mono')}
-                    value={form.quirks ?? ''}
-                    onChange={(e) => patch({ quirks: e.target.value || undefined })}
-                    placeholder={t('settings.agents.quirksPlaceholder')}
-                  />
-                </Field>
-              )}
-
-              {isAcp && form.authEnvVar && (
-                <Field label={t('settings.agents.apiKey')}>
-                  <input
-                    className={cn(inputCls, 'font-mono')}
-                    type="password"
-                    value={form.apiKey ?? ''}
-                    onChange={(e) => patch({ apiKey: e.target.value })}
-                    placeholder={form.authEnvVar}
-                  />
-                  <div className="mt-1 text-caption text-ink-tertiary">{t('settings.agents.apiKeyHint', { env: form.authEnvVar })}</div>
-                </Field>
-              )}
-
-            </>
-          )}
-
-          {error && <div className="text-meta text-danger">{error}</div>}
-        </div>
-
-        <div className="flex items-center gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-          <div className="flex flex-1 items-center gap-2">
-            <Switch
-              checked={form.enabled}
-              onCheckedChange={(v) => patch({ enabled: v })}
-              ariaLabel={t('settings.agents.enableThis')}
-            />
-            <span className="text-body text-ink-secondary">{t('settings.agents.enableThis')}</span>
-          </div>
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            {t('settings.agents.cancel')}
-          </Button>
-          <Button variant="primary" size="sm" disabled={busy || !isAgentDraftValid(form)} onClick={() => void submit()}>
-            {t('settings.agents.save')}
-          </Button>
-        </div>
-          </>
-        )}
-      </div>
+      {body}
     </Modal>
   )
 }

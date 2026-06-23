@@ -36,11 +36,13 @@ export function BuiltinCard() {
 
 export function AgentCard({
   agent,
+  viewMode = 'list',
   onToggle,
   onEdit,
   onDelete,
 }: {
   agent: AgentConfig
+  viewMode?: 'grid' | 'list'
   onToggle: (enabled: boolean) => void
   onEdit: () => void
   onDelete: () => void
@@ -49,6 +51,44 @@ export function AgentCard({
   const cat = agentCategory(agent)
   const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : t('settings.agents.badgeInternal')
   const cmdline = [agent.command, ...agent.args].join(' ')
+
+  if (viewMode === 'grid') {
+    return (
+      <div className="group relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
+        <div className="flex items-start gap-3">
+          <Avatar name={agent.name} shape="square" size={40} className={cn(!agent.enabled && 'opacity-60')} />
+          <div className={cn('min-w-0 flex-1', !agent.enabled && 'opacity-60')}>
+            <div className="truncate text-body font-medium text-ink">{agent.name}</div>
+            <Badge
+              className={cn(
+                'mt-1',
+                cat === 'internal'
+                  ? 'bg-accent-subtle text-accent-strong'
+                  : 'bg-surface-muted text-ink-tertiary',
+              )}
+            >
+              {catLabel}
+            </Badge>
+          </div>
+        </div>
+        <div className={cn('mt-3 flex-1', !agent.enabled && 'opacity-60')}>
+          <p className="line-clamp-2 text-body text-ink-secondary">
+            {agent.description || (
+              <span className="font-mono text-ink-tertiary">{cmdline}</span>
+            )}
+          </p>
+        </div>
+        <div className="mt-4 flex items-center justify-between">
+          <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />
+          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <ActionButton icon={<Pencil size={14} />} label={t('settings.agents.edit')} onClick={onEdit} />
+            <ActionButton icon={<Trash2 size={14} />} label={t('settings.agents.delete')} onClick={onDelete} danger />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
       <Avatar name={agent.name} shape="square" size={38} className={cn(!agent.enabled && 'opacity-60')} />
@@ -102,5 +142,34 @@ export function AgentCard({
         </DropdownMenu>
       </div>
     </div>
+  )
+}
+
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+        danger
+          ? 'text-ink-secondary hover:bg-danger/10 hover:text-danger'
+          : 'text-ink-secondary hover:bg-surface-muted hover:text-ink',
+      )}
+      aria-label={label}
+    >
+      {icon}
+    </button>
   )
 }

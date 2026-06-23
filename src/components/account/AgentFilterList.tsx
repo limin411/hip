@@ -10,7 +10,7 @@ const ICONS: Partial<Record<AgentFilterIcon, LucideIcon>> = {
   plug: Plug,
 }
 
-/** Left master pane: a fixed type-filter rail (no search — only five entries). */
+/** Left icon-only filter rail. */
 export function AgentFilterList({
   active,
   counts,
@@ -30,22 +30,34 @@ export function AgentFilterList({
     }
   }
   return (
-    <div className="w-[184px] shrink-0 self-start overflow-hidden rounded-lg border border-border p-1.5">
+    <div className="w-16 shrink-0 self-start overflow-hidden rounded-lg border border-border p-1.5">
       {AGENT_FILTERS.map((entry) => {
         const Icon = ICONS[entry.icon]
         const isActive = entry.id === active
+        const count = counts[entry.id]
         return (
           <button
             key={entry.id}
+            type="button"
             onClick={() => onSelect(entry.id)}
+            title={label(entry.id)}
             className={cn(
-              'flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-body transition-colors',
+              'relative flex w-full flex-col items-center rounded-md px-1 py-2 text-center transition-colors',
               isActive ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink-secondary hover:bg-surface-muted',
             )}
           >
-          {Icon && <Icon size={16} className="shrink-0" />}
-            <span className="flex-1 truncate">{label(entry.id)}</span>
-            <span className={cn('text-caption', isActive ? 'text-accent-strong' : 'text-ink-tertiary')}>{counts[entry.id]}</span>
+            {Icon && <Icon size={18} className="shrink-0" />}
+            <span className="mt-1 w-full truncate px-0.5 text-[10px] leading-tight">{label(entry.id)}</span>
+            <span
+              className={cn(
+                'absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border px-1 text-[10px] font-medium',
+                isActive
+                  ? 'border-accent-strong/30 bg-white text-accent-strong'
+                  : 'border-border bg-surface text-ink-tertiary',
+              )}
+            >
+              {count}
+            </span>
           </button>
         )
       })}

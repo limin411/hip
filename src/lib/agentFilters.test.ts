@@ -7,17 +7,17 @@ function a(kind: AgentConfig['kind']): AgentConfig {
 }
 
 describe('AGENT_FILTERS', () => {
-  it('lists the four entries in order', () => {
-    expect(AGENT_FILTERS.map((f) => f.id)).toEqual(['all', 'builtin', 'internal', 'acp'])
+  it('lists the visible entries in order (built-in hidden)', () => {
+    expect(AGENT_FILTERS.map((f) => f.id)).toEqual(['all', 'internal', 'acp'])
   })
 })
 
 describe('agentFilterCounts', () => {
-  it('counts an empty roster as just the built-in', () => {
-    expect(agentFilterCounts([])).toEqual({ all: 1, builtin: 1, acp: 0, internal: 0 })
+  it('counts only configured agents when roster is empty', () => {
+    expect(agentFilterCounts([])).toEqual({ all: 0, builtin: 0, acp: 0, internal: 0 })
   })
-  it('counts a mixed roster by category, all = agents + builtin', () => {
+  it('counts a mixed roster by category (built-in excluded)', () => {
     const agents = [a('internal'), a('internal'), a('custom'), a('acp'), a('opencode')]
-    expect(agentFilterCounts(agents)).toEqual({ all: 6, builtin: 1, internal: 2, acp: 3 })
+    expect(agentFilterCounts(agents)).toEqual({ all: 5, builtin: 0, internal: 2, acp: 3 })
   })
 })

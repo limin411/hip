@@ -9,20 +9,19 @@ export interface AgentFilterEntry {
   icon: AgentFilterIcon
 }
 
-/** Fixed, ordered rail entries: overview, built-in, then the three categories. */
+/** Icon-only rail entries shown in the UI. The built-in agent is hidden from this list. */
 export const AGENT_FILTERS: AgentFilterEntry[] = [
   { id: 'all', icon: 'layout-grid' },
-  { id: 'builtin', icon: 'sparkles' },
   { id: 'internal', icon: 'bot' },
   { id: 'acp', icon: 'plug' },
 ]
 
 /**
- * Per-entry counts. builtin is always 1 (the single hip core agent); all = builtin + every
- * configured agent; internal/acp = configured agents in that category.
+ * Per-entry counts. The built-in agent is no longer shown in the UI, so `all`
+ * counts only configured agents and `builtin` is kept at 0 for type compatibility.
  */
 export function agentFilterCounts(agents: AgentConfig[]): Record<AgentFilter, number> {
-  const counts: Record<AgentFilter, number> = { all: agents.length + 1, builtin: 1, acp: 0, internal: 0 }
+  const counts: Record<AgentFilter, number> = { all: agents.length, builtin: 0, acp: 0, internal: 0 }
   for (const agent of agents) {
     const category = agentCategory(agent)
     if (category in counts) counts[category] += 1

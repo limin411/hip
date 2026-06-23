@@ -8,6 +8,7 @@ import type { AgentConfig, ServerMessage } from '@hip/protocol'
 import { Session } from '../session.js'
 import type { AgentInvoker } from '../agents/invoker.js'
 import { RealModelRunner, type ModelRunner } from '../model-runner.js'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 
 /** Supervisor model: 1st call emits a dispatch_agent tool call, 2nd call emits final text.
  *  Mirrors session-unit.test.ts's HangingChatModel: bindTools returns `this` so the streaming
@@ -69,7 +70,7 @@ export function makeSession(id: string, model: ToolThenTextModel, stub: StubInvo
   return new Session(
     id,
     { llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd() },
-    model as never,
+    model as BaseChatModel,
     undefined, // store
     undefined, // titleGenerator
     undefined, // idleTimeoutMs
@@ -106,7 +107,7 @@ export class TextOnlyModel extends FakeListChatModel {
 
 /** A ModelRunner over a TextOnlyModel — used as the internal child's runner so no API is hit. */
 export function makeTextRunner(text: string): ModelRunner {
-  return new RealModelRunner(new TextOnlyModel(text) as never)
+  return new RealModelRunner(new TextOnlyModel(text) as BaseChatModel)
 }
 
 /** Session that uses a REAL AgentInvoker (built by invokerFactory) so the internal-agent loop runs.
@@ -119,7 +120,7 @@ export function makeSessionWithInvokerFactory(
   return new Session(
     id,
     { llmProvider: 'deepseek', model: 'm', tools: [], cwd: process.cwd() },
-    model as never,
+    model as BaseChatModel,
     undefined, // store
     undefined, // titleGenerator
     undefined, // idleTimeoutMs

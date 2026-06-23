@@ -1,6 +1,7 @@
 // packages/sidecar/src/session/session.test.ts
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ChatOpenAI } from '@langchain/openai'
+import { ChatAnthropic } from '@langchain/anthropic'
 import { Session } from './session.js'
 import { NetworkPolicy } from './network-policy.js'
 import { writeFileSync, existsSync, readFileSync, unlinkSync, renameSync, mkdirSync } from 'node:fs'
@@ -19,6 +20,14 @@ function createModel() {
     },
     temperature: 0,
     maxTokens: 64,
+  })
+}
+
+function createAnthropicModel() {
+  return new ChatAnthropic({
+    model: 'claude-3-haiku-20240307',
+    apiKey: process.env.HIP_MODEL_ANTHROPIC_API_KEY!,
+    streaming: true,
   })
 }
 

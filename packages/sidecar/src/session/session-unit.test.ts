@@ -175,20 +175,20 @@ describe('Session NO_API_KEY guard', () => {
   })
 })
 
-describe('Session incompatible-model guard', () => {
+  describe('Session incompatible-model guard', () => {
   // The active model is a process-global; a stale/hand-edited hip-providers.json can point it at a
   // native-only provider. Restore the default after each case so other suites see deepseek.
   let savedKey: string | undefined
-  beforeEach(() => { savedKey = process.env.HIP_MODEL_ANTHROPIC_API_KEY; delete process.env.HIP_MODEL_ANTHROPIC_API_KEY })
+  beforeEach(() => { savedKey = process.env.HIP_MODEL_GOOGLE_API_KEY; delete process.env.HIP_MODEL_GOOGLE_API_KEY })
   afterEach(() => {
     setActiveModel(DEEPSEEK_DEFAULT)
-    if (savedKey !== undefined) process.env.HIP_MODEL_ANTHROPIC_API_KEY = savedKey
+    if (savedKey !== undefined) process.env.HIP_MODEL_GOOGLE_API_KEY = savedKey
   })
 
   it('emits INCOMPATIBLE_MODEL (not NO_API_KEY) and no agent:started for a native-only active provider', async () => {
-    // No anthropic key is set, so the compat guard must fire BEFORE requireApiKey — proving ordering.
-    setActiveModel({ providerID: 'anthropic', modelID: 'claude-3-5-sonnet', baseURL: 'https://api.anthropic.com' })
-    const session = new Session('t-incompat', { llmProvider: 'anthropic', model: 'claude-3-5-sonnet', tools: [] })
+    // No google key is set, so the compat guard must fire BEFORE requireApiKey — proving ordering.
+    setActiveModel({ providerID: 'google', modelID: 'gemini-2.0-flash', baseURL: 'https://generativelanguage.googleapis.com' })
+    const session = new Session('t-incompat', { llmProvider: 'google', model: 'gemini-2.0-flash', tools: [] })
     const events = await collect(session, 'hi')
     expect(events.some((e) => e.type === 'agent:started')).toBe(false)
     const err = events.find((e) => e.type === 'error')
@@ -196,10 +196,10 @@ describe('Session incompatible-model guard', () => {
     expect((err as Ev).code).toBe('INCOMPATIBLE_MODEL')
   })
 
-  it('runs normally for a native provider when a model is injected (guard skipped in tests)', async () => {
-    setActiveModel({ providerID: 'anthropic', modelID: 'claude-3-5-sonnet', baseURL: 'https://api.anthropic.com' })
+  it('runs normally for an incompatible provider when a model is injected (guard skipped in tests)', async () => {
+    setActiveModel({ providerID: 'google', modelID: 'gemini-2.0-flash', baseURL: 'https://generativelanguage.googleapis.com' })
     const model = new FakeListChatModel({ responses: ['hello world'] })
-    const session = new Session('t-incompat-injected', { llmProvider: 'anthropic', model: 'claude-3-5-sonnet', tools: [] }, model)
+    const session = new Session('t-incompat-injected', { llmProvider: 'google', model: 'gemini-2.0-flash', tools: [] }, model)
     const events = await collect(session, 'hi')
     expect(events[0]?.type).toBe('agent:started')
     expect(events.some((e) => e.type === 'message:complete')).toBe(true)

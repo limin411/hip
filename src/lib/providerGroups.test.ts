@@ -19,19 +19,19 @@ describe('groupProviders', () => {
   it('partitions into configured (compatible + key) / available (compatible, no key) / incompatible', () => {
     const g = groupProviders(catalog, '', { deepseek: true, mine: true })
     expect(g.configured.map((x) => x.id)).toEqual(['deepseek', 'mine'])
-    expect(g.available.map((x) => x.id)).toEqual(['groq', 'openai'])
-    expect(g.incompatible.map((x) => x.id)).toEqual(['anthropic', 'google'])
+    expect(g.available.map((x) => x.id)).toEqual(['anthropic', 'groq', 'openai'])
+    expect(g.incompatible.map((x) => x.id)).toEqual(['google'])
   })
 
   it('sorts each group alphabetically by name', () => {
     const g = groupProviders(catalog, '', {})
     expect(g.configured).toEqual([])
-    expect(g.available.map((x) => x.name)).toEqual(['DeepSeek', 'Groq', 'Mine', 'OpenAI'])
-    expect(g.incompatible.map((x) => x.name)).toEqual(['Anthropic', 'Google'])
+    expect(g.available.map((x) => x.name)).toEqual(['Anthropic', 'DeepSeek', 'Groq', 'Mine', 'OpenAI'])
+    expect(g.incompatible.map((x) => x.name)).toEqual(['Google'])
   })
 
   it('filters by name substring, case-insensitive, across all groups before grouping', () => {
-    expect(groupProviders(catalog, 'op', {}).available.map((x) => x.id)).toEqual(['openai'])
+    expect(groupProviders(catalog, 'op', {}).available.map((x) => x.id)).toEqual(['anthropic', 'openai'])
     const g = groupProviders(catalog, 'GOOG', {})
     expect(g.incompatible.map((x) => x.id)).toEqual(['google'])
     expect(g.available).toEqual([])

@@ -12,7 +12,8 @@ describe('isCompatible', () => {
   it('always accepts custom providers', () => {
     expect(isCompatible({ id: 'mine', name: 'Mine', models: {}, env: [], custom: true })).toBe(true)
   })
-  it('rejects native-only vendors', () => {
-    expect(isCompatible({ id: 'anthropic', name: 'Anthropic', npm: '@ai-sdk/anthropic', models: {}, env: [] })).toBe(false)
+  it('admits anthropic but still rejects other native-only vendors', () => {
+    expect(isCompatible({ id: 'anthropic', name: 'Anthropic', npm: '@ai-sdk/anthropic', models: {}, env: [] })).toBe(true)
+    expect(isCompatible({ id: 'google', name: 'Google', npm: '@ai-sdk/google', models: {}, env: [] })).toBe(false)
   })
 })

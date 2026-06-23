@@ -48,7 +48,7 @@ describe('sidecar provider config', () => {
 
   it('isOpenAICompatible blocks native-only providers and admits everything else', () => {
     // The renderer-disabled (native-SDK) providers — the only ones a stale hip-providers.json can sneak in.
-    expect(isOpenAICompatible('anthropic')).toBe(false)
+    expect(isOpenAICompatible('anthropic')).toBe(true)
     expect(isOpenAICompatible('google')).toBe(false)
     expect(isOpenAICompatible('google-vertex')).toBe(false)
     expect(isOpenAICompatible('amazon-bedrock')).toBe(false)

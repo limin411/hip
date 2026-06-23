@@ -7,10 +7,26 @@ describe('normalizeMessageContent', () => {
     expect(normalizeMessageContent(input)).toBe('让我先看看项目。')
   })
 
-  it('only collapses runs of 5 or more short CJK lines', () => {
-    const input = '让\n我\n先\n看\n\n这是正常的段落。'
-    // 4 short lines stay as-is; blank line and paragraph stay as-is.
-    expect(normalizeMessageContent(input)).toBe('让\n我\n先\n看\n\n这是正常的段落。')
+  it('collapses runs of 2 or more short CJK lines', () => {
+    const input = '让\n我\n\n这是正常的段落。'
+    // 2 short lines collapse; blank line and paragraph stay as-is.
+    expect(normalizeMessageContent(input)).toBe('让我\n\n这是正常的段落。')
+  })
+
+  it('does not collapse a single short CJK line', () => {
+    const input = '让\n\n这是正常的段落。'
+    expect(normalizeMessageContent(input)).toBe(input)
+  })
+
+  it('collapses short runs of 2, 3, and 4 CJK lines', () => {
+    expect(normalizeMessageContent('让\n我')).toBe('让我')
+    expect(normalizeMessageContent('让\n我\n先')).toBe('让我先')
+    expect(normalizeMessageContent('让\n我\n先\n看')).toBe('让我先看')
+  })
+
+  it('stops collapsing when a run is interrupted by an ASCII line', () => {
+    const input = '的\n相\n关\nAPI\n信\n息'
+    expect(normalizeMessageContent(input)).toBe('的相关\nAPI\n信息')
   })
 
   it('preserves normal multi-line prose', () => {

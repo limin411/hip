@@ -10,7 +10,7 @@ const CJK_RE = /[\u4e00-\u9fff\u3000-\u303f\uff00-\uff0f\uff1a-\uff20\uff3b-\uff
 const CJK_PUNCT_RE = /[\u3001-\u3003\u3008-\u3011\u3014-\u3015\uff08-\uff09\u2018-\u2019\u201c-\u201d\u300c-\u300d\u300e-\u300f\uff02\uff07\u2014\u2026\uff0c\uff0e\uff01\uff1f\uff1b\uff1a]/
 
 const MAX_COLLAPSIBLE_LINE_LENGTH = 4
-const MIN_COLLAPSIBLE_RUN_LENGTH = 5
+const MIN_COLLAPSIBLE_RUN_LENGTH = 2
 
 /**
  * A line is treated as "collapsible" when it looks like a corrupted single-character
@@ -29,7 +29,7 @@ function isCollapsibleLine(line: string): boolean {
 
 /**
  * Collapse runs of single-character CJK lines back into paragraphs.
- * Only acts on runs of 5+ collapsible lines so normal short lines (titles,
+ * Only acts on runs of 2+ collapsible lines so normal short lines (titles,
  * single-word emphasis, etc.) are preserved.
  */
 function normalizeProse(text: string): string {

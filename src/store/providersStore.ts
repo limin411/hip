@@ -18,6 +18,7 @@ interface ProvidersStore {
   saveKey: (providerID: string, value: string) => Promise<void>
   clearKey: (providerID: string) => Promise<void>
   setBaseURL: (providerID: string, baseURL: string) => Promise<void>
+  setEnabled: (providerID: string, enabled: boolean) => Promise<void>
   addCustom: (providerID: string, name: string, baseURL: string, modelIDs: string[]) => Promise<void>
   setActiveModel: (providerID: string, modelID: string) => Promise<void>
 }
@@ -91,6 +92,23 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     if (config.activeModel?.providerID === providerID) {
       sessionService.setActiveModel(providerID, config.activeModel.modelID, baseURL)
     }
+  },
+
+  setEnabled: async (providerID, enabled) => {
+    const config = get().config
+    const next: ProvidersConfig = {
+      ...config,
+      providers: {
+        ...config.providers,
+        [providerID]: {
+          ...config.providers[providerID],
+          enabled,
+          baseURL: resolveBaseURL(get().catalog[providerID], config, providerID),
+        },
+      },
+    }
+    await setProvidersConfig(next)
+    set({ config: next })
   },
 
   // Note: addCustom persists config but does NOT restart the sidecar, so the new provider's

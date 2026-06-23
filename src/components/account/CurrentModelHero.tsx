@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { Check, AlertTriangle } from 'lucide-react'
+import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import type { CatalogModel } from '@/ipc/catalog'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { modelBadges, type ModelCapKey } from '@/lib/modelBadges'
+import { cn } from '@/lib/utils'
 
 const CAP_I18N = {
   reasoning: 'settings.modelConfig.reasoning',
@@ -17,17 +18,19 @@ export function CurrentModelHero({
   modelID,
   model,
   keyConfigured,
+  onLocate,
 }: {
   providerName: string | null
   modelID: string | null
   model: CatalogModel | undefined
   keyConfigured: boolean
+  onLocate?: () => void
 }) {
   const { t } = useTranslation()
 
   if (!modelID || !providerName) {
     return (
-      <div className="mb-4 rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-3.5">
+      <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-3.5">
         <div className="text-body text-ink-secondary">{t('settings.modelConfig.noModel')}</div>
         <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.modelConfig.noModelHint')}</div>
       </div>
@@ -36,7 +39,15 @@ export function CurrentModelHero({
 
   const badges = model ? modelBadges(model) : null
   return (
-    <div className="mb-4 flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3">
+    <button
+      type="button"
+      onClick={onLocate}
+      disabled={!onLocate}
+      className={cn(
+        'flex w-full items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3 text-left transition-colors',
+        onLocate && 'hover:bg-surface-muted',
+      )}
+    >
       <Avatar name={providerName} shape="square" size={40} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-body font-medium text-ink">{modelID}</div>
@@ -63,6 +74,11 @@ export function CurrentModelHero({
           <AlertTriangle size={12} /> {t('settings.modelConfig.keyMissing')}
         </span>
       )}
-    </div>
+      {onLocate && (
+        <span className="shrink-0 text-ink-tertiary">
+          <ArrowRight size={16} />
+        </span>
+      )}
+    </button>
   )
 }

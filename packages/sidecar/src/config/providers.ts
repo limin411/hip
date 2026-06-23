@@ -7,6 +7,8 @@ export const DEEPSEEK_DEFAULT: ActiveModel = {
   baseURL: 'https://api.deepseek.com/v1',
 }
 
+export const ANTHROPIC_DEFAULT_BASE_URL = 'https://api.anthropic.com/v1'
+
 /** Provider ids that require a native (non-OpenAI) SDK and so cannot be reached through ChatOpenAI.
  *  We BLOCKLIST rather than allowlist on purpose: the renderer (src/ipc/catalog.ts) admits any
  *  provider tagged npm '@ai-sdk/openai[-compatible]' — metadata the sidecar never sees — so a positive
@@ -15,7 +17,6 @@ export const DEEPSEEK_DEFAULT: ActiveModel = {
  *  renderer remains the primary gate. A stale/hand-edited hip-providers.json is the only way one of
  *  these reaches buildModel() — see the model-config follow-ups spec. */
 const NATIVE_ONLY_PROVIDERS = new Set([
-  'anthropic',
   'google',
   'google-vertex',
   'google-vertex-anthropic',
@@ -47,7 +48,7 @@ export function loadActiveModelFromEnv(): void {
     const cfg = JSON.parse(readFileSync(file, 'utf8')) as ProvidersConfig
     const sel = cfg.activeModel
     if (!sel) { active = DEEPSEEK_DEFAULT; return }
-    const baseURL = cfg.providers?.[sel.providerID]?.baseURL ?? DEEPSEEK_DEFAULT.baseURL
+    const baseURL = cfg.providers?.[sel.providerID]?.baseURL ?? resolveProviderBaseURL(sel.providerID)
     active = { providerID: sel.providerID, modelID: sel.modelID, baseURL }
   } catch {
     active = DEEPSEEK_DEFAULT
@@ -64,12 +65,12 @@ export function resolveProviderBaseURL(providerID: string): string {
       if (url) return url
     } catch { /* fall through */ }
   }
-  return DEEPSEEK_DEFAULT.baseURL
+  return providerID === 'anthropic' ? ANTHROPIC_DEFAULT_BASE_URL : DEEPSEEK_DEFAULT.baseURL
 }
 
 /** Cheap model for a provider's auxiliary calls (titles, compaction summaries). Falls back to the
  *  caller's active model when the provider has no known cheaper variant. */
-const CHEAP_MODEL: Record<string, string> = { deepseek: 'deepseek-chat' }
+const CHEAP_MODEL: Record<string, string> = { deepseek: 'deepseek-chat', anthropic: 'claude-3-haiku-20240307' }
 export function cheapModelFor(providerID: string, fallbackModelID: string): string {
   return CHEAP_MODEL[providerID] ?? fallbackModelID
 }

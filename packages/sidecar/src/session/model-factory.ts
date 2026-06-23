@@ -1,4 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai'
+import { ChatAnthropic } from '@langchain/anthropic'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
@@ -12,7 +14,7 @@ const REASONING_BLOCK_INDEX = 7
  *  reach the OpenAI request body. langchain's v0 outbound converter passes array blocks through raw,
  *  and these blocks also leak into ToolMessages (which carry no output_version tag and so bypass the
  *  v1 text-only filter), making DeepSeek 400 ("unknown variant `reasoning`"). Mutates in place. */
-function stripReasoningBlocks(messages: readonly { content: unknown }[]): void {
+export function stripReasoningBlocks(messages: readonly { content: unknown }[]): void {
   for (const m of messages) {
     if (!Array.isArray(m.content)) continue
     const kept = m.content.filter((b) => {
@@ -77,7 +79,15 @@ export function activeKey(providerID: string): string {
 }
 
 /** Build the production reasoning chat model for a concrete model choice. */
-export function buildChatModel(choice: { providerID: string; modelID: string; baseURL: string }): ChatOpenAI {
+export function buildChatModel(choice: { providerID: string; modelID: string; baseURL: string }): BaseChatModel {
+  if (choice.providerID === 'anthropic') {
+    return new ChatAnthropic({
+      model: choice.modelID,
+      apiKey: activeKey(choice.providerID),
+      streaming: true,
+      streamUsage: true,
+    })
+  }
   return new ReasoningChatOpenAI({
     model: choice.modelID,
     apiKey: activeKey(choice.providerID),
@@ -124,7 +134,7 @@ export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较�
 class RealSummarizer implements Summarizer {
   async summarize(messages: BaseMessage[]): Promise<string> {
     const { providerID, modelID, baseURL } = getActiveModel()
-    const model = new ChatOpenAI({ model: cheapModelFor(providerID, modelID), apiKey: activeKey(providerID), configuration: { baseURL }, maxTokens: SUMMARY_OUTPUT_TOKENS, temperature: 0.2 })
+    const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
     const res = await model.invoke([new SystemMessage(SUMMARY_TEMPLATE), new HumanMessage(transcript)])
     return typeof res.content === 'string' ? res.content : ''

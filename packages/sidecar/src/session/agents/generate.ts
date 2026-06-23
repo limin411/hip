@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { ChatOpenAI } from '@langchain/openai'
 import { SystemMessage, HumanMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import type { AgentConfig } from '@hip/protocol'
-import { resolveApiKey } from '../../config/auth-file.js'
 import { getActiveModel, cheapModelFor } from '../../config/providers.js'
+import { buildChatModel } from '../model-factory.js'
 
 const GENERATE_SYSTEM_PROMPT = `You are an agent config generator. Given a description of an AI agent's role, output a single JSON object that conforms to this TypeScript interface:
 
@@ -43,14 +42,7 @@ interface GenerateDeps {
 
 function buildDefaultCallLLM(modelID: string): (systemPrompt: string, userDescription: string) => Promise<string> {
   const { providerID, baseURL } = getActiveModel()
-  const apiKey = resolveApiKey(providerID) ?? 'sk-missing'
-  const model = new ChatOpenAI({
-    model: modelID,
-    apiKey,
-    configuration: { baseURL },
-    maxTokens: 1024,
-    temperature: 0.3,
-  })
+  const model = buildChatModel({ providerID, modelID, baseURL })
   return async (systemPrompt: string, userDescription: string) => {
     const res = await model.invoke([new SystemMessage(systemPrompt), new HumanMessage(userDescription)])
     return typeof res.content === 'string' ? res.content : ''

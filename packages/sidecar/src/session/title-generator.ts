@@ -1,8 +1,7 @@
 import type { SessionConfig } from '@hip/protocol'
-import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { getActiveModel } from '../config/providers.js'
-import { activeKey } from './model-factory.js'
+import { getActiveModel, cheapModelFor } from '../config/providers.js'
+import { buildChatModel } from './model-factory.js'
 
 const TITLE_LEN = 40
 
@@ -33,13 +32,7 @@ const TITLE_SYSTEM_PROMPT =
 export function buildDefaultTitleGenerator(_config: SessionConfig): TitleGenerator {
   return async ({ firstUserMessage, firstReply }) => {
     const { providerID, modelID, baseURL } = getActiveModel()
-    const model = new ChatOpenAI({
-      model: modelID,
-      apiKey: activeKey(providerID),
-      configuration: { baseURL },
-      maxTokens: 24,
-      temperature: 0.3,
-    })
+    const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     const res = await model.invoke([
       new SystemMessage(TITLE_SYSTEM_PROMPT),
       new HumanMessage(`${firstUserMessage}\n\n[assistant reply]: ${firstReply.slice(0, 200)}`),

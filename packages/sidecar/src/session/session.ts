@@ -1,7 +1,7 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
-import { ChatOpenAI } from '@langchain/openai'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { HumanMessage, AIMessage, ToolMessage, AIMessageChunk, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
@@ -90,7 +90,7 @@ export function resolveModelChoice(
   return fallback
 }
 
-function buildModel(config: SessionConfig, profileBinding?: { providerID: string; modelID: string }): ChatOpenAI {
+function buildModel(config: SessionConfig, profileBinding?: { providerID: string; modelID: string }): BaseChatModel {
   return buildChatModel(resolveModelChoice(config, getActiveModel(), profileBinding))
 }
 
@@ -333,7 +333,7 @@ export class Session {
 
   private modelRunner(): ModelRunner {
     if (this.injectedRunner) return this.injectedRunner
-    return new RealModelRunner((this.injectedModel as ChatOpenAI | undefined) ?? buildModel(this._config, this.getActiveProfile().modelBinding))
+    return new RealModelRunner((this.injectedModel as BaseChatModel | undefined) ?? buildModel(this._config, this.getActiveProfile().modelBinding))
   }
 
   private summarizer(): Summarizer {

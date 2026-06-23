@@ -3,6 +3,7 @@ import { SystemMessage } from '@langchain/core/messages'
 import { concat } from '@langchain/core/utils/stream'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { ChatOpenAI } from '@langchain/openai'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { MAX_STEPS_NOTE } from './loop-control.js'
 import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
@@ -30,7 +31,7 @@ export function textDelta(chunk: AIMessageChunk): string {
     .join('')
 }
 
-/** Per-chunk reasoning delta: reasoning blocks of array content, else additional_kwargs.reasoning_content. */
+/** Per-chunk reasoning delta: reasoning/thinking blocks of array content, else additional_kwargs.reasoning_content. */
 export function reasoningDelta(chunk: AIMessageChunk): string {
   if (Array.isArray(chunk.content)) {
     const fromBlocks = chunk.content
@@ -38,6 +39,12 @@ export function reasoningDelta(chunk: AIMessageChunk): string {
       .map((b) => b.reasoning)
       .join('')
     if (fromBlocks) return fromBlocks
+
+    const fromThinkingBlocks = chunk.content
+      .filter((b): b is { type: 'thinking'; thinking: string } => (b as { type?: string }).type === 'thinking')
+      .map((b) => b.thinking)
+      .join('')
+    if (fromThinkingBlocks) return fromThinkingBlocks
   }
   const rc = (chunk.additional_kwargs as { reasoning_content?: unknown } | undefined)?.reasoning_content
   return typeof rc === 'string' ? rc : ''
@@ -45,15 +52,15 @@ export function reasoningDelta(chunk: AIMessageChunk): string {
 
 /** Production runner over a ChatOpenAI/ReasoningChatOpenAI instance. */
 export class RealModelRunner implements ModelRunner {
-  constructor(private readonly model: ChatOpenAI) {}
+  constructor(private readonly model: BaseChatModel) {}
 
   async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
-    const bound = opts.bindTools ? this.model.bindTools(opts.tools) : this.model
+    const bound = opts.bindTools ? this.model.bindTools!(opts.tools) : this.model
     const input: BaseMessage[] = opts.bindTools ? messages : [...messages, new SystemMessage(MAX_STEPS_NOTE)]
     let emitted = false
     const attempt = async (): Promise<AIMessage> => {
       const t0 = Date.now()
-      logDebug('model', 'stream:start', { model: (bound as any).model ?? 'unknown' })
+      logDebug('model', 'stream:start', { model: (bound as any).model ?? (bound as any).modelName ?? 'unknown' })
       const stream = await bound.stream(input, { signal: opts.signal })
       let gathered: AIMessageChunk | undefined
       let firstToken = true

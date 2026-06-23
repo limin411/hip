@@ -26,11 +26,12 @@ export type Catalog = Record<string, CatalogProvider>
 const COMPATIBLE_IDS = new Set([
   'deepseek', 'openai', 'openrouter', 'groq', 'moonshotai', 'zhipuai', 'siliconflow',
   'mistral', 'xai', 'togetherai', 'deepinfra', 'fireworks', 'perplexity', 'ollama', 'lmstudio',
+  'anthropic',
 ])
 
 export function isCompatible(p: CatalogProvider): boolean {
   if (p.custom) return true
-  if (p.npm === '@ai-sdk/openai' || p.npm === '@ai-sdk/openai-compatible') return true
+  if (p.npm === '@ai-sdk/openai' || p.npm === '@ai-sdk/openai-compatible' || p.npm === '@ai-sdk/anthropic') return true
   return COMPATIBLE_IDS.has(p.id)
 }
 

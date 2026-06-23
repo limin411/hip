@@ -9,6 +9,7 @@ interface ModalProps {
   onOpenChange: (open: boolean) => void
   title: string
   children: React.ReactNode
+  footer?: React.ReactNode
   className?: string
   resizable?: boolean
   defaultSize?: Size
@@ -35,6 +36,7 @@ export function Modal({
   onOpenChange,
   title,
   children,
+  footer,
   className,
   resizable,
   defaultSize,
@@ -73,6 +75,9 @@ export function Modal({
             </DialogPrimitive.Close>
           </div>
           <div className="flex-1 overflow-y-auto">{children}</div>
+          {footer && (
+            <div className="shrink-0 border-t border-border bg-surface-subtle px-5 py-3">{footer}</div>
+          )}
           {resizable &&
             RESIZE_HANDLES.map((h) => (
               <div

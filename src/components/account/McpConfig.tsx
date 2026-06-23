@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw } from 'lucide-react'
+import type { TFunction } from 'i18next'
+import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
 import type { McpServerConfig, PluginMeta } from '@hip/protocol'
 import { useMcpServersStore } from '@/store/mcpServersStore'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { useMcpStatuses, type McpServerStatusVM } from '@/domain'
 import { cn } from '@/lib/utils'
-import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -48,6 +49,16 @@ export function statusLabelKey(status: McpServerStatusVM['status']): string {
     case 'connecting': return 'settings.mcp.statusConnecting'
     case 'disconnected': return 'settings.mcp.statusDisconnected'
     case 'error': return 'settings.mcp.statusError'
+  }
+}
+
+/** UI helper: translate a connection status to a readable label. */
+function getStatusLabel(t: TFunction, status: McpServerStatusVM['status']): string {
+  switch (status) {
+    case 'connected': return t('settings.mcp.statusConnected')
+    case 'connecting': return t('settings.mcp.statusConnecting')
+    case 'disconnected': return t('settings.mcp.statusDisconnected')
+    case 'error': return t('settings.mcp.statusError')
   }
 }
 
@@ -117,37 +128,98 @@ export function McpConfig() {
     if (!pluginsLoaded) void loadPlugins()
   }, [pluginsLoaded, loadPlugins])
 
-  const statusByServer = new Map(mcpStatuses.map((s) => [s.id, s]))
-  const pluginMcpServers = derivePluginMcpServers(plugins, new Set(servers.map((s) => s.id)))
+  const statusByServer = useMemo(() => new Map(mcpStatuses.map((s) => [s.id, s])), [mcpStatuses])
+  const pluginMcpServers = useMemo(
+    () => derivePluginMcpServers(plugins, new Set(servers.map((s) => s.id))),
+    [plugins, servers],
+  )
+
+  const stats = useMemo(() => {
+    const enabledCount = servers.filter((s) => s.enabled).length
+    const connectedCount = mcpStatuses.filter((s) => s.status === 'connected').length
+    const errorCount = mcpStatuses.filter((s) => s.status === 'error').length
+    const toolCount = mcpStatuses.reduce((sum, s) => sum + (s.toolCount ?? 0), 0)
+    return { enabledCount, connectedCount, errorCount, toolCount, total: servers.length }
+  }, [servers, mcpStatuses])
+
+  const handleUpdateTools = async (
+    server: McpServerConfig,
+    toolName: string,
+  ) => {
+    const result = toggleTool(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
+    await updateServer(server.id, result)
+  }
+
+  const handleResetTools = async (server: McpServerConfig) => {
+    await updateServer(server.id, { enabledTools: [], disabledTools: [] })
+  }
 
   return (
     <div className="p-6">
-      <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
-      <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-title font-semibold text-ink">{t('settings.mcp.title')}</h2>
+          <p className="mt-1 text-body text-ink-secondary">{t('settings.mcp.intro')}</p>
+        </div>
+        <Button size="sm" onClick={() => setEditing({ mode: 'add' })}>
+          <Plus size={15} />
+          {t('settings.mcp.add')}
+        </Button>
+      </div>
 
-      <div className="mt-5 space-y-2">
-        {servers.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border py-5 text-center text-meta text-ink-tertiary">
-            {t('settings.mcp.empty')}
-          </div>
-        ) : (
-          servers.map((s) => (
-            <McpServerRow
-              key={s.id}
-              server={s}
-              status={statusByServer.get(s.id)}
-              onToggle={(enabled) => void updateServer(s.id, { enabled })}
-              onEdit={() => setEditing({ mode: 'edit', server: s })}
-              onDelete={() => setDeleting(s)}
-            />
-          ))
-        )}
-        <button
-          onClick={() => setEditing({ mode: 'add' })}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-3 text-body font-medium text-accent-strong transition-colors hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          <Plus size={15} /> {t('settings.mcp.add')}
-        </button>
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          icon={Plug}
+          value={`${stats.enabledCount}/${stats.total}`}
+          label={t('settings.mcp.statEnabled')}
+          tone="accent"
+        />
+        <StatCard
+          icon={Server}
+          value={String(stats.connectedCount)}
+          label={t('settings.mcp.statConnected')}
+          tone="success"
+        />
+        <StatCard
+          icon={AlertCircle}
+          value={String(stats.errorCount)}
+          label={t('settings.mcp.statErrors')}
+          tone={stats.errorCount > 0 ? 'danger' : 'muted'}
+        />
+        <StatCard
+          icon={Cpu}
+          value={String(stats.toolCount)}
+          label={t('settings.mcp.statTools')}
+          tone="muted"
+        />
+      </div>
+
+      <div className="mt-6">
+        <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.myServersTitle')}</h3>
+        <div className="mt-2 space-y-2">
+          {servers.length === 0 ? (
+            <button
+              onClick={() => setEditing({ mode: 'add' })}
+              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              <Plug size={24} />
+              <span>{t('settings.mcp.empty')}</span>
+            </button>
+          ) : (
+            servers.map((s) => (
+              <McpServerCard
+                key={s.id}
+                server={s}
+                status={statusByServer.get(s.id)}
+                onToggle={(enabled) => void updateServer(s.id, { enabled })}
+                onEdit={() => setEditing({ mode: 'edit', server: s })}
+                onDelete={() => setDeleting(s)}
+                onToggleTool={(toolName) => void handleUpdateTools(s, toolName)}
+                onResetTools={() => void handleResetTools(s)}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       {pluginMcpServers.length > 0 && (
@@ -155,7 +227,7 @@ export function McpConfig() {
           <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.pluginSectionTitle')}</h3>
           <div className="mt-2 space-y-2">
             {pluginMcpServers.map((s) => (
-              <PluginMcpServerRow
+              <PluginMcpServerCard
                 key={s.id}
                 server={s}
                 pluginName={s.pluginName}
@@ -193,20 +265,70 @@ export function McpConfig() {
   )
 }
 
-function McpServerRow({
+function StatCard({
+  icon: Icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: React.ElementType
+  value: string
+  label: string
+  tone: 'accent' | 'success' | 'danger' | 'muted'
+}) {
+  const toneClasses = {
+    accent: 'bg-accent-subtle text-accent-strong',
+    success: 'bg-success/10 text-success',
+    danger: 'bg-danger/10 text-danger',
+    muted: 'bg-surface-muted text-ink-secondary',
+  }
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
+      <div className="flex items-center gap-2">
+        <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', toneClasses[tone])}>
+          <Icon size={16} />
+        </span>
+      </div>
+      <div className="mt-2 text-stat font-semibold tracking-tight text-ink">{value}</div>
+      <div className="text-caption text-ink-tertiary">{label}</div>
+    </div>
+  )
+}
+
+function StatusDot({ status }: { status: McpServerStatusVM['status'] }) {
+  const colors = {
+    connected: 'bg-success',
+    connecting: 'bg-warning animate-pulse',
+    disconnected: 'bg-ink-tertiary',
+    error: 'bg-danger',
+  }
+  return (
+    <span
+      className={cn('inline-block h-2 w-2 rounded-full', colors[status])}
+      aria-hidden="true"
+    />
+  )
+}
+
+function McpServerCard({
   server,
   status,
   onToggle,
   onEdit,
   onDelete,
+  onToggleTool,
+  onResetTools,
 }: {
   server: McpServerConfig
   status?: McpServerStatusVM
   onToggle: (enabled: boolean) => void
   onEdit: () => void
   onDelete: () => void
+  onToggleTool: (toolName: string) => void
+  onResetTools: () => void
 }) {
   const { t } = useTranslation()
+  const [toolsOpen, setToolsOpen] = useState(false)
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -215,81 +337,133 @@ function McpServerRow({
         : t('settings.mcp.transportHttp')
   const detail =
     server.transport === 'stdio' ? [server.command, ...(server.args ?? [])].join(' ') : (server.url ?? '')
-  const statusEmojiStr = status ? statusEmoji(status.status) : null
-  const statusLabel = status
-    ? status.status === 'connected' ? t('settings.mcp.statusConnected')
-    : status.status === 'connecting' ? t('settings.mcp.statusConnecting')
-    : status.status === 'disconnected' ? t('settings.mcp.statusDisconnected')
-    : t('settings.mcp.statusError')
-    : null
-  const toolCount = status?.toolCount
+  const statusLabel = status ? getStatusLabel(t, status.status) : null
+  const statusTitle = status?.lastError ? `${statusLabel}: ${status.lastError}` : statusLabel || undefined
+  const toolCount = status?.toolCount ?? 0
+  const discoveredTools = status?.toolNames ?? []
+  const hasTools = discoveredTools.length > 0
 
   return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <span
-        className={cn(
-          'flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
-          !server.enabled && 'opacity-60',
-        )}
-      >
-        <Plug size={18} />
-      </span>
-      <div className={cn('min-w-0 flex-1', !server.enabled && 'opacity-60')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{server.name}</span>
-          <Badge>{transportLabel}</Badge>
-          {statusEmojiStr && statusLabel && (
-            <span
-              className="text-caption"
-              title={status?.lastError ? `${String(statusLabel)}: ${status.lastError}` : String(statusLabel)}
-            >
-              {statusEmojiStr} {statusLabel}
-            </span>
+    <div
+      className={cn(
+        'rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover',
+        !server.enabled && 'opacity-75',
+      )}
+    >
+      <div className="flex items-start gap-3.5">
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
+            !server.enabled && 'opacity-60',
           )}
-          {toolCount !== undefined && (
-            <span className="text-caption text-ink-tertiary">
-              {toolCount} tool{toolCount !== 1 ? 's' : ''}
-            </span>
+        >
+          <Plug size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-body font-medium text-ink">{server.name}</span>
+            <Badge>{transportLabel}</Badge>
+            {status && (
+              <span
+                className="inline-flex items-center gap-1.5 text-caption text-ink-secondary"
+                title={statusTitle}
+              >
+                <StatusDot status={status.status} />
+                {statusLabel}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
+          {status && (
+            <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
+              <span>
+                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+              </span>
+              {hasTools && (
+                <button
+                  onClick={() => setToolsOpen((o) => !o)}
+                  className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
+                >
+                  {t('settings.mcp.manageTools')}
+                  <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
+                </button>
+              )}
+            </div>
+          )}
+          {toolsOpen && hasTools && (
+            <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+                  {t('settings.mcp.sectionTools')}
+                </span>
+                {(server.enabledTools?.length || server.disabledTools?.length) ? (
+                  <button
+                    type="button"
+                    onClick={() => void onResetTools()}
+                    className="text-caption text-accent hover:underline"
+                  >
+                    {t('settings.mcp.toolToggleAll')}
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {discoveredTools.map((toolName) => {
+                  const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
+                  return (
+                    <label
+                      key={toolName}
+                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
+                    >
+                      <Switch
+                        checked={enabled}
+                        onCheckedChange={() => onToggleTool(toolName)}
+                        ariaLabel={toolName}
+                      />
+                      <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           )}
         </div>
-        <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
-      </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        {status?.status === 'disconnected' && server.enabled && (
-          <button
-            onClick={() => onToggle(true)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-            title={t('settings.mcp.reconnect')}
-          >
-            <RefreshCw size={14} />
-          </button>
-        )}
-        <Switch checked={server.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.mcp.enableThis')} />
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
+        <div className="flex shrink-0 items-center gap-2">
+          {status?.status === 'disconnected' && server.enabled && (
             <button
+              onClick={() => onToggle(true)}
               className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              aria-label={t('settings.mcp.menuMore')}
+              title={t('settings.mcp.reconnect')}
             >
-              <MoreVertical size={16} />
+              <RefreshCw size={14} />
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEdit}>
-              <Pencil size={14} /> {t('settings.mcp.edit')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
-              <Trash2 size={14} /> {t('settings.mcp.delete')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          <Switch checked={server.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.mcp.enableThis')} />
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                aria-label={t('settings.mcp.menuMore')}
+              >
+                <MoreVertical size={16} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onEdit}>
+                <Pencil size={14} /> {t('settings.mcp.edit')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
+                <Trash2 size={14} /> {t('settings.mcp.delete')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   )
 }
 
-function PluginMcpServerRow({
+function PluginMcpServerCard({
   server,
   pluginName,
   status,
@@ -307,45 +481,48 @@ function PluginMcpServerRow({
         : t('settings.mcp.transportHttp')
   const detail =
     server.transport === 'stdio' ? [server.command, ...(server.args ?? [])].join(' ') : (server.url ?? '')
-  const statusEmojiStr = status ? statusEmoji(status.status) : null
-  const statusLabel = status
-    ? status.status === 'connected' ? t('settings.mcp.statusConnected')
-    : status.status === 'connecting' ? t('settings.mcp.statusConnecting')
-    : status.status === 'disconnected' ? t('settings.mcp.statusDisconnected')
-    : t('settings.mcp.statusError')
-    : null
+  const statusLabel = status ? getStatusLabel(t, status.status) : null
+  const statusTitle = status?.lastError ? `${statusLabel}: ${status.lastError}` : statusLabel || undefined
   const toolCount = status?.toolCount
 
   return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <span
-        className={cn(
-          'flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
-          !server.enabled && 'opacity-60',
-        )}
-      >
-        <Plug size={18} />
-      </span>
-      <div className={cn('min-w-0 flex-1', !server.enabled && 'opacity-60')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{server.name}</span>
-          <Badge>{transportLabel}</Badge>
-          <Badge className="bg-accent-subtle text-accent-strong">{t('settings.mcp.via', { name: pluginName })}</Badge>
-          {statusEmojiStr && statusLabel && (
-            <span
-              className="text-caption"
-              title={status?.lastError ? `${String(statusLabel)}: ${status.lastError}` : String(statusLabel)}
-            >
-              {statusEmojiStr} {statusLabel}
-            </span>
+    <div
+      className={cn(
+        'rounded-xl border border-border bg-surface p-4',
+        !server.enabled && 'opacity-75',
+      )}
+    >
+      <div className="flex items-start gap-3.5">
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
+            !server.enabled && 'opacity-60',
           )}
-          {toolCount !== undefined && (
-            <span className="text-caption text-ink-tertiary">
-              {toolCount} tool{toolCount !== 1 ? 's' : ''}
-            </span>
-          )}
+        >
+          <Plug size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-body font-medium text-ink">{server.name}</span>
+            <Badge>{transportLabel}</Badge>
+            <Badge className="bg-accent-subtle text-accent-strong">{t('settings.mcp.via', { name: pluginName })}</Badge>
+            {status && (
+              <span
+                className="inline-flex items-center gap-1.5 text-caption text-ink-secondary"
+                title={statusTitle}
+              >
+                <StatusDot status={status.status} />
+                {statusLabel}
+              </span>
+            )}
+            {toolCount !== undefined && (
+              <span className="text-caption text-ink-tertiary">
+                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+              </span>
+            )}
+          </div>
+          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
         </div>
-        <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
       </div>
     </div>
   )
@@ -385,6 +562,21 @@ function McpServerEditor({
   const discoveredTools = status?.toolNames ?? []
   const hasDiscoveredTools = discoveredTools.length > 0
 
+  const footer = (
+    <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center gap-2">
+        <Switch checked={form.enabled} onCheckedChange={(v) => patch({ enabled: v })} ariaLabel={t('settings.mcp.enableThis')} />
+        <span className="text-body text-ink-secondary">{t('settings.mcp.enableThis')}</span>
+      </div>
+      <Button variant="outline" size="sm" onClick={onCancel}>
+        {t('settings.mcp.cancel')}
+      </Button>
+      <Button variant="primary" size="sm" disabled={busy || !isMcpDraftValid(form)} onClick={() => void submit()}>
+        {t('settings.mcp.save')}
+      </Button>
+    </div>
+  )
+
   return (
     <Modal
       open
@@ -392,106 +584,92 @@ function McpServerEditor({
         if (!o) onCancel()
       }}
       title={initial ? t('settings.mcp.editTitle') : t('settings.mcp.addTitle')}
+      footer={footer}
     >
-      <div className="flex flex-col">
-        <div className="space-y-5 p-5 max-h-[60vh] overflow-y-auto">
-          <Field label={t('settings.mcp.name')}>
-            <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder={t('settings.mcp.namePlaceholder')} />
-          </Field>
+      <div className="space-y-5 p-5">
+        <Field label={t('settings.mcp.name')}>
+          <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder={t('settings.mcp.namePlaceholder')} />
+        </Field>
 
-          <Section label={t('settings.mcp.sectionTransport')}>
-            <div role="radiogroup" aria-label={t('settings.mcp.sectionTransport')} className="flex gap-2">
-              <ChoiceCard selected={form.transport === 'stdio'} title={t('settings.mcp.transportStdio')} desc={t('settings.mcp.transportStdioDesc')} onClick={() => patch({ transport: 'stdio' })} />
-              <ChoiceCard selected={form.transport === 'sse'} title={t('settings.mcp.transportSse')} desc={t('settings.mcp.transportSseDesc')} onClick={() => patch({ transport: 'sse' })} />
-              <ChoiceCard selected={form.transport === 'http'} title={t('settings.mcp.transportHttp')} desc={t('settings.mcp.transportHttpDesc')} onClick={() => patch({ transport: 'http' })} />
-            </div>
-          </Section>
-
-          {isStdio ? (
-            <Section label={t('settings.mcp.sectionCommand')}>
-              <Field label={t('settings.mcp.command')}>
-                <input className={cn(inputCls, 'font-mono')} value={form.command} onChange={(e) => patch({ command: e.target.value })} placeholder={t('settings.mcp.commandPlaceholder')} />
-              </Field>
-              <Field label={t('settings.mcp.args')}>
-                <input className={cn(inputCls, 'font-mono')} value={form.args} onChange={(e) => patch({ args: e.target.value })} placeholder={t('settings.mcp.argsPlaceholder')} />
-              </Field>
-              <Field label={t('settings.mcp.env')}>
-                <KvEditor pairs={form.env} onChange={(env) => patch({ env })} />
-              </Field>
-            </Section>
-          ) : (
-            <Section label={t('settings.mcp.sectionConnection')}>
-              <Field label={t('settings.mcp.url')}>
-                <input className={cn(inputCls, 'font-mono')} value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder={t('settings.mcp.urlPlaceholder')} />
-              </Field>
-              <Field label={t('settings.mcp.headers')}>
-                <KvEditor pairs={form.headers} onChange={(headers) => patch({ headers })} />
-              </Field>
-              <div className="text-caption text-ink-tertiary">{t('settings.mcp.remoteNote')}</div>
-            </Section>
-          )}
-
-          {initial && (
-            <Section label={t('settings.mcp.sectionTools')}>
-              <p className="text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
-              {hasDiscoveredTools ? (
-                <>
-                  <div className="flex items-center gap-2 mt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (form.enabledTools.length > 0 || form.disabledTools.length > 0) {
-                          patch({ enabledTools: [], disabledTools: [] })
-                        }
-                      }}
-                      className="text-caption text-accent hover:underline"
-                    >
-                      {t('settings.mcp.toolToggleAll')}
-                    </button>
-                  </div>
-                  <div className="space-y-1 mt-1 max-h-40 overflow-y-auto">
-                    {discoveredTools.map((toolName) => {
-                      const enabled = resolveToolEnabled(toolName, form.enabledTools, form.disabledTools)
-                      return (
-                        <label
-                          key={toolName}
-                          className="flex items-center gap-2 py-1 px-1 rounded hover:bg-surface-muted cursor-pointer"
-                        >
-                          <Switch
-                            checked={enabled}
-                            onCheckedChange={() => {
-                              const result = toggleTool(toolName, form.enabledTools, form.disabledTools)
-                              patch(result)
-                            }}
-                            ariaLabel={toolName}
-                          />
-                          <span className="text-body font-mono text-ink-secondary">{toolName}</span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="text-caption text-ink-tertiary mt-1">{t('settings.mcp.noToolsDiscovered')}</div>
-              )}
-            </Section>
-          )}
-
-          {error && <div className="text-meta text-danger">{error}</div>}
-        </div>
-
-        <div className="flex items-center gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-          <div className="flex flex-1 items-center gap-2">
-            <Switch checked={form.enabled} onCheckedChange={(v) => patch({ enabled: v })} ariaLabel={t('settings.mcp.enableThis')} />
-            <span className="text-body text-ink-secondary">{t('settings.mcp.enableThis')}</span>
+        <Section label={t('settings.mcp.sectionTransport')}>
+          <div role="radiogroup" aria-label={t('settings.mcp.sectionTransport')} className="flex flex-col gap-2">
+            <ChoiceCard selected={form.transport === 'stdio'} title={t('settings.mcp.transportStdio')} desc={t('settings.mcp.transportStdioDesc')} onClick={() => patch({ transport: 'stdio' })} />
+            <ChoiceCard selected={form.transport === 'sse'} title={t('settings.mcp.transportSse')} desc={t('settings.mcp.transportSseDesc')} onClick={() => patch({ transport: 'sse' })} />
+            <ChoiceCard selected={form.transport === 'http'} title={t('settings.mcp.transportHttp')} desc={t('settings.mcp.transportHttpDesc')} onClick={() => patch({ transport: 'http' })} />
           </div>
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            {t('settings.mcp.cancel')}
-          </Button>
-          <Button variant="primary" size="sm" disabled={busy || !isMcpDraftValid(form)} onClick={() => void submit()}>
-            {t('settings.mcp.save')}
-          </Button>
-        </div>
+        </Section>
+
+        {isStdio ? (
+          <Section label={t('settings.mcp.sectionCommand')}>
+            <Field label={t('settings.mcp.command')}>
+              <input className={cn(inputCls, 'font-mono')} value={form.command} onChange={(e) => patch({ command: e.target.value })} placeholder={t('settings.mcp.commandPlaceholder')} />
+            </Field>
+            <Field label={t('settings.mcp.args')}>
+              <input className={cn(inputCls, 'font-mono')} value={form.args} onChange={(e) => patch({ args: e.target.value })} placeholder={t('settings.mcp.argsPlaceholder')} />
+            </Field>
+            <Field label={t('settings.mcp.env')}>
+              <KvEditor pairs={form.env} onChange={(env) => patch({ env })} />
+            </Field>
+          </Section>
+        ) : (
+          <Section label={t('settings.mcp.sectionConnection')}>
+            <Field label={t('settings.mcp.url')}>
+              <input className={cn(inputCls, 'font-mono')} value={form.url} onChange={(e) => patch({ url: e.target.value })} placeholder={t('settings.mcp.urlPlaceholder')} />
+            </Field>
+            <Field label={t('settings.mcp.headers')}>
+              <KvEditor pairs={form.headers} onChange={(headers) => patch({ headers })} />
+            </Field>
+            <div className="text-caption text-ink-tertiary">{t('settings.mcp.remoteNote')}</div>
+          </Section>
+        )}
+
+        {initial && (
+          <Section label={t('settings.mcp.sectionTools')}>
+            <p className="text-caption text-ink-tertiary">{t('settings.mcp.toolToggleDesc')}</p>
+            {hasDiscoveredTools ? (
+              <>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (form.enabledTools.length > 0 || form.disabledTools.length > 0) {
+                        patch({ enabledTools: [], disabledTools: [] })
+                      }
+                    }}
+                    className="text-caption text-accent hover:underline"
+                  >
+                    {t('settings.mcp.toolToggleAll')}
+                  </button>
+                </div>
+                <div className="mt-1 max-h-40 space-y-1 overflow-y-auto">
+                  {discoveredTools.map((toolName) => {
+                    const enabled = resolveToolEnabled(toolName, form.enabledTools, form.disabledTools)
+                    return (
+                      <label
+                        key={toolName}
+                        className="flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-muted cursor-pointer"
+                      >
+                        <Switch
+                          checked={enabled}
+                          onCheckedChange={() => {
+                            const result = toggleTool(toolName, form.enabledTools, form.disabledTools)
+                            patch(result)
+                          }}
+                          ariaLabel={toolName}
+                        />
+                        <span className="text-body font-mono text-ink-secondary">{toolName}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="mt-1 text-caption text-ink-tertiary">{t('settings.mcp.noToolsDiscovered')}</div>
+            )}
+          </Section>
+        )}
+
+        {error && <div className="text-meta text-danger">{error}</div>}
       </div>
     </Modal>
   )
@@ -599,22 +777,22 @@ function ChoiceCard({
       aria-checked={selected}
       onClick={onClick}
       className={cn(
-        'flex-1 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+        'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
         selected ? 'border-accent bg-accent-subtle' : 'border-border hover:bg-surface-muted',
       )}
     >
-      <div className="flex items-center justify-between">
-        <span className={cn('text-body font-medium', selected ? 'text-accent-strong' : 'text-ink')}>{title}</span>
-        <span
-          className={cn(
-            'flex h-4 w-4 items-center justify-center rounded-full border',
-            selected ? 'border-accent bg-accent text-white' : 'border-border',
-          )}
-        >
-          {selected && <Check size={11} />}
-        </span>
+      <span
+        className={cn(
+          'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+          selected ? 'border-accent bg-accent text-white' : 'border-border',
+        )}
+      >
+        {selected && <Check size={11} />}
+      </span>
+      <div>
+        <div className={cn('text-body font-medium', selected ? 'text-accent-strong' : 'text-ink')}>{title}</div>
+        <div className={cn('text-caption', selected ? 'text-accent-strong/80' : 'text-ink-tertiary')}>{desc}</div>
       </div>
-      <div className={cn('mt-1 text-caption', selected ? 'text-accent-strong/80' : 'text-ink-tertiary')}>{desc}</div>
     </button>
   )
 }

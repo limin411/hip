@@ -338,32 +338,28 @@ describe('Session chat mode ACP auto-allow', () => {
     { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
   ]
 
-  it('auto-resolves read permission in chat mode', () => {
-    const result = tryAutoResolvePermission('chat', 'read', opts)
-    expect(result).not.toBeNull()
-    expect(result).toEqual({ optionId: 'allow_once' })
+  it('auto-resolves read permission in chat and edit modes', () => {
+    expect(tryAutoResolvePermission('chat', 'read', opts)).toEqual({ optionId: 'allow_once' })
+    expect(tryAutoResolvePermission('edit', 'read', opts)).toEqual({ optionId: 'allow_once' })
   })
 
-  it('auto-resolves fetch permission in chat mode', () => {
-    const result = tryAutoResolvePermission('chat', 'fetch', opts)
-    expect(result).not.toBeNull()
-    expect(result).toEqual({ optionId: 'allow_once' })
+  it('auto-resolves fetch permission in chat and edit modes', () => {
+    expect(tryAutoResolvePermission('chat', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
+    expect(tryAutoResolvePermission('edit', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
   })
 
-  it('still prompts for execute permission in chat mode', () => {
-    const result = tryAutoResolvePermission('chat', 'execute', opts)
-    expect(result).toBeNull()
-  })
-
-  it('still prompts for write permission in chat mode', () => {
-    const result = tryAutoResolvePermission('chat', 'write', opts)
-    expect(result).toBeNull()
-  })
-
-  it('still prompts in edit mode regardless of kind', () => {
-    expect(tryAutoResolvePermission('edit', 'read', opts)).toBeNull()
-    expect(tryAutoResolvePermission('edit', 'fetch', opts)).toBeNull()
+  it('still prompts for execute permission in chat and edit modes', () => {
+    expect(tryAutoResolvePermission('chat', 'execute', opts)).toBeNull()
     expect(tryAutoResolvePermission('edit', 'execute', opts)).toBeNull()
+  })
+
+  it('still prompts for write permission in chat and edit modes', () => {
+    expect(tryAutoResolvePermission('chat', 'write', opts)).toBeNull()
     expect(tryAutoResolvePermission('edit', 'write', opts)).toBeNull()
+  })
+
+  it('full mode always returns null (already auto-approved upstream)', () => {
+    expect(tryAutoResolvePermission('full', 'read', opts)).toBeNull()
+    expect(tryAutoResolvePermission('full', 'execute', opts)).toBeNull()
   })
 })

@@ -101,12 +101,13 @@ const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
 export const SAFE_KINDS = new Set(['read', 'fetch', 'other'])
 
 /**
- * In chat mode, auto-resolve safe permission requests without user prompting.
+ * Auto-resolve safe (non-file-modifying) permission requests without user prompting.
  * Returns a {@link PermissionChoice} if the request should be auto-resolved, or
  * `null` if it should go through the normal HITL prompt flow.
  *
  * Auto-resolve rules:
- * - Only in chat mode; other modes always return `null`.
+ * - In full mode, permissions are already auto-allowed upstream — skip.
+ * - In chat and edit modes, auto-resolve for safe kinds (non-file-modifying ops).
  * - Only for kinds in {@link SAFE_KINDS} (`read`/`fetch`/`other`).
  * - Resolves to the first `allow_*` option, or the first option overall, or `{ cancelled: true }` if no options exist.
  */
@@ -115,7 +116,7 @@ export function tryAutoResolvePermission(
   kind: string,
   options: Array<{ optionId: string; kind: string }>,
 ): PermissionChoice | null {
-  if (mode !== 'chat') return null
+  if (mode === 'full') return null
   if (!SAFE_KINDS.has(kind)) return null
   const allowOpt = options.find((o) => o.kind.startsWith('allow'))
   if (allowOpt) return { optionId: allowOpt.optionId }

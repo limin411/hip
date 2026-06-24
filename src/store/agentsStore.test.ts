@@ -1,30 +1,46 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { AgentConfig } from '@hip/protocol'
 
 const updateSection = vi.fn()
 const load = vi.fn()
+let mockAgents: AgentConfig[] = []
+
 vi.mock('@/store/hipConfigStore', () => ({
   useHipConfigStore: {
     getState: () => ({
       load: (...a: unknown[]) => load(...a),
       updateSection: (...a: unknown[]) => updateSection(...a),
+      config: { agents: mockAgents },
     }),
     setState: vi.fn(),
   },
-  useAgents: vi.fn(() => []),
+  // `useAgents` is a real React hook (`useHipConfigStore(selector)`). Calling it
+  // outside a React render throws "Invalid hook call", so the store must hydrate
+  // from `getState().config.agents` instead. The stub throws so any production
+  // use of the hook is caught by this suite, not only in the live app.
+  useAgents: () => {
+    throw new Error('Invalid hook call: useAgents() used outside a React render')
+  },
 }))
 
 beforeEach(async () => {
   updateSection.mockReset().mockResolvedValue(undefined)
   load.mockReset().mockResolvedValue(undefined)
+  mockAgents = []
   const { useAgentsStore } = await import('./agentsStore.js')
   useAgentsStore.setState({ agents: [], loaded: false })
 })
 
 describe('agentsStore', () => {
-  it('load() hydrates from hipConfigStore (no auto-injected agents)', async () => {
+  it('load() hydrates agents from hipConfigStore.config (never calls the useAgents hook)', async () => {
+    const saved: AgentConfig[] = [
+      { id: 'a1', name: 'Saved', kind: 'acp', command: 'x', args: [], enabled: true },
+    ]
+    mockAgents = saved
     const { useAgentsStore } = await import('./agentsStore.js')
     await useAgentsStore.getState().load()
     expect(load).toHaveBeenCalled()
+    expect(useAgentsStore.getState().agents).toEqual(saved)
     expect(useAgentsStore.getState().loaded).toBe(true)
   })
 

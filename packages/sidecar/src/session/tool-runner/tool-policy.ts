@@ -75,14 +75,14 @@ export function defaultToolPolicy(opts: {
       }
 
       if (toolName.startsWith('mcp__')) {
-        return mode === 'full' ? { risk: 'medium', approval: 'auto_allow' } : MEDIUM_RISK_ASK
+        return mode === 'edit' ? MEDIUM_RISK_ASK : { risk: 'medium', approval: 'auto_allow' }
       }
 
       if (registeredTools?.has(toolName)) {
         return MEDIUM_RISK_NONE
       }
 
-      return mode === 'full' ? MEDIUM_RISK_NONE : MEDIUM_RISK_ASK
+      return mode === 'edit' ? MEDIUM_RISK_ASK : MEDIUM_RISK_NONE
     },
   }
 }

@@ -99,17 +99,22 @@ impl SidecarState {
 // ── Unified TOML config types (wave 1) ──
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 struct BoundModel {
+    // Protocol (packages/protocol) uses capital-ID keys, not plain camelCase.
+    #[serde(rename = "providerID")]
     provider_id: String,
+    #[serde(rename = "modelID")]
     model_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
 struct ActiveModel {
+    // Protocol (packages/protocol) uses capital-ID/URL keys, not plain camelCase.
+    #[serde(rename = "providerID")]
     provider_id: String,
+    #[serde(rename = "modelID")]
     model_id: String,
+    #[serde(rename = "baseURL")]
     base_url: String,
 }
 
@@ -1209,6 +1214,39 @@ mod tests {
         let from_json2: super::HipConfig = serde_json::from_str(&json2).unwrap();
         assert_eq!(from_json2.version, 1);
         assert_eq!(from_json2.mcp_servers[0].id, "srv-1");
+    }
+
+    #[test]
+    fn frontend_active_model_and_bound_model_json_keys_roundtrip() {
+        // The renderer (protocol) emits capital-ID/URL keys: providerID / modelID / baseURL.
+        // set_hip_config does serde_json::from_str::<HipConfig>, so these MUST parse; and
+        // get_hip_config serializes back, so the same keys MUST be emitted for the renderer to read.
+        let json = r#"{
+            "version": 1,
+            "activeModel": { "providerID": "deepseek", "modelID": "deepseek-v4", "baseURL": "https://api.deepseek.com/v1" },
+            "agents": [
+                { "id": "coder", "name": "Coder", "kind": "internal", "command": "", "args": [], "enabled": true,
+                  "boundModel": { "providerID": "openai", "modelID": "gpt-4o" } }
+            ]
+        }"#;
+
+        let cfg: super::HipConfig =
+            serde_json::from_str(json).expect("renderer-shaped activeModel/boundModel JSON must parse");
+
+        let am = cfg.active_model.as_ref().expect("activeModel present");
+        assert_eq!(am.provider_id, "deepseek");
+        assert_eq!(am.model_id, "deepseek-v4");
+        assert_eq!(am.base_url, "https://api.deepseek.com/v1");
+        let bm = cfg.agents[0].bound_model.as_ref().expect("boundModel present");
+        assert_eq!(bm.provider_id, "openai");
+        assert_eq!(bm.model_id, "gpt-4o");
+
+        // Read path: serialize back with the SAME protocol keys the renderer reads.
+        let out = serde_json::to_string(&cfg).unwrap();
+        assert!(out.contains("\"providerID\""), "must emit providerID, got: {out}");
+        assert!(out.contains("\"modelID\""), "must emit modelID, got: {out}");
+        assert!(out.contains("\"baseURL\""), "must emit baseURL, got: {out}");
+        assert!(!out.contains("\"providerId\""), "must NOT emit camelCase providerId, got: {out}");
     }
 
     #[test]

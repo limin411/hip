@@ -227,6 +227,7 @@ export class McpManager {
     }
 
     // connect: anything wanted that is not already live (reuse skips matched fingerprints above)
+    const pending: Array<{ id: string; server: McpServerConfig }> = []
     for (const [id, server] of target) {
       if (this.conns.has(id)) continue
       const bo = this.backoffs.get(id)
@@ -234,15 +235,24 @@ export class McpManager {
         if (bo.fingerprint === this.fingerprint(server)) continue // same config, let retry run
         this.cancelReconnect(id) // config changed, cancel old retry, try fresh
       }
-      const ok = await this.connectOne(server)
-      if (!ok) this.scheduleReconnect(server, id)
+      pending.push({ id, server })
+    }
+    const results = await Promise.allSettled(
+      pending.map(({ id, server }) => this.connectOne(server, { suppressRefresh: true }))
+    )
+    for (let i = 0; i < results.length; i++) {
+      const { id, server } = pending[i]
+      const r = results[i]
+      if (r.status === 'rejected' || (r.status === 'fulfilled' && !r.value)) {
+        this.scheduleReconnect(server, id)
+      }
     }
 
     this.refreshRegistrations()
   }
 
   /** Full connect+listTools+listResources+listPrompts flow. Returns true on success, false on failure. */
-  private async connectOne(server: McpServerConfig): Promise<boolean> {
+  private async connectOne(server: McpServerConfig, opts?: { suppressRefresh?: boolean }): Promise<boolean> {
     let client: ClientLike
     try {
       client = await this.connect(server)
@@ -278,7 +288,7 @@ export class McpManager {
         prompts,
       })
       this.resetBackoff(server.id)
-      this.refreshRegistrations()
+      if (!opts?.suppressRefresh) { this.refreshRegistrations() }
       return true
     } catch (err) {
       await client.close().catch(() => {})

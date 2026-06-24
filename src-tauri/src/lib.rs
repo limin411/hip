@@ -107,12 +107,21 @@ struct BoundModel {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+struct ActiveModel {
+    provider_id: String,
+    model_id: String,
+    base_url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 struct ProviderEntry {
     id: String,
     name: String,
     base_url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     api_key: Option<String>,
+    enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -195,6 +204,8 @@ struct HipConfig {
     version: u32,
     #[serde(default)]
     providers: Vec<ProviderEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    active_model: Option<ActiveModel>,
     #[serde(default)]
     mcp_servers: Vec<McpServerEntry>,
     #[serde(default)]
@@ -233,6 +244,18 @@ struct TomlBoundModel {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
+struct TomlActiveModel {
+    #[serde(alias = "providerId")]
+    provider_id: String,
+    #[serde(alias = "modelId")]
+    model_id: String,
+    #[serde(alias = "baseUrl")]
+    base_url: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
 struct TomlProviderEntry {
     id: String,
     name: String,
@@ -240,6 +263,7 @@ struct TomlProviderEntry {
     base_url: String,
     #[serde(skip_serializing_if = "Option::is_none", alias = "apiKey")]
     api_key: Option<String>,
+    enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -330,6 +354,8 @@ struct TomlHipConfig {
     version: u32,
     #[serde(default)]
     providers: Vec<TomlProviderEntry>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "activeModel")]
+    active_model: Option<TomlActiveModel>,
     #[serde(default, alias = "mcpServers")]
     mcp_servers: Vec<TomlMcpServerEntry>,
     #[serde(default)]
@@ -360,6 +386,26 @@ impl From<TomlBoundModel> for BoundModel {
     }
 }
 
+impl From<ActiveModel> for TomlActiveModel {
+    fn from(m: ActiveModel) -> Self {
+        TomlActiveModel {
+            provider_id: m.provider_id,
+            model_id: m.model_id,
+            base_url: m.base_url,
+        }
+    }
+}
+
+impl From<TomlActiveModel> for ActiveModel {
+    fn from(m: TomlActiveModel) -> Self {
+        ActiveModel {
+            provider_id: m.provider_id,
+            model_id: m.model_id,
+            base_url: m.base_url,
+        }
+    }
+}
+
 impl From<ProviderEntry> for TomlProviderEntry {
     fn from(p: ProviderEntry) -> Self {
         TomlProviderEntry {
@@ -367,6 +413,7 @@ impl From<ProviderEntry> for TomlProviderEntry {
             name: p.name,
             base_url: p.base_url,
             api_key: p.api_key,
+            enabled: p.enabled,
         }
     }
 }
@@ -378,6 +425,7 @@ impl From<TomlProviderEntry> for ProviderEntry {
             name: p.name,
             base_url: p.base_url,
             api_key: p.api_key,
+            enabled: p.enabled,
         }
     }
 }
@@ -519,6 +567,7 @@ impl From<HipConfig> for TomlHipConfig {
         TomlHipConfig {
             version: cfg.version,
             providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
+            active_model: cfg.active_model.map(|x| x.into()),
             mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
             skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
@@ -532,51 +581,13 @@ impl From<TomlHipConfig> for HipConfig {
         HipConfig {
             version: cfg.version,
             providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
+            active_model: cfg.active_model.map(|x| x.into()),
             mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
             skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
             permissions: cfg.permissions.map(|x| x.into()),
         }
     }
-}
-
-// ── Legacy JSON deserialization helpers (read-only migration) ──
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct LegacyProviderEntry {
-    enabled: bool,
-    #[serde(default, alias = "baseURL")]
-    base_url: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct LegacyProvidersConfig {
-    providers: HashMap<String, LegacyProviderEntry>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct LegacyAgentsConfig {
-    agents: Vec<AgentEntry>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct LegacyMcpServersConfig {
-    servers: Vec<McpServerEntry>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-struct LegacySkillsConfig {
-    enabled: HashMap<String, bool>,
 }
 
 #[tauri::command]
@@ -603,67 +614,6 @@ async fn restart_sidecar(app: tauri::AppHandle) -> Result<u16, String> {
     Ok(port)
 }
 
-/// Read a single merged HipConfig from the legacy JSON files (read-only, never deletes).
-#[allow(dead_code)]
-fn from_legacy_json(app: &tauri::AppHandle) -> HipConfig {
-    let mut cfg = HipConfig {
-        version: 1,
-        providers: vec![],
-        mcp_servers: vec![],
-        skills: vec![],
-        agents: vec![],
-        permissions: None,
-    };
-
-    if let Some(p) = paths::providers_config_path(app) {
-        if let Ok(body) = std::fs::read_to_string(&p) {
-            if let Ok(legacy) = serde_json::from_str::<LegacyProvidersConfig>(&body) {
-                cfg.providers = legacy
-                    .providers
-                    .into_iter()
-                    .filter(|(_, v)| v.enabled)
-                    .map(|(id, v)| ProviderEntry {
-                        id: id.clone(),
-                        name: id,
-                        base_url: v.base_url.unwrap_or_default(),
-                        api_key: None,
-                    })
-                    .collect();
-            }
-        }
-    }
-
-    if let Some(p) = paths::agents_config_path(app) {
-        if let Ok(body) = std::fs::read_to_string(&p) {
-            if let Ok(legacy) = serde_json::from_str::<LegacyAgentsConfig>(&body) {
-                cfg.agents = legacy.agents;
-            }
-        }
-    }
-
-    if let Some(p) = paths::mcp_servers_config_path(app) {
-        if let Ok(body) = std::fs::read_to_string(&p) {
-            if let Ok(legacy) = serde_json::from_str::<LegacyMcpServersConfig>(&body) {
-                cfg.mcp_servers = legacy.servers;
-            }
-        }
-    }
-
-    if let Some(p) = paths::skills_config_path(app) {
-        if let Ok(body) = std::fs::read_to_string(&p) {
-            if let Ok(legacy) = serde_json::from_str::<LegacySkillsConfig>(&body) {
-                cfg.skills = legacy
-                    .enabled
-                    .into_iter()
-                    .map(|(id, enabled)| SkillEntry { id, enabled })
-                    .collect();
-            }
-        }
-    }
-
-    cfg
-}
-
 #[tauri::command]
 fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
     let path = paths::hip_config_path(&app).ok_or("no config dir")?;
@@ -675,12 +625,16 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let cfg = from_legacy_json(&app);
-            // One-time auto-migration: write TOML for future reads
-            let toml_cfg: TomlHipConfig = cfg.clone().into();
-            let toml_str = toml::to_string_pretty(&toml_cfg)
-                .map_err(|e| format!("TOML serialize error: {e}"))?;
-            std::fs::write(&path, toml_str).map_err(|e| e.to_string())?;
+            // No TOML yet -> return an empty default. Legacy JSON files are no longer read.
+            let cfg = HipConfig {
+                version: 1,
+                providers: vec![],
+                active_model: None,
+                mcp_servers: vec![],
+                skills: vec![],
+                agents: vec![],
+                permissions: None,
+            };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
         Err(e) => Err(e.to_string()),
@@ -760,34 +714,6 @@ const MODELS_URL: &str = "https://models.dev/api.json";
 const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
-#[tauri::command]
-fn get_providers_config(app: tauri::AppHandle) -> Result<String, String> {
-    match paths::providers_config_path(&app) {
-        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
-        None => Ok(String::new()),
-    }
-}
-
-#[tauri::command]
-fn set_providers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let p = paths::providers_config_path(&app).ok_or("no config dir")?;
-    std::fs::write(&p, json).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn get_agents_config(app: tauri::AppHandle) -> Result<String, String> {
-    match paths::agents_config_path(&app) {
-        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
-        None => Ok(String::new()),
-    }
-}
-
-#[tauri::command]
-fn set_agents_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let p = paths::agents_config_path(&app).ok_or("no config dir")?;
-    std::fs::write(&p, json).map_err(|e| e.to_string())
-}
-
 /// True if `p` is a file and (on unix) has any execute bit set.
 fn is_executable(p: &std::path::Path) -> bool {
     if !p.is_file() {
@@ -830,20 +756,6 @@ fn which_binaries(names: Vec<String>) -> Result<std::collections::HashMap<String
         .filter(|d| !d.as_os_str().is_empty())
         .collect();
     Ok(find_on_path(&names, &dirs))
-}
-
-#[tauri::command]
-fn get_mcp_servers_config(app: tauri::AppHandle) -> Result<String, String> {
-    match paths::mcp_servers_config_path(&app) {
-        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
-        None => Ok(String::new()),
-    }
-}
-
-#[tauri::command]
-fn set_mcp_servers_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let p = paths::mcp_servers_config_path(&app).ok_or("no config dir")?;
-    std::fs::write(&p, json).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1049,20 +961,6 @@ fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<Str
 }
 
 #[tauri::command]
-fn get_skills_config(app: tauri::AppHandle) -> Result<String, String> {
-    match paths::skills_config_path(&app) {
-        Some(p) => Ok(std::fs::read_to_string(&p).unwrap_or_default()),
-        None => Ok(String::new()),
-    }
-}
-
-#[tauri::command]
-fn set_skills_config(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let p = paths::skills_config_path(&app).ok_or("no config dir")?;
-    std::fs::write(&p, json).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
     let cache = paths::cache_dir(&app).map(|d| d.join("models.json"));
     if let Some(ref c) = cache {
@@ -1134,12 +1032,6 @@ pub fn run() {
             has_secret,
             delete_secret,
             models_catalog,
-            get_providers_config,
-            set_providers_config,
-            get_agents_config,
-            set_agents_config,
-            get_mcp_servers_config,
-            set_mcp_servers_config,
             get_hip_config,
             set_hip_config,
             get_network_policy,
@@ -1148,8 +1040,6 @@ pub fn run() {
             install_skill_zip,
             delete_skill,
             read_skill_file,
-            get_skills_config,
-            set_skills_config,
             get_plugins_config,
             set_plugins_config,
             list_plugins,
@@ -1230,7 +1120,9 @@ mod tests {
                 name: "OpenAI".into(),
                 base_url: "https://api.openai.com/v1".into(),
                 api_key: Some("sk-abc".into()),
+                enabled: true,
             }],
+            active_model: None,
             mcp_servers: vec![super::McpServerEntry {
                 id: "srv-1".into(),
                 name: "Local".into(),
@@ -1320,7 +1212,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_to_toml_roundtrip_preserves_all_fields() {
+    fn toml_roundtrip_preserves_all_fields() {
         let cfg = super::HipConfig {
             version: 1,
             providers: vec![
@@ -1329,14 +1221,17 @@ mod tests {
                     name: "OpenAI".into(),
                     base_url: "https://api.openai.com/v1".into(),
                     api_key: Some("sk-openai".into()),
+                    enabled: true,
                 },
                 super::ProviderEntry {
                     id: "anthropic".into(),
                     name: "Anthropic".into(),
                     base_url: "https://api.anthropic.com".into(),
                     api_key: Some("sk-ant".into()),
+                    enabled: true,
                 },
             ],
+            active_model: None,
             agents: vec![
                 super::AgentEntry {
                     id: "assistant".into(),
@@ -1475,14 +1370,17 @@ mod tests {
                     name: "OpenAI".into(),
                     base_url: "https://api.openai.com/v1".into(),
                     api_key: Some("sk-test-openai".into()),
+                    enabled: true,
                 },
                 super::TomlProviderEntry {
                     id: "deepseek".into(),
                     name: "DeepSeek".into(),
                     base_url: "https://api.deepseek.com/v1".into(),
                     api_key: Some("sk-test-deepseek".into()),
+                    enabled: true,
                 },
             ],
+            active_model: None,
             mcp_servers: vec![
                 super::TomlMcpServerEntry {
                     id: "filesystem".into(),
@@ -1678,6 +1576,7 @@ mod tests {
         let cfg = super::HipConfig {
             version: 1,
             providers: vec![],
+            active_model: None,
             mcp_servers: vec![],
             skills: vec![],
             agents: vec![],
@@ -1698,117 +1597,6 @@ mod tests {
     fn invalid_toml_returns_error() {
         let result: Result<super::HipConfig, _> = toml::from_str("this is {{{ not toml");
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn legacy_providers_migration_parses_enabled_only() {
-        let json = r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"},"off":{"enabled":false,"baseURL":"https://x.com"}}}"#;
-        let legacy: super::LegacyProvidersConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(legacy.providers.len(), 2);
-
-        let providers: Vec<super::ProviderEntry> = legacy
-            .providers
-            .into_iter()
-            .filter(|(_, v)| v.enabled)
-            .map(|(id, v)| super::ProviderEntry {
-                id: id.clone(),
-                name: id,
-                base_url: v.base_url.unwrap_or_default(),
-                api_key: None,
-            })
-            .collect();
-        assert_eq!(providers.len(), 1);
-        assert_eq!(providers[0].id, "openai");
-        assert_eq!(providers[0].base_url, "https://api.openai.com/v1");
-    }
-
-    #[test]
-    fn legacy_skills_migration_converts_to_entries() {
-        let json = r#"{"enabled":{"pdf-tools":true,"git-tools":false}}"#;
-        let legacy: super::LegacySkillsConfig = serde_json::from_str(json).unwrap();
-        let skills: Vec<super::SkillEntry> = legacy
-            .enabled
-            .into_iter()
-            .map(|(id, enabled)| super::SkillEntry { id, enabled })
-            .collect();
-        assert_eq!(skills.len(), 2);
-        let pdf = skills.iter().find(|s| s.id == "pdf-tools").unwrap();
-        assert!(pdf.enabled);
-        let git = skills.iter().find(|s| s.id == "git-tools").unwrap();
-        assert!(!git.enabled);
-    }
-
-    #[test]
-    fn legacy_agents_migration_parses_directly() {
-        let json = r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."}]}"#;
-        let legacy: super::LegacyAgentsConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(legacy.agents.len(), 1);
-        assert_eq!(legacy.agents[0].id, "helper");
-        assert_eq!(legacy.agents[0].enabled, true);
-    }
-
-    #[test]
-    fn legacy_mcp_servers_migration_parses_directly() {
-        let json = r#"{"servers":[{"id":"srv-1","name":"Local","transport":"stdio","command":"npx","args":[],"enabled":true}]}"#;
-        let legacy: super::LegacyMcpServersConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(legacy.servers.len(), 1);
-        assert_eq!(legacy.servers[0].id, "srv-1");
-        assert_eq!(legacy.servers[0].transport, "stdio");
-    }
-
-    #[test]
-    fn from_legacy_json_integration() {
-        let dir =
-            std::env::temp_dir().join(format!("hip-legacy-test-{}", std::process::id()));
-        let config_dir = dir.join("config");
-        std::fs::create_dir_all(&config_dir).unwrap();
-
-        std::fs::write(
-            config_dir.join("hip-providers.json"),
-            r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"}}}"#,
-        )
-        .unwrap();
-        std::fs::write(
-            config_dir.join("hip-skills.json"),
-            r#"{"enabled":{"pdf-tools":true}}"#,
-        )
-        .unwrap();
-        std::fs::write(
-            config_dir.join("hip-agents.json"),
-            r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."}]}"#,
-        )
-        .unwrap();
-        std::fs::write(
-            config_dir.join("hip-mcp-servers.json"),
-            r#"{"servers":[{"id":"srv-1","name":"Local","transport":"stdio","command":"npx","args":[],"enabled":true}]}"#,
-        )
-        .unwrap();
-
-        // Simulate what from_legacy_json does (cannot call it without AppHandle)
-        let providers_body =
-            std::fs::read_to_string(config_dir.join("hip-providers.json")).unwrap();
-        let legacy_p: super::LegacyProvidersConfig =
-            serde_json::from_str(&providers_body).unwrap();
-        let providers: Vec<super::ProviderEntry> = legacy_p
-            .providers
-            .into_iter()
-            .filter(|(_, v)| v.enabled)
-            .map(|(id, v)| super::ProviderEntry {
-                id: id.clone(),
-                name: id,
-                base_url: v.base_url.unwrap_or_default(),
-                api_key: None,
-            })
-            .collect();
-        assert_eq!(providers.len(), 1);
-
-        let skills_body =
-            std::fs::read_to_string(config_dir.join("hip-skills.json")).unwrap();
-        let legacy_s: super::LegacySkillsConfig =
-            serde_json::from_str(&skills_body).unwrap();
-        assert_eq!(legacy_s.enabled.get("pdf-tools"), Some(&true));
-
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1864,76 +1652,6 @@ mod tests {
     }
 
     #[test]
-    fn legacy_fallback_returns_merged_config_when_toml_missing() {
-        // Simulate: hip.toml is missing, but legacy JSON files exist.
-        // Test that we can parse legacy providers and agents separately,
-        // then assemble a HipConfig that a caller could use (round-trip).
-
-        // ── Parse legacy providers JSON ──
-        let providers_json = r#"{"providers":{"openai":{"enabled":true,"baseURL":"https://api.openai.com/v1"},"disabled-one":{"enabled":false,"baseURL":"https://x.com"}}}"#;
-        let legacy_p: super::LegacyProvidersConfig =
-            serde_json::from_str(providers_json).unwrap();
-        assert_eq!(legacy_p.providers.len(), 2);
-        assert!(legacy_p.providers.contains_key("openai"));
-        assert!(legacy_p.providers.contains_key("disabled-one"));
-
-        let providers: Vec<super::ProviderEntry> = legacy_p
-            .providers
-            .into_iter()
-            .filter(|(_, v)| v.enabled)
-            .map(|(id, v)| super::ProviderEntry {
-                id: id.clone(),
-                name: id,
-                base_url: v.base_url.unwrap_or_default(),
-                api_key: None,
-            })
-            .collect();
-        assert_eq!(providers.len(), 1);
-        assert_eq!(providers[0].id, "openai");
-        assert_eq!(providers[0].base_url, "https://api.openai.com/v1");
-
-        // ── Parse legacy agents JSON ──
-        let agents_json = r#"{"agents":[{"id":"helper","name":"Helper","kind":"internal","command":"","args":[],"enabled":true,"prompt":"You help."},{"id":"reviewer","name":"Reviewer","kind":"internal","command":"","args":[],"enabled":false,"prompt":"Review code."}]}"#;
-        let legacy_a: super::LegacyAgentsConfig =
-            serde_json::from_str(agents_json).unwrap();
-        assert_eq!(legacy_a.agents.len(), 2);
-        assert_eq!(legacy_a.agents[0].id, "helper");
-        assert!(legacy_a.agents[0].enabled);
-        assert_eq!(legacy_a.agents[1].id, "reviewer");
-        assert!(!legacy_a.agents[1].enabled);
-
-        let agents: Vec<super::AgentEntry> = legacy_a
-            .agents
-            .into_iter()
-            .filter(|a| a.enabled)
-            .collect();
-        assert_eq!(agents.len(), 1);
-        assert_eq!(agents[0].id, "helper");
-        assert_eq!(agents[0].prompt.as_deref(), Some("You help."));
-
-        // ── Assemble HipConfig from legacy data and round-trip through JSON ──
-        let cfg = super::HipConfig {
-            version: 1,
-            providers,
-            agents,
-            mcp_servers: vec![],
-            skills: vec![],
-            permissions: None,
-        };
-
-        let json_out = serde_json::to_string(&cfg).unwrap();
-        let from_json: super::HipConfig = serde_json::from_str(&json_out).unwrap();
-        assert_eq!(from_json.version, 1);
-        assert_eq!(from_json.providers.len(), 1);
-        assert_eq!(from_json.providers[0].id, "openai");
-        assert_eq!(from_json.agents.len(), 1);
-        assert_eq!(from_json.agents[0].id, "helper");
-        assert!(from_json.mcp_servers.is_empty());
-        assert!(from_json.skills.is_empty());
-        assert!(from_json.permissions.is_none());
-    }
-
-    #[test]
     fn toml_mirror_accepts_camelcase_keys() {
         // Simulate a TOML file written with camelCase keys (e.g. by older Rust
         // structs that used `#[serde(rename_all = "camelCase")]`). The
@@ -1947,6 +1665,7 @@ id = "openai"
 name = "OpenAI"
 baseUrl = "https://api.openai.com/v1"
 apiKey = "sk-abc"
+enabled = true
 
 [[mcpServers]]
 id = "srv-1"
@@ -2055,6 +1774,7 @@ version = 1
 id = "openai"
 name = "OpenAI"
 base_url = "https://api.openai.com/v1"
+enabled = true
 
 [[mcpServers]]
 id = "srv-2"

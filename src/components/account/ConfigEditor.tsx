@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FileCode, LoaderCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import type { HipConfig, ProviderEntry, McpServerConfig, SkillEntry, AgentConfig } from '@hip/protocol'
+import type { HipConfig, ProviderEntry, McpServerConfig, SkillEntry, AgentConfig, ActiveModel } from '@hip/protocol'
 
 // ── Pure-logic exports (tested in ConfigEditor.logic.test.ts) ────
 
@@ -29,9 +29,19 @@ export function configToToml(config: HipConfig): string {
       lines.push(`id = ${tomlStr(p.id)}`)
       lines.push(`name = ${tomlStr(p.name)}`)
       lines.push(`base_url = ${tomlStr(p.baseUrl)}`)
+      lines.push(`enabled = ${p.enabled}`)
       if (p.apiKey) lines.push(`api_key = ${tomlStr(p.apiKey)}`)
       lines.push('')
     }
+  }
+
+  // activeModel: single table
+  if (config.activeModel) {
+    lines.push('[active_model]')
+    lines.push(`provider_id = ${tomlStr(config.activeModel.providerID)}`)
+    lines.push(`model_id = ${tomlStr(config.activeModel.modelID)}`)
+    lines.push(`base_url = ${tomlStr(config.activeModel.baseURL)}`)
+    lines.push('')
   }
 
   // mcp_servers: array of tables
@@ -249,6 +259,7 @@ function setNested(obj: Record<string, unknown>, key: string, value: unknown): v
 /** Map TOML snake_case key to HipConfig camelCase key */
 function mapKey(key: string): string {
   if (key === 'mcp_servers') return 'mcpServers'
+  if (key === 'active_model') return 'activeModel'
   if (key === 'base_url') return 'baseUrl'
   if (key === 'api_key') return 'apiKey'
   if (key === 'bound_model') return 'boundModel'
@@ -375,11 +386,31 @@ function validateConfigShape(raw: unknown): { config: HipConfig } | { errors: st
         if (typeof p.name !== 'string') errors.push(`providers[${i}].name must be a string`)
         if (typeof p.baseUrl !== 'string' && typeof p.base_url !== 'string')
           errors.push(`providers[${i}].baseUrl (or base_url) must be a string`)
+        if (p.enabled !== undefined && typeof p.enabled !== 'boolean') errors.push(`providers[${i}].enabled must be a boolean`)
         // Normalize base_url → baseUrl
         if (p.base_url !== undefined && p.baseUrl === undefined) p.baseUrl = p.base_url
         if (p.api_key !== undefined && p.apiKey === undefined) p.apiKey = p.api_key
+        if (p.enabled === undefined) p.enabled = true
       }
     }
+  }
+
+  // Normalize active_model → activeModel
+  if (obj.active_model !== undefined && obj.activeModel === undefined) {
+    obj.activeModel = obj.active_model
+  }
+  if (obj.activeModel !== undefined && obj.activeModel !== null) {
+    const am = obj.activeModel as Record<string, unknown>
+    if (typeof am.providerId !== 'string' && typeof am.provider_id !== 'string')
+      errors.push('activeModel.providerId must be a string')
+    if (typeof am.modelId !== 'string' && typeof am.model_id !== 'string')
+      errors.push('activeModel.modelId must be a string')
+    if (typeof am.baseURL !== 'string' && typeof am.baseUrl !== 'string' && typeof am.base_url !== 'string')
+      errors.push('activeModel.baseURL (or base_url) must be a string')
+    if (am.provider_id !== undefined && am.providerId === undefined) am.providerId = am.provider_id
+    if (am.model_id !== undefined && am.modelId === undefined) am.modelId = am.model_id
+    if (am.baseUrl !== undefined && am.baseURL === undefined) am.baseURL = am.baseUrl
+    if (am.base_url !== undefined && am.baseURL === undefined) am.baseURL = am.base_url
   }
 
   if (obj.mcpServers != null || obj.mcp_servers != null) {
@@ -459,6 +490,7 @@ function validateConfigShape(raw: unknown): { config: HipConfig } | { errors: st
     version: obj.version as number,
   }
   if (obj.providers) cfg.providers = obj.providers as ProviderEntry[]
+  if (obj.activeModel) cfg.activeModel = obj.activeModel as ActiveModel
   if (obj.mcpServers) cfg.mcpServers = obj.mcpServers as McpServerConfig[]
   if (obj.skills) cfg.skills = obj.skills as SkillEntry[]
   if (obj.agents) cfg.agents = obj.agents as AgentConfig[]

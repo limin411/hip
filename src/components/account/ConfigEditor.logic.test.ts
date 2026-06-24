@@ -5,8 +5,8 @@ import type { HipConfig } from '@hip/protocol'
 const SAMPLE_CONFIG: HipConfig = {
   version: 1,
   providers: [
-    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-test' },
-    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-test', enabled: true },
+    { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', enabled: true },
   ],
   mcpServers: [
     {

@@ -12,7 +12,7 @@ import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
 import { agentCategory } from '@/lib/agentCategory'
 import { grantedMcpServerIds } from '@/lib/agentTools'
-import { useMcpServersStore } from '@/store/mcpServersStore'
+import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useAgentsStore } from '@/store/agentsStore'
 import { useDetectionStore } from '@/store/detectionStore'
@@ -38,7 +38,7 @@ export function AgentEditor({
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
-  const { servers: mcpServers } = useMcpServersStore()
+  const mcpServers = useMcpServers()
   const { skills } = useSkillsStore()
   const agents = useAgentsStore((s) => s.agents)
   const installed = useDetectionStore((s) => s.installed)
@@ -68,7 +68,7 @@ export function AgentEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    void useMcpServersStore.getState().load()
+    void useHipConfigStore.getState().load()
     void useSkillsStore.getState().load()
     void refreshDetection()
   }, [refreshDetection])

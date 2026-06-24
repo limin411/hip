@@ -97,12 +97,11 @@ beforeEach(() => {
 
   setEnv('HIP_PLUGINS_DIR', pluginsDir)
   setEnv('HIP_PLUGINS_PATH', pluginsPath)
-  // Session construction loads plugin components — these env vars keep it quiet.
-  setEnv('HIP_SKILLS_PATH', join(pluginsDir, 'skills.json'))
-  setEnv('HIP_MCP_SERVERS_PATH', join(pluginsDir, 'mcp.json'))
-  setEnv('HIP_AGENTS_PATH', '')
-  writeFileSync(join(pluginsDir, 'skills.json'), JSON.stringify({ enabled: {} }), 'utf8')
-  writeFileSync(join(pluginsDir, 'mcp.json'), JSON.stringify({ servers: [] }), 'utf8')
+  // Session construction loads plugin components — keep it quiet with an empty
+  // unified config (no skills section → all skills enabled by default).
+  const configPath = join(pluginsDir, 'hip.toml')
+  writeFileSync(configPath, 'version = 1\n', 'utf8')
+  setEnv('HIP_CONFIG_PATH', configPath)
 })
 
 afterEach(() => {

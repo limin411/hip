@@ -51,20 +51,23 @@ export interface ActiveModel {
   baseURL: string              // always resolved; sidecar falls back to DEEPSEEK_DEFAULT when unknown
 }
 
-/** One provider's non-secret config (the key lives only in ~/.hip/config/auth.json). */
+/** One provider's non-secret config (the key lives only in ~/.hip/config/auth.json).
+ *  This is the UI/runtime shape keyed by provider id; the durable source of truth is
+ *  HipConfig.providers (ProviderEntry[]) in ~/.hip/config/hip.toml. */
 export interface ProviderConfigEntry {
   enabled: boolean
   baseURL?: string             // catalog default or user override; required for custom
   custom?: { name: string }    // present iff user-defined (not in the models.dev catalog)
 }
 
-/** Durable, non-secret provider config persisted to ~/.hip/config/hip-providers.json. */
+/** UI/runtime aggregate of provider config. The durable source of truth is
+ *  HipConfig.providers / HipConfig.activeModel in ~/.hip/config/hip.toml. */
 export interface ProvidersConfig {
   providers: Record<string, ProviderConfigEntry>
   activeModel?: Pick<ActiveModel, 'providerID' | 'modelID'>   // baseURL resolved at read time
 }
 
-/** Which configured model an external agent should use. References hip-providers.json. */
+/** Which configured model an external agent should use. */
 export interface BoundModel { providerID: string; modelID: string }
 
 export interface AgentConfig {
@@ -96,7 +99,7 @@ export interface AgentConfig {
 export interface AgentsConfig { agents: AgentConfig[] }
 
 // ──────────────────────────────────────────────────────────────────
-// MCP server config (persisted to ~/.hip/config/hip-mcp-servers.json)
+// MCP server config (persisted as the mcpServers array in ~/.hip/config/hip.toml)
 // ──────────────────────────────────────────────────────────────────
 
 /** Transport hip uses to reach an MCP server. */
@@ -119,8 +122,7 @@ export interface McpServerConfig {
   pluginId?: string
 }
 
-/** Durable MCP server config persisted to ~/.hip/config/hip-mcp-servers.json. */
-export interface McpServersConfig { servers: McpServerConfig[] }
+
 
 // ──────────────────────────────────────────────────────────────────
 // Plugin manifest (local plugin bundles following Vercel open-plugin-spec)
@@ -206,7 +208,8 @@ export interface SkillMeta {
   hasAssets?: boolean
 }
 
-/** Skill enable/disable overrides, persisted to ~/.hip/config/hip-skills.json. A missing id is treated as enabled. */
+/** Skill enable/disable overrides, persisted to ~/.hip/config/hip.toml under `skills`.
+ *  A missing id is treated as enabled. */
 export interface SkillsConfig { enabled: Record<string, boolean> }
 
 /** auth.json key name AND env var name for a provider's API key. Single source of the rule. */
@@ -689,6 +692,7 @@ export interface ProviderEntry {
   name: string
   baseUrl: string
   apiKey?: string
+  enabled: boolean
 }
 
 export interface SkillEntry {
@@ -699,6 +703,7 @@ export interface SkillEntry {
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
+  activeModel?: ActiveModel
   mcpServers?: McpServerConfig[]
   skills?: SkillEntry[]
   agents?: AgentConfig[]

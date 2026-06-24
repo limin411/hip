@@ -53,7 +53,7 @@ describe('hipConfig IPC', () => {
     invoke.mockResolvedValueOnce(undefined)
     const config = {
       version: 1,
-      providers: [{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' }],
+      providers: [{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', enabled: true }],
     }
     await setHipConfig(config)
     expect(invoke).toHaveBeenCalledWith('set_hip_config', { json: JSON.stringify(config) })

@@ -19,12 +19,6 @@ function writeToml(dir: string, name: string, content: string): string {
   return p
 }
 
-function writeJson(dir: string, name: string, obj: unknown): string {
-  const p = join(dir, name)
-  writeFileSync(p, JSON.stringify(obj))
-  return p
-}
-
 function setupProjectDir(): { root: string; hipDir: string } {
   const root = tmpDir()
   const hipDir = join(root, '.hip')
@@ -35,10 +29,6 @@ function setupProjectDir(): { root: string; hipDir: string } {
 beforeEach(() => {
   dirs = []
   delete process.env.HIP_CONFIG_PATH
-  delete process.env.HIP_MCP_SERVERS_PATH
-  delete process.env.HIP_AGENTS_PATH
-  delete process.env.HIP_PROVIDERS_PATH
-  delete process.env.HIP_SKILLS_PATH
 })
 
 afterEach(() => {
@@ -435,96 +425,4 @@ enabled = true
     expect(cfg.providers![0]).toMatchObject({ id: 'openai' })
   })
 
-  it('falls back to legacy JSON readers when no TOML exists', () => {
-    const dir = tmpDir()
-    const mcpFile = writeJson(dir, 'hip-mcp-servers.json', {
-      servers: [
-        { id: 'legacy-mcp', name: 'Legacy', transport: 'stdio', command: 'cmd', enabled: true },
-      ],
-    })
-    const agentsFile = writeJson(dir, 'hip-agents.json', {
-      agents: [
-        { id: 'legacy-agent', name: 'Legacy Agent', kind: 'custom', command: 'echo', args: [], enabled: true },
-      ],
-    })
-    const providersFile = writeJson(dir, 'hip-providers.json', {
-      providers: {
-        deepseek: { enabled: true, baseURL: 'https://api.deepseek.com/v1' },
-      },
-    })
-    const skillsFile = writeJson(dir, 'hip-skills.json', {
-      enabled: { 'my-skill': true, 'other-skill': false },
-    })
-
-    process.env.HIP_MCP_SERVERS_PATH = mcpFile
-    process.env.HIP_AGENTS_PATH = agentsFile
-    process.env.HIP_PROVIDERS_PATH = providersFile
-    process.env.HIP_SKILLS_PATH = skillsFile
-
-    const projDir = tmpDir()
-    const cfg = resolveEffectiveConfig(projDir)
-
-    expect(cfg.version).toBe(1)
-    expect(cfg.mcpServers).toHaveLength(1)
-    expect(cfg.mcpServers![0]).toMatchObject({ id: 'legacy-mcp' })
-    expect(cfg.agents).toHaveLength(1)
-    expect(cfg.agents![0]).toMatchObject({ id: 'legacy-agent' })
-    expect(cfg.providers).toHaveLength(1)
-    expect(cfg.providers![0]).toMatchObject({ id: 'deepseek' })
-    expect(cfg.skills).toHaveLength(2)
-    expect(cfg.skills!.find((s) => s.id === 'my-skill')).toMatchObject({ enabled: true })
-    expect(cfg.skills!.find((s) => s.id === 'other-skill')).toMatchObject({ enabled: false })
-  })
-
-  it('global TOML wins over legacy JSON when HIP_CONFIG_PATH is set', () => {
-    // Set up a legacy JSON MCP file
-    const dir = tmpDir()
-    const legacyMcp = writeJson(dir, 'hip-mcp-servers.json', {
-      servers: [
-        { id: 'legacy-mcp', name: 'Legacy', transport: 'stdio', command: 'cmd', enabled: true },
-      ],
-    })
-    process.env.HIP_MCP_SERVERS_PATH = legacyMcp
-
-    // Set up a global TOML file
-    const tomlFile = writeToml(dir, 'hip.toml', `version = 1
-[[mcpServers]]
-id = "toml-mcp"
-name = "TOML MCP"
-transport = "http"
-url = "https://toml.test/mcp"
-enabled = true
-`)
-    process.env.HIP_CONFIG_PATH = tomlFile
-
-    const projDir = tmpDir()
-    const cfg = resolveEffectiveConfig(projDir)
-
-    // TOML should win — no legacy fallback
-    expect(cfg.mcpServers).toHaveLength(1)
-    expect(cfg.mcpServers![0]).toMatchObject({ id: 'toml-mcp' })
-  })
-
-  it('empty legacy files produce empty arrays (no crash)', () => {
-    // Corrupt legacy files
-    const dir = tmpDir()
-    const badMcp = writeToml(dir, 'hip-mcp-servers.json', '{ not json')
-    const badAgents = writeToml(dir, 'hip-agents.json', '')
-    const badProviders = writeToml(dir, 'hip-providers.json', 'null')
-    const badSkills = writeToml(dir, 'hip-skills.json', '{}')
-
-    process.env.HIP_MCP_SERVERS_PATH = badMcp
-    process.env.HIP_AGENTS_PATH = badAgents
-    process.env.HIP_PROVIDERS_PATH = badProviders
-    process.env.HIP_SKILLS_PATH = badSkills
-
-    const projDir = tmpDir()
-    const cfg = resolveEffectiveConfig(projDir)
-
-    expect(cfg.version).toBe(1)
-    expect(cfg.mcpServers).toEqual([])
-    expect(cfg.agents).toEqual([])
-    expect(cfg.providers).toEqual([])
-    expect(cfg.skills).toEqual([])
-  })
 })

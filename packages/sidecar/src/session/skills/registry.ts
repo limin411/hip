@@ -1,16 +1,19 @@
 // packages/sidecar/src/session/skills/registry.ts
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs'
+import { readdirSync, existsSync, statSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
-import type { SkillMeta, SkillsConfig } from '@hip/protocol'
+import type { SkillMeta } from '@hip/protocol'
+import { resolveEffectiveConfig } from '../../config/hip-config.js'
 import { parseFrontmatter } from './frontmatter.js'
 
-/** Read the enabled/disabled map from HIP_SKILLS_PATH. Missing/corrupt → {} (everything enabled). */
-function readEnabledMap(): Record<string, boolean> {
-  const file = process.env.HIP_SKILLS_PATH?.trim()
-  if (!file) return {}
+/** Build the enabled/disabled map from hip.toml (global + project). Missing/corrupt → {} (everything enabled). */
+function readEnabledMap(cwd: string): Record<string, boolean> {
   try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as SkillsConfig
-    return cfg?.enabled && typeof cfg.enabled === 'object' ? cfg.enabled : {}
+    const entries = resolveEffectiveConfig(cwd).skills ?? []
+    const map: Record<string, boolean> = {}
+    for (const e of entries) {
+      map[e.id] = e.enabled
+    }
+    return map
   } catch {
     return {}
   }
@@ -160,7 +163,7 @@ export function readProjectSkills(cwd: string): SkillMeta[] {
   const root = findProjectRoot(cwd)
   const projectSkillsDir = join(root, '.hip', 'skills')
   if (!existsSync(projectSkillsDir)) return []
-  const enabled = readEnabledMap()
+  const enabled = readEnabledMap(cwd)
   const skills = scanSkillDir(projectSkillsDir, enabled, 'project')
   skills.sort((a, b) => a.id.localeCompare(b.id))
   return skills
@@ -180,7 +183,7 @@ export function mergeSkills(global: SkillMeta[], project: SkillMeta[]): SkillMet
 
 /**
  * Scan HIP_SKILLS_DIR for SKILL.md files, parse YAML frontmatter (name/description),
- * cross-reference the HIP_SKILLS_PATH enabled map (a skill missing from the map counts
+ * cross-reference the hip.toml enabled map (a skill missing from the map counts
  * as enabled), and return the enabled SkillMeta[] sorted by id. Folders without a
  * SKILL.md, or whose frontmatter has no name, are skipped. Called every turn; never throws.
  *
@@ -195,7 +198,7 @@ export function readEnabledSkills(cwd?: string): SkillMeta[] {
     return []
   }
 
-  const enabled = readEnabledMap()
+  const enabled = readEnabledMap(cwd ?? process.cwd())
   const global = scanSkillDir(root, enabled, 'global')
   global.sort((a, b) => a.id.localeCompare(b.id))
 

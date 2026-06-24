@@ -741,7 +741,7 @@ export class Session {
       return text
     }
 
-    const enabledAgents = [...readAgentsConfig().filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
+    const enabledAgents = [...readAgentsConfig(cwd).filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
     const invoker = this.agentProv.invoker(cwd)
     const requestApproval = this.permissions.buildRequestApproval(send, this.id, turnId, nextSeq, mode, this.hooks)
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SkillMeta } from '@hip/protocol'
 import { readEnabledSkills, readSkillBody } from './skills/registry.js'
+import { writeHipToml } from './__testutils__/config-helpers.js'
 import { buildTools } from './tools.js'
 
 let dirs: string[] = []
@@ -23,9 +24,6 @@ function writeSkill(dir: string, id: string, name: string, description: string, 
 
 function resetEnv() {
   delete process.env.HIP_SKILLS_DIR
-  delete process.env.HIP_SKILLS_PATH
-  delete process.env.HIP_MCP_SERVERS_PATH
-  delete process.env.HIP_AGENTS_PATH
   delete process.env.HIP_CONFIG_PATH
 }
 
@@ -55,12 +53,9 @@ function setupMultiLevel(): {
   writeSkill(projectSkillsDir, 'formatter', 'Project Formatter', 'Format code (project)', 'Project version instructions')
   writeSkill(projectSkillsDir, 'deployer', 'Deployer', 'Deploy project', 'Deployer instructions')
 
-  // Empty skills config
-  const skillsCfg = join(base, 'skills.json')
-  writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
-
+  // Empty unified config (no skills section → all enabled by default)
   process.env.HIP_SKILLS_DIR = globalDir
-  process.env.HIP_SKILLS_PATH = skillsCfg
+  process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
   return { globalDir, cwd, projectSkillsDir }
 }
@@ -189,10 +184,8 @@ describe('multi-level edge cases', () => {
     mkdirSync(cwd, { recursive: true })
     // No .hip/skills/ under cwd
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = globalDir
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills(cwd)
     expect(skills).toHaveLength(1)
@@ -219,9 +212,7 @@ describe('multi-level edge cases', () => {
     mkdirSync(skillDir, { recursive: true })
     writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: Manual Skill\ndescription: Manual only\nautoInvoke: false\n---\nManual body', 'utf8')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills(cwd)
     const manual = skills.find((s) => s.id === 'manual-skill')

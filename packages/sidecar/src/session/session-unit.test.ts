@@ -176,7 +176,7 @@ describe('Session NO_API_KEY guard', () => {
 })
 
   describe('Session incompatible-model guard', () => {
-  // The active model is a process-global; a stale/hand-edited hip-providers.json can point it at a
+  // The active model is a process-global; a stale/hand-edited hip.toml can point it at a
   // native-only provider. Restore the default after each case so other suites see deepseek.
   let savedKey: string | undefined
   beforeEach(() => { savedKey = process.env.HIP_MODEL_GOOGLE_API_KEY; delete process.env.HIP_MODEL_GOOGLE_API_KEY })

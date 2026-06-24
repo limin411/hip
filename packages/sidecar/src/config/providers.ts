@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import type { ActiveModel, ProvidersConfig } from '@hip/protocol'
+import type { ActiveModel } from '@hip/protocol'
+import { readHipConfig } from './hip-config.js'
 
 export const DEEPSEEK_DEFAULT: ActiveModel = {
   providerID: 'deepseek',
@@ -14,8 +14,7 @@ export const ANTHROPIC_DEFAULT_BASE_URL = 'https://api.anthropic.com/v1'
  *  provider tagged npm '@ai-sdk/openai[-compatible]' — metadata the sidecar never sees — so a positive
  *  allowlist here would wrongly reject those valid selections. This list is best-effort and covers the
  *  common native-SDK families, NOT every provider the renderer's stricter allowlist disables; the
- *  renderer remains the primary gate. A stale/hand-edited hip-providers.json is the only way one of
- *  these reaches buildModel() — see the model-config follow-ups spec. */
+ *  renderer remains the primary gate. */
 const NATIVE_ONLY_PROVIDERS = new Set([
   'google',
   'google-vertex',
@@ -40,31 +39,27 @@ export function setActiveModel(m: ActiveModel): void {
   active = m
 }
 
-/** Initialise the process-global active model from HIP_PROVIDERS_PATH (call once at boot). */
-export function loadActiveModelFromEnv(): void {
-  const file = process.env.HIP_PROVIDERS_PATH?.trim()
-  if (!file) { active = DEEPSEEK_DEFAULT; return }
-  try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as ProvidersConfig
-    const sel = cfg.activeModel
-    if (!sel) { active = DEEPSEEK_DEFAULT; return }
-    const baseURL = cfg.providers?.[sel.providerID]?.baseURL ?? resolveProviderBaseURL(sel.providerID)
-    active = { providerID: sel.providerID, modelID: sel.modelID, baseURL }
-  } catch {
-    active = DEEPSEEK_DEFAULT
-  }
+function providerBaseUrlFromToml(providerID: string): string | undefined {
+  const cfg = readHipConfig()
+  return cfg.providers?.find((p) => p.id === providerID)?.baseUrl
 }
 
-/** Resolve a provider's OpenAI-compatible base URL from HIP_PROVIDERS_PATH; deepseek default otherwise. */
-export function resolveProviderBaseURL(providerID: string): string {
-  const file = process.env.HIP_PROVIDERS_PATH?.trim()
-  if (file) {
-    try {
-      const cfg = JSON.parse(readFileSync(file, 'utf8')) as ProvidersConfig
-      const url = cfg.providers?.[providerID]?.baseURL
-      if (url) return url
-    } catch { /* fall through */ }
+/** Initialise the process-global active model from hip.toml. */
+export function loadActiveModelFromEnv(): void {
+  const cfg = readHipConfig()
+  const sel = cfg.activeModel
+  if (sel) {
+    active = { providerID: sel.providerID, modelID: sel.modelID, baseURL: sel.baseURL }
+    return
   }
+  active = DEEPSEEK_DEFAULT
+}
+
+/** Resolve a provider's OpenAI-compatible base URL from hip.toml; fall back to the
+ *  deepseek/anthropic defaults. */
+export function resolveProviderBaseURL(providerID: string): string {
+  const fromToml = providerBaseUrlFromToml(providerID)
+  if (fromToml) return fromToml
   return providerID === 'anthropic' ? ANTHROPIC_DEFAULT_BASE_URL : DEEPSEEK_DEFAULT.baseURL
 }
 

@@ -46,16 +46,12 @@ beforeEach(() => {
   mkdirSync(deployDir, { recursive: true })
   writeFileSync(join(deployDir, 'SKILL.md'), '---\nname: Deployer\ndescription: Deploy project\n---\nDeploy skill', 'utf8')
 
-  // Empty config files
-  const skillsCfg = join(root, 'skills.json')
-  writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
-  const mcpPath = join(root, 'mcp.json')
-  writeFileSync(mcpPath, JSON.stringify({ servers: [] }), 'utf8')
+  // Empty unified config (no skills section → all enabled by default)
+  const configPath = join(root, 'hip.toml')
+  writeFileSync(configPath, 'version = 1\n', 'utf8')
 
+  setEnv('HIP_CONFIG_PATH', configPath)
   setEnv('HIP_SKILLS_DIR', globalSkillsDir)
-  setEnv('HIP_SKILLS_PATH', skillsCfg)
-  setEnv('HIP_MCP_SERVERS_PATH', mcpPath)
-  setEnv('HIP_AGENTS_PATH', '')
 })
 afterEach(() => {
   for (const [k, v] of Object.entries(prevEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v }

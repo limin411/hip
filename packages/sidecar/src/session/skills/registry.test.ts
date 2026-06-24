@@ -45,8 +45,18 @@ function addProjectSkill(root: string, folder: string, skillMd: string): string 
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
   delete process.env.HIP_SKILLS_DIR
-  delete process.env.HIP_SKILLS_PATH
+  delete process.env.HIP_CONFIG_PATH
 })
+
+/** Write a global hip.toml with the given skill enablement map. */
+function setGlobalSkillsConfig(enabled: Record<string, boolean>) {
+  const cfgDir = mkdtempSync(join(tmpdir(), 'hip-skills-cfg-'))
+  dirs.push(cfgDir)
+  const entries = Object.entries(enabled).map(([id, on]) => ({ id, enabled: on }))
+  const toml = `version = 1\n\n[[skills]]\n${entries.map((e) => `id = "${e.id}"\nenabled = ${e.enabled}`).join('\n\n[[skills]]\n')}`
+  writeFileSync(join(cfgDir, 'hip.toml'), toml)
+  process.env.HIP_CONFIG_PATH = join(cfgDir, 'hip.toml')
+}
 
 describe('readEnabledSkills', () => {
   it('returns [] when HIP_SKILLS_DIR is unset', () => {
@@ -110,11 +120,7 @@ describe('readEnabledSkills', () => {
     const root = makeSkillsRoot()
     addSkill(root, 'a', fm('A', 'da'))
     process.env.HIP_SKILLS_DIR = root
-    const cfgDir = mkdtempSync(join(tmpdir(), 'hip-skills-cfg-'))
-    dirs.push(cfgDir)
-    const cfgPath = join(cfgDir, 'hip-skills.json')
-    writeFileSync(cfgPath, JSON.stringify({ enabled: {} }))
-    process.env.HIP_SKILLS_PATH = cfgPath
+    setGlobalSkillsConfig({})
     expect(readEnabledSkills().map((s) => s.id)).toEqual(['a'])
   })
 
@@ -123,23 +129,18 @@ describe('readEnabledSkills', () => {
     addSkill(root, 'a', fm('A', 'da'))
     addSkill(root, 'b', fm('B', 'db'))
     process.env.HIP_SKILLS_DIR = root
-    const cfgDir = mkdtempSync(join(tmpdir(), 'hip-skills-cfg-'))
-    dirs.push(cfgDir)
-    const cfgPath = join(cfgDir, 'hip-skills.json')
-    writeFileSync(cfgPath, JSON.stringify({ enabled: { b: false } }))
-    process.env.HIP_SKILLS_PATH = cfgPath
+    setGlobalSkillsConfig({ b: false })
     expect(readEnabledSkills().map((s) => s.id)).toEqual(['a'])
   })
 
-  it('ignores a corrupt enabled map and treats all skills as enabled', () => {
+  it('ignores a corrupt config and treats all skills as enabled', () => {
     const root = makeSkillsRoot()
     addSkill(root, 'a', fm('A', 'da'))
     process.env.HIP_SKILLS_DIR = root
     const cfgDir = mkdtempSync(join(tmpdir(), 'hip-skills-cfg-'))
     dirs.push(cfgDir)
-    const cfgPath = join(cfgDir, 'hip-skills.json')
-    writeFileSync(cfgPath, 'not-json{{')
-    process.env.HIP_SKILLS_PATH = cfgPath
+    writeFileSync(join(cfgDir, 'hip.toml'), 'not valid toml {{{')
+    process.env.HIP_CONFIG_PATH = join(cfgDir, 'hip.toml')
     expect(readEnabledSkills().map((s) => s.id)).toEqual(['a'])
   })
 
@@ -509,11 +510,7 @@ describe('readProjectSkills', () => {
     const root = makeProjectRoot()
     addProjectSkill(root, 'a', fm('A', 'da'))
     addProjectSkill(root, 'b', fm('B', 'db'))
-    const cfgDir = mkdtempSync(join(tmpdir(), 'hip-skills-cfg-'))
-    dirs.push(cfgDir)
-    const cfgPath = join(cfgDir, 'hip-skills.json')
-    writeFileSync(cfgPath, JSON.stringify({ enabled: { a: false } }))
-    process.env.HIP_SKILLS_PATH = cfgPath
+    setGlobalSkillsConfig({ a: false })
     const skills = readProjectSkills(root)
     expect(skills.map((s) => s.id)).toEqual(['b'])
   })

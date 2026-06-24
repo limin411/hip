@@ -1,12 +1,12 @@
 // src/store/providersStore.ts
 import { create } from 'zustand'
-import type { ProvidersConfig } from '@hip/protocol'
+import type { ActiveModel, ProviderEntry, ProvidersConfig } from '@hip/protocol'
 import { fetchCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
-import { getProvidersConfig, setProvidersConfig } from '@/ipc/providersConfig'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { isProviderKeyConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
 
-/** Coordinates the models.dev catalog, the hip-providers.json config, and per-provider API
+/** Coordinates the models.dev catalog, the hip.toml provider config, and per-provider API
  *  keys. Every async action can reject (the underlying tauri `invoke` throws) — callers must
  *  try/catch and surface `settings.modelConfig.error`; the store does not hold an error field. */
 interface ProvidersStore {
@@ -21,6 +21,17 @@ interface ProvidersStore {
   setEnabled: (providerID: string, enabled: boolean) => Promise<void>
   addCustom: (providerID: string, name: string, baseURL: string, modelIDs: string[]) => Promise<void>
   setActiveModel: (providerID: string, modelID: string) => Promise<void>
+}
+
+const DEEPSEEK_BASE = 'https://api.deepseek.com/v1'
+
+/** First-run seed: DeepSeek enabled + active, so existing users see no change. */
+function withDefaults(cfg: ProvidersConfig | null): ProvidersConfig {
+  if (cfg && cfg.providers && Object.keys(cfg.providers).length > 0) return cfg
+  return {
+    providers: { deepseek: { enabled: true, baseURL: DEEPSEEK_BASE } },
+    activeModel: { providerID: 'deepseek', modelID: 'deepseek-reasoner' },
+  }
 }
 
 /** Merge user `custom` providers into the catalog so the list renders them too. */
@@ -38,6 +49,44 @@ function resolveBaseURL(p: CatalogProvider | undefined, config: ProvidersConfig,
   return config.providers[id]?.baseURL ?? p?.api ?? ''
 }
 
+function isCustomProvider(id: string, catalog: Catalog): boolean {
+  return !catalog[id] || catalog[id].custom === true
+}
+
+/** Convert hip.toml ProviderEntry[] into the UI-friendly ProvidersConfig shape. */
+function providerEntriesToConfig(entries: ProviderEntry[] | undefined, catalog: Catalog): ProvidersConfig {
+  const providers: ProvidersConfig['providers'] = {}
+  for (const e of entries ?? []) {
+    const entry: ProvidersConfig['providers'][string] = {
+      enabled: e.enabled,
+      baseURL: e.baseUrl || undefined,
+    }
+    if (isCustomProvider(e.id, catalog)) {
+      entry.custom = { name: e.name }
+    }
+    providers[e.id] = entry
+  }
+  return { providers }
+}
+
+/** Convert the UI-friendly ProvidersConfig into hip.toml ProviderEntry[]. */
+function configToProviderEntries(config: ProvidersConfig, catalog: Catalog): ProviderEntry[] {
+  return Object.entries(config.providers).map(([id, entry]) => ({
+    id,
+    name: entry.custom?.name ?? catalog[id]?.name ?? id,
+    baseUrl: entry.baseURL ?? '',
+    enabled: entry.enabled,
+  }))
+}
+
+/** Build the full ActiveModel (with resolved baseURL) from the store's ProvidersConfig shape. */
+function resolveActiveModel(config: ProvidersConfig, catalog: Catalog): ActiveModel | undefined {
+  const sel = config.activeModel
+  if (!sel) return undefined
+  const baseURL = resolveBaseURL(catalog[sel.providerID], config, sel.providerID)
+  return { providerID: sel.providerID, modelID: sel.modelID, baseURL }
+}
+
 export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   catalog: {},
   config: { providers: {} },
@@ -45,7 +94,14 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   loaded: false,
 
   load: async () => {
-    const [catalogRaw, config] = await Promise.all([fetchCatalog(), getProvidersConfig()])
+    const [catalogRaw] = await Promise.all([fetchCatalog(), useHipConfigStore.getState().load()])
+    const hipConfig = useHipConfigStore.getState().config
+    const config = withDefaults({
+      ...providerEntriesToConfig(hipConfig.providers, catalogRaw),
+      activeModel: hipConfig.activeModel
+        ? { providerID: hipConfig.activeModel.providerID, modelID: hipConfig.activeModel.modelID }
+        : undefined,
+    })
     const catalog = mergeCustom(catalogRaw, config)
     const ids = Object.keys(catalog).filter((id) => isCompatible(catalog[id]))
     const flags = await Promise.all(ids.map((id) => isProviderKeyConfigured(id).then((c) => [id, c] as const)))
@@ -67,7 +123,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         },
       },
     }
-    await setProvidersConfig(next)
+    await persistProvidersConfig(next, get().catalog)
     await restartSidecar()
     set((s) => ({ config: next, keyConfigured: { ...s.keyConfigured, [providerID]: true } }))
   },
@@ -84,7 +140,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       ...config,
       providers: { ...config.providers, [providerID]: { ...config.providers[providerID], enabled: config.providers[providerID]?.enabled ?? false, baseURL } },
     }
-    await setProvidersConfig(next)
+    await persistProvidersConfig(next, get().catalog)
     set({ config: next })
     // If we just edited the ACTIVE provider's base URL, re-apply it live (a non-secret
     // config:setActiveModel, no restart) so the running sidecar adopts it immediately — otherwise
@@ -107,7 +163,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
         },
       },
     }
-    await setProvidersConfig(next)
+    await persistProvidersConfig(next, get().catalog)
     set({ config: next })
   },
 
@@ -123,7 +179,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
       ...config,
       providers: { ...config.providers, [providerID]: { enabled: true, baseURL, custom: { name } } },
     }
-    await setProvidersConfig(next)
+    await persistProvidersConfig(next, get().catalog)
     set((s) => ({
       config: next,
       catalog: {
@@ -141,8 +197,20 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     // boot path, has no DEEPSEEK_DEFAULT fallback). Callers surface this via modelConfig.error.
     if (!baseURL) throw new Error(`No base URL configured for provider "${providerID}"`)
     const next: ProvidersConfig = { ...config, activeModel: { providerID, modelID } }
-    await setProvidersConfig(next)
+    await persistProvidersConfig(next, get().catalog)
     sessionService.setActiveModel(providerID, modelID, baseURL)
     set({ config: next })
   },
 }))
+
+/** Write the ProvidersConfig-shaped state back to hip.toml as ProviderEntry[] + activeModel. */
+async function persistProvidersConfig(config: ProvidersConfig, catalog: Catalog): Promise<void> {
+  const hipConfig = useHipConfigStore.getState().config
+  const activeModel = resolveActiveModel(config, catalog)
+  const next: typeof hipConfig = {
+    ...hipConfig,
+    providers: configToProviderEntries(config, catalog),
+    activeModel,
+  }
+  await useHipConfigStore.getState().save(next)
+}

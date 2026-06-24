@@ -14,6 +14,7 @@ import type {
   McpResourceContent,
   ClientMessage,
   ServerMessage,
+  ActiveModel,
 } from './index.js'
 
 // ──────────────────────────────────────────────────────────────────
@@ -29,15 +30,18 @@ void _skillScopes
 
 describe('protocol: HipConfig (Todo 1)', () => {
   it('instantiates HipConfig with all sections populated', () => {
+    const activeModel: ActiveModel = { providerID: 'openai', modelID: 'gpt-4o', baseURL: 'https://api.openai.com/v1' }
     const cfg: HipConfig = {
       version: 1,
-      providers: [{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' }],
+      providers: [{ id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', enabled: true }],
+      activeModel,
       mcpServers: [{ id: 'srv-1', name: 'Local', transport: 'stdio', command: 'npx', args: [], enabled: true }],
       skills: [{ id: 'pdf-tools', enabled: true }],
       agents: [{ id: 'helper', name: 'Helper', kind: 'internal', command: '', args: [], enabled: true, prompt: 'You help.' }],
     }
     expect(cfg.version).toBe(1)
     expect(cfg.providers).toHaveLength(1)
+    expect(cfg.activeModel).toEqual(activeModel)
     expect(cfg.mcpServers).toHaveLength(1)
     expect(cfg.skills).toHaveLength(1)
     expect(cfg.agents).toHaveLength(1)
@@ -47,6 +51,7 @@ describe('protocol: HipConfig (Todo 1)', () => {
     const cfg: HipConfig = { version: 1 }
     expect(cfg.version).toBe(1)
     expect(cfg.providers).toBeUndefined()
+    expect(cfg.activeModel).toBeUndefined()
     expect(cfg.mcpServers).toBeUndefined()
     expect(cfg.skills).toBeUndefined()
     expect(cfg.agents).toBeUndefined()
@@ -55,11 +60,13 @@ describe('protocol: HipConfig (Todo 1)', () => {
   it('round-trips HipConfig through JSON', () => {
     const cfg: HipConfig = {
       version: 1,
-      providers: [{ id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' }],
+      providers: [{ id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', enabled: true }],
+      activeModel: { providerID: 'deepseek', modelID: 'deepseek-reasoner', baseURL: 'https://api.deepseek.com/v1' },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.version).toBe(1)
     expect(round.providers![0].id).toBe('deepseek')
+    expect(round.activeModel?.providerID).toBe('deepseek')
   })
 })
 
@@ -70,23 +77,27 @@ describe('protocol: ProviderEntry (Todo 1)', () => {
       name: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1',
       apiKey: 'sk-abc',
+      enabled: true,
     }
     expect(p.id).toBe('openai')
     expect(p.name).toBe('OpenAI')
     expect(p.baseUrl).toBe('https://api.openai.com/v1')
     expect(p.apiKey).toBe('sk-abc')
+    expect(p.enabled).toBe(true)
   })
 
   it('allows optional apiKey to be absent', () => {
-    const p: ProviderEntry = { id: 'x', name: 'X', baseUrl: 'https://x.com' }
+    const p: ProviderEntry = { id: 'x', name: 'X', baseUrl: 'https://x.com', enabled: false }
     expect(p.apiKey).toBeUndefined()
+    expect(p.enabled).toBe(false)
   })
 
   it('round-trips through JSON', () => {
-    const p: ProviderEntry = { id: 'p1', name: 'P1', baseUrl: 'https://p1.example.com' }
+    const p: ProviderEntry = { id: 'p1', name: 'P1', baseUrl: 'https://p1.example.com', enabled: true }
     const round = JSON.parse(JSON.stringify(p)) as ProviderEntry
     expect(round.id).toBe('p1')
     expect(round.name).toBe('P1')
+    expect(round.enabled).toBe(true)
   })
 })
 

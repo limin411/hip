@@ -5,7 +5,7 @@ import { providerKeyEnv } from '@hip/protocol'
 
 /** Default path to the file-backed secret store (mirrors Rust `src-tauri/src/auth.rs`).
  *  Single source of truth for provider API keys across the desktop app, the standalone
- *  sidecar, and the test suite. Overridable via HIP_AUTH_PATH (mirrors HIP_PROVIDERS_PATH
+ *  sidecar, and the test suite. Overridable via HIP_AUTH_PATH (mirrors HIP_CONFIG_PATH
  *  / HIP_DB_PATH) so tests can isolate the file fallback. */
 export function defaultAuthPath(): string {
   return process.env.HIP_AUTH_PATH?.trim() || path.join(os.homedir(), '.hip', 'config', 'auth.json')

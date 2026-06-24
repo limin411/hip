@@ -24,7 +24,7 @@ export class AgentProviderManager {
   ensureExternalProvider(): AgentProvider {
     if (!this.externalProvider) {
       const config = this.getConfig()
-      const agent = readAgentsConfig().find((x) => x.id === config.agentId)
+      const agent = readAgentsConfig(config.cwd ?? process.cwd()).find((x) => x.id === config.agentId)
       if (!agent) throw new Error(`Unknown agent: ${config.agentId}`)
       const model = null
       const resume = this.store?.getAcpSessionId(this.sessionId) ?? null

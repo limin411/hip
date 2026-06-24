@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import type { AgentConfig } from '@hip/protocol'
-import { getAgentsConfig, setAgentsConfig } from '@/ipc/agentsConfig'
+import { useHipConfigStore, useAgents } from '@/store/hipConfigStore'
 
 interface AgentsStore {
   agents: AgentConfig[]
@@ -12,28 +12,33 @@ interface AgentsStore {
   removeAgent: (id: string) => Promise<void>
 }
 
+/**
+ * @deprecated Prefer useHipConfigStore + useAgents() for new code.
+ * This store is kept as a thin wrapper during the JSON→TOML migration
+ * so existing UI components continue to work without immediate rewrites.
+ */
 export const useAgentsStore = create<AgentsStore>((set, get) => ({
   agents: [],
   loaded: false,
   load: async () => {
-    const cfg = await getAgentsConfig()
-    set({ agents: cfg.agents, loaded: true })
+    await useHipConfigStore.getState().load()
+    set({ agents: useAgents(), loaded: true })
   },
   addAgent: async (a) => {
     const id = nanoid()
     const next = [...get().agents, { ...a, id }]
-    await setAgentsConfig({ agents: next })
+    await useHipConfigStore.getState().updateSection('agents', next)
     set({ agents: next })
     return id
   },
   updateAgent: async (id, patch) => {
     const next = get().agents.map((x) => (x.id === id ? { ...x, ...patch } : x))
-    await setAgentsConfig({ agents: next })
+    await useHipConfigStore.getState().updateSection('agents', next)
     set({ agents: next })
   },
   removeAgent: async (id) => {
     const next = get().agents.filter((x) => x.id !== id)
-    await setAgentsConfig({ agents: next })
+    await useHipConfigStore.getState().updateSection('agents', next)
     set({ agents: next })
   },
 }))

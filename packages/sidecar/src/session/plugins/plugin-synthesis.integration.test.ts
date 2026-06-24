@@ -46,8 +46,7 @@ import { Session } from '../session.js'
 let root: string
 let pluginDir: string
 let pluginsJsonPath: string
-let skillsCfgPath: string
-let mcpCfgPath: string
+let configPath: string
 const prevEnv: Record<string, string | undefined> = {}
 
 function setEnv(k: string, v: string) {
@@ -98,19 +97,16 @@ beforeEach(() => {
 
   // ── External config files (empty — plugin source is the only supply) ──
   pluginsJsonPath = join(root, 'plugins.json')
-  skillsCfgPath = join(root, 'skills.json')
-  mcpCfgPath = join(root, 'mcp.json')
+  configPath = join(root, 'hip.toml')
 
   // Start with the plugin enabled
   writeFileSync(pluginsJsonPath, JSON.stringify({ plugins: [pluginDir] }), 'utf8')
-  writeFileSync(skillsCfgPath, JSON.stringify({ enabled: {} }), 'utf8')
-  writeFileSync(mcpCfgPath, JSON.stringify({ servers: [] }), 'utf8')
+  // Empty unified config (no skills section → plugin skills enabled by default)
+  writeFileSync(configPath, 'version = 1\n', 'utf8')
 
   setEnv('HIP_PLUGINS_PATH', pluginsJsonPath)
-  setEnv('HIP_SKILLS_PATH', skillsCfgPath)
+  setEnv('HIP_CONFIG_PATH', configPath)
   setEnv('HIP_SKILLS_DIR', join(root, 'no-real-skills'))
-  setEnv('HIP_MCP_SERVERS_PATH', mcpCfgPath)
-  setEnv('HIP_AGENTS_PATH', '')
 
   // Reset mock state
   reconciledConfigs.length = 0

@@ -37,22 +37,6 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "config"
 pub fn cache_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "cache") }
 pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratch") }
 
-/// Canonical path of the non-secret provider config inside `config/`.
-/// Single source of truth so the renderer-writer and the sidecar-reader can't drift.
-pub fn providers_config_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(config_dir(app)?.join("hip-providers.json"))
-}
-
-/// Canonical path of the external-agent registry inside `config/`.
-pub fn agents_config_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(config_dir(app)?.join("hip-agents.json"))
-}
-
-/// Canonical path of the MCP-servers registry inside `config/`.
-pub fn mcp_servers_config_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(config_dir(app)?.join("hip-mcp-servers.json"))
-}
-
 /// Canonical path of the file-backed secret store inside `config/`.
 pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))
@@ -61,11 +45,6 @@ pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
 /// Directory holding installed Claude-format skills (`<dir>/<skill-id>/SKILL.md`).
 pub fn skills_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "skills")
-}
-
-/// Canonical path of the skill enable/disable table inside `config/`.
-pub fn skills_config_path(app: &AppHandle) -> Option<PathBuf> {
-    Some(config_dir(app)?.join("hip-skills.json"))
 }
 
 /// Canonical path of the plugin registry inside `config/`.
@@ -111,23 +90,16 @@ mod tests {
         assert_eq!(hip_base_from(None, Some(PathBuf::from("/x"))), None);
     }
 
-    // The skill layout: `skills_dir` resolves to `<base>/skills` (via `hip_subdir`)
-    // and `skills_config_path` to `<base>/config/hip-skills.json` (via `config_dir`).
-    // Both wrap `hip_base_dir` = `hip_base_from(HOME, app_data)`, so composing the
-    // real pure core with the exact subpaths the wrappers append pins the actual
-    // on-disk layout these two functions produce.
+    // The skill layout: `skills_dir` resolves to `<base>/skills` (via `hip_subdir`).
+    // It wraps `hip_base_dir` = `hip_base_from(HOME, app_data)`, so composing the
+    // real pure core with the exact subpath the wrapper appends pins the actual
+    // on-disk layout this function produces.
     #[test]
     #[cfg(not(windows))]
     fn skills_layout_lives_under_base() {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
         // `skills_dir(app)` → `hip_subdir(app, "skills")` → `<base>/skills`.
         assert_eq!(base.join("skills"), PathBuf::from("/Users/x/.hip/skills"));
-        // `skills_config_path(app)` → `config_dir(app)?.join("hip-skills.json")`
-        // → `<base>/config/hip-skills.json`.
-        assert_eq!(
-            base.join("config").join("hip-skills.json"),
-            PathBuf::from("/Users/x/.hip/config/hip-skills.json"),
-        );
     }
 
     #[test]

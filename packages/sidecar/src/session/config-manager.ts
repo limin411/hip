@@ -1,7 +1,7 @@
 import type { SessionConfig, SkillMeta, AgentConfig, McpServerConfig } from '@hip/protocol'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { readMcpServersConfig } from '../config/mcp-servers.js'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { readPluginsConfig } from '../config/plugins.js'
 import { readEnabledSkills, mergeSkills, extractSkillMetaFromData } from './skills/registry.js'
 import { parseFrontmatter } from './skills/frontmatter.js'
@@ -56,7 +56,8 @@ export class ConfigManager {
     }
     this.hookRegistry.clear()
     try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd) } catch { this.cachedSkills = [] }
-    this.cachedMcpConfigs = readMcpServersConfig()
+    const cwd = this.getConfig().cwd ?? process.cwd()
+    this.cachedMcpConfigs = resolveEffectiveConfig(cwd).mcpServers ?? []
     const pluginAgents: AgentConfig[] = []
     try {
       for (const pluginDir of readPluginsConfig().plugins) {
@@ -97,6 +98,7 @@ export class ConfigManager {
   /** Bind/replace the project directory and rebuild the agent. */
   setCwd(cwd: string): void {
     this.updateConfig({ ...this.getConfig(), cwd })
+    this.reloadPlugins()
     this.rebuildAgent()
   }
 

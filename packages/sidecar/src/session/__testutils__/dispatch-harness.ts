@@ -1,10 +1,11 @@
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { AIMessageChunk } from '@langchain/core/messages'
 import { ChatGenerationChunk } from '@langchain/core/outputs'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentConfig, ServerMessage } from '@hip/protocol'
+import { writeHipToml } from './config-helpers.js'
 import { Session } from '../session.js'
 import type { AgentInvoker } from '../agents/invoker.js'
 import { RealModelRunner, type ModelRunner } from '../model-runner.js'
@@ -41,7 +42,7 @@ export function makeToolCallingModel(args: { agent: string; task: string }, fina
 
 const tmpDirs: string[] = []
 
-/** Write a one-agent hip-agents.json and point HIP_AGENTS_PATH at it (see registry.test.ts). */
+/** Write a one-agent hip.toml and point HIP_CONFIG_PATH at it. */
 export function registerAgent(agent: Partial<AgentConfig> = {}): string {
   const full: AgentConfig = {
     id: 'echo', name: 'Echo', kind: 'acp', command: 'x', args: [],
@@ -49,16 +50,14 @@ export function registerAgent(agent: Partial<AgentConfig> = {}): string {
   }
   const dir = mkdtempSync(join(tmpdir(), 'hip-dispatch-'))
   tmpDirs.push(dir)
-  const p = join(dir, 'hip-agents.json')
-  writeFileSync(p, JSON.stringify({ agents: [full] }))
-  process.env.HIP_AGENTS_PATH = p
+  process.env.HIP_CONFIG_PATH = writeHipToml(dir, { agents: [full] })
   return full.id
 }
 
-/** Remove the temp agent files and clear the env (call in afterEach), matching registry.test.ts. */
+/** Remove the temp config files and clear the env (call in afterEach). */
 export function cleanupAgents(): void {
   for (const d of tmpDirs.splice(0)) rmSync(d, { recursive: true, force: true })
-  delete process.env.HIP_AGENTS_PATH
+  delete process.env.HIP_CONFIG_PATH
 }
 
 export type StubInvoke = AgentInvoker['invoke']

@@ -34,19 +34,11 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     // Point the sidecar at the unified TOML config (single source of truth for
     // mcpServers, skills, providers, agents, permissions). The sidecar resolves
     // effective config by merging this global hip.toml with a project-level
-    // .hip/hip.toml. When hip.toml is absent the sidecar falls back to reading
-    // the legacy per-domain JSON files (see buildLegacyConfig() in hip-config.ts).
+    // .hip/hip.toml. Legacy per-domain JSON files are no longer read.
     if let Some(p) = crate::paths::hip_config_path(app) {
         cmd = cmd.env("HIP_CONFIG_PATH", p.to_string_lossy().into_owned());
     }
-    // Point the sidecar at the non-secret providers config (active model + base URLs).
-    if let Some(p) = crate::paths::providers_config_path(app) {
-        cmd = cmd.env("HIP_PROVIDERS_PATH", p.to_string_lossy().into_owned());
-    }
-    // Point the sidecar at the external-agent registry (read fresh per external spawn).
-    if let Some(p) = crate::paths::agents_config_path(app) {
-        cmd = cmd.env("HIP_AGENTS_PATH", p.to_string_lossy().into_owned());
-    }
+    // Providers are read from hip.toml via HIP_CONFIG_PATH; no separate env var needed.
     // Point the sidecar at the plugin registry (installed plugin manifests).
     if let Some(p) = crate::paths::plugins_config_path(app) {
         cmd = cmd.env("HIP_PLUGINS_PATH", p.to_string_lossy().into_owned());
@@ -158,13 +150,15 @@ pub fn read_provider_key(app: &AppHandle, provider_id: &str) -> Option<String> {
 
 fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
     let mut ids = vec!["deepseek".to_string()];
-    if let Some(path) = crate::paths::providers_config_path(app) {
+    if let Some(path) = crate::paths::hip_config_path(app) {
         if let Ok(body) = std::fs::read_to_string(&path) {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
-                if let Some(map) = v.get("providers").and_then(|p| p.as_object()) {
-                    for k in map.keys() {
-                        if !ids.contains(k) {
-                            ids.push(k.clone());
+                if let Some(arr) = v.get("providers").and_then(|p| p.as_array()) {
+                    for entry in arr {
+                        if let Some(id) = entry.get("id").and_then(|i| i.as_str()) {
+                            if !ids.contains(&id.to_string()) {
+                                ids.push(id.to_string());
+                            }
                         }
                     }
                 }
@@ -234,4 +228,5 @@ mod tests {
             PathBuf::from("/Users/me/.hip/config/hip.toml"),
         );
     }
+
 }

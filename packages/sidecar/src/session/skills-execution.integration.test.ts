@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SkillMeta, ServerMessage } from '@hip/protocol'
 import { readEnabledSkills, readSkillBody } from './skills/registry.js'
+import { writeHipToml } from './__testutils__/config-helpers.js'
 import { buildTools } from './tools.js'
 import { skillsBlock, SkillUsageTracker } from './system-prompt.js'
 
@@ -54,9 +55,6 @@ function writeSkill(
 
 function resetEnv() {
   delete process.env.HIP_SKILLS_DIR
-  delete process.env.HIP_SKILLS_PATH
-  delete process.env.HIP_MCP_SERVERS_PATH
-  delete process.env.HIP_AGENTS_PATH
   delete process.env.HIP_CONFIG_PATH
 }
 
@@ -76,10 +74,8 @@ describe('skills block autoInvoke filtering', () => {
     writeSkill(base, 'auto-skill', 'Auto Skill', 'This skill auto-invokes')
     writeSkill(base, 'manual-skill', 'Manual Skill', 'This skill is manual', { autoInvoke: false })
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     // Skills block ONLY includes autoInvoke !== false skills
     const skills = readEnabledSkills()
@@ -102,10 +98,8 @@ describe('skills block autoInvoke filtering', () => {
     const base = tmpDir()
     writeSkill(base, 'only-manual', 'Only Manual', 'Never auto', { autoInvoke: false })
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     expect(skills.length).toBe(1)
@@ -126,10 +120,8 @@ describe('skills block budget overflow → LRU eviction', () => {
       writeSkill(base, id, id.toUpperCase(), `${id} is a skill that does ${id} things and provides ${id} functionality for your project`)
     }
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     expect(skills.length).toBe(5)
@@ -161,10 +153,8 @@ describe('skills block budget overflow → LRU eviction', () => {
       writeSkill(base, id, `Skill ${id.toUpperCase()}`, `Description for skill ${id} with some extra text to make it longer`)
     }
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     expect(skills.length).toBe(8)
@@ -187,10 +177,8 @@ describe('skills block budget overflow → LRU eviction', () => {
     const base = tmpDir()
     writeSkill(base, 'x', 'X', 'A skill with a very long description that will not fit in a tiny budget')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const block = skillsBlock(skills, undefined, { budget: 50 })
@@ -206,10 +194,8 @@ describe('use_skill progressive disclosure', () => {
     const base = tmpDir()
     writeSkill(base, 'test-skill', 'Test Skill', 'A test skill', {}, 'This is the full skill body with instructions.')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills, sessionId: 's1' })
@@ -224,10 +210,8 @@ describe('use_skill progressive disclosure', () => {
     const base = tmpDir()
     writeSkill(base, 'known', 'Known', 'A known skill')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })
@@ -241,10 +225,8 @@ describe('use_skill progressive disclosure', () => {
     const base = tmpDir()
     writeSkill(base, 'my-id', 'My Display Name', 'Desc', {}, 'Content by id')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })
@@ -266,10 +248,8 @@ describe('use_skill progressive disclosure', () => {
     mkdirSync(join(skillDir, 'assets'), { recursive: true })
     writeFileSync(join(skillDir, 'assets', 'logo.svg'), '<svg></svg>', 'utf8')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })
@@ -295,10 +275,8 @@ describe('skill argument substitution', () => {
       ],
     }, 'Hello $name! Your style is $style. Positional: $0, $1')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills, sessionId: 's-test' })
@@ -315,10 +293,8 @@ describe('skill argument substitution', () => {
     const base = tmpDir()
     writeSkill(base, 'echo', 'Echo', 'Echoes arguments', {}, 'Arguments received: $ARGUMENTS')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })
@@ -332,10 +308,8 @@ describe('skill argument substitution', () => {
     const base = tmpDir()
     const skillDir = writeSkill(base, 'ctx', 'Context', 'Context test', {}, 'Dir: ${HIP_SKILL_DIR}, Session: ${HIP_SESSION_ID}')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills, sessionId: 'my-session-123' })
@@ -354,10 +328,8 @@ describe('progressive disclosure: !`cmd` dynamic context', () => {
     const base = tmpDir()
     writeSkill(base, 'cmd-skill', 'Cmd Skill', 'Runs a command', {}, 'The result is: !`echo hello`')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })
@@ -371,10 +343,8 @@ describe('progressive disclosure: !`cmd` dynamic context', () => {
     const base = tmpDir()
     writeSkill(base, 'no-cmd', 'No Cmd', 'Shell disabled', { disableShellExecution: true }, 'Result: !`echo executed_output`')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = base
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills = readEnabledSkills()
     const tools = buildTools('/tmp', undefined, undefined, undefined, { skills })

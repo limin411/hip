@@ -43,6 +43,7 @@ describe('ConfigManager — hook registration', () => {
       rmSync(pluginsConfigPath, { force: true })
     }
     delete process.env.HIP_PLUGINS_PATH
+    delete process.env.HIP_CONFIG_PATH
   })
 
   function defaultConfig(overrides: Partial<SessionConfig> = {}): SessionConfig {
@@ -166,5 +167,127 @@ describe('ConfigManager — hook registration', () => {
     mgr.loadPluginComponents()
 
     expect(registry.hasMatchingHook('TurnStart')).toBe(false)
+  })
+})
+
+describe('ConfigManager — MCP config loading', () => {
+  const dirs: string[] = []
+  let pluginsConfigPath: string | undefined
+
+  afterEach(() => {
+    for (const d of dirs.splice(0)) {
+      if (existsSync(d)) rmSync(d, { recursive: true, force: true })
+    }
+    if (pluginsConfigPath !== undefined && existsSync(pluginsConfigPath)) {
+      rmSync(pluginsConfigPath, { force: true })
+    }
+    delete process.env.HIP_PLUGINS_PATH
+    delete process.env.HIP_CONFIG_PATH
+  })
+
+  function makeManager(initialCwd: string): ConfigManager {
+    let config: SessionConfig = {
+      llmProvider: 'test',
+      model: 'test-model',
+      tools: [],
+      cwd: initialCwd,
+    }
+    return new ConfigManager(
+      () => config,
+      (next) => { config = next },
+      () => false,
+      false,
+      () => {},
+      () => false,
+      () => false,
+      () => {},
+      new HookRegistry(),
+    )
+  }
+
+  it('loadPluginComponents() reads user MCP servers from hip.toml (HIP_CONFIG_PATH)', () => {
+    const configDir = tmpDir()
+    dirs.push(configDir)
+    const globalToml = join(configDir, 'hip.toml')
+    writeFileSync(
+      globalToml,
+      `version = 1\n\n[[mcp_servers]]\nid = "srv-1"\nname = "Tavily"\ntransport = "http"\nenabled = true\nurl = "https://mcp.tavily.com/mcp"\n`,
+    )
+    process.env.HIP_CONFIG_PATH = globalToml
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+
+    expect(mgr.mcpConfigs).toHaveLength(1)
+    expect(mgr.mcpConfigs[0]).toMatchObject({
+      id: 'srv-1',
+      name: 'Tavily',
+      transport: 'http',
+      enabled: true,
+      url: 'https://mcp.tavily.com/mcp',
+    })
+  })
+
+  it('loadPluginComponents() reads project-level .hip/hip.toml override', () => {
+    const configDir = tmpDir()
+    dirs.push(configDir)
+    const globalToml = join(configDir, 'hip.toml')
+    writeFileSync(
+      globalToml,
+      `version = 1\n\n[[mcp_servers]]\nid = "global-srv"\nname = "Global"\ntransport = "http"\nenabled = true\nurl = "https://global.test"\n`,
+    )
+    process.env.HIP_CONFIG_PATH = globalToml
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+    const projectConfigDir = join(cwdDir, '.hip')
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(
+      join(projectConfigDir, 'hip.toml'),
+      `version = 1\n\n[[mcp_servers]]\nid = "project-srv"\nname = "Project"\ntransport = "stdio"\nenabled = true\ncommand = "npx"\n`,
+    )
+
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+
+    // Project array replaces global array
+    expect(mgr.mcpConfigs).toHaveLength(1)
+    expect(mgr.mcpConfigs[0]).toMatchObject({
+      id: 'project-srv',
+      name: 'Project',
+      transport: 'stdio',
+    })
+  })
+
+  it('setCwd() reloads MCP configs from new project-level hip.toml', () => {
+    const configDir = tmpDir()
+    dirs.push(configDir)
+    const globalToml = join(configDir, 'hip.toml')
+    writeFileSync(globalToml, `version = 1\n`)
+    process.env.HIP_CONFIG_PATH = globalToml
+
+    const cwdDir = tmpDir()
+    dirs.push(cwdDir)
+
+    const mgr = makeManager(cwdDir)
+    mgr.loadPluginComponents()
+    expect(mgr.mcpConfigs).toHaveLength(0)
+
+    const newCwdDir = tmpDir()
+    dirs.push(newCwdDir)
+    const projectConfigDir = join(newCwdDir, '.hip')
+    mkdirSync(projectConfigDir, { recursive: true })
+    writeFileSync(
+      join(projectConfigDir, 'hip.toml'),
+      `version = 1\n\n[[mcp_servers]]\nid = "new-srv"\nname = "New"\ntransport = "http"\nenabled = true\nurl = "https://new.test"\n`,
+    )
+
+    mgr.setCwd(newCwdDir)
+
+    expect(mgr.mcpConfigs).toHaveLength(1)
+    expect(mgr.mcpConfigs[0]).toMatchObject({ id: 'new-srv', name: 'New' })
   })
 })

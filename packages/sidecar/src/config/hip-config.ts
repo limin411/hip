@@ -7,11 +7,7 @@ import type {
   AgentConfig,
   ProviderEntry,
   SkillEntry,
-  McpServersConfig,
-  AgentsConfig,
-  ProvidersConfig,
-  SkillsConfig,
-  ProviderConfigEntry,
+  ActiveModel,
 } from '@hip/protocol'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -30,9 +26,28 @@ function normalizeProviderEntry(raw: Record<string, unknown>): ProviderEntry {
   if (raw.api_key !== undefined && raw.apiKey === undefined) {
     raw.apiKey = raw.api_key
   }
+  if (raw.enabled === undefined) {
+    raw.enabled = true
+  }
   delete raw.base_url
   delete raw.api_key
   return raw as unknown as ProviderEntry
+}
+
+function normalizeActiveModel(raw: Record<string, unknown>): ActiveModel {
+  if (raw.provider_id !== undefined && raw.providerID === undefined) {
+    raw.providerID = raw.provider_id
+  }
+  if (raw.model_id !== undefined && raw.modelID === undefined) {
+    raw.modelID = raw.model_id
+  }
+  if (raw.base_url !== undefined && raw.baseURL === undefined) {
+    raw.baseURL = raw.base_url
+  }
+  delete raw.provider_id
+  delete raw.model_id
+  delete raw.base_url
+  return raw as unknown as ActiveModel
 }
 
 function normalizeMcpServerEntry(raw: Record<string, unknown>): McpServerConfig {
@@ -100,6 +115,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.providers = (providers as Record<string, unknown>[]).map(normalizeProviderEntry)
   }
 
+  const activeModel = obj.activeModel ?? obj.active_model
+  if (activeModel && typeof activeModel === 'object') {
+    config.activeModel = normalizeActiveModel(activeModel as Record<string, unknown>)
+  }
+
   const mcpServers = obj.mcpServers ?? obj.mcp_servers
   if (Array.isArray(mcpServers)) {
     config.mcpServers = (mcpServers as Record<string, unknown>[]).map(normalizeMcpServerEntry)
@@ -157,6 +177,9 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   if (project.providers !== undefined) {
     merged.providers = project.providers
   }
+  if (project.activeModel !== undefined) {
+    merged.activeModel = project.activeModel
+  }
   if (project.mcpServers !== undefined) {
     merged.mcpServers = project.mcpServers
   }
@@ -170,92 +193,13 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   return merged
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Legacy JSON readers (inlined to avoid circular dependencies with
-// session/agents/registry). Used as fallback when no hip.toml exists.
-// ──────────────────────────────────────────────────────────────────
-
-function readLegacyMcpServers(): McpServerConfig[] {
-  const file = process.env.HIP_MCP_SERVERS_PATH?.trim()
-  if (!file) return []
-  try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as McpServersConfig
-    return Array.isArray(cfg?.servers) ? cfg.servers : []
-  } catch {
-    return []
-  }
-}
-
-function readLegacyAgents(): AgentConfig[] {
-  const file = process.env.HIP_AGENTS_PATH?.trim()
-  if (!file) return []
-  try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as AgentsConfig
-    return Array.isArray(cfg?.agents) ? cfg.agents : []
-  } catch {
-    return []
-  }
-}
-
-function readLegacyProviders(): ProviderEntry[] {
-  const file = process.env.HIP_PROVIDERS_PATH?.trim()
-  if (!file) return []
-  try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as ProvidersConfig
-    const providers = cfg?.providers
-    if (!providers || typeof providers !== 'object') return []
-    return Object.entries(providers).map(([id, entry]) => {
-      const pe = entry as ProviderConfigEntry
-      return {
-        id,
-        name: pe.custom?.name ?? id,
-        baseUrl: pe.baseURL ?? '',
-        enabled: pe.enabled,
-      } as ProviderEntry & { enabled?: boolean }
-    })
-  } catch {
-    return []
-  }
-}
-
-function readLegacySkills(): SkillEntry[] {
-  const file = process.env.HIP_SKILLS_PATH?.trim()
-  if (!file) return []
-  try {
-    const cfg = JSON.parse(readFileSync(file, 'utf8')) as SkillsConfig
-    const enabled = cfg?.enabled
-    if (!enabled || typeof enabled !== 'object') return []
-    return Object.entries(enabled).map(([id, on]) => ({
-      id,
-      enabled: !!on,
-    }))
-  } catch {
-    return []
-  }
-}
-
-/**
- * Build a HipConfig from legacy per-domain JSON files when no hip.toml exists.
- * This is a **read-only fallback** — the old JSON files are never modified.
- */
-function buildLegacyConfig(): HipConfig {
-  return {
-    version: 1,
-    mcpServers: readLegacyMcpServers(),
-    agents: readLegacyAgents(),
-    providers: readLegacyProviders(),
-    skills: readLegacySkills(),
-  }
-}
-
 /**
  * Resolve the effective HipConfig for a given project directory by merging
  * the global hip.toml (`HIP_CONFIG_PATH`) with a project-level hip.toml
  * (`.hip/hip.toml` relative to `cwd`).
  *
- * **Merge priority:** project-level values override global values. When neither
- * a global nor a project hip.toml exists, the function falls back to reading
- * legacy per-domain JSON config files (mcp-servers, agents, providers, skills).
+ * **Merge priority:** project-level values override global values. MCP servers
+ * are read exclusively from hip.toml.
  *
  * This function **never throws** — it always returns at least `{ version: 1 }`.
  *
@@ -265,16 +209,8 @@ export function resolveEffectiveConfig(cwd: string): HipConfig {
   const globalFile = process.env.HIP_CONFIG_PATH?.trim()
   const projectFile = join(cwd, '.hip', 'hip.toml')
 
-  const hasGlobalToml = !!(globalFile && existsSync(globalFile))
-  const hasProjectToml = existsSync(projectFile)
-
-  // No TOML files at all → fall back to legacy JSON readers
-  if (!hasGlobalToml && !hasProjectToml) {
-    return buildLegacyConfig()
-  }
-
-  const global = hasGlobalToml ? readHipConfig(globalFile) : { ...DEFAULT_CONFIG }
-  const project = hasProjectToml ? readHipConfig(projectFile) : { ...DEFAULT_CONFIG }
+  const global = globalFile && existsSync(globalFile) ? readHipConfig(globalFile) : { ...DEFAULT_CONFIG }
+  const project = existsSync(projectFile) ? readHipConfig(projectFile) : { ...DEFAULT_CONFIG }
 
   return deepMergeConfig(global, project)
 }

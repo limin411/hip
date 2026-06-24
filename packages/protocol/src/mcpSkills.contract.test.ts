@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import type {
   McpTransport,
   McpServerConfig,
-  McpServersConfig,
   SkillMeta,
   SkillsConfig,
   ClientMessage,
@@ -49,10 +48,6 @@ describe('protocol: MCP server types', () => {
     expect(round.enabled).toBe(false)
   })
 
-  it('wraps servers in McpServersConfig', () => {
-    const cfg: McpServersConfig = { servers: [] }
-    expect(cfg.servers).toEqual([])
-  })
 })
 
 describe('protocol: Skill types', () => {

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
+import { nanoid } from 'nanoid'
 import type { McpServerConfig, PluginMeta } from '@hip/protocol'
-import { useMcpServersStore } from '@/store/mcpServersStore'
+import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { useMcpStatuses, type McpServerStatusVM } from '@/domain'
 import { cn } from '@/lib/utils'
@@ -114,11 +115,25 @@ export function derivePluginMcpServers(
 
 export function McpConfig() {
   const { t } = useTranslation()
-  const { servers, loaded, load, addServer, updateServer, removeServer } = useMcpServersStore()
+  const servers = useMcpServers()
+  const { loaded, load, updateSection } = useHipConfigStore()
   const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
   const mcpStatuses = useMcpStatuses()
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<McpServerConfig | null>(null)
+
+  const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
+    const next = [...servers, { ...s, id: nanoid() }]
+    await updateSection('mcpServers', next)
+  }
+  const updateServer = async (id: string, patch: Partial<McpServerConfig>) => {
+    const next = servers.map((s) => (s.id === id ? { ...s, ...patch } : s))
+    await updateSection('mcpServers', next)
+  }
+  const removeServer = async (id: string) => {
+    const next = servers.filter((s) => s.id !== id)
+    await updateSection('mcpServers', next)
+  }
 
   useEffect(() => {
     if (!loaded) void load()

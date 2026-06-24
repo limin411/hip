@@ -19,12 +19,6 @@ function writeToml(dir: string, name: string, content: string): string {
   return p
 }
 
-function writeJson(dir: string, name: string, obj: unknown): string {
-  const p = join(dir, name)
-  writeFileSync(p, JSON.stringify(obj))
-  return p
-}
-
 function setupProjectDir(): { root: string; hipDir: string } {
   const root = tmpDir()
   const hipDir = join(root, '.hip')
@@ -34,10 +28,6 @@ function setupProjectDir(): { root: string; hipDir: string } {
 
 function resetEnv() {
   delete process.env.HIP_CONFIG_PATH
-  delete process.env.HIP_MCP_SERVERS_PATH
-  delete process.env.HIP_AGENTS_PATH
-  delete process.env.HIP_PROVIDERS_PATH
-  delete process.env.HIP_SKILLS_PATH
 }
 
 beforeEach(resetEnv)
@@ -144,122 +134,6 @@ enabled = false
     const cfg2 = resolveEffectiveConfig(root)
     expect(cfg2.skills).toHaveLength(1)
     expect(cfg2.skills![0]).toMatchObject({ id: 'v2-skill', enabled: false })
-  })
-})
-
-// ── Wave 1: Legacy JSON fallback ──
-
-describe('legacy JSON fallback', () => {
-  it('reads legacy MCP servers JSON when no TOML exists', () => {
-    const dir = tmpDir()
-    const mcpFile = writeJson(dir, 'hip-mcp-servers.json', {
-      servers: [
-        {
-          id: 'legacy-srv',
-          name: 'Legacy Server',
-          transport: 'stdio',
-          command: 'npx',
-          enabled: true,
-        },
-      ],
-    })
-    process.env.HIP_MCP_SERVERS_PATH = mcpFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.mcpServers).toHaveLength(1)
-    expect(cfg.mcpServers![0]).toMatchObject({ id: 'legacy-srv', name: 'Legacy Server' })
-  })
-
-  it('reads legacy providers JSON when no TOML exists', () => {
-    const dir = tmpDir()
-    const providersFile = writeJson(dir, 'hip-providers.json', {
-      providers: {
-        myprovider: { enabled: true, baseURL: 'https://custom.api/v1' },
-      },
-    })
-    process.env.HIP_PROVIDERS_PATH = providersFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.providers).toHaveLength(1)
-    expect(cfg.providers![0]).toMatchObject({ id: 'myprovider', baseUrl: 'https://custom.api/v1' })
-  })
-
-  it('reads legacy agents JSON when no TOML exists', () => {
-    const dir = tmpDir()
-    const agentsFile = writeJson(dir, 'hip-agents.json', {
-      agents: [
-        {
-          id: 'custom-agent',
-          name: 'Custom Agent',
-          kind: 'custom',
-          command: 'my-tool',
-          args: [],
-          enabled: true,
-        },
-      ],
-    })
-    process.env.HIP_AGENTS_PATH = agentsFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.agents).toHaveLength(1)
-    expect(cfg.agents![0]).toMatchObject({ id: 'custom-agent', name: 'Custom Agent' })
-  })
-
-  it('reads legacy skills JSON when no TOML exists', () => {
-    const dir = tmpDir()
-    const skillsFile = writeJson(dir, 'hip-skills.json', {
-      enabled: { 'skill-1': true, 'skill-2': false },
-    })
-    process.env.HIP_SKILLS_PATH = skillsFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.skills).toHaveLength(2)
-    expect(cfg.skills!.find((s) => s.id === 'skill-1')).toMatchObject({ enabled: true })
-    expect(cfg.skills!.find((s) => s.id === 'skill-2')).toMatchObject({ enabled: false })
-  })
-
-  it('empty JSON {} is treated as no skills', () => {
-    const dir = tmpDir()
-    const skillsFile = writeJson(dir, 'hip-skills.json', {})
-    process.env.HIP_SKILLS_PATH = skillsFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.skills).toEqual([])
-  })
-
-  it('corrupt JSON files are handled gracefully (empty arrays)', () => {
-    const dir = tmpDir()
-    writeFileSync(join(dir, 'hip-mcp-servers.json'), '{ not valid')
-    writeFileSync(join(dir, 'hip-agents.json'), 'garbage')
-    process.env.HIP_MCP_SERVERS_PATH = join(dir, 'hip-mcp-servers.json')
-    process.env.HIP_AGENTS_PATH = join(dir, 'hip-agents.json')
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.mcpServers).toEqual([])
-    expect(cfg.agents).toEqual([])
-  })
-
-  it('global TOML takes priority over legacy JSON when both exist', () => {
-    const dir = tmpDir()
-
-    const legacyMcp = writeJson(dir, 'hip-mcp-servers.json', {
-      servers: [{ id: 'legacy-srv', name: 'Legacy', transport: 'stdio', command: 'cmd', enabled: true }],
-    })
-    process.env.HIP_MCP_SERVERS_PATH = legacyMcp
-
-    const tomlFile = writeToml(dir, 'hip.toml', `version = 1
-[[mcpServers]]
-id = "toml-srv"
-name = "TOML Server"
-transport = "http"
-url = "https://example.com/mcp"
-enabled = true
-`)
-    process.env.HIP_CONFIG_PATH = tomlFile
-
-    const cfg = resolveEffectiveConfig(tmpDir())
-    expect(cfg.mcpServers).toHaveLength(1)
-    expect(cfg.mcpServers![0]).toMatchObject({ id: 'toml-srv' })
   })
 })
 

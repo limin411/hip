@@ -78,7 +78,7 @@ function effectiveMcpServers(agent: AgentConfig): string[] {
 }
 
 export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentInvoker {
-  const readAgents = deps.readAgents ?? readAgentsConfig
+  const readAgents = deps.readAgents ?? (() => readAgentsConfig(cwd))
   const createProvider = deps.createProvider ?? createAgentProvider
   const resolveModel = deps.resolveModel ?? resolveAgentModel
   const runInternal = deps.runInternal ?? ((a: RunInternalArgs) =>

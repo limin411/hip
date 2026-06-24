@@ -48,22 +48,4 @@ describe('skills IPC', () => {
     expect(invoke).toHaveBeenCalledWith('read_skill_file', { id: 'pdf', rel: 'SKILL.md' })
   })
 
-  it('getSkillsConfig parses + returns default on blank/corrupt', async () => {
-    const { getSkillsConfig } = await import('./skills.js')
-    invoke.mockResolvedValueOnce(JSON.stringify({ enabled: { pdf: false } }))
-    expect((await getSkillsConfig()).enabled).toEqual({ pdf: false })
-    invoke.mockResolvedValueOnce('')
-    expect((await getSkillsConfig()).enabled).toEqual({})
-    invoke.mockResolvedValueOnce('{ broken')
-    expect((await getSkillsConfig()).enabled).toEqual({})
-  })
-
-  it('setSkillsConfig stringifies and invokes set_skills_config', async () => {
-    const { setSkillsConfig } = await import('./skills.js')
-    invoke.mockResolvedValueOnce(undefined)
-    await setSkillsConfig({ enabled: { pdf: true } })
-    expect(invoke).toHaveBeenCalledWith('set_skills_config', {
-      json: JSON.stringify({ enabled: { pdf: true } }, null, 2),
-    })
-  })
 })

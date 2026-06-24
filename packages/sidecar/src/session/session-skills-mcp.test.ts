@@ -19,16 +19,12 @@ beforeEach(() => {
   mkdirSync(join(fmt, 'scripts'), { recursive: true })
   writeFileSync(join(fmt, 'SKILL.md'), '---\nname: formatter\ndescription: Format code\n---\nUse scripts/run.sh', 'utf8')
   writeFileSync(join(fmt, 'scripts', 'run.sh'), 'echo formatted', 'utf8')
-  // empty MCP config so mcpManager.reconcile([]) is a clean no-op
-  const mcpPath = join(root, 'mcp.json')
-  writeFileSync(mcpPath, JSON.stringify({ servers: [] }), 'utf8')
-  // empty skills enabled map → all enabled by default
-  const skillsCfg = join(root, 'skills.json')
-  writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
+  // empty unified config so mcpManager.reconcile([]) is a clean no-op
+  // (no skills section → all skills enabled by default)
+  const configPath = join(root, 'hip.toml')
+  writeFileSync(configPath, 'version = 1\n', 'utf8')
+  setEnv('HIP_CONFIG_PATH', configPath)
   setEnv('HIP_SKILLS_DIR', skillsDir)
-  setEnv('HIP_SKILLS_PATH', skillsCfg)
-  setEnv('HIP_MCP_SERVERS_PATH', mcpPath)
-  setEnv('HIP_AGENTS_PATH', '') // no external/internal agents in this test
 })
 afterEach(() => {
   for (const [k, v] of Object.entries(prevEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v }

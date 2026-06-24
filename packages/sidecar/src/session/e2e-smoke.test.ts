@@ -11,6 +11,7 @@ import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { mcpManager } from './mcp/manager.js'
 import { skillsBlock } from './system-prompt.js'
 import { readEnabledSkills } from './skills/registry.js'
+import { writeHipToml } from './__testutils__/config-helpers.js'
 
 // ── Fake model that yields final text (no tool calls) ──
 
@@ -74,9 +75,6 @@ function writeSkillDir(
 
 function resetEnv() {
   delete process.env.HIP_SKILLS_DIR
-  delete process.env.HIP_SKILLS_PATH
-  delete process.env.HIP_MCP_SERVERS_PATH
-  delete process.env.HIP_AGENTS_PATH
   delete process.env.HIP_CONFIG_PATH
 }
 
@@ -196,10 +194,8 @@ describe('E2E smoke: multi-level skills', () => {
     writeSkillDir(projectSkillsDir, 'formatter', 'Project Formatter', 'Format code for this project')
     writeSkillDir(projectSkillsDir, 'deployer', 'Project Deployer', 'Deploy this project')
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = globalDir
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     // The session.loadPluginComponents() calls readEnabledSkills(cwd)
     const skills = readEnabledSkills(cwd)
@@ -222,10 +218,8 @@ describe('E2E smoke: multi-level skills', () => {
     writeSkillDir(globalDir, 'auto', 'Auto Skill', 'Auto invoked')
     writeSkillDir(globalDir, 'manual', 'Manual Skill', 'Manual only', { autoInvoke: false })
 
-    const skillsCfg = join(base, 'skills.json')
-    writeFileSync(skillsCfg, JSON.stringify({ enabled: {} }), 'utf8')
     process.env.HIP_SKILLS_DIR = globalDir
-    process.env.HIP_SKILLS_PATH = skillsCfg
+    process.env.HIP_CONFIG_PATH = writeHipToml(base, {})
 
     const skills2 = readEnabledSkills()
     expect(skills2.length).toBe(2)

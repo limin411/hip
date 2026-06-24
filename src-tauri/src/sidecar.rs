@@ -152,7 +152,7 @@ fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
     let mut ids = vec!["deepseek".to_string()];
     if let Some(path) = crate::paths::hip_config_path(app) {
         if let Ok(body) = std::fs::read_to_string(&path) {
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Ok(v) = toml::from_str::<toml::Value>(&body) {
                 if let Some(arr) = v.get("providers").and_then(|p| p.as_array()) {
                     for entry in arr {
                         if let Some(id) = entry.get("id").and_then(|i| i.as_str()) {

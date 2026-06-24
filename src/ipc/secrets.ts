@@ -6,6 +6,10 @@ export function isProviderKeyConfigured(providerID: string): Promise<boolean> {
   return invoke<boolean>('has_secret', { key: providerKeyEnv(providerID) })
 }
 
+export function areProviderKeysConfigured(ids: string[]): Promise<Record<string, boolean>> {
+  return invoke<Record<string, boolean>>('has_secrets', { keys: ids })
+}
+
 export function saveProviderKey(providerID: string, value: string): Promise<void> {
   return invoke<void>('set_secret', { key: providerKeyEnv(providerID), value })
 }

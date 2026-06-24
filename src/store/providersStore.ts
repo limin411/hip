@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import type { ActiveModel, ProviderEntry, ProvidersConfig } from '@hip/protocol'
 import { fetchCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
 import { useHipConfigStore } from '@/store/hipConfigStore'
-import { isProviderKeyConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
+import { areProviderKeysConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
 
 /** Coordinates the models.dev catalog, the hip.toml provider config, and per-provider API
@@ -104,7 +104,8 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     })
     const catalog = mergeCustom(catalogRaw, config)
     const ids = Object.keys(catalog).filter((id) => isCompatible(catalog[id]))
-    const flags = await Promise.all(ids.map((id) => isProviderKeyConfigured(id).then((c) => [id, c] as const)))
+    const configured = await areProviderKeysConfigured(ids)
+    const flags = ids.map((id) => [id, !!configured[id]] as const)
     set({ catalog, config, keyConfigured: Object.fromEntries(flags), loaded: true })
   },
 

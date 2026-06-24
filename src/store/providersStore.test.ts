@@ -23,7 +23,7 @@ vi.mock('@/ipc/catalog', () => ({
 }))
 
 vi.mock('@/ipc/secrets', () => ({
-  isProviderKeyConfigured: vi.fn().mockResolvedValue(false),
+  areProviderKeysConfigured: vi.fn().mockResolvedValue({}),
   saveProviderKey: vi.fn().mockResolvedValue(undefined),
   clearProviderKey: vi.fn().mockResolvedValue(undefined),
   restartSidecar: vi.fn().mockResolvedValue(undefined),

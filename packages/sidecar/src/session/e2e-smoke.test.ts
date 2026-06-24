@@ -173,6 +173,11 @@ describe('E2E smoke: full turn flow', () => {
     expect(mcpStatuses[0].servers).toEqual([
       { id: 'mcp1', name: 'Test MCP', status: 'connected', toolCount: 3, toolNames: ['a', 'b', 'c'] },
     ])
+
+    // Verify mcp:status is sent after agent:started (i.e. after buildSessionTooling/reconcile)
+    const mcpStatusIdx = events.findIndex(e => e.type === 'mcp:status')
+    const agentStartedIdx = events.findIndex(e => e.type === 'agent:started')
+    expect(mcpStatusIdx).toBeGreaterThan(agentStartedIdx)
   })
 })
 

@@ -56,16 +56,16 @@ export class SessionManager {
         await this.destroySession(msg.sessionId)
         break
       case 'message:send':
-        await this.ensureSession(msg.sessionId).sendMessage(msg.content, send, msg.id)
+        await this.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id)
         break
       case 'input:enqueue': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         s.enqueueInput({ type: 'message', content: msg.content, messageId: msg.id })
         await s.drainInputQueue(send)
         break
       }
       case 'input:steer': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         s.enqueueInput({ type: 'steer', content: msg.content, messageId: msg.id })
         await s.drainInputQueue(send)
         break
@@ -74,28 +74,28 @@ export class SessionManager {
         this.sessions.get(msg.sessionId)?.cancel()
         break
       case 'message:regenerate':
-        await this.ensureSession(msg.sessionId).regenerate(send)
+        await this.ensureSession(msg.sessionId, send).regenerate(send)
         break
       case 'message:resume':
-        await this.ensureSession(msg.sessionId).resume(msg.content, send)
+        await this.ensureSession(msg.sessionId, send).resume(msg.content, send)
         break
       case 'subagent:background': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const ac = new AbortController()
         void s.runBackgroundSubagent(msg.taskId, msg.description, ac.signal, send)
         break
       }
       case 'subagent:resume':
-        await this.ensureSession(msg.sessionId).resumeSubagent(msg.taskId, msg.message, send)
+        await this.ensureSession(msg.sessionId, send).resumeSubagent(msg.taskId, msg.message, send)
         break
       case 'plan:respond':
-        await this.ensureSession(msg.sessionId).handlePlanResponse(msg.action, send, msg.amendContent)
+        await this.ensureSession(msg.sessionId, send).handlePlanResponse(msg.action, send, msg.amendContent)
         break
       case 'agent:setConfigOption':
-        await this.ensureSession(msg.sessionId).setAgentConfigOption(msg.configId, msg.value)
+        await this.ensureSession(msg.sessionId, send).setAgentConfigOption(msg.configId, msg.value)
         break
       case 'agent:setProfile': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const ok = s.setAgentProfile(msg.id)
         if (ok) {
           send({ type: 'agent:profiles', sessionId: msg.sessionId, profiles: this.profileListFor(s) })
@@ -139,7 +139,7 @@ export class SessionManager {
         break
       }
       case 'session:setCwd': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         s.setCwd(msg.cwd)
         this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
         // Re-anchor the "since session start" snapshot to the newly-bound cwd so session-start
@@ -149,7 +149,7 @@ export class SessionManager {
         break
       }
       case 'session:setThinking': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const applied = s.setThinking(msg.thinking)
         if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
         // Echo the session's REAL thinking state (true by default) so the client syncs to truth
@@ -158,14 +158,14 @@ export class SessionManager {
         break
       }
       case 'session:setSystemPrompt': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const applied = s.setSystemPrompt(msg.systemPrompt)
         if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
         send({ type: 'session:systemPrompt', sessionId: msg.sessionId, systemPrompt: s.config.systemPrompt ?? null })
         break
       }
       case 'session:setPermissionMode': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const applied = s.setPermissionMode(msg.permissionMode)
         if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
         // Echo the session's REAL mode (default 'edit') so the client syncs to truth even if the set
@@ -177,7 +177,7 @@ export class SessionManager {
         // Change the global active model AND clear the session's pinned model so
         // resolveModelChoice falls back to the newly-set global default.
         setActiveModel({ providerID: msg.llmProvider, modelID: msg.model, baseURL: msg.baseURL ?? '' })
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const applied = s.setModel(msg.llmProvider)
         if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
         // Also apply to other sessions — they follow the global model if unpinned.
@@ -200,12 +200,12 @@ export class SessionManager {
         break
       }
       case 'fs:ls': {
-        const r = await this.ensureSession(msg.sessionId).lsDir(msg.path)
+        const r = await this.ensureSession(msg.sessionId, send).lsDir(msg.path)
         send({ type: 'fs:ls:result', sessionId: msg.sessionId, path: msg.path, entries: r.entries ?? [], error: r.error })
         break
       }
       case 'fs:read': {
-        const r = await this.ensureSession(msg.sessionId).readForPreview(msg.path)
+        const r = await this.ensureSession(msg.sessionId, send).readForPreview(msg.path)
         send(
           'error' in r
             ? { type: 'fs:read:result', sessionId: msg.sessionId, path: msg.path, error: r.error }
@@ -228,57 +228,57 @@ export class SessionManager {
         break
       }
       case 'fs:diff': {
-        const r = await this.ensureSession(msg.sessionId).workspaceDiff(msg.base ?? 'session-start')
+        const r = await this.ensureSession(msg.sessionId, send).workspaceDiff(msg.base ?? 'session-start')
         send({ type: 'fs:diff:result', sessionId: msg.sessionId, ...r })
         break
       }
       case 'fs:diffSummary': {
-        const r = await this.ensureSession(msg.sessionId).workspaceDiffSummary(msg.base ?? 'session-start')
+        const r = await this.ensureSession(msg.sessionId, send).workspaceDiffSummary(msg.base ?? 'session-start')
         send({ type: 'fs:diffSummary:result', sessionId: msg.sessionId, ...r })
         break
       }
       case 'fs:diffFile': {
-        const r = await this.ensureSession(msg.sessionId).workspaceDiffFile(msg.path, msg.base ?? 'session-start', msg.context)
+        const r = await this.ensureSession(msg.sessionId, send).workspaceDiffFile(msg.path, msg.base ?? 'session-start', msg.context)
         send({ type: 'fs:diffFile:result', sessionId: msg.sessionId, path: msg.path, base: msg.base ?? 'session-start', state: r.state, file: r.file, error: r.error })
         break
       }
       case 'fs:gitInit': {
-        const r = await this.ensureSession(msg.sessionId).workspaceGitInit()
+        const r = await this.ensureSession(msg.sessionId, send).workspaceGitInit()
         send({ type: 'fs:gitInit:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
         break
       }
       case 'git:checkpoint:list': {
-        const r = await this.ensureSession(msg.sessionId).listCheckpoints()
+        const r = await this.ensureSession(msg.sessionId, send).listCheckpoints()
         send({ type: 'git:checkpoint:list:result', sessionId: msg.sessionId, checkpoints: r.checkpoints, isGitRepo: r.isGitRepo, currentBranch: r.currentBranch })
         break
       }
       case 'git:checkpoint:diff': {
-        const r = await this.ensureSession(msg.sessionId).checkpointDiff(msg.checkpointId, msg.mode)
+        const r = await this.ensureSession(msg.sessionId, send).checkpointDiff(msg.checkpointId, msg.mode)
         send({ type: 'git:checkpoint:diff:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, mode: msg.mode, state: r.state, files: r.files, summary: r.summary, error: r.error })
         break
       }
       case 'git:commitLog': {
-        const r = await this.ensureSession(msg.sessionId).commitLog()
+        const r = await this.ensureSession(msg.sessionId, send).commitLog()
         send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
         break
       }
       case 'git:branch:list': {
-        const r = await this.ensureSession(msg.sessionId).listBranches()
+        const r = await this.ensureSession(msg.sessionId, send).listBranches()
         send({ type: 'git:branch:list:result', sessionId: msg.sessionId, branches: r.branches, currentBranch: r.currentBranch })
         break
       }
       case 'git:branch:switch': {
-        const r = await this.ensureSession(msg.sessionId).switchBranch(msg.branch)
+        const r = await this.ensureSession(msg.sessionId, send).switchBranch(msg.branch)
         send({ type: 'git:branch:switch:result', sessionId: msg.sessionId, branch: msg.branch, ok: r.ok, currentBranch: r.currentBranch, ...(r.error ? { error: r.error } : {}) })
         break
       }
       case 'git:revert': {
-        const r = await this.ensureSession(msg.sessionId).revertCheckpoint(msg.checkpointId, send)
+        const r = await this.ensureSession(msg.sessionId, send).revertCheckpoint(msg.checkpointId, send)
         send({ type: 'git:revert:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, ok: r.ok, ...(r.safetyCheckpointId ? { safetyCheckpointId: r.safetyCheckpointId } : {}), ...(r.error ? { error: r.error } : {}) })
         break
       }
       case 'git:worktree:create': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const cwd = s.config.cwd
         if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
         const worktreePath = path.join(getWorktreesDir(), msg.branch)
@@ -287,7 +287,7 @@ export class SessionManager {
         break
       }
       case 'git:worktree:list': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const cwd = s.config.cwd
         if (!cwd) { send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: [] }); break }
         const r = await workspaceGit.listWorktrees(cwd)
@@ -295,7 +295,7 @@ export class SessionManager {
         break
       }
       case 'git:worktree:remove': {
-        const s = this.ensureSession(msg.sessionId)
+        const s = this.ensureSession(msg.sessionId, send)
         const cwd = s.config.cwd
         if (!cwd) { send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
         const r = await workspaceGit.removeWorktree(cwd, msg.worktreePath)
@@ -303,7 +303,7 @@ export class SessionManager {
         break
       }
       case 'workflow:run':
-        await this.ensureSession(msg.sessionId).runWorkflowTurn(msg.def, send)
+        await this.ensureSession(msg.sessionId, send).runWorkflowTurn(msg.def, send)
         break
       case 'mcp:listResources': {
         const resources = mcpManager.allResources().filter((r) => r.serverId === msg.serverId)
@@ -353,7 +353,7 @@ export class SessionManager {
   }
 
   /** Get the in-memory session, or rebuild it from the DB (lazy resume). */
-  private ensureSession(id: string): Session {
+  private ensureSession(id: string, send: SendFn): Session {
     const existing = this.sessions.get(id)
     if (existing) return existing
     const row = this.store?.getSession(id)
@@ -361,6 +361,13 @@ export class SessionManager {
     const session = new Session(id, config, this.modelFactory(config), this.store)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)
+    // Send immediate MCP status for this session's configured servers.
+    // Connections may not be established yet (reconcile runs on first turn),
+    // but connectionStatuses reports honest disconnected/error states.
+    const mcpConfigs = session.configMgr.mcpConfigs
+    if (mcpConfigs.length > 0) {
+      send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(mcpConfigs) })
+    }
     return session
   }
 

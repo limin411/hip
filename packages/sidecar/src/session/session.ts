@@ -826,7 +826,6 @@ export class Session {
       system = prepared.system
       contextMessages = prepared.contextMessages
       logDebug('session', 'phase:contextDone', { sessionId: this.id, elapsedMs: Date.now() - t0, contextMsgCount: prepared.contextMessages.length })
-      send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(this.configMgr.mcpConfigs) })
       tooling = await buildSessionTooling({
         cwd,
         sessionId: this.id,
@@ -853,6 +852,8 @@ export class Session {
         },
       })
       logDebug('session', 'phase:toolingDone', { sessionId: this.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
+      // After reconcile: status reflects actual connection state
+      send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(this.configMgr.mcpConfigs) })
     }
 
     const maxSteps = this.activeActivity?.stepsRemaining ?? MAX_STEPS

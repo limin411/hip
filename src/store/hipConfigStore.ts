@@ -14,7 +14,10 @@ interface HipConfigStore {
   error: string | null
   load: () => Promise<void>
   save: (config: HipConfig) => Promise<void>
-  updateSection: <K extends keyof HipConfig>(section: K, value: HipConfig[K]) => Promise<void>
+  updateSection: <K extends keyof HipConfig>(
+    section: K,
+    valueOrUpdater: HipConfig[K] | ((prev: HipConfig[K]) => HipConfig[K]),
+  ) => Promise<void>
 }
 
 /**
@@ -40,16 +43,36 @@ export const useHipConfigStore = create<HipConfigStore>((set, get) => ({
     }
   },
 
-  save: async (config) => {
-    await setHipConfig(config)
-    set({ config, error: null })
-  },
+	  save: async (config) => {
+	    try {
+	      await setHipConfig(config)
+	      set({ config, error: null })
+	    } catch (e) {
+	      const msg = e instanceof Error ? e.message : 'Failed to save config'
+	      set({ error: msg })
+	      throw e
+	    }
+	  },
 
-  updateSection: async (section, value) => {
-    const next = { ...get().config, [section]: value }
-    await setHipConfig(next)
-    set({ config: next, error: null })
-  },
+	  updateSection: async <K extends keyof HipConfig>(
+	    section: K,
+	    valueOrUpdater: HipConfig[K] | ((prev: HipConfig[K]) => HipConfig[K]),
+	  ) => {
+	    try {
+	      const prev = get().config[section]
+	      const value =
+	        typeof valueOrUpdater === 'function'
+	          ? (valueOrUpdater as (prev: HipConfig[K]) => HipConfig[K])(prev as HipConfig[K] & NonNullable<HipConfig[K]>)
+	          : valueOrUpdater
+	      const next = { ...get().config, [section]: value }
+	      await setHipConfig(next)
+	      set({ config: next, error: null })
+	    } catch (e) {
+	      const msg = e instanceof Error ? e.message : `Failed to update ${String(section)}`
+	      set({ error: msg })
+	      throw e
+	    }
+	  },
 }))
 
 // ── Selectors ──────────────────────────────────────────────────

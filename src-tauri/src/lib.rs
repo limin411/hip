@@ -706,8 +706,14 @@ fn get_secret(app: tauri::AppHandle, key: String) -> Result<Option<String>, Stri
 }
 
 #[tauri::command]
-fn has_secret(app: tauri::AppHandle, key: String) -> Result<bool, String> {
-    Ok(get_secret(app, key)?.is_some())
+fn has_secrets(app: tauri::AppHandle, keys: Vec<String>) -> Result<HashMap<String, bool>, String> {
+    let auth_map = auth::auth_get_all(&auth_path(&app)?);
+    let mut result = HashMap::new();
+    for key in &keys {
+        let env_key = sidecar::provider_key_env(key);
+        result.insert(key.clone(), auth_map.contains_key(&env_key));
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -965,9 +971,8 @@ fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<Str
     std::fs::read_to_string(&target).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
-    let cache = paths::cache_dir(&app).map(|d| d.join("models.json"));
+async fn fetch_catalog(app: &tauri::AppHandle) -> Result<String, String> {
+    let cache = paths::cache_dir(app).map(|d| d.join("models.json"));
     if let Some(ref c) = cache {
         if let Ok(meta) = std::fs::metadata(c) {
             if let Ok(modified) = meta.modified() {
@@ -984,7 +989,9 @@ async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
         Ok(resp) => match resp.text().await {
             Ok(body) => {
                 if let Some(ref c) = cache {
-                    let _ = std::fs::write(c, &body);
+                    let tmp = c.with_extension("tmp");
+                    std::fs::write(&tmp, &body).map_err(|e| e.to_string())?;
+                    std::fs::rename(&tmp, c).map_err(|e| e.to_string())?;
                 }
                 Ok(body)
             }
@@ -992,6 +999,11 @@ async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
         },
         Err(_) => fallback_catalog(cache.as_deref()),
     }
+}
+
+#[tauri::command]
+async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
+    fetch_catalog(&app).await
 }
 
 fn fallback_catalog(cache: Option<&std::path::Path>) -> Result<String, String> {
@@ -1027,6 +1039,10 @@ pub fn run() {
                     Err(e) => eprintln!("[tauri] sidecar failed: {e}"),
                 }
             });
+            let handle2 = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = fetch_catalog(&handle2).await;
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1034,7 +1050,7 @@ pub fn run() {
             restart_sidecar,
             set_secret,
             get_secret,
-            has_secret,
+            has_secrets,
             delete_secret,
             models_catalog,
             get_hip_config,

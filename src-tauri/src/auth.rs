@@ -51,6 +51,12 @@ fn write_auth_map(path: &Path, map: &Map<String, Value>) -> io::Result<()> {
     result
 }
 
+/// Read the entire auth map (single file read). Used by batch lookups like
+/// `has_secrets` to avoid N sequential file reads per call.
+pub fn auth_get_all(path: &Path) -> Map<String, Value> {
+    read_auth_map(path)
+}
+
 /// Get one secret by key (key == the `HIP_MODEL_<ID>_API_KEY` env-var name).
 pub fn auth_get(path: &Path, key: &str) -> Option<String> {
     read_auth_map(path)

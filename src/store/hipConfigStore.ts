@@ -58,17 +58,23 @@ export const useHipConfigStore = create<HipConfigStore>((set, get) => ({
 	    section: K,
 	    valueOrUpdater: HipConfig[K] | ((prev: HipConfig[K]) => HipConfig[K]),
 	  ) => {
-	    try {
-	      const prev = get().config[section]
+	    // Atomically derive and write Zustand state — no async gap between read and write.
+	    // setHipConfig is a best-effort side effect that runs AFTER the atomic update.
+	    set((state) => {
+	      const prev = state.config[section]
+	      // TypeScript can't narrow generic indexed-access types through typeof;
+	      // all callers use ?? [] guard.
 	      const value =
 	        typeof valueOrUpdater === 'function'
 	          ? (valueOrUpdater as (prev: HipConfig[K]) => HipConfig[K])(prev as HipConfig[K] & NonNullable<HipConfig[K]>)
 	          : valueOrUpdater
-	      const next = { ...get().config, [section]: value }
-	      await setHipConfig(next)
-	      set({ config: next, error: null })
+	      return { config: { ...state.config, [section]: value }, error: null }
+	    })
+	    // Best-effort TOML persist after the atomic Zustand update
+	    try {
+	      await setHipConfig(get().config)
 	    } catch (e) {
-	      const msg = e instanceof Error ? e.message : `Failed to update ${String(section)}`
+	      const msg = e instanceof Error ? e.message : `Failed to persist ${String(section)}`
 	      set({ error: msg })
 	      throw e
 	    }

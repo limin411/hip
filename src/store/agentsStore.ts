@@ -17,7 +17,7 @@ interface AgentsStore {
  * This store is kept as a thin wrapper during the JSON→TOML migration
  * so existing UI components continue to work without immediate rewrites.
  */
-export const useAgentsStore = create<AgentsStore>((set, get) => ({
+export const useAgentsStore = create<AgentsStore>((set) => ({
   agents: [],
   loaded: false,
   load: async () => {
@@ -28,19 +28,19 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
 	    const id = nanoid()
 	    const entry = { ...a, id }
 	    await useHipConfigStore.getState().updateSection('agents', (prev) => [...(prev ?? []), entry])
-	    set({ agents: [...get().agents, entry] })
+	    set((state) => ({ agents: [...state.agents, entry] }))
 	    return id
 	  },
 	  updateAgent: async (id, patch) => {
 	    await useHipConfigStore.getState().updateSection('agents', (prev) =>
 	      (prev ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
 	    )
-	    set({ agents: get().agents.map((x) => (x.id === id ? { ...x, ...patch } : x)) })
+	    set((state) => ({ agents: state.agents.map((x) => (x.id === id ? { ...x, ...patch } : x)) }))
 	  },
 	  removeAgent: async (id) => {
 	    await useHipConfigStore.getState().updateSection('agents', (prev) =>
 	      (prev ?? []).filter((x) => x.id !== id),
 	    )
-	    set({ agents: get().agents.filter((x) => x.id !== id) })
+	    set((state) => ({ agents: state.agents.filter((x) => x.id !== id) }))
 	  },
 }))

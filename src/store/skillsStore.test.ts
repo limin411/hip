@@ -52,7 +52,11 @@ describe('skillsStore', () => {
     useSkillsStore.setState({ skills: [META], enabled: {}, loaded: true })
     await useSkillsStore.getState().toggle('pdf', false)
     expect(useSkillsStore.getState().enabled.pdf).toBe(false)
-    expect(hipConfigState.updateSection).toHaveBeenCalledWith('skills', [{ id: 'pdf', enabled: false }])
+    expect(hipConfigState.updateSection).toHaveBeenCalledWith('skills', expect.any(Function))
+    // Verify the updater function's behavior
+    const fn = hipConfigState.updateSection.mock.calls[0][1] as (prev: unknown[]) => unknown[]
+    const result = fn([])
+    expect(result).toEqual([{ id: 'pdf', enabled: false }])
   })
 
   it('install(zip) installs then reloads the list', async () => {
@@ -72,6 +76,10 @@ describe('skillsStore', () => {
     expect(deleteSkill).toHaveBeenCalledWith('pdf')
     expect(useSkillsStore.getState().skills).toHaveLength(0)
     expect(useSkillsStore.getState().enabled.pdf).toBeUndefined()
-    expect(hipConfigState.updateSection).toHaveBeenCalledWith('skills', [])
+    expect(hipConfigState.updateSection).toHaveBeenCalledWith('skills', expect.any(Function))
+    // Verify the updater function's behavior
+    const fn = hipConfigState.updateSection.mock.calls[0][1] as (prev: unknown[]) => unknown[]
+    const result = fn([{ id: 'pdf', enabled: true }])
+    expect(result).toEqual([])
   })
 })

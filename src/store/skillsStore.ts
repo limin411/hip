@@ -25,10 +25,6 @@ function entriesToEnabled(entries: SkillEntry[] | undefined): Record<string, boo
   return map
 }
 
-function enabledToEntries(enabled: Record<string, boolean>): SkillEntry[] {
-  return Object.entries(enabled).map(([id, on]) => ({ id, enabled: on }))
-}
-
 export const useSkillsStore = create<SkillsStore>((set, get) => ({
   skills: [],
   enabled: {},
@@ -39,7 +35,10 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
   },
   toggle: async (id, on) => {
     const enabled = { ...get().enabled, [id]: on }
-    await useHipConfigStore.getState().updateSection('skills', enabledToEntries(enabled))
+    await useHipConfigStore.getState().updateSection('skills', (prev) => [
+      ...(prev ?? []).filter((e) => e.id !== id),
+      { id, enabled: on },
+    ])
     set({ enabled })
   },
   install: async (zipPath) => {
@@ -51,7 +50,9 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
     await deleteSkill(id)
     const enabled = { ...get().enabled }
     delete enabled[id]
-    await useHipConfigStore.getState().updateSection('skills', enabledToEntries(enabled))
+    await useHipConfigStore.getState().updateSection('skills', (prev) =>
+      (prev ?? []).filter((e) => e.id !== id),
+    )
     set({ skills: get().skills.filter((s) => s.id !== id), enabled })
   },
 }))

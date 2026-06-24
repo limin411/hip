@@ -91,6 +91,72 @@ describe('hipConfigStore', () => {
     expect(useHipConfigStore.getState().config.mcpServers).toEqual(newMcp)
   })
 
+  it('updateSection() TOCTOU race: concurrent calls overwrite each other', async () => {
+    const { useHipConfigStore } = await import('./hipConfigStore.js')
+    useHipConfigStore.setState({
+      config: { version: 1, agents: [] },
+    })
+
+    // Widen the race window by making setHipConfig slow
+    setHipConfig.mockImplementation(() => new Promise(r => setTimeout(r, 10)))
+
+    const p1 = useHipConfigStore.getState().updateSection('agents', (prev) => [
+      ...(prev ?? []),
+      { id: 'a1', name: 'Alpha', kind: 'custom', command: 'echo', args: [], enabled: true },
+    ])
+    const p2 = useHipConfigStore.getState().updateSection('agents', (prev) => [
+      ...(prev ?? []),
+      { id: 'a2', name: 'Beta', kind: 'custom', command: 'echo', args: [], enabled: true },
+    ])
+    await Promise.all([p1, p2])
+
+    // The LAST setHipConfig call should contain BOTH agents
+    const calls = setHipConfig.mock.calls
+    const lastCallArg = calls[calls.length - 1][0] as { agents: unknown[] }
+    expect(lastCallArg.agents).toHaveLength(2)
+  })
+
+  it('updateSection() functional updater merges with existing state', async () => {
+    const { useHipConfigStore } = await import('./hipConfigStore.js')
+    // Seed with an existing mcpServer
+    useHipConfigStore.setState({
+      config: {
+        version: 1,
+        mcpServers: [
+          { id: 'old', name: 'Old', transport: 'stdio' as McpTransport, command: 'cmd', enabled: true },
+        ],
+      },
+    })
+
+    await useHipConfigStore.getState().updateSection('mcpServers', (prev) => [
+      ...(prev ?? []),
+      { id: 'new', name: 'New', transport: 'http' as McpTransport, url: 'https://t', enabled: true },
+    ])
+
+    const lastCallArg = setHipConfig.mock.calls[setHipConfig.mock.calls.length - 1][0] as {
+      mcpServers: unknown[]
+    }
+    expect(lastCallArg.mcpServers).toHaveLength(2)
+    expect(useHipConfigStore.getState().config.mcpServers).toHaveLength(2)
+  })
+
+  it('updateSection() functional updater handles undefined prev gracefully', async () => {
+    const { useHipConfigStore } = await import('./hipConfigStore.js')
+    // No seed — skills is absent from config
+    useHipConfigStore.setState({ config: { version: 1 } })
+
+    await useHipConfigStore.getState().updateSection('skills', (prev) => [
+      ...(prev ?? []),
+      { id: 's1', enabled: true },
+    ])
+
+    expect(useHipConfigStore.getState().config.skills).toHaveLength(1)
+    expect(useHipConfigStore.getState().config.skills?.[0]).toMatchObject({
+      id: 's1',
+      enabled: true,
+    })
+  })
+
   it('selectors extract correct sections', async () => {
     getHipConfig.mockResolvedValueOnce({
       version: 1,

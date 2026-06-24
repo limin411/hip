@@ -35,10 +35,13 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
   },
   toggle: async (id, on) => {
     const enabled = { ...get().enabled, [id]: on }
-    await useHipConfigStore.getState().updateSection('skills', (prev) => [
-      ...(prev ?? []).filter((e) => e.id !== id),
-      { id, enabled: on },
-    ])
+    await useHipConfigStore.getState().updateSection('skills', (prev) => {
+      const list = prev ?? []
+      // Update in place to keep ordering stable (avoids churny TOML diffs); append if new.
+      return list.some((e) => e.id === id)
+        ? list.map((e) => (e.id === id ? { ...e, enabled: on } : e))
+        : [...list, { id, enabled: on }]
+    })
     set({ enabled })
   },
   install: async (zipPath) => {

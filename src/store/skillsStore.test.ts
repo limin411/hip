@@ -59,6 +59,24 @@ describe('skillsStore', () => {
     expect(result).toEqual([{ id: 'pdf', enabled: false }])
   })
 
+  it('toggle(id, on) updates an existing entry in place without reordering', async () => {
+    const { useSkillsStore } = await import('./skillsStore.js')
+    await useSkillsStore.getState().toggle('b', false)
+    const fn = hipConfigState.updateSection.mock.calls[0][1] as (
+      prev: { id: string; enabled: boolean }[],
+    ) => { id: string; enabled: boolean }[]
+    const result = fn([
+      { id: 'a', enabled: true },
+      { id: 'b', enabled: true },
+      { id: 'c', enabled: true },
+    ])
+    expect(result).toEqual([
+      { id: 'a', enabled: true },
+      { id: 'b', enabled: false },
+      { id: 'c', enabled: true },
+    ])
+  })
+
   it('install(zip) installs then reloads the list', async () => {
     installSkillZip.mockResolvedValueOnce('pdf')
     listSkills.mockResolvedValueOnce([META])

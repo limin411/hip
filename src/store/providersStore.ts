@@ -54,7 +54,7 @@ function isCustomProvider(id: string, catalog: Catalog): boolean {
 }
 
 /** Convert hip.toml ProviderEntry[] into the UI-friendly ProvidersConfig shape. */
-function providerEntriesToConfig(entries: ProviderEntry[] | undefined, catalog: Catalog): ProvidersConfig {
+export function providerEntriesToConfig(entries: ProviderEntry[] | undefined, catalog: Catalog): ProvidersConfig {
   const providers: ProvidersConfig['providers'] = {}
   for (const e of entries ?? []) {
     const entry: ProvidersConfig['providers'][string] = {
@@ -70,7 +70,7 @@ function providerEntriesToConfig(entries: ProviderEntry[] | undefined, catalog: 
 }
 
 /** Convert the UI-friendly ProvidersConfig into hip.toml ProviderEntry[]. */
-function configToProviderEntries(config: ProvidersConfig, catalog: Catalog): ProviderEntry[] {
+export function configToProviderEntries(config: ProvidersConfig, catalog: Catalog): ProviderEntry[] {
   return Object.entries(config.providers).map(([id, entry]) => ({
     id,
     name: entry.custom?.name ?? catalog[id]?.name ?? id,
@@ -80,7 +80,7 @@ function configToProviderEntries(config: ProvidersConfig, catalog: Catalog): Pro
 }
 
 /** Build the full ActiveModel (with resolved baseURL) from the store's ProvidersConfig shape. */
-function resolveActiveModel(config: ProvidersConfig, catalog: Catalog): ActiveModel | undefined {
+export function resolveActiveModel(config: ProvidersConfig, catalog: Catalog): ActiveModel | undefined {
   const sel = config.activeModel
   if (!sel) return undefined
   const baseURL = resolveBaseURL(catalog[sel.providerID], config, sel.providerID)
@@ -203,14 +203,12 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   },
 }))
 
-/** Write the ProvidersConfig-shaped state back to hip.toml as ProviderEntry[] + activeModel. */
+/** Write the ProvidersConfig-shaped state back to hip.toml as ProviderEntry[] + activeModel.
+ *  Uses the atomic multi-section update so a concurrent edit to another section (agents,
+ *  skills, mcpServers) is not clobbered by a stale-snapshot whole-config write. */
 async function persistProvidersConfig(config: ProvidersConfig, catalog: Catalog): Promise<void> {
-  const hipConfig = useHipConfigStore.getState().config
-  const activeModel = resolveActiveModel(config, catalog)
-  const next: typeof hipConfig = {
-    ...hipConfig,
+  await useHipConfigStore.getState().updateSections({
     providers: configToProviderEntries(config, catalog),
-    activeModel,
-  }
-  await useHipConfigStore.getState().save(next)
+    activeModel: resolveActiveModel(config, catalog),
+  })
 }

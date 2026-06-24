@@ -116,6 +116,33 @@ describe('hipConfigStore', () => {
     expect(lastCallArg.agents).toHaveLength(2)
   })
 
+  it('updateSections() merges a multi-section patch into the latest state without clobbering a concurrent updateSection', async () => {
+    const { useHipConfigStore } = await import('./hipConfigStore.js')
+    useHipConfigStore.setState({ config: { version: 1, agents: [], providers: [] } })
+
+    // Widen the race window so the concurrent section write lands during the persist await.
+    setHipConfig.mockImplementation(() => new Promise((r) => setTimeout(r, 10)))
+
+    // A multi-section write (providers + activeModel), exactly what providersStore persists.
+    const pA = useHipConfigStore.getState().updateSections({
+      providers: [
+        { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', enabled: true },
+      ],
+      activeModel: { providerID: 'deepseek', modelID: 'deepseek-reasoner', baseURL: 'https://api.deepseek.com/v1' },
+    })
+    // A concurrent single-section write to a DIFFERENT section must survive.
+    const pB = useHipConfigStore.getState().updateSection('agents', (prev) => [
+      ...(prev ?? []),
+      { id: 'a1', name: 'Alpha', kind: 'custom', command: 'echo', args: [], enabled: true },
+    ])
+    await Promise.all([pA, pB])
+
+    const cfg = useHipConfigStore.getState().config
+    expect(cfg.providers).toHaveLength(1)
+    expect(cfg.activeModel?.providerID).toBe('deepseek')
+    expect(cfg.agents).toHaveLength(1) // not clobbered by the multi-section write
+  })
+
   it('updateSection() functional updater merges with existing state', async () => {
     const { useHipConfigStore } = await import('./hipConfigStore.js')
     // Seed with an existing mcpServer

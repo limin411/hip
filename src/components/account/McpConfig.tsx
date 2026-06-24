@@ -122,18 +122,17 @@ export function McpConfig() {
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<McpServerConfig | null>(null)
 
-  const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
-    const next = [...servers, { ...s, id: nanoid() }]
-    await updateSection('mcpServers', next)
-  }
-  const updateServer = async (id: string, patch: Partial<McpServerConfig>) => {
-    const next = servers.map((s) => (s.id === id ? { ...s, ...patch } : s))
-    await updateSection('mcpServers', next)
-  }
-  const removeServer = async (id: string) => {
-    const next = servers.filter((s) => s.id !== id)
-    await updateSection('mcpServers', next)
-  }
+	  const addServer = async (s: Omit<McpServerConfig, 'id'>) => {
+	    await updateSection('mcpServers', (prev) => [...(prev ?? []), { ...s, id: nanoid() }])
+	  }
+	  const updateServer = async (id: string, patch: Partial<McpServerConfig>) => {
+	    await updateSection('mcpServers', (prev) =>
+	      (prev ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)),
+	    )
+	  }
+	  const removeServer = async (id: string) => {
+	    await updateSection('mcpServers', (prev) => (prev ?? []).filter((s) => s.id !== id))
+	  }
 
   useEffect(() => {
     if (!loaded) void load()

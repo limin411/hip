@@ -48,6 +48,14 @@ describe('sidecar provider config', () => {
     expect(getActiveModel()).toEqual({ providerID: 'openai', modelID: 'gpt-4o', baseURL: 'https://api.openai.com/v1' })
   })
 
+  it('falls back to the provider base URL when the active model baseURL is empty', () => {
+    // A stored/edited activeModel with an empty baseURL must not ship '' to the SDK
+    // (which would default to api.openai.com); resolve from the providers list instead.
+    process.env.HIP_CONFIG_PATH = writeToml({ acme: true }, { providerID: 'acme', modelID: 'm', baseURL: '' })
+    loadActiveModelFromEnv()
+    expect(getActiveModel()).toEqual({ providerID: 'acme', modelID: 'm', baseURL: 'https://acme.test/v1' })
+  })
+
   it('setActiveModel/getActiveModel round-trip', () => {
     setActiveModel({ providerID: 'groq', modelID: 'llama-3.3-70b', baseURL: 'https://api.groq.com/openai/v1' })
     expect(getActiveModel().providerID).toBe('groq')

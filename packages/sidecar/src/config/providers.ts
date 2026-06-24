@@ -49,7 +49,10 @@ export function loadActiveModelFromEnv(): void {
   const cfg = readHipConfig()
   const sel = cfg.activeModel
   if (sel) {
-    active = { providerID: sel.providerID, modelID: sel.modelID, baseURL: sel.baseURL }
+    // Treat an empty/missing stored baseURL as unset and re-resolve it (provider override
+    // → deepseek/anthropic default) so we never hand the SDK '' (which defaults to OpenAI).
+    const baseURL = sel.baseURL || resolveProviderBaseURL(sel.providerID)
+    active = { providerID: sel.providerID, modelID: sel.modelID, baseURL }
     return
   }
   active = DEEPSEEK_DEFAULT

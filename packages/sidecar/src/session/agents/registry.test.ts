@@ -50,9 +50,9 @@ describe('readAgentsConfig', () => {
 
 describe('resolveAgentModel', () => {
   it('returns null when the agent has no bound model', () => {
-    expect(resolveAgentModel(baseAgent)).toBeNull()
+    expect(resolveAgentModel(baseAgent, tmpDir())).toBeNull()
   })
-  it('resolves baseURL (hip.toml) + apiKey (env) for the bound model', () => {
+  it('resolves baseURL (global hip.toml) + apiKey (env) for the bound model', () => {
     const dir = tmpDir()
     const cfg = writeToml(dir, 'hip.toml', `version = 1
 [[providers]]
@@ -64,6 +64,22 @@ enabled = true
     process.env.HIP_CONFIG_PATH = cfg
     process.env.HIP_MODEL_ACME_API_KEY = 'sk-acme'
     const agent: AgentConfig = { ...baseAgent, boundModel: { providerID: 'acme', modelID: 'acme-large' } }
-    expect(resolveAgentModel(agent)).toEqual({ providerID: 'acme', modelID: 'acme-large', baseURL: 'https://acme.test/v1', apiKey: 'sk-acme' })
+    // cwd has no project .hip/hip.toml → effective config is the global file.
+    expect(resolveAgentModel(agent, tmpDir())).toEqual({ providerID: 'acme', modelID: 'acme-large', baseURL: 'https://acme.test/v1', apiKey: 'sk-acme' })
+  })
+  it('prefers a project-level provider baseURL override (consistent with the agent list)', () => {
+    // Only a project-level .hip/hip.toml exists (no global) — its provider override must win.
+    const projectDir = tmpDir()
+    const hipDir = join(projectDir, '.hip')
+    mkdirSync(hipDir, { recursive: true })
+    writeToml(hipDir, 'hip.toml', `version = 1
+[[providers]]
+id = "acme"
+name = "Acme"
+baseUrl = "https://acme.project/v1"
+enabled = true
+`)
+    const agent: AgentConfig = { ...baseAgent, boundModel: { providerID: 'acme', modelID: 'acme-large' } }
+    expect(resolveAgentModel(agent, projectDir).baseURL).toBe('https://acme.project/v1')
   })
 })

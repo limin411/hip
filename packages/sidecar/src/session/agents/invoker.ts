@@ -55,7 +55,7 @@ export interface RunInternalArgs {
 export interface InvokerDeps {
   readAgents?: () => AgentConfig[]
   createProvider?: (agent: AgentConfig, cwd: string, model: ResolvedModel | null) => AgentProvider
-  resolveModel?: (agent: AgentConfig) => ResolvedModel | null
+  resolveModel?: (agent: AgentConfig, cwd: string) => ResolvedModel | null
   runInternal?: (args: RunInternalArgs) => Promise<string>
 }
 
@@ -104,7 +104,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         const narrowedSkills = extras?.skills?.filter((s) => allowedSkills.includes(s.id))
         const narrowedMcp = extras?.mcpTools?.filter((t) => serverIds.some((id) => t.name.startsWith(`mcp__${id}__`)))
         return runInternal({
-          agentId, resolved: resolveModel(agent), cwd, prompt: agent.prompt ?? '',
+          agentId, resolved: resolveModel(agent, cwd), cwd, prompt: agent.prompt ?? '',
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,
           requestApproval: extras?.requestApproval, permissionMode: extras?.permissionMode,

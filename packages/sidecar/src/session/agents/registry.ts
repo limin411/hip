@@ -11,8 +11,13 @@ export function readAgentsConfig(cwd: string): AgentConfig[] {
 }
 
 /** Resolve an agent's bound model to a concrete {providerID, modelID, baseURL, apiKey}, or null. */
-export function resolveAgentModel(agent: AgentConfig): ResolvedModel | null {
+export function resolveAgentModel(agent: AgentConfig, cwd: string): ResolvedModel | null {
   if (!agent.boundModel) return null
   const { providerID, modelID } = agent.boundModel
-  return { providerID, modelID, baseURL: resolveProviderBaseURL(providerID), apiKey: resolveApiKey(providerID) }
+  // Resolve baseURL from the effective config (global + project) so a project-level provider
+  // override applies — consistent with how readAgentsConfig() reads the agent list. Fall back
+  // to the global default resolver when the provider has no entry.
+  const override = resolveEffectiveConfig(cwd).providers?.find((p) => p.id === providerID)?.baseUrl
+  const baseURL = override || resolveProviderBaseURL(providerID)
+  return { providerID, modelID, baseURL, apiKey: resolveApiKey(providerID) }
 }

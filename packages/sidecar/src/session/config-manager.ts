@@ -55,9 +55,10 @@ export class ConfigManager {
       return
     }
     this.hookRegistry.clear()
-    try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd) } catch { this.cachedSkills = [] }
     const cwd = this.getConfig().cwd ?? process.cwd()
-    this.cachedMcpConfigs = resolveEffectiveConfig(cwd).mcpServers ?? []
+    const cfg = resolveEffectiveConfig(cwd)
+    try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd, cfg) } catch { this.cachedSkills = [] }
+    this.cachedMcpConfigs = cfg.mcpServers ?? []
     const pluginAgents: AgentConfig[] = []
     try {
       for (const pluginDir of readPluginsConfig().plugins) {

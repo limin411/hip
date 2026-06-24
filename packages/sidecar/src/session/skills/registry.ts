@@ -1,14 +1,14 @@
 // packages/sidecar/src/session/skills/registry.ts
 import { readdirSync, existsSync, statSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
-import type { SkillMeta } from '@hip/protocol'
+import type { SkillMeta, HipConfig } from '@hip/protocol'
 import { resolveEffectiveConfig } from '../../config/hip-config.js'
 import { parseFrontmatter } from './frontmatter.js'
 
 /** Build the enabled/disabled map from hip.toml (global + project). Missing/corrupt → {} (everything enabled). */
-function readEnabledMap(cwd: string): Record<string, boolean> {
+function readEnabledMap(cwd: string, effectiveConfig?: HipConfig): Record<string, boolean> {
   try {
-    const entries = resolveEffectiveConfig(cwd).skills ?? []
+    const entries = (effectiveConfig ?? resolveEffectiveConfig(cwd)).skills ?? []
     const map: Record<string, boolean> = {}
     for (const e of entries) {
       map[e.id] = e.enabled
@@ -159,11 +159,11 @@ function scanSkillDir(root: string, enabled: Record<string, boolean>, scope: 'gl
 /** Scan .hip/skills/ relative to the project root discovered from cwd.
  *  Returns skills with scope set to project. Walks up the directory tree to find the
  *  project root (git root or first .hip/skills/ dir). Never throws. */
-export function readProjectSkills(cwd: string): SkillMeta[] {
+export function readProjectSkills(cwd: string, effectiveConfig?: HipConfig): SkillMeta[] {
   const root = findProjectRoot(cwd)
   const projectSkillsDir = join(root, '.hip', 'skills')
   if (!existsSync(projectSkillsDir)) return []
-  const enabled = readEnabledMap(cwd)
+  const enabled = readEnabledMap(cwd, effectiveConfig)
   const skills = scanSkillDir(projectSkillsDir, enabled, 'project')
   skills.sort((a, b) => a.id.localeCompare(b.id))
   return skills
@@ -190,21 +190,21 @@ export function mergeSkills(global: SkillMeta[], project: SkillMeta[]): SkillMet
  * When cwd is provided, also scans .hip/skills/ relative to the project root and
  * merges project skills over global skills (project overrides global for same id).
  */
-export function readEnabledSkills(cwd?: string): SkillMeta[] {
+export function readEnabledSkills(cwd?: string, effectiveConfig?: HipConfig): SkillMeta[] {
   const root = process.env.HIP_SKILLS_DIR?.trim()
   if (!root || !existsSync(root)) {
     // No global skills dir — try project-only scan
-    if (cwd) return readProjectSkills(cwd)
+    if (cwd) return readProjectSkills(cwd, effectiveConfig)
     return []
   }
 
-  const enabled = readEnabledMap(cwd ?? process.cwd())
+  const enabled = readEnabledMap(cwd ?? process.cwd(), effectiveConfig)
   const global = scanSkillDir(root, enabled, 'global')
   global.sort((a, b) => a.id.localeCompare(b.id))
 
   if (!cwd) return global
 
-  const project = readProjectSkills(cwd)
+  const project = readProjectSkills(cwd, effectiveConfig)
   return mergeSkills(global, project)
 }
 

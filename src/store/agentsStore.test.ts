@@ -28,27 +28,27 @@ describe('agentsStore', () => {
     expect(useAgentsStore.getState().loaded).toBe(true)
   })
 
-  it('addAgent persists and returns an id', async () => {
-    const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'New', kind: 'acp', command: 'mybin', args: [], enabled: true })
-    expect(typeof id).toBe('string')
-    expect(useAgentsStore.getState().agents[0]).toMatchObject({ id, name: 'New' })
-    expect(updateSection).toHaveBeenCalledWith('agents', [expect.objectContaining({ id, name: 'New' })])
-  })
+	  it('addAgent persists and returns an id', async () => {
+	    const { useAgentsStore } = await import('./agentsStore.js')
+	    const id = await useAgentsStore.getState().addAgent({ name: 'New', kind: 'acp', command: 'mybin', args: [], enabled: true })
+	    expect(typeof id).toBe('string')
+	    expect(useAgentsStore.getState().agents[0]).toMatchObject({ id, name: 'New' })
+	    expect(updateSection).toHaveBeenCalledWith('agents', expect.any(Function))
+	  })
 
-  it('updateAgent patches the matching agent', async () => {
-    const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
-    await useAgentsStore.getState().updateAgent(id, { enabled: false })
-    expect(useAgentsStore.getState().agents.find((a) => a.id === id)!.enabled).toBe(false)
-    expect(updateSection).toHaveBeenLastCalledWith('agents', [expect.objectContaining({ id, enabled: false })])
-  })
+	  it('updateAgent patches the matching agent', async () => {
+	    const { useAgentsStore } = await import('./agentsStore.js')
+	    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
+	    await useAgentsStore.getState().updateAgent(id, { enabled: false })
+	    expect(useAgentsStore.getState().agents.find((a) => a.id === id)!.enabled).toBe(false)
+	    expect(updateSection).toHaveBeenLastCalledWith('agents', expect.any(Function))
+	  })
 
-  it('removeAgent drops it', async () => {
-    const { useAgentsStore } = await import('./agentsStore.js')
-    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
-    await useAgentsStore.getState().removeAgent(id)
-    expect(useAgentsStore.getState().agents).toHaveLength(0)
-    expect(updateSection).toHaveBeenLastCalledWith('agents', [])
-  })
+	  it('removeAgent drops it', async () => {
+	    const { useAgentsStore } = await import('./agentsStore.js')
+	    const id = await useAgentsStore.getState().addAgent({ name: 'X', kind: 'acp', command: 'b', args: [], enabled: true })
+	    await useAgentsStore.getState().removeAgent(id)
+	    expect(useAgentsStore.getState().agents).toHaveLength(0)
+	    expect(updateSection).toHaveBeenLastCalledWith('agents', expect.any(Function))
+	  })
 })

@@ -24,21 +24,23 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
     await useHipConfigStore.getState().load()
     set({ agents: useAgents(), loaded: true })
   },
-  addAgent: async (a) => {
-    const id = nanoid()
-    const next = [...get().agents, { ...a, id }]
-    await useHipConfigStore.getState().updateSection('agents', next)
-    set({ agents: next })
-    return id
-  },
-  updateAgent: async (id, patch) => {
-    const next = get().agents.map((x) => (x.id === id ? { ...x, ...patch } : x))
-    await useHipConfigStore.getState().updateSection('agents', next)
-    set({ agents: next })
-  },
-  removeAgent: async (id) => {
-    const next = get().agents.filter((x) => x.id !== id)
-    await useHipConfigStore.getState().updateSection('agents', next)
-    set({ agents: next })
-  },
+	  addAgent: async (a) => {
+	    const id = nanoid()
+	    const entry = { ...a, id }
+	    await useHipConfigStore.getState().updateSection('agents', (prev) => [...(prev ?? []), entry])
+	    set({ agents: [...get().agents, entry] })
+	    return id
+	  },
+	  updateAgent: async (id, patch) => {
+	    await useHipConfigStore.getState().updateSection('agents', (prev) =>
+	      (prev ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
+	    )
+	    set({ agents: get().agents.map((x) => (x.id === id ? { ...x, ...patch } : x)) })
+	  },
+	  removeAgent: async (id) => {
+	    await useHipConfigStore.getState().updateSection('agents', (prev) =>
+	      (prev ?? []).filter((x) => x.id !== id),
+	    )
+	    set({ agents: get().agents.filter((x) => x.id !== id) })
+	  },
 }))

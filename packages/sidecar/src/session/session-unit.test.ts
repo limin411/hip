@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ChatGenerationChunk } from '@langchain/core/outputs'
-import { Session, resolveModel } from './session.js'
+import { Session, resolveModel, tryAutoResolvePermission } from './session.js'
 import { setActiveModel, DEEPSEEK_DEFAULT } from '../config/providers.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 
@@ -329,5 +329,41 @@ describe('Session plan orchestration', () => {
     expect(plans.length).toBe(2)
     expect((plans[1] as Ev).plan).toEqual([{ content: 'revised draft', status: 'pending' }])
     expect(sent.filter((m) => m.type === 'agent:interrupt').length).toBe(2)
+  })
+})
+
+describe('Session chat mode ACP auto-allow', () => {
+  const opts = [
+    { optionId: 'allow_once', name: 'Allow', kind: 'allow_once' },
+    { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
+  ]
+
+  it('auto-resolves read permission in chat mode', () => {
+    const result = tryAutoResolvePermission('chat', 'read', opts)
+    expect(result).not.toBeNull()
+    expect(result).toEqual({ optionId: 'allow_once' })
+  })
+
+  it('auto-resolves fetch permission in chat mode', () => {
+    const result = tryAutoResolvePermission('chat', 'fetch', opts)
+    expect(result).not.toBeNull()
+    expect(result).toEqual({ optionId: 'allow_once' })
+  })
+
+  it('still prompts for execute permission in chat mode', () => {
+    const result = tryAutoResolvePermission('chat', 'execute', opts)
+    expect(result).toBeNull()
+  })
+
+  it('still prompts for write permission in chat mode', () => {
+    const result = tryAutoResolvePermission('chat', 'write', opts)
+    expect(result).toBeNull()
+  })
+
+  it('still prompts in edit mode regardless of kind', () => {
+    expect(tryAutoResolvePermission('edit', 'read', opts)).toBeNull()
+    expect(tryAutoResolvePermission('edit', 'fetch', opts)).toBeNull()
+    expect(tryAutoResolvePermission('edit', 'execute', opts)).toBeNull()
+    expect(tryAutoResolvePermission('edit', 'write', opts)).toBeNull()
   })
 })

@@ -24,7 +24,7 @@ import { Activity, ActivityTracker } from './activity.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
-import type { ExternalAgentHooks } from './agents/types.js'
+import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
@@ -95,6 +95,33 @@ function buildModel(config: SessionConfig, profileBinding?: { providerID: string
 }
 
 const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
+
+/** Permission kinds that are considered safe (non-destructive) and auto-resolve
+ *  in chat mode without emitting a `permission:request` to the user. */
+export const SAFE_KINDS = new Set(['read', 'fetch', 'other'])
+
+/**
+ * In chat mode, auto-resolve safe permission requests without user prompting.
+ * Returns a {@link PermissionChoice} if the request should be auto-resolved, or
+ * `null` if it should go through the normal HITL prompt flow.
+ *
+ * Auto-resolve rules:
+ * - Only in chat mode; other modes always return `null`.
+ * - Only for kinds in {@link SAFE_KINDS} (`read`/`fetch`/`other`).
+ * - Resolves to the first `allow_*` option, or the first option overall, or `{ cancelled: true }` if no options exist.
+ */
+export function tryAutoResolvePermission(
+  mode: PermissionMode,
+  kind: string,
+  options: Array<{ optionId: string; kind: string }>,
+): PermissionChoice | null {
+  if (mode !== 'chat') return null
+  if (!SAFE_KINDS.has(kind)) return null
+  const allowOpt = options.find((o) => o.kind.startsWith('allow'))
+  if (allowOpt) return { optionId: allowOpt.optionId }
+  if (options.length > 0) return { optionId: options[0].optionId }
+  return { cancelled: true }
+}
 
 export class Session {
   private app!: ReturnType<typeof buildGraph>
@@ -756,7 +783,11 @@ export class Session {
       const childId = `subagent-${++subagentSeq}`
       ensureStarted(childId, 'subagent', 'supervisor', task)
       const hooks: ExternalAgentHooks = {
-        requestPermission: (req) => new Promise((resolve) => { this.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: this.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options, agentFrame: { agentId: childId, parentAgentId: 'supervisor', name: cfg.name } }) }),
+        requestPermission: (req) => {
+          const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
+          if (auto) return Promise.resolve(auto)
+          return new Promise((resolve) => { this.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: this.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options, agentFrame: { agentId: childId, parentAgentId: 'supervisor', name: cfg.name } }) })
+        },
         configOptions: () => {},
       }
       try {
@@ -831,7 +862,11 @@ export class Session {
       if (this.agentProv.isExternalAgent()) {
         const userText = lastUserText(base?.messages ?? this.messages)
         const hooks: ExternalAgentHooks = {
-          requestPermission: (req) => new Promise((resolve) => { this.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: this.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options }) }),
+          requestPermission: (req) => {
+            const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
+            if (auto) return Promise.resolve(auto)
+            return new Promise((resolve) => { this.permissions.pendingPermissions.set(req.requestId, resolve); send({ type: 'permission:request', sessionId: this.id, turnId, requestId: req.requestId, tool: req.tool, options: req.options }) })
+          },
           configOptions: (options) => send({ type: 'agent:configOptions', sessionId: this.id, options }),
         }
         await this.agentProv.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal, hooks)

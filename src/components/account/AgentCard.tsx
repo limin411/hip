@@ -3,6 +3,7 @@ import { Bot, Lock, Cpu, Terminal, Pencil, Trash2, MoreVertical } from 'lucide-r
 import type { AgentConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { agentCategory } from '@/lib/agentCategory'
+import { agentCommandLine } from '@/lib/agentCommandLine'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
@@ -50,7 +51,7 @@ export function AgentCard({
   const { t } = useTranslation()
   const cat = agentCategory(agent)
   const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : t('settings.agents.badgeInternal')
-  const cmdline = [agent.command, ...agent.args].join(' ')
+  const cmdline = agentCommandLine(agent)
 
   if (viewMode === 'grid') {
     return (

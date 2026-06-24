@@ -99,19 +99,10 @@ describe('defaultToolPolicy', () => {
   describe('mcp tools', () => {
     const policy = makePolicy(SELF_GATED_TOOLS)
 
-    it('classifies mcp__server__tool as medium risk, approval ask in edit mode', () => {
-      const c = policy.classify('mcp__github__search_repos', 'edit')
-      expect(c).toEqual({ risk: 'medium', approval: 'ask' })
-    })
-
-    it('classifies mcp__server__tool as medium risk, approval auto_allow in chat mode', () => {
-      const c = policy.classify('mcp__github__search_repos', 'chat')
-      expect(c).toEqual({ risk: 'medium', approval: 'auto_allow' })
-    })
-
-    it('classifies mcp__another__get_data as medium risk, approval auto_allow in full mode', () => {
-      const c = policy.classify('mcp__another__get_data', 'full')
-      expect(c).toEqual({ risk: 'medium', approval: 'auto_allow' })
+    it('classifies mcp__server__tool as medium risk, approval auto_allow in all modes', () => {
+      expect(policy.classify('mcp__github__search_repos', 'edit')).toEqual({ risk: 'medium', approval: 'auto_allow' })
+      expect(policy.classify('mcp__github__search_repos', 'chat')).toEqual({ risk: 'medium', approval: 'auto_allow' })
+      expect(policy.classify('mcp__github__search_repos', 'full')).toEqual({ risk: 'medium', approval: 'auto_allow' })
     })
   })
 
@@ -168,42 +159,28 @@ describe('defaultToolPolicy', () => {
       expect(full.risk).toBe('high')
     })
 
-    it('classifies mcp__test as medium risk, approval auto_allow in chat mode', () => {
+    it('classifies mcp__test as medium risk, approval auto_allow in all modes', () => {
       const policy = makePolicy(SELF_GATED_TOOLS)
-      const result = policy.classify('mcp__test', 'chat')
-      expect(result).toEqual({ risk: 'medium', approval: 'auto_allow' })
+      expect(policy.classify('mcp__test', 'chat')).toEqual({ risk: 'medium', approval: 'auto_allow' })
+      expect(policy.classify('mcp__test', 'edit')).toEqual({ risk: 'medium', approval: 'auto_allow' })
+      expect(policy.classify('mcp__test', 'full')).toEqual({ risk: 'medium', approval: 'auto_allow' })
     })
 
-    it('classifies mcp__test as medium risk, approval ask in edit mode', () => {
+    it('classifies unknown tool as medium risk, approval none in all modes', () => {
       const policy = makePolicy(SELF_GATED_TOOLS)
-      const result = policy.classify('mcp__test', 'edit')
-      expect(result).toEqual({ risk: 'medium', approval: 'ask' })
-    })
-
-    it('classifies unknown tool as medium risk, approval none in chat mode', () => {
-      const policy = makePolicy(SELF_GATED_TOOLS)
-      const result = policy.classify('some_unknown_tool', 'chat')
-      expect(result).toEqual({ risk: 'medium', approval: 'none' })
-    })
-
-    it('classifies unknown tool as medium risk, approval ask in edit mode', () => {
-      const policy = makePolicy(SELF_GATED_TOOLS)
-      const result = policy.classify('some_unknown_tool', 'edit')
-      expect(result).toEqual({ risk: 'medium', approval: 'ask' })
+      expect(policy.classify('some_unknown_tool', 'chat')).toEqual({ risk: 'medium', approval: 'none' })
+      expect(policy.classify('some_unknown_tool', 'edit')).toEqual({ risk: 'medium', approval: 'none' })
+      expect(policy.classify('some_unknown_tool', 'full')).toEqual({ risk: 'medium', approval: 'none' })
     })
   })
 
   describe('unknown tools', () => {
     const policy = makePolicy(SELF_GATED_TOOLS)
 
-    it('classifies unknown tool as medium risk, approval ask in edit mode', () => {
-      const c = policy.classify('some_unknown_tool', 'edit')
-      expect(c).toEqual({ risk: 'medium', approval: 'ask' })
-    })
-
-    it('classifies unknown tool as medium risk, approval none in full mode', () => {
-      const c = policy.classify('some_unknown_tool', 'full')
-      expect(c).toEqual({ risk: 'medium', approval: 'none' })
+    it('classifies unknown tool as medium risk, approval none in all modes', () => {
+      expect(policy.classify('some_unknown_tool', 'edit')).toEqual({ risk: 'medium', approval: 'none' })
+      expect(policy.classify('some_unknown_tool', 'chat')).toEqual({ risk: 'medium', approval: 'none' })
+      expect(policy.classify('some_unknown_tool', 'full')).toEqual({ risk: 'medium', approval: 'none' })
     })
   })
 

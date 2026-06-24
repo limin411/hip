@@ -75,14 +75,16 @@ export function defaultToolPolicy(opts: {
       }
 
       if (toolName.startsWith('mcp__')) {
-        return mode === 'edit' ? MEDIUM_RISK_ASK : { risk: 'medium', approval: 'auto_allow' }
+        // MCP tools don't modify local files — auto-allow in all modes
+        return { risk: 'medium', approval: 'auto_allow' }
       }
 
       if (registeredTools?.has(toolName)) {
         return MEDIUM_RISK_NONE
       }
 
-      return mode === 'edit' ? MEDIUM_RISK_ASK : MEDIUM_RISK_NONE
+      // Unknown tools don't modify local files — auto-allow in all modes
+      return MEDIUM_RISK_NONE
     },
   }
 }

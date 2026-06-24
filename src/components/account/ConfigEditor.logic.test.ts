@@ -92,6 +92,22 @@ describe('configToToml', () => {
     expect(toml).toContain('allowed_mcp_servers = ["abc123"]')
   })
 
+  it('handles agents with omitted args/command (Rust skips empty arrays)', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      agents: [
+        { id: 'a1', name: 'A', kind: 'internal', command: '', args: [], enabled: true },
+        { id: 'a2', name: 'B', kind: 'internal', enabled: true } as any,
+      ],
+    }
+    const toml = configToToml(cfg)
+    expect(toml).toContain('args = []')
+    const result = parseConfigToml(toml)
+    expect('config' in result).toBe(true)
+    if (!('config' in result)) return
+    expect(result.config.agents?.length).toBe(2)
+  })
+
 })
 
 describe('parseConfigToml', () => {

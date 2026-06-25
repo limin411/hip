@@ -8,7 +8,6 @@ import { useAuthStore } from '@/store/authStore'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { HipLogo } from '@/components/login/HipLogo'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -37,11 +36,6 @@ export function MenuRail() {
       // z-50：盖住 SidebarPeek 关闭态因 rail 偏移而残留的缝隙（浮层锚在 chat 容器而非窗口左缘）
       className="relative z-50 flex h-full shrink-0 flex-col items-center border-r border-border bg-surface"
     >
-      {/* 品牌标志（红绿灯已移至全宽标题栏，本栏顶部不再预留偏移） */}
-      <div className="flex w-full flex-col items-center pt-3">
-        <HipLogo variant="minimal" size={26} decorative />
-      </div>
-
       {/* 主导航 */}
       <nav className="mt-3 flex w-full flex-col items-center gap-1">
         <RailButton

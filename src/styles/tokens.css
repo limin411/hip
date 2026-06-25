@@ -11,10 +11,10 @@
   --text-primary: #111111;
   --text-secondary: #666666;
   --text-tertiary: #757575; /* AA 4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
-  /* 品牌强调色：Blue */
-  --accent: #0062ad; /* 品牌填充色（按钮底、激活条、focus ring）—— 本身即 AA 6.3:1，正文/图标也可直接用 */
-  --accent-hover: #00538f;
-  --accent-strong: #005896; /* Blue 作正文/图标时用（AA 7:1，#0062ad 已 6.3:1 也达标，此处略深更锐利） */
+  /* 品牌强调色：Sage Gray */
+  --accent: #6b7c5c; /* 品牌填充色（按钮底、激活条、focus ring）—— 鼠尾草灰，正文/图标可用 */
+  --accent-hover: #5d6d50;
+  --accent-strong: #556647; /* Sage Gray 作正文/图标时用 */
   --accent-subtle: #efefef; /* 中性浅底 —— hover/头像/chip 底（刻意保持中性灰，不带品牌色调） */
   --accent-active: #e2e2e2; /* 中性选中底 —— 比 hover 更深以区分（刻意保持中性灰，不带品牌色调） */
   /* 功能状态色 —— 保留语义 */
@@ -50,10 +50,10 @@
   --text-primary: #f0f0f0;
   --text-secondary: #a0a0a0;
   --text-tertiary: #808080;
-  /* 品牌强调色：更亮的 Blue，保证在暗底上可识别 */
-  --accent: #3b9bff;
-  --accent-hover: #5badff;
-  --accent-strong: #7bc0ff;
+  /* 品牌强调色：更亮的 Sage Gray，保证在暗底上可识别 */
+  --accent: #a8b89a;
+  --accent-hover: #b7c7a9;
+  --accent-strong: #c6d4b8;
   --accent-subtle: #262626; /* 暗色中性 hover/头像/chip 底 */
   --accent-active: #333333; /* 暗色选中底 */
   /* 功能状态色 —— 提升亮度以在暗底保持可读 */

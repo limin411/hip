@@ -14,8 +14,8 @@
       {
         "title": "hip",
         "width": 1800,
-        "height": 1200,
-        "maximized": true,
+        "height": 1100,
+        "maximized": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {

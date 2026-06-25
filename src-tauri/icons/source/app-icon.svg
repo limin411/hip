@@ -2,12 +2,12 @@
   <!--
     hip app-icon master — 'tile' variant (大眼睛 + 怀里捧一条小鱼).
     Mirrors the tile branch of src/components/login/HipLogo.tsx (TileEyes + TileFish).
-    Cream googly eyes + navy pupils + white catchlights on a #0062ad rounded tile (rx 26),
-    coral fish below, blue paws cradling tail / stroking the back. Outside the tile is transparent.
+    Cream googly eyes + navy pupils + white catchlights on a #6b7c5c rounded tile (rx 26),
+    coral fish below, sage gray paws cradling tail / stroking the back. Outside the tile is transparent.
     Regenerate the icon set from this source (accepts an SVG with transparency):
       yarn tauri icon src-tauri/icons/source/app-icon.svg
   -->
-  <rect x="4" y="4" width="112" height="112" rx="26" fill="#0062ad"/>
+  <rect x="4" y="4" width="112" height="112" rx="26" fill="#6b7c5c"/>
   <circle cx="42" cy="58" r="24" fill="#f4ecd8"/>
   <circle cx="78" cy="58" r="24" fill="#f4ecd8"/>
   <circle cx="49" cy="65" r="10.5" fill="#003b68"/>
@@ -19,6 +19,6 @@
   <path d="M40 96 Q60 104 80 96 Q60 100 40 96 Z" fill="#f5c4b3" opacity="0.85"/>
   <circle cx="76" cy="90" r="3.4" fill="#f4ecd8"/>
   <circle cx="77" cy="90.5" r="1.7" fill="#003b68"/>
-  <ellipse cx="38" cy="96" rx="7" ry="5.5" fill="#0062ad"/>
-  <ellipse cx="62" cy="85" rx="7" ry="5.5" fill="#0062ad"/>
+  <ellipse cx="38" cy="96" rx="7" ry="5.5" fill="#6b7c5c"/>
+  <ellipse cx="62" cy="85" rx="7" ry="5.5" fill="#6b7c5c"/>
 </svg>

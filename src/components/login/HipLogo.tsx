@@ -1,11 +1,11 @@
 // hip 品牌标识 —— 大眼睛长出身体的「摸鱼小人」。变体共享眼睛 DNA（cream 眼白 + navy 瞳 + 白高光）：
-//   tile    —— 大眼睛 + 蓝砖 + 怀里捧一条 coral 小鱼（右爪搭鱼背 = 抚摸）；通吃 app 图标 / 内联品牌
+//   tile    —— 大眼睛 + 鼠尾草灰砖 + 怀里捧一条 coral 小鱼（右爪搭鱼背 = 抚摸）；通吃 app 图标 / 内联品牌
 //   minimal —— 纯眼睛、去高光、瞳放大，16px favicon 兜底（public/hip.svg 镜像它）
 //   mono    —— 透明底、单色描边眼 + 实心瞳（currentColor），菜单栏/单色场景
-//   hero    —— 全身吉祥物（抱大鱼）叠在登录蓝渐变上，奶油聚光衬底 + 眨眼/斜瞄/抚摸动画
+//   hero    —— 全身吉祥物（抱大鱼）叠在登录鼠尾草灰渐变上，奶油聚光衬底 + 眨眼/斜瞄/抚摸动画
 //
 // 颜色令牌化说明：
-// - 蓝砖 #0062ad 映射到全局 --accent。
+// - 鼠尾草灰砖 var(--accent) 映射到全局 --accent。
 // - cream / navy / coral 三鱼色是品牌专属色，没有对应全局 token，保留为常量并加注说明。
 
 interface HipLogoProps {
@@ -122,7 +122,7 @@ export function HipLogo({
     : ({ role: 'img', 'aria-label': title } as const)
 
   if (variant === 'hero') {
-    // 全身吉祥物 portrait（160×178）；奶油聚光衬底让蓝身在蓝渐变上脱离。
+    // 全身吉祥物 portrait（160×178）；奶油聚光衬底让鼠尾草灰身在鼠尾草灰渐变上脱离。
     const height = Math.round((size * 178) / 160)
     return (
       <div className={className} style={{ width: size, height }} {...a11y}>

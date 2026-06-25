@@ -57,7 +57,7 @@ export function Modal({
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-white shadow-overlay outline-none animate-menu-in',
+            'fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none animate-menu-in',
             !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
             className,
           )}

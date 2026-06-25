@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/Button'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
@@ -99,7 +100,7 @@ export function ChatPane() {
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-10 px-5 py-6">
+        <div className="mx-auto flex max-w-3xl flex-col gap-8 px-5 py-6">
           {showAgentRestart && (
             <div className="mx-auto my-2 w-fit rounded-full bg-surface-muted px-3 py-1 text-meta text-ink-tertiary">
               {t('chat.agentRestarted')}
@@ -162,20 +163,24 @@ export function ChatPane() {
                       : t('chat.errorGeneric', { message: error.message })}
               </p>
               {error.code === 'NO_API_KEY' ? (
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => setActiveView('settings')}
-                  className="mt-2 rounded-md bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="mt-2"
                 >
                   {t('chat.openSettings')}
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={() => sessionService.regenerate()}
                   data-testid="chat-error-retry"
-                  className="mt-2 rounded-md bg-accent px-3 py-1.5 text-meta font-medium text-white transition-colors hover:bg-accent-hover"
+                  className="mt-2"
                 >
                   {t('chat.retry')}
-                </button>
+                </Button>
               )}
             </div>
           )}

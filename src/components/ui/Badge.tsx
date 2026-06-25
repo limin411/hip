@@ -1,13 +1,37 @@
+import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
-/** Small inline metadata pill — tool counts, status tags ("stopped"), and the like. */
-export function Badge({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {
+const badgeVariants = cva(
+  'inline-flex items-center gap-1 rounded transition active:scale-[0.97]',
+  {
+    variants: {
+      variant: {
+        default: 'bg-surface-muted text-ink-tertiary hover:bg-surface-subtle hover:text-ink-secondary',
+        accent: 'bg-accent/10 text-accent hover:bg-accent/20',
+        success: 'bg-success/10 text-success hover:bg-success/20',
+        warning: 'bg-warning/10 text-warning hover:bg-warning/20',
+        danger: 'bg-danger/10 text-danger hover:bg-danger/20',
+      },
+      size: {
+        sm: 'px-1 py-0 text-meta',
+        default: 'px-1.5 py-0.5 text-caption',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  },
+)
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {}
+
+export function Badge({ className, variant, size, ...props }: BadgeProps) {
   return (
     <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary',
-        className,
-      )}
+      className={cn(badgeVariants({ variant, size }), className)}
       {...props}
     />
   )

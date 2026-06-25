@@ -1,4 +1,5 @@
 import type { AgentConfig } from '@hip/protocol'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { AgentCard } from './AgentCard'
 
 export function AgentListView({
@@ -23,7 +24,7 @@ export function AgentListView({
         <section key={section.title}>
           <h3 className="mb-3 text-body font-medium text-ink">{section.title}</h3>
           {section.agents.length === 0 ? (
-            <EmptyState title={section.emptyTitle} hint={section.emptyHint} />
+            <EmptyState title={section.emptyTitle} description={section.emptyHint} />
           ) : (
             <div className="space-y-2">
               {section.agents.map((agent) => (
@@ -40,15 +41,6 @@ export function AgentListView({
           )}
         </section>
       ))}
-    </div>
-  )
-}
-
-function EmptyState({ title, hint }: { title: string; hint?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-10 text-center">
-      <div className="text-body font-medium text-ink">{title}</div>
-      {hint && <div className="mt-1 max-w-xs text-meta text-ink-secondary">{hint}</div>}
     </div>
   )
 }

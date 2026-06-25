@@ -407,6 +407,7 @@ interface DomainStore {
   connection: Connection
   hasApiKey: boolean
   searchHits: SearchHit[]
+  searching: boolean
   mcpStatuses: McpServerStatusVM[]
   pluginInstall: PluginInstallState | null
 
@@ -420,6 +421,7 @@ interface DomainStore {
   regenerateLastTurn: (sessionId: string) => void
   clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
+  setSearching: (v: boolean) => void
   clearPluginInstall: () => void
 }
 
@@ -430,6 +432,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
   // Optimistic until the sidecar reports via 'ready' — avoids flashing "no key" before connect.
   hasApiKey: true,
   searchHits: [],
+  searching: false,
   mcpStatuses: [],
   pluginInstall: null,
 
@@ -439,7 +442,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
       // A live model switch carries the new active provider's key status — refresh the banner without
       // waiting for a reconnect's `ready`. (Top-level field, so handle here like `ready`, not in the reducer.)
       if (msg.type === 'config:activeModel') return { hasApiKey: msg.hasApiKey }
-      if (msg.type === 'session:search:result') return { searchHits: msg.hits }
+      if (msg.type === 'session:search:result') return { searchHits: msg.hits, searching: false }
       if (msg.type === 'mcp:status') return { mcpStatuses: msg.servers }
       return applyServerMessage(s, msg, Date.now())
     }),
@@ -488,6 +491,8 @@ export const useDomainStore = create<DomainStore>((set) => ({
   clearPermission: (requestId) => set((s) => clearPermission(s, requestId)),
 
   setConnection: (connection) => set({ connection }),
+
+  setSearching: (v) => set({ searching: v }),
 
   clearPluginInstall: () => set({ pluginInstall: null }),
 }))

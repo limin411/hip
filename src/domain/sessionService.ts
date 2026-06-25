@@ -359,6 +359,7 @@ export class SessionService {
   }
 
   search(query: string): void {
+    useDomainStore.getState().setSearching(query.trim().length > 0)
     this.transport.send({ type: 'session:search', query })
   }
 

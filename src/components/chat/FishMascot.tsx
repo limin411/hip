@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
+// 品牌专属色常量：小鱼吉祥物的 coral/navy/cream 色系是品牌识别色，
+// 没有对应全局设计 token，保留原色并加注说明。
+const CREAM = '#f4ecd8' // 眼白
+const NAVY = '#003b68' // 四肢 / 瞳孔
+const CORAL = '#f0997b' // 鱼身
+const CORAL_DEEP = '#d85a30' // 鱼尾 / 嘴
+const CORAL_PALE = '#f5c4b3' // 鱼肚
+
 interface FishMascotProps {
   animClass: string
   className?: string
@@ -115,55 +123,55 @@ export function FishMascot({ animClass, className }: FishMascotProps) {
               {/* tail: pivot (108,118) */}
               <g transform="translate(108,118)">
                 <g className="tail-rot">
-                  <path d="M0 -8 L28 -22 L18 0 L28 22 Z" fill="#d85a30" />
+                  <path d="M0 -8 L28 -22 L18 0 L28 22 Z" fill={CORAL_DEEP} />
                 </g>
               </g>
 
               {/* left leg: pivot (58,140) */}
               <g transform="translate(58,140)">
                 <g className="leg-l-rot">
-                  <line x1={0} y1={0} x2={-7} y2={36} stroke="#003b68" strokeWidth="3.5" strokeLinecap="round" />
-                  <ellipse cx={-7} cy={38} rx={8} ry={5} fill="#003b68" />
+                  <line x1={0} y1={0} x2={-7} y2={36} stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" />
+                  <ellipse cx={-7} cy={38} rx={8} ry={5} fill={NAVY} />
                 </g>
               </g>
 
               {/* right leg: pivot (102,140) */}
               <g transform="translate(102,140)">
                 <g className="leg-r-rot">
-                  <line x1={0} y1={0} x2={7} y2={36} stroke="#003b68" strokeWidth="3.5" strokeLinecap="round" />
-                  <ellipse cx={7} cy={38} rx={8} ry={5} fill="#003b68" />
+                  <line x1={0} y1={0} x2={7} y2={36} stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" />
+                  <ellipse cx={7} cy={38} rx={8} ry={5} fill={NAVY} />
                 </g>
               </g>
 
               {/* left arm: pivot (48,110) */}
               <g transform="translate(48,110)">
                 <g className="arm-l-rot">
-                  <path d="M0 0 Q-26 22 -22 38" stroke="#003b68" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                  <circle cx={-22} cy={40} r={6} fill="#003b68" />
+                  <path d="M0 0 Q-26 22 -22 38" stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                  <circle cx={-22} cy={40} r={6} fill={NAVY} />
                 </g>
               </g>
 
               {/* right arm: pivot (112,110) */}
               <g transform="translate(112,110)">
                 <g className="arm-r-rot">
-                  <path d="M0 0 Q26 22 22 38" stroke="#003b68" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                  <circle cx={22} cy={40} r={6} fill="#003b68" />
+                  <path d="M0 0 Q26 22 22 38" stroke={NAVY} strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                  <circle cx={22} cy={40} r={6} fill={NAVY} />
                 </g>
               </g>
 
               {/* body */}
-              <ellipse cx={80} cy={118} rx={34} ry={30} fill="#f0997b" />
-              <path d="M48 124 Q80 150 112 124 Q80 140 48 124 Z" fill="#f5c4b3" opacity=".85" />
-              <path d="M50 118 L40 112 L46 124 Z" fill="#d85a30" />
+              <ellipse cx={80} cy={118} rx={34} ry={30} fill={CORAL} />
+              <path d="M48 124 Q80 150 112 124 Q80 140 48 124 Z" fill={CORAL_PALE} opacity=".85" />
+              <path d="M50 118 L40 112 L46 124 Z" fill={CORAL_DEEP} />
 
               {/* eyes */}
-              <circle cx={70} cy={115} r={7.5} fill="#f4ecd8" />
-              <circle cx={90} cy={115} r={7.5} fill="#f4ecd8" />
-              <circle cx={71} cy={117} r={3.4} fill="#003b68" />
-              <circle cx={91} cy={117} r={3.4} fill="#003b68" />
+              <circle cx={70} cy={115} r={7.5} fill={CREAM} />
+              <circle cx={90} cy={115} r={7.5} fill={CREAM} />
+              <circle cx={71} cy={117} r={3.4} fill={NAVY} />
+              <circle cx={91} cy={117} r={3.4} fill={NAVY} />
 
               {/* mouth */}
-              <path d="M72 131 q8 6 16 0" stroke="#d85a30" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+              <path d="M72 131 q8 6 16 0" stroke={CORAL_DEEP} strokeWidth="2.4" strokeLinecap="round" fill="none" />
 
             </g>
           </g>

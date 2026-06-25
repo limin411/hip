@@ -34,6 +34,54 @@
   /* 毛玻璃效果：仅标题栏使用，半透明背景 + 模糊 */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(0, 0, 0, 0.06);
+  /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
+  --state-hover: var(--accent-subtle);
+  --state-active: var(--accent-active);
+  --state-disabled: var(--text-tertiary);
+  --focus-ring: var(--accent);
+}
+
+.dark {
+  /* 单色 chrome —— 压低背景亮度、提升文字对比 */
+  --bg-app: #0f0f0f;
+  --bg-subtle: #1a1a1a;
+  --bg-muted: #262626;
+  --border: #333333;
+  --text-primary: #f0f0f0;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #808080;
+  /* 品牌强调色：更亮的 Blue，保证在暗底上可识别 */
+  --accent: #3b9bff;
+  --accent-hover: #5badff;
+  --accent-strong: #7bc0ff;
+  --accent-subtle: #262626; /* 暗色中性 hover/头像/chip 底 */
+  --accent-active: #333333; /* 暗色选中底 */
+  /* 功能状态色 —— 提升亮度以在暗底保持可读 */
+  --success: #4caf50;
+  --danger: #ff5252;
+  --warning: #ffb74d;
+  /* 智能体角色色 —— 更饱和的亮色变体 */
+  --role-supervisor: #7c7cf0;
+  --role-planner: #4db8ff;
+  --role-coder: #5dc96c;
+  --role-reviewer: #ffab40;
+  --role-worker: #2ee6e6;
+  /* 毛玻璃效果：暗色半透明背景 + 浅色描边 */
+  --glass-bg: rgba(20, 20, 20, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  /* 公共交互状态 —— 复用暗色令牌 */
+  --state-hover: var(--accent-subtle);
+  --state-active: var(--accent-active);
+  --state-disabled: var(--text-tertiary);
+  --focus-ring: var(--accent);
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 html,

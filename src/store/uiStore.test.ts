@@ -9,6 +9,7 @@ beforeEach(() => {
     search: '',
     panelOpen: false,
     activeTab: 'agents',
+    theme: 'system',
   })
 })
 
@@ -196,5 +197,29 @@ describe('uiStore - chatActiveTab (Chat panel tabs)', () => {
     useUiStore.getState().setTab('timeline')
     expect(useUiStore.getState().activeTab).toBe('timeline')
     expect(useUiStore.getState().chatActiveTab).toBe('files')
+  })
+})
+
+describe('uiStore - theme', () => {
+  it('defaults to system', () => {
+    expect(useUiStore.getState().theme).toBe('system')
+  })
+
+  it('setTheme switches between light, dark, and system', () => {
+    useUiStore.getState().setTheme('light')
+    expect(useUiStore.getState().theme).toBe('light')
+
+    useUiStore.getState().setTheme('dark')
+    expect(useUiStore.getState().theme).toBe('dark')
+
+    useUiStore.getState().setTheme('system')
+    expect(useUiStore.getState().theme).toBe('system')
+  })
+
+  it('setTheme to the same value is a no-op (same reference)', () => {
+    useUiStore.getState().setTheme('system')
+    const before = useUiStore.getState()
+    useUiStore.getState().setTheme('system')
+    expect(useUiStore.getState()).toBe(before)
   })
 })

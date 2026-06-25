@@ -55,33 +55,35 @@ export function AgentCard({
 
   if (viewMode === 'grid') {
     return (
-      <div className="group relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
-        <div className="flex items-start gap-3">
-          <Avatar name={agent.name} shape="square" size={40} className={cn(!agent.enabled && 'opacity-60')} />
-          <div className={cn('min-w-0 flex-1', !agent.enabled && 'opacity-60')}>
-            <div className="truncate text-body font-medium text-ink">{agent.name}</div>
-            <Badge
-              className={cn(
-                'mt-1',
-                cat === 'internal'
-                  ? 'bg-accent-subtle text-accent-strong'
-                  : 'bg-surface-muted text-ink-tertiary',
-              )}
-            >
-              {catLabel}
-            </Badge>
+      <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
+        <div className={cn('flex flex-1 flex-col transition-opacity', !agent.enabled && 'opacity-60')}>
+          <div className="flex items-start gap-3">
+            <Avatar name={agent.name} shape="square" size={40} />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-body font-medium text-ink">{agent.name}</div>
+              <Badge
+                className={cn(
+                  'mt-1',
+                  cat === 'internal'
+                    ? 'bg-accent-subtle text-accent-strong'
+                    : 'bg-surface-muted text-ink-tertiary',
+                )}
+              >
+                {catLabel}
+              </Badge>
+            </div>
           </div>
-        </div>
-        <div className={cn('mt-3 flex-1', !agent.enabled && 'opacity-60')}>
-          <p className="line-clamp-2 text-body text-ink-secondary">
-            {agent.description || (
-              <span className="font-mono text-ink-tertiary">{cmdline}</span>
-            )}
-          </p>
+          <div className="mt-3 flex-1">
+            <p className="line-clamp-2 text-body text-ink-secondary">
+              {agent.description || (
+                <span className="font-mono text-ink-tertiary">{cmdline}</span>
+              )}
+            </p>
+          </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
           <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex items-center gap-1 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100">
             <ActionButton icon={<Pencil size={14} />} label={t('settings.agents.edit')} onClick={onEdit} />
             <ActionButton icon={<Trash2 size={14} />} label={t('settings.agents.delete')} onClick={onDelete} danger />
           </div>
@@ -92,30 +94,32 @@ export function AgentCard({
 
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <Avatar name={agent.name} shape="square" size={38} className={cn(!agent.enabled && 'opacity-60')} />
-      <div className={cn('min-w-0 flex-1', !agent.enabled && 'opacity-60')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{agent.name}</span>
-          <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
+      <div className={cn('flex min-w-0 flex-1 items-center gap-3.5 transition-opacity', !agent.enabled && 'opacity-60')}>
+        <Avatar name={agent.name} shape="square" size={38} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-body font-medium text-ink">{agent.name}</span>
+            <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
 
-          {cat === 'internal' && (
-            <Badge>
-              <Cpu size={11} />
-              {agent.boundModel ? agent.boundModel.modelID : t('settings.agents.badgeGlobalModel')}
-            </Badge>
+            {cat === 'internal' && (
+              <Badge>
+                <Cpu size={11} />
+                {agent.boundModel ? agent.boundModel.modelID : t('settings.agents.badgeGlobalModel')}
+              </Badge>
+            )}
+          </div>
+          {cat === 'internal' ? (
+            agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>
+          ) : (
+            <>
+              <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
+                <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
+                <span className="min-w-0 truncate">{cmdline}</span>
+              </div>
+              {agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>}
+            </>
           )}
         </div>
-        {cat === 'internal' ? (
-          agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>
-        ) : (
-          <>
-            <div className="mt-1 flex items-center gap-1 overflow-hidden font-mono text-caption text-ink-tertiary">
-              <Terminal size={12} className="shrink-0 text-ink-tertiary/70" />
-              <span className="min-w-0 truncate">{cmdline}</span>
-            </div>
-            {agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>}
-          </>
-        )}
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />

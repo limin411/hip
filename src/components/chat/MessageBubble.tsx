@@ -33,7 +33,7 @@ const MD_COMPONENTS: Components = {
       }
     }
     return (
-      <a href={href} onClick={handleClick} {...props} className="text-accent underline hover:opacity-80 cursor-pointer">
+      <a href={href} onClick={handleClick} {...props} className="underline hover:opacity-80 cursor-pointer">
         {children}
       </a>
     )

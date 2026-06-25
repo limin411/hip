@@ -16,7 +16,7 @@ export const DropdownMenuContent = forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 min-w-[200px] rounded-lg border border-border bg-white p-1 shadow-menu',
+        'z-50 min-w-[200px] rounded-lg border border-border bg-surface p-1 shadow-menu',
         'origin-[var(--radix-dropdown-menu-content-transform-origin)] data-[state=open]:animate-menu-in',
         className,
       )}

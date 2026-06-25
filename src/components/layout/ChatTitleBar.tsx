@@ -11,14 +11,14 @@ import {
 import { Button } from '@/components/ui/Button'
 
 const DOT: Record<string, string> = {
-  connected: 'bg-emerald-500',
-  connecting: 'bg-amber-500 animate-pulse',
+  connected: 'bg-success',
+  connecting: 'bg-warning animate-pulse',
   disconnected: 'bg-ink-tertiary',
-  error: 'bg-red-500',
+  error: 'bg-danger',
 }
 
 /**
- * 对话视图对标题栏的贡献：左侧连接状态 + token 用量、居中会话标题、右侧产物面板切换。
+ * 对话视图对标题栏的贡献：左侧连接状态、居中会话标题、右侧 token 用量 + 产物面板切换。
  * 不再渲染单独的 h-11 头行 —— 直接作为 TitleBar 的子内容嵌入到全宽标题栏。
  */
 export function ChatTitleBar() {
@@ -64,22 +64,21 @@ export function ChatTitleBar() {
           </>
         )}
       </div>
+      <span className="pointer-events-none absolute inset-x-0 mx-80 truncate text-center text-body font-medium text-ink">
+        {active?.title ?? t('chat.title')}
+      </span>
+
+      <div className="flex-1" />
       {usageTotal && (
         <span
           data-testid="session-usage"
           title={t('chat.usage.sessionTotal')}
           data-tauri-drag-region="false"
-          className="ml-3 rounded-full bg-surface-subtle px-2 py-0.5 text-caption text-ink-tertiary"
+          className="mr-3 rounded-full bg-surface-subtle px-2 py-0.5 text-caption text-ink-tertiary"
         >
           {t('chat.usage.tokens', { total: usageTotal.totalTokens })}
         </span>
       )}
-
-      <span className="pointer-events-none absolute left-1/2 max-w-[40%] -translate-x-1/2 truncate text-body font-medium text-ink">
-        {active?.title ?? t('chat.title')}
-      </span>
-
-      <div className="flex-1" />
       <Button
         variant="ghost"
         size="icon"

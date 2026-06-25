@@ -35,7 +35,7 @@ export function MenuRail() {
       data-tauri-drag-region
       style={{ width: 'var(--rail-width, 72px)' }}
       // z-50：盖住 SidebarPeek 关闭态因 rail 偏移而残留的缝隙（浮层锚在 chat 容器而非窗口左缘）
-      className="relative z-50 flex h-full shrink-0 flex-col items-center border-r border-border bg-surface-subtle"
+      className="relative z-50 flex h-full shrink-0 flex-col items-center border-r border-border bg-surface"
     >
       {/* 品牌标志（红绿灯已移至全宽标题栏，本栏顶部不再预留偏移） */}
       <div className="flex w-full flex-col items-center pt-3">
@@ -66,13 +66,15 @@ export function MenuRail() {
             导致关闭后 body 残留 pointer-events:none（沿用旧 UserMenu 的处理）。 */}
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               aria-label={currentUser.name}
               title={currentUser.email}
-              className="flex items-center justify-center rounded-full p-0.5 ring-1 ring-transparent transition-colors hover:ring-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="rounded-full p-0.5 ring-1 ring-transparent hover:ring-border"
             >
               <Avatar name={currentUser.name} src={currentUser.avatarUrl} size={32} />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent side="right" align="end" className="w-[220px]">

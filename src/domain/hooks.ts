@@ -42,6 +42,10 @@ export function useSearchHits(): SearchHit[] {
   return useDomainStore((s) => s.searchHits)
 }
 
+export function useSearching(): boolean {
+  return useDomainStore((s) => s.searching)
+}
+
 export function useActiveInterrupt(): { turnId: string; question: string; context?: string } | null {
   return useDomainStore((s) => s.sessions.find((x) => x.id === s.activeSessionId)?.interrupt ?? null)
 }

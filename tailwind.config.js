@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -25,6 +26,12 @@ export default {
         success: 'var(--success)',
         danger: 'var(--danger)',
         warning: 'var(--warning)',
+        state: {
+          hover: 'var(--state-hover)',
+          active: 'var(--state-active)',
+          disabled: 'var(--state-disabled)',
+        },
+        'focus-ring': 'var(--focus-ring)',
         role: {
           supervisor: 'var(--role-supervisor)',
           planner: 'var(--role-planner)',

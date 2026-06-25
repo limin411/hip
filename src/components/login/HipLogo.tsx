@@ -3,7 +3,10 @@
 //   minimal —— 纯眼睛、去高光、瞳放大，16px favicon 兜底（public/hip.svg 镜像它）
 //   mono    —— 透明底、单色描边眼 + 实心瞳（currentColor），菜单栏/单色场景
 //   hero    —— 全身吉祥物（抱大鱼）叠在登录蓝渐变上，奶油聚光衬底 + 眨眼/斜瞄/抚摸动画
-// 品牌色（cream / navy / coral 三鱼色）仅在此处出现，不引入全局 token。
+//
+// 颜色令牌化说明：
+// - 蓝砖 #0062ad 映射到全局 --accent。
+// - cream / navy / coral 三鱼色是品牌专属色，没有对应全局 token，保留为常量并加注说明。
 
 interface HipLogoProps {
   variant?: 'tile' | 'minimal' | 'hero' | 'mono'
@@ -15,12 +18,11 @@ interface HipLogoProps {
   decorative?: boolean
 }
 
-const BLUE = '#0062ad'
-const CREAM = '#f4ecd8'
-const NAVY = '#003b68'
-const CORAL = '#f0997b' // 鱼身
-const CORAL_DEEP = '#d85a30' // 鱼尾 / 鳍 / 嘴
-const CORAL_PALE = '#f5c4b3' // 鱼肚
+const CREAM = '#f4ecd8' // 品牌专属：眼白高光色，无对应全局 token
+const NAVY = '#003b68' // 品牌专属：瞳/四肢深色，无对应全局 token
+const CORAL = '#f0997b' // 品牌专属：鱼身，无对应全局 token
+const CORAL_DEEP = '#d85a30' // 品牌专属：鱼尾/鳍/嘴，无对应全局 token
+const CORAL_PALE = '#f5c4b3' // 品牌专属：鱼肚，无对应全局 token
 
 // 砖内眼睛 DNA —— 瞳孔朝右下「斜瞄」（瞄一眼老板有没有在看）。
 function TileEyes({ pupilR, highlight }: { pupilR: number; highlight: boolean }) {
@@ -49,8 +51,8 @@ function TileFish() {
       <path d="M40 96 Q60 104 80 96 Q60 100 40 96 Z" fill={CORAL_PALE} opacity={0.85} />
       <circle cx={76} cy={90} r={3.4} fill={CREAM} />
       <circle cx={77} cy={90.5} r={1.7} fill={NAVY} />
-      <ellipse cx={38} cy={96} rx={7} ry={5.5} fill={BLUE} />
-      <ellipse cx={62} cy={85} rx={7} ry={5.5} fill={BLUE} />
+      <ellipse cx={38} cy={96} rx={7} ry={5.5} fill="var(--accent)" />
+      <ellipse cx={62} cy={85} rx={7} ry={5.5} fill="var(--accent)" />
     </>
   )
 }
@@ -64,18 +66,18 @@ function HugMascot({ animated }: { animated: boolean }) {
   return (
     <>
       {/* 脚（奶油描边：蓝身在蓝底脱离） */}
-      <ellipse cx={62} cy={153} rx={13} ry={8} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
-      <ellipse cx={98} cy={153} rx={13} ry={8} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+      <ellipse cx={62} cy={153} rx={13} ry={8} fill="var(--accent)" stroke={CREAM} strokeWidth={2.5} />
+      <ellipse cx={98} cy={153} rx={13} ry={8} fill="var(--accent)" stroke={CREAM} strokeWidth={2.5} />
       {/* 身体（奶油描边） */}
-      <ellipse cx={80} cy={98} rx={46} ry={54} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+      <ellipse cx={80} cy={98} rx={46} ry={54} fill="var(--accent)" stroke={CREAM} strokeWidth={2.5} />
       {/* 腮红 */}
       <ellipse cx={49} cy={64} rx={6} ry={3.4} fill={CORAL} opacity={0.5} />
       <ellipse cx={111} cy={64} rx={6} ry={3.4} fill={CORAL} opacity={0.5} />
       {/* 抱臂（鱼后；奶油描边 = 先铺一层略宽的 cream 垫底再压蓝） */}
       <path d="M44 98 Q38 128 60 142" stroke={CREAM} strokeWidth={22} strokeLinecap="round" fill="none" />
       <path d="M116 98 Q122 128 100 142" stroke={CREAM} strokeWidth={22} strokeLinecap="round" fill="none" />
-      <path d="M44 98 Q38 128 60 142" stroke={BLUE} strokeWidth={17} strokeLinecap="round" fill="none" />
-      <path d="M116 98 Q122 128 100 142" stroke={BLUE} strokeWidth={17} strokeLinecap="round" fill="none" />
+      <path d="M44 98 Q38 128 60 142" stroke="var(--accent)" strokeWidth={17} strokeLinecap="round" fill="none" />
+      <path d="M116 98 Q122 128 100 142" stroke="var(--accent)" strokeWidth={17} strokeLinecap="round" fill="none" />
       {/* 鱼（含开心摆动） */}
       <g className={wiggle}>
         <path d="M108 110 L128 100 L121 116 L129 130 Z" fill={CORAL_DEEP} />
@@ -90,8 +92,8 @@ function HugMascot({ animated }: { animated: boolean }) {
       </g>
       {/* 抱爪（鱼前，轻揉抚摸；奶油描边） */}
       <g className={pet}>
-        <ellipse cx={60} cy={142} rx={9} ry={7} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
-        <ellipse cx={100} cy={142} rx={9} ry={7} fill={BLUE} stroke={CREAM} strokeWidth={2.5} />
+        <ellipse cx={60} cy={142} rx={9} ry={7} fill="var(--accent)" stroke={CREAM} strokeWidth={2.5} />
+        <ellipse cx={100} cy={142} rx={9} ry={7} fill="var(--accent)" stroke={CREAM} strokeWidth={2.5} />
       </g>
       {/* 小人大眼睛（眨眼包整组、斜瞄只动瞳孔） */}
       <g className={blink}>
@@ -161,7 +163,7 @@ export function HipLogo({
 
       {variant === 'tile' && (
         <>
-          <rect x={4} y={4} width={112} height={112} rx={26} fill={BLUE} />
+          <rect x={4} y={4} width={112} height={112} rx={26} fill="var(--accent)" />
           <TileEyes pupilR={10.5} highlight />
           <TileFish />
         </>
@@ -169,7 +171,7 @@ export function HipLogo({
 
       {variant === 'minimal' && (
         <>
-          <rect x={4} y={4} width={112} height={112} rx={26} fill={BLUE} />
+          <rect x={4} y={4} width={112} height={112} rx={26} fill="var(--accent)" />
           <TileEyes pupilR={12} highlight={false} />
         </>
       )}

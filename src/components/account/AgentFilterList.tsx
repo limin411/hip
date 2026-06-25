@@ -52,8 +52,8 @@ export function AgentFilterList({
               className={cn(
                 'absolute right-0.5 top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border px-1 text-[10px] font-medium',
                 isActive
-                  ? 'border-accent-strong/30 bg-white text-accent-strong'
-                  : 'border-border bg-surface text-ink-tertiary',
+                  ? 'border-accent-strong/30 bg-surface text-accent-strong'
+                  : 'border-border bg-surface-subtle text-ink-tertiary',
               )}
             >
               {count}

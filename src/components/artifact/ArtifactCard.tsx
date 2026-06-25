@@ -60,8 +60,9 @@ export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
                 data-testid="artifact-row"
                 data-path={a.path}
                 onClick={canPreview ? () => open(a.path) : undefined}
-                disabled={!canPreview}
-                title={a.path}
+                aria-disabled={!canPreview}
+                tabIndex={canPreview ? undefined : -1}
+                title={canPreview ? a.path : t('artifact.needsSessionScope')}
                 className={cn(
                   'flex w-full items-center gap-2 px-3 py-1.5 text-left text-body text-ink transition-colors',
                   canPreview ? 'cursor-pointer hover:bg-surface-muted' : 'cursor-default opacity-70',

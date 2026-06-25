@@ -29,7 +29,7 @@ export function RailButton({ icon: Icon, label, active = false, danger = false, 
       )}
     >
       <Icon size={18} />
-      <span className="text-[9px] leading-none">{label}</span>
+      <span className="text-caption">{label}</span>
     </button>
   )
 }

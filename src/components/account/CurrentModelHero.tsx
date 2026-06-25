@@ -38,16 +38,8 @@ export function CurrentModelHero({
   }
 
   const badges = model ? modelBadges(model) : null
-  return (
-    <button
-      type="button"
-      onClick={onLocate}
-      disabled={!onLocate}
-      className={cn(
-        'flex w-full items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3 text-left transition-colors',
-        onLocate && 'hover:bg-surface-muted',
-      )}
-    >
+  const content = (
+    <>
       <Avatar name={providerName} shape="square" size={40} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-body font-medium text-ink">{modelID}</div>
@@ -66,19 +58,32 @@ export function CurrentModelHero({
         )}
       </div>
       {keyConfigured ? (
-        <span className="flex shrink-0 items-center gap-1 rounded-md bg-success/10 px-2 py-1 text-caption text-success">
+        <Badge variant="success" size="sm">
           <Check size={12} /> {t('settings.modelConfig.ready')}
-        </span>
+        </Badge>
       ) : (
-        <span className="flex shrink-0 items-center gap-1 rounded-md bg-warning/10 px-2 py-1 text-caption text-warning">
+        <Badge variant="warning" size="sm">
           <AlertTriangle size={12} /> {t('settings.modelConfig.keyMissing')}
-        </span>
+        </Badge>
       )}
       {onLocate && (
         <span className="shrink-0 text-ink-tertiary">
           <ArrowRight size={16} />
         </span>
       )}
+    </>
+  )
+
+  const className = cn(
+    'flex w-full items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3 text-left transition-colors',
+    onLocate && 'hover:bg-surface-muted',
+  )
+
+  return onLocate ? (
+    <button type="button" onClick={onLocate} className={className}>
+      {content}
     </button>
+  ) : (
+    <div className={className}>{content}</div>
   )
 }

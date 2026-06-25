@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { SearchX } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, useSearchHits, sessionService } from '@/domain'
 import { filterSessions, filterBySurface } from '@/lib/sessions'
@@ -28,7 +29,22 @@ export function SessionList() {
     : []
 
   if (local.length === 0 && contentHits.length === 0) {
-    return <div className="px-2.5 py-4 text-meta text-ink-tertiary">{t('sidebar.noMatches')}</div>
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+        <SearchX size={20} className="text-ink-tertiary" />
+        <div className="flex flex-col gap-1">
+          <p className="text-meta text-ink-secondary">{t('sidebar.noMatches')}</p>
+          {q && (
+            <button
+              onClick={() => useUiStore.getState().setSearch('')}
+              className="rounded text-meta text-accent hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              {t('sidebar.clearSearch')}
+            </button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (

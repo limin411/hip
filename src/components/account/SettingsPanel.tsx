@@ -67,7 +67,7 @@ export function SettingsPanel() {
                   className={cn(
                     'flex items-center gap-2 rounded-md px-2.5 py-2 text-body transition-colors',
                     'text-ink-secondary hover:bg-surface-muted',
-                    'data-[state=active]:bg-accent-active data-[state=active]:font-medium data-[state=active]:text-accent-strong',
+                    'data-[state=active]:bg-accent-active data-[state=active]:text-accent-strong',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
                   )}
                 >

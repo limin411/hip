@@ -6,6 +6,7 @@ export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
 export type ActiveView = 'chat' | 'code' | 'settings'
 export type ChatTab = 'files' | 'agents'
+export type Theme = 'light' | 'dark' | 'system'
 
 interface UiState {
   collapsed: boolean
@@ -54,6 +55,9 @@ interface UiState {
 
   checkpointMode: CheckpointMode
   setCheckpointMode: (m: CheckpointMode) => void
+
+  theme: Theme
+  setTheme: (t: Theme) => void
 }
 
 // In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
@@ -66,7 +70,7 @@ function memoryStorage(): StateStorage {
   }
 }
 
-const storage = createJSONStorage<{ codeSessionId: string | null }>(() =>
+const storage = createJSONStorage<{ codeSessionId: string | null; theme: Theme }>(() =>
   typeof localStorage !== 'undefined' ? localStorage : memoryStorage(),
 )
 
@@ -116,7 +120,10 @@ export const useUiStore = create<UiState>()(
 
       checkpointMode: 'this-turn',
       setCheckpointMode: (m) => set({ checkpointMode: m }),
+
+      theme: 'system',
+      setTheme: (t) => set((s) => (s.theme === t ? s : { theme: t })),
     }),
-    { name: 'hip-ui', storage, partialize: (s) => ({ codeSessionId: s.codeSessionId }) },
+    { name: 'hip-ui', storage, partialize: (s) => ({ codeSessionId: s.codeSessionId, theme: s.theme }) },
   ),
 )

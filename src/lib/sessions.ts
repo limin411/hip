@@ -34,12 +34,9 @@ export function groupSessionsByRelativeDate<T extends { updatedAtMs: number }>(
   }
 
   const todayStart = dayStart(now)
-  const yesterdayStart = (() => {
-    const d = new Date(todayStart)
-    d.setDate(d.getDate() - 1)
-    d.setHours(0, 0, 0, 0)
-    return d.getTime()
-  })()
+  const yesterdayDate = new Date(todayStart)
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+  const yesterdayStart = yesterdayDate.getTime()
 
   const groups: Record<DateGroupKey, T[]> = { today: [], yesterday: [], older: [] }
   for (const s of sessions) {

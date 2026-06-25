@@ -85,7 +85,7 @@ describe('groupSessionsByRelativeDate', () => {
     expect(groupSessionsByRelativeDate([], now)).toEqual([])
   })
 
-  it('uses local calendar date for yesterday boundary (DST-safe)', () => {
+  it('uses local calendar date for yesterday boundary', () => {
     // 2026-03-09 is the day after the US spring-forward DST transition (Mar 8 has 23 hours).
     // Going back exactly 86_400_000 ms from Mar 9 noon lands at Mar 8 11:00, not Mar 8 midnight.
     const dstNow = new Date('2026-03-09T12:00:00').getTime()

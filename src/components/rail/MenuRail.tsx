@@ -34,7 +34,8 @@ export function MenuRail() {
       data-tauri-drag-region
       style={{ width: 'var(--rail-width, 72px)' }}
       // z-50：盖住 SidebarPeek 关闭态因 rail 偏移而残留的缝隙（浮层锚在 chat 容器而非窗口左缘）
-      className="relative z-50 flex h-full shrink-0 flex-col items-center border-r border-border bg-surface"
+      // mt-[-1px]：向上覆盖标题栏底边 1px，使玻璃材质的标题栏与菜单栏在视觉上连成一体。
+      className="relative z-50 mt-[-1px] flex h-full shrink-0 flex-col items-center border-r border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl"
     >
       {/* 主导航 */}
       <nav className="mt-3 flex w-full flex-col items-center gap-1">

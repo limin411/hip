@@ -19,13 +19,13 @@ export function RailButton({ icon: Icon, label, active = false, danger = false, 
       aria-current={active ? 'page' : undefined}
       data-tauri-drag-region="false"
       className={cn(
-        'flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-lg transition hover:scale-110',
+        'flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-lg transition',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
         active
-          ? 'bg-accent-active text-accent-strong'
+          ? 'bg-accent text-white'
           : danger
             ? 'text-ink-tertiary hover:bg-danger/10 hover:text-danger'
-            : 'text-ink-tertiary hover:bg-surface-muted hover:text-ink',
+            : 'text-ink-tertiary hover:bg-accent-subtle/50 hover:text-ink',
       )}
     >
       <Icon size={18} />

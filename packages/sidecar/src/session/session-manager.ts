@@ -16,6 +16,8 @@ import { safeErrorMessage } from './error.js'
 import { logDebug } from '../debug-logger.js'
 import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js'
 import { buildTools } from './tools.js'
+import { SessionReplay } from './replay.js'
+import { EventStore } from '../persistence/event-store.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -336,6 +338,21 @@ export class SessionManager {
       case 'plugin:install:url':
         await this.handlePluginInstallUrl(msg.url, send)
         break
+      case 'replay:session': {
+        if (!this.store) {
+          send({ type: 'error', sessionId: msg.sessionId, code: 'NO_STORE', message: 'No persistence store available for replay' })
+          break
+        }
+        try {
+          const eventStore = new EventStore(this.store.getDb())
+          const replay = new SessionReplay(eventStore)
+          const result = await replay.replayTurn(msg.sessionId, msg.turnIndex)
+          send({ type: 'replay:result', sessionId: msg.sessionId, result })
+        } catch (err) {
+          send({ type: 'error', sessionId: msg.sessionId, code: 'REPLAY_FAILED', message: safeErrorMessage(err) })
+        }
+        break
+      }
     }
     logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }

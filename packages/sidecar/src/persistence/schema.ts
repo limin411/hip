@@ -316,6 +316,34 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 14) {
+    db.exec('BEGIN')
+    try {
+      // Cron tasks for scheduled prompt injection (agent self-reminders).
+      // `schedule_type` is 'once' (fires at `next_fire_at`) or 'recurring'
+      // (re-schedules by `schedule_interval_ms` after each fire). `schedule_at`
+      // is the absolute timestamp for 'once' tasks; `schedule_interval_ms` is
+      // the interval for 'recurring' tasks.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cron_tasks (
+          id                   TEXT PRIMARY KEY,
+          session_id           TEXT NOT NULL,
+          prompt               TEXT NOT NULL,
+          schedule_type        TEXT NOT NULL CHECK(schedule_type IN ('once','recurring')),
+          schedule_at          INTEGER,
+          schedule_interval_ms INTEGER,
+          next_fire_at         INTEGER NOT NULL,
+          created_at           INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cron_tasks_session ON cron_tasks(session_id, next_fire_at);
+      `)
+      db.exec('PRAGMA user_version = 14')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

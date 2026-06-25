@@ -21,7 +21,7 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
   })
 
   it('is idempotent and upgrades an existing v1 database in place', () => {
@@ -46,7 +46,7 @@ describe('migrate', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('acp_session_id')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
   })
 
   it('v10 adds event_sequence + event + snapshots tables and reaches user_version 10', () => {
@@ -61,7 +61,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='event'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_event_aggregate_seq', 'idx_event_aggregate_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
   })
 
   it('v10 migration preserves all pre-existing tables (no drop / no rename)', () => {
@@ -79,7 +79,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_message'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_message_session_seq', 'idx_session_message_session_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
   })
 
   it('v13 adds session_input queue table and reaches user_version 13', () => {
@@ -90,6 +90,17 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_input'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_input_session', 'idx_session_input_session_promoted']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(13)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
+  })
+
+  it('v14 adds cron_tasks table and reaches user_version 14', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    expect(columns(db, 'cron_tasks')).toEqual(
+      expect.arrayContaining(['id', 'session_id', 'prompt', 'schedule_type', 'schedule_at', 'schedule_interval_ms', 'next_fire_at', 'created_at']),
+    )
+    const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='cron_tasks'`).all() as { name: string }[]).map((r) => r.name)
+    expect(indexes).toEqual(expect.arrayContaining(['idx_cron_tasks_session']))
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(14)
   })
 })

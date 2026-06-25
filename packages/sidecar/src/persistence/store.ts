@@ -341,4 +341,25 @@ export class SessionStore {
     const promotedSeq = this.nextInputPromotedSeq(sessionId)
     this.db.prepare(`UPDATE session_input SET promoted_seq=? WHERE session_id=? AND id=? AND promoted_seq IS NULL`).run(promotedSeq, sessionId, id)
   }
+
+  insertCronTask(r: { id: string; sessionId: string; prompt: string; scheduleType: string; scheduleAt: number | null; scheduleIntervalMs: number | null; nextFireAt: number; createdAt: number }): void {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO cron_tasks(id, session_id, prompt, schedule_type, schedule_at, schedule_interval_ms, next_fire_at, created_at) VALUES(?,?,?,?,?,?,?,?)`,
+    ).run(r.id, r.sessionId, r.prompt, r.scheduleType, r.scheduleAt, r.scheduleIntervalMs, r.nextFireAt, r.createdAt)
+  }
+
+  updateCronTaskNextFire(id: string, nextFireAt: number): void {
+    this.db.prepare(`UPDATE cron_tasks SET next_fire_at=? WHERE id=?`).run(nextFireAt, id)
+  }
+
+  loadCronTasks(sessionId: string): { id: string; sessionId: string; prompt: string; scheduleType: string; scheduleAt: number | null; scheduleIntervalMs: number | null; nextFireAt: number; createdAt: number }[] {
+    return this.db.prepare(
+      `SELECT id, session_id AS sessionId, prompt, schedule_type AS scheduleType, schedule_at AS scheduleAt, schedule_interval_ms AS scheduleIntervalMs, next_fire_at AS nextFireAt, created_at AS createdAt FROM cron_tasks WHERE session_id=? ORDER BY created_at`,
+    ).all(sessionId) as { id: string; sessionId: string; prompt: string; scheduleType: string; scheduleAt: number | null; scheduleIntervalMs: number | null; nextFireAt: number; createdAt: number }[]
+  }
+
+  deleteCronTask(id: string): boolean {
+    const result = this.db.prepare(`DELETE FROM cron_tasks WHERE id=?`).run(id)
+    return result.changes > 0
+  }
 }

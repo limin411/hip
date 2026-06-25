@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import type { SearchHit } from '@hip/protocol'
 import type { SessionVM } from '@/domain/sessionStore'
 import { SessionList } from './SessionList'
 
@@ -7,22 +8,25 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { resolvedLanguage: 'en', language: 'en' } }),
 }))
 
+let mockSearch = ''
+
 vi.mock('@/store/uiStore', () => ({
   useUiStore: (selector: (s: any) => any) =>
     selector({
       activeView: 'chat',
-      search: '',
+      search: mockSearch,
       setSearch: vi.fn(),
     }),
 }))
 
 let mockSessions: SessionVM[] = []
 let mockActiveSessionId: string | null = null
+let mockHits: SearchHit[] = []
 
 vi.mock('@/domain', () => ({
   useSessions: () => mockSessions,
   useActiveSessionId: () => mockActiveSessionId,
-  useSearchHits: () => [],
+  useSearchHits: () => mockHits,
   useSearching: () => false,
   sessionService: {
     selectSession: vi.fn(),
@@ -75,5 +79,29 @@ describe('SessionList grouped', () => {
     expect(html).toContain('Today Session')
     expect(html).toContain('Yesterday Session')
     expect(html).toContain('Older Session')
+  })
+})
+
+describe('SessionList search results', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSearch = 'query'
+    mockSessions = [
+      { id: 's1', title: 'query match', preview: '', updatedAtMs: now - 60_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
+      { id: 's2', title: 'Another chat', preview: '', updatedAtMs: now - 120_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
+    ]
+    mockHits = [
+      { sessionId: 's2', messageId: 'm1', title: 'Another chat', snippet: 'this is a <mark>query</mark> hit', timestamp: now - 120_000 },
+    ]
+    mockActiveSessionId = null
+  })
+
+  it('renders flat search results with title match and FTS hit', () => {
+    const html = renderToStaticMarkup(<SessionList />)
+
+    expect(html).toContain('sidebar.searchResults')
+    expect(html).toContain('query match')
+    expect(html).toContain('Another chat')
+    expect(html).toContain('this is a')
   })
 })

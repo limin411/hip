@@ -954,7 +954,7 @@ export class Session {
         this.consumeActivitySteps(finalState.steps - stepsBefore)
         closeReasoning('supervisor'); finishRemaining()
 
-        const ephemeralPrefix = 1 + contextMessages.length
+        const ephemeralPrefix = 1 + cronMessages.length + contextMessages.length
         if (finalState.compacted && this.store) {
           new ContextEpoch(this.store.getDb()).requestReplacement(this.id, 0)
         }

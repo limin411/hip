@@ -14,7 +14,7 @@ export function NewSessionButton({ surface }: NewSessionButtonProps) {
       variant="outline"
       size="sm"
       className="w-full"
-      onClick={() => sessionService.newConversation()}
+      onClick={() => sessionService.newConversation(surface)}
     >
       <Plus size={16} />
       <span>{surface === 'code' ? t('sidebar.newCodeTask') : t('sidebar.newChat')}</span>

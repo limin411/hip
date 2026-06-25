@@ -15,7 +15,7 @@ export interface Draft {
 
 interface DraftStore {
   draft: Draft | null
-  ensureDraft: () => Draft
+  ensureDraft: (surface?: 'chat' | 'code') => Draft
   setText: (text: string) => void
   pickProject: (cwd: string) => void
   clearProject: () => void
@@ -43,10 +43,16 @@ export const useDraftStore = create<DraftStore>()(
   persist(
     (set, get) => ({
       draft: null,
-      ensureDraft: () => {
+      ensureDraft: (surface) => {
         const cur = get().draft
-        if (cur) return cur
-        const d: Draft = { tempId: nanoid(), mode: 'chat', text: '' }
+        const mode = surface === 'code' ? 'project' : 'chat'
+        if (cur) {
+          if (surface && cur.mode !== mode) {
+            set({ draft: { ...cur, mode, cwd: mode === 'chat' ? undefined : cur.cwd } })
+          }
+          return get().draft!
+        }
+        const d: Draft = { tempId: nanoid(), mode, text: '' }
         set({ draft: d })
         return d
       },

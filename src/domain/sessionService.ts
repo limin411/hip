@@ -339,8 +339,8 @@ export class SessionService {
   }
 
   /** Start a fresh new-conversation draft (no committed session yet). */
-  newConversation(): void {
-    useDraftStore.getState().ensureDraft()
+  newConversation(surface?: 'chat' | 'code'): void {
+    useDraftStore.getState().ensureDraft(surface)
     useDomainStore.getState().deselect()
     this.rememberActiveForSurface(null)
   }

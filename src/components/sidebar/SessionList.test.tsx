@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { SessionVM } from '@/domain/sessionStore'
 import { SessionList } from './SessionList'
@@ -31,16 +31,14 @@ vi.mock('@/domain', () => ({
   },
 }))
 
-vi.mock('@/lib/sessions', async () => {
-  const actual = await vi.importActual('@/lib/sessions')
-  return {
-    ...actual,
-    groupSessionsByRelativeDate: vi.fn((sessions: SessionVM[]) => [
-      { key: 'today', sessions: sessions.filter((s) => s.title === 'Today Session') },
-      { key: 'yesterday', sessions: sessions.filter((s) => s.title === 'Yesterday Session') },
-      { key: 'older', sessions: sessions.filter((s) => s.title === 'Older Session') },
-    ]),
-  }
+const now = new Date('2026-06-25T14:00:00').getTime()
+
+beforeAll(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(now)
+})
+
+afterAll(() => {
+  vi.restoreAllMocks()
 })
 
 describe('SessionList empty', () => {
@@ -64,9 +62,9 @@ describe('SessionList grouped', () => {
 
   it('renders sessions inside date groups', () => {
     mockSessions = [
-      { id: '1', title: 'Today Session', preview: '', updatedAtMs: 0, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
-      { id: '2', title: 'Yesterday Session', preview: '', updatedAtMs: 0, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
-      { id: '3', title: 'Older Session', preview: '', updatedAtMs: 0, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
+      { id: '1', title: 'Today Session', preview: '', updatedAtMs: now - 60_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
+      { id: '2', title: 'Yesterday Session', preview: '', updatedAtMs: now - 86_400_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
+      { id: '3', title: 'Older Session', preview: '', updatedAtMs: now - 86_400_000 * 3, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
     ]
 
     const html = renderToStaticMarkup(<SessionList />)

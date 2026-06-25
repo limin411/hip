@@ -54,8 +54,8 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
           data-testid="session-item"
           onClick={editing ? undefined : onSelect}
           className={cn(
-            'group flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors',
-            active ? 'bg-accent-active text-accent-strong' : 'text-ink hover:bg-surface-muted',
+            'group flex cursor-pointer flex-col gap-0.5 rounded-lg px-2.5 py-2 transition-colors',
+            active ? 'bg-accent/10 text-accent-strong' : 'text-ink hover:bg-surface-muted',
           )}
         >
           <div className="flex items-center gap-2">

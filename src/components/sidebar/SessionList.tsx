@@ -1,3 +1,4 @@
+import type { SearchHit } from '@hip/protocol'
 import { useTranslation } from 'react-i18next'
 import { SearchX } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
@@ -17,14 +18,18 @@ export function SessionList() {
   const q = search.trim()
   const local = filterSessions(sessions, q)
   const surfaceIds = new Set(sessions.map((s) => s.id))
-  const seen = new Set(local.map((s) => s.id))
-  const contentHits = q
-    ? hits.filter((h) => {
-        if (!h.sessionId || !surfaceIds.has(h.sessionId) || seen.has(h.sessionId)) return false
-        seen.add(h.sessionId)
-        return true
-      })
-    : []
+
+  // Content matches (sidecar FTS) for sessions the instant local title/preview
+  // filter didn't already surface; dedupe so each session appears once.
+  const seenIds = new Set(local.map((s) => s.id))
+  const contentHits: SearchHit[] = []
+  if (q) {
+    for (const h of hits) {
+      if (!h.sessionId || !surfaceIds.has(h.sessionId) || seenIds.has(h.sessionId)) continue
+      seenIds.add(h.sessionId)
+      contentHits.push(h)
+    }
+  }
 
   if (local.length === 0 && contentHits.length === 0) {
     return (

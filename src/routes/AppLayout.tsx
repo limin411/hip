@@ -10,7 +10,6 @@ import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
-import { MenuRail } from '@/components/rail/MenuRail'
 import { TitleBar } from '@/components/layout/TitleBar'
 import { SettingsPage } from '@/components/account/SettingsPage'
 
@@ -46,12 +45,11 @@ export function AppLayout() {
       {/* 贯穿全宽的标题栏 —— 红绿灯与统一折叠按钮的唯一归属，下方各列不再预留偏移 */}
       <TitleBar />
       <div className="relative flex min-h-0 flex-1">
-        <MenuRail />
         <div className="relative min-w-0 flex-1">
           <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={sidebarRef}
-          defaultSize={14}
+          defaultSize={18}
           minSize={12}
           maxSize={22}
           collapsible

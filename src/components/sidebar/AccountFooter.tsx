@@ -68,9 +68,8 @@ export function AccountFooter() {
               {t('common.cancel')}
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
               size="sm"
-              className="bg-danger text-white hover:bg-danger/90"
               onClick={() => {
                 setConfirmLogout(false)
                 logout()

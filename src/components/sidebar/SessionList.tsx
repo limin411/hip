@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { SearchX } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, useSearchHits, sessionService } from '@/domain'
-import { filterSessions, filterBySurface } from '@/lib/sessions'
+import { filterSessions, filterBySurface, groupSessionsByRelativeDate } from '@/lib/sessions'
 import { SessionItem } from './SessionItem'
 
 export function SessionList() {
@@ -16,8 +16,6 @@ export function SessionList() {
 
   const q = search.trim()
   const local = filterSessions(sessions, q)
-  // Content matches (sidecar FTS) for sessions the instant local title/preview
-  // filter didn't already surface; dedupe so each session appears once.
   const surfaceIds = new Set(sessions.map((s) => s.id))
   const seen = new Set(local.map((s) => s.id))
   const contentHits = q
@@ -47,31 +45,51 @@ export function SessionList() {
     )
   }
 
+  const grouped = groupSessionsByRelativeDate(local)
+
   return (
-    <div className="flex flex-col gap-0.5">
-      {local.map((session) => (
-        <SessionItem
-          key={session.id}
-          session={session}
-          active={session.id === activeSessionId}
-          onSelect={() => sessionService.selectSession(session.id)}
-          onDelete={() => sessionService.deleteSession(session.id)}
-        />
+    <div className="flex flex-col gap-4">
+      {grouped.map(({ key, sessions: groupSessions }) => (
+        <div key={key} className="flex flex-col gap-1">
+          <div className="px-2.5 text-caption uppercase tracking-wider text-ink-tertiary">
+            {t(`sidebar.dateGroup.${key}`)}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {groupSessions.map((session) => (
+              <SessionItem
+                key={session.id}
+                session={session}
+                active={session.id === activeSessionId}
+                onSelect={() => sessionService.selectSession(session.id)}
+                onDelete={() => sessionService.deleteSession(session.id)}
+              />
+            ))}
+          </div>
+        </div>
       ))}
-      {contentHits.map((h) => {
-        const s = sessions.find((x) => x.id === h.sessionId)
-        if (!s) return null
-        return (
-          <SessionItem
-            key={`hit-${h.sessionId}`}
-            session={s}
-            snippet={h.snippet}
-            active={s.id === activeSessionId}
-            onSelect={() => sessionService.selectSession(s.id, h.messageId ?? undefined)}
-            onDelete={() => sessionService.deleteSession(s.id)}
-          />
-        )
-      })}
+      {contentHits.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <div className="px-2.5 text-caption uppercase tracking-wider text-ink-tertiary">
+            {t('sidebar.searchResults')}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {contentHits.map((h) => {
+              const s = sessions.find((x) => x.id === h.sessionId)
+              if (!s) return null
+              return (
+                <SessionItem
+                  key={`hit-${h.sessionId}`}
+                  session={s}
+                  snippet={h.snippet}
+                  active={s.id === activeSessionId}
+                  onSelect={() => sessionService.selectSession(s.id, h.messageId ?? undefined)}
+                  onDelete={() => sessionService.deleteSession(s.id)}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

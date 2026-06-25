@@ -149,6 +149,12 @@ export const en = {
       renameSession: 'Rename',
       newChat: 'New Chat',
       newCodeTask: 'New Code Task',
+      dateGroup: {
+        today: 'Today',
+        yesterday: 'Yesterday',
+        older: 'Earlier',
+      },
+      searchResults: 'Search Results',
     },
     artifact: {
       files: 'Files',

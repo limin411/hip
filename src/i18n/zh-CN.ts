@@ -149,6 +149,12 @@ export const zhCN = {
       renameSession: '重命名',
       newChat: '新建会话',
       newCodeTask: '新建代码任务',
+      dateGroup: {
+        today: '今天',
+        yesterday: '昨天',
+        older: '更早',
+      },
+      searchResults: '搜索结果',
     },
     artifact: {
       files: '文件',

@@ -149,6 +149,12 @@ export const zhTW = {
       renameSession: '重新命名',
       newChat: '新建會話',
       newCodeTask: '新建程式碼任務',
+      dateGroup: {
+        today: '今天',
+        yesterday: '昨天',
+        older: '更早',
+      },
+      searchResults: '搜尋結果',
     },
     artifact: {
       files: '文件',

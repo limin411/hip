@@ -147,6 +147,8 @@ export const en = {
       clearSearch: 'Clear search',
       deleteSession: 'Delete Session',
       renameSession: 'Rename',
+      newChat: 'New Chat',
+      newCodeTask: 'New Code Task',
     },
     artifact: {
       files: 'Files',

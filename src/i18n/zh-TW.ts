@@ -147,6 +147,8 @@ export const zhTW = {
       clearSearch: '清除搜尋',
       deleteSession: '刪除會話',
       renameSession: '重新命名',
+      newChat: '新建會話',
+      newCodeTask: '新建程式碼任務',
     },
     artifact: {
       files: '文件',

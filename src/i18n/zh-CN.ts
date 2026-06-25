@@ -147,6 +147,8 @@ export const zhCN = {
       clearSearch: '清除搜索',
       deleteSession: '删除会话',
       renameSession: '重命名',
+      newChat: '新建会话',
+      newCodeTask: '新建代码任务',
     },
     artifact: {
       files: '文件',

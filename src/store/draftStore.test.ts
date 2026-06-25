@@ -10,6 +10,26 @@ describe('draftStore', () => {
     expect(a.tempId).toBe(b.tempId)
     expect(a.mode).toBe('chat')
   })
+  it('ensureDraft("code") creates a project mode draft', () => {
+    const d = useDraftStore.getState().ensureDraft('code')
+    expect(d.mode).toBe('project')
+  })
+  it('ensureDraft("chat") creates a chat mode draft', () => {
+    const d = useDraftStore.getState().ensureDraft('chat')
+    expect(d.mode).toBe('chat')
+  })
+  it('ensureDraft("code") switches an existing chat draft to project and keeps cwd', () => {
+    useDraftStore.setState({ draft: { tempId: 't1', mode: 'chat', text: '', cwd: '/keep' } })
+    const d = useDraftStore.getState().ensureDraft('code')
+    expect(d.mode).toBe('project')
+    expect(d.cwd).toBe('/keep')
+  })
+  it('ensureDraft("chat") switches an existing project draft to chat and clears cwd', () => {
+    useDraftStore.setState({ draft: { tempId: 't2', mode: 'project', text: '', cwd: '/drop' } })
+    const d = useDraftStore.getState().ensureDraft('chat')
+    expect(d.mode).toBe('chat')
+    expect(d.cwd).toBeUndefined()
+  })
   it('setText updates the draft text', () => {
     useDraftStore.getState().ensureDraft()
     useDraftStore.getState().setText('hello')

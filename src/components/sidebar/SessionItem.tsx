@@ -54,8 +54,8 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
           data-testid="session-item"
           onClick={editing ? undefined : onSelect}
           className={cn(
-            'group flex cursor-pointer flex-col gap-0.5 rounded-md border-l-2 py-2 pr-2.5 transition-colors',
-            active ? 'border-accent bg-accent-active pl-2' : 'border-transparent pl-2.5 hover:bg-surface-muted',
+            'group flex cursor-pointer flex-col gap-0.5 rounded-md px-2.5 py-2 transition-colors',
+            active ? 'bg-accent-active text-accent-strong' : 'text-ink hover:bg-surface-muted',
           )}
         >
           <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function SessionItem({ session, active, onSelect, onDelete, snippet }: Se
               />
             ) : (
               <>
-                <span className={cn('min-w-0 flex-1 truncate text-body', active ? 'font-semibold text-accent-strong' : 'font-medium text-ink')}>
+                <span className={cn('min-w-0 flex-1 truncate text-body font-medium', active ? 'text-accent-strong' : 'text-ink')}>
                   {session.title}
                 </span>
                 {/* Relative time is formatted at render from updatedAtMs (localized; recomputed on each

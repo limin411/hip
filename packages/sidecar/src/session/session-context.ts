@@ -9,6 +9,7 @@ import {
   LocationMismatchError,
   type PrepareResult,
 } from './context-epoch.js'
+import type { ContextInjectorRegistry, InjectorState } from './context-injector.js'
 
 export interface SessionContextState {
   cwd: string
@@ -43,6 +44,7 @@ export async function prepareSessionContext(
   state: SessionContextState,
   store?: SessionStore,
   requestReplace?: boolean,
+  injectorRegistry?: ContextInjectorRegistry,
 ): Promise<PreparedContext> {
   try {
     const input = buildFragmentInput(state)
@@ -50,8 +52,12 @@ export async function prepareSessionContext(
     const systemContext = new SystemContext(registry.sources())
     const generation = await systemContext.initialize()
 
+    const system = injectorRegistry
+      ? await assembleFromInjectors(injectorRegistry, state)
+      : generation.baseline
+
     if (!store) {
-      return { system: generation.baseline, contextMessages: [] }
+      return { system, contextMessages: [] }
     }
 
     const epoch = new ContextEpoch(store.getDb())
@@ -61,21 +67,46 @@ export async function prepareSessionContext(
     const result = await ensureEpochPrepared(epoch, sessionId, agent, systemContext, state.cwd, generation)
 
     if (result.action === 'replace') {
-      return { system: result.generation.baseline, contextMessages: [] }
+      return { system, contextMessages: [] }
     }
 
     if (result.action === 'updated') {
       return {
-        system: generation.baseline,
+        system,
         contextMessages: result.messages.map((m) => new SystemMessage(m)),
       }
     }
 
-    return { system: generation.baseline, contextMessages: [] }
+    return { system, contextMessages: [] }
   } catch (err) {
     console.error('[session-context] failed to prepare context:', err)
     return { system: '', contextMessages: [] }
   }
+}
+
+async function assembleFromInjectors(
+  injectorRegistry: ContextInjectorRegistry,
+  state: SessionContextState,
+): Promise<string> {
+  const injectorState: InjectorState = {
+    cwd: state.cwd,
+    permissionMode: state.permissionMode,
+    skills: state.skills,
+    tokenBudgetPercent: state.tokenBudgetPercent,
+    pendingSubagents: state.pendingSubagents?.map((s) => ({
+      id: s.id,
+      description: s.description,
+      status: s.status,
+    })),
+    completedSubagents: state.completedSubagents?.map((s) => ({
+      id: s.id,
+      description: s.description,
+      status: s.status,
+    })),
+  }
+  const results = await injectorRegistry.injectAll(injectorState)
+  const messages = results.flatMap((r) => r.systemMessages)
+  return messages.join('\n\n')
 }
 
 async function ensureEpochPrepared(

@@ -16,6 +16,7 @@ import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
+import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
@@ -67,6 +68,7 @@ const LoopState = Annotation.Root({
   plan: Annotation<PlanItem[] | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   compacted: Annotation<boolean>({ reducer: (_prev, next) => next, default: () => false }),
+  deferredMessages: Annotation<BaseMessage[]>({ reducer: (prev, next) => [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(next) ? next : [])], default: () => [] }),
 })
 
 type State = typeof LoopState.State
@@ -76,6 +78,44 @@ function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   const ctx = (config.configurable as { ctx?: GraphCtx } | undefined)?.ctx
   if (!ctx) throw new Error('graph invoked without configurable.ctx')
   return ctx
+}
+
+/** Scan the last AIMessage's tool_calls and return IDs without a matching ToolMessage in the message history. */
+export function getPendingToolCallIds(messages: BaseMessage[]): Set<string> {
+  const lastAi = messages.filter((m): m is AIMessage => m instanceof AIMessage).at(-1)
+  if (!lastAi || !lastAi.tool_calls?.length) return new Set()
+  const resolvedIds = new Set(
+    messages.filter((m): m is ToolMessage => m instanceof ToolMessage).map((m) => m.tool_call_id),
+  )
+  return new Set(lastAi.tool_calls.map((c) => c.id ?? c.name).filter((id) => !resolvedIds.has(id)))
+}
+
+/** Flush orphaned deferred messages (tool results that never arrived) with an error annotation. */
+export function resolveDeferred(state: State): Partial<State> {
+  const deferred = state.deferredMessages ?? []
+  if (!deferred.length) return { deferredMessages: deferred }
+  const resolvedIds = new Set(
+    state.messages.filter((m): m is ToolMessage => m instanceof ToolMessage).map((m) => m.tool_call_id),
+  )
+  const orphaned = deferred.filter((m) => {
+    if (!(m instanceof ToolMessage)) return false
+    // Skip pending placeholders — they are still waiting for results
+    if (typeof m.content === 'string' && m.content.startsWith('[Deferred: pending]')) return false
+    return !resolvedIds.has(m.tool_call_id)
+  })
+  // Keep non-orphaned entries (resolved or still-pending) for next cycle
+  const keep = deferred.filter((m) => !orphaned.includes(m))
+  if (!orphaned.length) return { deferredMessages: keep }
+  // Mark orphans with error annotation and flush them as ToolMessages
+  const flushed = orphaned.map(
+    (m) =>
+      new ToolMessage({
+        content: `[Deferred: tool result never arrived] ${typeof m.content === 'string' ? m.content : ''}`,
+        tool_call_id: (m as ToolMessage).tool_call_id,
+        name: (m as ToolMessage).name ?? 'unknown',
+      }),
+  )
+  return { messages: flushed, deferredMessages: keep }
 }
 
 function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): BaseMessage[] {
@@ -89,21 +129,41 @@ function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): B
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
 /** Pre-turn compaction: shrink the middle when over budget (≤ once per invoke). */
   async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    if (state.compacted) return {}
+    const deferredResolved = resolveDeferred(state)
+
+    if (isMicroCompactionEnabled() && !state.compacted) {
+      const mc = new MicroCompaction()
+      const { messages: mcMessages, truncated } = mc.compact(state.messages)
+      if (truncated > 0) {
+        const out: BaseMessage[] = [...(deferredResolved.messages ?? [])]
+        for (let i = 0; i < state.messages.length; i++) {
+          if (mcMessages[i] !== state.messages[i]) {
+            const orig = state.messages[i]
+            if (orig.id) out.push(new RemoveMessage({ id: orig.id }))
+            out.push(mcMessages[i])
+          }
+        }
+        return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+      }
+    }
+
+    if (state.compacted) return deferredResolved
     const ctx = ctxOf(config)
     const overBudget = estimateTokens(state.messages) > compactBudget
-    if (!overBudget) return {}
+    if (!overBudget) return deferredResolved
     const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
-    if (!result) return {}
+    if (!result) return deferredResolved
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
     ctx.emit.compaction(summaryText)
     return {
-      messages: [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
+      messages: [...(deferredResolved.messages ?? []), result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
       compacted: true,
+      deferredMessages: deferredResolved.deferredMessages,
     }
   }
 
   async function agent(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
+    const deferredResolved = resolveDeferred(state)
     const ctx = ctxOf(config)
     const { runner, tools, emit, systemPrompt } = ctx
     const stepCap = ctx.maxSteps ?? maxSteps
@@ -140,7 +200,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     const messages = prepareMessages(state.messages)
     try {
-      return await execute(messages)
+      const result = await execute(messages)
+      return {
+        ...result,
+        messages: [...(deferredResolved.messages ?? []), ...(result.messages ?? [])],
+        deferredMessages: deferredResolved.deferredMessages,
+      }
     } catch (err) {
       if (state.compacted || !isOverflowError(err)) throw err
       const result = await compactMessages(messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer, overflowRecovery: true })
@@ -151,7 +216,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const compactedState = applyCompaction(state.messages, result)
       const retryMessages = prepareMessages(compactedState)
       const msgResult = await execute(retryMessages)
-      return { ...msgResult, messages: [...compactedMessages, ...(msgResult.messages ?? [])], compacted: true }
+      return { ...msgResult, messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])], compacted: true, deferredMessages: deferredResolved.deferredMessages }
     }
   }
 
@@ -215,19 +280,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
     }
 
-    const results: ToolCallResult[] = new Array(calls.length)
+    const results: (ToolCallResult | undefined)[] = new Array(calls.length)
 
-    await runWithConcurrency(parallelIndices, parallelism, async (index) => {
-      const call = calls[index]
-      const id = call.id ?? call.name
-      results[index] = await runner.runToolCall({
-        name: call.name,
-        callId: id,
-        args: (call.args as Record<string, unknown>) ?? {},
-      })
-    })
-
-    for (const index of sequentialIndices) {
+    const runOne = async (index: number): Promise<void> => {
       const call = calls[index]
       const id = call.id ?? call.name
       results[index] = await runner.runToolCall({
@@ -237,7 +292,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       })
     }
 
-    const out: ToolMessage[] = results.map((result) => new ToolMessage({
+    await runWithConcurrency(parallelIndices, parallelism, runOne)
+
+    for (const index of sequentialIndices) {
+      await runOne(index)
+    }
+
+    const resolvedResults = results.filter((r): r is ToolCallResult => r !== undefined)
+    const allResolved = resolvedResults.length === calls.length
+
+    const out: ToolMessage[] = resolvedResults.map((result) => new ToolMessage({
       content: result.content,
       tool_call_id: result.tool_call_id,
       name: result.name,
@@ -246,7 +310,26 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const updatedPlan = deriveUpdatedPlan(state.plan, last.tool_calls ?? [])
 
     const sig = sigOf(last.tool_calls ?? [])
-    return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
+
+    if (allResolved) {
+      return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
+    }
+    // Some tool calls did not resolve yet: show resolved results in messages,
+    // include placeholder entries for all calls in deferredMessages for tracking.
+    const unresolvedIds = new Set(
+      calls.filter((_c, i) => results[i] === undefined).map((c) => c.id ?? c.name),
+    )
+    const deferredEntries: ToolMessage[] = [
+      ...out,
+      ...calls
+        .filter((c) => unresolvedIds.has(c.id ?? c.name))
+        .map((c) => new ToolMessage({
+          content: '[Deferred: pending]',
+          tool_call_id: c.id ?? c.name,
+          name: c.name,
+        })),
+    ]
+    return { messages: [...blockedCalls, ...out], deferredMessages: deferredEntries, recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
   }
 
   /** Corrective note after the Nth identical batch; recorded against the offending signature. */

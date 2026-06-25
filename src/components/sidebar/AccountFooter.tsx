@@ -16,7 +16,6 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/DropdownMenu'
 
-// TODO: replace with real authenticated user once auth flow is implemented
 const currentUser = { name: 'User', email: 'user@example.com', avatarUrl: undefined }
 
 export function AccountFooter() {

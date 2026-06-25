@@ -50,6 +50,41 @@ export function SessionList() {
     )
   }
 
+  if (q) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="px-2.5 text-caption uppercase tracking-wider text-ink-tertiary">
+          {t('sidebar.searchResults')}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          {local.map((session) => (
+            <SessionItem
+              key={session.id}
+              session={session}
+              active={session.id === activeSessionId}
+              onSelect={() => sessionService.selectSession(session.id)}
+              onDelete={() => sessionService.deleteSession(session.id)}
+            />
+          ))}
+          {contentHits.map((h) => {
+            const s = sessions.find((x) => x.id === h.sessionId)
+            if (!s) return null
+            return (
+              <SessionItem
+                key={`hit-${h.sessionId}`}
+                session={s}
+                snippet={h.snippet}
+                active={s.id === activeSessionId}
+                onSelect={() => sessionService.selectSession(s.id, h.messageId ?? undefined)}
+                onDelete={() => sessionService.deleteSession(s.id)}
+              />
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   const grouped = groupSessionsByRelativeDate(local)
 
   return (
@@ -72,29 +107,6 @@ export function SessionList() {
           </div>
         </div>
       ))}
-      {contentHits.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <div className="px-2.5 text-caption uppercase tracking-wider text-ink-tertiary">
-            {t('sidebar.searchResults')}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {contentHits.map((h) => {
-              const s = sessions.find((x) => x.id === h.sessionId)
-              if (!s) return null
-              return (
-                <SessionItem
-                  key={`hit-${h.sessionId}`}
-                  session={s}
-                  snippet={h.snippet}
-                  active={s.id === activeSessionId}
-                  onSelect={() => sessionService.selectSession(s.id, h.messageId ?? undefined)}
-                  onDelete={() => sessionService.deleteSession(s.id)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

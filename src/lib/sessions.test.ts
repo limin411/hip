@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterSessions, surfaceOf, filterBySurface } from './sessions'
+import { filterSessions, surfaceOf, filterBySurface, groupSessionsByRelativeDate } from './sessions'
 
 interface TestSession {
   id: string
@@ -52,5 +52,36 @@ describe('filterBySurface', () => {
   it('treats a missing surface as code', () => {
     const list = [mk('a'), mk('b', 'chat')]
     expect(filterBySurface(list, 'code').map((s) => s.id)).toEqual(['a'])
+  })
+})
+
+describe('groupSessionsByRelativeDate', () => {
+  const now = new Date('2026-06-25T14:00:00').getTime()
+
+  it('groups sessions into today, yesterday, and older', () => {
+    const sessions = [
+      { id: 'today-1', updatedAtMs: now - 3_600_000 },
+      { id: 'today-2', updatedAtMs: now - 60_000 },
+      { id: 'yesterday', updatedAtMs: now - 86_400_000 },
+      { id: 'older', updatedAtMs: now - 86_400_000 * 3 },
+    ]
+    const result = groupSessionsByRelativeDate(sessions, now)
+    expect(result.map((g) => g.key)).toEqual(['today', 'yesterday', 'older'])
+    expect(result[0].sessions.map((s) => s.id)).toEqual(['today-1', 'today-2'])
+    expect(result[1].sessions.map((s) => s.id)).toEqual(['yesterday'])
+    expect(result[2].sessions.map((s) => s.id)).toEqual(['older'])
+  })
+
+  it('omits empty groups', () => {
+    const result = groupSessionsByRelativeDate(
+      [{ id: 'only-today', updatedAtMs: now - 60_000 }],
+      now,
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].key).toBe('today')
+  })
+
+  it('returns empty array for no sessions', () => {
+    expect(groupSessionsByRelativeDate([], now)).toEqual([])
   })
 })

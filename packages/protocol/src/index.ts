@@ -297,6 +297,33 @@ export interface ToolCall {
   truncated?: boolean      // input and/or output was clipped; sticky-OR
 }
 
+/** A message in a replayed session conversation. */
+export interface ReplayMessage {
+  readonly type: 'human' | 'ai' | 'system'
+  readonly content: string
+  readonly tool_calls?: readonly ReplayToolCall[]
+}
+
+export interface ReplayToolCall {
+  readonly name: string
+  readonly args: Record<string, unknown>
+  readonly id: string
+  readonly type: 'tool_call'
+}
+
+export interface ReplayToolCallSummary {
+  readonly name: string
+  readonly input: unknown
+  readonly output?: string
+  readonly error?: string
+}
+
+export interface ReplayResult {
+  readonly messages: readonly ReplayMessage[]   // conversation at the start of the requested turn
+  readonly agentResponse?: string               // agent's text for this turn
+  readonly toolCalls: readonly ReplayToolCallSummary[] // tool calls with inputs/outputs for this turn
+}
+
 /**
  * One step in an assistant turn's execution trace. `stepSeq` is a single
  * turn-global monotonic counter shared across reasoning and tool steps, so a
@@ -438,6 +465,7 @@ export type ClientMessage =
   | { type: 'permission:respond'; sessionId: string; requestId: string; optionId?: string; cancelled?: boolean }
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
   | { type: 'plugin:install:url'; url: string }
+  | { type: 'plugin:install:github'; url: string }
   | { type: 'git:worktree:create'; sessionId: string; branch: string }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
@@ -450,6 +478,7 @@ export type ClientMessage =
   | { type: 'agent:setProfile'; sessionId: string; id: string }
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
+  | { type: 'replay:session'; sessionId: string; turnIndex: number }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -508,6 +537,7 @@ export type ServerMessage =
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
+  | { type: 'replay:result'; sessionId: string; result: ReplayResult }
 
 export interface AgentProfileInfo {
   id: string;

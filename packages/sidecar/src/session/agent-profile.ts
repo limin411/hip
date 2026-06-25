@@ -40,6 +40,9 @@ export const ALL_BUILTIN_TOOLS: string[] = [
   'run_script',
   'task',
   'dispatch_agent',
+  'goal_create',
+  'goal_status',
+  'goal_update',
 ]
 
 export const BUILTIN_PROFILES: AgentProfile[] = [

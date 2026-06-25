@@ -21,6 +21,7 @@ import { buildChatModel, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
 import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
+import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
@@ -48,9 +49,19 @@ import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
+import {
+  ContextInjectorRegistry,
+  SystemPromptInjector,
+  SkillsListInjector,
+  PermissionModeInjector,
+  TokenBudgetInjector,
+  SubagentStatusInjector,
+} from './context-injector.js'
 import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
+import { BackgroundManager, BackgroundTaskPersistence, type BackgroundTaskMeta } from './background-manager.js'
+import { CronManager } from './cron.js'
 import { logInfo, logDebug, logDebugEveryN } from '../debug-logger.js'
 
 export { sanitizeTitle } from './title-generator.js'
@@ -149,12 +160,20 @@ export class Session {
   private modelDirty = false
   private turnSeq = 0
   private stopContinued = false
+  private goalContinued = false
   readonly usesEnvModel: boolean
   private readonly titleGenerator?: TitleGenerator
   private readonly invokerFactory: (cwd: string) => AgentInvoker
-  readonly backgroundTasks: Map<string, Promise<void>> = new Map()
-  private readonly backgroundTaskMeta: Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }> = new Map()
+  readonly backgroundManager: BackgroundManager
+  readonly cronManager: CronManager
+  /** @deprecated Use backgroundManager.tasks instead. Kept for test backward-compat. */
+  get backgroundTasks(): Map<string, Promise<void>> { return this.backgroundManager.tasks }
+  /** @deprecated Use backgroundManager.meta instead. Kept for internal backward-compat. */
+  private get backgroundTaskMeta(): Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }> {
+    return this.backgroundManager.meta as Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }>
+  }
   private readonly spawnedSubagentIds = new Set<string>()
+  private readonly subagentInstances: Map<string, { description: string }> = new Map()
   private readonly toolOutputStore = new ToolOutputStore()
   private readonly networkPolicy = new NetworkPolicy(loadNetworkPolicyConfig())
   private readonly inputQueueStore?: SessionInputQueue
@@ -165,6 +184,7 @@ export class Session {
   private readonly snapshotStore?: SnapshotStore
   private readonly activeSteps = new Map<string, string>()
   private activeActivity?: ActivityTracker
+  readonly goalManager = new GoalManager()
 
   readonly git: GitOperations
   readonly permissions: PermissionManager
@@ -174,12 +194,14 @@ export class Session {
   readonly approvalCache = new SessionApprovalCache()
   readonly toolPolicy = defaultToolPolicy({ selfGatedTools: SELF_GATED_TOOLS })
 
-  listBackgroundTasks(): string[] { return [...this.backgroundTasks.keys()] }
+  listBackgroundTasks(): string[] { return this.backgroundManager.listIds() }
 
+  /** @deprecated Use backgroundManager directly. Kept for backward compat. */
   private trimBackgroundTaskMeta(): void {
-    if (this.backgroundTaskMeta.size <= Session.MAX_RETAINED_BACKGROUND_META) return
-    for (const [id, m] of this.backgroundTaskMeta) {
-      if (m.status !== 'running') { this.backgroundTaskMeta.delete(id); break }
+    const { meta } = this.backgroundManager
+    if (meta.size <= Session.MAX_RETAINED_BACKGROUND_META) return
+    for (const [id, m] of meta) {
+      if (m.status !== 'running') { meta.delete(id); break }
     }
   }
 
@@ -233,11 +255,7 @@ export class Session {
       error = msg
     }
 
-    const meta = this.backgroundTaskMeta.get(taskId)
-    if (meta) {
-      meta.status = status
-      if (error === undefined) { meta.result = result } else { meta.error = error }
-    }
+    this.backgroundManager.completeTask(taskId, status, error === undefined ? result : undefined, error)
 
     const ts = Date.now()
     this.emit({ type: 'step_started', sessionId: this.id, turnId: syntheticTurnId, agentId: syntheticAgentId, timestamp: ts })
@@ -330,6 +348,13 @@ export class Session {
     this.usesEnvModel = !model && !runner
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
 
+    this.backgroundManager = new BackgroundManager(id, {
+      maxTasks: Session.MAX_BACKGROUND_TASKS,
+      maxRetainedMeta: Session.MAX_RETAINED_BACKGROUND_META,
+    })
+
+    this.cronManager = new CronManager(id, store)
+
     this.eventStore = store ? new EventStore(store.getDb()) : undefined
     this.snapshotStore = store ? new SnapshotStore(store.getDb()) : undefined
     this.inputQueueStore = store ? new SessionInputQueue(store, id) : undefined
@@ -354,6 +379,15 @@ export class Session {
     this.buildAgent()
     this.configMgr.loadPluginComponents()
     this.recoverFromCrash()
+    this.reconcileBackgroundTasks()
+  }
+
+  /** Reconcile persisted background task state after a process restart. */
+  private reconcileBackgroundTasks(): void {
+    const lost = this.backgroundManager.reconcile()
+    if (lost.length > 0) {
+      logInfo('session', 'background:reconciled', { sessionId: this.id, lostTasks: lost })
+    }
   }
 
   get config(): SessionConfig { return this._config }
@@ -729,6 +763,9 @@ export class Session {
 
     ensureStarted('supervisor', 'supervisor')
 
+    const cronDue = this.cronManager.tick()
+    const cronMessages: BaseMessage[] = cronDue.map((p) => new SystemMessage(`<system-reminder>${p}</system-reminder>`))
+
     const cwd = this._config.cwd ?? process.cwd()
     const runner = this.modelRunner(); const summarizer = this.summarizer()
     const skills = this.configMgr.skills; const pluginAgents = this.configMgr.pluginAgents
@@ -752,13 +789,12 @@ export class Session {
     const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground', taskId?: string): Promise<string> => {
       const childId = taskId ?? `worker-${++subagentSeq}`
       this.spawnedSubagentIds.add(childId)
+      this.subagentInstances.set(childId, { description })
       if (subagentMode === 'background') {
-        if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
-        if (this.backgroundTasks.size >= Session.MAX_BACKGROUND_TASKS) return `Error: maximum ${Session.MAX_BACKGROUND_TASKS} concurrent background tasks reached`
-        this.backgroundTaskMeta.set(childId, { description, status: 'running' })
-        const promise = this.runBackgroundSubagent(childId, description, this.abortController!.signal, send)
-          .finally(() => { this.backgroundTasks.delete(childId); this.trimBackgroundTaskMeta() })
-        this.backgroundTasks.set(childId, promise)
+        const result = this.backgroundManager.spawn(childId, description, async (signal) => {
+          await this.runBackgroundSubagent(childId, description, signal, send)
+        })
+        if (result !== childId) return result
         return `Background task started: ${childId}`
       }
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
@@ -766,6 +802,13 @@ export class Session {
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
       const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text)
+      return text
+    }
+
+    const retrySubagentWrapper = async (agentId: string): Promise<string> => {
+      ensureStarted(agentId, 'worker', 'supervisor', 'retrying', agentId)
+      const text = await this.retrySubagent(agentId, send)
+      ensureFinished(agentId, text)
       return text
     }
 
@@ -810,19 +853,24 @@ export class Session {
         permissionMode: mode,
         mcpCatalog: mcpManager.toolCatalog() || undefined,
         tokenBudgetPercent,
-        pendingSubagents: this.backgroundTasks.size > 0
-          ? [...this.backgroundTasks.keys()].map((id) => {
-              const meta = this.backgroundTaskMeta.get(id)
-              return { id, description: meta?.description ?? id, status: 'running' as const }
-            })
+        pendingSubagents: this.backgroundManager.runningCount > 0
+          ? this.backgroundManager.runningEntries()
           : undefined,
         completedSubagents: (() => {
-          const entries = [...this.backgroundTaskMeta.entries()].filter(([, m]) => m.status !== 'running')
-          return entries.length > 0 ? entries.map(([id, m]) => ({ id, description: m.description, status: m.status })) : undefined
+          const entries = this.backgroundManager.completedEntries()
+          return entries.length > 0 ? entries : undefined
         })(),
       }
+
+      const injectorRegistry = new ContextInjectorRegistry()
+      injectorRegistry.register(new SystemPromptInjector())
+      injectorRegistry.register(new SkillsListInjector())
+      injectorRegistry.register(new PermissionModeInjector())
+      injectorRegistry.register(new TokenBudgetInjector())
+      injectorRegistry.register(new SubagentStatusInjector())
+
       logDebug('session', 'phase:prepareContext', { sessionId: this.id, elapsedMs: Date.now() - t0 })
-      const prepared = await prepareSessionContext(this.id, 'supervisor', contextState, this.store)
+      const prepared = await prepareSessionContext(this.id, 'supervisor', contextState, this.store, false, injectorRegistry)
       system = prepared.system
       contextMessages = prepared.contextMessages
       logDebug('session', 'phase:contextDone', { sessionId: this.id, elapsedMs: Date.now() - t0, contextMsgCount: prepared.contextMessages.length })
@@ -835,6 +883,9 @@ export class Session {
         enabledAgents,
         dispatch: enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
         spawnSubagent,
+        retrySubagent: retrySubagentWrapper,
+        stopBackgroundTask: (taskId, reason) => this.backgroundManager.stop(taskId, reason),
+        getBackgroundTaskOutput: (taskId) => this.backgroundManager.getOutput(taskId),
         hooks: this.hooks,
         approvalCache: this.approvalCache,
         requestApproval,
@@ -850,6 +901,8 @@ export class Session {
         emitRisk: (toolName, risk, approval) => {
           send({ type: 'guardian:risk', sessionId: this.id, turnId, toolName, risk, category: approval, reason: '' })
         },
+        goalManager: this.goalManager,
+        cronManager: this.cronManager,
       })
       logDebug('session', 'phase:toolingDone', { sessionId: this.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
       // After reconcile: status reflects actual connection state
@@ -863,6 +916,7 @@ export class Session {
     try {
       if (this.agentProv.isExternalAgent()) {
         const userText = lastUserText(base?.messages ?? this.messages)
+        const cronPrefix = cronMessages.length ? cronMessages.map((m) => m.content as string).join('\n\n') + '\n\n' : ''
         const hooks: ExternalAgentHooks = {
           requestPermission: (req) => {
             const auto = tryAutoResolvePermission(mode, req.tool.kind, req.options)
@@ -871,7 +925,7 @@ export class Session {
           },
           configOptions: (options) => send({ type: 'agent:configOptions', sessionId: this.id, options }),
         }
-        await this.agentProv.ensureExternalProvider().runTurn(userText, emit, this.abortController.signal, hooks)
+        await this.agentProv.ensureExternalProvider().runTurn(cronPrefix + userText, emit, this.abortController.signal, hooks)
         closeReasoning('supervisor'); finishRemaining()
         const acpId = this.agentProv.acpSessionId; if (acpId && this.store) this.store.setAcpSessionId(this.id, acpId)
       } else {
@@ -885,7 +939,7 @@ export class Session {
         logDebug('session', 'phase:invokeGraph', { sessionId: this.id, elapsedMs: Date.now() - t0, msgCount: base?.messages.length ?? this.messages.length })
         finalState = await this.app.invoke(
           {
-            messages: [new SystemMessage(system), ...contextMessages, ...(base?.messages ?? this.messages)],
+            messages: [new SystemMessage(system), ...cronMessages, ...contextMessages, ...(base?.messages ?? this.messages)],
             steps: base?.steps ?? 0,
             recentSigs: [],
             nudgedSig: undefined,
@@ -984,6 +1038,28 @@ export class Session {
     }
 
     void this.hooks.fire('TurnComplete', { sessionId: this.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
+
+    // Goal mode: record turn usage for every completed turn.
+    const turnUsage = sumUsage([...usageByAgent.values()])
+    const totalTokens = (turnUsage?.inputTokens ?? 0) + (turnUsage?.outputTokens ?? 0)
+    this.goalManager.recordTurn()
+    if (totalTokens > 0) this.goalManager.recordTokens(totalTokens)
+
+    // Goal mode: auto-continue if active goal has remaining budget and no user input pending.
+    if (!this.awaitingResume && !this.goalContinued) {
+      const driveResult = this.goalManager.drive()
+      if (driveResult) {
+        this.goalContinued = true
+        this.messages.push(new HumanMessage(driveResult.prompt))
+        try {
+          const continuedText = await this.runTurn(rawSend)
+          return continuedText
+        } finally {
+          this.goalContinued = false
+        }
+      }
+    }
+
     const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
     void this.captureCheckpoint(turnId, ckptLabel, send).catch((err) => logNonCritical('captureCheckpoint', err))
     return finalText
@@ -1161,6 +1237,67 @@ export class Session {
     this.resumeAbortController?.abort()
   }
 
+  /**
+   * Retry a previously failed or interrupted subagent with the original task
+   * description. Prior message history (before the failed turn) is preserved;
+   * the failed turn itself is excluded so the retry starts clean.
+   */
+  async retrySubagent(agentId: string, send: SendFn): Promise<string> {
+    const instance = this.subagentInstances.get(agentId)
+    if (!instance) return `Error: subagent ${agentId} not found`
+    if (!this.spawnedSubagentIds.has(agentId)) return `Error: ${agentId} is not a known subagent`
+
+    const allMessages = this.loadSubagentMessages(agentId)
+
+    let retryDescription = instance.description
+    let lastUserIdx = -1
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      if (allMessages[i].getType() === 'human') { lastUserIdx = i; break }
+    }
+    if (lastUserIdx >= 0) {
+      const content = allMessages[lastUserIdx].content
+      if (typeof content === 'string') retryDescription = content
+    }
+
+    const priorContext = lastUserIdx > 0 ? allMessages.slice(0, lastUserIdx) : []
+
+    const cwd = this._config.cwd ?? process.cwd()
+    const runner = this.modelRunner()
+    const summarizer = this.summarizer()
+    const rawMode = this._config.permissionMode
+    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const requestApproval = this.permissions.buildRequestApproval(send, this.id, '', () => 0, mode, this.hooks)
+
+    const turnId = `retry-${agentId}-${Date.now()}`
+    send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role: 'worker', taskId: agentId, taskInput: retryDescription })
+
+    let result = ''
+    try {
+      result = await runSubagent({
+        runner,
+        root: cwd,
+        summarizer,
+        emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
+        signal: new AbortController().signal,
+        description: retryDescription,
+        childMaxSteps: CHILD_MAX_STEPS,
+        permissionMode: mode,
+        requestApproval,
+        sessionId: this.id,
+        networkPolicy: this.networkPolicy,
+        toolOutputStore: this.toolOutputStore,
+        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+        ...(priorContext.length > 0 ? { existingMessages: priorContext } : {}),
+      })
+    } catch (err) {
+      const msg = safeErrorMessage(err)
+      result = `Error: ${msg}`
+    }
+
+    send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+    return result
+  }
+
   async resumeSubagent(taskId: string, content: string, send: SendFn): Promise<void> {
     if (this.running || this.awaitingResume) return
     if (this.backgroundTasks.has(taskId)) return
@@ -1220,11 +1357,10 @@ export class Session {
 
   async destroy(): Promise<void> {
     this.cancel()
-    if (this.backgroundTasks.size > 0) {
+    if (this.backgroundManager.totalCount > 0) {
       const timeout = new Promise<'timed_out'>((resolve) => setTimeout(() => resolve('timed_out'), 5_000))
-      await Promise.race([Promise.allSettled([...this.backgroundTasks.values()]).then(() => 'settled' as const), timeout])
-      this.backgroundTasks.clear()
-      this.backgroundTaskMeta.clear()
+      await Promise.race([Promise.allSettled([...this.backgroundManager.tasks.values()]).then(() => 'settled' as const), timeout])
+      this.backgroundManager.clear()
     }
     this.spawnedSubagentIds.clear()
     this.agentProv.dispose()

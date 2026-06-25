@@ -11,6 +11,10 @@ import type { NetworkPolicy } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { ModelRunner } from './model-runner.js'
+import type { GoalManager } from './goal.js'
+import { buildGoalTools } from './tools/goal.js'
+import type { CronManager } from './cron.js'
+import { buildCronTools } from './cron.js'
 export interface SessionTooling {
   tools: StructuredToolInterface[]
   toolRunner: ToolRunner
@@ -26,6 +30,9 @@ export interface BuildSessionToolingInput {
   enabledAgents: AgentConfig[]
   dispatch?: DispatchSpec
   spawnSubagent: (description: string, mode?: 'foreground' | 'background') => Promise<string>
+  retrySubagent?: (agentId: string) => Promise<string>
+  stopBackgroundTask?: (taskId: string, reason?: string) => string
+  getBackgroundTaskOutput?: (taskId: string) => string
   hooks: HookRegistry
   approvalCache: SessionApprovalCache
   requestApproval?: ApprovalFn
@@ -39,6 +46,8 @@ export interface BuildSessionToolingInput {
   onToolStarted: (name: string, callId: string, input: unknown) => void
   onToolFinished: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
   emitRisk: (toolName: string, risk: 'low' | 'medium' | 'high', approval: string) => void
+  goalManager?: GoalManager
+  cronManager?: CronManager
 }
 
 export async function buildSessionTooling(input: BuildSessionToolingInput): Promise<SessionTooling> {
@@ -63,9 +72,24 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       blockedTools: input.blockedTools,
       networkPolicy: input.networkPolicy,
     },
+    input.retrySubagent,
+    input.stopBackgroundTask,
+    input.getBackgroundTaskOutput,
   )
   for (const t of builtInTools) {
     registry.register(t)
+  }
+  if (input.goalManager) {
+    const goalTools = buildGoalTools(input.goalManager)
+    for (const t of goalTools) {
+      registry.register(t)
+    }
+  }
+  if (input.cronManager) {
+    const cronTools = buildCronTools(input.cronManager)
+    for (const t of cronTools) {
+      registry.register(t)
+    }
   }
   mcpManager.registerWithRegistry?.(registry, scope)
 

@@ -128,6 +128,15 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
+  it('remembers previousView when entering settings from chat or code', () => {
+    useUiStore.setState({ activeView: 'code', previousView: null })
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().previousView).toBe('code')
+
+    useUiStore.getState().setActiveView('chat')
+    expect(useUiStore.getState().previousView).toBeNull()
+  })
+
   it('setActiveView to the same value is a no-op (same reference)', () => {
     useUiStore.getState().setActiveView('chat')
     const before = useUiStore.getState()

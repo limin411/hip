@@ -533,6 +533,7 @@ export const zhCN = {
       clear: '清除',
       cancel: '取消',
       close: '关闭',
+      back: '返回',
       logout: '退出登录',
       logoutConfirmTitle: '退出登录？',
       logoutConfirmDesc: '退出后需要重新登录才能继续。',

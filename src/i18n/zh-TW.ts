@@ -533,6 +533,7 @@ export const zhTW = {
       clear: '清除',
       cancel: '取消',
       close: '關閉',
+      back: '返回',
       logout: '登出',
       logoutConfirmTitle: '登出？',
       logoutConfirmDesc: '登出後需要重新登入才能繼續。',

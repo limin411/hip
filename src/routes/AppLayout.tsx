@@ -107,13 +107,13 @@ export function AppLayout() {
         </PanelGroup>
 
         {activeView !== 'settings' && <SidebarPeek />}
+        </div>
 
         {activeView === 'settings' && (
           <div className="absolute inset-0 z-20 bg-surface">
             <SettingsPage />
           </div>
         )}
-        </div>
       </div>
     </div>
   )

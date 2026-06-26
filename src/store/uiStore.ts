@@ -49,6 +49,7 @@ interface UiState {
 
   activeView: ActiveView
   setActiveView: (v: ActiveView) => void
+  previousView: ActiveView | null
 
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
@@ -113,7 +114,20 @@ export const useUiStore = create<UiState>()(
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
 
       activeView: 'chat',
-      setActiveView: (v) => set((s) => (s.activeView === v ? s : { activeView: v })),
+      previousView: null,
+      setActiveView: (v) =>
+        set((s) => {
+          if (s.activeView === v) return s
+          return {
+            activeView: v,
+            previousView:
+              v === 'settings' && s.activeView !== 'settings'
+                ? s.activeView
+                : s.activeView === 'settings'
+                  ? null
+                  : s.previousView,
+          }
+        }),
 
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),

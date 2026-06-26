@@ -533,6 +533,7 @@ export const en = {
       clear: 'Clear',
       cancel: 'Cancel',
       close: 'Close',
+      back: 'Back',
       logout: 'Log Out',
       logoutConfirmTitle: 'Log out?',
       logoutConfirmDesc: 'You will need to log in again to continue.',

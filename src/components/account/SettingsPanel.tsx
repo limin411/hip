@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
+import { Button } from '@/components/ui/Button'
 import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
@@ -26,6 +27,9 @@ export function SettingsPanel() {
   const navRef = useRef<ImperativePanelHandle>(null)
   const navCollapsed = useUiStore((s) => s.settingsNavCollapsed)
   const setNavCollapsed = useUiStore((s) => s.setSettingsNavCollapsed)
+  const previousView = useUiStore((s) => s.previousView)
+  const setActiveView = useUiStore((s) => s.setActiveView)
+  const handleBack = () => setActiveView(previousView ?? 'chat')
 
   // 折叠态由 store 驱动（标题栏统一按钮 → settingsNavCollapsed），命令式同步到 Panel，
   // 与对话侧栏（AppLayout 同款 effect）完全一致。
@@ -54,29 +58,42 @@ export function SettingsPanel() {
           onCollapse={() => setNavCollapsed(true)}
           onExpand={() => setNavCollapsed(false)}
         >
-          <TabsPrimitive.List
-            aria-label={t('settings.title')}
-            className="flex h-full flex-col gap-1 overflow-y-auto bg-surface p-2"
-          >
-            {PAGES.map((page) => {
-              const Icon = page.icon
-              return (
-                <TabsPrimitive.Trigger
-                  key={page.id}
-                  value={page.id}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md px-2.5 py-2 text-body transition-colors',
-                    'text-ink-secondary hover:bg-surface-muted',
-                    'data-[state=active]:bg-accent-active data-[state=active]:text-accent-strong',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-                  )}
-                >
-                  <Icon size={16} className="shrink-0" />
-                  <span className="truncate">{t(page.labelKey)}</span>
-                </TabsPrimitive.Trigger>
-              )
-            })}
-          </TabsPrimitive.List>
+          <div className="flex h-full flex-col bg-surface">
+            <TabsPrimitive.List
+              aria-label={t('settings.title')}
+              className="flex flex-1 flex-col gap-1 overflow-y-auto p-2"
+            >
+              {PAGES.map((page) => {
+                const Icon = page.icon
+                return (
+                  <TabsPrimitive.Trigger
+                    key={page.id}
+                    value={page.id}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-2.5 py-2 text-body transition-colors',
+                      'text-ink-secondary hover:bg-surface-muted',
+                      'data-[state=active]:bg-accent-active data-[state=active]:text-accent-strong',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                    )}
+                  >
+                    <Icon size={16} className="shrink-0" />
+                    <span className="truncate">{t(page.labelKey)}</span>
+                  </TabsPrimitive.Trigger>
+                )
+              })}
+            </TabsPrimitive.List>
+            <div className="border-t border-border p-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2"
+                onClick={handleBack}
+              >
+                <ArrowLeft size={16} />
+                <span>{t('common.back')}</span>
+              </Button>
+            </div>
+          </div>
         </Panel>
 
         <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">

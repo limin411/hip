@@ -22,12 +22,6 @@ export const en = {
       newConversationGreeting: 'What are we building?',
       codeGreeting: 'What should we build?',
       codeNeedFolder: 'Choose a project folder to start coding',
-      sampleQuestionExplainCodebase: 'Explain this codebase',
-      sampleQuestionWriteComponent: 'Write a React component',
-      sampleQuestionBrainstorm: 'Brainstorm app ideas',
-      sampleQuestionRefactorAuth: 'Refactor the auth module',
-      sampleQuestionAddEndpoint: 'Add a new API endpoint',
-      sampleQuestionFixTests: 'Fix the failing tests',
       greeting: {
         default: 'What are we building?',
         wave: 'Hey there!',

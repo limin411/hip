@@ -22,12 +22,6 @@ export const zhTW = {
       newConversationGreeting: '我們來做點什麼？',
       codeGreeting: '我們來寫點什麼？',
       codeNeedFolder: '選擇一個專案資料夾以開始編碼',
-      sampleQuestionExplainCodebase: '解釋這個程式碼庫',
-      sampleQuestionWriteComponent: '寫一個 React 元件',
-      sampleQuestionBrainstorm: '腦力激盪應用點子',
-      sampleQuestionRefactorAuth: '重構認證模組',
-      sampleQuestionAddEndpoint: '新增一個 API 介面',
-      sampleQuestionFixTests: '修復失敗的測試',
       greeting: {
         default: '我們來做點什麼？',
         wave: '你好呀！',

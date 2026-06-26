@@ -22,12 +22,6 @@ export const zhCN = {
       newConversationGreeting: '我们来做点什么？',
       codeGreeting: '我们来写点什么？',
       codeNeedFolder: '选择一个项目文件夹以开始编码',
-      sampleQuestionExplainCodebase: '解释这个代码库',
-      sampleQuestionWriteComponent: '写一个 React 组件',
-      sampleQuestionBrainstorm: '头脑风暴应用创意',
-      sampleQuestionRefactorAuth: '重构认证模块',
-      sampleQuestionAddEndpoint: '新增一个 API 接口',
-      sampleQuestionFixTests: '修复失败的测试',
       greeting: {
         default: '我们来做点什么？',
         wave: '你好呀！',

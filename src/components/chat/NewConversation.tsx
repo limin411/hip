@@ -3,24 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { sessionService } from '@/domain'
-import { SampleQuestionPill } from '@/components/ui/SampleQuestionPill'
 import { Composer } from './Composer'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
-
-const SAMPLE_QUESTIONS = {
-  chat: [
-    'chat.sampleQuestionExplainCodebase',
-    'chat.sampleQuestionWriteComponent',
-    'chat.sampleQuestionBrainstorm',
-  ],
-  code: [
-    'chat.sampleQuestionRefactorAuth',
-    'chat.sampleQuestionAddEndpoint',
-    'chat.sampleQuestionFixTests',
-  ],
-} as const satisfies Record<'chat' | 'code', readonly string[]>
 
 export function NewConversation() {
   const { t } = useTranslation()
@@ -49,7 +35,6 @@ export function NewConversation() {
   }
 
   const greeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
-  const sampleQuestions = SAMPLE_QUESTIONS[surface]
 
   const setText = (value: string) => useDraftStore.getState().setText(value)
 
@@ -72,13 +57,6 @@ export function NewConversation() {
           submitDisabled={!canSend}
           leftSlot={surface === 'code' ? <><ModelPicker /><PermissionModePicker /></> : <ModelPicker />}
         />
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {sampleQuestions.map((key) => (
-            <SampleQuestionPill key={key} onClick={() => setText(t(key))}>
-              {t(key)}
-            </SampleQuestionPill>
-          ))}
-        </div>
         {surface === 'code' && (
           <div className="mt-2 flex flex-col items-center gap-1">
             <FolderPill />

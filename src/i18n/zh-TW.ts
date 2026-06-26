@@ -69,7 +69,6 @@ export const zhTW = {
         tumble: '體操選手上線',
       },
       pickFolder: '選擇專案資料夾',
-      orJustChat: '或直接對話（沙箱）',
       clearFolder: '純對話',
       stop: '停止',
       copy: '複製',

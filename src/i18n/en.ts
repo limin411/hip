@@ -69,7 +69,6 @@ export const en = {
         tumble: 'Gymnastics time',
       },
       pickFolder: 'Choose project folder',
-      orJustChat: 'or just chat (sandbox)',
       clearFolder: 'Pure chat',
       stop: 'Stop',
       copy: 'Copy',

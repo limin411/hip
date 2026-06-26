@@ -69,7 +69,6 @@ export const zhCN = {
         tumble: '体操选手上线',
       },
       pickFolder: '选择项目文件夹',
-      orJustChat: '或直接对话（沙箱）',
       clearFolder: '纯对话',
       stop: '停止',
       copy: '复制',

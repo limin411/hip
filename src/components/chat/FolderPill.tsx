@@ -59,7 +59,6 @@ export function FolderPill() {
     >
       <Folder size={13} className="text-ink-tertiary" />
       {t('chat.pickFolder')}
-      <span className="text-ink-tertiary">· {t('chat.orJustChat')}</span>
     </button>
   )
 }

@@ -14,7 +14,7 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
       t: (key: string) => key,
       i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
-  }
+  } as any
 })
 
 vi.mock('react-resizable-panels', () => ({

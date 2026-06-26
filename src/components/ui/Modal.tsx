@@ -55,37 +55,39 @@ export function Modal({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
-        <DialogPrimitive.Content
-          className={cn(
-            'fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none animate-menu-in',
-            !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
-            className,
-          )}
-          style={resizable ? { width: size.width, height: size.height } : undefined}
-        >
-          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-            <DialogPrimitive.Title className="text-title font-bold tracking-tight text-ink">
-              {title}
-            </DialogPrimitive.Title>
-            <DialogPrimitive.Close
-              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted"
-              title={t('common.close')}
-            >
-              <X size={18} />
-            </DialogPrimitive.Close>
+        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-center justify-center outline-none">
+          <div
+            className={cn(
+              'relative z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none animate-menu-in',
+              !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
+              className,
+            )}
+            style={resizable ? { width: size.width, height: size.height } : undefined}
+          >
+            <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
+              <DialogPrimitive.Title className="text-title font-bold tracking-tight text-ink">
+                {title}
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Close
+                className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted"
+                title={t('common.close')}
+              >
+                <X size={18} />
+              </DialogPrimitive.Close>
+            </div>
+            <div className="flex-1 overflow-y-auto">{children}</div>
+            {footer && (
+              <div className="shrink-0 border-t border-border bg-surface-subtle px-5 py-3">{footer}</div>
+            )}
+            {resizable &&
+              RESIZE_HANDLES.map((h) => (
+                <div
+                  key={h.dir}
+                  onPointerDown={(e) => onResizeStart(h.dir, e)}
+                  className={cn('absolute select-none', h.dir.includes('-') ? 'z-20' : 'z-10', h.className)}
+                />
+              ))}
           </div>
-          <div className="flex-1 overflow-y-auto">{children}</div>
-          {footer && (
-            <div className="shrink-0 border-t border-border bg-surface-subtle px-5 py-3">{footer}</div>
-          )}
-          {resizable &&
-            RESIZE_HANDLES.map((h) => (
-              <div
-                key={h.dir}
-                onPointerDown={(e) => onResizeStart(h.dir, e)}
-                className={cn('absolute select-none', h.dir.includes('-') ? 'z-20' : 'z-10', h.className)}
-              />
-            ))}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

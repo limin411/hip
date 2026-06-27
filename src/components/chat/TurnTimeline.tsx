@@ -120,7 +120,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns }: TurnTimelineProps)
   const seen = new Set<string>()
   const plan = latestTodos(toolCalls)
   return (
-    <div className="mb-2 flex flex-col gap-1.5" data-testid="turn-timeline">
+    <div className="mb-0 flex flex-col gap-1" data-testid="turn-timeline">
       {plan && plan.todos.length > 0 && <TodoChecklist todos={plan.todos} />}
       {ordered.flatMap((step) => {
         const nodes: JSX.Element[] = []

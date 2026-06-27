@@ -36,4 +36,33 @@ describe('AccountFooter', () => {
     expect(html).toContain('User')
     expect(html).toContain('user@example.com')
   })
+
+  it('renders as a card container with rounded background', () => {
+    const html = renderToStaticMarkup(<AccountFooter />)
+    expect(html).toContain('rounded-lg')
+    expect(html).toContain('bg-surface-muted')
+    expect(html).toContain('border-border')
+  })
+
+  it('renders avatar with gradient', () => {
+    const html = renderToStaticMarkup(<AccountFooter />)
+    expect(html).toContain('linear-gradient(135deg, var(--accent), var(--accent-hover))')
+  })
+
+  it('does not use flat border-t separator on trigger button', () => {
+    const html = renderToStaticMarkup(<AccountFooter />)
+    expect(html).not.toMatch(/border-t border-border pt-3/)
+  })
+
+  it('shows keyboard shortcut hint in settings menu item', () => {
+    const html = renderToStaticMarkup(<AccountFooter />)
+    // \u2318 is the ⌘ symbol
+    expect(html).toContain('\u2318,')
+  })
+
+  it('shows logout item without shortcut hint', () => {
+    const html = renderToStaticMarkup(<AccountFooter />)
+    expect(html).toContain('common.logout')
+  })
 })
+

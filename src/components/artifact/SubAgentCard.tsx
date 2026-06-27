@@ -18,7 +18,7 @@ export function splitAgents(agents: TurnAgent[]): { flat: TurnAgent[]; nested: T
 export function SubAgentCard({ agent }: { agent: TurnAgent }) {
   const [open, setOpen] = useState(true)
   return (
-    <div className="rounded-md border border-border bg-surface-muted/30">
+    <div className="rounded-lg border border-border bg-surface-muted/30">
       <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-2 py-1.5 text-left" data-testid="subagent-card">
         <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
         <span className="shrink-0 text-meta font-medium text-ink">{agent.agentId}</span>

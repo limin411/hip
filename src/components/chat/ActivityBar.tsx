@@ -60,17 +60,19 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
     ? (currentStepText ?? t('chat.activity.runningReasoning'))
     : t('chat.activity.completed', { finished: finishedCount, total: totalCount, agents: agentCount })
 
-  const canExpand = !streaming
-
   const barClassName = cn(
-    'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors',
-    canExpand && 'hover:border-accent/30 hover:bg-surface-muted/60',
-    !canExpand && 'cursor-default',
+    'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',
   )
 
   const barContent = (
     <>
-      {activeRole ? <AgentBadge role={activeRole} /> : <Circle size={10} className="mt-1.5 text-ink-tertiary" />}
+      {activeRole ? (
+        <span className={cn('inline-flex', status === 'running' && 'animate-pulse')}>
+          <AgentBadge role={activeRole} />
+        </span>
+      ) : (
+        <Circle size={10} className="mt-1.5 text-ink-tertiary" />
+      )}
       {activeRole && (
         <span className="shrink-0 text-meta font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
       )}
@@ -79,28 +81,17 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
         {status === 'running' && <Loader2 size={14} className="animate-spin text-accent-strong" />}
         {status === 'finished' && <CheckCircle2 size={14} className="text-success" />}
         {status === 'error' && <XCircle size={14} className="text-danger" />}
-        {canExpand && (
-          <ChevronRight size={14} className={cn('text-ink-tertiary transition-transform', open && 'rotate-90')} />
-        )}
+        <ChevronRight size={14} className={cn('text-ink-tertiary transition-transform', open && 'rotate-90')} />
       </span>
     </>
   )
 
   return (
-    <div className="mb-2" data-testid="activity-bar">
-      {canExpand ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className={barClassName}
-        >
-          {barContent}
-        </button>
-      ) : (
-        <div className={barClassName}>{barContent}</div>
-      )}
-      {open && canExpand && (
+    <div className="mb-2" data-testid="activity-bar" aria-live="polite">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={barClassName}>
+        {barContent}
+      </button>
+      {open && (
         <div className="mt-1.5 rounded-lg border border-border bg-surface-muted/30 px-2 py-1.5">
           <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} />
         </div>

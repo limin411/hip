@@ -44,12 +44,14 @@ describe('ActivityBar', () => {
     expect(html).toContain('aria-expanded="false"')
   })
 
-  it('shows running state without expand chevron when streaming', () => {
+  it('shows running state with expand chevron when streaming', () => {
     const html = renderToStaticMarkup(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />,
     )
     expect(html).toContain('正在 read_file')
-    expect(html).not.toContain('aria-expanded')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('lucide-chevron-right')
+    expect(html).toContain('animate-pulse')
   })
 
   it('hides when there is no activity', () => {
@@ -120,6 +122,24 @@ describe('ActivityBar', () => {
     expect(button).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByTestId('turn-timeline')).toBeInTheDocument()
     expect(screen.getByTestId('turn-timeline')).toHaveTextContent('TurnTimeline content')
+
+    vi.mocked(TurnTimeline).mockReturnValue(null)
+  })
+
+  it('toggles the activity drawer on click while streaming', () => {
+    vi.mocked(TurnTimeline).mockReturnValue(<div data-testid="turn-timeline">TurnTimeline content</div>)
+
+    const { container } = render(<ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />)
+
+    const button = container.querySelector('[data-testid="activity-bar"] button')!
+
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(container.querySelector('[data-testid="turn-timeline"]')).not.toBeInTheDocument()
+
+    fireEvent.click(button)
+
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
 
     vi.mocked(TurnTimeline).mockReturnValue(null)
   })

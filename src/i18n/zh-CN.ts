@@ -519,7 +519,7 @@ export const zhCN = {
     },
     nav: {
       chat: '办公',
-      code: '代码',
+      code: '编码',
       settings: '设置',
     },
     common: {

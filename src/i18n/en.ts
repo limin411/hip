@@ -519,7 +519,7 @@ export const en = {
     },
     nav: {
       chat: 'Work',
-      code: 'Code',
+      code: 'Coding',
       settings: 'Settings',
     },
     common: {

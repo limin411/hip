@@ -519,7 +519,7 @@ export const zhTW = {
     },
     nav: {
       chat: '辦公',
-      code: '程式碼',
+      code: '編碼',
       settings: '設定',
     },
     common: {

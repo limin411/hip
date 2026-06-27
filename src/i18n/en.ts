@@ -518,7 +518,7 @@ export const en = {
       skip: 'Skip Login',
     },
     nav: {
-      chat: 'Chat',
+      chat: 'Work',
       code: 'Code',
       settings: 'Settings',
     },

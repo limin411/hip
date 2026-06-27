@@ -131,6 +131,11 @@ export const zhCN = {
         sessionTotal: '本对话累计',
         cost: '约 {{cost}}',
       },
+      activity: {
+        completed: '已完成 · {{finished}}/{{total}} 个工具 · {{agents}} 个子 Agent',
+        runningTool: '正在 {{name}}',
+        runningReasoning: '正在思考',
+      },
     },
     sidebar: {
       collapse: '折叠侧边栏',

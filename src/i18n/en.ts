@@ -131,6 +131,11 @@ export const en = {
         sessionTotal: 'Session total',
         cost: '~{{cost}}',
       },
+      activity: {
+        completed: 'Completed · {{finished}}/{{total}} tools · {{agents}} sub-agents',
+        runningTool: 'Running {{name}}',
+        runningReasoning: 'Thinking',
+      },
     },
     sidebar: {
       collapse: 'Collapse Sidebar',

@@ -131,6 +131,11 @@ export const zhTW = {
         sessionTotal: '本對話累計',
         cost: '約 {{cost}}',
       },
+      activity: {
+        completed: '已完成 · {{finished}}/{{total}} 個工具 · {{agents}} 個子 Agent',
+        runningTool: '正在 {{name}}',
+        runningReasoning: '正在思考',
+      },
     },
     sidebar: {
       collapse: '折疊側邊欄',

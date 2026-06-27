@@ -42,6 +42,16 @@ export function AppLayout() {
     return () => clearTimeout(t)
   }, [collapsed])
 
+  // 在设置页调整宽度后返回主界面时，同步主侧边栏的宽度。
+  useEffect(() => {
+    const p = sidebarRef.current
+    if (!p || collapsed || sidebarWidth <= 0) return
+    const current = p.getSize()
+    if (Math.abs(current - sidebarWidth) > 0.1) {
+      p.resize(sidebarWidth)
+    }
+  }, [sidebarWidth, collapsed])
+
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-surface">
       {/* 贯穿全宽的标题栏 —— 红绿灯与统一折叠按钮的唯一归属，下方各列不再预留偏移 */}

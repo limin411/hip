@@ -27,6 +27,8 @@ export function SettingsPanel() {
   const navRef = useRef<ImperativePanelHandle>(null)
   const navCollapsed = useUiStore((s) => s.settingsNavCollapsed)
   const setNavCollapsed = useUiStore((s) => s.setSettingsNavCollapsed)
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const previousView = useUiStore((s) => s.previousView)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const handleBack = () => setActiveView(previousView ?? 'chat')
@@ -50,13 +52,16 @@ export function SettingsPanel() {
       <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={navRef}
-          defaultSize={18}
+          defaultSize={sidebarWidth}
           minSize={13}
           maxSize={34}
           collapsible
           collapsedSize={0}
           onCollapse={() => setNavCollapsed(true)}
           onExpand={() => setNavCollapsed(false)}
+          onResize={(size) => {
+            if (!navCollapsed && size > 0) setSidebarWidth(size)
+          }}
         >
           <div className="flex h-full flex-col bg-surface">
             <TabsPrimitive.List

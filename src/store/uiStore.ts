@@ -12,6 +12,8 @@ interface UiState {
   collapsed: boolean
   setCollapsed: (v: boolean) => void
   toggleCollapsed: () => void
+  sidebarWidth: number
+  setSidebarWidth: (v: number) => void
 
   settingsNavCollapsed: boolean
   setSettingsNavCollapsed: (v: boolean) => void
@@ -81,6 +83,8 @@ export const useUiStore = create<UiState>()(
       collapsed: false,
       setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
+      sidebarWidth: 18,
+      setSidebarWidth: (v) => set((s) => (s.sidebarWidth === v ? s : { sidebarWidth: v })),
 
       settingsNavCollapsed: false,
       setSettingsNavCollapsed: (v) =>

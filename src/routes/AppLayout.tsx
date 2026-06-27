@@ -16,6 +16,8 @@ import { SettingsPage } from '@/components/account/SettingsPage'
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
   const collapsed = useUiStore((s) => s.collapsed)
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth)
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
@@ -49,13 +51,16 @@ export function AppLayout() {
           <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={sidebarRef}
-          defaultSize={18}
+          defaultSize={sidebarWidth}
           minSize={12}
           maxSize={22}
           collapsible
           collapsedSize={0}
           onCollapse={() => setCollapsed(true)}
           onExpand={() => setCollapsed(false)}
+          onResize={(size) => {
+            if (!collapsed && size > 0) setSidebarWidth(size)
+          }}
         >
           {!collapsed && (
             <div className="h-full bg-surface">

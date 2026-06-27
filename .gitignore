@@ -45,3 +45,6 @@ tsconfig.node.tsbuildinfo
 .omo/
 .claude/
 .hip/
+
+# Worktrees
+.worktrees/

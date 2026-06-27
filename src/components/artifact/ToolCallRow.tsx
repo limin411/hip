@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Loader2, Check, X } from 'lucide-react'
+import { ChevronRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import type { ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 
@@ -29,15 +29,15 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
   const [open, setOpen] = useState(false)
   const hint = targetHint(tool.input)
   return (
-    <div className="rounded-md border border-border bg-surface-muted/40">
+    <div className="rounded-lg border border-border bg-surface-muted/40">
       <button onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors" data-testid="tool-row">
         <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
         <span className="shrink-0 font-mono text-meta text-ink">{tool.name}</span>
         {hint && <span className="truncate font-mono text-caption text-ink-tertiary">{hint}</span>}
         <span className="ml-auto shrink-0">
           {tool.status === 'running' && <Loader2 size={12} className="animate-spin text-accent-strong" />}
-          {tool.status === 'finished' && <Check size={12} className="text-success" />}
-          {tool.status === 'error' && <X size={12} className="text-danger" />}
+          {tool.status === 'finished' && <CheckCircle2 size={12} className="text-success" />}
+          {tool.status === 'error' && <XCircle size={12} className="text-danger" />}
         </span>
       </button>
       {open && (

@@ -65,7 +65,7 @@ export function AppLayout() {
         </Panel>
 
         <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
-          <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+          <div className="mx-auto h-full w-px bg-[var(--glass-border)] transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
         </PanelResizeHandle>
 
         <Panel minSize={34}>

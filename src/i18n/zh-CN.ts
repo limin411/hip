@@ -133,6 +133,7 @@ export const zhCN = {
       },
       activity: {
         completed: '已完成 · {{finished}}/{{total}} 个工具 · {{agents}} 个子 Agent',
+        completedWithError: '已完成 · {{finished}}/{{total}} 个工具 · {{agents}} 个子 Agent · 部分失败',
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
         initializing: '准备中…',

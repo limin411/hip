@@ -43,8 +43,9 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
         className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5"
         data-testid="activity-bar"
         role="status"
+        aria-live="polite"
       >
-        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent" aria-hidden />
+        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">{t('chat.activity.initializing')}</span>
         <Loader2 aria-hidden size={14} className="animate-spin text-accent-strong" />
       </div>
@@ -58,7 +59,9 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
 
   const summaryText = streaming
     ? (currentStepText ?? t('chat.activity.runningReasoning'))
-    : t('chat.activity.completed', { finished: finishedCount, total: totalCount, agents: agentCount })
+    : hasError
+      ? t('chat.activity.completedWithError', { finished: finishedCount, total: totalCount, agents: agentCount })
+      : t('chat.activity.completed', { finished: finishedCount, total: totalCount, agents: agentCount })
 
   const barClassName = cn(
     'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',

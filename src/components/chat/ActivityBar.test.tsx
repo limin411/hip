@@ -9,6 +9,7 @@ import { TurnTimeline } from './TurnTimeline'
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, params?: Record<string, unknown>) => {
     if (key === 'chat.activity.completed') return `已完成 · ${params?.finished}/${params?.total} 个工具 · ${params?.agents} 个子 Agent`
+    if (key === 'chat.activity.completedWithError') return `已完成 · ${params?.finished}/${params?.total} 个工具 · ${params?.agents} 个子 Agent · 部分失败`
     if (key === 'chat.activity.runningTool') return `正在 ${params?.name}`
     if (key === 'chat.activity.runningReasoning') return '正在思考'
     if (key === 'artifact.roles.planner') return '规划员'
@@ -84,6 +85,17 @@ describe('ActivityBar', () => {
       />,
     )
     expect(html).toContain('lucide-circle-x')
+  })
+
+  it('shows error summary text when a tool call failed', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        steps={baseSteps}
+        toolCalls={[{ ...baseTools[0], status: 'error' as const }]}
+        agentRuns={baseRuns}
+      />,
+    )
+    expect(html).toContain('已完成 · 0/1 个工具 · 1 个子 Agent · 部分失败')
   })
 
   it('shows thinking text while streaming a reasoning step', () => {

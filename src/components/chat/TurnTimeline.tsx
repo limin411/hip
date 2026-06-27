@@ -8,7 +8,7 @@ import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
 import { isSuppressedToolStep } from '@/lib/timelineFilter'
 import { latestTodos, type Todo } from '@/lib/todos'
 
-function AgentBadge({ role }: { role: AgentRole }) {
+export function AgentBadge({ role }: { role: AgentRole }) {
   return (
     <span
       className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"

@@ -1,6 +1,10 @@
+// @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ActivityBar } from './ActivityBar'
+import { TurnTimeline } from './TurnTimeline'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, params?: Record<string, unknown>) => {
@@ -13,7 +17,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('./TurnTimeline', () => ({
-  TurnTimeline: () => null,
+  TurnTimeline: vi.fn(() => null),
   AgentBadge: ({ role }: { role: string }) => `<AgentBadge role="${role}" />`,
 }))
 
@@ -93,5 +97,24 @@ describe('ActivityBar', () => {
       />,
     )
     expect(html).toContain('正在思考')
+  })
+
+  it('toggles the activity drawer on click', () => {
+    vi.mocked(TurnTimeline).mockReturnValue(<div data-testid="turn-timeline">TurnTimeline content</div>)
+
+    render(<ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} />)
+
+    const button = screen.getByTestId('activity-bar').querySelector('button')!
+
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('turn-timeline')).not.toBeInTheDocument()
+
+    fireEvent.click(button)
+
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('turn-timeline')).toBeInTheDocument()
+    expect(screen.getByTestId('turn-timeline')).toHaveTextContent('TurnTimeline content')
+
+    vi.mocked(TurnTimeline).mockReturnValue(null)
   })
 })

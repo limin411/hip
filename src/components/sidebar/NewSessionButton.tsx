@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
 import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
 
@@ -16,7 +15,6 @@ export function NewSessionButton({ surface }: NewSessionButtonProps) {
       className="w-full"
       onClick={() => sessionService.newConversation(surface)}
     >
-      <Plus size={16} />
       <span>{surface === 'code' ? t('sidebar.newCodeTask') : t('sidebar.newChat')}</span>
     </Button>
   )

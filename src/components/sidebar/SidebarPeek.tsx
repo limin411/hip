@@ -42,7 +42,7 @@ export function SidebarPeek() {
       >
         <ChevronRight
           size={16}
-          className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded bg-surface text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
+          className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded bg-[var(--glass-bg)] text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
         />
       </div>
 

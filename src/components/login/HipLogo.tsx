@@ -58,7 +58,7 @@ function TileFish() {
 }
 
 // 全身吉祥物「抱大鱼」（viewBox 0 0 160 178）。animated=true 时挂眨眼 / 斜瞄 / 抚摸 / 摆鱼动画。
-function HugMascot({ animated }: { animated: boolean }) {
+export function HugMascot({ animated }: { animated: boolean }) {
   const blink = animated ? 'hip-eyes-blink' : undefined
   const glance = animated ? 'hip-eyes-glance' : undefined
   const pet = animated ? 'hip-pet' : undefined
@@ -122,19 +122,15 @@ export function HipLogo({
     : ({ role: 'img', 'aria-label': title } as const)
 
   if (variant === 'hero') {
-    // 全身吉祥物 portrait（160×178）；奶油聚光衬底让鼠尾草灰身在鼠尾草灰渐变上脱离。
     const height = Math.round((size * 178) / 160)
     return (
-      <div className={className} style={{ width: size, height }} {...a11y}>
-        {/* 外层 div 已挂 role/aria-label；内层 svg 对 AT 隐藏，避免重复朗读，<title> 仅作文档。 */}
+      <div className={className} style={{ width: size, height, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} {...a11y}>
         <svg
-          width={size}
-          height={height}
+          aria-hidden="true"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
           viewBox="0 0 160 178"
           xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
         >
-          {!decorative && <title>{title}</title>}
           <ellipse
             className="hip-mascot-glow"
             cx={80}
@@ -144,8 +140,12 @@ export function HipLogo({
             fill={CREAM}
             opacity={0.13}
           />
-          <HugMascot animated />
         </svg>
+        <img
+          src="/logo.svg"
+          alt={decorative ? '' : title}
+          style={{ position: 'relative', zIndex: 1, width: Math.round(size * 0.75), height: 'auto' }}
+        />
       </div>
     )
   }

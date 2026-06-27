@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
+import { HipLogo } from '@/components/login/HipLogo'
 import { useAuthStore } from '@/store/authStore'
 
 export function LoginScreen() {
@@ -13,11 +14,12 @@ export function LoginScreen() {
   return (
     // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
     <div data-tauri-drag-region className="flex h-screen">
-      {/* 左侧品牌区 —— 白色底 */}
+      {/* 左侧品牌区 —— 吉祥物 */}
       <div
         className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex"
-        style={{ background: '#ffffff' }}
-      />
+      >
+        <HipLogo variant="hero" size={320} />
+      </div>
 
       {/* 右侧登录方式 */}
       <div className="flex flex-1 items-center justify-center px-8">

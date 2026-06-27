@@ -7,6 +7,7 @@ import { Composer } from './Composer'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
+import { HipLogo } from '@/components/login/HipLogo'
 
 export function NewConversation() {
   const { t } = useTranslation()
@@ -41,6 +42,9 @@ export function NewConversation() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5" data-testid="new-conversation">
       <div className="w-full max-w-3xl">
+        <div className="mb-6 flex justify-center">
+          <HipLogo variant="hero" size={160} />
+        </div>
         <div key={surface} className="animate-greeting-enter">
           <h1 className="mb-1 text-center text-display font-semibold text-ink">
             {greeting}

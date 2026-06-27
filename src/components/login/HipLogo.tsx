@@ -122,29 +122,12 @@ export function HipLogo({
     : ({ role: 'img', 'aria-label': title } as const)
 
   if (variant === 'hero') {
-    const height = Math.round((size * 178) / 160)
     return (
-      <div className={className} style={{ width: size, height, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} {...a11y}>
-        <svg
-          aria-hidden="true"
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-          viewBox="0 0 160 178"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <ellipse
-            className="hip-mascot-glow"
-            cx={80}
-            cy={104}
-            rx={60}
-            ry={66}
-            fill={CREAM}
-            opacity={0.13}
-          />
-        </svg>
+      <div className={className} style={{ width: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }} {...a11y}>
         <img
           src="/logo.svg"
           alt={decorative ? '' : title}
-          style={{ position: 'relative', zIndex: 1, width: Math.round(size * 0.75), height: 'auto' }}
+          style={{ width: Math.round(size * 0.75), height: 'auto' }}
         />
       </div>
     )

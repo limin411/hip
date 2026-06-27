@@ -518,7 +518,7 @@ export const zhTW = {
       skip: '跳過登錄',
     },
     nav: {
-      chat: '對話',
+      chat: '辦公',
       code: '程式碼',
       settings: '設定',
     },

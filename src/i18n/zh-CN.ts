@@ -518,7 +518,7 @@ export const zhCN = {
       skip: '跳过登录',
     },
     nav: {
-      chat: '对话',
+      chat: '办公',
       code: '代码',
       settings: '设置',
     },

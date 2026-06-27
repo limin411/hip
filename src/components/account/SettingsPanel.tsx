@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, ArrowLeft } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
-import { Button } from '@/components/ui/Button'
+
 import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
 import { AgentManagement } from './AgentManagement'
@@ -82,16 +82,15 @@ export function SettingsPanel() {
                 )
               })}
             </TabsPrimitive.List>
-            <div className="border-t border-border p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2"
+            <div className="p-2">
+              <button
+                type="button"
                 onClick={handleBack}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               >
-                <ArrowLeft size={16} />
+                <ChevronLeft size={16} className="shrink-0" />
                 <span>{t('common.back')}</span>
-              </Button>
+              </button>
             </div>
           </div>
         </Panel>

@@ -11,7 +11,7 @@ export function Sidebar() {
   const surface = activeView === 'code' ? 'code' : 'chat'
 
   return (
-    <div className="flex h-full flex-col">
+    <div data-testid="sidebar-root" className="flex h-full flex-col bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--glass-border)]">
       <div className="flex flex-col gap-2.5 p-3">
         <SurfaceTabs active={surface} onChange={(v) => sessionService.setSurface(v)} />
         <NewSessionButton surface={surface} />

@@ -48,11 +48,12 @@ export function SidebarPeek() {
 
       {/* 滑动浮层侧栏。 */}
       <aside
+        data-testid="sidebar-peek"
         onMouseEnter={() => dispatch({ type: 'enter' })}
         onMouseLeave={() => dispatch({ type: 'leave' })}
         style={{ width: PEEK_WIDTH, transitionDuration: `${PEEK_ANIM_MS}ms` }}
         className={cn(
-          'absolute left-0 top-0 z-40 h-full bg-surface border-r border-border transition-transform ease-out motion-reduce:transition-none',
+          'absolute left-0 top-0 z-40 h-full bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--glass-border)] transition-transform ease-out motion-reduce:transition-none',
           state.open ? 'translate-x-0' : '-translate-x-full',
         )}
       >

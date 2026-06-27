@@ -1,0 +1,34 @@
+<svg viewBox="0 0 1320 1320" xmlns="http://www.w3.org/2000/svg">
+  <!-- Green body/head -->
+  <g fill="#9faf8b">
+    <!-- Main head circle -->
+    <circle cx="636" cy="724" r="500"/>
+    <!-- Side bumps -->
+    <circle cx="162" cy="1020" r="68"/>
+    <circle cx="1110" cy="1020" r="68"/>
+    <!-- Antennae stems -->
+    <line x1="428" y1="240" x2="362" y2="165" stroke="#9faf8b" stroke-width="40" stroke-linecap="round"/>
+    <line x1="844" y1="240" x2="910" y2="165" stroke="#9faf8b" stroke-width="40" stroke-linecap="round"/>
+  </g>
+
+  <!-- Eyes -->
+  <g fill="#ffffff">
+    <ellipse cx="454" cy="632" rx="109" ry="72"/>
+    <ellipse cx="818" cy="632" rx="109" ry="72"/>
+  </g>
+
+  <!-- Pupils -->
+  <g fill="#1a1a1a">
+    <circle cx="454" cy="632" r="35"/>
+    <circle cx="819" cy="632" r="35"/>
+  </g>
+
+  <!-- Eyebrows -->
+  <g fill="none" stroke="#1a1a1a" stroke-width="55" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M332,470 Q454,430 576,470"/>
+    <path d="M697,470 Q818,430 940,470"/>
+  </g>
+
+  <!-- Mouth -->
+  <path d="M555,855 Q636,890 717,855" fill="none" stroke="#1a1a1a" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

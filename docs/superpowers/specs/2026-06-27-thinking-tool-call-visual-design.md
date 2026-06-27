@@ -91,6 +91,7 @@ ThinkingBubble
 - 移除三个跳动点动画。
 - 保留 AI 头像和“hip”标题。
 - 主体替换为 `ActivityBar`，显示当前执行中的 Agent 和步骤。
+- 在助手消息出现前的短暂窗口期，`ActivityBar` 渲染 `chat.activity.initializing` 占位文案；此时 provisional assistant message 尚未生成，`timeline` / `toolCalls` / `agentRuns` 数据不可用。
 - 由于处于运行中，不显示展开箭头（抽屉内容尚未生成）。
 
 ### TurnTimeline（改造）
@@ -157,7 +158,7 @@ MessageBubble
 ├── TurnTimeline（抽屉内）
 │   └── 复用 ActivityBar 接收的 steps / toolCalls / agentRuns
 └── ThinkingBubble
-    └── 仅接收当前活跃步骤描述和角色
+    └── 在 provisional assistant message 出现前显示 `chat.activity.initializing` 占位；`agent:started` 触发、消息生成后由 MessageBubble 的 ActivityBar 接管
 ```
 
 渲染规则：
@@ -171,6 +172,7 @@ MessageBubble
    - 若已完成：显示“已完成 · {finished}/{total} 个工具 · {agentCount} 个子 Agent”
 4. 计算子 Agent 数量：`agentCount` 取 `agentRuns` 中 `role !== 'supervisor'` 的唯一 `agentId` 数量。
 5. 过滤 suppressed tool steps：继续使用 `isSuppressedToolStep` 与 `write_todos` 过滤逻辑。
+6. `ThinkingBubble` 仅覆盖最初的延迟空档；一旦 `agent:started` 触发并生成 provisional assistant message，`MessageBubble` 的 `ActivityBar` 即接管并展示实时活动。
 
 ## Accessibility
 

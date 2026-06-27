@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Loader2, Check } from 'lucide-react'
+import { ChevronRight, Loader2, CheckCircle2 } from 'lucide-react'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { cn } from '@/lib/utils'
@@ -24,7 +24,7 @@ export function SubAgentCard({ agent }: { agent: TurnAgent }) {
         <span className="shrink-0 text-meta font-medium text-ink">{agent.agentId}</span>
         {agent.taskInput && <span className="truncate text-caption text-ink-tertiary">{agent.taskInput}</span>}
         <span className="ml-auto shrink-0">
-          {agent.status === 'running' ? <Loader2 size={12} className="animate-spin text-accent-strong" /> : <Check size={12} className="text-success" />}
+          {agent.status === 'running' ? <Loader2 size={12} className="animate-spin text-accent-strong" /> : <CheckCircle2 size={12} className="text-success" />}
         </span>
       </button>
       {open && (

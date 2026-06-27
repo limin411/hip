@@ -132,8 +132,10 @@ export const en = {
         cost: '~{{cost}}',
       },
       activity: {
-        completed: 'Completed · {{finished}}/{{total}} tools · {{agents}} sub-agents',
-        completedWithError: 'Completed · {{finished}}/{{total}} tools · {{agents}} sub-agents · some failed',
+        completed: 'Completed',
+        toolCount: '{{finished}}/{{total}} tools',
+        agentCount: '{{agents}} sub-agents',
+        someFailed: 'some failed',
         runningTool: '{{name}} in progress',
         runningReasoning: 'Thinking',
         initializing: 'Initializing…',

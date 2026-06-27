@@ -132,8 +132,10 @@ export const zhTW = {
         cost: '約 {{cost}}',
       },
       activity: {
-        completed: '已完成 · {{finished}}/{{total}} 個工具 · {{agents}} 個子 Agent',
-        completedWithError: '已完成 · {{finished}}/{{total}} 個工具 · {{agents}} 個子 Agent · 部分失敗',
+        completed: '已完成',
+        toolCount: '{{finished}}/{{total}} 個工具',
+        agentCount: '{{agents}} 個子 Agent',
+        someFailed: '部分失敗',
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
         initializing: '準備中…',

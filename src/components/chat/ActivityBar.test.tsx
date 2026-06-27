@@ -8,8 +8,10 @@ import { TurnTimeline } from './TurnTimeline'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, params?: Record<string, unknown>) => {
-    if (key === 'chat.activity.completed') return `已完成 · ${params?.finished}/${params?.total} 个工具 · ${params?.agents} 个子 Agent`
-    if (key === 'chat.activity.completedWithError') return `已完成 · ${params?.finished}/${params?.total} 个工具 · ${params?.agents} 个子 Agent · 部分失败`
+    if (key === 'chat.activity.completed') return '已完成'
+    if (key === 'chat.activity.toolCount') return `${params?.finished}/${params?.total} 个工具`
+    if (key === 'chat.activity.agentCount') return `${params?.agents} 个子 Agent`
+    if (key === 'chat.activity.someFailed') return '部分失败'
     if (key === 'chat.activity.runningTool') return `正在 ${params?.name}`
     if (key === 'chat.activity.runningReasoning') return '正在思考'
     if (key === 'artifact.roles.planner') return '规划员'
@@ -96,6 +98,29 @@ describe('ActivityBar', () => {
       />,
     )
     expect(html).toContain('已完成 · 0/1 个工具 · 1 个子 Agent · 部分失败')
+  })
+
+  it('omits tool count when there are no tool calls', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar steps={baseSteps} toolCalls={[]} agentRuns={baseRuns} />,
+    )
+    expect(html).toContain('已完成 · 1 个子 Agent')
+    expect(html).not.toContain('个工具')
+  })
+
+  it('omits agent count when there are no sub-agent runs', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={[]} />,
+    )
+    expect(html).toContain('已完成 · 1/1 个工具')
+    expect(html).not.toContain('子 Agent')
+  })
+
+  it('omits both tool and agent counts when neither are present', () => {
+    const html = renderToStaticMarkup(<ActivityBar steps={baseSteps} toolCalls={[]} agentRuns={[]} />)
+    expect(html).toContain('已完成')
+    expect(html).not.toContain('个工具')
+    expect(html).not.toContain('子 Agent')
   })
 
   it('shows thinking text while streaming a reasoning step', () => {

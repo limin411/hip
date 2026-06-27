@@ -57,11 +57,20 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
   const hasError = toolCalls.some((t) => t.status === 'error')
   const status: 'running' | 'finished' | 'error' = hasError ? 'error' : streaming ? 'running' : 'finished'
 
-  const summaryText = streaming
-    ? (currentStepText ?? t('chat.activity.runningReasoning'))
-    : hasError
-      ? t('chat.activity.completedWithError', { finished: finishedCount, total: totalCount, agents: agentCount })
-      : t('chat.activity.completed', { finished: finishedCount, total: totalCount, agents: agentCount })
+  const summaryText = useMemo(() => {
+    if (streaming) return currentStepText ?? t('chat.activity.runningReasoning')
+    const parts: string[] = [t('chat.activity.completed')]
+    if (totalCount > 0) {
+      parts.push(t('chat.activity.toolCount', { finished: finishedCount, total: totalCount }))
+    }
+    if (agentCount > 0) {
+      parts.push(t('chat.activity.agentCount', { agents: agentCount }))
+    }
+    if (hasError) {
+      parts.push(t('chat.activity.someFailed'))
+    }
+    return parts.join(' · ')
+  }, [streaming, currentStepText, t, totalCount, finishedCount, agentCount, hasError])
 
   const barClassName = cn(
     'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',

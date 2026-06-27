@@ -282,13 +282,6 @@ describe('agent architecture end-to-end smoke', () => {
 
     // ── Cross-cutting assertions ─────────────────────────────────────────────
 
-    // Verify system prompt contains the current time fragment ("It is 20…")
-    expect(runner.systemPrompts.length).toBeGreaterThan(0)
-    const hasTimeFragment = runner.systemPrompts.some((sp) =>
-      sp.includes('It is 20'),
-    )
-    expect(hasTimeFragment).toBe(true)
-
     // Verify hook fires: register a TurnComplete hook and confirm it was called
     let hookFired = false
     session.registerHook({

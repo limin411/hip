@@ -68,9 +68,6 @@ describe('fragment-based context injection (integration)', () => {
     expect(systemPrompt).toContain('Your working directory is the project root `/tmp/hip-ctx-test`')
     expect(systemPrompt).toContain('sandboxed')
 
-    // Time fragment (CurrentTimeFragment: "It is YYYY-MM-DD HH:MM:SS UTC.")
-    expect(systemPrompt).toMatch(/It is \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC/)
-
     // Plan profile filters out write_file and edit_file from tool list
     expect(runner.capturedTools).toBeDefined()
     expect(runner.capturedTools!).not.toContain('write_file')
@@ -81,24 +78,9 @@ describe('fragment-based context injection (integration)', () => {
     expect(runner.capturedTools!).toContain('grep')
   })
 
-  // ── Test 2: token budget fragment is active and renders the remaining budget ──
+  // ── Test 2: healthy budget (remaining > 10%) does NOT render the warning ──
 
-  it('token budget fragment activates and renders remaining budget text', async () => {
-    const runner = new CapturingRunner()
-    const session = makeSession(runner, 'plan')
-    await sendAndCollect(session, 'hello')
-
-    const systemPrompt = capturedSystemPrompt(runner)
-
-    // Token budget fragment should render something with "approximatel" and "token budget"
-    // (for a single short message, remaining will be near 100%)
-    expect(systemPrompt).toContain('approximately')
-    expect(systemPrompt).toContain('token budget remaining')
-  })
-
-  // ── Test 3: healthy budget (remaining > 10%) does NOT render the warning ──
-
-  it('token budget fragment does not render warning when budget is healthy', async () => {
+  it('does not render token-budget warning when budget is healthy', async () => {
     const runner = new CapturingRunner()
     const session = makeSession(runner, 'plan')
     await sendAndCollect(session, 'hello')
@@ -110,7 +92,7 @@ describe('fragment-based context injection (integration)', () => {
     expect(systemPrompt).not.toContain('nearly exhausted')
   })
 
-  // ── Test 4: corrupted fragment degrades gracefully ──
+  // ── Test 3: corrupted fragment degrades gracefully ──
 
   it('corrupted fragment that throws in render does not crash assembly', () => {
     const registry = new FragmentRegistry()

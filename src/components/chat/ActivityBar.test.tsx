@@ -52,4 +52,46 @@ describe('ActivityBar', () => {
     const html = renderToStaticMarkup(<ActivityBar />)
     expect(html).toBe('')
   })
+
+  it('renders expand button in collapsed state', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} />,
+    )
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).toContain('lucide-chevron-right')
+    expect(html).not.toContain('rotate-90')
+    expect(html).not.toContain('TurnTimeline')
+  })
+
+  it('shows error icon when a tool call failed', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        steps={baseSteps}
+        toolCalls={[{ ...baseTools[0], status: 'error' as const }]}
+        agentRuns={baseRuns}
+      />,
+    )
+    expect(html).toContain('lucide-circle-x')
+  })
+
+  it('shows thinking text while streaming a reasoning step', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        steps={[{ kind: 'reasoning' as const, stepSeq: 1, agentId: 'planner-1', role: 'planner' as const, content: '思考中' }]}
+        streaming
+      />,
+    )
+    expect(html).toContain('正在思考')
+  })
+
+  it('falls back to thinking text when streaming a tool step with missing tool call', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        steps={[{ kind: 'tool' as const, stepSeq: 1, agentId: 'planner-1', role: 'planner' as const, callId: 'missing-call' }]}
+        toolCalls={baseTools}
+        streaming
+      />,
+    )
+    expect(html).toContain('正在思考')
+  })
 })

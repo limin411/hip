@@ -133,7 +133,7 @@ export const en = {
       },
       activity: {
         completed: 'Completed · {{finished}}/{{total}} tools · {{agents}} sub-agents',
-        runningTool: 'Running {{name}}',
+        runningTool: '{{name}} in progress',
         runningReasoning: 'Thinking',
       },
     },

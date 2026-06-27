@@ -39,10 +39,14 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
   if (!hasActivity) {
     if (!streaming) return null
     return (
-      <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5" data-testid="activity-bar">
+      <div
+        className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5"
+        data-testid="activity-bar"
+        role="status"
+      >
         <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">{t('chat.activity.initializing')}</span>
-        <Loader2 size={14} className="animate-spin text-accent-strong" />
+        <Loader2 aria-hidden size={14} className="animate-spin text-accent-strong" />
       </div>
     )
   }

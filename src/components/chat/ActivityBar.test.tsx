@@ -57,6 +57,12 @@ describe('ActivityBar', () => {
     expect(html).toBe('')
   })
 
+  it('renders initializing placeholder while streaming with no activity', () => {
+    const html = renderToStaticMarkup(<ActivityBar streaming />)
+    expect(html).toContain('data-testid="activity-bar"')
+    expect(html).toContain('chat.activity.initializing')
+  })
+
   it('renders expand button in collapsed state', () => {
     const html = renderToStaticMarkup(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} />,

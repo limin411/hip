@@ -10,7 +10,7 @@ export function NewSessionButton({ surface }: NewSessionButtonProps) {
   const { t } = useTranslation()
   return (
     <Button
-      variant="outline"
+      variant="primary"
       size="sm"
       className="w-full"
       onClick={() => sessionService.newConversation(surface)}

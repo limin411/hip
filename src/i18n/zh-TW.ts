@@ -135,6 +135,7 @@ export const zhTW = {
         completed: '已完成 · {{finished}}/{{total}} 個工具 · {{agents}} 個子 Agent',
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
+        initializing: '準備中…',
       },
     },
     sidebar: {

@@ -11,7 +11,7 @@ import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
 import { CodeBlock } from './CodeBlock'
-import { TurnTimeline } from './TurnTimeline'
+import { ActivityBar } from './ActivityBar'
 import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
@@ -94,7 +94,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
         >
           {message.role === 'assistant' && (
             <>
-              <TurnTimeline steps={flatSteps} toolCalls={message.toolCalls} agentRuns={message.agentRuns} />
+              <ActivityBar steps={flatSteps} toolCalls={message.toolCalls} agentRuns={message.agentRuns} streaming={streaming} />
               {nested.map((a) => <SubAgentCard key={a.agentId} agent={a} />)}
             </>
           )}

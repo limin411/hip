@@ -135,6 +135,7 @@ export const zhCN = {
         completed: '已完成 · {{finished}}/{{total}} 个工具 · {{agents}} 个子 Agent',
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
+        initializing: '准备中…',
       },
     },
     sidebar: {

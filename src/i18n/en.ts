@@ -135,6 +135,7 @@ export const en = {
         completed: 'Completed · {{finished}}/{{total}} tools · {{agents}} sub-agents',
         runningTool: '{{name}} in progress',
         runningReasoning: 'Thinking',
+        initializing: 'Initializing…',
       },
     },
     sidebar: {

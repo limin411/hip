@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
 import { nanoid } from 'nanoid'
-import type { McpServerConfig, PluginMeta } from '@hip/protocol'
+import type { ClientMessage, McpServerConfig, PluginMeta } from '@hip/protocol'
 import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
+import { wsClient } from '@/ipc/ws-client'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { useMcpStatuses, type McpServerStatusVM } from '@/domain'
 import { cn } from '@/lib/utils'
@@ -168,6 +169,12 @@ export function McpConfig() {
     await updateServer(server.id, { enabledTools: [], disabledTools: [] })
   }
 
+  const reconnectMcpServers = () => {
+    const allServers: McpServerConfig[] = [...servers, ...pluginMcpServers]
+    const msg: ClientMessage = { type: 'mcp:reconnect', servers: allServers }
+    wsClient.send(msg)
+  }
+
   return (
     <div className="p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -230,6 +237,7 @@ export function McpConfig() {
                 onDelete={() => setDeleting(s)}
                 onToggleTool={(toolName) => void handleUpdateTools(s, toolName)}
                 onResetTools={() => void handleResetTools(s)}
+                onReconnect={reconnectMcpServers}
               />
             ))
           )}
@@ -332,6 +340,7 @@ function McpServerCard({
   onDelete,
   onToggleTool,
   onResetTools,
+  onReconnect,
 }: {
   server: McpServerConfig
   status?: McpServerStatusVM
@@ -340,6 +349,7 @@ function McpServerCard({
   onDelete: () => void
   onToggleTool: (toolName: string) => void
   onResetTools: () => void
+  onReconnect: () => void
 }) {
   const { t } = useTranslation()
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -444,7 +454,7 @@ function McpServerCard({
         <div className="flex shrink-0 items-center gap-2">
           {status?.status === 'disconnected' && server.enabled && (
             <button
-              onClick={() => onToggle(true)}
+              onClick={onReconnect}
               className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
               title={t('settings.mcp.reconnect')}
             >

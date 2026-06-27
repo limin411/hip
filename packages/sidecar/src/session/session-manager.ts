@@ -335,6 +335,15 @@ export class SessionManager {
         )
         break
       }
+      case 'mcp:reconnect': {
+        // Force-disconnect all servers, then reconnect with the provided configs.
+        // This gives immediate feedback: the frontend sends its latest config state
+        // so the sidecar doesn't need to re-read TOML.
+        await mcpManager.reconcile([])
+        await mcpManager.reconcile(msg.servers)
+        send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(msg.servers) })
+        break
+      }
       case 'plugin:install:url':
         await this.handlePluginInstallUrl(msg.url, send)
         break

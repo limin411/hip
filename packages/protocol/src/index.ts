@@ -474,6 +474,7 @@ export type ClientMessage =
   | { type: 'mcp:readResource'; serverId: string; uri: string }
   | { type: 'mcp:listPrompts'; serverId: string }
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
+  | { type: 'mcp:reconnect'; servers: McpServerConfig[] }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
   | { type: 'agent:setProfile'; sessionId: string; id: string }
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }

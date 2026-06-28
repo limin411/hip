@@ -98,6 +98,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       if (!agent) throw new Error(`unknown or disabled agent: ${agentId}`)
 
       if (agent.kind === 'internal') {
+        // Attachment forwarding is unconditional: the caller (dispatch path) is responsible
+        // for ensuring only image attachments are passed and the agent is eligible.
         // hip's own loop — no external provider, no token-teeing (runManagedAgent returns the final text).
         // Per-agent narrowing happens HERE on the inputs: built-ins are always on (no allowedTools gate);
         // only the skills/mcp tools the agent was granted are passed through. When extras are absent

@@ -1,10 +1,25 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { AgentConfig } from '@hip/protocol'
 import type { GraphEmit } from '../graph.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
 import type { ResolvedModel } from './registry.js'
 import type { AttachmentPayload } from '../attachments.js'
+import type { RunManagedAgentArgs } from '../internal-runner.js'
+import { runManagedAgent } from '../internal-runner.js'
 import { createAgentInvoker } from './invoker.js'
+
+const runManagedAgentCalls: RunManagedAgentArgs[] = []
+
+vi.mock('../internal-runner.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../internal-runner.js')>()
+  return {
+    ...actual,
+    runManagedAgent: vi.fn((args: RunManagedAgentArgs) => {
+      runManagedAgentCalls.push(args)
+      return Promise.resolve('managed')
+    }),
+  }
+})
 
 function collectingEmit() {
   const tokens: string[] = []
@@ -148,5 +163,23 @@ describe('createAgentInvoker', () => {
     const attachments: AttachmentPayload[] = [{ id: 'a1', name: 'x.png', mimeType: 'image/png', path: '/tmp/x.png' }]
     await invoker.invoke('vis', 'look', collectingEmit().emit, new AbortController().signal, undefined, undefined, attachments)
     expect(seen).toEqual(attachments)
+  })
+
+  it('forwards attachments through the default runInternal to runManagedAgent', async () => {
+    const internalAgent: AgentConfig = {
+      id: 'vis-default', name: 'Vision Default', kind: 'internal', command: '', args: [],
+      enabled: true, prompt: 'vision default',
+    }
+    const invoker = createAgentInvoker('/work', {
+      readAgents: () => [internalAgent],
+      resolveModel: () => null,
+      // no runInternal override; verify the default path delegates to runManagedAgent
+    })
+    const attachments: AttachmentPayload[] = [{ id: 'a2', name: 'y.png', mimeType: 'image/png', path: '/tmp/y.png' }]
+    const text = await invoker.invoke('vis-default', 'look', collectingEmit().emit, new AbortController().signal, undefined, undefined, attachments)
+    expect(text).toBe('managed')
+    const managedCalls = runManagedAgentCalls.filter((c) => c.task === 'look')
+    expect(managedCalls).toHaveLength(1)
+    expect(managedCalls[0].attachments).toEqual(attachments)
   })
 })

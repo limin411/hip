@@ -26,7 +26,9 @@ export interface RunManagedAgentArgs {
   prompt: string                      // persona
   task: string
   attachments?: AttachmentPayload[]   // image/document attachments rendered as content parts in the human message
-  attachmentParts?: ContentPart[]     // pre-built content parts; skips re-validation/re-reading attachments
+  /** Pre-built content parts; skips re-validation/re-reading attachments. When provided, the caller
+   *  must include any task text as the first text part; `task` is ignored in that case. */
+  attachmentParts?: ContentPart[]
   emit: GraphEmit
   signal: AbortSignal
   childMaxSteps: number

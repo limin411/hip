@@ -649,8 +649,10 @@ export class Session {
 
     if (hasImageAttachment && !modelSupportsImages) {
       this.endActivity()
+      // Keep in-memory history in sync with the persisted user_message event.
+      this.messages.push(new HumanMessage(input.content))
       const message = imageAgentError
-        ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`
+        ? 'Image agent selection failed. Please enable a multimodal agent or switch to a multimodal model.'
         : 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.'
       _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message })
       return ''

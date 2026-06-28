@@ -429,7 +429,16 @@ function McpServerCard({
               {(server.enabledTools?.length || server.disabledTools?.length) ? (
                 <button
                   type="button"
-                  onClick={async () => { setToolBusy((b) => ({ ...b, __reset: true })); try { await onResetTools() } finally { setToolBusy((b) => ({ ...b, __reset: false })) } }}
+                  onClick={async () => {
+                    setToolBusy((b) => ({ ...b, __reset: true }))
+                    try {
+                      await onResetTools()
+                    } catch {
+                      // TODO: surface error via toast/notification
+                    } finally {
+                      setToolBusy((b) => ({ ...b, __reset: false }))
+                    }
+                  }}
                   disabled={toolBusy.__reset}
                   className="text-caption text-accent hover:underline disabled:opacity-50"
                 >
@@ -447,8 +456,17 @@ function McpServerCard({
                   >
                     <Switch
                       checked={enabled}
-                      disabled={!!toolBusy[toolName]}
-                      onCheckedChange={async () => { setToolBusy((b) => ({ ...b, [toolName]: true })); try { await onToggleTool(toolName) } finally { setToolBusy((b) => ({ ...b, [toolName]: false })) } }}
+                      disabled={!!toolBusy[toolName] || toolBusy.__reset}
+                      onCheckedChange={async () => {
+                        setToolBusy((b) => ({ ...b, [toolName]: true }))
+                        try {
+                          await onToggleTool(toolName)
+                        } catch {
+                          // TODO: surface error via toast/notification
+                        } finally {
+                          setToolBusy((b) => ({ ...b, [toolName]: false }))
+                        }
+                      }}
                       ariaLabel={toolName}
                     />
                     <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
@@ -461,7 +479,21 @@ function McpServerCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <Switch checked={server.enabled} onCheckedChange={async (enabled) => { setToggleBusy(true); try { await onToggle(enabled) } finally { setToggleBusy(false) } }} disabled={toggleBusy} ariaLabel={t('settings.mcp.enableThis')} />
+        <Switch
+          checked={server.enabled}
+          disabled={toggleBusy}
+          onCheckedChange={async (enabled) => {
+            setToggleBusy(true)
+            try {
+              await onToggle(enabled)
+            } catch {
+              // TODO: surface error via toast/notification
+            } finally {
+              setToggleBusy(false)
+            }
+          }}
+          ariaLabel={t('settings.mcp.enableThis')}
+        />
         <div className="flex items-center gap-1">
           {status?.status === 'disconnected' && server.enabled && (
             <ActionButton icon={<RefreshCw size={14} />} label={t('settings.mcp.reconnect')} onClick={onReconnect} />

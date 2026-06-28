@@ -28,10 +28,11 @@ export function HipLogo({
       {...a11y}
     >
       <img
-        src={`${import.meta.env.BASE_URL}logo.svg`}
+        src={`${import.meta.env.BASE_URL ?? '/'}logo.svg`}
         alt=""
         aria-hidden="true"
         width={Math.round(size * LOGO_SCALE)}
+        height={Math.round(size * LOGO_SCALE)}
       />
     </div>
   )

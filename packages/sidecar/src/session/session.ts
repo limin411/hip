@@ -593,9 +593,10 @@ export class Session {
     if (input.content) parts.push({ type: 'text', text: input.content })
 
     const modelSupportsImages = this.currentModelSupportsImages()
+    const needsImageAgent = hasImageAttachment && !modelSupportsImages
     let imageAgent: AgentConfig | null = null
     let imageAgentError: string | null = null
-    if (hasImageAttachment && !modelSupportsImages) {
+    if (needsImageAgent) {
       try {
         imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
       } catch (err) {
@@ -614,7 +615,7 @@ export class Session {
         // When dispatching to an internal multimodal agent, keep image_url parts out of the
         // main session history so the text-only main model never sees them on follow-up turns.
         // Also keep them out when no image agent is available and we are about to error.
-        const filterImages = hasImageAttachment && !modelSupportsImages
+        const filterImages = needsImageAgent
         const historyParts = filterImages ? undefined : (isRichContentParts(parts) ? parts : undefined)
         this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
@@ -647,7 +648,7 @@ export class Session {
       return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
 
-    if (hasImageAttachment && !modelSupportsImages) {
+    if (needsImageAgent) {
       this.endActivity()
       // Keep in-memory history in sync with the persisted user_message event.
       this.messages.push(new HumanMessage(input.content))

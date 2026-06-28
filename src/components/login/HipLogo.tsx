@@ -26,8 +26,8 @@ export function HipLogo({
 
   return (
     <div
-      className={className}
-      style={{ width: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      className={['flex items-center justify-center', className].filter(Boolean).join(' ')}
+      style={{ width: size }}
       {...a11y}
     >
       <img

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { chmodSync, mkdtempSync } from 'node:fs'
@@ -21,7 +21,34 @@ function registerMockAgent(dir: string, env?: Record<string, string>): void {
   process.env.HIP_CONFIG_PATH = writeHipToml(dir, { agents: [agent] })
 }
 
+async function waitForTerminal(out: ServerMessage[], predicate: (m: ServerMessage) => boolean, timeoutMs = 10000): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (out.some(predicate)) return
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  throw new Error(`Timeout waiting for terminal message`)
+}
+
+async function resetMockAgent(): Promise<void> {
+  // The mock agent reads stdin; sending {"reset":true} clears its module state.
+  for (const conn of acpConnections.getConnections()) {
+    try {
+      ;(conn as any).child?.stdin?.write('{"reset":true}\n')
+    } catch {
+      // ignore if already closed
+    }
+  }
+}
+
 describe('external ACP agent through SessionManager', () => {
+  afterEach(async () => {
+    // Close any open ACP connection.
+    acpConnections.disposeAll()
+    // Reset mutable mock-agent state so the next test starts clean.
+    await resetMockAgent()
+  })
+
   it('routes a turn to the acp agent and streams reasoning + text + tools', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'hip-acp-'))
     registerMockAgent(dir, { MOCK_ACP_THINK: '1', MOCK_ACP_TOOL: '1' })
@@ -30,9 +57,7 @@ describe('external ACP agent through SessionManager', () => {
     const out: ServerMessage[] = []
     mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, (m) => out.push(m))
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, (m) => out.push(m))
-    // settle
-    await new Promise((r) => setTimeout(r, 500))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
 
     expect(out.some((m) => m.type === 'reasoning:delta')).toBe(true)
     expect(out.some((m) => m.type === 'token:stream' && m.delta.includes('hello'))).toBe(true)
@@ -51,8 +76,8 @@ describe('external ACP agent through SessionManager', () => {
     }
     mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'edit', role: 'user' } as any, send)
-    await new Promise((r) => setTimeout(r, 800))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
+
     expect(out.some((m) => m.type === 'permission:request')).toBe(true)
     // I3: the modal payload must carry the tool's diff so the user sees what they're approving.
     const perm = out.find((m) => m.type === 'permission:request') as Extract<ServerMessage, { type: 'permission:request' }> | undefined
@@ -73,8 +98,8 @@ describe('external ACP agent through SessionManager', () => {
     }
     mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'edit', role: 'user' } as any, send)
-    await new Promise((r) => setTimeout(r, 800))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
+
     expect(out.some((m) => m.type === 'permission:request')).toBe(true)
     // Rejected → the gated tool must NOT report a successful finish, and the turn still completes.
     expect(out.some((m) => m.type === 'tool:finished' && m.status === 'finished')).toBe(false)
@@ -90,11 +115,11 @@ describe('external ACP agent through SessionManager', () => {
     const send = (m: ServerMessage) => out.push(m)
     mgr.handle({ type: 'session:create', id: 's1', config: { agentId: 'mock', cwd: dir } as any }, send)
     const turn = mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, send)
-    await new Promise((r) => setTimeout(r, 150)) // after the first chunk, before the stream finishes
+    await waitForTerminal(out, (m) => m.type === 'token:stream')
     mgr.handle({ type: 'message:cancel', sessionId: 's1' } as any, send)
     await turn
-    await new Promise((r) => setTimeout(r, 200))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete' || (m.type === 'error' && m.code === 'CANCELLED'))
+
     // Cancel must NOT surface as AGENT_ERROR (OpenCode returns end_turn on cancel — we rely on our own
     // abort flag). The turn ends as a stopped completion or an explicit CANCELLED.
     expect(out.some((m) => m.type === 'error' && m.code === 'AGENT_ERROR')).toBe(false)
@@ -112,8 +137,8 @@ describe('external ACP agent through SessionManager', () => {
     const mgr = new SessionManager(store, () => undefined, dir)
     const out: ServerMessage[] = []
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'continue', role: 'user' } as any, (m) => out.push(m))
-    await new Promise((r) => setTimeout(r, 800))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
+
     // The mock prefixes its answer 'resumed(...)' ONLY when loadSession ran — proving the reopen
     // branch was taken (a fresh newSession would prefix 'answer(...)'; see the negative control below).
     const text = out.filter((m) => m.type === 'token:stream').map((m) => (m as Extract<ServerMessage, { type: 'token:stream' }>).delta).join('')
@@ -131,8 +156,8 @@ describe('external ACP agent through SessionManager', () => {
     const mgr = new SessionManager(store, () => undefined, dir)
     const out: ServerMessage[] = []
     await mgr.handle({ type: 'message:send', sessionId: 's1', id: 'm1', content: 'hi', role: 'user' } as any, (m) => out.push(m))
-    await new Promise((r) => setTimeout(r, 800))
-    acpConnections.disposeAll()
+    await waitForTerminal(out, (m) => m.type === 'message:complete')
+
     const text = out.filter((m) => m.type === 'token:stream').map((m) => (m as Extract<ServerMessage, { type: 'token:stream' }>).delta).join('')
     expect(text).toContain('answer(')
     expect(text).not.toContain('resumed(')

@@ -7,13 +7,41 @@
 //   MOCK_ACP_AUTH_REQUIRED=1-> newSession throws auth_required until authenticate() is called
 //   MOCK_ACP_SLOW_MS=<n>    -> delay between answer chunks (so cancel can land mid-stream)
 import { AgentSideConnection, ndJsonStream } from '@agentclientprotocol/sdk'
-import { Readable, Writable } from 'node:stream'
+import { Readable, Writable, Transform } from 'node:stream'
 
 const env = process.env
 let authed = !env.MOCK_ACP_AUTH_REQUIRED
 let model = 'mock/base'
 let sessionSeq = 0 // distinct id per newSession (first is 'mock-sess-1')
+let cancelled = new Set()
+let resumed = new Set()
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+function resetState() {
+  cancelled.clear()
+  resumed.clear()
+  sessionSeq = 0
+}
+
+// Intercept control messages on stdin before they reach the ACP connection.
+let stdinBuffer = ''
+const stdinFilter = new Transform({
+  transform(chunk, _encoding, callback) {
+    stdinBuffer += chunk.toString('utf8')
+    let nl
+    while ((nl = stdinBuffer.indexOf('\n')) !== -1) {
+      const line = stdinBuffer.slice(0, nl)
+      stdinBuffer = stdinBuffer.slice(nl + 1)
+      if (line.trim() === '{"reset":true}') {
+        resetState()
+      } else {
+        this.push(line + '\n')
+      }
+    }
+    callback()
+  },
+})
+process.stdin.pipe(stdinFilter)
 
 const agent = {
   async initialize() {
@@ -68,6 +96,4 @@ const agent = {
     return { stopReason: 'end_turn' }
   },
 }
-const cancelled = new Set()
-const resumed = new Set()
-const conn = new AgentSideConnection(() => agent, ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(process.stdin)))
+const conn = new AgentSideConnection(() => agent, ndJsonStream(Writable.toWeb(process.stdout), Readable.toWeb(stdinFilter)))

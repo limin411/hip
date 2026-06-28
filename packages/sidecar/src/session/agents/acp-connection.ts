@@ -156,6 +156,9 @@ export class AcpConnectionManager {
   }
 
   disposeAll(): void { for (const c of this.conns.values()) c.dispose(); this.conns.clear() }
+
+  /** Expose active connections for test cleanup. */
+  getConnections(): AcpConnection[] { return [...this.conns.values()] }
 }
 
 /** Process-wide pool. Disposed on sidecar shutdown (see main.ts). */

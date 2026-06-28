@@ -149,6 +149,7 @@ export class SessionService {
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
     const id = nanoid()
     const enriched: SessionConfig = { ...config, language: currentLanguage() }
+    console.debug('[hip:attachment] sessionService.createSession', { id, provider: enriched.llmProvider, model: enriched.model })
     useDomainStore.getState().createSession(id, enriched)
     this.rememberActiveForSurface(id)
     this.transport.send({ type: 'session:create', id, config: enriched })
@@ -262,6 +263,7 @@ export class SessionService {
    *  model), and optimistically updates the session's config. */
   setSessionModel(modelKey: string): void {
     const { activeSessionId } = useDomainStore.getState()
+    console.debug('[hip:attachment] sessionService.setSessionModel', { modelKey, activeSessionId })
     if (!activeSessionId) return
     const { catalog, config } = useProvidersStore.getState()
     const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, modelKey)
@@ -375,10 +377,17 @@ export class SessionService {
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     if (active?.interrupt) { this.resume(text, attachments); return }
     let { activeSessionId } = useDomainStore.getState()
+    const draft = useDraftStore.getState().draft
+    console.debug('[hip:attachment] sessionService.sendMessage', {
+      text,
+      attachmentCount: attachments.length,
+      activeSessionId,
+      draftModelKey: draft?.modelKey,
+    })
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
-      const draft = useDraftStore.getState().draft
       const config: SessionConfig = configFromDraft(draft)
+      console.debug('[hip:attachment] sessionService.sendMessage creating session from draft', { draftModelKey: draft?.modelKey, configModel: config.model, configProvider: config.llmProvider })
       activeSessionId = this.createSession(config)
       if (draft?.cwd) useFsStore.getState().clearSession(draft.cwd)
       useDraftStore.getState().reset()
@@ -430,6 +439,8 @@ export class SessionService {
     const sess = sessions.find((x) => x.id === activeSessionId)
     if (!sess) return
     if (sess.status === 'running' && !sess.interrupt) return
+    // The sidecar decides whether to dispatch image turns to an internal multimodal agent.
+    // The frontend no longer switches the session model.
     useDomainStore.getState().regenerateLastTurn(activeSessionId)
     this.transport.send({ type: 'message:regenerate', sessionId: activeSessionId })
   }

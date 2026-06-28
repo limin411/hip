@@ -5,6 +5,7 @@ import type { GraphEmit } from '../graph.js'
 import type { NetworkPolicy } from '../network-policy.js'
 import type { ToolOutputStore } from '../tool-output-store.js'
 import type { GuardianReviewer } from '../guardian.js'
+import type { AttachmentPayload } from '../attachments.js'
 import { runManagedAgent } from '../internal-runner.js'
 import { CHILD_MAX_STEPS } from '../loop-control.js'
 import { createAgentProvider } from './index.js'
@@ -29,7 +30,7 @@ export interface InvokerExtras {
 }
 
 export interface AgentInvoker {
-  invoke(agentId: string, task: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks, extras?: InvokerExtras): Promise<string>
+  invoke(agentId: string, task: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks, extras?: InvokerExtras, attachments?: AttachmentPayload[]): Promise<string>
 }
 
 /** Args handed to the internal-loop runner (a seam so tests can stub the loop). skills/mcpTools are
@@ -50,6 +51,7 @@ export interface RunInternalArgs {
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
+  attachments?: AttachmentPayload[]
 }
 
 export interface InvokerDeps {
@@ -90,7 +92,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
     }))
   return {
-    async invoke(agentId, task, emit, signal, hooks, extras) {
+    async invoke(agentId, task, emit, signal, hooks, extras, attachments) {
       const agent = readAgents().find((a) => a.id === agentId && a.enabled)
       if (!agent) throw new Error(`unknown or disabled agent: ${agentId}`)
 
@@ -110,6 +112,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           requestApproval: extras?.requestApproval, permissionMode: extras?.permissionMode,
           sessionId: extras?.sessionId, networkPolicy: extras?.networkPolicy,
           toolOutputStore: extras?.toolOutputStore, guardianReviewer: extras?.guardianReviewer,
+          attachments,
         })
       }
 

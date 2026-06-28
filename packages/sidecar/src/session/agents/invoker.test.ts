@@ -3,6 +3,7 @@ import type { AgentConfig } from '@hip/protocol'
 import type { GraphEmit } from '../graph.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
 import type { ResolvedModel } from './registry.js'
+import type { AttachmentPayload } from '../attachments.js'
 import { createAgentInvoker } from './invoker.js'
 
 function collectingEmit() {
@@ -131,5 +132,21 @@ describe('createAgentInvoker', () => {
     })
     await invoker.invoke('sum', 't', collectingEmit().emit, new AbortController().signal)
     expect(seenResolved).toBeNull()
+  })
+
+  it('forwards attachments to runInternal for internal agents', async () => {
+    const seen: AttachmentPayload[] = []
+    const internalAgent: AgentConfig = {
+      id: 'vis', name: 'Vision', kind: 'internal', command: '', args: [],
+      enabled: true, prompt: 'vision',
+    }
+    const invoker = createAgentInvoker('/work', {
+      readAgents: () => [internalAgent],
+      resolveModel: () => null,
+      runInternal: async (a) => { seen.push(...(a.attachments ?? [])); return 'ok' },
+    })
+    const attachments: AttachmentPayload[] = [{ id: 'a1', name: 'x.png', mimeType: 'image/png', path: '/tmp/x.png' }]
+    await invoker.invoke('vis', 'look', collectingEmit().emit, new AbortController().signal, undefined, undefined, attachments)
+    expect(seen).toEqual(attachments)
   })
 })

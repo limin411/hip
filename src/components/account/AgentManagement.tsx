@@ -101,6 +101,14 @@ function Content({
 }) {
   const { t } = useTranslation()
 
+  const isEmpty = filteredAgents.length === 0
+  const emptyTitle = isEmpty
+    ? isSearchActive
+      ? t('settings.agents.searchEmpty')
+      : t('settings.agents.gridEmptyTitle')
+    : ''
+  const emptyHint = isEmpty && !isSearchActive ? t('settings.agents.gridEmptyHint') : undefined
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
@@ -109,8 +117,8 @@ function Content({
       </div>
       <AgentGrid
         agents={filteredAgents}
-        emptyTitle={filteredAgents.length === 0 && isSearchActive ? t('settings.agents.searchEmpty') : t('settings.agents.gridEmptyTitle')}
-        emptyHint={filteredAgents.length === 0 && isSearchActive ? undefined : t('settings.agents.gridEmptyHint')}
+        emptyTitle={emptyTitle}
+        emptyHint={emptyHint}
         onEdit={onEdit}
         onToggle={onToggle}
         onDelete={onDelete}

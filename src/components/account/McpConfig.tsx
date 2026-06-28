@@ -510,18 +510,17 @@ function McpServerCard({
             <ActionButton
               icon={<RefreshCw size={14} />}
               label={t('settings.mcp.reconnect')}
-              onClick={async () => {
+              onClick={() => {
                 setActionError(null)
                 setReconnectBusy(true)
                 try {
                   onReconnect()
                 } catch {
                   setActionError(t('settings.mcp.error'))
-                } finally {
-                  setTimeout(() => {
-                    if (isMountedRef.current) setReconnectBusy(false)
-                  }, 1000)
                 }
+                setTimeout(() => {
+                  if (isMountedRef.current) setReconnectBusy(false)
+                }, 1000)
               }}
               disabled={reconnectBusy}
             />
@@ -788,15 +787,17 @@ function DeleteServerDialog({
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
   const handleConfirm = async () => {
     setBusy(true)
     setError(null)
     try {
       await onConfirm()
     } catch {
-      setError(t('settings.mcp.error'))
+      if (mountedRef.current) setError(t('settings.mcp.error'))
     } finally {
-      setBusy(false)
+      if (mountedRef.current) setBusy(false)
     }
   }
   return (

@@ -791,6 +791,7 @@ export class Session {
     try {
       const invoker = this.agentProv.invoker(cwd)
       // Only forward image parts to the image agent; non-image attachments stay with the main model.
+      // TODO: split non-image parts to the main model once multi-agent streaming is supported.
       const imageParts = parts.filter((p) => p.type === 'image_url')
       agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),

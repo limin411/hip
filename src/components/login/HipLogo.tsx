@@ -21,14 +21,17 @@ export function HipLogo({
     ? ({ 'aria-hidden': true } as const)
     : ({ role: 'img', 'aria-label': title } as const)
 
+  const base = import.meta.env.BASE_URL ?? '/'
+  const src = base.endsWith('/') ? `${base}logo.svg` : `${base}/logo.svg`
+
   return (
     <div
       className={className}
-      style={{ width: size }}
+      style={{ width: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       {...a11y}
     >
       <img
-        src={`${import.meta.env.BASE_URL ?? '/'}logo.svg`}
+        src={src}
         alt=""
         aria-hidden="true"
         width={Math.round(size * LOGO_SCALE)}

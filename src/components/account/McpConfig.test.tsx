@@ -1,6 +1,33 @@
-import { describe, it, expect } from 'vitest'
-import { derivePluginMcpServers } from './McpConfig'
+// @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, cleanup, waitFor } from '@testing-library/react'
+import { derivePluginMcpServers, McpConfig } from './McpConfig'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import { usePluginsStore } from '@/store/pluginsStore'
+import { wsClient } from '@/ipc/ws-client'
 import type { McpServerConfig, PluginMeta } from '@hip/protocol'
+
+vi.mock(import('react-i18next'), async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string) => key,
+      i18n: { language: 'en', changeLanguage: vi.fn() },
+    }),
+  } as any
+})
+
+vi.mock('@/ipc/ws-client', () => ({
+  wsClient: {
+    send: vi.fn(),
+    onMessage: vi.fn(() => () => {}),
+    onStatus: vi.fn(() => () => {}),
+    start: vi.fn(),
+    disconnect: vi.fn(),
+  },
+}))
 
 function makeServer(id: string, overrides?: Partial<McpServerConfig>): McpServerConfig {
   return {
@@ -92,6 +119,74 @@ describe('derivePluginMcpServers', () => {
       enabled: false,
       pluginId: 'plugin-a',
       pluginName: 'Plugin A',
+    })
+  })
+})
+
+describe('McpConfig', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useHipConfigStore.setState({
+      config: { version: 1, mcpServers: [] },
+      loaded: true,
+      error: null,
+    })
+    usePluginsStore.setState({ plugins: [], loaded: true })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('sends mcp:reconnect automatically after config and plugins are loaded', async () => {
+    useHipConfigStore.setState({
+      config: {
+        version: 1,
+        mcpServers: [
+          {
+            id: 'standalone-1',
+            name: 'Standalone Server',
+            transport: 'stdio',
+            command: 'npx',
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+    })
+
+    render(<McpConfig />)
+
+    await waitFor(() => {
+      expect(wsClient.send).toHaveBeenCalledWith({
+        type: 'mcp:reconnect',
+        servers: expect.arrayContaining([
+          expect.objectContaining({ id: 'standalone-1', name: 'Standalone Server' }),
+        ]),
+      })
+    })
+  })
+
+  it('includes plugin-provided MCP servers in the auto reconnect', async () => {
+    useHipConfigStore.setState({ config: { version: 1, mcpServers: [] }, loaded: true })
+    usePluginsStore.setState({
+      plugins: [
+        makePlugin('plugin-a', 'Plugin A', [
+          makeServer('plugin-mcp-1', { name: 'Plugin MCP Server' }),
+        ]),
+      ],
+      loaded: true,
+    })
+
+    render(<McpConfig />)
+
+    await waitFor(() => {
+      expect(wsClient.send).toHaveBeenCalledWith({
+        type: 'mcp:reconnect',
+        servers: expect.arrayContaining([
+          expect.objectContaining({ id: 'plugin-mcp-1', name: 'Plugin MCP Server' }),
+        ]),
+      })
     })
   })
 })

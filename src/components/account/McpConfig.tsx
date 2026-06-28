@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
@@ -169,11 +169,22 @@ export function McpConfig() {
     await updateServer(server.id, { enabledTools: [], disabledTools: [] })
   }
 
-  const reconnectMcpServers = () => {
+  const reconnectMcpServers = useCallback(() => {
     const allServers: McpServerConfig[] = [...servers, ...pluginMcpServers]
     const msg: ClientMessage = { type: 'mcp:reconnect', servers: allServers }
     wsClient.send(msg)
-  }
+  }, [servers, pluginMcpServers])
+
+  // Ask the sidecar for the current MCP status as soon as the page has both
+  // standalone and plugin server configs loaded. Without this the list stays
+  // blank until the user manually hits the refresh button.
+  const statusRequestedRef = useRef(false)
+  useEffect(() => {
+    if (!loaded || !pluginsLoaded || statusRequestedRef.current) return
+    if (servers.length === 0 && pluginMcpServers.length === 0) return
+    statusRequestedRef.current = true
+    reconnectMcpServers()
+  }, [loaded, pluginsLoaded, servers, pluginMcpServers, reconnectMcpServers])
 
   return (
     <div className="p-6">

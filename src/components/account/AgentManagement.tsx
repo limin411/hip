@@ -102,12 +102,16 @@ function Content({
   const { t } = useTranslation()
 
   const isEmpty = filteredAgents.length === 0
-  const emptyTitle = isEmpty
-    ? isSearchActive
-      ? t('settings.agents.searchEmpty')
-      : t('settings.agents.gridEmptyTitle')
-    : ''
-  const emptyHint = isEmpty && !isSearchActive ? t('settings.agents.gridEmptyHint') : undefined
+  let emptyTitle = ''
+  let emptyHint: string | undefined
+  if (isEmpty) {
+    if (isSearchActive) {
+      emptyTitle = t('settings.agents.searchEmpty')
+    } else {
+      emptyTitle = t('settings.agents.gridEmptyTitle')
+      emptyHint = t('settings.agents.gridEmptyHint')
+    }
+  }
 
   return (
     <div className="space-y-5">

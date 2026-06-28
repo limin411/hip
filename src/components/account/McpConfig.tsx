@@ -518,6 +518,7 @@ function McpServerCard({
                 } catch {
                   setActionError(t('settings.mcp.error'))
                 }
+                // Reconnect is fire-and-forget; clear busy after a short debounce so the user cannot spam.
                 setTimeout(() => {
                   if (isMountedRef.current) setReconnectBusy(false)
                 }, 1000)

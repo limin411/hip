@@ -109,6 +109,7 @@ export const zhCN = {
       agentRestarted: '外部智能体已重启 —— 之前的上下文未保留。',
       modelHint: '选择模型',
       noModelSelected: '选择模型',
+      attach: '添加附件',
       todos: {
         plan: '计划',
         pending: '待办',

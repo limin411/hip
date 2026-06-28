@@ -109,6 +109,7 @@ export const zhTW = {
       agentRestarted: '外部智能體已重啟 —— 先前的上下文未保留。',
       modelHint: '選擇模型',
       noModelSelected: '選擇模型',
+      attach: '新增附件',
       todos: {
         plan: '計畫',
         pending: '待辦',

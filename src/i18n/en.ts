@@ -109,6 +109,7 @@ export const en = {
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
       modelHint: 'Choose the model',
       noModelSelected: 'Select a model',
+      attach: 'Attach file',
       todos: {
         plan: 'Plan',
         pending: 'To do',

@@ -8,6 +8,7 @@ import * as hipConfigStore from '@/store/hipConfigStore'
 import * as draftStore from '@/store/draftStore'
 import * as domain from '@/domain'
 import { sessionService } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 
 vi.mock('@/ipc/dialog', () => ({
@@ -79,7 +80,7 @@ describe('InputBar', () => {
     })
   })
 
-  it('switches to the first multimodal internal agent model before sending an image attachment', async () => {
+  it('does not switch model before sending an image attachment when a vision agent exists', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue({
       id: 's1',
@@ -109,13 +110,12 @@ describe('InputBar', () => {
     fireEvent.click(screen.getByTestId('composer-send'))
 
     await vi.waitFor(() => {
-      expect(setSessionModel).toHaveBeenCalledWith('openai/gpt-4o')
+      expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
     })
-    expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
-    expect(setSessionModel.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0])
+    expect(setSessionModel).not.toHaveBeenCalled()
   })
 
-  it('switches the draft model before sending an image attachment when no session is active', async () => {
+  it('does not switch the draft model before sending an image attachment', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue(null)
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(null as any)
@@ -142,10 +142,9 @@ describe('InputBar', () => {
     fireEvent.click(screen.getByTestId('composer-send'))
 
     await vi.waitFor(() => {
-      expect(setModelKey).toHaveBeenCalledWith('openai/gpt-4o')
+      expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
     })
-    expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
-    expect(setModelKey.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0])
+    expect(setModelKey).not.toHaveBeenCalled()
   })
 
   it('does not switch model when the active session model is already multimodal', async () => {
@@ -170,6 +169,57 @@ describe('InputBar', () => {
 
     await vi.waitFor(() => {
       expect(sendMessage).toHaveBeenCalled()
+    })
+    expect(setSessionModel).not.toHaveBeenCalled()
+  })
+
+  it('does not switch model before resuming an interrupt with an image attachment', async () => {
+    baseMocks()
+    useDomainStore.setState({
+      sessions: [{
+        id: 's1',
+        config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+        title: 'T',
+        preview: 'P',
+        updatedAtMs: 0,
+        loaded: true,
+        messages: [],
+        status: 'idle',
+        error: null,
+        interrupt: { turnId: 't1', question: 'need more info' },
+      }],
+      activeSessionId: 's1',
+    })
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+      interrupt: { turnId: 't1', question: 'need more info' },
+    } as any)
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          { id: 'a1', name: 'Vision', kind: 'internal', command: '', args: [], enabled: true, boundModel: { providerID: 'openai', modelID: 'gpt-4o' }, prompt: '' },
+        ],
+      },
+    })
+    vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/image.png'])
+    const setSessionModel = vi.spyOn(sessionService, 'setSessionModel').mockReturnValue(undefined)
+    const resume = vi.spyOn(sessionService, 'resume').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    fireEvent.click(screen.getByTestId('attachment-button'))
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('attachment-chip')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)'), { target: { value: 'here is the image' } })
+    fireEvent.click(screen.getByTestId('composer-send'))
+
+    await vi.waitFor(() => {
+      expect(resume).toHaveBeenCalledWith('here is the image', expect.any(Array))
     })
     expect(setSessionModel).not.toHaveBeenCalled()
   })

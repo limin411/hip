@@ -7,6 +7,8 @@ import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
+import { useProvidersStore } from '@/store/providersStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -23,6 +25,37 @@ class FakeTransport implements Transport {
   pushStatus(s: ConnectionStatus) { this.statusHandler?.(s) }
 }
 
+const multimodalCatalog = {
+  openai: {
+    id: 'openai',
+    name: 'OpenAI',
+    env: [],
+    models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } },
+  },
+  deepseek: {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    env: [],
+    models: { 'deepseek-v4-flash': { id: 'deepseek-v4-flash', name: 'V4 Flash', attachment: false } },
+  },
+}
+
+const textActiveConfig = {
+  providers: { deepseek: { enabled: true } },
+  activeModel: { providerID: 'deepseek', modelID: 'deepseek-v4-flash' },
+}
+
+const visionAgent = {
+  id: 'a1',
+  name: 'Vision',
+  kind: 'internal' as const,
+  command: '',
+  args: [],
+  enabled: true,
+  boundModel: { providerID: 'openai', modelID: 'gpt-4o' },
+  prompt: '',
+}
+
 beforeEach(() => {
   // NOTE: drop the `true` (replace) flag — Zustand v5 setState with replace=true
   // wipes action methods from the store, causing "X is not a function" errors.
@@ -32,6 +65,8 @@ beforeEach(() => {
   useDraftStore.setState({ draft: null })
   useDiffStore.setState({ bySession: {} })
   useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents' })
+  useProvidersStore.setState({ catalog: multimodalCatalog, config: textActiveConfig, keyConfigured: {}, loaded: true })
+  useHipConfigStore.setState({ config: { version: 1, agents: [visionAgent] }, loaded: true, error: null })
 })
 
 describe('SessionService', () => {
@@ -565,5 +600,55 @@ describe('branches + revert', () => {
     expect(useDiffStore.getState().bySession['s1'].revertError).toBe('safety checkpoint failed')
     // no refresh requests fire on a failed revert
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
+  })
+
+  it('sendMessage with an image does not switch the draft model', () => {
+    useDomainStore.setState({ activeSessionId: null })
+    useDraftStore.setState({ draft: { tempId: 'd1', mode: 'chat', text: '', modelKey: 'deepseek/deepseek-v4-flash' } })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
+    svc.sendMessage('describe', attachments)
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.some((m) => m.type === 'session:create' && m.config.model === 'deepseek-v4-flash')).toBe(true)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
+  })
+
+  it('sendMessage with an image does not switch the active session model', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
+    svc.sendMessage('describe', attachments)
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
+  })
+
+  it('regenerate does not switch model when the session history contains an image', () => {
+    useDomainStore.setState({
+      sessions: [{
+        id: 's1',
+        config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] },
+        title: 'T',
+        preview: 'P',
+        updatedAtMs: 0,
+        loaded: true,
+        messages: [
+          { id: 'u1', role: 'user', content: 'what is this', timestamp: 0, attachments: [{ id: 'a1', name: 'image.png', mimeType: 'image/png' }] },
+          { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 },
+        ],
+        status: 'idle',
+        error: null,
+      }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.regenerate()
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(true)
   })
 })

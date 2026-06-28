@@ -222,7 +222,7 @@ export function McpConfig() {
 
       <div className="mt-6">
         <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.myServersTitle')}</h3>
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {servers.length === 0 ? (
             <button
               onClick={() => setEditing({ mode: 'add' })}
@@ -252,7 +252,7 @@ export function McpConfig() {
       {pluginMcpServers.length > 0 && (
         <div className="mt-6">
           <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.pluginSectionTitle')}</h3>
-          <div className="mt-2 space-y-2">
+          <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {pluginMcpServers.map((s) => (
               <PluginMcpServerCard
                 key={s.id}

@@ -363,8 +363,6 @@ function McpServerCard({
   const [resetBusy, setResetBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reconnectBusy, setReconnectBusy] = useState(false)
-  const isMountedRef = useRef(true)
-  useEffect(() => () => { isMountedRef.current = false }, [])
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -442,7 +440,7 @@ function McpServerCard({
                     } catch {
                       setActionError(t('settings.mcp.error'))
                     } finally {
-                      if (isMountedRef.current) setResetBusy(false)
+                      setResetBusy(false)
                     }
                   }}
                   disabled={resetBusy}
@@ -471,7 +469,7 @@ function McpServerCard({
                         } catch {
                           setActionError(t('settings.mcp.error'))
                         } finally {
-                          if (isMountedRef.current) setToolBusy((b) => ({ ...b, [toolName]: false }))
+                          setToolBusy((b) => ({ ...b, [toolName]: false }))
                         }
                       }}
                       ariaLabel={toolName}
@@ -498,7 +496,7 @@ function McpServerCard({
               } catch {
                 setActionError(t('settings.mcp.error'))
               } finally {
-                if (isMountedRef.current) setToggleBusy(false)
+                setToggleBusy(false)
               }
             }}
             ariaLabel={t('settings.mcp.enableThis')}
@@ -515,13 +513,12 @@ function McpServerCard({
                 setReconnectBusy(true)
                 try {
                   onReconnect()
+                  // Debounce only on success; synchronous failures allow immediate retry.
+                  setTimeout(() => { setReconnectBusy(false) }, 1000)
                 } catch {
                   setActionError(t('settings.mcp.error'))
+                  setReconnectBusy(false)
                 }
-                // Reconnect is fire-and-forget; clear busy after a short debounce so the user cannot spam.
-                setTimeout(() => {
-                  if (isMountedRef.current) setReconnectBusy(false)
-                }, 1000)
               }}
               disabled={reconnectBusy}
             />
@@ -788,17 +785,15 @@ function DeleteServerDialog({
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
   const handleConfirm = async () => {
     setBusy(true)
     setError(null)
     try {
       await onConfirm()
     } catch {
-      if (mountedRef.current) setError(t('settings.mcp.error'))
+      setError(t('settings.mcp.error'))
     } finally {
-      if (mountedRef.current) setBusy(false)
+      setBusy(false)
     }
   }
   return (

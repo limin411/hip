@@ -653,7 +653,7 @@ export class Session {
       // Keep in-memory history in sync with the persisted user_message event.
       this.messages.push(new HumanMessage(input.content))
       const message = imageAgentError
-        ? 'Image agent selection failed. Please enable a multimodal agent or switch to a multimodal model.'
+        ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`
         : 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.'
       _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message })
       return ''
@@ -794,6 +794,7 @@ export class Session {
       // Forward the user's text plus image parts to the image agent. Non-image attachments stay with
       // the main model; mixed-attachment splitting is left for future multi-agent streaming work.
       const imageParts = parts.filter((p) => p.type === 'image_url' || p.type === 'text')
+      const imageAttachments = input.attachments?.filter((a) => a.mimeType.startsWith('image/'))
       agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),
         skills: this.configMgr.skills,
@@ -804,7 +805,7 @@ export class Session {
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
         attachmentParts: imageParts,
-      }, input.attachments)
+      }, imageAttachments)
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
       this.emit({ type: 'step_failed', sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() })

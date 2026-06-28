@@ -17,9 +17,9 @@ export function HipLogo({
   title = 'hip',
   decorative = false,
 }: HipLogoProps) {
-  const a11y = decorative
-    ? ({ 'aria-hidden': true } as const)
-    : ({ role: 'img', 'aria-label': title } as const)
+  const a11y: React.HTMLAttributes<HTMLDivElement> = decorative
+    ? { 'aria-hidden': true }
+    : { role: 'img', 'aria-label': title }
 
   const base = import.meta.env.BASE_URL ?? '/'
   const src = base.endsWith('/') ? `${base}logo.svg` : `${base}/logo.svg`

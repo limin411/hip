@@ -1102,7 +1102,7 @@ export class Session {
     let finalState: LoopState | undefined
     try {
       if (this.agentProv.isExternalAgent()) {
-        const userText = lastUserText(base?.messages ? modelReady(base.messages) : visibleMessages)
+        const userText = lastUserText(base?.messages !== undefined ? modelReady(base.messages) : visibleMessages)
         const cronPrefix = cronMessages.length ? cronMessages.map((m) => m.content as string).join('\n\n') + '\n\n' : ''
         const hooks: ExternalAgentHooks = {
           requestPermission: (req) => {
@@ -1116,7 +1116,7 @@ export class Session {
         closeReasoning('supervisor'); finishRemaining()
         const acpId = this.agentProv.acpSessionId; if (acpId && this.store) this.store.setAcpSessionId(this.id, acpId)
       } else {
-        const effectiveMessages = base?.messages ? modelReady(base.messages) : visibleMessages
+        const effectiveMessages = base?.messages !== undefined ? modelReady(base.messages) : visibleMessages
         const userText = lastUserText(effectiveMessages)
         const usePlan = shouldPlan(userText, {
           forcePlan: this._config.forcePlan,

@@ -10,7 +10,7 @@ export function DomainPane() {
     >
       <div className="w-full max-w-3xl">
         <div className="mb-6 flex justify-center">
-          <HipLogo variant="hero" size={160} />
+          <HipLogo size={160} />
         </div>
         <h1 className="mb-1 text-center text-display font-semibold text-ink">
           Domain coming soon

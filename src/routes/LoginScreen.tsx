@@ -18,7 +18,7 @@ export function LoginScreen() {
       <div
         className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex"
       >
-        <HipLogo variant="hero" size={320} />
+        <HipLogo size={320} />
       </div>
 
       {/* 右侧登录方式 */}

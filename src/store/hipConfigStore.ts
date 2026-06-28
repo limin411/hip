@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import type {
   HipConfig,
   McpServerConfig,
@@ -103,16 +104,16 @@ export const useHipConfigStore = create<HipConfigStore>((set, get) => ({
 
 /** Select MCP server configurations. */
 export const useMcpServers = (): McpServerConfig[] =>
-  useHipConfigStore((s) => s.config.mcpServers ?? [])
+  useHipConfigStore(useShallow((s) => s.config.mcpServers ?? []))
 
 /** Select skill enable/disable entries. */
 export const useSkills = (): SkillEntry[] =>
-  useHipConfigStore((s) => s.config.skills ?? [])
+  useHipConfigStore(useShallow((s) => s.config.skills ?? []))
 
 /** Select provider entries. */
 export const useProviders = (): ProviderEntry[] =>
-  useHipConfigStore((s) => s.config.providers ?? [])
+  useHipConfigStore(useShallow((s) => s.config.providers ?? []))
 
 /** Select agent configurations. */
 export const useAgents = (): AgentConfig[] =>
-  useHipConfigStore((s) => s.config.agents ?? [])
+  useHipConfigStore(useShallow((s) => s.config.agents ?? []))

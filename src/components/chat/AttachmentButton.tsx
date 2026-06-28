@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Paperclip } from 'lucide-react'
 import { nanoid } from 'nanoid'
+import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/Button'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 import { getAttachmentMimeType } from '@/lib/attachmentMimeType'
@@ -20,7 +21,7 @@ export function AttachmentButton({ onAttach }: AttachmentButtonProps) {
   const { t } = useTranslation()
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
-  const agents = useHipConfigStore((s) => s.config.agents ?? [])
+  const agents = useHipConfigStore(useShallow((s) => s.config.agents ?? []))
   const draft = useDraftStore((s) => s.draft)
   const activeId = useActiveSessionId()
   const session = useActiveSession()

@@ -8,6 +8,7 @@ import * as hipConfigStore from '@/store/hipConfigStore'
 import * as domain from '@/domain'
 import * as draftStore from '@/store/draftStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
+import type { Catalog } from '@/ipc/catalog'
 
 vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
@@ -78,5 +79,21 @@ describe('AttachmentButton', () => {
       expect(attachments[0].id).toBeDefined()
       expect(attachments[0].path).toBe('/path/to/file.png')
     })
+  })
+
+  it('does not infinite-loop when agents is absent (real Zustand store)', () => {
+    const catalog: Catalog = {
+      openai: { id: 'openai', name: 'OpenAI', env: [], models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } } },
+    }
+    providersStore.useProvidersStore.setState({
+      catalog,
+      config: { providers: { openai: { enabled: true } }, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },
+      keyConfigured: {},
+      loaded: true,
+    })
+    hipConfigStore.useHipConfigStore.setState({ config: { version: 1 }, loaded: true, error: null })
+
+    expect(() => render(<AttachmentButton onAttach={vi.fn()} />)).not.toThrow()
+    expect(screen.getByTestId('attachment-button')).toBeInTheDocument()
   })
 })

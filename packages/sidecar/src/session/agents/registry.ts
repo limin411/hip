@@ -53,13 +53,13 @@ export function selectImageAgent(cwd: string, userPrompt: string, catalog?: Cata
   if (agents.length === 0) return null
   const keywords = extractKeywords(userPrompt)
   if (keywords.length > 0) {
-    const matched = agents.filter((a) =>
+    const matched = agents.find((a) =>
       keywords.some((kw) =>
         (a.prompt ?? '').toLowerCase().includes(kw) ||
         (a.description ?? '').toLowerCase().includes(kw),
       ),
     )
-    if (matched.length > 0) return matched[0]
+    if (matched) return matched
   }
   return agents[0]
 }

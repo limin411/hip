@@ -592,9 +592,10 @@ export class Session {
     const parts: ContentPart[] = []
     if (input.content) parts.push({ type: 'text', text: input.content })
 
+    const modelSupportsImages = this.currentModelSupportsImages()
     let imageAgent: AgentConfig | null = null
     let imageAgentError: string | null = null
-    if (hasImageAttachment && !this.currentModelSupportsImages()) {
+    if (hasImageAttachment && !modelSupportsImages) {
       try {
         imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
       } catch (err) {
@@ -612,7 +613,9 @@ export class Session {
         isFirstTurn = !this.store.hasMessages(this.id)
         // When dispatching to an internal multimodal agent, keep image_url parts out of the
         // main session history so the text-only main model never sees them on follow-up turns.
-        const historyParts = imageAgent ? undefined : (isRichContentParts(parts) ? parts : undefined)
+        // Also keep them out when no image agent is available and we are about to error.
+        const filterImages = !!imageAgent || (hasImageAttachment && !modelSupportsImages)
+        const historyParts = filterImages ? undefined : (isRichContentParts(parts) ? parts : undefined)
         this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
     } else if (this.store) {
@@ -644,7 +647,7 @@ export class Session {
       return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
 
-    if (hasImageAttachment && !this.currentModelSupportsImages()) {
+    if (hasImageAttachment && !modelSupportsImages) {
       this.endActivity()
       const message = imageAgentError
         ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`

@@ -237,29 +237,11 @@ export function McpConfig() {
                 key={s.id}
                 server={s}
                 status={statusByServer.get(s.id)}
-                onToggle={async (enabled) => {
-                  try {
-                    await updateServer(s.id, { enabled })
-                  } catch {
-                    window.alert(t('settings.mcp.error'))
-                  }
-                }}
+                onToggle={async (enabled) => { await updateServer(s.id, { enabled }) }}
                 onEdit={() => setEditing({ mode: 'edit', server: s })}
                 onDelete={() => setDeleting(s)}
-                onToggleTool={async (toolName) => {
-                  try {
-                    await handleUpdateTools(s, toolName)
-                  } catch {
-                    window.alert(t('settings.mcp.error'))
-                  }
-                }}
-                onResetTools={async () => {
-                  try {
-                    await handleResetTools(s)
-                  } catch {
-                    window.alert(t('settings.mcp.error'))
-                  }
-                }}
+                onToggleTool={async (toolName) => { await handleUpdateTools(s, toolName) }}
+                onResetTools={async () => { await handleResetTools(s) }}
                 onReconnect={reconnectMcpServers}
               />
             ))
@@ -367,15 +349,17 @@ function McpServerCard({
 }: {
   server: McpServerConfig
   status?: McpServerStatusVM
-  onToggle: (enabled: boolean) => void
+  onToggle: (enabled: boolean) => Promise<void>
   onEdit: () => void
   onDelete: () => void
-  onToggleTool: (toolName: string) => void
-  onResetTools: () => void
+  onToggleTool: (toolName: string) => Promise<void>
+  onResetTools: () => Promise<void>
   onReconnect: () => void
 }) {
   const { t } = useTranslation()
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [toggleBusy, setToggleBusy] = useState(false)
+  const [toolBusy, setToolBusy] = useState<Record<string, boolean>>({})
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -445,8 +429,9 @@ function McpServerCard({
               {(server.enabledTools?.length || server.disabledTools?.length) ? (
                 <button
                   type="button"
-                  onClick={() => { onResetTools() }}
-                  className="text-caption text-accent hover:underline"
+                  onClick={async () => { setToolBusy((b) => ({ ...b, __reset: true })); try { await onResetTools() } finally { setToolBusy((b) => ({ ...b, __reset: false })) } }}
+                  disabled={toolBusy.__reset}
+                  className="text-caption text-accent hover:underline disabled:opacity-50"
                 >
                   {t('settings.mcp.toolToggleAll')}
                 </button>
@@ -462,7 +447,8 @@ function McpServerCard({
                   >
                     <Switch
                       checked={enabled}
-                      onCheckedChange={() => onToggleTool(toolName)}
+                      disabled={!!toolBusy[toolName]}
+                      onCheckedChange={async () => { setToolBusy((b) => ({ ...b, [toolName]: true })); try { await onToggleTool(toolName) } finally { setToolBusy((b) => ({ ...b, [toolName]: false })) } }}
                       ariaLabel={toolName}
                     />
                     <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
@@ -475,7 +461,7 @@ function McpServerCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <Switch checked={server.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.mcp.enableThis')} />
+        <Switch checked={server.enabled} onCheckedChange={async (enabled) => { setToggleBusy(true); try { await onToggle(enabled) } finally { setToggleBusy(false) } }} disabled={toggleBusy} ariaLabel={t('settings.mcp.enableThis')} />
         <div className="flex items-center gap-1">
           {status?.status === 'disconnected' && server.enabled && (
             <ActionButton icon={<RefreshCw size={14} />} label={t('settings.mcp.reconnect')} onClick={onReconnect} />

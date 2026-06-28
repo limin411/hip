@@ -32,8 +32,6 @@ export function HipLogo({
         alt=""
         aria-hidden="true"
         width={Math.round(size * LOGO_SCALE)}
-        height={Math.round(size * LOGO_SCALE)}
-        style={{ width: Math.round(size * LOGO_SCALE), height: 'auto' }}
       />
     </div>
   )

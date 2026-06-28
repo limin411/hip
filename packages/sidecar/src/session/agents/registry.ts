@@ -6,9 +6,9 @@ import type { Catalog } from '../../config/catalog.js'
 import { readCatalog } from '../../config/catalog.js'
 
 const STOP_WORDS = new Set([
-  'the','a','an','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','must','shall','can','need','dare','ought','used','to','of','in','for','on','with','at','by','from','as','into','through','during','before','after','above','below','between','under','over','again','further','then','once','here','there','when','where','why','how','all','any','both','each','few','more','most','other','some','such','no','nor','not','only','own','same','so','than','too','very','just','and','but','if','or','because','until','while','what','which','who','whom','this','that','these','those','am','it','its','their','them','they','we','our','you','your','i','me','my','he','she','his','her','him',
-  '请','一下','的','了','在','是','我','你','他','她','它','我们','你们','他们','这个','那个','这些','那些','什么','怎么','为什么','哪里','谁','哪','和','或','但是','如果','因为','所以','虽然','然后','就','都','也','很','非常','不','没','有','没有','要','会','能','可以','应该','可能','必须','需要','把','被','给','对','向','从','到','让','看','说','做','用','拿','想','知道','觉得','认为','吗','呢','吧','啊','哦','嗯',
-])
+  'the','an','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','must','shall','can','need','dare','ought','used','to','of','in','for','on','with','at','by','from','as','into','through','during','before','after','above','below','between','under','over','again','further','then','once','here','there','when','where','why','how','all','any','both','each','few','more','most','other','some','such','no','nor','not','only','own','same','so','than','too','very','just','and','but','if','or','because','until','while','what','which','who','whom','this','that','these','those','am','it','its','their','them','they','we','our','you','your','me','my','he','she','his','her','him',
+  '请','一下','我们','你们','他们','这个','那个','这些','那些','什么','怎么','为什么','哪里','谁','哪','但是','如果','因为','所以','虽然','然后','非常','没有','可以','应该','可能','必须','需要','知道','觉得','认为',
+].filter((w) => w.length >= 2))
 
 function extractKeywords(text: string): string[] {
   const words = text

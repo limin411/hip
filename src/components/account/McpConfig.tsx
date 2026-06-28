@@ -427,7 +427,7 @@ function McpServerCard({
               {(server.enabledTools?.length || server.disabledTools?.length) ? (
                 <button
                   type="button"
-                  onClick={() => { void onResetTools().catch((err) => console.error('Failed to reset MCP tools:', err)) }}
+                  onClick={() => { void onResetTools() }}
                   className="text-caption text-accent hover:underline"
                 >
                   {t('settings.mcp.toolToggleAll')}

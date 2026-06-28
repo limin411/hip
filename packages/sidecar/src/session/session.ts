@@ -592,9 +592,14 @@ export class Session {
     const parts: ContentPart[] = []
     if (input.content) parts.push({ type: 'text', text: input.content })
 
-    const imageAgent = hasImageAttachment && !this.currentModelSupportsImages()
-      ? selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
-      : null
+    let imageAgent: AgentConfig | null = null
+    if (hasImageAttachment && !this.currentModelSupportsImages()) {
+      try {
+        imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
+      } catch (err) {
+        console.warn('Failed to select image agent:', err instanceof Error ? err.message : String(err))
+      }
+    }
 
     if (input.attachments?.length) {
       await validateAttachments(input.attachments)
@@ -634,6 +639,7 @@ export class Session {
     }
 
     if (hasImageAttachment && !this.currentModelSupportsImages()) {
+      this.endActivity()
       _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message: 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.' })
       return ''
     }

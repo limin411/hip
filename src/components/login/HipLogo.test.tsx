@@ -18,7 +18,8 @@ describe('HipLogo', () => {
 
     const logo = container.querySelector('img[src="/logo.svg"]')
     expect(logo).toBeInTheDocument()
-    expect(logo).toHaveAttribute('alt', 'hip')
+    expect(logo).toHaveAttribute('alt', '')
+    expect(logo).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('renders aria-hidden="true" and empty alt when decorative', () => {

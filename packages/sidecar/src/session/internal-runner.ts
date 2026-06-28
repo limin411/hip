@@ -62,6 +62,9 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {
     humanParts = attachmentParts
+    if (task) {
+      console.warn('runManagedAgent: task is ignored when attachmentParts is provided')
+    }
   } else {
     humanParts = []
     if (task) humanParts.push({ type: 'text', text: task })

@@ -282,9 +282,13 @@ export function McpConfig() {
         <DeleteServerDialog
           server={deleting}
           onCancel={() => setDeleting(null)}
-          onConfirm={() => {
-            removeServer(deleting.id).catch((err) => console.error('Failed to remove MCP server:', err))
-            setDeleting(null)
+          onConfirm={async () => {
+            try {
+              await removeServer(deleting.id)
+              setDeleting(null)
+            } catch (err) {
+              console.error('Failed to remove MCP server:', err)
+            }
           }}
         />
       )}

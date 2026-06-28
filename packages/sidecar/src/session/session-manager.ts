@@ -18,6 +18,7 @@ import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js
 import { buildTools } from './tools.js'
 import { SessionReplay } from './replay.js'
 import { EventStore } from '../persistence/event-store.js'
+import { AttachmentError } from './attachments.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -43,7 +44,8 @@ export class SessionManager {
     this.handleAsync(msg, send).catch((err) => {
       console.error('[session-manager] handler error', err)
       const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
-      send({ type: 'error', sessionId, code: 'INTERNAL', message: safeErrorMessage(err) })
+      const code = err instanceof AttachmentError ? err.code : 'INTERNAL'
+      send({ type: 'error', sessionId, code, message: safeErrorMessage(err) })
     })
   }
 
@@ -79,7 +81,7 @@ export class SessionManager {
         await this.ensureSession(msg.sessionId, send).regenerate(send)
         break
       case 'message:resume':
-        await this.ensureSession(msg.sessionId, send).resume(msg.content, send)
+        await this.ensureSession(msg.sessionId, send).resume(msg.content, send, msg.attachments)
         break
       case 'subagent:background': {
         const s = this.ensureSession(msg.sessionId, send)

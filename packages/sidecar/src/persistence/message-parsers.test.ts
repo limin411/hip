@@ -5,6 +5,7 @@ import {
   optString,
   optNumber,
   optStringArray,
+  optObjectArray,
   parseUsage,
 } from './message-parsers.js'
 
@@ -107,5 +108,26 @@ describe('message-parsers: parseUsage', () => {
     expect(parseUsage({ usage: { inputTokens: 10, outputTokens: 5 } })).toBeNull()
     expect(parseUsage({ usage: { inputTokens: 10, outputTokens: 5, totalTokens: NaN } })).toBeNull()
     expect(parseUsage({ usage: { inputTokens: '10', outputTokens: 5, totalTokens: 15 } })).toBeNull()
+  })
+})
+
+describe('message-parsers: optObjectArray', () => {
+  it('returns objects when no guard is provided', () => {
+    expect(optObjectArray({ foo: [{ a: 1 }, { b: 2 }] }, 'foo')).toEqual([{ a: 1 }, { b: 2 }])
+  })
+
+  it('filters out non-objects', () => {
+    expect(optObjectArray({ foo: [{ a: 1 }, 'x', null, 42] }, 'foo')).toEqual([{ a: 1 }])
+  })
+
+  it('returns undefined when field is absent or not an array', () => {
+    expect(optObjectArray({}, 'foo')).toBeUndefined()
+    expect(optObjectArray({ foo: 'not-array' }, 'foo')).toBeUndefined()
+  })
+
+  it('applies guard to filter objects', () => {
+    interface Item { id: string }
+    const guard = (x: Record<string, unknown>): x is Item => typeof x.id === 'string'
+    expect(optObjectArray<Item>({ foo: [{ id: 'a' }, { id: 1 }, { name: 'b' }] }, 'foo', guard)).toEqual([{ id: 'a' }])
   })
 })

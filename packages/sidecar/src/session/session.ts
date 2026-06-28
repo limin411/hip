@@ -49,7 +49,7 @@ import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
-import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
+import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload, type ContentPart } from './attachments.js'
 import { defaultScratchRoot } from './scratch.js'
 import {
   ContextInjectorRegistry,
@@ -667,10 +667,25 @@ export class Session {
     }
   }
 
-  async resume(content: string, send: SendFn): Promise<void> {
+  async resume(content: string, send: SendFn, attachments?: AttachmentPayload[]): Promise<void> {
     if (!this.awaitingResume || !this.paused || this.running) return
+    const parts: ContentPart[] = []
+    if (content) parts.push({ type: 'text', text: content })
+    let staged: Attachment[] | undefined
+
+    if (attachments?.length) {
+      await validateAttachments(attachments)
+      staged = await stageAttachments(this.id, attachments, this.scratchRoot)
+      const attachmentParts = await buildAttachmentContentParts(attachments)
+      parts.push(...attachmentParts)
+    }
+
+    const humanMessage = parts.length === 1 && parts[0].type === 'text'
+      ? new HumanMessage(content)
+      : new HumanMessage({ content: parts })
+
     const base = {
-      messages: [...this.paused.messages, new HumanMessage(content)],
+      messages: [...this.paused.messages, humanMessage],
       steps: this.paused.steps,
       planningMode: this.paused.planningMode,
       planStatus: this.paused.planStatus,
@@ -679,9 +694,9 @@ export class Session {
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
-      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts })
+      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}) })
     }
-    this.messages.push(new HumanMessage(content))
+    this.messages.push(humanMessage)
     await this.runTurn(send, base)
   }
 
@@ -1387,11 +1402,6 @@ export class Session {
 
 function rowToBaseMessage(d: SessionMessageData): BaseMessage {
   if (d.role === 'user') {
-    if (d.attachments?.some((a) => a.mimeType.startsWith('image/'))) {
-      // For loaded rows we only have metadata; images would need to be re-read from scratch.
-      // As a fallback, keep the text content. A future improvement can reload image data.
-      return new HumanMessage(d.content)
-    }
     return new HumanMessage(d.content)
   }
   if (d.role === 'assistant' && 'kind' in d) return new SystemMessage(d.summary)

@@ -444,7 +444,7 @@ export type ClientMessage =
   | { type: 'input:steer'; sessionId: string; id: string; content: string }
   | { type: 'message:cancel'; sessionId: string }
   | { type: 'message:regenerate'; sessionId: string }
-  | { type: 'message:resume'; sessionId: string; content: string }
+  | { type: 'message:resume'; sessionId: string; content: string; attachments?: AttachmentSendPayload[] }
   | { type: 'session:list' }
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }

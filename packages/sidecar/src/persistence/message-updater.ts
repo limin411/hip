@@ -141,7 +141,9 @@ export class SessionMessageUpdater {
     const messageId = reqString(event.data, 'user_message', 'messageId')
     const content = reqString(event.data, 'user_message', 'content')
     const timestamp = optNumber(event.data, 'timestamp') ?? event.seq
-    const attachments = optObjectArray<Attachment>(event.data, 'attachments')
+    const attachments = optObjectArray<Attachment>(event.data, 'attachments', (x): x is Attachment =>
+      typeof x.id === 'string' && typeof x.name === 'string' && typeof x.mimeType === 'string',
+    )
     const data: SessionMessageData = { role: 'user', content, messageId, ...(attachments?.length ? { attachments } : {}) }
     this.upsertRow({
       id: messageId,

@@ -369,7 +369,7 @@ export class SessionService {
     if (!text && attachments.length === 0) return
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
-    if (active?.interrupt) { this.resume(text); return }
+    if (active?.interrupt) { this.resume(text, attachments); return }
     let { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
@@ -393,14 +393,19 @@ export class SessionService {
 
   /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and
    *  send it as message:resume so the sidecar continues the loop. */
-  resume(content: string): void {
+  resume(content: string, attachments: LocalAttachment[] = []): void {
     const text = content.trim()
     if (!text) return
     const { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) return
     const id = nanoid()
-    useDomainStore.getState().appendUserMessage(activeSessionId, id, text)
-    this.transport.send({ type: 'message:resume', sessionId: activeSessionId, content: text })
+    useDomainStore.getState().appendUserMessage(activeSessionId, id, text, attachments)
+    this.transport.send({
+      type: 'message:resume',
+      sessionId: activeSessionId,
+      content: text,
+      ...(attachments.length ? { attachments: attachments.map((a) => ({ id: a.id, name: a.name, mimeType: a.mimeType, path: a.path })) } : {}),
+    })
   }
 
   /** Respond to a plan approval interrupt (approve / reject / amend). */

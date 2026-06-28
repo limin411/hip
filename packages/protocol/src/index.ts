@@ -217,6 +217,13 @@ export function providerKeyEnv(providerID: string): string {
   return `HIP_MODEL_${providerID.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_API_KEY`
 }
 
+export interface Attachment {
+  id: string
+  name: string
+  mimeType: string
+  size?: number
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -228,6 +235,7 @@ export interface Message {
   toolCalls?: ToolCall[]     // flat tool calls for this turn, referenced by timeline tool steps via callId
   agentRuns?: AgentRun[]     // per-agent run metadata for THIS turn (taskInput/output/timing/parent)
   usage?: TurnUsage          // turn total = sum of agentRuns' usage; present once usage was reported
+  attachments?: Attachment[]
 }
 
 /** Provider-reported token counts for a turn or a single agent's slice of it.
@@ -431,7 +439,7 @@ export type SubagentMode = 'foreground' | 'background'
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
   | { type: 'session:destroy'; sessionId: string }
-  | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user' }
+  | { type: 'message:send'; sessionId: string; id: string; content: string; role: 'user'; attachments?: AttachmentSendPayload[] }
   | { type: 'input:enqueue'; sessionId: string; id: string; content: string }
   | { type: 'input:steer'; sessionId: string; id: string; content: string }
   | { type: 'message:cancel'; sessionId: string }
@@ -480,6 +488,8 @@ export type ClientMessage =
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
   | { type: 'replay:session'; sessionId: string; turnIndex: number }
+
+type AttachmentSendPayload = Attachment & { path: string }
 
 export type ServerMessage =
   | { type: 'session:created'; sessionId: string }
@@ -704,7 +714,7 @@ export interface McpResourceContent {
 // ──────────────────────────────────────────────────────────────────
 
 export type SessionEvent =
-  | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number }
+  | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number; attachments?: Attachment[] }
   | { type: 'step_started'; sessionId: string; turnId: string; agentId: string; timestamp: number }
   | { type: 'step_ended'; sessionId: string; turnId: string; agentId: string; timestamp: number }
   | { type: 'text_started'; sessionId: string; messageId: string; timestamp: number }

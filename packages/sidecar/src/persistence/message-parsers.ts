@@ -39,6 +39,12 @@ export function optStringArray(data: Record<string, unknown>, field: string): re
   return raw.filter((x): x is string => typeof x === 'string')
 }
 
+export function optObjectArray<T>(data: Record<string, unknown>, field: string): T[] | undefined {
+  const raw = data[field]
+  if (!Array.isArray(raw)) return undefined
+  return raw.filter((x): x is T => x != null && typeof x === 'object') as T[]
+}
+
 export function parseUsage(data: Record<string, unknown>): ProjectedUsage | null {
   const usage = data['usage']
   if (usage == null || typeof usage !== 'object') return null

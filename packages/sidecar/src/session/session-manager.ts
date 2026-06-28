@@ -58,7 +58,7 @@ export class SessionManager {
         await this.destroySession(msg.sessionId)
         break
       case 'message:send':
-        await this.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id)
+        await this.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id, msg.attachments)
         break
       case 'input:enqueue': {
         const s = this.ensureSession(msg.sessionId, send)
@@ -371,7 +371,7 @@ export class SessionManager {
     if (!cfg.cwd) cfg = { ...cfg, cwd: ensureScratchDir(id, this.scratchRoot) }
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
-    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store))
+    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store, undefined, undefined, undefined, undefined, undefined, this.scratchRoot))
     void this.sessions.get(id)!.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
@@ -384,7 +384,7 @@ export class SessionManager {
     if (existing) return existing
     const row = this.store?.getSession(id)
     const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
-    const session = new Session(id, config, this.modelFactory(config), this.store)
+    const session = new Session(id, config, this.modelFactory(config), this.store, undefined, undefined, undefined, undefined, undefined, this.scratchRoot)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)
     // Send immediate MCP status for this session's configured servers.
@@ -471,7 +471,7 @@ export class SessionManager {
       surface: 'chat',
     }
 
-    const tempSession = new Session(sessionId, tempConfig)
+    const tempSession = new Session(sessionId, tempConfig, undefined, undefined, undefined, undefined, undefined, undefined, undefined, this.scratchRoot)
     this.sessions.set(sessionId, tempSession)
 
     try {

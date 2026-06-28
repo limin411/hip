@@ -1,10 +1,12 @@
 import type { SessionStore, PendingInputRow } from '../persistence/store.js'
+import type { AttachmentPayload } from './attachments.js'
 
 /** In-memory shape of a queued input. */
 export interface SessionInput {
   type: 'message' | 'steer'
   content: string
   messageId?: string
+  attachments?: AttachmentPayload[]
 }
 
 /** Thin facade over `SessionStore` for the durable input queue. */

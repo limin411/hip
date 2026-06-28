@@ -1,4 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
+import type { Attachment } from '@hip/protocol'
 import type { SessionEvent } from './event-store.js'
 import {
   stepRowId,
@@ -9,7 +10,7 @@ import {
   type AssistantStepData,
   type ProjectedToolCall,
 } from './message-types.js'
-import { reqString, optString, optNumber, optStringArray, parseUsage } from './message-parsers.js'
+import { reqString, optString, optNumber, optStringArray, optObjectArray, parseUsage } from './message-parsers.js'
 
 export {
   stepRowId,
@@ -140,7 +141,8 @@ export class SessionMessageUpdater {
     const messageId = reqString(event.data, 'user_message', 'messageId')
     const content = reqString(event.data, 'user_message', 'content')
     const timestamp = optNumber(event.data, 'timestamp') ?? event.seq
-    const data: SessionMessageData = { role: 'user', content, messageId }
+    const attachments = optObjectArray<Attachment>(event.data, 'attachments')
+    const data: SessionMessageData = { role: 'user', content, messageId, ...(attachments?.length ? { attachments } : {}) }
     this.upsertRow({
       id: messageId,
       sessionId: event.aggregateId,

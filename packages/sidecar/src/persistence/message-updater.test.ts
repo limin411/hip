@@ -80,6 +80,17 @@ describe('SessionMessageUpdater: user_message', () => {
     expect(() => updater.apply(ev(SID, 'user_message', { content: 'hi' }))).toThrow(/messageId/)
     expect(() => updater.apply(ev(SID, 'user_message', { messageId: 'm1' }))).toThrow(/content/)
   })
+
+  it('persists optional attachments on a user row', () => {
+    const db = freshDb()
+    const updater = new SessionMessageUpdater(db)
+    const attachments = [{ id: 'a1', name: 'pic.png', mimeType: 'image/png', size: 123 }]
+
+    updater.apply(ev(SID, 'user_message', { messageId: 'm1', content: 'hi', timestamp: 1000, attachments }))
+
+    const row = loadProjection(db, SID)[0]
+    expect(row?.data).toMatchObject({ role: 'user', content: 'hi', messageId: 'm1', attachments })
+  })
 })
 
 describe('SessionMessageUpdater: step lifecycle', () => {

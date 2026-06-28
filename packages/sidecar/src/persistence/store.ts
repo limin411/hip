@@ -1,5 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Checkpoint, Message, SessionConfig, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
+import type { AgentRole, AgentRun, Attachment, Checkpoint, Message, SessionConfig, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
 import { sumUsage } from '../session/usage.js'
 import { surfaceOf } from '../session/surface.js'
 
@@ -109,10 +109,11 @@ export class SessionStore {
     return row.n
   }
 
-  insertMessage(r: { id: string; sessionId: string; role: 'user' | 'assistant'; agentId: string | null; content: string; timestamp: number; stopped?: boolean }): number {
+  insertMessage(r: { id: string; sessionId: string; role: 'user' | 'assistant'; agentId: string | null; content: string; timestamp: number; stopped?: boolean; attachments?: Attachment[] }): number {
     const seq = this.nextSeq(r.sessionId)
-    this.db.prepare(`INSERT INTO messages(id,session_id,seq,role,agent_id,content,timestamp,stopped) VALUES(?,?,?,?,?,?,?,?)`)
-      .run(r.id, r.sessionId, seq, r.role, r.agentId, r.content, r.timestamp, r.stopped ? 1 : 0)
+    const attachments = r.attachments?.length ? JSON.stringify(r.attachments) : null
+    this.db.prepare(`INSERT INTO messages(id,session_id,seq,role,agent_id,content,timestamp,stopped,attachments) VALUES(?,?,?,?,?,?,?,?,?)`)
+      .run(r.id, r.sessionId, seq, r.role, r.agentId, r.content, r.timestamp, r.stopped ? 1 : 0, attachments)
     return seq
   }
 
@@ -169,15 +170,16 @@ export class SessionStore {
   }
 
   loadMessages(sessionId: string): Message[] {
-    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped,timeline FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
-      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number; timeline: string | null }[]
+    const rows = this.db.prepare(`SELECT id,role,agent_id,content,timestamp,stopped,timeline,attachments FROM messages WHERE session_id=? ORDER BY seq`).all(sessionId) as
+      { id: string; role: 'user' | 'assistant'; agent_id: string | null; content: string; timestamp: number; stopped: number; timeline: string | null; attachments: string | null }[]
     const toolStmt = this.db.prepare(
       `SELECT tc.call_id,tc.agent_id,tc.name,tc.input,tc.output,tc.status,tc.error,tc.seq,tc.truncated
        FROM tool_calls tc JOIN agent_runs ar ON ar.id = tc.agent_run_id
        WHERE ar.message_id=? ORDER BY tc.seq`,
     )
     return rows.map((r) => {
-      const base: Message = { id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}) }
+      const attachments = r.attachments != null ? (JSON.parse(r.attachments) as Attachment[]) : undefined
+      const base: Message = { id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}), ...(attachments?.length ? { attachments } : {}) }
       if (r.timeline != null) {
         base.timeline = JSON.parse(r.timeline) as TimelineStep[]
         const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])

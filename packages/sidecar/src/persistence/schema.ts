@@ -344,6 +344,17 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 15) {
+    db.exec('BEGIN')
+    try {
+      db.exec(`ALTER TABLE messages ADD COLUMN attachments TEXT`)
+      db.exec('PRAGMA user_version = 15')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

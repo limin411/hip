@@ -50,6 +50,13 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')[0]).toEqual({ id: 'u1', role: 'user', content: 'hi', agentId: undefined, timestamp: 7 })
   })
 
+  it('insertMessage persists attachments and loadMessages restores them', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const attachments = [{ id: 'a1', name: 'pic.png', mimeType: 'image/png', size: 123 }]
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 7, attachments })
+    expect(store.loadMessages('s1')[0]).toEqual({ id: 'u1', role: 'user', content: 'hi', agentId: undefined, timestamp: 7, attachments })
+  })
+
   it('search finds a Chinese substring via FTS and returns a snippet', () => {
     store.insertSession({ id: 's1', title: '关于配置', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '未配置密钥请在设置中配置', timestamp: 1 })

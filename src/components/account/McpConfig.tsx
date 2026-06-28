@@ -237,11 +237,11 @@ export function McpConfig() {
                 key={s.id}
                 server={s}
                 status={statusByServer.get(s.id)}
-                onToggle={(enabled) => void updateServer(s.id, { enabled })}
+                onToggle={async (enabled) => { await updateServer(s.id, { enabled }).catch((err) => console.error('Failed to update MCP server:', err)) }}
                 onEdit={() => setEditing({ mode: 'edit', server: s })}
                 onDelete={() => setDeleting(s)}
-                onToggleTool={(toolName) => void handleUpdateTools(s, toolName)}
-                onResetTools={() => void handleResetTools(s)}
+                onToggleTool={async (toolName) => { await handleUpdateTools(s, toolName).catch((err) => console.error('Failed to update MCP tools:', err)) }}
+                onResetTools={async () => { await handleResetTools(s).catch((err) => console.error('Failed to reset MCP tools:', err)) }}
                 onReconnect={reconnectMcpServers}
               />
             ))
@@ -283,7 +283,7 @@ export function McpConfig() {
           server={deleting}
           onCancel={() => setDeleting(null)}
           onConfirm={() => {
-            void removeServer(deleting.id)
+            removeServer(deleting.id).catch((err) => console.error('Failed to remove MCP server:', err))
             setDeleting(null)
           }}
         />
@@ -349,11 +349,11 @@ function McpServerCard({
 }: {
   server: McpServerConfig
   status?: McpServerStatusVM
-  onToggle: (enabled: boolean) => void
+  onToggle: (enabled: boolean) => Promise<void>
   onEdit: () => void
   onDelete: () => void
-  onToggleTool: (toolName: string) => void
-  onResetTools: () => void
+  onToggleTool: (toolName: string) => Promise<void>
+  onResetTools: () => Promise<void>
   onReconnect: () => void
 }) {
   const { t } = useTranslation()
@@ -427,7 +427,7 @@ function McpServerCard({
               {(server.enabledTools?.length || server.disabledTools?.length) ? (
                 <button
                   type="button"
-                  onClick={() => void onResetTools()}
+                  onClick={() => { void onResetTools().catch((err) => console.error('Failed to reset MCP tools:', err)) }}
                   className="text-caption text-accent hover:underline"
                 >
                   {t('settings.mcp.toolToggleAll')}

@@ -47,6 +47,7 @@ export function AgentManagement() {
         <Content
           search={search}
           filteredAgents={filteredAgents}
+          totalAgents={agents.length}
           enabledCount={enabledCount}
           onEdit={(a) => setEditing({ mode: 'edit', agent: a })}
           onToggle={(a, enabled) => void updateAgent(a.id, { enabled })}
@@ -84,6 +85,7 @@ export function AgentManagement() {
 function Content({
   search,
   filteredAgents,
+  totalAgents,
   enabledCount,
   onEdit,
   onToggle,
@@ -91,6 +93,7 @@ function Content({
 }: {
   search: string
   filteredAgents: AgentConfig[]
+  totalAgents: number
   enabledCount: number
   onEdit: (agent: AgentConfig) => void
   onToggle: (agent: AgentConfig, enabled: boolean) => void
@@ -100,8 +103,8 @@ function Content({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        <Stat label={t('settings.agents.overviewTotal')} value={filteredAgents.length} />
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label={t('settings.agents.overviewTotal')} value={totalAgents} />
         <Stat label={t('settings.agents.overviewEnabled')} value={enabledCount} />
       </div>
       <AgentGrid

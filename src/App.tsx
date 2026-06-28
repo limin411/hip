@@ -27,8 +27,8 @@ function App() {
     })
     // Pre-load non-critical settings data in the background so settings/skills/plugin
     // pages open instantly; we do not gate the UI on these.
-    void useSkillsStore.getState().load()
-    void usePluginsStore.getState().load()
+    void useSkillsStore.getState().load().catch((err) => { console.error('Failed to preload skills:', err) })
+    void usePluginsStore.getState().load().catch((err) => { console.error('Failed to preload plugins:', err) })
   }, [])
 
   if (!providersLoaded) {

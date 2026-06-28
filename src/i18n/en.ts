@@ -455,8 +455,6 @@ export const en = {
         addInternal: 'Add internal agent',
         prompt: 'Prompt',
         promptPlaceholder: 'Describe this internal agent: its role, style, and how it works…',
-        sectionTools: 'Tools & capabilities',
-        toolBuiltinNote: 'Built-in tools (read/write, planning, git, run scripts) are always available. The permission mode of each conversation controls what can actually be written or run.',
         toolSkillsSection: 'Skills',
         toolSkillsSectionDesc: 'Grant this agent specific installed skills (use_skill is restricted to these)',
         toolSkillsEmpty: 'No skills installed yet',

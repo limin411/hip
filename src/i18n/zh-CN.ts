@@ -455,8 +455,6 @@ export const zhCN = {
         addInternal: '新增内部智能体',
         prompt: '提示词',
         promptPlaceholder: '描述这个内部智能体的角色、风格与工作方式…',
-        sectionTools: '工具与能力',
-        toolBuiltinNote: '内置工具（读写、规划、git、运行脚本）始终可用。能写入或执行什么由每个对话的权限模式控制。',
         toolSkillsSection: '技能',
         toolSkillsSectionDesc: '授予该智能体指定的已安装技能（use_skill 仅限这些）',
         toolSkillsEmpty: '尚未安装任何技能',

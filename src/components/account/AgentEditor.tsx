@@ -180,12 +180,6 @@ export function AgentEditor({
                   </select>
                 </Section>
 
-                <Section label={t('settings.agents.sectionTools')}>
-                  <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                    {t('settings.agents.toolBuiltinNote')}
-                  </div>
-                </Section>
-
                 <Section label={t('settings.agents.toolSkillsSection')}>
                   <div className="text-caption text-ink-tertiary">{t('settings.agents.toolSkillsSectionDesc')}</div>
                   {skills.length === 0 ? (

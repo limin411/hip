@@ -455,8 +455,6 @@ export const zhTW = {
         addInternal: '新增內部智能體',
         prompt: '提示詞',
         promptPlaceholder: '描述這個內部智能體的角色、風格與工作方式…',
-        sectionTools: '工具與能力',
-        toolBuiltinNote: '內建工具（讀寫、規劃、git、執行指令稿）始終可用。能寫入或執行什麼由每個對話的權限模式控制。',
         toolSkillsSection: '技能',
         toolSkillsSectionDesc: '授予該智能體指定的已安裝技能（use_skill 僅限這些）',
         toolSkillsEmpty: '尚未安裝任何技能',

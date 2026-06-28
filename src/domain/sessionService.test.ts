@@ -438,7 +438,7 @@ describe('workspace diff', () => {
     expect(useDiffStore.getState().bySession['s1']).toMatchObject({ status: 'ready', state: 'ok' })
   })
 
-  it('gitInitWorkspace sends fs:gitInit; an ok result chains a fresh fs:diff', () => {
+  it('gitInitWorkspace sends fs:gitInit; an ok result chains a fresh fs:diff + checkpoint list', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     svc.gitInitWorkspace('s1')
@@ -446,7 +446,10 @@ describe('workspace diff', () => {
     expect(useDiffStore.getState().bySession['s1'].initPending).toBe(true)
     t.push({ type: 'fs:gitInit:result', sessionId: 's1', ok: true })
     expect(useDiffStore.getState().bySession['s1'].initPending).toBe(false)
-    expect(t.sent.at(-1)).toMatchObject({ type: 'fs:diff', sessionId: 's1' })
+    expect(t.sent.slice(-2)).toEqual([
+      expect.objectContaining({ type: 'fs:diff', sessionId: 's1' }),
+      expect.objectContaining({ type: 'git:checkpoint:list', sessionId: 's1' }),
+    ])
   })
 
   it('a failed fs:gitInit:result keeps not_a_repo with the error inline', () => {

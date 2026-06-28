@@ -81,8 +81,13 @@ export class SessionService {
       if (msg.file) useDiffStore.getState().setFileExpanded(msg.sessionId, msg.path, msg.file)
     } else if (msg.type === 'fs:gitInit:result') {
       useDiffStore.getState().setInitPending(msg.sessionId, false)
-      if (msg.ok) this.requestDiff(msg.sessionId)
-      else useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', base: 'head', hasSessionStart: false, error: msg.error })
+      if (msg.ok) {
+        // Init flipped the cwd into a repo; refresh the repo gate so the git-gated tabs appear.
+        this.requestDiff(msg.sessionId)
+        this.requestCheckpoints(msg.sessionId)
+      } else {
+        useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', base: 'head', hasSessionStart: false, error: msg.error })
+      }
     } else if (msg.type === 'git:checkpoint:list:result') {
       useDiffStore.getState().setCheckpoints(msg.sessionId, msg.checkpoints, msg.isGitRepo, msg.currentBranch)
     } else if (msg.type === 'checkpoint:created') {

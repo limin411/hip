@@ -742,17 +742,21 @@ export class Session {
     const requestApproval = this.permissions.buildRequestApproval(_send, this.id, turnId, () => 0, mode, this.hooks)
 
     let stepSeq = 0
+    let reasoningSeq = 0
+    const usageByAgent = new Map<string, TurnUsage>()
     const emit: GraphEmit = {
       token: (delta) => { _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
-      reasoning: () => {},
+      reasoning: (delta) => { _send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', stepSeq: reasoningSeq++, delta }) },
       toolStarted: (name, callId, input) => { _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input), seq: stepSeq++ }) },
       toolFinished: (callId, status, output, error) => { _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(output ? { output } : {}), ...(error ? { error } : {}) }) },
-      usage: () => {},
+      usage: (u) => { usageByAgent.set(agent.id, addUsage(usageByAgent.get(agent.id), u)) },
       planDelta: () => {},
       compaction: () => {},
     }
 
-    _send({ type: 'agent:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent' })
+    // Use role 'supervisor' so the frontend creates the assistant message container that holds
+    // streaming tokens for this turn.
+    _send({ type: 'agent:started', sessionId: this.id, turnId, agentId: agent.id, role: 'supervisor' })
     this.emit({ type: 'step_started', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() })
     this.emit({ type: 'text_started', sessionId: this.id, messageId: turnId, timestamp: Date.now() })
     // Keep image_url parts out of the main session history; the agent received them via extras.
@@ -791,7 +795,8 @@ export class Session {
 
     this.messages.push(new AIMessage(agentText))
     this.emit({ type: 'text_ended', sessionId: this.id, messageId: turnId, content: agentText, timestamp: Date.now() })
-    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() })
+    const turnUsage = sumUsage([...usageByAgent.values()])
+    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() }, { usage: turnUsage })
     _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now() } })
 
     if (isFirstTurn) {

@@ -36,6 +36,8 @@ export function readCatalog(): Catalog {
     cachedMtimeMs = stat.mtimeMs
     return parsed
   } catch {
+    cached = null
+    cachedMtimeMs = 0
     return {}
   }
 }

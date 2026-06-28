@@ -360,8 +360,11 @@ function McpServerCard({
   const [toolsOpen, setToolsOpen] = useState(false)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toolBusy, setToolBusy] = useState<Record<string, boolean>>({})
+  const [resetBusy, setResetBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reconnectBusy, setReconnectBusy] = useState(false)
+  const isMountedRef = useRef(true)
+  useEffect(() => () => { isMountedRef.current = false }, [])
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -433,16 +436,16 @@ function McpServerCard({
                   type="button"
                   onClick={async () => {
                     setActionError(null)
-                    setToolBusy((b) => ({ ...b, __reset: true }))
+                    setResetBusy(true)
                     try {
                       await onResetTools()
                     } catch {
                       setActionError(t('settings.mcp.error'))
                     } finally {
-                      setToolBusy((b) => ({ ...b, __reset: false }))
+                      if (isMountedRef.current) setResetBusy(false)
                     }
                   }}
-                  disabled={toolBusy.__reset}
+                  disabled={resetBusy}
                   className="text-caption text-accent hover:underline disabled:opacity-50"
                 >
                   {t('settings.mcp.toolToggleAll')}
@@ -459,7 +462,7 @@ function McpServerCard({
                   >
                     <Switch
                       checked={enabled}
-                      disabled={!!toolBusy[toolName] || toolBusy.__reset}
+                      disabled={!!toolBusy[toolName] || resetBusy}
                       onCheckedChange={async () => {
                         setActionError(null)
                         setToolBusy((b) => ({ ...b, [toolName]: true }))
@@ -468,7 +471,7 @@ function McpServerCard({
                         } catch {
                           setActionError(t('settings.mcp.error'))
                         } finally {
-                          setToolBusy((b) => ({ ...b, [toolName]: false }))
+                          if (isMountedRef.current) setToolBusy((b) => ({ ...b, [toolName]: false }))
                         }
                       }}
                       ariaLabel={toolName}
@@ -495,7 +498,7 @@ function McpServerCard({
               } catch {
                 setActionError(t('settings.mcp.error'))
               } finally {
-                setToggleBusy(false)
+                if (isMountedRef.current) setToggleBusy(false)
               }
             }}
             ariaLabel={t('settings.mcp.enableThis')}
@@ -512,8 +515,12 @@ function McpServerCard({
                 setReconnectBusy(true)
                 try {
                   onReconnect()
+                } catch {
+                  setActionError(t('settings.mcp.error'))
                 } finally {
-                  setTimeout(() => setReconnectBusy(false), 1000)
+                  setTimeout(() => {
+                    if (isMountedRef.current) setReconnectBusy(false)
+                  }, 1000)
                 }
               }}
               disabled={reconnectBusy}

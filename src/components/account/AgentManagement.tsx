@@ -45,10 +45,10 @@ export function AgentManagement() {
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
         <Content
-          search={search}
           filteredAgents={filteredAgents}
           totalAgents={agents.length}
           enabledCount={enabledCount}
+          isSearchActive={search.trim().length > 0}
           onEdit={(a) => setEditing({ mode: 'edit', agent: a })}
           onToggle={(a, enabled) => void updateAgent(a.id, { enabled })}
           onDelete={(a) => setDeleting(a)}
@@ -83,18 +83,18 @@ export function AgentManagement() {
 }
 
 function Content({
-  search,
   filteredAgents,
   totalAgents,
   enabledCount,
+  isSearchActive,
   onEdit,
   onToggle,
   onDelete,
 }: {
-  search: string
   filteredAgents: AgentConfig[]
   totalAgents: number
   enabledCount: number
+  isSearchActive: boolean
   onEdit: (agent: AgentConfig) => void
   onToggle: (agent: AgentConfig, enabled: boolean) => void
   onDelete: (agent: AgentConfig) => void
@@ -109,8 +109,8 @@ function Content({
       </div>
       <AgentGrid
         agents={filteredAgents}
-        emptyTitle={search ? t('settings.agents.searchEmpty') : t('settings.agents.gridEmptyTitle')}
-        emptyHint={search ? undefined : t('settings.agents.gridEmptyHint')}
+        emptyTitle={filteredAgents.length === 0 && isSearchActive ? t('settings.agents.searchEmpty') : t('settings.agents.gridEmptyTitle')}
+        emptyHint={filteredAgents.length === 0 && isSearchActive ? undefined : t('settings.agents.gridEmptyHint')}
         onEdit={onEdit}
         onToggle={onToggle}
         onDelete={onDelete}

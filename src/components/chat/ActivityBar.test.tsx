@@ -180,4 +180,15 @@ describe('ActivityBar', () => {
 
     vi.mocked(TurnTimeline).mockReturnValue(null)
   })
+
+  it('does not break React hook rules when activity appears after initial render', () => {
+    const { rerender, container } = render(<ActivityBar streaming />)
+    expect(container.querySelector('[data-testid="activity-bar"]')).toBeInTheDocument()
+
+    expect(() =>
+      rerender(<ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />),
+    ).not.toThrow()
+
+    expect(container.querySelector('[data-testid="activity-bar"]')).toBeInTheDocument()
+  })
 })

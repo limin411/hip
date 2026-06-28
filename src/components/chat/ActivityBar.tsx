@@ -36,6 +36,27 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
   }, [lastStep, byCallId, t])
 
   const hasActivity = steps.length > 0 || toolCalls.length > 0 || agentRuns.length > 0
+
+  const totalCount = toolCalls.length
+  const finishedCount = toolCalls.filter((t) => t.status === 'finished').length
+  const hasError = toolCalls.some((t) => t.status === 'error')
+  const status: 'running' | 'finished' | 'error' = hasError ? 'error' : streaming ? 'running' : 'finished'
+
+  const summaryText = (() => {
+    if (streaming) return currentStepText ?? t('chat.activity.runningReasoning')
+    const parts: string[] = [t('chat.activity.completed')]
+    if (totalCount > 0) {
+      parts.push(t('chat.activity.toolCount', { finished: finishedCount, total: totalCount }))
+    }
+    if (agentCount > 0) {
+      parts.push(t('chat.activity.agentCount', { agents: agentCount }))
+    }
+    if (hasError) {
+      parts.push(t('chat.activity.someFailed'))
+    }
+    return parts.join(' · ')
+  })()
+
   if (!hasActivity) {
     if (!streaming) return null
     return (
@@ -51,26 +72,6 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
       </div>
     )
   }
-
-  const totalCount = toolCalls.length
-  const finishedCount = toolCalls.filter((t) => t.status === 'finished').length
-  const hasError = toolCalls.some((t) => t.status === 'error')
-  const status: 'running' | 'finished' | 'error' = hasError ? 'error' : streaming ? 'running' : 'finished'
-
-  const summaryText = useMemo(() => {
-    if (streaming) return currentStepText ?? t('chat.activity.runningReasoning')
-    const parts: string[] = [t('chat.activity.completed')]
-    if (totalCount > 0) {
-      parts.push(t('chat.activity.toolCount', { finished: finishedCount, total: totalCount }))
-    }
-    if (agentCount > 0) {
-      parts.push(t('chat.activity.agentCount', { agents: agentCount }))
-    }
-    if (hasError) {
-      parts.push(t('chat.activity.someFailed'))
-    }
-    return parts.join(' · ')
-  }, [streaming, currentStepText, t, totalCount, finishedCount, agentCount, hasError])
 
   const barClassName = cn(
     'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',

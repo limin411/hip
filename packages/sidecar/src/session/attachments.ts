@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import type { Attachment, ContentPart } from '@hip/protocol'
+export type { ContentPart } from '@hip/protocol'
 import { scratchDirFor } from './scratch.js'
 
 export interface AttachmentPayload extends Attachment {

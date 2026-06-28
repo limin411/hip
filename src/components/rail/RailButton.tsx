@@ -7,9 +7,17 @@ interface RailButtonProps {
   active?: boolean
   danger?: boolean
   onClick: () => void
+  'data-testid'?: string
 }
 
-export function RailButton({ icon: Icon, label, active = false, danger = false, onClick }: RailButtonProps) {
+export function RailButton({
+  icon: Icon,
+  label,
+  active = false,
+  danger = false,
+  onClick,
+  'data-testid': dataTestId,
+}: RailButtonProps) {
   return (
     <button
       type="button"
@@ -18,6 +26,7 @@ export function RailButton({ icon: Icon, label, active = false, danger = false, 
       aria-label={label}
       aria-current={active ? 'page' : undefined}
       data-tauri-drag-region="false"
+      data-testid={dataTestId}
       className={cn(
         'flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-lg transition',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',

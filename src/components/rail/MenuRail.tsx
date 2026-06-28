@@ -43,18 +43,21 @@ export function MenuRail() {
           icon={MessageSquare}
           label={t('nav.chat')}
           active={activeView === 'chat'}
+          data-testid="rail-chat"
           onClick={() => sessionService.setSurface('chat')}
         />
         <RailButton
           icon={FolderGit2}
           label={t('nav.code')}
           active={activeView === 'code'}
+          data-testid="rail-code"
           onClick={() => sessionService.setSurface('code')}
         />
         <RailButton
           icon={Globe}
           label={t('nav.domain')}
           active={activeView === 'domain'}
+          data-testid="rail-domain"
           onClick={() => sessionService.setSurface('domain')}
         />
       </nav>

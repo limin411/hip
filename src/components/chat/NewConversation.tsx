@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
@@ -7,6 +7,8 @@ import { Composer } from './Composer'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
+import { AttachmentButton } from './AttachmentButton'
+import type { LocalAttachment } from './attachmentTypes'
 import { HipLogo } from '@/components/login/HipLogo'
 
 export function NewConversation() {
@@ -15,6 +17,7 @@ export function NewConversation() {
   const surface = activeView === 'code' ? 'code' : 'chat'
   const draft = useDraftStore((s) => s.draft)
   const text = draft?.text ?? ''
+  const [attachments, setAttachments] = useState<LocalAttachment[]>([])
 
   // Ensure a draft exists; keep Chat drafts in chat mode so a leftover project draft (e.g. a
   // folder picked in Code, then switched to Chat without sending) can't commit as a Code session.
@@ -28,11 +31,14 @@ export function NewConversation() {
 
   // Code requires a project folder before the first send; Chat is always sandboxed.
   const hasFolder = draft?.mode === 'project' && !!draft.cwd
-  const canSend = surface === 'chat' ? !!text.trim() : !!text.trim() && hasFolder
+  const canSend = surface === 'chat'
+    ? !!text.trim() || attachments.length > 0
+    : (!!text.trim() || attachments.length > 0) && hasFolder
 
   const submit = () => {
     if (!canSend) return
-    sessionService.sendMessage(text) // commit: creates the session (surface-aware) + resets the draft
+    sessionService.sendMessage(text, attachments) // commit: creates the session (surface-aware) + resets the draft
+    setAttachments([])
   }
 
   const greeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
@@ -59,7 +65,15 @@ export function NewConversation() {
           onSubmit={submit}
           autoFocus
           submitDisabled={!canSend}
-          leftSlot={surface === 'code' ? <><ModelPicker /><PermissionModePicker /></> : <ModelPicker />}
+          leftSlot={
+            surface === 'code' ? (
+              <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+            ) : (
+              <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+            )
+          }
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
         />
         {surface === 'code' && (
           <div className="mt-2 flex flex-col items-center gap-1">

@@ -20,4 +20,9 @@ describe('NewSessionButton', () => {
     const html = renderToStaticMarkup(<NewSessionButton surface="code" />)
     expect(html).toContain('sidebar.newCodeTask')
   })
+
+  it('renders domain label', () => {
+    const html = renderToStaticMarkup(<NewSessionButton surface="domain" />)
+    expect(html).toContain('sidebar.newDomainTask')
+  })
 })

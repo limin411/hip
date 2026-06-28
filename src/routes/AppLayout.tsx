@@ -7,6 +7,7 @@ import { NewConversation } from '@/components/chat/NewConversation'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
+import { DomainPane } from '@/components/domain/DomainPane'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { SidebarPeek } from '@/components/sidebar/SidebarPeek'
@@ -85,7 +86,9 @@ export function AppLayout() {
 
         <Panel minSize={34}>
           <div className="flex h-full flex-col bg-surface">
-            {activeSessionId == null ? (
+            {activeView === 'domain' ? (
+              <DomainPane />
+            ) : activeSessionId == null ? (
               <NewConversation />
             ) : (
               <>

@@ -1,4 +1,4 @@
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type Surface } from '@/store/uiStore'
 import { sessionService } from '@/domain'
 import { SurfaceTabs } from './SurfaceTabs'
 import { NewSessionButton } from './NewSessionButton'
@@ -8,7 +8,7 @@ import { AccountFooter } from './AccountFooter'
 
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
-  const surface = activeView === 'code' ? 'code' : 'chat'
+  const surface: Surface = activeView === 'code' ? 'code' : activeView === 'domain' ? 'domain' : 'chat'
 
   return (
     <div data-testid="sidebar-root" className="flex h-full flex-col bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--glass-border)]">

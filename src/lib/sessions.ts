@@ -1,4 +1,5 @@
 import type { SessionConfig } from '@hip/protocol'
+import type { Surface } from '@/store/uiStore'
 
 // 仅依赖 title/preview 两个展示字段，对 MockSession / SessionVM 通用
 export function filterSessions<T extends { title: string; preview: string }>(sessions: T[], query: string): T[] {
@@ -16,8 +17,9 @@ export function surfaceOf(config: Pick<SessionConfig, 'surface'>): 'chat' | 'cod
 /** Keep only the sessions belonging to `surface`. Generic over anything carrying a config.surface. */
 export function filterBySurface<T extends { config: Pick<SessionConfig, 'surface'> }>(
   sessions: T[],
-  surface: 'chat' | 'code',
+  surface: Surface,
 ): T[] {
+  if (surface === 'domain') return []
   return sessions.filter((s) => surfaceOf(s.config) === surface)
 }
 

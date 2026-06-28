@@ -1,7 +1,7 @@
 import type { SearchHit } from '@hip/protocol'
 import { useTranslation } from 'react-i18next'
 import { SearchX } from 'lucide-react'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type Surface } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, useSearchHits, sessionService } from '@/domain'
 import { filterSessions, filterBySurface, groupSessionsByRelativeDate } from '@/lib/sessions'
 import { SessionItem } from './SessionItem'
@@ -9,7 +9,7 @@ import { SessionItem } from './SessionItem'
 export function SessionList() {
   const { t } = useTranslation()
   const activeView = useUiStore((s) => s.activeView)
-  const surface = activeView === 'code' ? 'code' : 'chat'
+  const surface: Surface = activeView === 'code' ? 'code' : activeView === 'domain' ? 'domain' : 'chat'
   const sessions = filterBySurface(useSessions(), surface)
   const search = useUiStore((s) => s.search)
   const activeSessionId = useActiveSessionId()

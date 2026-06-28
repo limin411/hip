@@ -18,6 +18,10 @@ describe('draftStore', () => {
     const d = useDraftStore.getState().ensureDraft('chat')
     expect(d.mode).toBe('chat')
   })
+  it('ensureDraft("domain") creates a chat mode draft', () => {
+    const d = useDraftStore.getState().ensureDraft('domain')
+    expect(d.mode).toBe('chat')
+  })
   it('ensureDraft("code") switches an existing chat draft to project and keeps cwd', () => {
     useDraftStore.setState({ draft: { tempId: 't1', mode: 'chat', text: '', cwd: '/keep' } })
     const d = useDraftStore.getState().ensureDraft('code')

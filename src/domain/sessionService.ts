@@ -7,7 +7,7 @@ import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import type { Draft } from '@/store/draftStore'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type Surface } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import i18n from '@/i18n'
 import { resolveModelConfig } from '@/lib/modelKey'
@@ -183,14 +183,18 @@ export class SessionService {
   /** Switch the active top-level surface. Snapshots the leaving surface's open conversation, then
    *  restores the entering surface's (validated against the loaded list + its surface). Code restores
    *  its last conversation; Chat starts at new-conversation on cold launch (chatSessionId starts null). */
-  setSurface(view: 'chat' | 'code'): void {
+  setSurface(view: Surface): void {
     const cur = useUiStore.getState().activeView
     const activeId = useDomainStore.getState().activeSessionId
     if (cur === 'chat') useUiStore.getState().setChatSessionId(activeId)
     else if (cur === 'code') useUiStore.getState().setCodeSessionId(activeId)
     useUiStore.getState().setActiveView(view)
-    if (view === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
+    if ((view === 'chat' || view === 'domain') && useDraftStore.getState().draft?.mode === 'project') {
       useDraftStore.getState().clearProject()
+    }
+    if (view === 'domain') {
+      useDomainStore.getState().deselect()
+      return
     }
     const want = view === 'chat' ? useUiStore.getState().chatSessionId : useUiStore.getState().codeSessionId
     const sessions = useDomainStore.getState().sessions
@@ -340,7 +344,7 @@ export class SessionService {
   }
 
   /** Start a fresh new-conversation draft (no committed session yet). */
-  newConversation(surface?: 'chat' | 'code'): void {
+  newConversation(surface?: Surface): void {
     useDraftStore.getState().ensureDraft(surface)
     useDomainStore.getState().deselect()
     this.rememberActiveForSurface(null)

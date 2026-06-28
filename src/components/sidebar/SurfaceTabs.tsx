@@ -1,16 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
+import type { Surface } from '@/store/uiStore'
+
 interface SurfaceTabsProps {
-  active: 'chat' | 'code'
-  onChange: (view: 'chat' | 'code') => void
+  active: Surface
+  onChange: (view: Surface) => void
 }
 
 export function SurfaceTabs({ active, onChange }: SurfaceTabsProps) {
   const { t } = useTranslation()
   return (
     <div className="flex rounded-lg bg-surface-subtle p-0.5">
-      {(['chat', 'code'] as const).map((view) => {
+      {(['chat', 'code', 'domain'] as const).map((view) => {
         const isActive = active === view
         return (
           <button

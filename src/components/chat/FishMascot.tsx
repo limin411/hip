@@ -80,7 +80,7 @@ function pickRandom(pool: AnimName[]): AnimName {
   return pool[Math.floor(Math.random() * pool.length)]!
 }
 
-export function useFishAnimation(surface: 'chat' | 'code'): { animClass: string; animName: AnimName } {
+export function useFishAnimation(surface: 'chat' | 'code' | 'domain'): { animClass: string; animName: AnimName } {
   const [anim, setAnim] = useState<AnimName>('idle')
   const returnTimer = useRef<ReturnType<typeof setTimeout>>()
 

@@ -120,7 +120,13 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('setActiveView switches between chat and settings', () => {
+  it('setActiveView switches between chat, code, domain, and settings', () => {
+    useUiStore.getState().setActiveView('code')
+    expect(useUiStore.getState().activeView).toBe('code')
+
+    useUiStore.getState().setActiveView('domain')
+    expect(useUiStore.getState().activeView).toBe('domain')
+
     useUiStore.getState().setActiveView('settings')
     expect(useUiStore.getState().activeView).toBe('settings')
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { nanoid } from 'nanoid'
 import type { PermissionMode } from '@hip/protocol'
+import type { Surface } from './uiStore'
 
 export interface Draft {
   tempId: string
@@ -15,7 +16,7 @@ export interface Draft {
 
 interface DraftStore {
   draft: Draft | null
-  ensureDraft: (surface?: 'chat' | 'code') => Draft
+  ensureDraft: (surface?: Surface) => Draft
   setText: (text: string) => void
   pickProject: (cwd: string) => void
   clearProject: () => void

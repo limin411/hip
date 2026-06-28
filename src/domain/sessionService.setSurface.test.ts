@@ -49,6 +49,22 @@ describe('setSurface', () => {
     svc.setSurface('code')
     expect(useDomainStore.getState().activeSessionId).toBeNull()
   })
+
+  it('switching to domain deselects the active session and sets activeView', () => {
+    useDomainStore.setState({ activeSessionId: 'h1' })
+    svc.setSurface('domain')
+    expect(useUiStore.getState().activeView).toBe('domain')
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+  })
+
+  it('switching from chat to domain snapshots the chat session id', () => {
+    useDomainStore.setState({ activeSessionId: 'h1' })
+    useUiStore.setState({ activeView: 'chat' })
+    svc.setSurface('domain')
+    expect(useUiStore.getState().chatSessionId).toBe('h1')
+    expect(useUiStore.getState().activeView).toBe('domain')
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+  })
 })
 
 describe('deleteSession surface reconcile', () => {

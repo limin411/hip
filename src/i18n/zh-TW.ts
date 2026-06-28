@@ -153,6 +153,7 @@ export const zhTW = {
       renameSession: '重新命名',
       newChat: '新建會話',
       newCodeTask: '新建程式碼任務',
+      newDomainTask: '新建領域任務',
       dateGroup: {
         today: '今天',
         yesterday: '昨天',
@@ -529,6 +530,7 @@ export const zhTW = {
     nav: {
       chat: '辦公',
       code: '編碼',
+      domain: '領域',
       settings: '設定',
     },
     common: {

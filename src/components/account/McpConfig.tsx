@@ -363,6 +363,13 @@ function McpServerCard({
   const [resetBusy, setResetBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reconnectBusy, setReconnectBusy] = useState(false)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+  }, [])
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -514,7 +521,7 @@ function McpServerCard({
                 try {
                   onReconnect()
                   // Debounce only on success; synchronous failures allow immediate retry.
-                  setTimeout(() => { setReconnectBusy(false) }, 1000)
+                  reconnectTimerRef.current = setTimeout(() => { setReconnectBusy(false) }, 1000)
                 } catch {
                   setActionError(t('settings.mcp.error'))
                   setReconnectBusy(false)

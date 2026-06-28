@@ -793,7 +793,7 @@ export class Session {
       const invoker = this.agentProv.invoker(cwd)
       // Forward the user's text plus image parts to the image agent. Non-image attachments stay with
       // the main model; mixed-attachment splitting is left for future multi-agent streaming work.
-      const imageParts = parts.filter((p) => p.type === 'image_url' || p.type === 'text')
+      const agentParts = parts.filter((p) => p.type === 'image_url' || p.type === 'text')
       const imageAttachments = input.attachments?.filter((a) => a.mimeType.startsWith('image/'))
       agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),
@@ -804,7 +804,7 @@ export class Session {
         networkPolicy: this.networkPolicy,
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
-        attachmentParts: imageParts,
+        attachmentParts: agentParts,
       }, imageAttachments)
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })

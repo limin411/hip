@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -49,7 +49,7 @@ import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
-import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload, type ContentPart } from './attachments.js'
+import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
 import { defaultScratchRoot } from './scratch.js'
 import {
   ContextInjectorRegistry,
@@ -562,7 +562,7 @@ export class Session {
 
     const userTs = Date.now()
     let isFirstTurn = false
-    const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = []
+    const parts: ContentPart[] = []
     if (input.content) parts.push({ type: 'text', text: input.content })
 
     if (input.attachments?.length) {
@@ -572,7 +572,8 @@ export class Session {
       parts.push(...attachmentParts)
       if (this.store) {
         isFirstTurn = !this.store.hasMessages(this.id)
-        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged })
+        const richContent = parts.length > 1 || parts[0]?.type !== 'text'
+        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(richContent ? { contentParts: parts } : {}) })
       }
     } else if (this.store) {
       isFirstTurn = !this.store.hasMessages(this.id)
@@ -694,7 +695,8 @@ export class Session {
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
-      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}) })
+      const richContent = parts.length > 1 || parts[0]?.type !== 'text'
+      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(richContent ? { contentParts: parts } : {}) })
     }
     this.messages.push(humanMessage)
     await this.runTurn(send, base)
@@ -1402,6 +1404,10 @@ export class Session {
 
 function rowToBaseMessage(d: SessionMessageData): BaseMessage {
   if (d.role === 'user') {
+    const richContent = d.contentParts && (d.contentParts.length > 1 || d.contentParts[0]?.type !== 'text')
+    if (richContent) {
+      return new HumanMessage({ content: d.contentParts })
+    }
     return new HumanMessage(d.content)
   }
   if (d.role === 'assistant' && 'kind' in d) return new SystemMessage(d.summary)
@@ -1443,7 +1449,7 @@ function sessionEventToEventData(
 ): Record<string, unknown> {
   switch (event.type) {
     case 'user_message':
-      return { messageId: event.messageId, content: event.content, timestamp: event.timestamp, ...(event.attachments?.length ? { attachments: event.attachments } : {}) }
+      return { messageId: event.messageId, content: event.content, timestamp: event.timestamp, ...(event.attachments?.length ? { attachments: event.attachments } : {}), ...(event.contentParts?.length ? { contentParts: event.contentParts } : {}) }
     case 'step_started':
       return { stepId: event.turnId, agentId: event.agentId, startedAt: event.timestamp }
     case 'step_ended':

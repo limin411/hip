@@ -224,6 +224,10 @@ export interface Attachment {
   size?: number
 }
 
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -714,7 +718,7 @@ export interface McpResourceContent {
 // ──────────────────────────────────────────────────────────────────
 
 export type SessionEvent =
-  | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number; attachments?: Attachment[] }
+  | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number; attachments?: Attachment[]; contentParts?: ContentPart[] }
   | { type: 'step_started'; sessionId: string; turnId: string; agentId: string; timestamp: number }
   | { type: 'step_ended'; sessionId: string; turnId: string; agentId: string; timestamp: number }
   | { type: 'text_started'; sessionId: string; messageId: string; timestamp: number }

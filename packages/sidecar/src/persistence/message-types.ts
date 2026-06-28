@@ -1,4 +1,4 @@
-import type { Attachment } from '@hip/protocol'
+import type { Attachment, ContentPart } from '@hip/protocol'
 
 /**
  * Public types for the session_message projection.
@@ -23,7 +23,7 @@ export interface SessionMessageRow {
 
 /** JSON blob stored in session_message.data. Discriminated by role/kind for exhaustive reads. */
 export type SessionMessageData =
-  | { readonly role: 'user'; readonly content: string; readonly messageId: string; readonly attachments?: Attachment[] }
+  | { readonly role: 'user'; readonly content: string; readonly messageId: string; readonly attachments?: Attachment[]; readonly contentParts?: ContentPart[] }
   | {
     readonly role: 'assistant'
     readonly stepId: string

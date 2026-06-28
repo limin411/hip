@@ -91,6 +91,27 @@ describe('SessionMessageUpdater: user_message', () => {
     const row = loadProjection(db, SID)[0]
     expect(row?.data).toMatchObject({ role: 'user', content: 'hi', messageId: 'm1', attachments })
   })
+
+  it('persists contentParts on a user row', () => {
+    const db = freshDb()
+    const updater = new SessionMessageUpdater(db)
+    const contentParts = [{ type: 'text', text: 'hi' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }]
+
+    updater.apply(ev(SID, 'user_message', { messageId: 'm1', content: 'hi', timestamp: 1000, contentParts }))
+
+    const row = loadProjection(db, SID)[0]
+    expect(row?.data).toMatchObject({ role: 'user', content: 'hi', messageId: 'm1', contentParts })
+  })
+
+  it('ignores malformed contentParts entries', () => {
+    const db = freshDb()
+    const updater = new SessionMessageUpdater(db)
+
+    updater.apply(ev(SID, 'user_message', { messageId: 'm1', content: 'hi', timestamp: 1000, contentParts: [{ type: 'text', text: 'hi' }, { type: 'unknown' }, null] }))
+
+    const row = loadProjection(db, SID)[0]
+    expect((row?.data as { contentParts?: unknown[] }).contentParts).toEqual([{ type: 'text', text: 'hi' }])
+  })
 })
 
 describe('SessionMessageUpdater: step lifecycle', () => {

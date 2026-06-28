@@ -1,5 +1,5 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { Attachment } from '@hip/protocol'
+import type { Attachment, ContentPart } from '@hip/protocol'
 import type { SessionEvent } from './event-store.js'
 import {
   stepRowId,
@@ -11,6 +11,17 @@ import {
   type ProjectedToolCall,
 } from './message-types.js'
 import { reqString, optString, optNumber, optStringArray, optObjectArray, parseUsage } from './message-parsers.js'
+
+function isContentPart(x: Record<string, unknown>): x is ContentPart {
+  const type = x.type
+  if (type === 'text') return typeof x.text === 'string'
+  if (type === 'image_url') {
+    const imageUrl = x.image_url
+    if (imageUrl == null || typeof imageUrl !== 'object' || Array.isArray(imageUrl)) return false
+    return typeof (imageUrl as Record<string, unknown>).url === 'string'
+  }
+  return false
+}
 
 export {
   stepRowId,
@@ -144,7 +155,8 @@ export class SessionMessageUpdater {
     const attachments = optObjectArray<Attachment>(event.data, 'attachments', (x): x is Attachment =>
       typeof x.id === 'string' && typeof x.name === 'string' && typeof x.mimeType === 'string',
     )
-    const data: SessionMessageData = { role: 'user', content, messageId, ...(attachments?.length ? { attachments } : {}) }
+    const contentParts = optObjectArray<ContentPart>(event.data, 'contentParts', isContentPart)
+    const data: SessionMessageData = { role: 'user', content, messageId, ...(attachments?.length ? { attachments } : {}), ...(contentParts?.length ? { contentParts } : {}) }
     this.upsertRow({
       id: messageId,
       sessionId: event.aggregateId,

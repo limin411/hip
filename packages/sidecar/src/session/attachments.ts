@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import type { Attachment } from '@hip/protocol'
+import type { Attachment, ContentPart } from '@hip/protocol'
 import { scratchDirFor } from './scratch.js'
 
 export interface AttachmentPayload extends Attachment {
@@ -167,8 +167,6 @@ export async function stageAttachments(
   }
   return staged
 }
-
-export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }
 
 export async function buildAttachmentContentParts(attachments: AttachmentPayload[]): Promise<ContentPart[]> {
   const parts: ContentPart[] = []

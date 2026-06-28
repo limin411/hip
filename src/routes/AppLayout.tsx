@@ -31,7 +31,9 @@ export function AppLayout() {
     // App.tsx already bootstraps providers/config before rendering the router.
     // This is a reload/reconnect safety net for direct navigation or hot reload.
     if (!useProvidersStore.getState().loaded) {
-      void useProvidersStore.getState().load()
+      void useProvidersStore.getState().load().catch((err) => {
+        console.error('Failed to load providers catalog (safety net):', err)
+      })
     }
     sessionService.connect()
     return () => sessionService.disconnect()

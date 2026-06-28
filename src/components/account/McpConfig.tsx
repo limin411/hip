@@ -237,11 +237,29 @@ export function McpConfig() {
                 key={s.id}
                 server={s}
                 status={statusByServer.get(s.id)}
-                onToggle={(enabled) => { updateServer(s.id, { enabled }).catch((err) => console.error('Failed to update MCP server:', err)) }}
+                onToggle={async (enabled) => {
+                  try {
+                    await updateServer(s.id, { enabled })
+                  } catch {
+                    window.alert(t('settings.mcp.error'))
+                  }
+                }}
                 onEdit={() => setEditing({ mode: 'edit', server: s })}
                 onDelete={() => setDeleting(s)}
-                onToggleTool={(toolName) => { handleUpdateTools(s, toolName).catch((err) => console.error('Failed to update MCP tools:', err)) }}
-                onResetTools={() => { handleResetTools(s).catch((err) => console.error('Failed to reset MCP tools:', err)) }}
+                onToggleTool={async (toolName) => {
+                  try {
+                    await handleUpdateTools(s, toolName)
+                  } catch {
+                    window.alert(t('settings.mcp.error'))
+                  }
+                }}
+                onResetTools={async () => {
+                  try {
+                    await handleResetTools(s)
+                  } catch {
+                    window.alert(t('settings.mcp.error'))
+                  }
+                }}
                 onReconnect={reconnectMcpServers}
               />
             ))
@@ -283,12 +301,8 @@ export function McpConfig() {
           server={deleting}
           onCancel={() => setDeleting(null)}
           onConfirm={async () => {
-            try {
-              await removeServer(deleting.id)
-              setDeleting(null)
-            } catch (err) {
-              console.error('Failed to remove MCP server:', err)
-            }
+            await removeServer(deleting.id)
+            setDeleting(null)
           }}
         />
       )}
@@ -718,10 +732,23 @@ function DeleteServerDialog({
   onCancel,
 }: {
   server: McpServerConfig
-  onConfirm: () => void
+  onConfirm: () => Promise<void>
   onCancel: () => void
 }) {
   const { t } = useTranslation()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const handleConfirm = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await onConfirm()
+    } catch {
+      setError(t('settings.mcp.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <Modal
       open
@@ -733,11 +760,12 @@ function DeleteServerDialog({
     >
       <div className="p-5">
         <p className="text-body text-ink-secondary">{t('settings.mcp.deleteConfirmBody')}</p>
+        {error && <p className="mt-3 text-meta text-danger">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>
             {t('settings.mcp.cancel')}
           </Button>
-          <Button variant="danger" size="sm" onClick={onConfirm}>
+          <Button variant="danger" size="sm" onClick={() => void handleConfirm()} disabled={busy}>
             {t('settings.mcp.delete')}
           </Button>
         </div>

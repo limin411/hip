@@ -5441,6 +5441,11 @@ netmask@^2.0.2:
   resolved "https://registry.npmmirror.com/netmask/-/netmask-2.1.1.tgz#80043d265b53aa521b3bd01e8fcdf353f9e1e81e"
   integrity sha512-eonl3sLUha+S1GzTPxychyhnUzKyeQkZ7jLjKrBagJgPla13F+uQ71HgpFefyHgqrjEbCPkDArxYsjY8/+gLKA==
 
+node-ensure@^0.0.0:
+  version "0.0.0"
+  resolved "https://registry.npmmirror.com/node-ensure/-/node-ensure-0.0.0.tgz#ecae764150de99861ec5c810fd5d096b183932a7"
+  integrity sha512-DRI60hzo2oKN1ma0ckc6nQWlHU69RH6xN0sjQTjMpChPfTYvKZdcQFfdYK2RWbJcKyUizSIy/l8OTGxMAM1QDw==
+
 node-releases@^2.0.36:
   version "2.0.47"
   resolved "https://registry.npmmirror.com/node-releases/-/node-releases-2.0.47.tgz#521bb2786da8eb140b748841c0b3b3a75334ffc4"
@@ -5731,6 +5736,13 @@ pathval@^2.0.0:
   version "2.0.1"
   resolved "https://registry.npmmirror.com/pathval/-/pathval-2.0.1.tgz#8855c5a2899af072d6ac05d11e46045ad0dc605d"
   integrity sha512-//nshmD55c46FuFw26xV/xFAaB5HF9Xdap7HJBBnrKdAd6/GxDBaNA1870O79+9ueg61cZLSVc+OaFlfmObYVQ==
+
+pdf-parse@^1.1.1:
+  version "1.1.4"
+  resolved "https://registry.npmmirror.com/pdf-parse/-/pdf-parse-1.1.4.tgz#97bca6f46758130dafb1fdd9df905efd07581f4a"
+  integrity sha512-XRIRcLgk6ZnUbsHsYXExMw+krrPE81hJ6FQPLdBNhhBefqIQKXu/WeTgNBGSwPrfU0v+UCEwn7AoAUOsVKHFvQ==
+  dependencies:
+    node-ensure "^0.0.0"
 
 pend@~1.2.0:
   version "1.2.0"

@@ -1,14 +1,17 @@
 import type { Options } from '@wdio/types'
 import { createServer, type ViteDevServer } from 'vite'
+import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 const VITE_PORT = 1420
+const DEFAULT_BINARY = './src-tauri/target/debug/hip'
+const appBinaryPath = process.env.E2E_BINARY || DEFAULT_BINARY
 
-// The tauri-service spawns the app binary directly (not via `tauri dev`), so the
-// webview loads `devUrl` (http://localhost:1420) without anyone starting the
-// frontend. We bring Vite up here so `yarn test:e2e` is self-contained; wdio
-// awaits config.onPrepare before the service's onPrepare spawns the app, so the
-// window loads the real UI instead of about:blank. If a dev server is already
-// running (e.g. `scripts/dev.sh start web`) we reuse it and leave it alone.
+// Isolated data dir so repeated E2E runs do not accumulate sessions.
+const e2eDataDir = process.env.E2E_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-data-'))
+process.env.HIP_DATA_DIR = e2eDataDir
+
 let viteServer: ViteDevServer | undefined
 
 async function pingVite(): Promise<boolean> {
@@ -20,6 +23,15 @@ async function pingVite(): Promise<boolean> {
   }
 }
 
+async function waitForVite(timeoutMs = 30000): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (await pingVite()) return
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error(`Vite did not become ready on port ${VITE_PORT}`)
+}
+
 export const config: Options.Testrunner = {
   runner: 'local',
   specs: ['./e2e/**/*.spec.ts'],
@@ -27,7 +39,7 @@ export const config: Options.Testrunner = {
 
   services: [
     ['@wdio/tauri-service', {
-      appBinaryPath: './src-tauri/target/release/bundle/macos/hip.app/Contents/MacOS/hip',
+      appBinaryPath,
       driverProvider: 'embedded',
     }],
   ],
@@ -35,7 +47,7 @@ export const config: Options.Testrunner = {
   capabilities: [{
     browserName: 'tauri',
     'tauri:options': {
-      application: './src-tauri/target/release/bundle/macos/hip.app/Contents/MacOS/hip',
+      application: appBinaryPath,
     },
   }],
 
@@ -48,12 +60,7 @@ export const config: Options.Testrunner = {
   framework: 'mocha',
   mochaOpts: {
     ui: 'bdd',
-    // Generous: the debug bundle loads the Vite-dev frontend, so a cold WebKit
-    // webview can take ~30s+ to mount and the first sidecar round-trip adds more.
     timeout: 180000,
-    // Optional selective run: E2E_GREP filters by test title; E2E_INVERT=1 turns
-    // it into an exclusion (run everything EXCEPT matches). Used to skip the
-    // live-agent "send first message" flow, which is manual GUI-acceptance only.
     ...(process.env.E2E_GREP ? { grep: process.env.E2E_GREP, invert: process.env.E2E_INVERT === '1' } : {}),
   },
 
@@ -62,18 +69,14 @@ export const config: Options.Testrunner = {
   onPrepare: async () => {
     if (await pingVite()) {
       console.log(`[e2e] reusing Vite already running on :${VITE_PORT}`)
-      return
+    } else {
+      viteServer = await createServer()
+      await viteServer.listen()
+      await waitForVite()
+      console.log(`[e2e] started Vite on :${VITE_PORT}`)
     }
-    // No inline server config needed — vite.config.ts already pins port 1420
-    // (strictPort). createServer loads it from the project root.
-    viteServer = await createServer()
-    await viteServer.listen()
-    // listen() resolves once the server accepts connections; confirm with a few
-    // pings so the app's webview never races ahead of the first served response.
-    for (let i = 0; i < 10 && !(await pingVite()); i++) {
-      await new Promise((r) => setTimeout(r, 200))
-    }
-    console.log(`[e2e] started Vite on :${VITE_PORT}`)
+    // Give the sidecar a moment to cold-start after the app spawns.
+    // The actual readiness is verified by the first spec's before hook.
   },
 
   onComplete: async () => {
@@ -81,6 +84,10 @@ export const config: Options.Testrunner = {
       await viteServer.close()
       viteServer = undefined
       console.log('[e2e] stopped Vite')
+    }
+    // Cleanup isolated data dir unless the user provided one.
+    if (!process.env.E2E_DATA_DIR && fs.existsSync(e2eDataDir)) {
+      fs.rmSync(e2eDataDir, { recursive: true, force: true })
     }
   },
 }

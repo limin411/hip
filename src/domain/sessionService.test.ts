@@ -366,6 +366,56 @@ describe('SessionService', () => {
     expect(t.sent.some((m) => m.type === 'session:load' && (m as { sessionId: string }).sessionId === 's2')).toBe(true)
     expect(useUiStore.getState().scrollTargetMessageId).toBe('m1')
   })
+
+  it('sendMessage with an image does not switch the draft model', () => {
+    useDomainStore.setState({ activeSessionId: null })
+    useDraftStore.setState({ draft: { tempId: 'd1', mode: 'chat', text: '', modelKey: 'deepseek/deepseek-v4-flash' } })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
+    svc.sendMessage('describe', attachments)
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.some((m) => m.type === 'session:create' && m.config.model === 'deepseek-v4-flash')).toBe(true)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
+  })
+
+  it('sendMessage with an image does not switch the active session model', () => {
+    useDomainStore.setState({
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
+    svc.sendMessage('describe', attachments)
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
+  })
+
+  it('regenerate does not switch model when the session history contains an image', () => {
+    useDomainStore.setState({
+      sessions: [{
+        id: 's1',
+        config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] },
+        title: 'T',
+        preview: 'P',
+        updatedAtMs: 0,
+        loaded: true,
+        messages: [
+          { id: 'u1', role: 'user', content: 'what is this', timestamp: 0, attachments: [{ id: 'a1', name: 'image.png', mimeType: 'image/png' }] },
+          { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 },
+        ],
+        status: 'idle',
+        error: null,
+      }],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.regenerate()
+    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
+    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(true)
+  })
 })
 
 describe('workspace diff', () => {
@@ -600,55 +650,5 @@ describe('branches + revert', () => {
     expect(useDiffStore.getState().bySession['s1'].revertError).toBe('safety checkpoint failed')
     // no refresh requests fire on a failed revert
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
-  })
-
-  it('sendMessage with an image does not switch the draft model', () => {
-    useDomainStore.setState({ activeSessionId: null })
-    useDraftStore.setState({ draft: { tempId: 'd1', mode: 'chat', text: '', modelKey: 'deepseek/deepseek-v4-flash' } })
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
-    svc.sendMessage('describe', attachments)
-    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
-    expect(t.sent.some((m) => m.type === 'session:create' && m.config.model === 'deepseek-v4-flash')).toBe(true)
-    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
-  })
-
-  it('sendMessage with an image does not switch the active session model', () => {
-    useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }],
-      activeSessionId: 's1',
-    })
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    const attachments = [{ id: 'a1', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
-    svc.sendMessage('describe', attachments)
-    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
-    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: 'describe', attachments })
-  })
-
-  it('regenerate does not switch model when the session history contains an image', () => {
-    useDomainStore.setState({
-      sessions: [{
-        id: 's1',
-        config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] },
-        title: 'T',
-        preview: 'P',
-        updatedAtMs: 0,
-        loaded: true,
-        messages: [
-          { id: 'u1', role: 'user', content: 'what is this', timestamp: 0, attachments: [{ id: 'a1', name: 'image.png', mimeType: 'image/png' }] },
-          { id: 'a1', role: 'assistant', content: 'ans', timestamp: 1 },
-        ],
-        status: 'idle',
-        error: null,
-      }],
-      activeSessionId: 's1',
-    })
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    svc.regenerate()
-    expect(t.sent.some((m) => m.type === 'session:setModel')).toBe(false)
-    expect(t.sent.some((m) => m.type === 'message:regenerate')).toBe(true)
   })
 })

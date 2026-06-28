@@ -226,7 +226,7 @@ export function McpConfig() {
           {servers.length === 0 ? (
             <button
               onClick={() => setEditing({ mode: 'add' })}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+              className="col-span-full flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-8 text-body font-medium text-accent-strong transition-colors hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               <Plug size={24} />
               <span>{t('settings.mcp.empty')}</span>
@@ -360,6 +360,8 @@ function McpServerCard({
   const [toolsOpen, setToolsOpen] = useState(false)
   const [toggleBusy, setToggleBusy] = useState(false)
   const [toolBusy, setToolBusy] = useState<Record<string, boolean>>({})
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [reconnectBusy, setReconnectBusy] = useState(false)
   const transportLabel =
     server.transport === 'stdio'
       ? t('settings.mcp.transportStdio')
@@ -430,11 +432,12 @@ function McpServerCard({
                 <button
                   type="button"
                   onClick={async () => {
+                    setActionError(null)
                     setToolBusy((b) => ({ ...b, __reset: true }))
                     try {
                       await onResetTools()
                     } catch {
-                      // TODO: surface error via toast/notification
+                      setActionError(t('settings.mcp.error'))
                     } finally {
                       setToolBusy((b) => ({ ...b, __reset: false }))
                     }
@@ -458,11 +461,12 @@ function McpServerCard({
                       checked={enabled}
                       disabled={!!toolBusy[toolName] || toolBusy.__reset}
                       onCheckedChange={async () => {
+                        setActionError(null)
                         setToolBusy((b) => ({ ...b, [toolName]: true }))
                         try {
                           await onToggleTool(toolName)
                         } catch {
-                          // TODO: surface error via toast/notification
+                          setActionError(t('settings.mcp.error'))
                         } finally {
                           setToolBusy((b) => ({ ...b, [toolName]: false }))
                         }
@@ -479,24 +483,41 @@ function McpServerCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <Switch
-          checked={server.enabled}
-          disabled={toggleBusy}
-          onCheckedChange={async (enabled) => {
-            setToggleBusy(true)
-            try {
-              await onToggle(enabled)
-            } catch {
-              // TODO: surface error via toast/notification
-            } finally {
-              setToggleBusy(false)
-            }
-          }}
-          ariaLabel={t('settings.mcp.enableThis')}
-        />
+        <div className="flex flex-col gap-1">
+          <Switch
+            checked={server.enabled}
+            disabled={toggleBusy}
+            onCheckedChange={async (enabled) => {
+              setActionError(null)
+              setToggleBusy(true)
+              try {
+                await onToggle(enabled)
+              } catch {
+                setActionError(t('settings.mcp.error'))
+              } finally {
+                setToggleBusy(false)
+              }
+            }}
+            ariaLabel={t('settings.mcp.enableThis')}
+          />
+          {actionError && <span className="text-meta text-danger">{actionError}</span>}
+        </div>
         <div className="flex items-center gap-1">
           {status?.status === 'disconnected' && server.enabled && (
-            <ActionButton icon={<RefreshCw size={14} />} label={t('settings.mcp.reconnect')} onClick={onReconnect} />
+            <ActionButton
+              icon={<RefreshCw size={14} />}
+              label={t('settings.mcp.reconnect')}
+              onClick={async () => {
+                setActionError(null)
+                setReconnectBusy(true)
+                try {
+                  onReconnect()
+                } finally {
+                  setTimeout(() => setReconnectBusy(false), 1000)
+                }
+              }}
+              disabled={reconnectBusy}
+            />
           )}
           <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
           <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
@@ -573,22 +594,26 @@ function ActionButton({
   label,
   onClick,
   danger,
+  disabled,
 }: {
   icon: React.ReactNode
   label: string
   onClick: () => void
   danger?: boolean
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={label}
       className={cn(
         'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
         danger
           ? 'text-ink-secondary hover:bg-danger/10 hover:text-danger'
           : 'text-ink-secondary hover:bg-surface-muted hover:text-ink',
+        disabled && 'opacity-50 cursor-not-allowed',
       )}
       aria-label={label}
     >

@@ -614,7 +614,7 @@ export class Session {
         // When dispatching to an internal multimodal agent, keep image_url parts out of the
         // main session history so the text-only main model never sees them on follow-up turns.
         // Also keep them out when no image agent is available and we are about to error.
-        const filterImages = !!imageAgent || (hasImageAttachment && !modelSupportsImages)
+        const filterImages = hasImageAttachment && !modelSupportsImages
         const historyParts = filterImages ? undefined : (isRichContentParts(parts) ? parts : undefined)
         this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
@@ -790,6 +790,8 @@ export class Session {
     let agentText = ''
     try {
       const invoker = this.agentProv.invoker(cwd)
+      // Only forward image parts to the image agent; non-image attachments stay with the main model.
+      const imageParts = parts.filter((p) => p.type === 'image_url')
       agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),
         skills: this.configMgr.skills,
@@ -799,7 +801,7 @@ export class Session {
         networkPolicy: this.networkPolicy,
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
-        attachmentParts: parts,
+        attachmentParts: imageParts,
       }, input.attachments)
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })

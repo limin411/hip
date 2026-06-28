@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
@@ -28,13 +26,11 @@ export function AgentEditor({
   initialKind,
   onSave,
   onCancel,
-  variant = 'modal',
 }: {
   initial: AgentConfig | null
   initialKind?: AgentConfig['kind']
   onSave: (draft: Omit<AgentConfig, 'id'>) => Promise<void>
   onCancel: () => void
-  variant?: 'modal' | 'drawer'
 }) {
   const { t } = useTranslation()
   const { config, catalog } = useProvidersStore()
@@ -72,15 +68,6 @@ export function AgentEditor({
     void useSkillsStore.getState().load()
     void refreshDetection()
   }, [refreshDetection])
-
-  useEffect(() => {
-    if (variant !== 'drawer') return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [variant, onCancel])
 
   const isNewAcp = !initial && initialKind === 'acp'
   const [acpStep, setAcpStep] = useState<'pick' | 'form'>(isNewAcp ? 'pick' : 'form')
@@ -295,34 +282,6 @@ export function AgentEditor({
       )}
     </div>
   )
-
-  if (variant === 'drawer') {
-    return createPortal(
-      <div className="fixed inset-0 z-50">
-        <div className="absolute inset-0 bg-ink/40" onClick={onCancel} />
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="absolute inset-y-0 right-0 flex w-full max-w-[480px] animate-panel-in flex-col border-l border-border bg-surface shadow-overlay outline-none"
-        >
-          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-            <div className="text-title font-bold tracking-tight text-ink">{title}</div>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              title={t('common.close')}
-              aria-label={t('common.close')}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto">{body}</div>
-        </div>
-      </div>,
-      document.body,
-    )
-  }
 
   return (
     <Modal

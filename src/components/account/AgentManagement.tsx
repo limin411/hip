@@ -56,7 +56,6 @@ export function AgentManagement() {
 
       {editing && (
         <AgentEditor
-          variant={editing.mode === 'add' ? 'modal' : 'drawer'}
           initial={editing.mode === 'edit' ? editing.agent : null}
           initialKind={editing.mode === 'add' ? editing.kind : undefined}
           onCancel={() => setEditing(null)}

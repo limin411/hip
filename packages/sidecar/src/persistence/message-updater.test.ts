@@ -112,6 +112,42 @@ describe('SessionMessageUpdater: user_message', () => {
     const row = loadProjection(db, SID)[0]
     expect((row?.data as { contentParts?: unknown[] }).contentParts).toEqual([{ type: 'text', text: 'hi' }])
   })
+
+  it('filters image_url contentParts missing a url', () => {
+    const db = freshDb()
+    const updater = new SessionMessageUpdater(db)
+
+    updater.apply(ev(SID, 'user_message', {
+      messageId: 'm1',
+      content: 'hi',
+      timestamp: 1000,
+      contentParts: [
+        { type: 'image_url', image_url: {} },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } },
+      ],
+    }))
+
+    const row = loadProjection(db, SID)[0]
+    expect((row?.data as { contentParts?: unknown[] }).contentParts).toEqual([{ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }])
+  })
+
+  it('filters image_url contentParts with non-object image_url', () => {
+    const db = freshDb()
+    const updater = new SessionMessageUpdater(db)
+
+    updater.apply(ev(SID, 'user_message', {
+      messageId: 'm1',
+      content: 'hi',
+      timestamp: 1000,
+      contentParts: [
+        { type: 'image_url', image_url: 'not-an-object' },
+        { type: 'image_url' },
+      ],
+    }))
+
+    const row = loadProjection(db, SID)[0]
+    expect((row?.data as { contentParts?: unknown[] }).contentParts).toBeUndefined()
+  })
 })
 
 describe('SessionMessageUpdater: step lifecycle', () => {

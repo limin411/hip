@@ -34,6 +34,7 @@ import { EventStore, SnapshotStore, saveSessionSnapshot, loadSessionSnapshot } f
 import { loadProjection, projectEvent } from '../persistence/message-projector.js'
 import type { SessionMessageData, ProjectedToolCall } from '../persistence/message-types.js'
 import { isAssistantStep } from '../persistence/message-types.js'
+import { isContentPart } from '../persistence/message-updater.js'
 import * as workspaceFs from './workspace-fs.js'
 import { GitOperations } from './git-operations.js'
 import { PermissionManager } from './permission-manager.js'
@@ -572,8 +573,7 @@ export class Session {
       parts.push(...attachmentParts)
       if (this.store) {
         isFirstTurn = !this.store.hasMessages(this.id)
-        const richContent = parts.length > 1 || parts[0]?.type !== 'text'
-        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(richContent ? { contentParts: parts } : {}) })
+        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(isRichContentParts(parts) ? { contentParts: parts } : {}) })
       }
     } else if (this.store) {
       isFirstTurn = !this.store.hasMessages(this.id)
@@ -695,8 +695,7 @@ export class Session {
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
-      const richContent = parts.length > 1 || parts[0]?.type !== 'text'
-      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(richContent ? { contentParts: parts } : {}) })
+      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(parts) ? { contentParts: parts } : {}) })
     }
     this.messages.push(humanMessage)
     await this.runTurn(send, base)
@@ -1402,11 +1401,15 @@ export class Session {
   }
 }
 
+function isRichContentParts(parts: ContentPart[] | undefined): boolean {
+  return !!parts && parts.length > 0 && !(parts.length === 1 && parts[0].type === 'text')
+}
+
 function rowToBaseMessage(d: SessionMessageData): BaseMessage {
   if (d.role === 'user') {
-    const richContent = d.contentParts && (d.contentParts.length > 1 || d.contentParts[0]?.type !== 'text')
-    if (richContent) {
-      return new HumanMessage({ content: d.contentParts })
+    const validParts = d.contentParts?.filter((p): p is ContentPart => isContentPart(p as Record<string, unknown>))
+    if (isRichContentParts(validParts)) {
+      return new HumanMessage({ content: validParts })
     }
     return new HumanMessage(d.content)
   }

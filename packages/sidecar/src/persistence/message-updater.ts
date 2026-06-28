@@ -12,7 +12,7 @@ import {
 } from './message-types.js'
 import { reqString, optString, optNumber, optStringArray, optObjectArray, parseUsage } from './message-parsers.js'
 
-function isContentPart(x: Record<string, unknown>): x is ContentPart {
+export function isContentPart(x: Record<string, unknown>): x is ContentPart {
   const type = x.type
   if (type === 'text') return typeof x.text === 'string'
   if (type === 'image_url') {

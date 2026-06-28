@@ -44,7 +44,10 @@ describe('Session image attachments', () => {
     expect(userMessages.length).toBeGreaterThan(0)
     const lastUser = userMessages[userMessages.length - 1]
     expect(Array.isArray(lastUser.content)).toBe(true)
-    const imageParts = (lastUser.content as Array<{ type: string }>).filter((p) => p.type === 'image_url')
-    expect(imageParts.length).toBe(1)
+    const parts = lastUser.content as Array<{ type: string }>
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toEqual({ type: 'text', text: 'describe this' })
+    expect(parts[1].type).toBe('image_url')
+    expect((parts[1] as { image_url: { url: string } }).image_url.url).toMatch(/^data:image\/png;base64,/)
   })
 })

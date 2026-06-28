@@ -32,6 +32,9 @@ describe('AttachmentButton', () => {
   beforeEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    providersStore.useProvidersStore.setState({ catalog: {}, config: { providers: {} }, keyConfigured: {}, loaded: false })
+    hipConfigStore.useHipConfigStore.setState({ config: { version: 1 }, loaded: false, error: null })
+    draftStore.useDraftStore.setState({ draft: null })
   })
 
   it('renders when current model supports attachments', () => {

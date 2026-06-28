@@ -18,6 +18,14 @@ import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 
+function formatBytes(bytes?: number): string {
+  if (bytes === undefined || bytes === null) return ''
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
 const REMARK_PLUGINS = [remarkGfm]
 const MD_COMPONENTS: Components = {
   pre: CodeBlock,
@@ -99,6 +107,22 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
             </>
           )}
           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{displayContent}</ReactMarkdown>
+          {isUser && message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {message.attachments.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1 text-meta"
+                  data-testid="message-attachment"
+                >
+                  <span className="max-w-[160px] truncate">{a.name}</span>
+                  {a.size !== undefined && (
+                    <span className="text-caption text-ink-tertiary">({formatBytes(a.size)})</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {streaming && <StreamingCursor />}
         </div>
         {!streaming && message.role === 'assistant' && (

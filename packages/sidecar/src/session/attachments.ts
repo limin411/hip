@@ -1,4 +1,5 @@
 import * as fs from 'node:fs/promises'
+import { type Stats } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import type { Attachment, ContentPart } from '@hip/protocol'
@@ -108,7 +109,7 @@ async function resolveAndValidateAttachmentPath(filePath: string): Promise<{ rea
       }
     }
   }
-  let stat: fs.Stats
+  let stat: Stats
   try {
     stat = await fs.stat(realPath)
   } catch (err) {

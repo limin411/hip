@@ -728,10 +728,11 @@ export class Session {
     const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
     const requestApproval = this.permissions.buildRequestApproval(_send, this.id, turnId, () => 0, mode, this.hooks)
 
+    let stepSeq = 0
     const emit: GraphEmit = {
       token: (delta) => { _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
       reasoning: () => {},
-      toolStarted: (name, callId, input) => { _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input) }) },
+      toolStarted: (name, callId, input) => { _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input), seq: stepSeq++ }) },
       toolFinished: (callId, status, output, error) => { _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(output ? { output } : {}), ...(error ? { error } : {}) }) },
       usage: () => {},
       planDelta: () => {},

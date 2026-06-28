@@ -48,6 +48,6 @@ describe('Session image attachments', () => {
     expect(parts).toHaveLength(2)
     expect(parts[0]).toEqual({ type: 'text', text: 'describe this' })
     expect(parts[1].type).toBe('image_url')
-    expect((parts[1] as { image_url: { url: string } }).image_url.url).toMatch(/^data:image\/png;base64,/)
+    expect(((parts[1] as unknown) as { image_url: { url: string } }).image_url.url).toMatch(/^data:image\/png;base64,/)
   })
 })

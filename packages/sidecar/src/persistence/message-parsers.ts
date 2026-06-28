@@ -42,7 +42,7 @@ export function optStringArray(data: Record<string, unknown>, field: string): re
 export function optObjectArray<T>(
   data: Record<string, unknown>,
   field: string,
-  guard?: (x: Record<string, unknown>) => x is T,
+  guard?: (x: Record<string, unknown>) => boolean,
 ): T[] | undefined {
   const raw = data[field]
   if (!Array.isArray(raw)) return undefined

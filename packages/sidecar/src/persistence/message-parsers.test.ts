@@ -127,7 +127,7 @@ describe('message-parsers: optObjectArray', () => {
 
   it('applies guard to filter objects', () => {
     interface Item { id: string }
-    const guard = (x: Record<string, unknown>): x is Item => typeof x.id === 'string'
+    const guard = (x: Record<string, unknown>): boolean => typeof x.id === 'string'
     expect(optObjectArray<Item>({ foo: [{ id: 'a' }, { id: 1 }, { name: 'b' }] }, 'foo', guard)).toEqual([{ id: 'a' }])
   })
 })

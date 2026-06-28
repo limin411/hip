@@ -28,7 +28,11 @@ export function AppLayout() {
   const activeSessionId = useActiveSessionId()
 
   useEffect(() => {
-    void useProvidersStore.getState().load()
+    // App.tsx already bootstraps providers/config before rendering the router.
+    // This is a reload/reconnect safety net for direct navigation or hot reload.
+    if (!useProvidersStore.getState().loaded) {
+      void useProvidersStore.getState().load()
+    }
     sessionService.connect()
     return () => sessionService.disconnect()
   }, [])

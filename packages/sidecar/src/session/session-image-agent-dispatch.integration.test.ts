@@ -18,8 +18,8 @@ function makeStore() {
 }
 
 const textCatalog = {
-  openai: { id: 'openai', name: 'OpenAI', env: [], models: { 'gpt-4o': { id: 'gpt-4o', attachment: true } } },
-  deepseek: { id: 'deepseek', name: 'DeepSeek', env: [], models: { 'deepseek-chat': { id: 'deepseek-chat', attachment: false } } },
+  openai: { id: 'openai', name: 'OpenAI', models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } } },
+  deepseek: { id: 'deepseek', name: 'DeepSeek', models: { 'deepseek-chat': { id: 'deepseek-chat', name: 'DeepSeek Chat', attachment: false } } },
 }
 
 describe('Session image agent dispatch', () => {

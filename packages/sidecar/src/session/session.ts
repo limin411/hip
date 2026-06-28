@@ -514,13 +514,10 @@ export class Session {
 
   /** Rebuild the in-memory message list from the event-sourced projection.
    *  Falls back to the legacy messages table when the projection is empty.
-   *  If crash recovery already warm-started messages from a snapshot, skip
-   *  rebuilding so the snapshot remains the source of truth. */
+   *  The event projection is authoritative when it exists: it contains any
+   *  messages persisted after the last snapshot (e.g. an attachment-bearing
+   *  user message sent just before an interruption). */
   hydrate(messages?: Message[]): void {
-    if (this.messages.length > 0) {
-      this.reseedLastCheckpoint()
-      return
-    }
     this.messages.length = 0
     const rebuilt = this.rebuildMessagesFromEvents(this.id)
     if (rebuilt.length > 0) {
@@ -532,6 +529,14 @@ export class Session {
     } else if (this.store) {
       for (const m of this.store.loadMessages(this.id)) {
         this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
+      }
+    }
+    // If the projection and legacy tables are both empty, fall back to the last
+    // snapshot so a session that lost its event log is not left with no history.
+    if (this.messages.length === 0 && this.snapshotStore) {
+      const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
+      if (snapshot != null && snapshot.messages.length > 0) {
+        this.messages.push(...snapshot.messages)
       }
     }
     this.reseedLastCheckpoint()
@@ -768,12 +773,20 @@ export class Session {
     const requestApproval = this.permissions.buildRequestApproval(_send, this.id, turnId, () => 0, mode, this.hooks)
 
     let stepSeq = 0
-    let reasoningSeq = 0
+    const reasoning = new ReasoningTracker(() => stepSeq++)
     const usageByAgent = new Map<string, TurnUsage>()
     const emit: GraphEmit = {
       token: (delta) => { _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
-      reasoning: (delta) => { _send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', stepSeq: reasoningSeq++, delta }) },
-      toolStarted: (name, callId, input) => { _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input), seq: stepSeq++ }) },
+      reasoning: (delta) => {
+        if (!delta) return
+        _send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', stepSeq: reasoning.push(agent.id, delta), delta })
+      },
+      toolStarted: (name, callId, input) => {
+        // Close any open reasoning burst BEFORE the tool claims the next stepSeq, so reasoning and
+        // tool steps share a single turn-global ordering (mirrors runTurn).
+        reasoning.close(agent.id)
+        _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input), seq: stepSeq++ })
+      },
       toolFinished: (callId, status, output, error) => { _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(output ? { output } : {}), ...(error ? { error } : {}) }) },
       usage: (u) => { usageByAgent.set(agent.id, addUsage(usageByAgent.get(agent.id), u)) },
       planDelta: () => {},
@@ -808,6 +821,7 @@ export class Session {
       }, imageAttachments)
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
+      reasoning.close(agent.id)
       this.emit({ type: 'step_failed', sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() })
       const isAbort = err instanceof Error && err.name === 'AbortError'
       _send({ type: 'error', sessionId: this.id, code: isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
@@ -821,6 +835,7 @@ export class Session {
     this.running = false
     this.abortController = null
     this.endActivity()
+    reasoning.close(agent.id)
     _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
 
     this.messages.push(new AIMessage(agentText))

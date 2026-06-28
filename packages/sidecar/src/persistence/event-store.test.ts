@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDatabase } from './open.js'
 import { SessionStore } from './store.js'
-import { EventStore, SnapshotStore } from './event-store.js'
+import { EventStore, SnapshotStore, serializeMessages, deserializeMessages } from './event-store.js'
 import type { SessionEvent } from './event-store.js'
+import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 
 function freshDb() {
   const { db } = openDatabase(':memory:')
@@ -182,6 +183,43 @@ describe('SnapshotStore', () => {
 
     expect(snapshots.loadSnapshot('s1')!.state).toBe('{"a":1}')
     expect(snapshots.loadSnapshot('s2')!.state).toBe('{"b":2}')
+  })
+})
+
+describe('serializeMessages / deserializeMessages', () => {
+  it('round-trips a HumanMessage with structured content parts', () => {
+    const original = [
+      new HumanMessage({
+        content: [
+          { type: 'text', text: 'describe this' },
+          { type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } },
+        ],
+      }),
+    ]
+    const roundTripped = deserializeMessages(serializeMessages(original))
+    expect(roundTripped).toHaveLength(1)
+    expect(roundTripped[0]).toBeInstanceOf(HumanMessage)
+    expect(roundTripped[0].content).toEqual(original[0].content)
+  })
+
+  it('round-trips plain string messages', () => {
+    const original = [new HumanMessage('hi'), new AIMessage('hello'), new SystemMessage('context')]
+    const roundTripped = deserializeMessages(serializeMessages(original))
+    expect(roundTripped.map((m) => m.content)).toEqual(['hi', 'hello', 'context'])
+  })
+
+  it('round-trips an AIMessage with tool calls', () => {
+    const original = [
+      new AIMessage({
+        content: 'used a tool',
+        tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }],
+      }),
+    ]
+    const roundTripped = deserializeMessages(serializeMessages(original))
+    expect(roundTripped[0]).toBeInstanceOf(AIMessage)
+    const ai = roundTripped[0] as AIMessage
+    expect(ai.content).toBe('used a tool')
+    expect(ai.tool_calls).toEqual([{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }])
   })
 })
 

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from './sqlite.js'
 import type { SessionConfig, TurnUsage } from '@hip/protocol'
-import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, SystemMessage, type BaseMessage, type MessageContent } from '@langchain/core/messages'
 
 export interface SessionEvent {
   id: string
@@ -83,6 +83,18 @@ function isMessageJson(value: unknown): value is MessageJson {
   return true
 }
 
+/** Parse a snapshot content string. Arrays are stored as JSON strings by
+ *  serializeMessages; restore them so HumanMessage content parts survive. */
+function parseSnapshotContent(content: string): MessageContent {
+  try {
+    const parsed: unknown = JSON.parse(content)
+    if (Array.isArray(parsed)) return parsed as MessageContent
+  } catch {
+    // intentionally fall through
+  }
+  return content
+}
+
 /** Convert a BaseMessage array into a snapshot-serializable JSON string. */
 export function serializeMessages(messages: readonly BaseMessage[]): string {
   const payload: MessageJson[] = messages.map((m) => {
@@ -115,12 +127,12 @@ export function deserializeMessages(json: string): BaseMessage[] {
     if (!isMessageJson(item)) return new AIMessage(String(item))
     switch (item.type) {
       case 'human':
-        return new HumanMessage(item.content)
+        return new HumanMessage(parseSnapshotContent(item.content))
       case 'system':
-        return new SystemMessage(item.content)
+        return new SystemMessage(parseSnapshotContent(item.content))
       case 'ai':
         return new AIMessage({
-          content: item.content,
+          content: parseSnapshotContent(item.content),
           tool_calls: item.tool_calls?.map((tc) => ({ ...tc, type: tc.type ?? 'tool_call' })),
         })
     }

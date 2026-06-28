@@ -91,7 +91,7 @@ describe('protocol: SessionEvent', () => {
       content: 'hello',
       timestamp: 1700000000000,
     }
-    const rt = JSON.parse(JSON.stringify(e)) as SessionEvent
+    const rt = JSON.parse(JSON.stringify(e)) as Extract<SessionEvent, { type: 'user_message' }>
     expect(rt.type).toBe('user_message')
     expect(rt.sessionId).toBe('s1')
     expect(rt.messageId).toBe('m1')
@@ -114,8 +114,8 @@ describe('protocol: SessionEvent', () => {
       agentId: 'supervisor',
       timestamp: 2,
     }
-    const rtStarted = JSON.parse(JSON.stringify(started)) as SessionEvent
-    const rtEnded = JSON.parse(JSON.stringify(ended)) as SessionEvent
+    const rtStarted = JSON.parse(JSON.stringify(started)) as Extract<SessionEvent, { type: 'step_started' }>
+    const rtEnded = JSON.parse(JSON.stringify(ended)) as Extract<SessionEvent, { type: 'step_ended' }>
     expect(rtStarted.type).toBe('step_started')
     expect(rtEnded.type).toBe('step_ended')
   })
@@ -134,8 +134,8 @@ describe('protocol: SessionEvent', () => {
       content: 'hi',
       timestamp: 2,
     }
-    const rtStarted = JSON.parse(JSON.stringify(started)) as SessionEvent
-    const rtEnded = JSON.parse(JSON.stringify(ended)) as SessionEvent
+    const rtStarted = JSON.parse(JSON.stringify(started)) as Extract<SessionEvent, { type: 'text_started' }>
+    const rtEnded = JSON.parse(JSON.stringify(ended)) as Extract<SessionEvent, { type: 'text_ended' }>
     expect(rtStarted.type).toBe('text_started')
     expect(rtEnded.type).toBe('text_ended')
     expect(rtEnded.content).toBe('hi')
@@ -164,9 +164,9 @@ describe('protocol: SessionEvent', () => {
       error: 'not found',
       timestamp: 3,
     }
-    const rtCalled = JSON.parse(JSON.stringify(called)) as SessionEvent
-    const rtSuccess = JSON.parse(JSON.stringify(success)) as SessionEvent
-    const rtFailed = JSON.parse(JSON.stringify(failed)) as SessionEvent
+    const rtCalled = JSON.parse(JSON.stringify(called)) as Extract<SessionEvent, { type: 'tool_called' }>
+    const rtSuccess = JSON.parse(JSON.stringify(success)) as Extract<SessionEvent, { type: 'tool_success' }>
+    const rtFailed = JSON.parse(JSON.stringify(failed)) as Extract<SessionEvent, { type: 'tool_failed' }>
     expect(rtCalled.type).toBe('tool_called')
     expect(rtSuccess.type).toBe('tool_success')
     expect(rtFailed.type).toBe('tool_failed')
@@ -179,7 +179,7 @@ describe('protocol: SessionEvent', () => {
       summary: 'summary text',
       timestamp: 1,
     }
-    const rt = JSON.parse(JSON.stringify(e)) as SessionEvent
+    const rt = JSON.parse(JSON.stringify(e)) as Extract<SessionEvent, { type: 'compaction_ended' }>
     expect(rt.type).toBe('compaction_ended')
     expect(rt.summary).toBe('summary text')
   })

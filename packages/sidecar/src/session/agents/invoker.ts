@@ -90,6 +90,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval, permissionMode: a.permissionMode,
       sessionId: a.sessionId, networkPolicy: a.networkPolicy,
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
+      attachments: a.attachments,
     }))
   return {
     async invoke(agentId, task, emit, signal, hooks, extras, attachments) {

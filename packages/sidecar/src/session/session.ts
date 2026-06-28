@@ -8,8 +8,10 @@ import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTrack
 import { verifyWrites } from './verify.js'
 import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
+import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
+import { selectImageAgent } from './agents/registry.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import { mcpManager } from './mcp/manager.js'
@@ -550,6 +552,11 @@ export class Session {
     return true
   }
 
+  private currentModelSupportsImages(): boolean {
+    const choice = resolveModelChoice(this._config, getActiveModel(), this.getActiveProfile().modelBinding)
+    return isMultimodalModel(choice.providerID, choice.modelID)
+  }
+
   async sendMessage(content: string, _send: SendFn, userMessageId?: string, attachments?: AttachmentPayload[]): Promise<void> {
     this.enqueueInput({ type: 'message', content, messageId: userMessageId, attachments })
     if (this.running || this.awaitingResume) return
@@ -560,6 +567,12 @@ export class Session {
     if (this.modelDirty) { this.buildAgent(); this.modelDirty = false }
     if (!this.requireCompatibleModel(_send)) return ''
     if (!this.requireApiKey(_send)) return ''
+
+    const hasImageAttachment = input.attachments?.some((a) => a.mimeType.startsWith('image/'))
+    if (hasImageAttachment) {
+      const choice = resolveModelChoice(this._config, getActiveModel(), this.getActiveProfile().modelBinding)
+      logInfo('session', 'image-attachment:resolved-model', { sessionId: this.id, providerID: choice.providerID, modelID: choice.modelID, baseURL: choice.baseURL })
+    }
 
     const userTs = Date.now()
     let isFirstTurn = false
@@ -594,6 +607,13 @@ export class Session {
     if (input.type === 'message') {
       if (this.activeActivity) this.endActivity()
       this.startActivity(input.content)
+    }
+
+    const imageAgent = hasImageAttachment && !this.currentModelSupportsImages()
+      ? selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
+      : null
+    if (imageAgent) {
+      return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
 
     this.messages.push(parts.length === 1 && parts[0].type === 'text'
@@ -699,6 +719,75 @@ export class Session {
     }
     this.messages.push(humanMessage)
     await this.runTurn(send, base)
+  }
+
+  private async runManagedAgentTurn(input: SessionInput, agent: AgentConfig, parts: ContentPart[], _send: SendFn, isFirstTurn: boolean): Promise<string> {
+    const turnId = `asst-managed-${agent.id}-${Date.now()}-${this.turnSeq++}`
+    logInfo('session', 'turn:start', { sessionId: this.id, turnId, agentId: agent.id })
+    this.abortController = new AbortController()
+    this.running = true
+
+    const cwd = this._config.cwd ?? process.cwd()
+    const rawMode = this._config.permissionMode
+    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const requestApproval = this.permissions.buildRequestApproval(_send, this.id, turnId, () => 0, mode, this.hooks)
+
+    const emit: GraphEmit = {
+      token: (delta) => { _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
+      reasoning: () => {},
+      toolStarted: (name, callId, input) => { _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input) }) },
+      toolFinished: (callId, status, output, error) => { _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(output ? { output } : {}), ...(error ? { error } : {}) }) },
+      usage: () => {},
+      planDelta: () => {},
+      compaction: () => {},
+    }
+
+    _send({ type: 'agent:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent' })
+    this.messages.push(parts.length === 1 && parts[0].type === 'text'
+      ? new HumanMessage(input.content)
+      : new HumanMessage({ content: parts }))
+
+    let agentText = ''
+    try {
+      const invoker = this.agentProv.invoker(cwd)
+      agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
+        mcpTools: mcpManager.tools(),
+        skills: this.configMgr.skills,
+        requestApproval,
+        permissionMode: mode,
+        sessionId: this.id,
+        networkPolicy: this.networkPolicy,
+        toolOutputStore: this.toolOutputStore,
+        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
+      }, input.attachments)
+    } catch (err) {
+      logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
+      const isAbort = err instanceof Error && err.name === 'AbortError'
+      _send({ type: 'error', sessionId: this.id, code: isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
+      _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
+      this.running = false
+      this.abortController = null
+      return ''
+    }
+
+    this.running = false
+    this.abortController = null
+    _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
+    this.messages.push(new AIMessage(agentText))
+    _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now() } })
+
+    if (isFirstTurn && this.titleGenerator && agentText && this.store) {
+      try {
+        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: agentText }))
+        if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
+          _send({ type: 'session:title', sessionId: this.id, title: refined })
+        }
+      } catch (err) {
+        console.warn(`Title generation failed for session ${this.id}:`, err instanceof Error ? err.message : String(err))
+      }
+    }
+
+    return agentText
   }
 
   private async runTurn(rawSend: SendFn, base?: {

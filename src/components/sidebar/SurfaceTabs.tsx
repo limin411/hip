@@ -19,6 +19,7 @@ export function SurfaceTabs({ active, onChange }: SurfaceTabsProps) {
             key={view}
             type="button"
             aria-pressed={isActive}
+            data-testid={`surface-tab-${view}`}
             onClick={() => onChange(view)}
             className={cn(
               'flex-1 rounded-md px-4 py-1 text-sm font-medium transition-all duration-150',

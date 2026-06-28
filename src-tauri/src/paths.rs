@@ -12,7 +12,14 @@ pub fn hip_base_from(home: Option<PathBuf>, app_data: Option<PathBuf>) -> Option
 }
 
 /// The storage root for the running app.
+///
+/// Honors `HIP_DATA_DIR` when present so E2E harnesses can isolate sessions and
+/// config from the user's real data directory. Falls back to the platform default
+/// (`$HOME/.hip` on Unix, the Tauri app-data dir on Windows) otherwise.
 pub fn hip_base_dir(app: &AppHandle) -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os("HIP_DATA_DIR") {
+        return Some(PathBuf::from(dir));
+    }
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let app_data = app.path().app_data_dir().ok();
     hip_base_from(home, app_data)

@@ -3,25 +3,12 @@ import { expect } from 'expect-webdriverio'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { skipLoginIfPresent } from '../helpers/auth.js'
+import { switchToCodeSurface } from '../helpers/surface.js'
 
 // A disposable NON-repo folder — init must never touch the repo-tracked fixtures.
 // Created in before() (not at module load) so an E2E_GREP-filtered run never leaks it.
 let dir: string
-
-async function skipLoginIfPresent(): Promise<void> {
-  const skip = await browser.$('button=跳过登录')
-  if (await skip.isExisting()) {
-    await skip.click()
-    await browser.waitUntil(async () => (await browser.getUrl()).includes('#/app'), { timeout: 10000, interval: 200 })
-  }
-}
-
-async function switchToCodeSurface(): Promise<void> {
-  const codeBtn = await browser.$('[aria-label="代码"]')
-  await codeBtn.waitForClickable({ timeout: 10000 })
-  await codeBtn.click()
-  await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 30000 })
-}
 
 async function initGitAndOpenChanges(): Promise<void> {
   // The init button lives in the Files tab GitInitBanner before the workspace is a repo.

@@ -779,9 +779,46 @@ export class Session {
       parts.push(...attachmentParts)
     }
 
-    const humanMessage = parts.length === 1 && parts[0].type === 'text'
-      ? new HumanMessage(content)
-      : new HumanMessage({ content: parts })
+    const hasImageAttachment = attachments?.some((a) => a.mimeType.startsWith('image/')) ?? false
+    let resumeContent = content
+    let resumeParts = parts
+
+    // If the user is answering an interrupt with an image but the main model is text-only,
+    // preprocess the image with an internal multimodal agent so the resumed turn can see a
+    // textual description instead of silently dropping the image.
+    if (hasImageAttachment && !this.currentModelSupportsImages()) {
+      let imageAgent: AgentConfig | null = null
+      try {
+        imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), content)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn('Failed to select image agent for resume:', message)
+      }
+      if (imageAgent) {
+        const visionResult = await this.runManagedAgentTurn(
+          { type: 'message', content, messageId: `u-${Date.now()}`, attachments: attachments ?? [] },
+          imageAgent,
+          parts,
+          send,
+          false,
+        )
+        resumeContent = content ? `${content}\n\n[Image: ${visionResult}]` : `[Image: ${visionResult}]`
+        resumeParts = [{ type: 'text', text: resumeContent }]
+      } else {
+        this.awaitingResume = false; this.paused = null
+        send({
+          type: 'error',
+          sessionId: this.id,
+          code: 'NO_IMAGE_AGENT',
+          message: 'No image-capable agent is available for this resume. Please enable a multimodal agent or switch to a multimodal model.',
+        })
+        return
+      }
+    }
+
+    const humanMessage = resumeParts.length === 1 && resumeParts[0].type === 'text'
+      ? new HumanMessage(resumeContent)
+      : new HumanMessage({ content: resumeParts })
 
     const base = {
       messages: [...this.paused.messages, humanMessage],
@@ -793,7 +830,7 @@ export class Session {
     this.awaitingResume = false; this.paused = null
     const ts = Date.now()
     if (this.store) {
-      this.emit({ type: 'user_message', sessionId: this.id, content, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(parts) ? { contentParts: parts } : {}) })
+      this.emit({ type: 'user_message', sessionId: this.id, content: resumeContent, messageId: `u-${ts}`, timestamp: ts, ...(staged?.length ? { attachments: staged } : {}), ...(isRichContentParts(resumeParts) ? { contentParts: resumeParts } : {}) })
     }
     this.messages.push(humanMessage)
     await this.runTurn(send, base)

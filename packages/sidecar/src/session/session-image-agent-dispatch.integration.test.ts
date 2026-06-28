@@ -7,7 +7,7 @@ import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { AttachmentPayload } from './attachments.js'
 import type { AgentInvoker } from './agents/invoker.js'
-import type { ServerMessage, SessionConfig } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, PlanItem } from '@hip/protocol'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import { loadProjection, projectEvent } from '../persistence/message-projector.js'
@@ -519,5 +519,55 @@ describe('Session image agent dispatch', () => {
       return Array.isArray(content) && content.some((p) => typeof p === 'object' && p !== null && 'type' in p && (p as { type: string }).type === 'image_url')
     })
     expect(hasImagePart).toBe(false)
+  })
+
+  it('dispatches image agent when resuming an interrupted turn with an image and a text-only model', async () => {
+    const imgPath = path.join(scratch, 'resume.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const st = makeStore()
+    st.insertSession({ id: 's-resume-img', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    let imageAgentInvoked = false
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, _emit, _signal, _hooks, extras) {
+        imageAgentInvoked = (extras?.attachmentParts ?? []).some((p) => p.type === 'image_url')
+        return 'image description'
+      },
+    }
+
+    const runner: ModelRunner = {
+      async run(_m, o) {
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-resume-img', cfg, undefined, st, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    // Simulate an interrupted supervisor turn awaiting user input.
+    const s = session as unknown as {
+      awaitingResume: boolean
+      paused: { messages: BaseMessage[]; steps: number; planningMode?: 'fast' | 'plan'; planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'; plan?: PlanItem[] }
+      running: boolean
+    }
+    s.awaitingResume = true
+    s.paused = { messages: [new HumanMessage('previous question'), new AIMessage('assistant interrupt')], steps: 1 }
+    s.running = false
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session.resume('see screenshot', send, [{ id: 'a1', name: 'resume.png', mimeType: 'image/png', path: imgPath }])
+
+    expect(imageAgentInvoked).toBe(true)
+    expect(messages.some((m) => m.type === 'agent:started' && m.agentId === 'vis')).toBe(true)
+    expect(messages.some((m) => m.type === 'agent:finished' && m.agentId === 'vis')).toBe(true)
   })
 })

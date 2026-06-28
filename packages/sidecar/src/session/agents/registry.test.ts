@@ -80,6 +80,6 @@ baseUrl = "https://acme.project/v1"
 enabled = true
 `)
     const agent: AgentConfig = { ...baseAgent, boundModel: { providerID: 'acme', modelID: 'acme-large' } }
-    expect(resolveAgentModel(agent, projectDir).baseURL).toBe('https://acme.project/v1')
+    expect(resolveAgentModel(agent, projectDir)!.baseURL).toBe('https://acme.project/v1')
   })
 })

@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/pdf-parse": "^1.1.5",
     "@types/ws": "^8",
     "@vercel/ncc": "^0.38",
     "tsx": "^4",

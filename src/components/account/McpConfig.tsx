@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { Plug, Plus, Pencil, Trash2, MoreVertical, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
+import { Plug, Plus, Pencil, Trash2, Check, X, RefreshCw, ChevronDown, Server, AlertCircle, Cpu } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import type { ClientMessage, McpServerConfig, PluginMeta } from '@hip/protocol'
 import { useHipConfigStore, useMcpServers } from '@/store/hipConfigStore'
@@ -13,13 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/DropdownMenu'
+
 import {
   buildMcpDraft,
   isMcpDraftValid,
@@ -381,26 +375,21 @@ function McpServerCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover',
-        !server.enabled && 'opacity-75',
+        'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover',
+        !server.enabled && 'opacity-60',
       )}
     >
-      <div className="flex items-start gap-3.5">
-        <span
-          className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
-            !server.enabled && 'opacity-60',
-          )}
-        >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
           <Plug size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-body font-medium text-ink">{server.name}</span>
+          <div className="truncate text-body font-medium text-ink">{server.name}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <Badge>{transportLabel}</Badge>
             {status && (
               <span
-                className="inline-flex items-center gap-1.5 text-caption text-ink-secondary"
+                className="inline-flex items-center gap-1 text-caption text-ink-secondary"
                 title={statusTitle}
               >
                 <StatusDot status={status.status} />
@@ -408,90 +397,73 @@ function McpServerCard({
               </span>
             )}
           </div>
-          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
-          {status && (
-            <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
-              <span>
-                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
-              </span>
-              {hasTools && (
-                <button
-                  onClick={() => setToolsOpen((o) => !o)}
-                  className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
-                >
-                  {t('settings.mcp.manageTools')}
-                  <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
-                </button>
-              )}
-            </div>
-          )}
-          {toolsOpen && hasTools && (
-            <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
-                  {t('settings.mcp.sectionTools')}
-                </span>
-                {(server.enabledTools?.length || server.disabledTools?.length) ? (
-                  <button
-                    type="button"
-                    onClick={() => void onResetTools()}
-                    className="text-caption text-accent hover:underline"
-                  >
-                    {t('settings.mcp.toolToggleAll')}
-                  </button>
-                ) : null}
-              </div>
-              <div className="grid gap-1.5 sm:grid-cols-2">
-                {discoveredTools.map((toolName) => {
-                  const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
-                  return (
-                    <label
-                      key={toolName}
-                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
-                    >
-                      <Switch
-                        checked={enabled}
-                        onCheckedChange={() => onToggleTool(toolName)}
-                        ariaLabel={toolName}
-                      />
-                      <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {status?.status === 'disconnected' && server.enabled && (
-            <button
-              onClick={onReconnect}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              title={t('settings.mcp.reconnect')}
-            >
-              <RefreshCw size={14} />
-            </button>
-          )}
-          <Switch checked={server.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.mcp.enableThis')} />
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
+      </div>
+
+      <div className="mt-3 flex-1">
+        <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
+        {status && (
+          <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
+            <span>
+              {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+            </span>
+            {hasTools && (
               <button
-                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                aria-label={t('settings.mcp.menuMore')}
+                onClick={() => setToolsOpen((o) => !o)}
+                className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
               >
-                <MoreVertical size={16} />
+                {t('settings.mcp.manageTools')}
+                <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onEdit}>
-                <Pencil size={14} /> {t('settings.mcp.edit')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
-                <Trash2 size={14} /> {t('settings.mcp.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+          </div>
+        )}
+        {toolsOpen && hasTools && (
+          <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+                {t('settings.mcp.sectionTools')}
+              </span>
+              {(server.enabledTools?.length || server.disabledTools?.length) ? (
+                <button
+                  type="button"
+                  onClick={() => void onResetTools()}
+                  className="text-caption text-accent hover:underline"
+                >
+                  {t('settings.mcp.toolToggleAll')}
+                </button>
+              ) : null}
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {discoveredTools.map((toolName) => {
+                const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
+                return (
+                  <label
+                    key={toolName}
+                    className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
+                  >
+                    <Switch
+                      checked={enabled}
+                      onCheckedChange={() => onToggleTool(toolName)}
+                      ariaLabel={toolName}
+                    />
+                    <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between">
+        <Switch checked={server.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.mcp.enableThis')} />
+        <div className="flex items-center gap-1">
+          {status?.status === 'disconnected' && server.enabled && (
+            <ActionButton icon={<RefreshCw size={14} />} label={t('settings.mcp.reconnect')} onClick={onReconnect} />
+          )}
+          <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
+          <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
         </div>
       </div>
     </div>
@@ -523,43 +495,69 @@ function PluginMcpServerCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-surface p-4',
-        !server.enabled && 'opacity-75',
+        'relative flex min-h-[140px] flex-col rounded-lg border border-border bg-surface p-4',
+        !server.enabled && 'opacity-60',
       )}
     >
-      <div className="flex items-start gap-3.5">
-        <span
-          className={cn(
-            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong',
-            !server.enabled && 'opacity-60',
-          )}
-        >
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
           <Plug size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-body font-medium text-ink">{server.name}</span>
+          <div className="truncate text-body font-medium text-ink">{server.name}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <Badge>{transportLabel}</Badge>
             <Badge className="bg-accent-subtle text-accent-strong">{t('settings.mcp.via', { name: pluginName })}</Badge>
             {status && (
               <span
-                className="inline-flex items-center gap-1.5 text-caption text-ink-secondary"
+                className="inline-flex items-center gap-1 text-caption text-ink-secondary"
                 title={statusTitle}
               >
                 <StatusDot status={status.status} />
                 {statusLabel}
               </span>
             )}
-            {toolCount !== undefined && (
-              <span className="text-caption text-ink-tertiary">
-                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
-              </span>
-            )}
           </div>
-          <div className="mt-1 truncate font-mono text-caption text-ink-tertiary">{detail}</div>
         </div>
       </div>
+      <div className="mt-3 flex-1">
+        <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
+        {toolCount !== undefined && (
+          <div className="mt-2 text-caption text-ink-tertiary">
+            {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+        danger
+          ? 'text-ink-secondary hover:bg-danger/10 hover:text-danger'
+          : 'text-ink-secondary hover:bg-surface-muted hover:text-ink',
+      )}
+      aria-label={label}
+    >
+      {icon}
+    </button>
   )
 }
 

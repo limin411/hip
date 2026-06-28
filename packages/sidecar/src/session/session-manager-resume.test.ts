@@ -18,4 +18,17 @@ describe('SessionManager message:resume routing', () => {
     await mgr.handleAsync({ type: 'message:resume', sessionId: 's1', content: 'hi' }, (m) => sent.push(m))
     expect(sent.some((m) => m.type === 'error')).toBe(false)
   })
+
+  it('forwards message:resume with attachments without error when not awaiting', async () => {
+    const mgr = new SessionManager(undefined, () => undefined, scratch)
+    const sent: ServerMessage[] = []
+    mgr.handle({ type: 'session:create', id: 's1', config: { llmProvider: 'deepseek', model: '', tools: [] } }, (m) => sent.push(m))
+    await mgr.handleAsync({
+      type: 'message:resume',
+      sessionId: 's1',
+      content: '',
+      attachments: [{ id: 'a1', name: 'x.png', mimeType: 'image/png', path: '/tmp/x.png' }],
+    }, (m) => sent.push(m))
+    expect(sent.some((m) => m.type === 'error')).toBe(false)
+  })
 })

@@ -395,7 +395,7 @@ export class SessionService {
    *  send it as message:resume so the sidecar continues the loop. */
   resume(content: string, attachments: LocalAttachment[] = []): void {
     const text = content.trim()
-    if (!text) return
+    if (!text && attachments.length === 0) return
     const { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) return
     const id = nanoid()

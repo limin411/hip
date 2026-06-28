@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as os from 'node:os'
@@ -181,5 +181,91 @@ describe('attachments', () => {
       buildAttachmentContentParts([{ id: 'a1', name: 'x.txt', mimeType: 'text/plain', path: '/etc/passwd' }]),
       'ATTACHMENT_INVALID_PATH',
     )
+  })
+
+  it('stageAttachments rejects traversal in id', async () => {
+    const src = await tempFile('note.txt', 'hello')
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
+    await expectAttachmentError(
+      stageAttachments('s1', [{ id: '../escape', name: 'x.txt', mimeType: 'text/plain', path: src }], root),
+      'ATTACHMENT_INVALID_PATH',
+      /path separators/,
+    )
+    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(path.dirname(src), { recursive: true, force: true })
+  })
+
+  it('stageAttachments rejects traversal in name', async () => {
+    const src = await tempFile('note.txt', 'hello')
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
+    await expectAttachmentError(
+      stageAttachments('s1', [{ id: 'a1', name: '../../../.ssh/authorized_keys', mimeType: 'text/plain', path: src }], root),
+      'ATTACHMENT_INVALID_PATH',
+      /path separators/,
+    )
+    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(path.dirname(src), { recursive: true, force: true })
+  })
+
+  it('stageAttachments rejects empty id or name', async () => {
+    const src = await tempFile('note.txt', 'hello')
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
+    await expectAttachmentError(
+      stageAttachments('s1', [{ id: '', name: 'x.txt', mimeType: 'text/plain', path: src }], root),
+      'ATTACHMENT_INVALID_PATH',
+      /cannot be empty/,
+    )
+    await expectAttachmentError(
+      stageAttachments('s1', [{ id: 'a1', name: '  ', mimeType: 'text/plain', path: src }], root),
+      'ATTACHMENT_INVALID_PATH',
+      /cannot be empty/,
+    )
+    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(path.dirname(src), { recursive: true, force: true })
+  })
+
+  it('rejects sensitive and hidden home paths', async () => {
+    const fakeHome = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-fake-home-'))
+    vi.stubEnv('HOME', fakeHome)
+    try {
+      const targets = [
+        { dir: '.ssh', file: 'authorized_keys', label: '.ssh' },
+        { dir: '.gnupg', file: 'secring.gpg', label: '.gnupg' },
+        { dir: '.aws', file: 'credentials', label: '.aws' },
+        { dir: path.join('.hip', 'config'), file: 'auth.json', label: '.hip/config' },
+      ]
+      for (const t of targets) {
+        const dir = path.join(fakeHome, t.dir)
+        await fs.mkdir(dir, { recursive: true })
+        const p = path.join(dir, t.file)
+        await fs.writeFile(p, 'secret')
+        await expectAttachmentError(
+          validateAttachments([{ id: '1', name: t.file, mimeType: 'text/plain', path: p }]),
+          'ATTACHMENT_INVALID_PATH',
+          /sensitive|hidden/i,
+        )
+      }
+
+      // Hidden top-level home file/directory is blocked.
+      const hiddenDir = path.join(fakeHome, '.hidden-test-dir')
+      await fs.mkdir(hiddenDir, { recursive: true })
+      const hiddenFile = path.join(hiddenDir, 'x.txt')
+      await fs.writeFile(hiddenFile, 'x')
+      await expectAttachmentError(
+        validateAttachments([{ id: '1', name: 'x.txt', mimeType: 'text/plain', path: hiddenFile }]),
+        'ATTACHMENT_INVALID_PATH',
+        /hidden/,
+      )
+
+      // Non-hidden top-level home path remains allowed.
+      const allowedDir = path.join(fakeHome, 'Documents')
+      await fs.mkdir(allowedDir, { recursive: true })
+      const allowedFile = path.join(allowedDir, 'notes.txt')
+      await fs.writeFile(allowedFile, 'notes')
+      await expect(validateAttachments([{ id: '1', name: 'notes.txt', mimeType: 'text/plain', path: allowedFile }])).resolves.toBeUndefined()
+    } finally {
+      vi.unstubAllEnvs()
+      await fs.rm(fakeHome, { recursive: true, force: true })
+    }
   })
 })

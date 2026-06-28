@@ -11,6 +11,8 @@ export interface AttachmentPayload extends Attachment {
 export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
 export const MAX_TOTAL_ATTACHMENT_SIZE = 50 * 1024 * 1024
 
+export const SENSITIVE_HOME_DIRS = ['.ssh', '.gnupg', '.aws', '.hip/config']
+
 export type AttachmentErrorCode =
   | 'ATTACHMENT_UNSUPPORTED'
   | 'ATTACHMENT_TOO_LARGE'
@@ -25,6 +27,22 @@ export class AttachmentError extends Error {
     super(message)
     this.name = 'AttachmentError'
   }
+}
+
+function sanitizeAttachmentFilename(value: string): string {
+  if (value == null || value.length === 0 || value.trim().length === 0) {
+    throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment id/name cannot be empty`)
+  }
+  if (value.includes('\0')) {
+    throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment id/name cannot contain null bytes: ${value}`)
+  }
+  if (path.isAbsolute(value)) {
+    throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment id/name must be a relative basename: ${value}`)
+  }
+  if (value.includes(path.sep) || value.includes('/') || value.includes('\\') || value.split(/[/\\]/).some((s) => s === '..')) {
+    throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment id/name cannot contain path separators or '..': ${value}`)
+  }
+  return path.basename(value)
 }
 
 const TEXT_EXTENSIONS = new Set([
@@ -74,6 +92,21 @@ async function resolveAndValidateAttachmentPath(filePath: string): Promise<{ rea
   if (!underAllowed) {
     throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path is outside allowed directories (${os.homedir()} or ${os.tmpdir()}): ${filePath}`)
   }
+  const homeRoot = allowedRoots[0]
+  const homeRel = path.relative(homeRoot, normalizedReal)
+  const isUnderHome = homeRel && !homeRel.startsWith('..') && !path.isAbsolute(homeRel)
+  if (isUnderHome) {
+    const topLevel = homeRel.split(path.sep)[0]
+    if (topLevel.startsWith('.')) {
+      throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path is inside a hidden top-level home directory: ${filePath}`)
+    }
+    for (const sensitive of SENSITIVE_HOME_DIRS) {
+      const sensitivePrefix = path.join(homeRoot, ...sensitive.split('/'))
+      if (normalizedReal === sensitivePrefix || normalizedReal.startsWith(sensitivePrefix + path.sep)) {
+        throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path is inside a sensitive home directory (${sensitive}): ${filePath}`)
+      }
+    }
+  }
   let stat: fs.Stats
   try {
     stat = await fs.stat(realPath)
@@ -114,12 +147,20 @@ export async function stageAttachments(
 ): Promise<Attachment[]> {
   const baseDir = path.join(scratchDirFor(sessionId, scratchRoot), 'attachments')
   await fs.mkdir(baseDir, { recursive: true })
+  const resolvedBase = path.resolve(baseDir)
   const staged: Attachment[] = []
   for (const a of attachments) {
     const { realPath } = await resolveAndValidateAttachmentPath(a.path)
-    const targetDir = path.join(baseDir, a.id)
+    const safeId = sanitizeAttachmentFilename(a.id)
+    const safeName = sanitizeAttachmentFilename(a.name)
+    const targetDir = path.join(baseDir, safeId)
     await fs.mkdir(targetDir, { recursive: true })
-    const targetPath = path.join(targetDir, a.name)
+    const targetPath = path.join(targetDir, safeName)
+    const resolvedTarget = path.resolve(targetPath)
+    const rel = path.relative(resolvedBase, resolvedTarget)
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment staging path escaped the attachments directory: ${a.id}/${a.name}`)
+    }
     await fs.copyFile(realPath, targetPath)
     const stat = await fs.stat(targetPath)
     staged.push({ id: a.id, name: a.name, mimeType: a.mimeType, size: stat.size })

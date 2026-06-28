@@ -258,6 +258,24 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].interrupt ?? null).toBeNull()
   })
 
+  it('resume forwards attachments and does not require text', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], interrupt: { turnId: 't1', question: 'q' } }] })
+    const attachments = [{ id: 'a1', name: 'diagram.png', mimeType: 'image/png', path: '/tmp/diagram.png' }]
+    svc.resume('   ', attachments)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:resume', sessionId: 's1', content: '', attachments })
+    expect(useDomainStore.getState().sessions[0].messages.at(-1)).toMatchObject({ role: 'user', content: '', attachments })
+  })
+
+  it('resume ignores empty text with no attachments', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({ sessions: [{ ...useDomainStore.getState().sessions[0], interrupt: { turnId: 't1', question: 'q' } }] })
+    svc.resume('   ')
+    expect(t.sent).toHaveLength(0)
+  })
+
   it('regenerate sends message:regenerate when an interrupt is pending (user retries paused turn)', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

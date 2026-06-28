@@ -3,13 +3,16 @@ import { useTranslation } from 'react-i18next'
 import { Composer } from './Composer'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
+import { AttachmentButton } from './AttachmentButton'
 import { sessionService, useActiveSession, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
+import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
+  const [attachments, setAttachments] = useState<LocalAttachment[]>([])
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
   const active = useActiveSession()
@@ -21,9 +24,10 @@ export function InputBar() {
   const reconnecting = status === 'running' && connection !== 'connected'
   const submit = () => {
     const text = value.trim()
-    if (!text) return
-    sessionService.sendMessage(text)
+    if (!text && attachments.length === 0) return
+    sessionService.sendMessage(text, attachments)
     setValue('')
+    setAttachments([])
   }
   return (
     <div className="shrink-0 px-5 pb-5">
@@ -40,7 +44,15 @@ export function InputBar() {
             running={status === 'running'}
             onStop={() => sessionService.cancel()}
             reconnecting={reconnecting}
-            leftSlot={isCode ? <><ModelPicker /><PermissionModePicker /></> : <ModelPicker />}
+            leftSlot={
+              isCode ? (
+                <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+              ) : (
+                <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+              )
+            }
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
           />
         )}
       </div>

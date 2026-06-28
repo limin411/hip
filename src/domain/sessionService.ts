@@ -13,6 +13,7 @@ import i18n from '@/i18n'
 import { resolveModelConfig } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
 import { surfaceOf } from '@/lib/sessions'
+import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -363,9 +364,9 @@ export class SessionService {
     this.transport.send({ type: 'session:search', query })
   }
 
-  sendMessage(content: string): void {
+  sendMessage(content: string, attachments: LocalAttachment[] = []): void {
     const text = content.trim()
-    if (!text) return
+    if (!text && attachments.length === 0) return
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     if (active?.interrupt) { this.resume(text); return }
@@ -379,8 +380,15 @@ export class SessionService {
       useDraftStore.getState().reset()
     }
     const id = nanoid()
-    useDomainStore.getState().appendUserMessage(activeSessionId, id, text)
-    this.transport.send({ type: 'message:send', sessionId: activeSessionId, id, content: text, role: 'user' })
+    useDomainStore.getState().appendUserMessage(activeSessionId, id, text, attachments)
+    this.transport.send({
+      type: 'message:send',
+      sessionId: activeSessionId,
+      id,
+      content: text,
+      role: 'user',
+      attachments: attachments.map((a) => ({ id: a.id, name: a.name, mimeType: a.mimeType, path: a.path })),
+    })
   }
 
   /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and

@@ -1,6 +1,7 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
 import type { AcpConfigOption, AgentFrame, AgentProfileInfo, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, PlanItem, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
 export interface SessionError {
@@ -417,7 +418,7 @@ interface DomainStore {
   deselect: () => void
   deleteSession: (id: string) => void
   renameSession: (id: string, title: string) => void
-  appendUserMessage: (sessionId: string, id: string, content: string) => void
+  appendUserMessage: (sessionId: string, id: string, content: string, attachments?: LocalAttachment[]) => void
   regenerateLastTurn: (sessionId: string) => void
   clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
@@ -466,13 +467,13 @@ export const useDomainStore = create<DomainStore>((set) => ({
   renameSession: (id, title) =>
     set((s) => ({ sessions: s.sessions.map((x) => (x.id === id ? { ...x, title } : x)) })),
 
-  appendUserMessage: (sessionId, id, content) =>
+  appendUserMessage: (sessionId, id, content, attachments = []) =>
     set((s) => ({
       sessions: s.sessions.map((sess) =>
         sess.id !== sessionId
           ? sess
           : // Clear any prior error: appending a user message means a retry is underway.
-            { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now() }] },
+            { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now(), attachments }] },
       ),
     })),
 

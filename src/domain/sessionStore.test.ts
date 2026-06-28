@@ -530,6 +530,15 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().sessions[0].error).toBeNull()
   })
 
+  it('appendUserMessage stores attachments on the user message', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const attachments = [{ id: 'a1', name: 'file.md', mimeType: 'text/markdown', path: '/proj/file.md' }]
+    useDomainStore.getState().appendUserMessage('s1', 'u1', 'look', attachments)
+    const msg = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages[0]
+    expect(msg).toMatchObject({ role: 'user', content: 'look', attachments })
+  })
+
   it('deleteSession removes and reassigns active', () => {
     reset()
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })

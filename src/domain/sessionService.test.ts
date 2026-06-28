@@ -51,6 +51,24 @@ describe('SessionService', () => {
     expect(t.sent).toHaveLength(0)
   })
 
+  it('sendMessage forwards attachments to the store and transport', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a1', name: 'notes.md', mimeType: 'text/markdown', path: '/proj/notes.md' }]
+    svc.sendMessage('summarize', attachments)
+    expect(useDomainStore.getState().sessions[0].messages.at(-1)).toMatchObject({ role: 'user', content: 'summarize', attachments })
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', sessionId: 's1', content: 'summarize', attachments: [{ id: 'a1', name: 'notes.md', mimeType: 'text/markdown', path: '/proj/notes.md' }] })
+  })
+
+  it('sendMessage allows attachment-only submission', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const attachments = [{ id: 'a2', name: 'image.png', mimeType: 'image/png', path: '/tmp/image.png' }]
+    svc.sendMessage('   ', attachments)
+    expect(useDomainStore.getState().sessions[0].messages.at(-1)).toMatchObject({ role: 'user', content: '', attachments })
+    expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', content: '', attachments })
+  })
+
   it('inbound ServerMessage flows into the store', () => {
     const t = new FakeTransport()
     new SessionService(t)

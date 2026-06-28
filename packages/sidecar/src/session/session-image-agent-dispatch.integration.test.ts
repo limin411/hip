@@ -355,4 +355,169 @@ describe('Session image agent dispatch', () => {
 
     expect(seenImagePart).toBe(true)
   })
+
+  it('reuses the existing incomplete assistant stepId when regenerating an interrupted image-agent turn', async () => {
+    const imgPath = path.join(scratch, 'reuse.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "vision"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { db, store, eventStore, snapshotStore } = makeStoreWithEventAndSnapshot()
+    store.insertSession({ id: 's-reuse', title: 't', config: JSON.stringify({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true }), createdAt: 1, updatedAt: 1 })
+
+    // First completed turn with a snapshot.
+    const invoker1: AgentInvoker = {
+      async invoke(_agentId, _task, emit) {
+        emit.token('first')
+        return 'first'
+      },
+    }
+    const runner1: ModelRunner = {
+      async run(_m, o) {
+        o.onText('first-main')
+        return new AIMessage('first-main')
+      },
+    }
+    const session1 = new Session('s-reuse', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner1, undefined, () => invoker1, scratch)
+    await session1.sendMessage('first', () => {}, 'u1')
+
+    // Simulate interrupted image-agent turn: user_message persisted and step_started emitted.
+    const stagedPath = path.join(scratchDirFor('s-reuse', scratch), 'attachments', 'a2', 'reuse.png')
+    await fs.mkdir(path.dirname(stagedPath), { recursive: true })
+    await fs.copyFile(imgPath, stagedPath)
+    publishEvent(db, eventStore, 's-reuse', 'user_message', {
+      messageId: 'u2',
+      content: 'describe this',
+      timestamp: Date.now(),
+      attachments: [{ id: 'a2', name: 'reuse.png', mimeType: 'image/png', size: 16 }],
+      contentParts: [
+        { type: 'text', text: 'describe this' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,reuse-payload' } },
+      ],
+    })
+
+    const interruptedTurnId = 'vis-turn-interrupted'
+    publishEvent(db, eventStore, 's-reuse', 'step_started', {
+      stepId: interruptedTurnId,
+      agentId: 'vis',
+      startedAt: Date.now(),
+    })
+
+    // Stale snapshot from after first turn.
+    saveSessionSnapshot(snapshotStore, 's-reuse', eventStore.latestSeq('s-reuse') - 2, {
+      messages: [new HumanMessage('first'), new AIMessage('first-main')],
+      config: { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true },
+    })
+
+    // Restart and regenerate.
+    const invoker2: AgentInvoker = {
+      async invoke(_agentId, _task, _emit, _signal, _hooks, _extras) {
+        return 'regenerated vision result'
+      },
+    }
+    const runner2: ModelRunner = {
+      async run() {
+        throw new Error('main model should not be invoked for image-agent regenerate')
+      },
+    }
+    const session2 = new Session('s-reuse', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner2, undefined, () => invoker2, scratch)
+    await session2.hydrate()
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session2.regenerate(send)
+
+    const started = messages.find((m) => m.type === 'agent:started' && m.agentId === 'vis')
+    expect(started).toBeDefined()
+    expect(started!.turnId).toBe(interruptedTurnId)
+
+    const projection = loadProjection(store.getDb(), 's-reuse')
+    const assistantRows = projection.filter((r) => isAssistantStep(r.data))
+    expect(assistantRows.length).toBe(2) // first turn + reused image-agent turn
+    const reusedRow = assistantRows.find((r) => r.data.stepId === interruptedTurnId)
+    expect(reusedRow).toBeDefined()
+    expect(reusedRow!.data.content).toBe('regenerated vision result')
+    expect(reusedRow!.data.finishedAt).not.toBeNull()
+  })
+
+  it('falls through to the text-only main model when no image agent is available during regenerate', async () => {
+    const imgPath = path.join(scratch, 'fallthrough.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    // No agents configured → selectImageAgent returns null.
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { db, store, eventStore, snapshotStore } = makeStoreWithEventAndSnapshot()
+    store.insertSession({ id: 's-fallthrough', title: 't', config: JSON.stringify({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true }), createdAt: 1, updatedAt: 1 })
+
+    // First completed turn with a snapshot.
+    const runner1: ModelRunner = {
+      async run(_m, o) {
+        o.onText('first-main')
+        return new AIMessage('first-main')
+      },
+    }
+    const invoker1 = vi.fn<AgentInvoker['invoke']>().mockRejectedValue(new Error('should not be called'))
+    const session1 = new Session('s-fallthrough', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner1, undefined, () => ({ invoke: invoker1 }), scratch)
+    await session1.sendMessage('first', () => {}, 'u1')
+
+    // Simulate interrupted image turn with no available image agent.
+    const stagedPath = path.join(scratchDirFor('s-fallthrough', scratch), 'attachments', 'a2', 'fallthrough.png')
+    await fs.mkdir(path.dirname(stagedPath), { recursive: true })
+    await fs.copyFile(imgPath, stagedPath)
+    publishEvent(db, eventStore, 's-fallthrough', 'user_message', {
+      messageId: 'u2',
+      content: 'describe this',
+      timestamp: Date.now(),
+      attachments: [{ id: 'a2', name: 'fallthrough.png', mimeType: 'image/png', size: 16 }],
+      contentParts: [
+        { type: 'text', text: 'describe this' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,fallthrough-payload' } },
+      ],
+    })
+
+    saveSessionSnapshot(snapshotStore, 's-fallthrough', eventStore.latestSeq('s-fallthrough') - 1, {
+      messages: [new HumanMessage('first'), new AIMessage('first-main')],
+      config: { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true },
+    })
+
+    // Restart and regenerate.
+    const invoker2 = vi.fn<AgentInvoker['invoke']>().mockRejectedValue(new Error('should not be called'))
+    const seenRunnerMessages: BaseMessage[][] = []
+    const runner2: ModelRunner = {
+      async run(messages, o) {
+        seenRunnerMessages.push(messages)
+        o.onText('text-only reply')
+        return new AIMessage('text-only reply')
+      },
+    }
+    const session2 = new Session('s-fallthrough', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner2, undefined, () => ({ invoke: invoker2 }), scratch)
+    await session2.hydrate()
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session2.regenerate(send)
+
+    expect(invoker2).not.toHaveBeenCalled()
+    const errorMsg = messages.find((m) => m.type === 'error')
+    expect(errorMsg).toBeUndefined()
+
+    const complete = messages.find((m) => m.type === 'message:complete')
+    expect(complete).toBeDefined()
+    expect(complete!.message.content).toBe('text-only reply')
+
+    expect(seenRunnerMessages.length).toBeGreaterThan(0)
+    const lastRunMessages = seenRunnerMessages[seenRunnerMessages.length - 1]
+    const hasImagePart = lastRunMessages.some((m) => {
+      if (m.getType() !== 'human') return false
+      const content = (m as HumanMessage).content
+      if (typeof content === 'string') return false
+      return Array.isArray(content) && content.some((p) => typeof p === 'object' && p !== null && 'type' in p && (p as { type: string }).type === 'image_url')
+    })
+    expect(hasImagePart).toBe(false)
+  })
 })

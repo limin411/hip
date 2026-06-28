@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useShallow } from 'zustand/react/shallow'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
+import { useProvidersStore } from '@/store/providersStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { sessionService } from '@/domain'
 import { Composer } from './Composer'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
+import { isAttachmentSupported } from '@/lib/attachmentEligibility'
+import { activeModelKey } from '@/lib/modelKey'
 import type { LocalAttachment } from './attachmentTypes'
 import { HipLogo } from '@/components/login/HipLogo'
 
@@ -28,6 +33,18 @@ export function NewConversation() {
       useDraftStore.getState().clearProject()
     }
   }, [surface])
+
+  const catalog = useProvidersStore((s) => s.catalog)
+  const providersConfig = useProvidersStore((s) => s.config)
+  const agents = useHipConfigStore(useShallow((s) => s.config.agents ?? []))
+  const currentKey = draft?.modelKey ?? activeModelKey(providersConfig)
+  const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
+
+  useEffect(() => {
+    if (!attachmentsSupported && attachments.length > 0) {
+      setAttachments([])
+    }
+  }, [attachmentsSupported, attachments.length])
 
   // Code requires a project folder before the first send; Chat is always sandboxed.
   const hasFolder = draft?.mode === 'project' && !!draft.cwd

@@ -1,12 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useShallow } from 'zustand/react/shallow'
 import { Composer } from './Composer'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
-import { sessionService, useActiveSession, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
+import { isAttachmentSupported } from '@/lib/attachmentEligibility'
+import { activeModelKey } from '@/lib/modelKey'
+import { useProvidersStore } from '@/store/providersStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useDraftStore } from '@/store/draftStore'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -15,6 +21,7 @@ export function InputBar() {
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
+  const activeId = useActiveSessionId()
   const active = useActiveSession()
   const isCode = active ? surfaceOf(active.config) === 'code' : false
   const planApprovalPending = hasPlanApproval(active)
@@ -22,6 +29,22 @@ export function InputBar() {
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
   const reconnecting = status === 'running' && connection !== 'connected'
+
+  const draft = useDraftStore((s) => s.draft)
+  const catalog = useProvidersStore((s) => s.catalog)
+  const config = useProvidersStore((s) => s.config)
+  const agents = useHipConfigStore(useShallow((s) => s.config.agents ?? []))
+  const currentKey = activeId && active
+    ? (active.config.model ? `${active.config.llmProvider}/${active.config.model}` : activeModelKey(config))
+    : (draft?.modelKey ?? activeModelKey(config))
+  const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
+
+  useEffect(() => {
+    if (!attachmentsSupported && attachments.length > 0) {
+      setAttachments([])
+    }
+  }, [attachmentsSupported, attachments.length])
+
   const submit = () => {
     const text = value.trim()
     if (!text && attachments.length === 0) return

@@ -7,7 +7,7 @@ import { readCatalog } from '../../config/catalog.js'
 
 const STOP_WORDS = new Set([
   'the','an','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','must','shall','can','need','dare','ought','used','to','of','in','for','on','with','at','by','from','as','into','through','during','before','after','above','below','between','under','over','again','further','then','once','here','there','when','where','why','how','all','any','both','each','few','more','most','other','some','such','no','nor','not','only','own','same','so','than','too','very','just','and','but','if','or','because','until','while','what','which','who','whom','this','that','these','those','am','it','its','their','them','they','we','our','you','your','me','my','he','she','his','her','him',
-  '请','一下','我们','你们','他们','这个','那个','这些','那些','什么','怎么','为什么','哪里','谁','哪','但是','如果','因为','所以','虽然','然后','非常','没有','可以','应该','可能','必须','需要','知道','觉得','认为',
+  '一下','我们','你们','他们','这个','那个','这些','那些','什么','怎么','为什么','哪里','但是','如果','因为','所以','虽然','然后','非常','没有','可以','应该','可能','必须','需要','知道','觉得','认为',
 ].filter((w) => w.length >= 2))
 
 function extractKeywords(text: string): string[] {

@@ -102,7 +102,7 @@ describe('Session image agent dispatch', () => {
     expect(assistantRow!.agentId).toBe('vis')
   })
 
-  it('falls back to the supervisor when no internal multimodal agent is available', async () => {
+  it('returns a clear error when no image-capable agent is available', async () => {
     const imgPath = path.join(scratch, 'test.png')
     await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
     // No agents configured → selectImageAgent returns null.
@@ -130,14 +130,12 @@ describe('Session image agent dispatch', () => {
     await session.sendMessage('describe this', send, undefined, [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }])
 
     expect(invoker).not.toHaveBeenCalled()
-    const complete = messages.find((m) => m.type === 'message:complete')
-    expect(complete).toBeDefined()
-    expect(complete!.message.content).toBe('supervisor reply')
+    const errorMsg = messages.find((m) => m.type === 'error')
+    expect(errorMsg).toBeDefined()
+    expect(errorMsg!.code).toBe('NO_IMAGE_AGENT')
 
     const projection = loadProjection(st.getDb(), 's-fallback')
-    const assistantRow = projection.find((r) => isAssistantStep(r.data))?.data as AssistantStepData | undefined
-    expect(assistantRow).toBeDefined()
-    expect(assistantRow!.content).toBe('supervisor reply')
+    expect(projection.some((r) => isAssistantStep(r.data))).toBe(false)
   })
 
   it('does not dispatch non-image attachments to the multimodal agent', async () => {

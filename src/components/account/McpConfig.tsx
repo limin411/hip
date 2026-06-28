@@ -237,11 +237,11 @@ export function McpConfig() {
                 key={s.id}
                 server={s}
                 status={statusByServer.get(s.id)}
-                onToggle={async (enabled) => { await updateServer(s.id, { enabled }).catch((err) => console.error('Failed to update MCP server:', err)) }}
+                onToggle={(enabled) => { updateServer(s.id, { enabled }).catch((err) => console.error('Failed to update MCP server:', err)) }}
                 onEdit={() => setEditing({ mode: 'edit', server: s })}
                 onDelete={() => setDeleting(s)}
-                onToggleTool={async (toolName) => { await handleUpdateTools(s, toolName).catch((err) => console.error('Failed to update MCP tools:', err)) }}
-                onResetTools={async () => { await handleResetTools(s).catch((err) => console.error('Failed to reset MCP tools:', err)) }}
+                onToggleTool={(toolName) => { handleUpdateTools(s, toolName).catch((err) => console.error('Failed to update MCP tools:', err)) }}
+                onResetTools={() => { handleResetTools(s).catch((err) => console.error('Failed to reset MCP tools:', err)) }}
                 onReconnect={reconnectMcpServers}
               />
             ))
@@ -349,11 +349,11 @@ function McpServerCard({
 }: {
   server: McpServerConfig
   status?: McpServerStatusVM
-  onToggle: (enabled: boolean) => Promise<void>
+  onToggle: (enabled: boolean) => void
   onEdit: () => void
   onDelete: () => void
-  onToggleTool: (toolName: string) => Promise<void>
-  onResetTools: () => Promise<void>
+  onToggleTool: (toolName: string) => void
+  onResetTools: () => void
   onReconnect: () => void
 }) {
   const { t } = useTranslation()
@@ -427,7 +427,7 @@ function McpServerCard({
               {(server.enabledTools?.length || server.disabledTools?.length) ? (
                 <button
                   type="button"
-                  onClick={() => { void onResetTools() }}
+                  onClick={() => { onResetTools() }}
                   className="text-caption text-accent hover:underline"
                 >
                   {t('settings.mcp.toolToggleAll')}

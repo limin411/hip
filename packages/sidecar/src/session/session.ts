@@ -633,6 +633,11 @@ export class Session {
       return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
 
+    if (hasImageAttachment && !this.currentModelSupportsImages()) {
+      _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message: 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.' })
+      return ''
+    }
+
     this.messages.push(parts.length === 1 && parts[0].type === 'text'
       ? new HumanMessage(input.content)
       : new HumanMessage({ content: parts }))

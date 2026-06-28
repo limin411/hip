@@ -53,7 +53,7 @@ import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
 import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
-import { defaultScratchRoot } from './scratch.js'
+import { defaultScratchRoot, scratchDirFor } from './scratch.js'
 import {
   ContextInjectorRegistry,
   SystemPromptInjector,
@@ -542,6 +542,44 @@ export class Session {
     this.reseedLastCheckpoint()
   }
 
+  private lastUserMessageRow(): Extract<SessionMessageData, { role: 'user' }> | null {
+    if (!this.store) return null
+    const rows = loadProjection(this.store.getDb(), this.id)
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const d = rows[i].data
+      if (d.role === 'user') return d
+    }
+    return null
+  }
+
+  private incompleteAssistantStepAfter(userMessageId: string): { stepId: string; agentId: string } | null {
+    if (!this.store) return null
+    const rows = loadProjection(this.store.getDb(), this.id)
+    let userIndex = -1
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const d = rows[i].data
+      if (d.role === 'user' && d.messageId === userMessageId) {
+        userIndex = i
+        break
+      }
+    }
+    if (userIndex === -1) return null
+    for (let i = userIndex + 1; i < rows.length; i++) {
+      const d = rows[i].data
+      if (d.role === 'assistant' && !('kind' in d) && d.content === '' && d.finishedAt === null) {
+        return { stepId: d.stepId, agentId: d.agentId }
+      }
+    }
+    return null
+  }
+
+  private async rebuildPartsForImageAgent(userData: Extract<SessionMessageData, { role: 'user' }>): Promise<ContentPart[]> {
+    const fromParts = userData.contentParts?.filter((p): p is ContentPart => isContentPart(p as Record<string, unknown>))
+    if (fromParts && fromParts.length > 0) return fromParts
+    const attachments = (userData.attachments ?? []).map((a) => ({ ...a, path: join(scratchDirFor(this.id, this.scratchRoot), 'attachments', a.id, a.name) }) as AttachmentPayload)
+    return attachments.length ? await buildAttachmentContentParts(attachments) : []
+  }
+
   /** Load session_message rows and map them back to LangGraph BaseMessages.
    *  This is the boundary where events become the source of truth for LoopState. */
   rebuildMessagesFromEvents(sessionId: string): BaseMessage[] {
@@ -761,8 +799,8 @@ export class Session {
     await this.runTurn(send, base)
   }
 
-  private async runManagedAgentTurn(input: SessionInput, agent: AgentConfig, parts: ContentPart[], _send: SendFn, isFirstTurn: boolean): Promise<string> {
-    const turnId = `asst-managed-${agent.id}-${Date.now()}-${this.turnSeq++}`
+  private async runManagedAgentTurn(input: SessionInput, agent: AgentConfig, parts: ContentPart[], _send: SendFn, isFirstTurn: boolean, reuseTurnId?: string): Promise<string> {
+    const turnId = reuseTurnId ?? `asst-managed-${agent.id}-${Date.now()}-${this.turnSeq++}`
     logInfo('session', 'turn:start', { sessionId: this.id, turnId, agentId: agent.id })
     this.abortController = new AbortController()
     this.running = true
@@ -1347,16 +1385,41 @@ export class Session {
     }
     if (!this.requireCompatibleModel(send)) return
     if (!this.requireApiKey(send)) return
+
     while (this.messages[this.messages.length - 1] instanceof AIMessage) {
       this.messages.pop()
       this.store?.deleteLastAssistantMessage(this.id)
     }
+
     const tail = this.messages[this.messages.length - 1]
-    if (tail instanceof HumanMessage || tail instanceof ToolMessage) {
-      await this.runTurn(send)
+    if (!(tail instanceof HumanMessage || tail instanceof ToolMessage)) {
+      send({ type: 'error', sessionId: this.id, code: 'CANNOT_REGENERATE', message: 'No user turn to regenerate from' })
       return
     }
-    send({ type: 'error', sessionId: this.id, code: 'CANNOT_REGENERATE', message: 'No user turn to regenerate from' })
+
+    const lastUser = this.lastUserMessageRow()
+    const hasImageAttachment = lastUser?.attachments?.some(isImageAttachment) ?? false
+    const needsImageAgent = tail instanceof HumanMessage && hasImageAttachment && !this.currentModelSupportsImages()
+
+    if (needsImageAgent && lastUser) {
+      const imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), lastUser.content)
+      if (imageAgent) {
+        // Remove the text-only user message placeholder; runManagedAgentTurn will push its own.
+        if (tail instanceof HumanMessage) this.messages.pop()
+        const reuseTurnId = this.incompleteAssistantStepAfter(lastUser.messageId)?.stepId
+        await this.runManagedAgentTurn(
+          { type: 'message', content: lastUser.content, messageId: lastUser.messageId, attachments: (lastUser.attachments ?? []).map((a) => ({ ...a, path: join(scratchDirFor(this.id, this.scratchRoot), 'attachments', a.id, a.name) })) },
+          imageAgent,
+          await this.rebuildPartsForImageAgent(lastUser),
+          send,
+          false,
+          reuseTurnId,
+        )
+        return
+      }
+    }
+
+    await this.runTurn(send)
   }
 
   async handlePlanResponse(action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
@@ -1574,6 +1637,10 @@ function rowToBaseMessage(d: SessionMessageData): BaseMessage {
 
 function projectedToolCallToToolCall(t: ProjectedToolCall) {
   return { name: t.name, args: parseToolInput(t.input), id: t.callId, type: 'tool_call' as const }
+}
+
+function isImageAttachment(a: { mimeType: string }): boolean {
+  return a.mimeType.startsWith('image/')
 }
 
 /** Remove image_url content parts from HumanMessages so a text-only main model never

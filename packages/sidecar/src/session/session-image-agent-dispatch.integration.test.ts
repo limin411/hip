@@ -7,12 +7,14 @@ import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { AttachmentPayload } from './attachments.js'
 import type { AgentInvoker } from './agents/invoker.js'
-import type { ServerMessage } from '@hip/protocol'
+import type { ServerMessage, SessionConfig } from '@hip/protocol'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
-import { loadProjection } from '../persistence/message-projector.js'
+import { loadProjection, projectEvent } from '../persistence/message-projector.js'
 import { isAssistantStep } from '../persistence/message-updater.js'
 import type { AssistantStepData, SessionMessageData } from '../persistence/message-types.js'
+import { EventStore, SnapshotStore, saveSessionSnapshot } from '../persistence/event-store.js'
+import { scratchDirFor } from './scratch.js'
 import * as catalogModule from '../config/catalog.js'
 
 type UserMessageData = Extract<SessionMessageData, { role: 'user' }>
@@ -20,6 +22,24 @@ type UserMessageData = Extract<SessionMessageData, { role: 'user' }>
 function makeStore() {
   const { db, ftsEnabled } = openDatabase(':memory:')
   return new SessionStore(db, ftsEnabled)
+}
+
+function makeStoreWithEventAndSnapshot() {
+  const { db, ftsEnabled } = openDatabase(':memory:')
+  return { db, store: new SessionStore(db, ftsEnabled), eventStore: new EventStore(db), snapshotStore: new SnapshotStore(db) }
+}
+
+function publishEvent(
+  db: ReturnType<typeof openDatabase>['db'],
+  eventStore: EventStore,
+  sessionId: string,
+  type: string,
+  data: Record<string, unknown>,
+): void {
+  db.exec('BEGIN')
+  const event = eventStore.append(sessionId, type, data)
+  projectEvent(db, event)
+  db.exec('COMMIT')
 }
 
 const textCatalog = {
@@ -218,5 +238,121 @@ describe('Session image agent dispatch', () => {
       return Array.isArray(content) && content.some((p) => typeof p === 'object' && p !== null && 'type' in p && (p as { type: string }).type === 'image_url')
     })
     expect(hasImagePart).toBe(false)
+  })
+
+  it('accumulates managed-agent reasoning deltas under a single stepSeq', async () => {
+    const imgPath = path.join(scratch, 'test.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const st = makeStore()
+    st.insertSession({ id: 's-reasoning', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit, _signal) {
+        emit.reasoning('Let me ')
+        emit.reasoning('look at the image. ')
+        emit.token('V')
+        emit.reasoning('Now I understand.')
+        return 'vision result'
+      },
+    }
+
+    const runner: ModelRunner = {
+      async run(_m, o) {
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-reasoning', cfg, undefined, st, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session.sendMessage('describe this', send, undefined, [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }])
+
+    const reasoningDeltas = messages.filter((m): m is Extract<ServerMessage, { type: 'reasoning:delta' }> => m.type === 'reasoning:delta')
+    expect(reasoningDeltas.length).toBeGreaterThanOrEqual(3)
+    // All reasoning deltas for the same burst must share one stepSeq so the frontend concatenates
+    // them into a single reasoning block instead of spawning a new disclosure per delta.
+    const stepSeqs = reasoningDeltas.map((m) => m.stepSeq)
+    expect(new Set(stepSeqs).size).toBe(1)
+    expect(reasoningDeltas.map((m) => m.delta).join('')).toBe('Let me look at the image. Now I understand.')
+  })
+
+  it('regenerate after restart re-invokes the image agent and preserves image context', async () => {
+    const imgPath = path.join(scratch, 'regen.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "vision"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { db, store, eventStore, snapshotStore } = makeStoreWithEventAndSnapshot()
+    store.insertSession({ id: 's-regen-img', title: 't', config: JSON.stringify({ llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true }), createdAt: 1, updatedAt: 1 })
+
+    // First completed turn with a snapshot.
+    const invoker1: AgentInvoker = {
+      async invoke(_agentId, _task, emit) {
+        emit.token('first')
+        return 'first'
+      },
+    }
+    const runner1: ModelRunner = {
+      async run(_m, o) {
+        o.onText('first-main')
+        return new AIMessage('first-main')
+      },
+    }
+    const session1 = new Session('s-regen-img', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner1, undefined, () => invoker1, scratch)
+    await session1.sendMessage('first', () => {}, 'u1')
+
+    // Simulate interrupted image-agent turn: user_message persisted, but assistant step never completed.
+    const stagedPath = path.join(scratchDirFor('s-regen-img', scratch), 'attachments', 'a2', 'regen.png')
+    await fs.mkdir(path.dirname(stagedPath), { recursive: true })
+    await fs.copyFile(imgPath, stagedPath)
+    publishEvent(db, eventStore, 's-regen-img', 'user_message', {
+      messageId: 'u2',
+      content: 'describe this',
+      timestamp: Date.now(),
+      attachments: [{ id: 'a2', name: 'regen.png', mimeType: 'image/png', size: 16 }],
+      contentParts: [
+        { type: 'text', text: 'describe this' },
+        { type: 'image_url', image_url: { url: 'data:image/png;base64,regen-payload' } },
+      ],
+    })
+
+    // Stale snapshot from after first turn.
+    saveSessionSnapshot(snapshotStore, 's-regen-img', eventStore.latestSeq('s-regen-img') - 1, {
+      messages: [new HumanMessage('first'), new AIMessage('first-main')],
+      config: { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [], cwd, disablePlan: true },
+    })
+
+    // Restart and regenerate.
+    let seenImagePart = false
+    const invoker2: AgentInvoker = {
+      async invoke(_agentId, _task, _emit, _signal, _hooks, extras) {
+        seenImagePart = (extras?.attachmentParts ?? []).some((p) => p.type === 'image_url')
+        return 'regenerated vision result'
+      },
+    }
+    const runner2: ModelRunner = {
+      async run() {
+        throw new Error('main model should not be invoked for image-agent regenerate')
+      },
+    }
+    const session2 = new Session('s-regen-img', { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }, undefined, store, undefined, 10_000, runner2, undefined, () => invoker2, scratch)
+    await session2.hydrate()
+    await session2.regenerate(() => {})
+
+    expect(seenImagePart).toBe(true)
   })
 })

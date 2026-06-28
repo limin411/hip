@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isAttachmentSupported } from './attachmentEligibility'
+import { isAttachmentSupported, findMultimodalAgentModelKey } from './attachmentEligibility'
 import type { Catalog } from '@/ipc/catalog'
 import type { AgentConfig } from '@hip/protocol'
 
@@ -52,5 +52,29 @@ describe('isAttachmentSupported', () => {
       agent({ enabled: false, boundModel: { providerID: 'openai', modelID: 'gpt-4o' } }),
     ]
     expect(isAttachmentSupported('openai/gpt-4', agents, catalog)).toBe(false)
+  })
+})
+
+describe('findMultimodalAgentModelKey', () => {
+  it('returns undefined when no agents are multimodal', () => {
+    expect(findMultimodalAgentModelKey([], catalog)).toBeUndefined()
+    expect(findMultimodalAgentModelKey([agent({ boundModel: { providerID: 'openai', modelID: 'gpt-4' } })], catalog)).toBeUndefined()
+  })
+
+  it('returns the first enabled internal agent with a multimodal bound model', () => {
+    const agents = [
+      agent({ id: 'a1', boundModel: { providerID: 'openai', modelID: 'gpt-4' } }),
+      agent({ id: 'a2', boundModel: { providerID: 'openai', modelID: 'gpt-4o' } }),
+    ]
+    expect(findMultimodalAgentModelKey(agents, catalog)).toBe('openai/gpt-4o')
+  })
+
+  it('ignores external agents and builtin/disabled agents', () => {
+    const agents = [
+      agent({ id: 'builtin', enabled: true, boundModel: { providerID: 'openai', modelID: 'gpt-4o' } }),
+      agent({ id: 'acp1', kind: 'acp', boundModel: { providerID: 'openai', modelID: 'gpt-4o' } }),
+      agent({ id: 'disabled', enabled: false, boundModel: { providerID: 'openai', modelID: 'gpt-4o' } }),
+    ]
+    expect(findMultimodalAgentModelKey(agents, catalog)).toBeUndefined()
   })
 })

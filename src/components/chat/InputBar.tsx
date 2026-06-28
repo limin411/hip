@@ -8,7 +8,7 @@ import { AttachmentButton } from './AttachmentButton'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
-import { isAttachmentSupported } from '@/lib/attachmentEligibility'
+import { isAttachmentSupported, findMultimodalAgentModelKey } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
@@ -48,6 +48,18 @@ export function InputBar() {
   const submit = () => {
     const text = value.trim()
     if (!text && attachments.length === 0) return
+    const hasImageAttachment = attachments.some((a) => a.mimeType.startsWith('image/'))
+    const currentModelSupportsImages = isAttachmentSupported(currentKey, [], catalog)
+    if (hasImageAttachment && !currentModelSupportsImages) {
+      const fallbackKey = findMultimodalAgentModelKey(agents, catalog)
+      if (fallbackKey) {
+        if (activeId && active) {
+          sessionService.setSessionModel(fallbackKey)
+        } else {
+          useDraftStore.getState().setModelKey(fallbackKey)
+        }
+      }
+    }
     sessionService.sendMessage(text, attachments)
     setValue('')
     setAttachments([])

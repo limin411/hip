@@ -7,6 +7,7 @@ import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import * as draftStore from '@/store/draftStore'
 import * as domain from '@/domain'
+import { sessionService } from '@/domain'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 
 vi.mock('@/ipc/dialog', () => ({
@@ -26,14 +27,14 @@ const multimodalCatalog = {
 }
 
 function baseMocks() {
-  vi.spyOn(providersStore, 'useProvidersStore').mockImplementation((selector: any) =>
-    selector({
-      catalog: multimodalCatalog,
-      config: { providers: {}, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },
-    }),
-  )
-  vi.spyOn(hipConfigStore, 'useHipConfigStore').mockImplementation((selector: any) => selector({ config: { agents: [] } }))
-  vi.spyOn(draftStore, 'useDraftStore').mockImplementation((selector: any) => selector({ draft: null }))
+  providersStore.useProvidersStore.setState({
+    catalog: multimodalCatalog,
+    config: { providers: {}, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },
+    keyConfigured: {},
+    loaded: false,
+  })
+  hipConfigStore.useHipConfigStore.setState({ config: { version: 1, agents: [] }, loaded: false, error: null })
+  draftStore.useDraftStore.setState({ draft: null })
   vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
   vi.spyOn(domain, 'useActiveSessionStatus').mockReturnValue('idle')
   vi.spyOn(domain, 'useConnectionStatus').mockReturnValue('connected')
@@ -76,5 +77,134 @@ describe('InputBar', () => {
     await vi.waitFor(() => {
       expect(screen.queryByTestId('attachment-chip')).not.toBeInTheDocument()
     })
+  })
+
+  it('switches to the first multimodal internal agent model before sending an image attachment', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          { id: 'a1', name: 'Vision', kind: 'internal', command: '', args: [], enabled: true, boundModel: { providerID: 'openai', modelID: 'gpt-4o' }, prompt: '' },
+        ],
+      },
+    })
+    vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/image.png'])
+    const setSessionModel = vi.spyOn(sessionService, 'setSessionModel').mockReturnValue(undefined)
+    const sendMessage = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    fireEvent.click(screen.getByTestId('attachment-button'))
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('attachment-chip')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)'), { target: { value: 'describe this' } })
+    fireEvent.click(screen.getByTestId('composer-send'))
+
+    await vi.waitFor(() => {
+      expect(setSessionModel).toHaveBeenCalledWith('openai/gpt-4o')
+    })
+    expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
+    expect(setSessionModel.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0])
+  })
+
+  it('switches the draft model before sending an image attachment when no session is active', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue(null)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(null as any)
+    vi.spyOn(hipConfigStore, 'useHipConfigStore').mockImplementation((selector: any) =>
+      selector({
+        config: {
+          agents: [
+            { id: 'a1', name: 'Vision', kind: 'internal', command: '', args: [], enabled: true, boundModel: { providerID: 'openai', modelID: 'gpt-4o' }, prompt: '' },
+          ],
+        },
+      }),
+    )
+    draftStore.useDraftStore.setState({ draft: { tempId: 'd1', mode: 'chat', text: '', modelKey: 'openai/gpt-4' } })
+    const setModelKey = vi.spyOn(draftStore.useDraftStore.getState(), 'setModelKey').mockReturnValue(undefined)
+    vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/image.png'])
+    const sendMessage = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    fireEvent.click(screen.getByTestId('attachment-button'))
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('attachment-chip')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)'), { target: { value: 'describe this' } })
+    fireEvent.click(screen.getByTestId('composer-send'))
+
+    await vi.waitFor(() => {
+      expect(setModelKey).toHaveBeenCalledWith('openai/gpt-4o')
+    })
+    expect(sendMessage).toHaveBeenCalledWith('describe this', expect.any(Array))
+    expect(setModelKey.mock.invocationCallOrder[0]).toBeLessThan(sendMessage.mock.invocationCallOrder[0])
+  })
+
+  it('does not switch model when the active session model is already multimodal', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/image.png'])
+    const setSessionModel = vi.spyOn(sessionService, 'setSessionModel').mockReturnValue(undefined)
+    const sendMessage = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    fireEvent.click(screen.getByTestId('attachment-button'))
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('attachment-chip')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('composer-send'))
+
+    await vi.waitFor(() => {
+      expect(sendMessage).toHaveBeenCalled()
+    })
+    expect(setSessionModel).not.toHaveBeenCalled()
+  })
+
+  it('does not switch model for non-image attachments when the current model is not multimodal', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          { id: 'a1', name: 'Vision', kind: 'internal', command: '', args: [], enabled: true, boundModel: { providerID: 'openai', modelID: 'gpt-4o' }, prompt: '' },
+        ],
+      },
+    })
+    vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/doc.pdf'])
+    const setSessionModel = vi.spyOn(sessionService, 'setSessionModel').mockReturnValue(undefined)
+    const sendMessage = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+    fireEvent.click(screen.getByTestId('attachment-button'))
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('attachment-chip')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('composer-send'))
+
+    await vi.waitFor(() => {
+      expect(sendMessage).toHaveBeenCalled()
+    })
+    expect(setSessionModel).not.toHaveBeenCalled()
   })
 })

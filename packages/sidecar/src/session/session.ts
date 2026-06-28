@@ -593,11 +593,13 @@ export class Session {
     if (input.content) parts.push({ type: 'text', text: input.content })
 
     let imageAgent: AgentConfig | null = null
+    let imageAgentError: string | null = null
     if (hasImageAttachment && !this.currentModelSupportsImages()) {
       try {
         imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
       } catch (err) {
-        console.warn('Failed to select image agent:', err instanceof Error ? err.message : String(err))
+        imageAgentError = err instanceof Error ? err.message : String(err)
+        console.warn('Failed to select image agent:', imageAgentError)
       }
     }
 
@@ -635,12 +637,19 @@ export class Session {
     }
 
     if (imageAgent) {
+      // TODO: when the turn also contains non-image attachments (e.g. PDF),
+      // those parts are currently forwarded to the image agent. The spec says
+      // PDF/text should stay with the main model; implement splitting once we
+      // can run multiple sub-agents or stream both branches.
       return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
 
     if (hasImageAttachment && !this.currentModelSupportsImages()) {
       this.endActivity()
-      _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message: 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.' })
+      const message = imageAgentError
+        ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`
+        : 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.'
+      _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message })
       return ''
     }
 

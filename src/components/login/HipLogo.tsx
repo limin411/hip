@@ -1,5 +1,7 @@
 // hip 品牌标识 —— 使用 public/logo.svg 的全身吉祥物。
 
+const LOGO_SCALE = 0.75
+
 interface HipLogoProps {
   size?: number
   className?: string
@@ -22,16 +24,16 @@ export function HipLogo({
   return (
     <div
       className={className}
-      style={{ width: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: size }}
       {...a11y}
     >
       <img
         src={`${import.meta.env.BASE_URL}logo.svg`}
         alt=""
         aria-hidden="true"
-        width={Math.round(size * 0.75)}
-        height={Math.round(size * 0.75)}
-        style={{ width: Math.round(size * 0.75), height: 'auto' }}
+        width={Math.round(size * LOGO_SCALE)}
+        height={Math.round(size * LOGO_SCALE)}
+        style={{ width: Math.round(size * LOGO_SCALE), height: 'auto' }}
       />
     </div>
   )

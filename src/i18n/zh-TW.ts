@@ -110,6 +110,7 @@ export const zhTW = {
       modelHint: '選擇模型',
       noModelSelected: '選擇模型',
       attach: '新增附件',
+      removeAttachment: '移除附件 {{name}}',
       todos: {
         plan: '計畫',
         pending: '待辦',

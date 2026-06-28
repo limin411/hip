@@ -110,6 +110,7 @@ export const en = {
       modelHint: 'Choose the model',
       noModelSelected: 'Select a model',
       attach: 'Attach file',
+      removeAttachment: 'Remove attachment {{name}}',
       todos: {
         plan: 'Plan',
         pending: 'To do',

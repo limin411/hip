@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUp, Square } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
+import type { LocalAttachment } from './attachmentTypes'
 
 export function Composer({
   value,
@@ -13,6 +14,8 @@ export function Composer({
   reconnecting,
   leftSlot,
   submitDisabled,
+  attachments = [],
+  onAttachmentsChange,
 }: {
   value: string
   onChange: (v: string) => void
@@ -23,10 +26,34 @@ export function Composer({
   reconnecting?: boolean
   leftSlot?: React.ReactNode
   submitDisabled?: boolean
+  attachments?: LocalAttachment[]
+  onAttachmentsChange?: (attachments: LocalAttachment[]) => void
 }) {
   const { t } = useTranslation()
   return (
     <div className="rounded-xl border border-border bg-surface p-2 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8 transition-shadow">
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-2 pb-2">
+          {attachments.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1 text-meta"
+              data-testid="attachment-chip"
+            >
+              <span className="max-w-[120px] truncate">{a.name}</span>
+              <button
+                type="button"
+                className="text-ink-tertiary hover:text-ink"
+                onClick={() => onAttachmentsChange?.(attachments.filter((x) => x.id !== a.id))}
+                aria-label={t('chat.removeAttachment', { name: a.name })}
+                data-testid="attachment-remove"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <Textarea
         value={value}
         autoFocus={autoFocus}
@@ -65,7 +92,7 @@ export function Composer({
             variant="primary"
             size="icon"
             onClick={onSubmit}
-            disabled={!value.trim() || submitDisabled}
+            disabled={(!value.trim() && attachments.length === 0) || submitDisabled}
             data-testid="composer-send"
             title={t('chat.send')}
           >

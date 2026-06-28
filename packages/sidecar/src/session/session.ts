@@ -569,10 +569,6 @@ export class Session {
     if (!this.requireApiKey(_send)) return ''
 
     const hasImageAttachment = input.attachments?.some((a) => a.mimeType.startsWith('image/'))
-    if (hasImageAttachment) {
-      const choice = resolveModelChoice(this._config, getActiveModel(), this.getActiveProfile().modelBinding)
-      logInfo('session', 'image-attachment:resolved-model', { sessionId: this.id, providerID: choice.providerID, modelID: choice.modelID, baseURL: choice.baseURL })
-    }
 
     const userTs = Date.now()
     let isFirstTurn = false

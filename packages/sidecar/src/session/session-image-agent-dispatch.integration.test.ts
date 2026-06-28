@@ -44,6 +44,7 @@ describe('Session image agent dispatch', () => {
       `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
     )
     vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    // isMultimodalModel calls readCatalog() internally, so spying on readCatalog alone does not intercept it.
     vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
 
     const st = makeStore()

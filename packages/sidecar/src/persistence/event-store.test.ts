@@ -208,6 +208,12 @@ describe('serializeMessages / deserializeMessages', () => {
     expect(roundTripped.map((m) => m.content)).toEqual(['hi', 'hello', 'context'])
   })
 
+  it('keeps string content that looks like a JSON array as a string', () => {
+    const original = [new HumanMessage('[]'), new HumanMessage('[1,2,3]')]
+    const roundTripped = deserializeMessages(serializeMessages(original))
+    expect(roundTripped.map((m) => m.content)).toEqual(['[]', '[1,2,3]'])
+  })
+
   it('round-trips an AIMessage with tool calls', () => {
     const original = [
       new AIMessage({

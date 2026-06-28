@@ -1402,7 +1402,13 @@ export class Session {
     const needsImageAgent = tail instanceof HumanMessage && hasImageAttachment && !this.currentModelSupportsImages()
 
     if (needsImageAgent && lastUser) {
-      const imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), lastUser.content)
+      let imageAgent: AgentConfig | null = null
+      try {
+        imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), lastUser.content)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn('Failed to select image agent:', message)
+      }
       if (imageAgent) {
         // Remove the text-only user message placeholder; runManagedAgentTurn will push its own.
         if (tail instanceof HumanMessage) this.messages.pop()
@@ -1645,7 +1651,7 @@ function isImageAttachment(a: { mimeType: string }): boolean {
 
 /** Remove image_url content parts from HumanMessages so a text-only main model never
  *  receives them. Call this at invocation time; durable storage keeps the full parts. */
-function stripImageContentParts(messages: BaseMessage[]): BaseMessage[] {
+export function stripImageContentParts(messages: BaseMessage[]): BaseMessage[] {
   return messages.map((m) => {
     if (!(m instanceof HumanMessage)) return m
     const content = m.content

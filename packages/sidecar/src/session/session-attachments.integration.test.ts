@@ -76,6 +76,12 @@ describe('Session image attachments', () => {
     const { db, store, eventStore, snapshotStore } = makeStore()
     store.insertSession({ id: 's-regen', title: 't', config: JSON.stringify(baseCfg), createdAt: 1, updatedAt: 1 })
 
+    // Force a multimodal main model so runTurn does not strip image parts.
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue({
+      openai: { id: 'openai', name: 'OpenAI', models: { 'gpt-4': { id: 'gpt-4', name: 'GPT-4', attachment: true } } },
+    })
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(true)
+
     // Complete a first turn so a snapshot is saved.
     const session1 = new Session('s-regen', { ...baseCfg, cwd: scratch }, undefined, store, undefined, 10_000, capturingRunner([]))
     await session1.sendMessage('first message', () => {}, 'u1')
@@ -122,6 +128,8 @@ describe('Session image attachments', () => {
     expect(Array.isArray(lastUser.content)).toBe(true)
     const parts = lastUser.content as Array<{ type: string }>
     expect(parts.some((p) => p.type === 'image_url')).toBe(true)
+
+    vi.restoreAllMocks()
   })
 
   it('persists contentParts for image-agent turns', async () => {

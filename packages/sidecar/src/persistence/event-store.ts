@@ -83,12 +83,22 @@ function isMessageJson(value: unknown): value is MessageJson {
   return true
 }
 
-/** Parse a snapshot content string. Arrays are stored as JSON strings by
- *  serializeMessages; restore them so HumanMessage content parts survive. */
+interface LcArrayTag {
+  __lcArray: true
+  value: unknown
+}
+
+function isLcArrayTag(value: unknown): value is LcArrayTag {
+  return isRecord(value) && value.__lcArray === true && 'value' in value
+}
+
+/** Parse a snapshot content string. Non-string content arrays are stored as tagged
+ *  JSON strings by serializeMessages; restore them so HumanMessage content parts survive.
+ *  Plain string content is kept as a string, even when it looks like JSON. */
 function parseSnapshotContent(content: string): MessageContent {
   try {
     const parsed: unknown = JSON.parse(content)
-    if (Array.isArray(parsed)) return parsed as MessageContent
+    if (isLcArrayTag(parsed)) return parsed.value as MessageContent
   } catch {
     // intentionally fall through
   }
@@ -98,7 +108,9 @@ function parseSnapshotContent(content: string): MessageContent {
 /** Convert a BaseMessage array into a snapshot-serializable JSON string. */
 export function serializeMessages(messages: readonly BaseMessage[]): string {
   const payload: MessageJson[] = messages.map((m) => {
-    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+    const content = typeof m.content === 'string'
+      ? m.content
+      : JSON.stringify({ __lcArray: true, value: m.content })
     const type = m.getType()
     if (type === 'human') return { type: 'human', content }
     if (type === 'system') return { type: 'system', content }

@@ -14,19 +14,21 @@ export default defineConfig({
     // single source of truth (~/.hip/config/auth.json — the same file the desktop app
     // writes); when it's absent (e.g. CI) those suites skipIf-skip.
     setupFiles: ['./vitest.setup.ts'],
-  },
-  coverage: {
-    provider: 'v8',
-    reporter: ['text', 'lcov'],
-    include: ['src/**', 'packages/sidecar/src/**', 'packages/protocol/src/**'],
-    exclude: [
-      '**/*.d.ts',
-      '**/*.test.ts',
-      '**/*.integration.test.ts',
-      '**/*.contract.test.ts',
-      '**/node_modules/**',
-      '**/dist/**',
-      'coverage/**',
-    ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      include: ['src/**', 'packages/sidecar/src/**', 'packages/protocol/src/**'],
+      exclude: [
+        '**/*.d.ts',
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/*.integration.test.ts',
+        '**/*.contract.test.ts',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/src-tauri/**',
+        '**/coverage/**',
+      ],
+    },
   },
 })

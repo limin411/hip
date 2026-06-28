@@ -47,13 +47,8 @@ export function InputBar() {
 
   const submit = () => {
     const text = value.trim()
-    console.debug('[hip:attachment] submit', { text, attachmentCount: attachments.length, interrupt: !!active?.interrupt })
     if (!text && attachments.length === 0) return
-    if (active?.interrupt) {
-      sessionService.resume(text, attachments)
-    } else {
-      sessionService.sendMessage(text, attachments)
-    }
+    sessionService.sendMessage(text, attachments)
     setValue('')
     setAttachments([])
   }

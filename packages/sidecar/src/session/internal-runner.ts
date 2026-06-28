@@ -10,6 +10,8 @@ import { lastAiText } from './subagent.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { getActiveModel } from '../config/providers.js'
+import { validateAttachments, buildAttachmentContentParts } from './attachments.js'
+import type { AttachmentPayload, ContentPart } from './attachments.js'
 import type { Summarizer } from './compaction.js'
 import type { ResolvedModel } from './agents/registry.js'
 import type { SkillMeta, PermissionMode } from '@hip/protocol'
@@ -23,6 +25,7 @@ export interface RunManagedAgentArgs {
   cwd: string
   prompt: string                      // persona
   task: string
+  attachments?: AttachmentPayload[]   // image/document attachments rendered as content parts in the human message
   emit: GraphEmit
   signal: AbortSignal
   childMaxSteps: number
@@ -47,7 +50,7 @@ export interface RunManagedAgentArgs {
  * through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, task, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
+  const { resolved, cwd, prompt, task, attachments, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
@@ -55,10 +58,22 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
   const toolNames = tools.map((t) => t.name)
   const ctx: GraphCtx = { runner, tools, emit, summarizer, sessionId: args.sessionId ?? 'managed-agent', toolOutputStore, guardianReviewer }
+  const humanParts: ContentPart[] = []
+  if (task) humanParts.push({ type: 'text', text: task })
+  if (attachments?.length) {
+    await validateAttachments(attachments)
+    const attachmentParts = await buildAttachmentContentParts(attachments)
+    humanParts.push(...attachmentParts)
+  }
+  const humanMessage = humanParts.length === 0
+    ? new HumanMessage('')
+    : humanParts.length === 1 && humanParts[0].type === 'text'
+      ? new HumanMessage(humanParts[0].text)
+      : new HumanMessage({ content: humanParts })
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode, mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined })), new HumanMessage(task)],
+      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode, mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined })), humanMessage],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

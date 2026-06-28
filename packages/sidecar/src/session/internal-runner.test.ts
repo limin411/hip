@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AIMessage, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { GraphEmit, GraphCtx } from './graph.js'
 import { runManagedAgent } from './internal-runner.js'
@@ -237,5 +237,40 @@ describe('runManagedAgent safety-dependency wiring (C3 — sessionId, networkPol
 
     const ctx = capturedGraphCtxs.at(-1)
     expect(ctx?.sessionId).toBe('managed-agent')
+  })
+})
+
+describe('runManagedAgent attachments', () => {
+  it('includes image attachments as content parts in the human message', async () => {
+    const cwd = tmp()
+    const imgPath = join(cwd, 'test.png')
+    writeFileSync(imgPath, Buffer.from('fake-image-bytes'))
+    const captured: BaseMessage[] = []
+    const runner: ModelRunner = {
+      async run(messages, opts) {
+        captured.push(...messages)
+        opts.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+    await runManagedAgent({
+      resolved: null,
+      cwd,
+      prompt: 'p',
+      task: 'describe',
+      attachments: [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }],
+      emit: collectingEmit().emit,
+      signal: new AbortController().signal,
+      childMaxSteps: 5,
+      runner,
+      summarizer: { async summarize() { return '' } },
+    })
+    const human = captured.find((m) => m instanceof HumanMessage)
+    expect(human).toBeDefined()
+    expect(Array.isArray(human!.content)).toBe(true)
+    const parts = human!.content as Array<{ type: string }>
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toEqual({ type: 'text', text: 'describe' })
+    expect(parts[1].type).toBe('image_url')
   })
 })

@@ -2,6 +2,7 @@ export const zhCN = {
   translation: {
     chat: {
       title: '对话',
+      loading: '加载中…',
       newChat: '新对话',
       newChatDesc: '开始一段新的对话…',
       sendMessage: '发送一条消息开始对话',

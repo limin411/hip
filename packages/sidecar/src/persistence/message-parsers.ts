@@ -42,14 +42,14 @@ export function optStringArray(data: Record<string, unknown>, field: string): re
 export function optObjectArray<T>(
   data: Record<string, unknown>,
   field: string,
-  guard?: (x: Record<string, unknown>) => boolean,
+  guard?: (x: Record<string, unknown>) => x is Record<string, unknown> & T,
 ): T[] | undefined {
   const raw = data[field]
   if (!Array.isArray(raw)) return undefined
-  return raw.filter((x): x is T => {
+  return raw.filter((x): x is Record<string, unknown> & T => {
     if (x == null || typeof x !== 'object') return false
     return guard ? guard(x as Record<string, unknown>) : true
-  }) as T[]
+  })
 }
 
 export function parseUsage(data: Record<string, unknown>): ProjectedUsage | null {

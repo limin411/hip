@@ -20,7 +20,11 @@ function App() {
   useEffect(() => {
     // Load the critical config/catalog before showing either login or the main UI.
     // This ensures model/agent data is available the moment the user can interact.
-    void useProvidersStore.getState().load()
+    useProvidersStore.getState().load().catch((err) => {
+      console.error('Failed to load providers catalog:', err)
+      // Even on failure, unblock the UI so the user sees login/settings and can retry.
+      useProvidersStore.setState({ loaded: true })
+    })
     // Pre-load non-critical settings data in the background so settings/skills/plugin
     // pages open instantly; we do not gate the UI on these.
     void useSkillsStore.getState().load()

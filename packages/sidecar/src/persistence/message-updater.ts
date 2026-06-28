@@ -152,7 +152,7 @@ export class SessionMessageUpdater {
     const messageId = reqString(event.data, 'user_message', 'messageId')
     const content = reqString(event.data, 'user_message', 'content')
     const timestamp = optNumber(event.data, 'timestamp') ?? event.seq
-    const attachments = optObjectArray<Attachment>(event.data, 'attachments', (x): boolean =>
+    const attachments = optObjectArray<Attachment>(event.data, 'attachments', (x): x is Record<string, unknown> & Attachment =>
       typeof x.id === 'string' && typeof x.name === 'string' && typeof x.mimeType === 'string',
     )
     const contentParts = optObjectArray<ContentPart>(event.data, 'contentParts', isContentPart)

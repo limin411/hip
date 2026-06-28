@@ -334,6 +334,23 @@ export class Session {
     this.activeActivity?.consume(steps)
   }
 
+  private resolvePermissionMode(): PermissionMode {
+    const rawMode = this._config.permissionMode
+    return rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+  }
+
+  private async generateFirstTurnTitle(input: SessionInput, replyText: string, _send: SendFn): Promise<void> {
+    if (!this.titleGenerator || !replyText || !this.store) return
+    try {
+      const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: replyText }))
+      if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
+        _send({ type: 'session:title', sessionId: this.id, title: refined })
+      }
+    } catch (err) {
+      console.warn(`Title generation failed for session ${this.id}:`, err instanceof Error ? err.message : String(err))
+    }
+  }
+
   constructor(
     readonly id: string,
     config: SessionConfig,
@@ -575,6 +592,10 @@ export class Session {
     const parts: ContentPart[] = []
     if (input.content) parts.push({ type: 'text', text: input.content })
 
+    const imageAgent = hasImageAttachment && !this.currentModelSupportsImages()
+      ? selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
+      : null
+
     if (input.attachments?.length) {
       await validateAttachments(input.attachments)
       const staged = await stageAttachments(this.id, input.attachments, this.scratchRoot)
@@ -582,7 +603,10 @@ export class Session {
       parts.push(...attachmentParts)
       if (this.store) {
         isFirstTurn = !this.store.hasMessages(this.id)
-        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(isRichContentParts(parts) ? { contentParts: parts } : {}) })
+        // When dispatching to an internal multimodal agent, keep image_url parts out of the
+        // main session history so the text-only main model never sees them on follow-up turns.
+        const historyParts = imageAgent ? undefined : (isRichContentParts(parts) ? parts : undefined)
+        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
     } else if (this.store) {
       isFirstTurn = !this.store.hasMessages(this.id)
@@ -605,9 +629,6 @@ export class Session {
       this.startActivity(input.content)
     }
 
-    const imageAgent = hasImageAttachment && !this.currentModelSupportsImages()
-      ? selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
-      : null
     if (imageAgent) {
       return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
     }
@@ -617,15 +638,8 @@ export class Session {
       : new HumanMessage({ content: parts }))
     const supervisorText = await this.runTurn(_send)
 
-    if (isFirstTurn && this.titleGenerator && supervisorText && this.store) {
-      try {
-        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: supervisorText }))
-        if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
-          _send({ type: 'session:title', sessionId: this.id, title: refined })
-        }
-      } catch (err) {
-        console.warn(`Title generation failed for session ${this.id}:`, err instanceof Error ? err.message : String(err))
-      }
+    if (isFirstTurn) {
+      await this.generateFirstTurnTitle(input, supervisorText, _send)
     }
     return supervisorText
   }
@@ -724,8 +738,7 @@ export class Session {
     this.running = true
 
     const cwd = this._config.cwd ?? process.cwd()
-    const rawMode = this._config.permissionMode
-    const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
+    const mode = this.resolvePermissionMode()
     const requestApproval = this.permissions.buildRequestApproval(_send, this.id, turnId, () => 0, mode, this.hooks)
 
     let stepSeq = 0
@@ -740,9 +753,10 @@ export class Session {
     }
 
     _send({ type: 'agent:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent' })
-    this.messages.push(parts.length === 1 && parts[0].type === 'text'
-      ? new HumanMessage(input.content)
-      : new HumanMessage({ content: parts }))
+    this.emit({ type: 'step_started', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() })
+    this.emit({ type: 'text_started', sessionId: this.id, messageId: turnId, timestamp: Date.now() })
+    // Keep image_url parts out of the main session history; the agent received them via extras.
+    this.messages.push(new HumanMessage(input.content))
 
     let agentText = ''
     try {
@@ -756,32 +770,32 @@ export class Session {
         networkPolicy: this.networkPolicy,
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
+        attachmentParts: parts,
       }, input.attachments)
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
+      this.emit({ type: 'step_failed', sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() })
       const isAbort = err instanceof Error && err.name === 'AbortError'
       _send({ type: 'error', sessionId: this.id, code: isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
-      _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
       this.running = false
       this.abortController = null
+      this.endActivity()
+      _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
       return ''
     }
 
     this.running = false
     this.abortController = null
+    this.endActivity()
     _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
+
     this.messages.push(new AIMessage(agentText))
+    this.emit({ type: 'text_ended', sessionId: this.id, messageId: turnId, content: agentText, timestamp: Date.now() })
+    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() })
     _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now() } })
 
-    if (isFirstTurn && this.titleGenerator && agentText && this.store) {
-      try {
-        const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: agentText }))
-        if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
-          _send({ type: 'session:title', sessionId: this.id, title: refined })
-        }
-      } catch (err) {
-        console.warn(`Title generation failed for session ${this.id}:`, err instanceof Error ? err.message : String(err))
-      }
+    if (isFirstTurn) {
+      await this.generateFirstTurnTitle(input, agentText, _send)
     }
 
     return agentText
@@ -1543,6 +1557,8 @@ function sessionEventToEventData(
       return { stepId: event.turnId, agentId: event.agentId, startedAt: event.timestamp }
     case 'step_ended':
       return { stepId: event.turnId, agentId: event.agentId, finishedAt: event.timestamp, ...(context?.usage ? { usage: context.usage } : {}) }
+    case 'step_failed':
+      return { stepId: event.turnId, agentId: event.agentId, error: event.error, finishedAt: event.timestamp }
     case 'text_started':
       return { stepId: event.messageId }
     case 'text_ended':

@@ -6,7 +6,7 @@ export function LoadingScreen() {
   return (
     <div className="flex h-dvh w-screen flex-col items-center justify-center gap-3 bg-surface text-ink-secondary">
       <Loader2 className="animate-spin" size={24} />
-      <span className="text-body">{t('chat.loading', { defaultValue: '加载中…' })}</span>
+      <span className="text-body">{t('chat.loading')}</span>
     </div>
   )
 }

@@ -721,6 +721,7 @@ export type SessionEvent =
   | { type: 'user_message'; sessionId: string; content: string; messageId: string; timestamp: number; attachments?: Attachment[]; contentParts?: ContentPart[] }
   | { type: 'step_started'; sessionId: string; turnId: string; agentId: string; timestamp: number }
   | { type: 'step_ended'; sessionId: string; turnId: string; agentId: string; timestamp: number }
+  | { type: 'step_failed'; sessionId: string; turnId: string; agentId: string; error: string; timestamp: number }
   | { type: 'text_started'; sessionId: string; messageId: string; timestamp: number }
   | { type: 'text_ended'; sessionId: string; messageId: string; content: string; timestamp: number }
   | { type: 'tool_called'; sessionId: string; callId: string; name: string; input: string; timestamp: number }

@@ -2,6 +2,7 @@ export const en = {
   translation: {
     chat: {
       title: 'Conversation',
+      loading: 'Loading…',
       newChat: 'New Chat',
       newChatDesc: 'Start a new conversation…',
       sendMessage: 'Send a message to start the conversation',

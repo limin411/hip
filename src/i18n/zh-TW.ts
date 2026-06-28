@@ -2,6 +2,7 @@ export const zhTW = {
   translation: {
     chat: {
       title: '對話',
+      loading: '載入中…',
       newChat: '新對話',
       newChatDesc: '開始一段新的對話…',
       sendMessage: '發送一條消息開始對話',

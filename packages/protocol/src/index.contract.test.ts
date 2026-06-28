@@ -16,6 +16,7 @@ const _sessionEventGuard = (
     'user_message',
     'step_started',
     'step_ended',
+    'step_failed',
     'text_started',
     'text_ended',
     'tool_called',

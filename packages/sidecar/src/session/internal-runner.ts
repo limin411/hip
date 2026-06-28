@@ -26,6 +26,7 @@ export interface RunManagedAgentArgs {
   prompt: string                      // persona
   task: string
   attachments?: AttachmentPayload[]   // image/document attachments rendered as content parts in the human message
+  attachmentParts?: ContentPart[]     // pre-built content parts; skips re-validation/re-reading attachments
   emit: GraphEmit
   signal: AbortSignal
   childMaxSteps: number
@@ -50,7 +51,7 @@ export interface RunManagedAgentArgs {
  * through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, task, attachments, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
+  const { resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
@@ -58,18 +59,26 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
   const toolNames = tools.map((t) => t.name)
   const ctx: GraphCtx = { runner, tools, emit, summarizer, sessionId: args.sessionId ?? 'managed-agent', toolOutputStore, guardianReviewer }
-  const humanParts: ContentPart[] = []
-  if (task) humanParts.push({ type: 'text', text: task })
-  if (attachments?.length) {
-    await validateAttachments(attachments)
-    const attachmentParts = await buildAttachmentContentParts(attachments)
-    humanParts.push(...attachmentParts)
+  let humanParts: ContentPart[]
+  if (attachmentParts?.length) {
+    humanParts = attachmentParts
+  } else {
+    humanParts = []
+    if (task) humanParts.push({ type: 'text', text: task })
+    if (attachments?.length) {
+      await validateAttachments(attachments)
+      const built = await buildAttachmentContentParts(attachments)
+      humanParts.push(...built)
+    }
   }
-  const humanMessage = humanParts.length === 0
-    ? new HumanMessage('')
-    : humanParts.length === 1 && humanParts[0].type === 'text'
-      ? new HumanMessage(humanParts[0].text)
-      : new HumanMessage({ content: humanParts })
+  let humanMessage: HumanMessage
+  if (humanParts.length === 0) {
+    humanMessage = new HumanMessage('')
+  } else if (humanParts.length === 1 && humanParts[0].type === 'text') {
+    humanMessage = new HumanMessage(humanParts[0].text)
+  } else {
+    humanMessage = new HumanMessage({ content: humanParts })
+  }
   const app = buildGraph(childMaxSteps)
   const final = await app.invoke(
     {

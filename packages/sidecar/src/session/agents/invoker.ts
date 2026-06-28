@@ -5,7 +5,7 @@ import type { GraphEmit } from '../graph.js'
 import type { NetworkPolicy } from '../network-policy.js'
 import type { ToolOutputStore } from '../tool-output-store.js'
 import type { GuardianReviewer } from '../guardian.js'
-import type { AttachmentPayload } from '../attachments.js'
+import type { AttachmentPayload, ContentPart } from '../attachments.js'
 import { runManagedAgent } from '../internal-runner.js'
 import { CHILD_MAX_STEPS } from '../loop-control.js'
 import { createAgentProvider } from './index.js'
@@ -27,6 +27,9 @@ export interface InvokerExtras {
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
+  /** Pre-built content parts for the agent's HumanMessage. When provided, the runner skips
+   * re-validating/re-reading raw attachments. */
+  attachmentParts?: ContentPart[]
 }
 
 export interface AgentInvoker {
@@ -52,6 +55,8 @@ export interface RunInternalArgs {
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
   attachments?: AttachmentPayload[]
+  /** Pre-built content parts; passed through to runManagedAgent to avoid duplicate file I/O. */
+  attachmentParts?: ContentPart[]
 }
 
 export interface InvokerDeps {
@@ -91,6 +96,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       sessionId: a.sessionId, networkPolicy: a.networkPolicy,
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
       attachments: a.attachments,
+      attachmentParts: a.attachmentParts,
     }))
   return {
     async invoke(agentId, task, emit, signal, hooks, extras, attachments) {
@@ -116,6 +122,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           sessionId: extras?.sessionId, networkPolicy: extras?.networkPolicy,
           toolOutputStore: extras?.toolOutputStore, guardianReviewer: extras?.guardianReviewer,
           attachments,
+          attachmentParts: extras?.attachmentParts,
         })
       }
 

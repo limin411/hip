@@ -375,9 +375,9 @@ export class SessionService {
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     if (active?.interrupt) { this.resume(text, attachments); return }
     let { activeSessionId } = useDomainStore.getState()
-    const draft = useDraftStore.getState().draft
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
+      const draft = useDraftStore.getState().draft
       const config: SessionConfig = configFromDraft(draft)
       activeSessionId = this.createSession(config)
       if (draft?.cwd) useFsStore.getState().clearSession(draft.cwd)

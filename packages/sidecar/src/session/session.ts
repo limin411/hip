@@ -617,11 +617,10 @@ export class Session {
       parts.push(...attachmentParts)
       if (this.store) {
         isFirstTurn = !this.store.hasMessages(this.id)
-        // When dispatching to an internal multimodal agent, keep image_url parts out of the
-        // main session history so the text-only main model never sees them on follow-up turns.
-        // Also keep them out when no image agent is available and we are about to error.
-        const filterImages = needsImageAgent
-        const historyParts = filterImages ? undefined : (isRichContentParts(parts) ? parts : undefined)
+        // Persist the full content parts so that interrupted image-agent turns can be
+        // reconstructed after restart. Image parts are stripped from the main model prompt
+        // at invocation time, not by omitting them from durable storage.
+        const historyParts = isRichContentParts(parts) ? parts : undefined
         this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
     } else if (this.store) {
@@ -879,6 +878,10 @@ export class Session {
       }
     }
 
+    const supportsImages = this.currentModelSupportsImages()
+    const modelReady = (messages: BaseMessage[]) => supportsImages ? messages : stripImageContentParts(messages)
+    const visibleMessages = modelReady(this.messages)
+
     let timedOut = false
     const watchdog = new IdleWatchdog(this.idleTimeoutMs, () => { timedOut = true; this.abortController?.abort() })
     const send: SendFn = (msg) => { watchdog.kick(); rawSend(msg) }
@@ -955,7 +958,7 @@ export class Session {
     const skills = this.configMgr.skills; const pluginAgents = this.configMgr.pluginAgents
     const rawMode = this._config.permissionMode
     const mode: PermissionMode = rawMode === 'chat' || rawMode === 'full' ? rawMode : 'edit'
-    const usedTokens = estimateTokens(this.messages)
+    const usedTokens = estimateTokens(visibleMessages)
     const tokenBudgetPercent = Math.max(0, Math.min(100, Math.round(100 - (usedTokens / COMPACT_BUDGET_TOKENS) * 100)))
 
     const logToken = logDebugEveryN('session', 10, 'token:stream', { sessionId: this.id, turnId, agentId: 'supervisor' })
@@ -1099,7 +1102,7 @@ export class Session {
     let finalState: LoopState | undefined
     try {
       if (this.agentProv.isExternalAgent()) {
-        const userText = lastUserText(base?.messages ?? this.messages)
+        const userText = lastUserText(base?.messages ? modelReady(base.messages) : visibleMessages)
         const cronPrefix = cronMessages.length ? cronMessages.map((m) => m.content as string).join('\n\n') + '\n\n' : ''
         const hooks: ExternalAgentHooks = {
           requestPermission: (req) => {
@@ -1113,17 +1116,18 @@ export class Session {
         closeReasoning('supervisor'); finishRemaining()
         const acpId = this.agentProv.acpSessionId; if (acpId && this.store) this.store.setAcpSessionId(this.id, acpId)
       } else {
-        const userText = lastUserText(base?.messages ?? this.messages)
+        const effectiveMessages = base?.messages ? modelReady(base.messages) : visibleMessages
+        const userText = lastUserText(effectiveMessages)
         const usePlan = shouldPlan(userText, {
           forcePlan: this._config.forcePlan,
           disablePlan: this._config.disablePlan,
         })
         const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
         const stepsBefore = base?.steps ?? 0
-        logDebug('session', 'phase:invokeGraph', { sessionId: this.id, elapsedMs: Date.now() - t0, msgCount: base?.messages.length ?? this.messages.length })
+        logDebug('session', 'phase:invokeGraph', { sessionId: this.id, elapsedMs: Date.now() - t0, msgCount: effectiveMessages.length })
         finalState = await this.app.invoke(
           {
-            messages: [new SystemMessage(system), ...cronMessages, ...contextMessages, ...(base?.messages ?? this.messages)],
+            messages: [new SystemMessage(system), ...cronMessages, ...contextMessages, ...effectiveMessages],
             steps: base?.steps ?? 0,
             recentSigs: [],
             nudgedSig: undefined,
@@ -1570,6 +1574,28 @@ function rowToBaseMessage(d: SessionMessageData): BaseMessage {
 
 function projectedToolCallToToolCall(t: ProjectedToolCall) {
   return { name: t.name, args: parseToolInput(t.input), id: t.callId, type: 'tool_call' as const }
+}
+
+/** Remove image_url content parts from HumanMessages so a text-only main model never
+ *  receives them. Call this at invocation time; durable storage keeps the full parts. */
+function stripImageContentParts(messages: BaseMessage[]): BaseMessage[] {
+  return messages.map((m) => {
+    if (!(m instanceof HumanMessage)) return m
+    const content = m.content
+    if (!Array.isArray(content)) return m
+    const filtered = content.filter((p) => {
+      if (p != null && typeof p === 'object' && 'type' in p) {
+        return (p as { type: string }).type !== 'image_url'
+      }
+      return true
+    })
+    if (filtered.length === content.length) return m
+    if (filtered.length === 0) return new HumanMessage('')
+    if (filtered.length === 1 && (filtered[0] as { type: string }).type === 'text') {
+      return new HumanMessage((filtered[0] as { text: string }).text)
+    }
+    return new HumanMessage({ content: filtered })
+  })
 }
 
 function parseToolInput(input: string): Record<string, unknown> {

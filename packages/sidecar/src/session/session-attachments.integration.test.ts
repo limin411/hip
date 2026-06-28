@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { loadProjection } from '../persistence/message-projector.js'
+import * as catalogModule from '../config/catalog.js'
+import type { AgentInvoker } from './agents/invoker.js'
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -119,5 +122,43 @@ describe('Session image attachments', () => {
     expect(Array.isArray(lastUser.content)).toBe(true)
     const parts = lastUser.content as Array<{ type: string }>
     expect(parts.some((p) => p.type === 'image_url')).toBe(true)
+  })
+
+  it('persists contentParts for image-agent turns', async () => {
+    const { store, db } = makeStore()
+    store.insertSession({ id: 's-img-persist', title: 't', config: JSON.stringify({ ...baseCfg, cwd: scratch }), createdAt: 1, updatedAt: 1 })
+
+    // Create a minimal image agent config.
+    const cwd = scratch
+    await fs.mkdir(path.join(cwd, '.hip'), { recursive: true })
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "vision"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+
+    const imgPath = path.join(scratch, 'persist.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+
+    // Force text-only main model and image agent available.
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue({
+      openai: { id: 'openai', name: 'OpenAI', models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } } },
+    })
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit) {
+        emit.token('vision result')
+        return 'vision result'
+      },
+    }
+
+    const session = new Session('s-img-persist', { ...baseCfg, cwd }, undefined, store, undefined, 10_000, undefined, undefined, () => invoker, scratch)
+    await session.sendMessage('describe this', () => {}, undefined, [{ id: 'a1', name: 'persist.png', mimeType: 'image/png', path: imgPath }])
+
+    const rows = loadProjection(db, 's-img-persist')
+    const userRow = rows.find((r) => r.type === 'user')
+    expect(userRow).toBeDefined()
+    const data = userRow!.data as { contentParts?: Array<{ type: string }> }
+    expect(data.contentParts?.some((p) => p.type === 'image_url')).toBe(true)
   })
 })

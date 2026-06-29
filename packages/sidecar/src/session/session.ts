@@ -849,8 +849,37 @@ export class Session {
     let stepSeq = 0
     const reasoning = new ReasoningTracker(() => stepSeq++)
     const usageByAgent = new Map<string, TurnUsage>()
+    // Mirror runTurn's trajectory so the final message:complete can carry the image agent's
+    // reasoning bursts, tool calls and per-agent runs. Without this, the frontend's provisional
+    // assistant message accumulates the live activity but message:complete replaces it with an
+    // empty shell, causing the sub-agent's activity to vanish for a moment.
+    const trajectory = new Map<string, TraceRun>()
+    const recorder: TraceRecorder = {
+      start: (agentId, callId, name, input, seq, truncated) => {
+        const r = trajectory.get(agentId); if (!r) return
+        r.toolCalls.set(callId, { callId, agentId, name, input, status: 'running', seq, ...(truncated ? { truncated: true } : {}) })
+      },
+      finish: (agentId, callId, status, output, error, truncated) => {
+        const tc = trajectory.get(agentId)?.toolCalls.get(callId)
+        if (!tc) return
+        tc.status = status
+        if (output !== undefined) tc.output = output
+        if (error !== undefined) tc.error = error
+        if (truncated || tc.truncated) tc.truncated = true
+      },
+    }
+    const closeReasoningBurst = () => {
+      const burst = reasoning.close(agent.id)
+      const r = trajectory.get(agent.id)
+      if (r && burst) r.reasoningBursts.push(burst)
+    }
+    let agentText = ''
     const emit: GraphEmit = {
-      token: (delta) => { _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
+      // Stream tokens directly into the assistant body (supervisor role). Don't duplicate them
+      // into the trajectory run's output; the image agent's reply is the message content.
+      // Also tee them locally so that if the invoker returns an empty string (e.g. the graph's
+      // final AIMessage has no text), we still have the streamed reply for message:complete.
+      token: (delta) => { agentText += delta; _send({ type: 'token:stream', sessionId: this.id, turnId, agentId: agent.id, delta }) },
       reasoning: (delta) => {
         if (!delta) return
         _send({ type: 'reasoning:delta', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', stepSeq: reasoning.push(agent.id, delta), delta })
@@ -858,31 +887,39 @@ export class Session {
       toolStarted: (name, callId, input) => {
         // Close any open reasoning burst BEFORE the tool claims the next stepSeq, so reasoning and
         // tool steps share a single turn-global ordering (mirrors runTurn).
-        reasoning.close(agent.id)
-        _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: typeof input === 'string' ? input : JSON.stringify(input), seq: stepSeq++ })
+        closeReasoningBurst()
+        const seq = stepSeq++
+        const inClip = clip(typeof input === 'string' ? input : JSON.stringify(input))
+        recorder.start(agent.id, callId, name, inClip.text, seq, inClip.truncated)
+        _send({ type: 'tool:started', sessionId: this.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
       },
-      toolFinished: (callId, status, output, error) => { _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(output ? { output } : {}), ...(error ? { error } : {}) }) },
+      toolFinished: (callId, status, output, error) => {
+        const outClip = output !== undefined ? clip(typeof output === 'string' ? output : JSON.stringify(output)) : undefined
+        recorder.finish(agent.id, callId, status, outClip?.text, error, outClip?.truncated ?? false)
+        _send({ type: 'tool:finished', sessionId: this.id, turnId, agentId: agent.id, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
+      },
       usage: (u) => { usageByAgent.set(agent.id, addUsage(usageByAgent.get(agent.id), u)) },
       planDelta: () => {},
       compaction: () => {},
     }
 
     // Use role 'supervisor' so the frontend creates the assistant message container that holds
-    // streaming tokens for this turn.
+    // streaming tokens for this turn. The final message:complete records the run as a dispatched
+    // sub-agent (role='subagent', parentAgentId='supervisor') so the UI renders a SubAgentCard.
     _send({ type: 'agent:started', sessionId: this.id, turnId, agentId: agent.id, role: 'supervisor' })
+    trajectory.set(agent.id, { role: 'subagent', output: '', startedAt: Date.now(), finishedAt: null, seq: 0, toolCalls: new Map(), reasoningBursts: [] })
     this.emit({ type: 'step_started', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() })
     this.emit({ type: 'text_started', sessionId: this.id, messageId: turnId, timestamp: Date.now() })
     // Keep image_url parts out of the main session history; the agent received them via extras.
     this.messages.push(new HumanMessage(input.content))
 
-    let agentText = ''
     try {
       const invoker = this.agentProv.invoker(cwd)
       // Forward the user's text plus image parts to the image agent. Non-image attachments stay with
       // the main model; mixed-attachment splitting is left for future multi-agent streaming work.
       const agentParts = parts.filter((p) => p.type === 'image_url' || p.type === 'text')
       const imageAttachments = input.attachments?.filter((a) => a.mimeType.startsWith('image/'))
-      agentText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
+      const returnedText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),
         skills: this.configMgr.skills,
         requestApproval,
@@ -893,9 +930,12 @@ export class Session {
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
         attachmentParts: agentParts,
       }, imageAttachments)
+      // Prefer the locally-tee'd streamed text; fall back to the invoker's return value when the
+      // graph's final AIMessage happens to be empty (e.g. tool-call-only final step).
+      agentText = agentText || returnedText
     } catch (err) {
       logInfo('session', 'turn:error', { sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err) })
-      reasoning.close(agent.id)
+      closeReasoningBurst()
       this.emit({ type: 'step_failed', sessionId: this.id, turnId, agentId: agent.id, error: err instanceof Error ? err.message : String(err), timestamp: Date.now() })
       const isAbort = err instanceof Error && err.name === 'AbortError'
       _send({ type: 'error', sessionId: this.id, code: isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
@@ -909,14 +949,18 @@ export class Session {
     this.running = false
     this.abortController = null
     this.endActivity()
-    reasoning.close(agent.id)
+    closeReasoningBurst()
+    const run = trajectory.get(agent.id); if (run) run.finishedAt = Date.now()
     _send({ type: 'agent:finished', sessionId: this.id, turnId, agentId: agent.id })
 
     this.messages.push(new AIMessage(agentText))
     this.emit({ type: 'text_ended', sessionId: this.id, messageId: turnId, content: agentText, timestamp: Date.now() })
-    const turnUsage = sumUsage([...usageByAgent.values()])
-    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() }, { usage: turnUsage })
-    _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now() } })
+    const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => ({ ...r, messageId: turnId, parentAgentId: 'supervisor', ...(usageByAgent.get(r.agentId) ? { usage: usageByAgent.get(r.agentId) } : {}) }))
+    const turnUsage = sumUsage(runs.map((r) => r.usage))
+    const timeline = trajectoryToTimeline(trajectory)
+    const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
+    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() }, { usage: turnUsage, runs })
+    _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now(), timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}) } })
 
     if (isFirstTurn) {
       await this.generateFirstTurnTitle(input, agentText, _send)

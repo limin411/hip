@@ -80,7 +80,7 @@ describe('Session image agent dispatch', () => {
       async invoke(_agentId, task, emit, _signal, _hooks, _extras, attachments) {
         seen.task = task
         seen.attachments = attachments
-        emit.token('V')
+        emit.token('vision result')
         return 'vision result'
       },
     }
@@ -120,6 +120,97 @@ describe('Session image agent dispatch', () => {
     expect(assistantRow).toBeDefined()
     expect(assistantRow!.content).toBe('vision result')
     expect(assistantRow!.agentId).toBe('vis')
+  })
+
+  it('message:complete preserves reasoning, tool calls and agent runs from the image agent', async () => {
+    const imgPath = path.join(scratch, 'test.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const st = makeStore()
+    st.insertSession({ id: 's-trace', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit, _signal, _hooks, _extras, _attachments) {
+        emit.reasoning('Looking at the image')
+        emit.toolStarted('read_file', 'c1', { path: '/tmp/hint.txt' })
+        emit.toolFinished('c1', 'finished', 'the answer is 42')
+        emit.token('42')
+        emit.usage({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
+        return '42'
+      },
+    }
+
+    const runner: ModelRunner = {
+      async run(_m, o) {
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-trace', cfg, undefined, st, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session.sendMessage('what is the answer', send, undefined, [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }])
+
+    const complete = messages.find((m) => m.type === 'message:complete')
+    expect(complete).toBeDefined()
+    expect(complete!.message.content).toBe('42')
+    expect(complete!.message.agentRuns).toHaveLength(1)
+    expect(complete!.message.agentRuns![0].agentId).toBe('vis')
+    expect(complete!.message.agentRuns![0].role).toBe('subagent')
+    expect(complete!.message.agentRuns![0].parentAgentId).toBe('supervisor')
+    expect(complete!.message.toolCalls).toHaveLength(1)
+    expect(complete!.message.toolCalls![0].callId).toBe('c1')
+    expect(complete!.message.timeline?.some((t) => t.kind === 'reasoning' && t.role === 'subagent')).toBe(true)
+    expect(complete!.message.timeline?.some((t) => t.kind === 'tool' && t.callId === 'c1' && t.role === 'subagent')).toBe(true)
+    expect(complete!.message.usage).toEqual({ inputTokens: 10, outputTokens: 5, totalTokens: 15 })
+  })
+
+  it('keeps streamed text when the image agent returns an empty final string', async () => {
+    const imgPath = path.join(scratch, 'test.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const st = makeStore()
+    st.insertSession({ id: 's-empty-return', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit, _signal, _hooks, _extras, _attachments) {
+        emit.token('streamed answer')
+        return ''
+      },
+    }
+
+    const runner: ModelRunner = {
+      async run(_m, o) {
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-empty-return', cfg, undefined, st, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session.sendMessage('describe this', send, undefined, [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }])
+
+    const complete = messages.find((m) => m.type === 'message:complete')
+    expect(complete).toBeDefined()
+    expect(complete!.message.content).toBe('streamed answer')
   })
 
   it('returns a clear error when no image-capable agent is available', async () => {

@@ -122,7 +122,7 @@ export class BackgroundManager {
       persistence?: BackgroundTaskPersistence
     },
   ) {
-    this.maxTasks = opts?.maxTasks ?? 10
+    this.maxTasks = opts?.maxTasks ?? 100
     this.maxRetainedMeta = opts?.maxRetainedMeta ?? 50
     this.persistence = opts?.persistence
   }

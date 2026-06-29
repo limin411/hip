@@ -14,7 +14,6 @@ import { CodeBlock } from './CodeBlock'
 import { ActivityBar } from './ActivityBar'
 import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
-import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 
@@ -85,9 +84,6 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
             <span className="text-caption font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
               {formatClockTime(message.timestamp, locale)}
             </span>
-          )}
-          {message.stopped && (
-            <Badge data-testid="stopped-badge">{t('chat.stopped')}</Badge>
           )}
         </div>
         <div

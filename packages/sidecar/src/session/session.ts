@@ -83,7 +83,12 @@ export function resolveModel(config: SessionConfig): string {
 function lastUserText(messages: BaseMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
-    if (m.getType() === 'human') return typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+    if (m.getType() !== 'human') continue
+    if (typeof m.content === 'string') return m.content
+    // ContentPart[] — return only the user-typed text (first text part),
+    // not attachment content that inflates plan-detection length.
+    const firstText = m.content.find((b): b is { type: 'text'; text: string } => b.type === 'text')
+    return firstText?.text ?? ''
   }
   return ''
 }

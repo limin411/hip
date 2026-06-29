@@ -431,17 +431,17 @@ describe('Session image agent dispatch', () => {
     const send = (msg: ServerMessage) => { messages.push(msg) }
     await session2.regenerate(send)
 
-    const started = messages.find((m) => m.type === 'agent:started' && m.agentId === 'vis')
+    const started = messages.find((m) => m.type === 'agent:started' && m.agentId === 'vis') as Extract<ServerMessage, { type: 'agent:started' }> | undefined
     expect(started).toBeDefined()
     expect(started!.turnId).toBe(interruptedTurnId)
 
     const projection = loadProjection(store.getDb(), 's-reuse')
     const assistantRows = projection.filter((r) => isAssistantStep(r.data))
     expect(assistantRows.length).toBe(2) // first turn + reused image-agent turn
-    const reusedRow = assistantRows.find((r) => r.data.stepId === interruptedTurnId)
+    const reusedRow = assistantRows.find((r) => (r.data as AssistantStepData).stepId === interruptedTurnId)
     expect(reusedRow).toBeDefined()
-    expect(reusedRow!.data.content).toBe('regenerated vision result')
-    expect(reusedRow!.data.finishedAt).not.toBeNull()
+    expect((reusedRow!.data as AssistantStepData).content).toBe('regenerated vision result')
+    expect((reusedRow!.data as AssistantStepData).finishedAt).not.toBeNull()
   })
 
   it('falls through to the text-only main model when no image agent is available during regenerate', async () => {

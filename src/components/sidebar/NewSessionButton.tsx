@@ -18,6 +18,7 @@ export function NewSessionButton({ surface }: NewSessionButtonProps) {
       variant="primary"
       size="sm"
       className="w-full"
+      data-testid="new-session-button"
       onClick={() => sessionService.newConversation(surface)}
     >
       <span>{label}</span>

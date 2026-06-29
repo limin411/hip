@@ -8,9 +8,11 @@ const VITE_PORT = 1420
 const DEFAULT_BINARY = './src-tauri/target/debug/hip'
 const appBinaryPath = process.env.E2E_BINARY || DEFAULT_BINARY
 
-// Isolated data dir so repeated E2E runs do not accumulate sessions.
-const e2eDataDir = process.env.E2E_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-data-'))
-process.env.HIP_DATA_DIR = e2eDataDir
+// Run-level isolated data dir. The embedded Tauri WebDriver provider spawns a
+// single shared app process in its onPrepare hook, so per-worker dirs cannot be
+// honored after the app is running. We create one fresh dir at suite start and
+// use it for the entire run. The harness tracks it for cleanup in onComplete.
+let e2eDataDir: string | undefined
 
 let viteServer: ViteDevServer | undefined
 
@@ -66,7 +68,26 @@ export const config: Options.Testrunner = {
 
   reporters: ['spec'],
 
+  onWorkerStart: async (_cid, _caps, specs) => {
+    // The embedded WebDriver provider spawns a single shared app process, so
+    // per-worker data isolation is not possible. Log the active dir for debugging.
+    fs.appendFileSync('/tmp/hip-e2e-worker.log', `onWorkerStart HIP_DATA_DIR=${process.env.HIP_DATA_DIR} for ${specs?.join(', ') || 'worker'}\n`)
+    console.log(`[e2e] HIP_DATA_DIR=${process.env.HIP_DATA_DIR} for ${specs?.join(', ') || 'worker'}`)
+  },
+
+  beforeSession: async (_config, _capabilities, specs) => {
+    fs.appendFileSync('/tmp/hip-e2e-worker.log', `beforeSession HIP_DATA_DIR=${process.env.HIP_DATA_DIR} for ${specs?.join(', ') || 'session'}\n`)
+  },
+
   onPrepare: async () => {
+    // Set up a fresh data directory BEFORE the Tauri service spawns the app in
+    // its own onPrepare hook. The service inherits process.env and passes it to
+    // the app, so this is the only point where run-level isolation is effective
+    // with the embedded shared-driver mode.
+    e2eDataDir = process.env.E2E_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-data-'))
+    process.env.HIP_DATA_DIR = e2eDataDir
+    console.log(`[e2e] HIP_DATA_DIR=${e2eDataDir}`)
+
     if (await pingVite()) {
       console.log(`[e2e] reusing Vite already running on :${VITE_PORT}`)
     } else {
@@ -85,9 +106,10 @@ export const config: Options.Testrunner = {
       viteServer = undefined
       console.log('[e2e] stopped Vite')
     }
-    // Cleanup isolated data dir unless the user provided one.
-    if (!process.env.E2E_DATA_DIR && fs.existsSync(e2eDataDir)) {
+    // Cleanup the run-level data dir unless the user provided a fixed one.
+    if (!process.env.E2E_DATA_DIR && e2eDataDir && fs.existsSync(e2eDataDir)) {
       fs.rmSync(e2eDataDir, { recursive: true, force: true })
+      console.log(`[e2e] cleaned up ${e2eDataDir}`)
     }
   },
 }

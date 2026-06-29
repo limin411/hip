@@ -248,7 +248,7 @@ export class Session {
         requestApproval,
         mode: 'background',
         sessionId: this.id,
-        networkPolicy: this.networkPolicy,
+        networkPolicy: new NetworkPolicy(),
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       })
@@ -1004,7 +1004,7 @@ export class Session {
         requestApproval,
         permissionMode: mode,
         sessionId: this.id,
-        networkPolicy: this.networkPolicy,
+        networkPolicy: new NetworkPolicy(),
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
         attachmentParts: agentParts,
@@ -1196,7 +1196,7 @@ export class Session {
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
       const existingMessages = taskId ? this.loadSubagentMessages(taskId) : undefined
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
-      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: signal ?? this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
+      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: signal ?? this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: new NetworkPolicy(), toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text)
       return text
     }
@@ -1231,7 +1231,7 @@ export class Session {
         configOptions: () => {},
       }
       try {
-        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? this.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? this.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: this.id, networkPolicy: new NetworkPolicy(), toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
         ensureFinished(childId, text); return text || '(sub-agent produced no output)'
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') throw err
@@ -1720,7 +1720,7 @@ export class Session {
         permissionMode: mode,
         requestApproval,
         sessionId: this.id,
-        networkPolicy: this.networkPolicy,
+        networkPolicy: new NetworkPolicy(),
         toolOutputStore: this.toolOutputStore,
         guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
         ...(priorContext.length > 0 ? { existingMessages: priorContext } : {}),

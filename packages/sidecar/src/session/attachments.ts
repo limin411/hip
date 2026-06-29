@@ -15,6 +15,11 @@ export const MAX_TOTAL_ATTACHMENT_SIZE = 50 * 1024 * 1024
 
 export const SENSITIVE_HOME_DIRS = ['.ssh', '.gnupg', '.aws', '.hip/config']
 
+/** Hidden top-level home directories allowed despite the hidden-directory guard.
+ *  `.hip` is the app's own scratch/config root; `.hip/config` is separately
+ *  guarded by {@link SENSITIVE_HOME_DIRS}. */
+const ALLOWED_HIDDEN_HOME_DIRS = new Set(['.hip'])
+
 export type AttachmentErrorCode =
   | 'ATTACHMENT_UNSUPPORTED'
   | 'ATTACHMENT_TOO_LARGE'
@@ -99,7 +104,7 @@ async function resolveAndValidateAttachmentPath(filePath: string): Promise<{ rea
   const isUnderHome = homeRel && !homeRel.startsWith('..') && !path.isAbsolute(homeRel)
   if (isUnderHome) {
     const topLevel = homeRel.split(path.sep)[0]
-    if (topLevel.startsWith('.')) {
+    if (topLevel.startsWith('.') && !ALLOWED_HIDDEN_HOME_DIRS.has(topLevel)) {
       throw new AttachmentError('ATTACHMENT_INVALID_PATH', `Attachment path is inside a hidden top-level home directory: ${filePath}`)
     }
     for (const sensitive of SENSITIVE_HOME_DIRS) {

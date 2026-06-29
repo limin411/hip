@@ -7,8 +7,8 @@ import type { ApprovalFn } from './tools.js'
 import type { AgentInvoker, InvokerExtras } from './agents/invoker.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 
-/** Signature for the worker subagent runner (task-tool depth-1 subagent). */
-export type RunSubagentFn = (input: string, signal: AbortSignal) => Promise<string>
+/** Signature for the worker subagent runner (task-tool depth-1 subagent or workflow node). */
+export type RunSubagentFn = (input: string, signal: AbortSignal, nodeId?: string) => Promise<string>
 
 /** Optional knobs threaded through to the invoker (MCP tools, skills, approval seam, permission mode). */
 export interface SessionAgentRunnerOpts {
@@ -16,6 +16,7 @@ export interface SessionAgentRunnerOpts {
   skills?: SkillMeta[]
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
+  emit?: (nodeId: string) => GraphEmit
 }
 
 /**
@@ -51,11 +52,11 @@ export function createSessionAgentRunner(
       // Worker-agent shortcut — depth-1 task subagent, not an external provider.
       if (req.agentId === 'worker') {
         if (!subagentRunner) throw new Error('worker subagent runner not configured')
-        const text = await subagentRunner(req.input.text, signal)
+        const text = await subagentRunner(req.input.text, signal, req.nodeId)
         return { text, data: req.input.data }
       }
 
-      // No-op emit — batch DAG, no streaming card to feed.
+      // No-op emit fallback — used when the caller does not supply a per-node emit factory.
       const noopEmit: GraphEmit = {
         token: () => {},
         reasoning: () => {},
@@ -65,6 +66,7 @@ export function createSessionAgentRunner(
         planDelta: () => {},
         compaction: () => {},
       }
+      const emit = opts?.emit?.(req.nodeId) ?? noopEmit
 
       // Auto-reject HITL — orchestrator nodes cannot block waiting for user feedback.
       const hooks: ExternalAgentHooks = {
@@ -83,7 +85,7 @@ export function createSessionAgentRunner(
           : undefined
 
       // The invoker handles agent lookup and throws for unknown/disabled agents.
-      const text = await invoker.invoke(req.agentId, req.input.text, noopEmit, signal, hooks, extras)
+      const text = await invoker.invoke(req.agentId, req.input.text, emit, signal, hooks, extras)
       return { text, data: req.input.data }
     },
   }

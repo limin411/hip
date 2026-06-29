@@ -23,7 +23,7 @@ function mockInvoker(returnText: string, fn?: (emit: GraphEmit, hooks: ExternalA
 
 /** Build a mock subagent runner. */
 function mockSubagentRunner(returnText: string) {
-  return vi.fn(async (_input: string, _signal: AbortSignal) => returnText)
+  return vi.fn(async (_input: string, _signal: AbortSignal, _nodeId?: string) => returnText)
 }
 
 describe('createSessionAgentRunner', () => {
@@ -34,7 +34,7 @@ describe('createSessionAgentRunner', () => {
 
     const out = await adapter.run(reqFor('worker', 'do the task'), new AbortController().signal)
     expect(out).toEqual({ text: 'worker output', data: undefined })
-    expect(runner).toHaveBeenCalledWith('do the task', expect.any(AbortSignal))
+    expect(runner).toHaveBeenCalledWith('do the task', expect.any(AbortSignal), 'n1')
   })
 
   it('① throws when worker subagentRunner not configured', async () => {

@@ -661,4 +661,60 @@ describe('Session image agent dispatch', () => {
     expect(messages.some((m) => m.type === 'agent:started' && m.agentId === 'vis')).toBe(true)
     expect(messages.some((m) => m.type === 'agent:finished' && m.agentId === 'vis')).toBe(true)
   })
+
+  it('persists image-agent timeline and runs so session:load still shows the sub-agent card', async () => {
+    const imgPath = path.join(scratch, 'test.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "you are a vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { db, store, eventStore, snapshotStore } = makeStoreWithEventAndSnapshot()
+    store.insertSession({ id: 's-persist', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit, _signal, _hooks, _extras, _attachments) {
+        emit.reasoning('Looking at the image')
+        emit.toolStarted('read_file', 'c1', { path: '/tmp/hint.txt' })
+        emit.toolFinished('c1', 'finished', 'the answer is 42')
+        emit.token('42')
+        return '42'
+      },
+    }
+
+    const runner: ModelRunner = {
+      async run(_m, o) {
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-persist', cfg, undefined, store, async () => 'title', 10_000, runner, undefined, () => invoker, scratch)
+
+    const messages: ServerMessage[] = []
+    const send = (msg: ServerMessage) => { messages.push(msg) }
+    await session.sendMessage('what is the answer', send, undefined, [{ id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath }])
+
+    const complete = messages.find((m) => m.type === 'message:complete')
+    expect(complete).toBeDefined()
+
+    // Simulate a session:load (e.g. reconnect or Code-session refresh) and verify the sub-agent
+    // activity survives in the persisted projection.
+    const loaded = store.loadMessagesWithRuns('s-persist')
+    const assistantRow = loaded.find((m) => m.role === 'assistant')
+    expect(assistantRow).toBeDefined()
+    expect(assistantRow!.content).toBe('42')
+    expect(assistantRow!.timeline?.some((t) => t.kind === 'reasoning')).toBe(true)
+    expect(assistantRow!.timeline?.some((t) => t.kind === 'tool' && t.callId === 'c1')).toBe(true)
+    expect(assistantRow!.agentRuns).toHaveLength(1)
+    expect(assistantRow!.agentRuns![0].agentId).toBe('vis')
+    expect(assistantRow!.agentRuns![0].role).toBe('subagent')
+    expect(assistantRow!.agentRuns![0].parentAgentId).toBe('supervisor')
+
+    db.close()
+  })
 })

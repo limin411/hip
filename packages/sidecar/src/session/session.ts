@@ -959,7 +959,14 @@ export class Session {
     const turnUsage = sumUsage(runs.map((r) => r.usage))
     const timeline = trajectoryToTimeline(trajectory)
     const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
-    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: agent.id, timestamp: Date.now() }, { usage: turnUsage, runs })
+    // Persist with agentId='supervisor' so insertTurnBody is invoked and the legacy messages table
+    // stores timeline + agentRuns. Without this, a later session:load (common in Code sessions with
+    // cwd/project state) returns a stripped message and the sub-agent activity vanishes.
+    this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: 'supervisor', timestamp: Date.now() }, {
+      usage: turnUsage,
+      runs,
+      assistant: agentText ? { id: turnId, sessionId: this.id, agentId: agent.id, content: agentText, timestamp: Date.now(), timeline } : null,
+    })
     _send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now(), timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}) } })
 
     if (isFirstTurn) {
@@ -1044,10 +1051,14 @@ export class Session {
     }
     const ensureFinished = (agentId: string, output: string) => {
       if (!started.has(agentId)) return; closeReasoning(agentId)
-      const r = trajectory.get(agentId); if (r) { r.output = output; r.finishedAt = Date.now() }
+      const r = trajectory.get(agentId)
+      // Prefer the explicit final output, but fall back to the tee'd streamed output when the
+      // invoker/runSubagent happens to return an empty string (e.g. tool-call-only final step).
+      const effectiveOutput = output || r?.output || ''
+      if (r) { r.output = effectiveOutput; r.finishedAt = Date.now() }
       started.delete(agentId); send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
       const stepId = this.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId)
-      this.emit({ type: 'text_ended', sessionId: this.id, messageId: stepId, content: output, timestamp: Date.now() })
+      this.emit({ type: 'text_ended', sessionId: this.id, messageId: stepId, content: effectiveOutput, timestamp: Date.now() })
       if (agentId !== 'supervisor') {
         this.emit({ type: 'step_ended', sessionId: this.id, turnId: stepId, agentId, timestamp: Date.now() })
       }
@@ -1113,7 +1124,7 @@ export class Session {
 
     const retrySubagentWrapper = async (agentId: string): Promise<string> => {
       ensureStarted(agentId, 'worker', 'supervisor', 'retrying', agentId)
-      const text = await this.retrySubagent(agentId, send)
+      const text = await this.retrySubagent(agentId, send, makeEmit(agentId, 'worker'))
       ensureFinished(agentId, text)
       return text
     }
@@ -1579,8 +1590,12 @@ export class Session {
    * Retry a previously failed or interrupted subagent with the original task
    * description. Prior message history (before the failed turn) is preserved;
    * the failed turn itself is excluded so the retry starts clean.
+   *
+   * When called from inside runTurn, pass a real `emit` so tokens/reasoning/tools
+   * are recorded as part of the current turn. When called standalone, emit is
+   * omitted and the method emits its own agent:started/finished lifecycle events.
    */
-  async retrySubagent(agentId: string, send: SendFn): Promise<string> {
+  async retrySubagent(agentId: string, send: SendFn, emit?: GraphEmit): Promise<string> {
     const instance = this.subagentInstances.get(agentId)
     if (!instance) return `Error: subagent ${agentId} not found`
     if (!this.spawnedSubagentIds.has(agentId)) return `Error: ${agentId} is not a known subagent`
@@ -1607,7 +1622,11 @@ export class Session {
     const requestApproval = this.permissions.buildRequestApproval(send, this.id, '', () => 0, mode, this.hooks)
 
     const turnId = `retry-${agentId}-${Date.now()}`
-    send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role: 'worker', taskId: agentId, taskInput: retryDescription })
+    const standalone = emit == null
+    const effectiveEmit = emit ?? { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} }
+    if (standalone) {
+      send({ type: 'agent:started', sessionId: this.id, turnId, agentId, role: 'worker', taskId: agentId, taskInput: retryDescription })
+    }
 
     let result = ''
     try {
@@ -1615,7 +1634,7 @@ export class Session {
         runner,
         root: cwd,
         summarizer,
-        emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
+        emit: effectiveEmit,
         signal: new AbortController().signal,
         description: retryDescription,
         childMaxSteps: CHILD_MAX_STEPS,
@@ -1632,7 +1651,9 @@ export class Session {
       result = `Error: ${msg}`
     }
 
-    send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+    if (standalone) {
+      send({ type: 'agent:finished', sessionId: this.id, turnId, agentId })
+    }
     return result
   }
 

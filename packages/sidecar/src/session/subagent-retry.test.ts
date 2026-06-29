@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { AIMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import type { ServerMessage } from '@hip/protocol'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
+import type { GraphEmit } from './graph.js'
 import { Session } from './session.js'
 import { buildSubagentTools } from './tools/subagent.js'
 import { buildAllTools } from './tools/index.js'
@@ -199,6 +200,30 @@ describe('Session.retrySubagent()', () => {
     const result = await s.retrySubagent('worker-err', fakeSend)
     expect(result).toContain('Error:')
     expect(result).toContain('model crashed')
+  })
+
+  it('forwards streamed tokens to an external emit when provided', async () => {
+    const session = mkSession(fakeRunner('retry streamed'))
+    ;(session as unknown as { spawnedSubagentIds: Set<string> }).spawnedSubagentIds.add('worker-emit')
+    ;(session as unknown as { subagentInstances: Map<string, { description: string }> }).subagentInstances.set('worker-emit', { description: 'original task' })
+
+    const emitted: string[] = []
+    const emit: GraphEmit = {
+      token: (delta) => emitted.push(delta),
+      reasoning: () => {},
+      toolStarted: () => {},
+      toolFinished: () => {},
+      usage: () => {},
+      planDelta: () => {},
+      compaction: () => {},
+    }
+
+    const result = await session.retrySubagent('worker-emit', fakeSend, emit)
+    expect(result).toBe('retry streamed')
+    expect(emitted).toContain('retry streamed')
+    // With emit provided, retrySubagent does not send its own agent:started/finished lifecycle events
+    expect(fakeSend).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'agent:started', agentId: 'worker-emit' }))
+    expect(fakeSend).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'agent:finished', agentId: 'worker-emit' }))
   })
 })
 

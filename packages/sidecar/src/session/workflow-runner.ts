@@ -1,5 +1,6 @@
 import type { ServerMessage, SessionConfig, AgentRole, WorkflowDef, OrchestratorEvent } from '@hip/protocol'
 import type { TraceRun } from './tool-trace.js'
+import { ReasoningTracker, stringify } from './tool-trace.js'
 import { IdleWatchdog } from './idle-watchdog.js'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
@@ -8,6 +9,7 @@ import { createSessionAgentRunner } from './orchestrator-adapter.js'
 import { runSubagent } from './subagent.js'
 import { CHILD_MAX_STEPS } from './loop-control.js'
 import type { OrchestratorEventSink, AgentRunner } from '../orchestrator/ports.js'
+import type { GraphEmit } from './graph.js'
 import type { AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
 import type { NetworkPolicy } from './network-policy.js'
@@ -45,8 +47,10 @@ export async function runWorkflowTurn(
 
   const turnId = `asst-supervisor-${Date.now()}`
   const trajectory = new Map<string, TraceRun>()
-  let agentSeq = 0
+  let agentSeq = 0; let stepSeq = 0
+  const nextSeq = () => stepSeq++
   const started = new Set<string>()
+  const reasoning = new ReasoningTracker(nextSeq)
 
   const ensureStarted = (agentId: string, role: AgentRole, parentAgentId?: string, taskInput?: string) => {
     if (started.has(agentId)) return
@@ -71,6 +75,48 @@ export async function runWorkflowTurn(
     started.clear()
   }
 
+  const makeEmit = (agentId: string, role: AgentRole): GraphEmit => {
+    const closeReasoning = () => {
+      const burst = reasoning.close(agentId)
+      if (burst) {
+        const r = trajectory.get(agentId)
+        if (r) r.reasoningBursts.push(burst)
+      }
+    }
+    return {
+      token: (delta) => {
+        if (!delta) return
+        const r = trajectory.get(agentId)
+        if (r) r.output += delta
+        send({ type: 'token:stream', sessionId: deps.id, turnId, agentId, delta })
+      },
+      reasoning: (delta) => {
+        if (!delta) return
+        send({ type: 'reasoning:delta', sessionId: deps.id, turnId, agentId, role, stepSeq: reasoning.push(agentId, delta), delta })
+      },
+      toolStarted: (name, callId, input) => {
+        closeReasoning()
+        const seq = nextSeq()
+        const r = trajectory.get(agentId)
+        if (r) r.toolCalls.set(callId, { callId, agentId, name, input: stringify(input), status: 'running', seq })
+        send({ type: 'tool:started', sessionId: deps.id, turnId, agentId, role, callId, name, input: stringify(input), seq })
+      },
+      toolFinished: (callId, status, output, error) => {
+        const r = trajectory.get(agentId)
+        const tc = r?.toolCalls.get(callId)
+        if (tc) {
+          tc.status = status
+          if (output !== undefined) tc.output = output
+          if (error !== undefined) tc.error = error
+        }
+        send({ type: 'tool:finished', sessionId: deps.id, turnId, agentId, callId, status, ...(output !== undefined ? { output } : {}), ...(error ? { error } : {}) })
+      },
+      usage: () => {},
+      planDelta: () => {},
+      compaction: () => {},
+    }
+  }
+
   let runner: AgentRunner
   if (deps.orchestratorRunner) {
     runner = deps.orchestratorRunner
@@ -79,12 +125,13 @@ export async function runWorkflowTurn(
     runner = createSessionAgentRunner(
       cwd,
       deps.invokerFactory,
-      async (input: string, signal: AbortSignal): Promise<string> => {
+      async (input: string, signal: AbortSignal, nodeId?: string): Promise<string> => {
+        const agentId = nodeId ?? 'worker'
         return runSubagent({
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
-          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
+          emit: makeEmit(agentId, 'worker'),
           signal,
           description: input,
           childMaxSteps: CHILD_MAX_STEPS,
@@ -95,6 +142,7 @@ export async function runWorkflowTurn(
           guardianReviewer: deps.guardianReviewer,
         })
       },
+      { emit: (nodeId) => makeEmit(nodeId, 'subagent') },
     )
     deps.orchestratorRunner = runner
   }
@@ -144,7 +192,7 @@ export async function runWorkflowTurn(
           runner: deps.modelRunner(),
           root: deps.config.cwd ?? process.cwd(),
           summarizer: deps.summarizer(),
-          emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
+          emit: makeEmit('aggregator', 'supervisor'),
           signal: abortController.signal,
           description: `You are an aggregator. Merge these subagent results into one coherent summary:\n\n${rawTexts.join('\n\n---\n\n')}`,
           childMaxSteps: CHILD_MAX_STEPS,

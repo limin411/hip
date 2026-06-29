@@ -57,4 +57,31 @@ describe('dispatch -> internal managed agent (end-to-end)', () => {
       .join('')
     expect(supervisorText).toContain('The reviewer said: looks good.')
   })
+
+  it('keeps streamed sub-agent output when the internal agent returns an empty string', async () => {
+    registerAgent(internalAgent)
+
+    const supervisorModel = makeToolCallingModel(
+      { agent: 'reviewer', task: 'review /a.ts' },
+      'The reviewer said: looks good.',
+    )
+
+    const invokerFactory = (cwd: string) => createAgentInvoker(cwd, {
+      runInternal: (a) => runManagedAgent({
+        resolved: a.resolved, cwd: a.cwd, prompt: a.prompt,
+        task: a.task, emit: a.emit, signal: a.signal, childMaxSteps: 5,
+        runner: makeTextRunner('looks good'),
+        summarizer: { async summarize() { return '' } },
+      }).then(() => ''), // simulate empty return while tokens were streamed
+    })
+
+    const session = makeSessionWithInvokerFactory('s-internal-empty', supervisorModel, invokerFactory)
+    const msgs = await collect(session, 'please review')
+
+    const complete = msgs.find((m): m is Extract<ServerMessage, { type: 'message:complete' }> => m.type === 'message:complete')
+    expect(complete).toBeDefined()
+    const subRun = complete!.message.agentRuns?.find((r) => r.role === 'subagent')
+    expect(subRun).toBeDefined()
+    expect(subRun!.output).toBe('looks good')
+  })
 })

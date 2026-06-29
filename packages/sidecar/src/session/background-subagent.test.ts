@@ -95,6 +95,29 @@ describe('foreground subagent (no regression)', () => {
     expect(started.length).toBeGreaterThanOrEqual(1)
     expect(finished.length).toBeGreaterThanOrEqual(1)
   })
+
+  it('keeps streamed foreground sub-agent output when the internal runner returns empty', async () => {
+    class EmptyReturnRunner implements ModelRunner {
+      private call = 0
+      async run(_msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+        this.call += 1
+        if (this.call === 1) {
+          return new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'research' }, id: 'c1', type: 'tool_call' }] })
+        }
+        // The foreground sub-agent streams tokens but returns an empty final string.
+        opts.onText?.('streamed result')
+        return new AIMessage('')
+      }
+    }
+    const session = makeRunnerSession('s-fg-empty', new EmptyReturnRunner())
+    const events = await collect(session, 'please research')
+
+    const complete = events.find((e): e is Extract<ServerMessage, { type: 'message:complete' }> => e.type === 'message:complete')
+    expect(complete).toBeDefined()
+    const subRun = complete!.message.agentRuns?.find((r) => r.role === 'worker')
+    expect(subRun).toBeDefined()
+    expect(subRun!.output).toBe('streamed result')
+  })
 })
 
 describe('background subagent mode', () => {

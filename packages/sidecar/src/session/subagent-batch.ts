@@ -8,8 +8,6 @@ export interface QueuedSubagentTask {
   prompt: string
   /** Human-readable description (used in tool schemas / logging). */
   description: string
-  /** Execution mode: foreground blocks, background returns immediately. Default foreground. */
-  mode?: 'foreground' | 'background'
   /** Optional per-task abort signal. When aborted the runner promise rejects. */
   signal?: AbortSignal
 }

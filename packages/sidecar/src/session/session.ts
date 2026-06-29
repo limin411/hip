@@ -52,7 +52,7 @@ import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
 import { SessionInputQueue, type SessionInput } from './session-input.js'
 import { prepareSessionContext, type SessionContextState } from './session-context.js'
-import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
+import { validateAttachments, stageAttachments, buildAttachmentContentParts, splitAttachments, type AttachmentPayload } from './attachments.js'
 import { defaultScratchRoot, scratchDirFor } from './scratch.js'
 import {
   ContextInjectorRegistry,
@@ -174,8 +174,8 @@ export class Session {
   /** @deprecated Use backgroundManager.tasks instead. Kept for test backward-compat. */
   get backgroundTasks(): Map<string, Promise<void>> { return this.backgroundManager.tasks }
   /** @deprecated Use backgroundManager.meta instead. Kept for internal backward-compat. */
-  private get backgroundTaskMeta(): Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }> {
-    return this.backgroundManager.meta as Map<string, { description: string; status: 'running' | 'completed' | 'failed'; result?: string; error?: string }>
+  private get backgroundTaskMeta(): Map<string, { description: string; status: 'running' | 'completed' | 'failed' | 'lost'; result?: string; error?: string }> {
+    return this.backgroundManager.meta as Map<string, { description: string; status: 'running' | 'completed' | 'failed' | 'lost'; result?: string; error?: string }>
   }
   private readonly spawnedSubagentIds = new Set<string>()
   private readonly subagentInstances: Map<string, { description: string }> = new Map()
@@ -628,77 +628,155 @@ export class Session {
     if (!this.requireCompatibleModel(_send)) return ''
     if (!this.requireApiKey(_send)) return ''
 
-    const hasImageAttachment = input.attachments?.some((a) => a.mimeType.startsWith('image/'))
+    const modelSupportsImages = this.currentModelSupportsImages()
+
+    // Split attachments when the main model is text-only. Multimodal attachments
+    // (image/PDF/video) are routed to an image agent; text attachments stay with
+    // the main model together with the user's text prompt.
+    // When the model IS multimodal, no splitting is needed (existing behavior).
+    const { multimodal, text } = input.attachments?.length && !modelSupportsImages
+      ? splitAttachments(input.attachments)
+      : { multimodal: [] as AttachmentPayload[], text: (input.attachments ?? []) as AttachmentPayload[] }
+
+    const hasMultimodalForAgent = multimodal.length > 0
 
     const userTs = Date.now()
     let isFirstTurn = false
     const parts: ContentPart[] = []
     if (input.content) parts.push({ type: 'text', text: input.content })
 
-    const modelSupportsImages = this.currentModelSupportsImages()
-    const needsImageAgent = hasImageAttachment && !modelSupportsImages
-    let imageAgent: AgentConfig | null = null
-    let imageAgentError: string | null = null
-    if (needsImageAgent) {
-      try {
-        imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
-      } catch (err) {
-        imageAgentError = err instanceof Error ? err.message : String(err)
-        console.warn('Failed to select image agent:', imageAgentError)
+    // Preprocess multimodal attachments with an image agent when the main model is text-only.
+    if (hasMultimodalForAgent) {
+      await validateAttachments(multimodal)
+      const { staged: mStaged, stagedPaths: mStagedPaths } = await stageAttachments(this.id, multimodal, this.scratchRoot)
+      const mParts = await buildAttachmentContentParts(multimodal, mStagedPaths)
+      // Only image_url parts are forwarded to the image agent (the agent's bound
+      // multimodal model is responsible for visual analysis). Non-image multimodal
+      // parts (e.g. extracted PDF text) stay with the main model.
+      const imageParts = mParts.filter((p) => p.type === 'image_url')
+      const multimodalTextParts = mParts.filter((p) => p.type !== 'image_url')
+      parts.push(...multimodalTextParts)
+
+      // Process text attachments before emitting so we can combine all staged
+      // attachments and content parts into a single user_message event.
+      let tStaged: Attachment[] = []
+      let tParts: ContentPart[] = []
+      if (text.length > 0) {
+        await validateAttachments(text)
+        const result = await stageAttachments(this.id, text, this.scratchRoot)
+        tStaged = result.staged
+        tParts = await buildAttachmentContentParts(text, result.stagedPaths)
+        parts.push(...tParts)
+      }
+
+      if (this.store) {
+        isFirstTurn = !this.store.hasMessages(this.id)
+        const allStaged = [...mStaged, ...tStaged]
+        const allContentParts = [parts[0], ...imageParts, ...multimodalTextParts, ...tParts]
+        const historyParts = isRichContentParts(allContentParts) ? allContentParts : undefined
+        this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: allStaged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
+      }
+
+      // Select image agent early so error handling can short-circuit before hooks/activity.
+      let imageAgent: AgentConfig | null = null
+      let imageAgentError: string | null = null
+      if (imageParts.length > 0) {
+        try {
+          imageAgent = selectImageAgent(this._config.cwd ?? process.cwd(), input.content)
+        } catch (err) {
+          imageAgentError = err instanceof Error ? err.message : String(err)
+          console.warn('Failed to select image agent:', imageAgentError)
+        }
+      }
+      if (imageParts.length > 0 && !imageAgent) {
+        this.endActivity()
+        this.messages.push(new HumanMessage(input.content))
+        const message = imageAgentError
+          ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`
+          : 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.'
+        _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message })
+        return ''
+      }
+
+      // Run the image agent after hooks/activity (below) so processInput starts the
+      // activity that the image agent turn owns. For image-only attachments, the
+      // image agent result IS the final answer — we return early without running the
+      // main model. For mixed (image + text) attachments, we merge the vision result
+      // into the user prompt and fall through to the main model.
+      const runImageAgent = async () => {
+        if (input.type === 'message') {
+          if (this.activeActivity) this.endActivity()
+          this.startActivity(input.content)
+        }
+        const visionResult = await this.runManagedAgentTurn(
+          { type: 'message', content: input.content, messageId: input.messageId, attachments: multimodal },
+          imageAgent!,
+          imageParts,
+          _send,
+          isFirstTurn,
+        )
+        const mergedContent = input.content
+          ? `${input.content}\n\n[Image: ${visionResult}]`
+          : `[Image: ${visionResult}]`
+        return { visionResult, mergedContent }
+      }
+
+      // Standard hooks, activity, and image agent dispatch — mirror the original
+      // processInput flow (lines that ran before the old imageAgent dispatch).
+      if (this.store && isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(input.content)) === 1) {
+        _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(input.content) })
+      }
+      const promptResult = await this.hooks.fire('UserPromptSubmit', { sessionId: this.id }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+      if (promptResult.kind !== 'allow') {
+        _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
+        return ''
+      }
+      if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch((err) => logNonCritical('SessionStart', err))
+
+      if (imageAgent) {
+        const { visionResult, mergedContent } = await runImageAgent()
+        parts[0] = { type: 'text', text: mergedContent }
+
+        // Image-only: no text/file attachments to process — the image agent IS the answer.
+        if (text.length === 0 && multimodalTextParts.length === 0) {
+          return visionResult
+        }
+        // Mixed attachments: fall through to main model.
       }
     }
 
-    if (input.attachments?.length) {
+    // Handle text attachments (or all attachments when model IS multimodal).
+    if (input.attachments?.length && !hasMultimodalForAgent) {
       await validateAttachments(input.attachments)
-      const staged = await stageAttachments(this.id, input.attachments, this.scratchRoot)
-      const attachmentParts = await buildAttachmentContentParts(input.attachments)
+      const { staged, stagedPaths } = await stageAttachments(this.id, input.attachments, this.scratchRoot)
+      const attachmentParts = await buildAttachmentContentParts(input.attachments, stagedPaths)
       parts.push(...attachmentParts)
       if (this.store) {
         isFirstTurn = !this.store.hasMessages(this.id)
-        // Persist the full content parts so that interrupted image-agent turns can be
-        // reconstructed after restart. Image parts are stripped from the main model prompt
-        // at invocation time, not by omitting them from durable storage.
         const historyParts = isRichContentParts(parts) ? parts : undefined
         this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs, attachments: staged, ...(historyParts?.length ? { contentParts: historyParts } : {}) })
       }
-    } else if (this.store) {
+    } else if (this.store && !hasMultimodalForAgent) {
       isFirstTurn = !this.store.hasMessages(this.id)
       this.emit({ type: 'user_message', sessionId: this.id, content: input.content, messageId: input.messageId ?? `u-${userTs}`, timestamp: userTs })
     }
 
-    if (this.store && isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(input.content)) === 1) {
-      _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(input.content) })
+    // Standard title/hooks/activity for non-split cases (multimodal split handled its own above).
+    if (!hasMultimodalForAgent) {
+      if (this.store && isFirstTurn && this.store.updateTitleIfAuto(this.id, deriveTitle(input.content)) === 1) {
+        _send({ type: 'session:title', sessionId: this.id, title: deriveTitle(input.content) })
+      }
+      const promptResult = await this.hooks.fire('UserPromptSubmit', { sessionId: this.id }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+      if (promptResult.kind !== 'allow') {
+        _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
+        return ''
+      }
+      if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch((err) => logNonCritical('SessionStart', err))
     }
-
-    const promptResult = await this.hooks.fire('UserPromptSubmit', { sessionId: this.id }).catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
-    if (promptResult.kind !== 'allow') {
-      _send({ type: 'error', sessionId: this.id, code: 'HOOK_DENIED', message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}` })
-      return ''
-    }
-    if (isFirstTurn) void this.hooks.fire('SessionStart', { sessionId: this.id }).catch((err) => logNonCritical('SessionStart', err))
 
     if (input.type === 'message') {
       if (this.activeActivity) this.endActivity()
       this.startActivity(input.content)
-    }
-
-    if (imageAgent) {
-      // TODO: when the turn also contains non-image attachments (e.g. PDF),
-      // those parts are currently forwarded to the image agent. The spec says
-      // PDF/text should stay with the main model; implement splitting once we
-      // can run multiple sub-agents or stream both branches.
-      return this.runManagedAgentTurn(input, imageAgent, parts, _send, isFirstTurn)
-    }
-
-    if (needsImageAgent) {
-      this.endActivity()
-      // Keep in-memory history in sync with the persisted user_message event.
-      this.messages.push(new HumanMessage(input.content))
-      const message = imageAgentError
-        ? `Image agent selection failed: ${imageAgentError}. Please enable a multimodal agent or switch to a multimodal model.`
-        : 'No image-capable agent is available. Please enable a multimodal agent or switch to a multimodal model.'
-      _send({ type: 'error', sessionId: this.id, code: 'NO_IMAGE_AGENT', message })
-      return ''
     }
 
     this.messages.push(parts.length === 1 && parts[0].type === 'text'
@@ -774,8 +852,9 @@ export class Session {
 
     if (attachments?.length) {
       await validateAttachments(attachments)
-      staged = await stageAttachments(this.id, attachments, this.scratchRoot)
-      const attachmentParts = await buildAttachmentContentParts(attachments)
+      const result = await stageAttachments(this.id, attachments, this.scratchRoot)
+      staged = result.staged
+      const attachmentParts = await buildAttachmentContentParts(attachments, result.stagedPaths)
       parts.push(...attachmentParts)
     }
 
@@ -915,9 +994,9 @@ export class Session {
 
     try {
       const invoker = this.agentProv.invoker(cwd)
-      // Forward the user's text plus image parts to the image agent. Non-image attachments stay with
-      // the main model; mixed-attachment splitting is left for future multi-agent streaming work.
-      const agentParts = parts.filter((p) => p.type === 'image_url' || p.type === 'text')
+      // Forward only image_url parts to the image agent (text parts are handled by the main model
+      // after multimodal attachment splitting in processInput).
+      const agentParts = parts.filter((p) => p.type === 'image_url')
       const imageAttachments = input.attachments?.filter((a) => a.mimeType.startsWith('image/'))
       const returnedText = await invoker.invoke(agent.id, input.content, emit, this.abortController.signal, undefined, {
         mcpTools: mcpManager.tools(),
@@ -1103,7 +1182,7 @@ export class Session {
     })
     const emit = makeEmit('supervisor', 'supervisor')
     let subagentSeq = 0
-    const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground', taskId?: string): Promise<string> => {
+    const spawnSubagent = async (description: string, subagentMode: 'foreground' | 'background' = 'foreground', taskId?: string, signal?: AbortSignal): Promise<string> => {
       const childId = taskId ?? `worker-${++subagentSeq}`
       this.spawnedSubagentIds.add(childId)
       this.subagentInstances.set(childId, { description })
@@ -1117,7 +1196,7 @@ export class Session {
       if (taskId && this.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
       const existingMessages = taskId ? this.loadSubagentMessages(taskId) : undefined
       ensureStarted(childId, 'worker', 'supervisor', description, taskId)
-      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
+      const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: signal ?? this.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
       ensureFinished(childId, text)
       return text
     }
@@ -1138,7 +1217,7 @@ export class Session {
     let contextMessages: BaseMessage[] = []
     let system = ''
 
-    const dispatchAgent = async (agentId: string, task: string): Promise<string> => {
+    const dispatchAgent = async (agentId: string, task: string, overrideSignal?: AbortSignal): Promise<string> => {
       const cfg = enabledAgents.find((a) => a.id === agentId)
       if (!cfg) return `Error: unknown or disabled agent ${agentId}`
       const childId = `subagent-${++subagentSeq}`
@@ -1152,7 +1231,7 @@ export class Session {
         configOptions: () => {},
       }
       try {
-        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), this.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
+        const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? this.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: this.id, networkPolicy: this.networkPolicy, toolOutputStore: this.toolOutputStore, guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
         ensureFinished(childId, text); return text || '(sub-agent produced no output)'
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') throw err
@@ -1198,7 +1277,7 @@ export class Session {
         skills,
         mcpConfigs: this.configMgr.mcpConfigs,
         enabledAgents,
-        dispatch: enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), run: dispatchAgent } : undefined,
+        dispatch: enabledAgents.length ? { agents: enabledAgents.map((a) => ({ id: a.id, name: a.name, description: a.description })), signal: this.abortController!.signal, run: dispatchAgent } : undefined,
         spawnSubagent,
         retrySubagent: retrySubagentWrapper,
         stopBackgroundTask: (taskId, reason) => this.backgroundManager.stop(taskId, reason),

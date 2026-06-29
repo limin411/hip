@@ -8,7 +8,7 @@ import { safeErrorMessage } from './error.js'
 /** Extended metadata for a single background task. */
 export interface BackgroundTaskMeta {
   description: string
-  status: 'running' | 'completed' | 'failed' | 'killed'
+  status: 'running' | 'completed' | 'failed' | 'killed' | 'lost'
   result?: string
   error?: string
   abortController: AbortController
@@ -227,7 +227,7 @@ export class BackgroundManager {
    *
    * Returns:
    * - `"killed"` — task was running and has been aborted
-   * - `"already terminal"` — task was already completed/failed/killed
+   * - `"already terminal"` — task was already completed/failed/killed/lost
    * - `"not found"` — no task with this ID exists
    */
   stop(taskId: string, reason?: string): string {
@@ -270,6 +270,7 @@ export class BackgroundManager {
       if (m.status === 'completed' && m.result !== undefined) return m.result
       if (m.status === 'failed') return `Error: ${m.error ?? 'unknown error'}`
       if (m.status === 'killed') return `Error: ${m.error ?? 'task was killed'}`
+      if (m.status === 'lost') return `Error: lost: ${m.error ?? 'task was lost'}`
       return `Error: background task ${taskId} is ${m.status} with no result`
     }
 
@@ -291,6 +292,7 @@ export class BackgroundManager {
     if (m.status === 'completed' && m.result !== undefined) return m.result
     if (m.status === 'failed') return `Error: ${m.error ?? 'unknown error'}`
     if (m.status === 'killed') return `Error: ${m.error ?? 'task was killed'}`
+    if (m.status === 'lost') return `Error: lost: ${m.error ?? 'task was lost'}`
     return `Error: unknown status ${m.status}`
   }
 
@@ -380,7 +382,7 @@ export class BackgroundManager {
         const ac = new AbortController()
         const meta: BackgroundTaskMeta = {
           description: taskId,
-          status: 'killed',
+          status: 'lost',
           error: 'process terminated while task was running',
           abortController: ac,
         }
@@ -390,7 +392,7 @@ export class BackgroundManager {
         this.meta.set(taskId, meta)
 
         this.persistence.flushMeta(this.sessionId, taskId, {
-          status: 'killed',
+          status: 'lost',
           error: meta.error,
         })
 

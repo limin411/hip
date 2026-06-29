@@ -35,6 +35,29 @@ describe('dispatch_agent end-to-end (nested sub-agent)', () => {
     expect(events.some((e) => e.type === 'token:stream' && e.delta === 'all done')).toBe(false)
   })
 
+  it('dispatch_agent propagates abort signal through DispatchSpec — cancel reaches invoker', async () => {
+    registerAgent({ id: 'echo', name: 'Echo' })
+    const model = makeToolCallingModel({ agent: 'echo', task: 'do it' }, 'all done')
+    // Stub that blocks until aborted — verifies the signal reaches the invoker.
+    let receivedSignal: AbortSignal | undefined
+    const stub: StubInvoke = (_id, _task, _emit, signal) =>
+      new Promise<string>((resolve, reject) => {
+        receivedSignal = signal
+        signal.addEventListener('abort', () => { const e = new Error('Cancelled'); e.name = 'AbortError'; reject(e) }, { once: true })
+      })
+    const session = makeSession('s-dispatch-sig', model, stub)
+    const events = await collect(session, 'delegate and abort', (m) => {
+      if (m.type === 'agent:started' && m.role === 'subagent') session.cancel()
+    })
+    // Verify the invoker received a real AbortSignal and the turn ended as CANCELLED.
+    expect(receivedSignal).toBeInstanceOf(AbortSignal)
+    expect(receivedSignal!.aborted).toBe(true)
+    const err = events.find((e): e is Extract<ServerMessage, { type: 'error' }> => e.type === 'error')
+    expect(err?.code).toBe('CANCELLED')
+    // Supervisor must NOT have resumed.
+    expect(events.some((e) => e.type === 'token:stream' && e.delta === 'all done')).toBe(false)
+  })
+
   it('message:complete preserves the dispatched sub-agent run and timeline', async () => {
     registerAgent({ id: 'echo', name: 'Echo' })
     const model = makeToolCallingModel({ agent: 'echo', task: 'do it' }, 'all done')

@@ -26,8 +26,8 @@ export interface RunManagedAgentArgs {
   prompt: string                      // persona
   task: string
   attachments?: AttachmentPayload[]   // image/document attachments rendered as content parts in the human message
-  /** Pre-built content parts; skips re-validation/re-reading attachments. When provided, the caller
-   *  must include any task text as the first text part; `task` is ignored in that case. */
+  /** Pre-built content parts; skips re-validation/re-reading attachments. When provided with a
+   *  non-empty `task`, the task text is automatically prepended as the first content part. */
   attachmentParts?: ContentPart[]
   emit: GraphEmit
   signal: AbortSignal
@@ -63,9 +63,10 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const ctx: GraphCtx = { runner, tools, emit, summarizer, sessionId: args.sessionId ?? 'managed-agent', toolOutputStore, guardianReviewer }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {
-    humanParts = attachmentParts
     if (task) {
-      console.warn('runManagedAgent: task is ignored when attachmentParts is provided')
+      humanParts = [{ type: 'text', text: task }, ...attachmentParts]
+    } else {
+      humanParts = attachmentParts
     }
   } else {
     humanParts = []

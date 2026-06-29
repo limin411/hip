@@ -12,7 +12,8 @@ import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import { EventStore, SnapshotStore, saveSessionSnapshot } from '../persistence/event-store.js'
 import { projectEvent } from '../persistence/message-projector.js'
-import type { SessionConfig } from '@hip/protocol'
+import type { SessionConfig, ServerMessage } from '@hip/protocol'
+import { splitAttachments, type AttachmentPayload } from './attachments.js'
 
 function makeStore() {
   const { db, ftsEnabled } = openDatabase(':memory:')
@@ -168,5 +169,211 @@ describe('Session image attachments', () => {
     expect(userRow).toBeDefined()
     const data = userRow!.data as { contentParts?: Array<{ type: string }> }
     expect(data.contentParts?.some((p) => p.type === 'image_url')).toBe(true)
+  })
+})
+
+describe('Session multimodal attachment splitting', () => {
+  let scratch: string
+  let cwd: string
+  beforeEach(async () => {
+    scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-split-'))
+    cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-split-cwd-'))
+    await fs.mkdir(path.join(cwd, '.hip'), { recursive: true })
+  })
+  afterEach(async () => {
+    await fs.rm(scratch, { recursive: true, force: true })
+    await fs.rm(cwd, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
+
+  it('splits image+text attachments — image to image agent, text to main model', async () => {
+    const imgPath = path.join(scratch, 'test.png')
+    await fs.writeFile(imgPath, Buffer.from('fake-image-bytes'))
+    const txtPath = path.join(scratch, 'notes.txt')
+    await fs.writeFile(txtPath, 'hello from file')
+
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    const textCatalog = {
+      openai: { id: 'openai', name: 'OpenAI', models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } } },
+      deepseek: { id: 'deepseek', name: 'DeepSeek', models: { 'deepseek-chat': { id: 'deepseek-chat', name: 'DeepSeek Chat', attachment: false } } },
+    }
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { store } = makeStore()
+    store.insertSession({ id: 's-mixed', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invokerSeen: { task?: string; attachments?: AttachmentPayload[]; parts?: Array<{ type: string }> } = {}
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, task, emit, _signal, _hooks, extras, attachments) {
+        invokerSeen.task = task
+        invokerSeen.attachments = attachments
+        invokerSeen.parts = extras?.attachmentParts
+        emit.token('image description')
+        return 'image description'
+      },
+    }
+
+    const captured: BaseMessage[][] = []
+    const runner: ModelRunner = {
+      async run(messages: BaseMessage[], o: ModelRunOptions) {
+        captured.push([...messages])
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-mixed', cfg, undefined, store, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    const attachments: AttachmentPayload[] = [
+      { id: 'a1', name: 'test.png', mimeType: 'image/png', path: imgPath },
+      { id: 'a2', name: 'notes.txt', mimeType: 'text/plain', path: txtPath },
+    ]
+    await session.sendMessage('describe these', () => {}, undefined, attachments)
+
+    // Image agent was dispatched and received only image_url parts (no text parts)
+    expect(invokerSeen.task).toBe('describe these')
+    expect(invokerSeen.attachments).toHaveLength(1)
+    expect(invokerSeen.attachments![0].mimeType).toBe('image/png')
+    expect(invokerSeen.parts).toHaveLength(1)
+    expect((invokerSeen.parts![0] as unknown as { type: string }).type).toBe('image_url')
+
+    // Main model received the text attachment content plus the merged vision result
+    expect(captured.length).toBeGreaterThan(0)
+    const lastBatch = captured[captured.length - 1]
+    const userMessages = lastBatch.filter((m) => m instanceof HumanMessage)
+    expect(userMessages.length).toBeGreaterThanOrEqual(1)
+    const lastUser = userMessages[userMessages.length - 1]
+    expect(Array.isArray(lastUser.content)).toBe(true)
+    const parts = lastUser.content as Array<{ type: string; text?: string }>
+    expect(parts[0].type).toBe('text')
+    expect(parts[0].text).toContain('image description')
+    expect(parts[0].text).toContain('describe these')
+    const hasTextAttachment = parts.some((p) => p.type === 'text' && p.text?.includes('notes.txt'))
+    expect(hasTextAttachment).toBe(true)
+    const hasImageUrl = parts.some((p) => p.type === 'image_url')
+    expect(hasImageUrl).toBe(false)
+  })
+
+  it('routes PDF+text with non-multimodal model — PDF text to main model', async () => {
+    // A minimal valid PDF that pdf-parse can process
+    const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
+   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 44 >>
+stream
+BT /F1 24 Tf 100 700 Td (Hello World) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000360 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+431
+%%EOF`
+    const pdfPath = path.join(scratch, 'doc.pdf')
+    await fs.writeFile(pdfPath, pdfContent)
+    const txtPath = path.join(scratch, 'notes.txt')
+    await fs.writeFile(txtPath, 'hello from file')
+
+    await fs.writeFile(
+      path.join(cwd, '.hip', 'hip.toml'),
+      `version = 1\n[[agents]]\nid = "vis"\nname = "Vision"\nkind = "internal"\ncommand = ""\nargs = []\nenabled = true\nprompt = "vision expert"\n[agents.boundModel]\nproviderID = "openai"\nmodelID = "gpt-4o"\n`,
+    )
+    const textCatalog = {
+      openai: { id: 'openai', name: 'OpenAI', models: { 'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true } } },
+      deepseek: { id: 'deepseek', name: 'DeepSeek', models: { 'deepseek-chat': { id: 'deepseek-chat', name: 'DeepSeek Chat', attachment: false } } },
+    }
+    vi.spyOn(catalogModule, 'readCatalog').mockReturnValue(textCatalog)
+    vi.spyOn(catalogModule, 'isMultimodalModel').mockReturnValue(false)
+
+    const { store } = makeStore()
+    store.insertSession({ id: 's-pdf', title: 't', config: '{}', createdAt: 1, updatedAt: 1 })
+
+    const invokerCalled = { count: 0 }
+    const invoker: AgentInvoker = {
+      async invoke(_agentId, _task, emit, _signal, _hooks, _extras, _attachments) {
+        invokerCalled.count++
+        emit.token('should not be called')
+        return ''
+      },
+    }
+
+    const captured: BaseMessage[][] = []
+    const runner: ModelRunner = {
+      async run(messages: BaseMessage[], o: ModelRunOptions) {
+        captured.push([...messages])
+        o.onText('ok')
+        return new AIMessage('ok')
+      },
+    }
+
+    const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [], cwd, disablePlan: true }
+    const session = new Session('s-pdf', cfg, undefined, store, undefined, 10_000, runner, undefined, () => invoker, scratch)
+
+    const attachments: AttachmentPayload[] = [
+      { id: 'a1', name: 'doc.pdf', mimeType: 'application/pdf', path: pdfPath },
+      { id: 'a2', name: 'notes.txt', mimeType: 'text/plain', path: txtPath },
+    ]
+    await session.sendMessage('describe these', () => {}, undefined, attachments)
+
+    // PDF has no image_url parts, so the image agent should NOT be dispatched
+    expect(invokerCalled.count).toBe(0)
+
+    // Main model received both the PDF text and the text/plain content
+    expect(captured.length).toBeGreaterThan(0)
+    const lastBatch = captured[captured.length - 1]
+    const userMessages = lastBatch.filter((m) => m instanceof HumanMessage)
+    expect(userMessages.length).toBeGreaterThanOrEqual(1)
+    const lastUser = userMessages[userMessages.length - 1]
+    expect(Array.isArray(lastUser.content)).toBe(true)
+    const parts = lastUser.content as Array<{ type: string; text?: string }>
+    const pdfPart = parts.find((p) => p.type === 'text' && p.text?.includes('doc.pdf'))
+    expect(pdfPart).toBeDefined()
+    const txtPart = parts.find((p) => p.type === 'text' && p.text?.includes('notes.txt'))
+    expect(txtPart).toBeDefined()
+  })
+
+  it('splitAttachments correctly classifies attachments', () => {
+    const attachments: AttachmentPayload[] = [
+      { id: 'a1', name: 'img.png', mimeType: 'image/png', path: '/tmp/img.png' },
+      { id: 'a2', name: 'doc.pdf', mimeType: 'application/pdf', path: '/tmp/doc.pdf' },
+      { id: 'a3', name: 'vid.mp4', mimeType: 'video/mp4', path: '/tmp/vid.mp4' },
+      { id: 'a4', name: 'notes.txt', mimeType: 'text/plain', path: '/tmp/notes.txt' },
+      { id: 'a5', name: 'code.ts', mimeType: 'text/typescript', path: '/tmp/code.ts' },
+    ]
+    const { multimodal, text } = splitAttachments(attachments)
+    expect(multimodal).toHaveLength(3)
+    expect(multimodal.map((a) => a.mimeType)).toEqual(['image/png', 'application/pdf', 'video/mp4'])
+    expect(text).toHaveLength(2)
+    expect(text.map((a) => a.mimeType)).toEqual(['text/plain', 'text/typescript'])
+  })
+
+  it('splitAttachments handles empty/null input', () => {
+    expect(splitAttachments([] as AttachmentPayload[])).toEqual({ multimodal: [], text: [] })
+    expect(splitAttachments(null as unknown as AttachmentPayload[])).toEqual({ multimodal: [], text: [] })
   })
 })

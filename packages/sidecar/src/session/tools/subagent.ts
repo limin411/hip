@@ -95,7 +95,7 @@ export function buildSubagentTools(
   const ids = dispatch.agents.map((a) => a.id) as [string, ...string[]]
 
   const dispatchAgent = tool(
-    async ({ agent, task: t }) => dispatch.run(agent, t),
+    async ({ agent, task: t }) => dispatch.run(agent, t, dispatch.signal),
     {
       name: 'dispatch_agent',
       description:
@@ -118,13 +118,13 @@ export function buildSubagentTools(
  * Returns an empty array when spawnSubagent is not provided (same guard as task/dispatchAgent).
  */
 export function buildTaskBatchTools(
-  spawnSubagent?: (description: string, mode?: 'foreground' | 'background') => Promise<string>,
+  spawnSubagent?: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>,
 ): StructuredToolInterface[] {
   if (!spawnSubagent) return []
 
   const taskBatch = tool(
     async ({ tasks: batchTasks }) => {
-      const runner: RunSubagentFn = async (input: string) => spawnSubagent(input)
+      const runner: RunSubagentFn = async (input: string, signal: AbortSignal) => spawnSubagent(input, undefined, undefined, signal)
       const batch = new SubagentBatch(runner)
       const results = await batch.run(
         batchTasks.map((t, i) => ({

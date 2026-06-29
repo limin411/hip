@@ -152,9 +152,11 @@ describe('attachments', () => {
   it('stages attachments into scratch', async () => {
     const src = await tempFile('note.txt', 'hello')
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
-    const staged = await stageAttachments('s1', [{ id: 'a1', name: 'note.txt', mimeType: 'text/plain', path: src }], root)
+    const { staged, stagedPaths } = await stageAttachments('s1', [{ id: 'a1', name: 'note.txt', mimeType: 'text/plain', path: src }], root)
     expect(staged[0].size).toBe(5)
-    const copied = await fs.readFile(path.join(root, 's1', 'attachments', 'a1', 'note.txt'), 'utf-8')
+    const stagedPath = stagedPaths.get('a1')
+    expect(stagedPath).toBeDefined()
+    const copied = await fs.readFile(stagedPath!, 'utf-8')
     expect(copied).toBe('hello')
     await fs.rm(root, { recursive: true, force: true })
     await fs.rm(path.dirname(src), { recursive: true, force: true })
@@ -222,6 +224,50 @@ describe('attachments', () => {
     )
     await fs.rm(root, { recursive: true, force: true })
     await fs.rm(path.dirname(src), { recursive: true, force: true })
+  })
+
+  it('stageAttachments re-validates size and rejects file enlarged after validate (TOCTOU)', async () => {
+    const src = await tempFile('small.txt', 'hello')
+    try {
+      // validate passes: file is small
+      await validateAttachments([{ id: 'a1', name: 'small.txt', mimeType: 'text/plain', path: src }])
+
+      // TOCTOU: attacker replaces file with a large one between validate and stage
+      const fd = await fs.open(src, 'w')
+      await fd.write(Buffer.alloc(11 * 1024 * 1024))
+      await fd.close()
+
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
+      await expectAttachmentError(
+        stageAttachments('s1', [{ id: 'a1', name: 'small.txt', mimeType: 'text/plain', path: src }], root),
+        'ATTACHMENT_TOO_LARGE',
+        /10 MB/,
+      )
+      await fs.rm(root, { recursive: true, force: true })
+    } finally {
+      await fs.rm(path.dirname(src), { recursive: true, force: true })
+    }
+  })
+
+  it('buildAttachmentContentParts reads from staged path when provided, not original (TOCTOU)', async () => {
+    const src = await tempFile('note.txt', 'original content')
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-scratch-'))
+    try {
+      const { staged, stagedPaths } = await stageAttachments('s1', [{ id: 'a1', name: 'note.txt', mimeType: 'text/plain', path: src }], root)
+
+      // TOCTOU: attacker modifies original file after staging
+      await fs.writeFile(src, 'MALICIOUS INJECTED CONTENT')
+
+      // build should read from staged copy, not modified original
+      const parts = await buildAttachmentContentParts(
+        [{ id: 'a1', name: 'note.txt', mimeType: 'text/plain', path: src }],
+        stagedPaths,
+      )
+      expect(parts).toEqual([{ type: 'text', text: '[Attached: note.txt]\noriginal content' }])
+    } finally {
+      await fs.rm(root, { recursive: true, force: true })
+      await fs.rm(path.dirname(src), { recursive: true, force: true })
+    }
   })
 
   it('rejects sensitive and hidden home paths', async () => {

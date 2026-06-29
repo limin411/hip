@@ -4,6 +4,7 @@ import {
   resolveMaxConcurrency,
   type QueuedSubagentTask,
 } from './subagent-batch.js'
+import { buildTaskBatchTools } from './tools/subagent.js'
 import { buildTools } from './tools.js'
 import type { RunSubagentFn } from './orchestrator-adapter.js'
 
@@ -205,5 +206,21 @@ describe('task_batch in buildTools', () => {
     const names = tools.map((t) => t.name)
     expect(names).not.toContain('task_batch')
     expect(names).not.toContain('task')
+  })
+
+  it('RunSubagentFn wrapper passes AbortSignal to spawnSubagent', async () => {
+    let capturedSignal: AbortSignal | undefined
+    const spawnFn = async (desc: string, _mode?: string, _taskId?: string, signal?: AbortSignal) => {
+      capturedSignal = signal
+      return desc
+    }
+    const tools = buildTaskBatchTools(spawnFn)
+    expect(tools).toHaveLength(1)
+    const result = await tools[0].invoke({
+      tasks: [{ description: 'signal check', prompt: 'hello' }],
+    })
+    expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    expect(capturedSignal!.aborted).toBe(false)
+    expect(typeof result).toBe('string')
   })
 })

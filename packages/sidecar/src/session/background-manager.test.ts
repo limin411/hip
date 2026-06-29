@@ -67,6 +67,22 @@ describe('BackgroundManager.stop', () => {
     const result = mgr.stop('task-1')
     expect(result).toBe('Error: background task task-1 is already completed')
   })
+
+  it('stop a lost task → returns error string', () => {
+    const mgr = makeManager()
+
+    // Manually add a lost task (simulating reconcile aftermath)
+    const ac = new AbortController()
+    mgr.meta.set('orphan-1', {
+      description: 'orphaned task',
+      status: 'lost',
+      error: 'process terminated while task was running',
+      abortController: ac,
+    })
+
+    const result = mgr.stop('orphan-1')
+    expect(result).toBe('Error: background task orphan-1 is already lost')
+  })
 })
 
 // ── Wait ──────────────────────────────────────────────────────────────────
@@ -112,6 +128,22 @@ describe('BackgroundManager.wait', () => {
 
     const result = await mgr.wait('task-1')
     expect(result).toContain('killed')
+  })
+
+  it('wait for lost task → returns error containing lost', async () => {
+    const mgr = makeManager()
+
+    // Manually add a lost task (simulating reconcile aftermath)
+    const ac = new AbortController()
+    mgr.meta.set('orphan-1', {
+      description: 'orphaned task',
+      status: 'lost',
+      error: 'process terminated while task was running',
+      abortController: ac,
+    })
+
+    const result = await mgr.wait('orphan-1')
+    expect(result).toContain('lost')
   })
 })
 
@@ -307,7 +339,7 @@ describe('BackgroundManager with persistence', () => {
 
     const meta = mgr.meta.get('orphan-1')
     expect(meta).toBeTruthy()
-    expect(meta!.status).toBe('killed')
+    expect(meta!.status).toBe('lost')
     expect(meta!.error).toContain('process terminated')
   })
 

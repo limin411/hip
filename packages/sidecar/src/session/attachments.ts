@@ -146,11 +146,13 @@ export async function stageAttachments(
   sessionId: string,
   attachments: AttachmentPayload[],
   scratchRoot: string,
-): Promise<Attachment[]> {
+): Promise<{ staged: Attachment[]; stagedPaths: Map<string, string> }> {
   const baseDir = path.join(scratchDirFor(sessionId, scratchRoot), 'attachments')
   await fs.mkdir(baseDir, { recursive: true })
   const resolvedBase = path.resolve(baseDir)
   const staged: Attachment[] = []
+  const stagedPaths = new Map<string, string>()
+  let stagedSize = 0
   for (const a of attachments) {
     const { realPath } = await resolveAndValidateAttachmentPath(a.path)
     const safeId = sanitizeAttachmentFilename(a.id)
@@ -165,15 +167,60 @@ export async function stageAttachments(
     }
     await fs.copyFile(realPath, targetPath)
     const stat = await fs.stat(targetPath)
+    if (stat.size > MAX_ATTACHMENT_SIZE) {
+      throw new AttachmentError('ATTACHMENT_TOO_LARGE', `Attachment exceeds 10 MB limit: ${a.name}`)
+    }
+    stagedSize += stat.size
+    if (stagedSize > MAX_TOTAL_ATTACHMENT_SIZE) {
+      throw new AttachmentError('ATTACHMENT_TOO_LARGE', 'Total attachment size exceeds 50 MB limit')
+    }
     staged.push({ id: a.id, name: a.name, mimeType: a.mimeType, size: stat.size })
+    stagedPaths.set(a.id, targetPath)
   }
-  return staged
+  return { staged, stagedPaths }
 }
 
-export async function buildAttachmentContentParts(attachments: AttachmentPayload[]): Promise<ContentPart[]> {
+export function isMultimodalAttachment(mimeType: string): boolean {
+  return mimeType.startsWith('image/') || mimeType === 'application/pdf' || mimeType.startsWith('video/')
+}
+
+export function splitAttachments(attachments: AttachmentPayload[]): {
+  multimodal: AttachmentPayload[]
+  text: AttachmentPayload[]
+} {
+  if (!attachments) return { multimodal: [], text: [] }
+  const multimodal: AttachmentPayload[] = []
+  const text: AttachmentPayload[] = []
+  for (const a of attachments) {
+    if (isMultimodalAttachment(a.mimeType)) {
+      multimodal.push(a)
+    } else {
+      text.push(a)
+    }
+  }
+  return { multimodal, text }
+}
+
+export async function buildAttachmentContentPartsWithSources(
+  attachments: AttachmentPayload[],
+  stagedPaths?: Map<string, string>,
+): Promise<{ parts: ContentPart[]; sourceAttachments: Map<number, AttachmentPayload> }> {
+  const parts = await buildAttachmentContentParts(attachments, stagedPaths)
+  const sourceAttachments = new Map<number, AttachmentPayload>()
+  for (let i = 0; i < attachments.length; i++) {
+    sourceAttachments.set(i, attachments[i])
+  }
+  return { parts, sourceAttachments }
+}
+
+export async function buildAttachmentContentParts(
+  attachments: AttachmentPayload[],
+  stagedPaths?: Map<string, string>,
+): Promise<ContentPart[]> {
   const parts: ContentPart[] = []
   for (const a of attachments) {
-    const { realPath } = await resolveAndValidateAttachmentPath(a.path)
+    const readPath = stagedPaths?.get(a.id) ?? a.path
+    const { realPath } = await resolveAndValidateAttachmentPath(readPath)
     if (a.mimeType.startsWith('image/')) {
       const data = await fs.readFile(realPath)
       const base64 = data.toString('base64')

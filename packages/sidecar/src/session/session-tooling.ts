@@ -29,7 +29,7 @@ export interface BuildSessionToolingInput {
   mcpConfigs: McpServerConfig[]
   enabledAgents: AgentConfig[]
   dispatch?: DispatchSpec
-  spawnSubagent: (description: string, mode?: 'foreground' | 'background') => Promise<string>
+  spawnSubagent: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>
   retrySubagent?: (agentId: string) => Promise<string>
   stopBackgroundTask?: (taskId: string, reason?: string) => string
   getBackgroundTaskOutput?: (taskId: string) => string

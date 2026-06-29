@@ -240,6 +240,104 @@ describe('runManagedAgent safety-dependency wiring (C3 — sessionId, networkPol
   })
 })
 
+describe('runManagedAgent attachmentParts + task behavior', () => {
+  function messageCapturingRunner(): { runner: ModelRunner; human: () => HumanMessage | undefined } {
+    const captured: BaseMessage[] = []
+    return {
+      runner: {
+        async run(messages, opts) {
+          captured.push(...messages)
+          opts.onText('ok')
+          return new AIMessage('ok')
+        },
+      },
+      human: () => captured.find((m) => m instanceof HumanMessage) as HumanMessage | undefined,
+    }
+  }
+
+  it('prepends task as first text part when both attachmentParts and task are provided', async () => {
+    const cwd = tmp()
+    const { runner, human } = messageCapturingRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: 'hello',
+      attachmentParts: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }],
+      emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    const msg = human()
+    expect(msg).toBeDefined()
+    const parts = msg!.content as Array<{ type: string; text?: string; image_url?: { url: string } }>
+    expect(Array.isArray(parts)).toBe(true)
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toEqual({ type: 'text', text: 'hello' })
+    expect(parts[1]).toEqual({ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } })
+  })
+
+  it('passes attachmentParts through unchanged when no task is provided', async () => {
+    const cwd = tmp()
+    const { runner, human } = messageCapturingRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: '',
+      attachmentParts: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } }],
+      emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    const msg = human()
+    expect(msg).toBeDefined()
+    const parts = msg!.content as Array<{ type: string; image_url?: { url: string } }>
+    expect(Array.isArray(parts)).toBe(true)
+    expect(parts).toHaveLength(1)
+    expect(parts[0]).toEqual({ type: 'image_url', image_url: { url: 'data:image/png;base64,abc' } })
+  })
+
+  it('creates a single text part when only task is provided (no attachmentParts)', async () => {
+    const cwd = tmp()
+    const { runner, human } = messageCapturingRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: 'hello world',
+      emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    const msg = human()
+    expect(msg).toBeDefined()
+    // When there's a single text part, HumanMessage stores it as a plain string
+    expect(typeof msg!.content).toBe('string')
+    expect(msg!.content).toBe('hello world')
+  })
+
+  it('creates an empty HumanMessage when neither task nor attachmentParts is provided', async () => {
+    const cwd = tmp()
+    const { runner, human } = messageCapturingRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: '',
+      emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    const msg = human()
+    expect(msg).toBeDefined()
+    expect(msg!.content).toBe('')
+  })
+
+  it('handles empty task and empty attachmentParts array gracefully', async () => {
+    const cwd = tmp()
+    const { runner, human } = messageCapturingRunner()
+    await runManagedAgent({
+      resolved: null, cwd, prompt: 'p',
+      task: '',
+      attachmentParts: [],
+      emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 5,
+      runner, summarizer: { async summarize() { return '' } },
+    })
+    const msg = human()
+    expect(msg).toBeDefined()
+    expect(msg!.content).toBe('')
+  })
+})
+
 describe('runManagedAgent attachments', () => {
   it('includes image attachments as content parts in the human message', async () => {
     const cwd = tmp()

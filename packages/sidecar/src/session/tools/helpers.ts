@@ -267,7 +267,8 @@ export type ApprovalFn = (req: { title: string; toolName?: string; kind: string;
 
 export interface DispatchSpec {
   agents: Array<{ id: string; name: string; description?: string }>
-  run: (agentId: string, task: string) => Promise<string>
+  signal?: AbortSignal
+  run: (agentId: string, task: string, signal?: AbortSignal) => Promise<string>
 }
 
 export interface BuildToolsOpts {

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
-import { nanoid } from 'nanoid'
 import { Composer } from './Composer'
-import { SlashCommandPalette, BUILTIN_COMMANDS, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
+import { SlashCommandPalette, extractSlashQuery, type ComposerSurface } from './SlashCommandPalette'
+import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
-import { sessionService, useDomainStore, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
@@ -16,7 +16,6 @@ import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
-import { useUiStore } from '@/store/uiStore'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -28,6 +27,7 @@ export function InputBar() {
   const activeId = useActiveSessionId()
   const active = useActiveSession()
   const isCode = active ? surfaceOf(active.config) === 'code' : false
+  const surface: ComposerSurface = isCode ? 'code' : 'chat'
   const planApprovalPending = hasPlanApproval(active)
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
@@ -39,40 +39,12 @@ export function InputBar() {
   const query = useMemo(() => extractSlashQuery(value), [value])
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const handleCommandSelect = (cmd: SlashCommand) => {
-    if (cmd.kind === 'builtin') {
-      if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'init') { if (activeId) sessionService.gitInitWorkspace(activeId); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'diff') { if (activeId) sessionService.requestDiff(activeId); useUiStore.getState().setTab('changes'); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'help') {
-        const lines = ['Available commands:']
-        for (const c of BUILTIN_COMMANDS) { lines.push(`/${c.name} — ${c.description}`) }
-        if (skills.length > 0) {
-          for (const sk of skills) { lines.push(`/${sk.name} — ${sk.description || sk.name}`) }
-        }
-        const helpText = lines.join('\n')
-        useDomainStore.getState().appendMessage(activeId!, { id: nanoid(), role: 'assistant', content: helpText, timestamp: Date.now() })
-        setValue('')
-        setTimeout(() => inputRef.current?.focus(), 0)
-        return
-      }
-      if (cmd.id === 'compact') { 
-        if (activeId) sessionService.compactSession(activeId)
-        setValue('')
-        setTimeout(() => inputRef.current?.focus(), 0)
-        return 
-      }
-    }
-    setValue(applyCommand(cmd, value))
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
-
-  const handleDismiss = () => {
-    const m = value.match(/^((?:.*\s)?)\/\S*$/)
-    setValue(m ? m[1] : '')
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
+  const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
+    sessionId: activeId,
+    skills,
+    setText: setValue,
+    inputRef,
+  })
 
   const draft = useDraftStore((s) => s.draft)
   const catalog = useProvidersStore((s) => s.catalog)
@@ -106,7 +78,7 @@ export function InputBar() {
         ) : (
           <div className="relative">
             {query !== null && (
-              <SlashCommandPalette value={value} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+              <SlashCommandPalette value={value} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
             )}
             <Composer
               value={value}

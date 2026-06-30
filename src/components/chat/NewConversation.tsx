@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
-import { nanoid } from 'nanoid'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useSkillsStore } from '@/store/skillsStore'
-import { sessionService, useDomainStore, useActiveSessionId } from '@/domain'
+import { sessionService, useActiveSessionId } from '@/domain'
 import { Composer } from './Composer'
-import { SlashCommandPalette, BUILTIN_COMMANDS, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
+import { SlashCommandPalette, extractSlashQuery } from './SlashCommandPalette'
+import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
@@ -71,34 +71,12 @@ export function NewConversation() {
   const query = useMemo(() => extractSlashQuery(text), [text])
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  const handleCommandSelect = (cmd: SlashCommand) => {
-    if (cmd.kind === 'builtin') {
-      if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'init') { if (activeId) sessionService.gitInitWorkspace(activeId); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'diff') { if (activeId) sessionService.requestDiff(activeId); useUiStore.getState().setTab('changes'); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
-      if (cmd.id === 'help') {
-        const lines = ['Available commands:']
-        for (const c of BUILTIN_COMMANDS) { lines.push(`/${c.name} — ${c.description}`) }
-        if (skills.length > 0) {
-          for (const sk of skills) { lines.push(`/${sk.name} — ${sk.description || sk.name}`) }
-        }
-        const helpText = lines.join('\n')
-        useDomainStore.getState().appendMessage(activeId!, { id: nanoid(), role: 'assistant', content: helpText, timestamp: Date.now() })
-        setText('')
-        setTimeout(() => inputRef.current?.focus(), 0)
-        return
-      }
-    }
-    setText(applyCommand(cmd, text))
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
-
-  const handleDismiss = () => {
-    const m = text.match(/^((?:.*\s)?)\/\S*$/)
-    setText(m ? m[1] : '')
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
+  const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
+    sessionId: activeId,
+    skills,
+    setText,
+    inputRef,
+  })
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5" data-testid="new-conversation">
@@ -116,7 +94,7 @@ export function NewConversation() {
         </div>
         <div className="relative">
           {query !== null && (
-            <SlashCommandPalette value={text} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+            <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
           )}
           <Composer
             value={text}

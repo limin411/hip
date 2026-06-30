@@ -492,6 +492,7 @@ export type ClientMessage =
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
   | { type: 'replay:session'; sessionId: string; turnIndex: number }
+  | { type: 'message:compact'; sessionId: string }
 
 type AttachmentSendPayload = Attachment & { path: string }
 
@@ -553,6 +554,7 @@ export type ServerMessage =
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
+  | { type: 'compact:result'; sessionId: string; ok: boolean; inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number; error?: string }
 
 export interface AgentProfileInfo {
   id: string;

@@ -46,3 +46,4 @@ Transform tasks into verifiable goals:
 - “Fix the bug” → “Reproduce it in a test, then fix”
 - “Refactor X” → “Ensure tests pass before and after”
 - Commit code promptly after completing each phase of work.
+- After each coding task, run the local Alibaba `open-code-review` agent for code review and promptly fix any issues it reports.

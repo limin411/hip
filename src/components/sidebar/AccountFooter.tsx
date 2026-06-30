@@ -31,6 +31,7 @@ export function AccountFooter() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
+            data-testid="account-footer"
             className="w-full rounded-lg bg-surface border border-border p-2.5 text-left transition-colors duration-150 hover:border-accent/30 hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-focus-ring/60 focus-visible:outline-none"
           >
             <div className="flex w-full items-center gap-3">
@@ -46,7 +47,7 @@ export function AccountFooter() {
         <DropdownMenuContent side="top" align="start" className="w-[220px]">
           <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setActiveView('settings')}>
+          <DropdownMenuItem data-testid="settings-menu-item" onSelect={() => setActiveView('settings')}>
             <Settings size={15} className="shrink-0 text-ink-secondary" />
             <span className="flex-1">{t('nav.settings')}</span>
             <span className="text-caption text-ink-tertiary">{'\u2318'},</span>

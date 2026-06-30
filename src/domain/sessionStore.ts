@@ -419,6 +419,7 @@ interface DomainStore {
   deleteSession: (id: string) => void
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string, attachments?: LocalAttachment[]) => void
+  appendMessage: (sessionId: string, message: { id: string; role: 'user' | 'assistant'; content: string; timestamp: number }) => void
   regenerateLastTurn: (sessionId: string) => void
   clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
@@ -474,6 +475,13 @@ export const useDomainStore = create<DomainStore>((set) => ({
           ? sess
           : // Clear any prior error: appending a user message means a retry is underway.
             { ...sess, status: 'running' as const, error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, updatedAtMs: Date.now(), messages: [...sess.messages, { id, role: 'user' as const, content, timestamp: Date.now(), attachments }] },
+      ),
+    })),
+
+  appendMessage: (sessionId, message) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId ? sess : { ...sess, messages: [...sess.messages, message], updatedAtMs: Date.now() },
       ),
     })),
 

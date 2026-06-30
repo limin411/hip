@@ -13,6 +13,7 @@ type Editing =
   | null
 
 export function AgentManagement() {
+  const { t } = useTranslation()
   const { agents, loaded, load, addAgent, updateAgent, removeAgent } = useAgentsStore()
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Editing>(null)
@@ -37,6 +38,9 @@ export function AgentManagement() {
 
   return (
     <div className="flex h-full flex-col p-6">
+      <div>
+        <h2 className="text-title font-semibold text-ink">{t('settings.agentsLabel')}</h2>
+      </div>
       <AgentToolbar
         search={search}
         onSearchChange={setSearch}

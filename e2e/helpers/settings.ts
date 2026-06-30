@@ -3,9 +3,16 @@ import { SettingsPage } from '../page-objects/SettingsPage.js'
 const settings = new SettingsPage()
 
 export async function openSettings(): Promise<void> {
-  await settings.accountFooter.click()
-  await settings.settingsMenuItem.waitForClickable({ timeout: 10000 })
-  await settings.settingsMenuItem.click()
+  const footer = await settings.accountFooter
+  await footer.waitForExist({ timeout: 10000 })
+  // WebKit/Tauri WebDriver does not reliably trigger Radix dropdowns with
+  // `.click()`, so dispatch `pointerdown` directly (matches composer-widgets).
+  await browser.execute((el) => {
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
+  }, footer)
+  const menuItem = await settings.settingsMenuItem
+  await menuItem.waitForExist({ timeout: 10000 })
+  await menuItem.click()
   await settings.nav('general').waitForExist({ timeout: 10000 })
 }
 

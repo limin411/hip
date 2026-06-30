@@ -28,6 +28,9 @@ export function GeneralSettings() {
 
   return (
     <div className="flex flex-col">
+      <div className="px-6 pt-6 pb-2">
+        <h2 className="text-title font-semibold text-ink">{t('settings.general')}</h2>
+      </div>
       <div className="flex items-center justify-between px-6 py-5">
         <div className="min-w-0 flex-1">
           <div className="text-prose font-medium text-ink">{t('settings.language')}</div>

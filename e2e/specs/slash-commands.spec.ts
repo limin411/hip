@@ -2,6 +2,7 @@ import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { sendComposerMessage } from '../helpers/composer.js'
+import { switchToChatSurface } from '../helpers/surface.js'
 import { ChatPage } from '../page-objects/ChatPage.js'
 
 let chat: ChatPage
@@ -15,6 +16,15 @@ describe('slash commands', () => {
   })
 
   before(async () => {
+    // Earlier specs may have left an active session or the code surface. Force
+    // a chat-mode new draft so the slash-command tests run against the
+    // NewConversation surface and can send without a project folder.
+    await switchToChatSurface()
+    const newBtn = await browser.$('[data-testid="new-session-button"]')
+    if (await newBtn.isExisting()) {
+      await newBtn.click()
+      await chat.newConversation.waitForExist({ timeout: 10000 })
+    }
     await sendComposerMessage('/help')
     await browser.pause(2500)
   })

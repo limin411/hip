@@ -2,6 +2,7 @@ import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { sendChatMessage } from '../helpers/session.js'
+import { switchToChatSurface } from '../helpers/surface.js'
 import { ChatPage } from '../page-objects/ChatPage.js'
 
 const chat = new ChatPage()
@@ -11,6 +12,9 @@ describe('session management', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    // Earlier specs may have left the app on the code surface. Chat-mode
+    // sessions must not require a project folder before sending.
+    await switchToChatSurface()
   })
 
   it('creates a new conversation draft from the sidebar', async () => {

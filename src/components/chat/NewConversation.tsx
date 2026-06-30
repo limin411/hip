@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useSkillsStore } from '@/store/skillsStore'
 import { sessionService } from '@/domain'
 import { Composer } from './Composer'
+import { SlashCommandPalette, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
@@ -62,6 +64,26 @@ export function NewConversation() {
 
   const setText = (value: string) => useDraftStore.getState().setText(value)
 
+  const allSkills = useSkillsStore((s) => s.skills)
+  const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
+  const query = useMemo(() => extractSlashQuery(text), [text])
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleCommandSelect = (cmd: SlashCommand) => {
+    if (cmd.kind === 'builtin') {
+      if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+    }
+    setText(applyCommand(cmd, text))
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleDismiss = () => {
+    const m = text.match(/^((?:.*\s)?)\/\S*$/)
+    setText(m ? m[1] : '')
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5" data-testid="new-conversation">
       <div className="w-full max-w-3xl">
@@ -76,22 +98,28 @@ export function NewConversation() {
             {t('chat.greetingSub.default', '')}
           </p>
         </div>
-        <Composer
-          value={text}
-          onChange={(v) => setText(v)}
-          onSubmit={submit}
-          autoFocus
-          submitDisabled={!canSend}
-          leftSlot={
-            surface === 'code' ? (
-              <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
-            ) : (
-              <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
-            )
-          }
-          attachments={attachments}
-          onAttachmentsChange={setAttachments}
-        />
+        <div className="relative">
+          {query !== null && (
+            <SlashCommandPalette value={text} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+          )}
+          <Composer
+            value={text}
+            onChange={(v) => setText(v)}
+            onSubmit={submit}
+            autoFocus
+            submitDisabled={!canSend}
+            inputRef={inputRef}
+            leftSlot={
+              surface === 'code' ? (
+                <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+              ) : (
+                <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+              )
+            }
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+          />
+        </div>
         {surface === 'code' && (
           <div className="mt-2 flex flex-col items-center gap-1">
             <FolderPill />

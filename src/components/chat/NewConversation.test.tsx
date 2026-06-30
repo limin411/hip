@@ -6,6 +6,7 @@ import { NewConversation } from './NewConversation'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
+import { useSkillsStore } from '@/store/skillsStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 
 vi.mock('@/ipc/dialog', () => ({
@@ -47,6 +48,7 @@ describe('NewConversation', () => {
     })
     hipConfigStore.useHipConfigStore.setState({ config: { version: 1, agents: [] }, loaded: true, error: null })
     useDraftStore.setState({ draft: null })
+    useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
   })
 
   it('clears existing attachments when the draft model loses attachment support', async () => {
@@ -65,5 +67,26 @@ describe('NewConversation', () => {
     await vi.waitFor(() => {
       expect(screen.queryByTestId('attachment-chip')).not.toBeInTheDocument()
     })
+  })
+
+  it('renders slash palette when typing / in composer', async () => {
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/cle', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
+  })
+
+  it('does not render slash palette when composer text has no slash', () => {
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: 'hello', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+    expect(screen.queryByTestId('slash-palette')).not.toBeInTheDocument()
+  })
+
+  it('renders builtin /clear and /config in slash palette', async () => {
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-config')).toBeInTheDocument()
   })
 })

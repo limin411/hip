@@ -16,6 +16,10 @@ Before implementing:
 - If a simpler approach exists, say so.
 - If something is unclear, stop. Name what's confusing.
 - Look up information online promptly; never trust your own knowledge.
+- When a reference path is provided, check the code design there first if it exists, and supplement with external web/GitHub searches for current best practices.
+
+Reference path:
+- `/Users/lijiamin/data/code-repository/20260427/`
 
 ## 2. Simplicity First
 Minimum code that solves the problem. Nothing speculative.

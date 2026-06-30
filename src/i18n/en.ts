@@ -133,6 +133,8 @@ export const en = {
         io: '{{input}} in · {{output}} out',
         sessionTotal: 'Session total',
         cost: '~{{cost}}',
+        percentage: '{{percent}}%',
+        percentageTooltip: '{{used}} / {{total}} tokens ({{percent}}%)',
       },
       activity: {
         completed: 'Completed',

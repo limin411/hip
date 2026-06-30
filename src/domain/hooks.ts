@@ -2,6 +2,9 @@
 import type { AcpConfigOption, Message, SearchHit, TurnUsage } from '@hip/protocol'
 import { useShallow } from 'zustand/react/shallow'
 import { useDomainStore, type PendingPermission, type SessionError, type SessionVM, type McpServerStatusVM } from './sessionStore'
+import { computePercentage, zoneForPercent } from '@/lib/tokenPercentage'
+import { activeModelKey, parseModelKey } from '@/lib/modelKey'
+import { useProvidersStore } from '@/store/providersStore'
 
 const EMPTY_MESSAGES: Message[] = []
 const EMPTY_CONFIG_OPTIONS: AcpConfigOption[] = []
@@ -71,9 +74,9 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
   for (const m of active.messages) {
     if (!m.usage) continue
     any = true
-    total.inputTokens += m.usage.inputTokens
-    total.outputTokens += m.usage.outputTokens
-    total.totalTokens += m.usage.totalTokens
+    total.inputTokens += m.usage.inputTokens ?? 0
+    total.outputTokens += m.usage.outputTokens ?? 0
+    total.totalTokens += m.usage.totalTokens ?? 0
   }
   return any ? total : null
 }
@@ -85,6 +88,26 @@ export function selectUsageTotal(state: { sessions: SessionVM[]; activeSessionId
  *  useShallow caches by value, so the snapshot stays referentially stable until the totals change. */
 export function useActiveUsageTotal(): TurnUsage | null {
   return useDomainStore(useShallow(selectUsageTotal))
+}
+
+/** Token usage relative to the active model's context window. Returns null when
+ *  there is no active session, no usage, or the model catalog hasn't loaded. */
+export function useTokenUsage(): { usedTokens: number | null; contextWindow: number | undefined; percent: number | null; zone: 'success' | 'warning' | 'danger' | null } | null {
+  const usageTotal = useActiveUsageTotal()
+  const catalog = useProvidersStore((s) => s.catalog)
+  const config = useProvidersStore((s) => s.config)
+  const active = useActiveSession()
+  if (!usageTotal) return null
+  const currentKey = active?.config.model
+    ? `${active.config.llmProvider}/${active.config.model}`
+    : activeModelKey(config)
+  const { providerID, modelID } = parseModelKey(currentKey)
+  const limit = catalog[providerID]?.models[modelID]?.limit
+  const contextWindow = limit?.context
+  const usedTokens = usageTotal.totalTokens
+  const percent = computePercentage(usedTokens, contextWindow)
+  const zone = zoneForPercent(percent)
+  return { usedTokens, contextWindow, percent, zone }
 }
 
 export function useMcpStatuses(): McpServerStatusVM[] {

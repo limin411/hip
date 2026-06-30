@@ -5,7 +5,7 @@ import {
   useActiveSession,
   useConnectionStatus,
   useHasApiKey,
-  useActiveUsageTotal,
+  useTokenUsage,
   sessionService,
 } from '@/domain'
 import { Button } from '@/components/ui/Button'
@@ -30,7 +30,7 @@ export function ChatTitleBar() {
   const active = useActiveSession()
   const status = useConnectionStatus()
   const hasApiKey = useHasApiKey()
-  const usageTotal = useActiveUsageTotal()
+  const tokenUsage = useTokenUsage()
 
   return (
     <>
@@ -69,14 +69,19 @@ export function ChatTitleBar() {
       </span>
 
       <div className="flex-1" />
-      {usageTotal && (
+      {tokenUsage && (
         <span
           data-testid="session-usage"
-          title={t('chat.usage.sessionTotal')}
           data-tauri-drag-region="false"
-          className="mr-3 rounded-full bg-surface-subtle px-2 py-0.5 text-caption text-ink-tertiary"
+          className={`mr-3 rounded-full bg-surface-subtle px-2 py-0.5 text-caption ${
+            tokenUsage.zone === 'success' ? 'text-success' :
+            tokenUsage.zone === 'warning' ? 'text-warning' :
+            'text-danger'
+          }`}
         >
-          {t('chat.usage.tokens', { total: usageTotal.totalTokens })}
+          {tokenUsage.percent !== null
+            ? `${tokenUsage.percent}%\u00A0(${(tokenUsage.usedTokens ?? 0).toLocaleString()}\u00A0/\u00A0${tokenUsage.contextWindow?.toLocaleString() ?? '?'})`
+            : (tokenUsage.usedTokens ?? 0).toLocaleString()}
         </span>
       )}
       <Button

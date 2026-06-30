@@ -133,6 +133,8 @@ export const zhTW = {
         io: '{{input}} 輸入 · {{output}} 輸出',
         sessionTotal: '本對話累計',
         cost: '約 {{cost}}',
+        percentage: '{{percent}}%',
+        percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
       },
       activity: {
         completed: '已完成',

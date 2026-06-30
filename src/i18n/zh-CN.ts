@@ -133,6 +133,8 @@ export const zhCN = {
         io: '{{input}} 输入 · {{output}} 输出',
         sessionTotal: '本对话累计',
         cost: '约 {{cost}}',
+        percentage: '{{percent}}%',
+        percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
       },
       activity: {
         completed: '已完成',

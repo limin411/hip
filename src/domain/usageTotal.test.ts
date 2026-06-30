@@ -36,4 +36,31 @@ describe('selectUsageTotal', () => {
     const state = { activeSessionId: null, sessions: [] }
     expect(selectUsageTotal(state)).toBeNull()
   })
+
+  it('handles undefined usage fields by treating them as 0', () => {
+    const state = {
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          // Simulate malformed protocol data where usage fields are undefined at runtime
+          { id: 'a', role: 'assistant' as const, content: 'x', timestamp: 1, usage: { inputTokens: undefined as unknown as number, outputTokens: 100, totalTokens: 100 } } as Message,
+        ]),
+      ],
+    }
+    expect(selectUsageTotal(state)).toEqual({ inputTokens: 0, outputTokens: 100, totalTokens: 100 })
+  })
+
+  it('sums correctly with mixed usage and non-usage messages', () => {
+    const state = {
+      activeSessionId: 's1',
+      sessions: [
+        session('s1', [
+          msg('a', { inputTokens: 10, outputTokens: 20, totalTokens: 30 }),
+          msg('b'), // no usage → skipped
+          msg('c', { inputTokens: 40, outputTokens: 50, totalTokens: 90 }),
+        ]),
+      ],
+    }
+    expect(selectUsageTotal(state)).toEqual({ inputTokens: 50, outputTokens: 70, totalTokens: 120 })
+  })
 })

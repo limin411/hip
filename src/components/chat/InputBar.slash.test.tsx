@@ -5,6 +5,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { InputBar } from './InputBar'
 import * as domain from '@/domain'
 import { sessionService, useDomainStore } from '@/domain'
+import type { SessionVM } from '@/domain'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import * as draftStore from '@/store/draftStore'
@@ -63,6 +64,20 @@ function baseMocks() {
   vi.spyOn(domain, 'useConnectionStatus').mockReturnValue('connected')
 }
 
+function stubSession(surface: 'chat' | 'code'): SessionVM {
+  return {
+    id: 's1',
+    config: { surface, llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+    title: '',
+    preview: '',
+    updatedAtMs: 0,
+    loaded: true,
+    messages: [],
+    status: 'idle',
+    error: null,
+  }
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('InputBar slash commands', () => {
@@ -80,13 +95,7 @@ describe('InputBar slash commands', () => {
 
   it('shows built-in slash commands when typing /h and selecting /help clears input and injects message', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -107,13 +116,7 @@ describe('InputBar slash commands', () => {
 
   it('/clear command cancels and starts new conversation, then clears value', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const cancelSpy = vi.spyOn(sessionService, 'cancel').mockReturnValue(undefined)
     const newConvSpy = vi.spyOn(sessionService, 'newConversation').mockReturnValue(undefined)
 
@@ -137,13 +140,7 @@ describe('InputBar slash commands', () => {
 
   it('/config command opens settings via setActiveView', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -164,13 +161,7 @@ describe('InputBar slash commands', () => {
 
   it('/init command calls gitInitWorkspace and clears input', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const gitInitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
@@ -193,13 +184,7 @@ describe('InputBar slash commands', () => {
 
   it('/diff command calls requestDiff and switches to changes tab', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
@@ -222,13 +207,7 @@ describe('InputBar slash commands', () => {
 
   it('selecting /help injects help text and clears input without sending to AI', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
     const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
 
@@ -257,13 +236,7 @@ describe('InputBar slash commands', () => {
 
   it('does not show palette when typing normal text without slash', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -278,13 +251,7 @@ describe('InputBar slash commands', () => {
 
   it('hides palette when slash is removed (backspace)', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -300,13 +267,7 @@ describe('InputBar slash commands', () => {
 
   it('skills appear in palette when loaded', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true }]
 
     render(<InputBar />)
@@ -321,13 +282,7 @@ describe('InputBar slash commands', () => {
 
   it('skills with userInvocable:false are hidden', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     mockSkills = [{ id: 'hidden', name: 'hidden-skill', description: 'Should be hidden', userInvocable: false }]
 
     render(<InputBar />)
@@ -342,13 +297,7 @@ describe('InputBar slash commands', () => {
 
   it('skills without userInvocable field default to visible', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     mockSkills = [{ id: 'v1', name: 'visible-skill', description: 'Should be visible' }]
 
     render(<InputBar />)
@@ -363,13 +312,7 @@ describe('InputBar slash commands', () => {
 
   it('focus returns to textarea after selecting a skill command', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true }]
 
     render(<InputBar />)
@@ -389,13 +332,7 @@ describe('InputBar slash commands', () => {
 
   it('focus returns to textarea after Escape dismiss', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -416,13 +353,7 @@ describe('InputBar slash commands', () => {
 
   it('normal text without slash is sent to the model', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)
@@ -437,13 +368,7 @@ describe('InputBar slash commands', () => {
 
   it('unix-path-looking text starting with slash passes through to sendMessage', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)
@@ -458,13 +383,7 @@ describe('InputBar slash commands', () => {
 
   it('empty input does not call sendMessage', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)
@@ -479,13 +398,7 @@ describe('InputBar slash commands', () => {
 
   it('slashes in the middle of text pass through to sendMessage', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)
@@ -500,13 +413,7 @@ describe('InputBar slash commands', () => {
 
   it('keyboard ArrowDown+Enter on palette selects /compact and calls compactSession', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const compactSpy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
@@ -546,13 +453,7 @@ describe('InputBar slash commands', () => {
 
   it('selecting /compact calls compactSession', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const compactSpy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
@@ -577,13 +478,7 @@ describe('InputBar slash commands', () => {
 
   it('regression: selecting /clear still calls cancel() and newConversation() and clears input', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const cancelSpy = vi.spyOn(sessionService, 'cancel').mockReturnValue(undefined)
     const newConvSpy = vi.spyOn(sessionService, 'newConversation').mockReturnValue(undefined)
     const initSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
@@ -610,13 +505,7 @@ describe('InputBar slash commands', () => {
 
   it('regression: selecting /config still opens settings via setActiveView("settings") and clears input', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     mockSetActiveView.mockClear()
 
     render(<InputBar />)
@@ -638,13 +527,7 @@ describe('InputBar slash commands', () => {
 
   it('regression: /clear and /config appear BEFORE /init, /diff, /help in palette order', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
-      id: 's1',
-      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
-      title: '',
-      preview: '',
-      messages: [],
-    } as any)
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
@@ -670,5 +553,39 @@ describe('InputBar slash commands', () => {
     expect(clearIdx).toBeLessThan(initIdx)
     expect(configIdx).toBeLessThan(diffIdx)
     expect(configIdx).toBeLessThan(initIdx)
+  })
+
+  it('shows all built-in commands including code-only ones in the default code session surface', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+
+    render(<InputBar />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/' } })
+
+    expect(screen.getByText('/help')).toBeInTheDocument()
+    expect(screen.getByText('/clear')).toBeInTheDocument()
+    expect(screen.getByText('/config')).toBeInTheDocument()
+    expect(screen.getByText('/diff')).toBeInTheDocument()
+    expect(screen.getByText('/init')).toBeInTheDocument()
+    expect(screen.getByText('/compact')).toBeInTheDocument()
+  })
+
+  it('hides code-only commands in a chat session surface', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('chat'))
+
+    render(<InputBar />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/' } })
+
+    expect(screen.getByText('/help')).toBeInTheDocument()
+    expect(screen.getByText('/clear')).toBeInTheDocument()
+    expect(screen.getByText('/config')).toBeInTheDocument()
+    expect(screen.queryByText('/diff')).not.toBeInTheDocument()
+    expect(screen.queryByText('/init')).not.toBeInTheDocument()
+    expect(screen.queryByText('/compact')).not.toBeInTheDocument()
   })
 })

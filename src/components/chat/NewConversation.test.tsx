@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { NewConversation } from './NewConversation'
 import * as domain from '@/domain'
-import { sessionService, useDomainStore } from '@/domain'
+import { useDomainStore } from '@/domain'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
@@ -135,61 +135,37 @@ describe('NewConversation', () => {
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
     expect(message.content).toContain('/config')
-    expect(message.content).toContain('/diff')
-    expect(message.content).toContain('/init')
+    expect(message.content).not.toContain('/diff')
+    expect(message.content).not.toContain('/init')
+    expect(message.content).not.toContain('/compact')
     // Draft text should be cleared
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
 
-  it('/diff command calls requestDiff and switches to changes tab', async () => {
+  it('/diff command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
-    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
-    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/dif', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
-    const diffButton = screen.getByText('/diff')
-    expect(diffButton).toBeInTheDocument()
-
-    fireEvent.click(diffButton)
-
-    expect(requestDiffSpy).toHaveBeenCalledWith('s1')
-    expect(mockSetTab).toHaveBeenCalledWith('changes')
-    expect(useDraftStore.getState().draft?.text).toBe('')
-    expect(sendSpy).not.toHaveBeenCalled()
+    expect(screen.queryByText('/diff')).not.toBeInTheDocument()
   })
 
-  it('/init command calls gitInitWorkspace and clears input', async () => {
+  it('/init command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
-    const gitInitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
-    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/in', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
-    const initButton = screen.getByText('/init')
-    expect(initButton).toBeInTheDocument()
-
-    fireEvent.click(initButton)
-
-    expect(gitInitSpy).toHaveBeenCalledWith('s1')
-    expect(useDraftStore.getState().draft?.text).toBe('')
-    expect(sendSpy).not.toHaveBeenCalled()
+    expect(screen.queryByText('/init')).not.toBeInTheDocument()
   })
 
-  it('/compact command injects text without clearing input', async () => {
+  it('/compact command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/comp', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
-    const compactButton = screen.getByText('/compact')
-    expect(compactButton).toBeInTheDocument()
-
-    fireEvent.click(compactButton)
-
-    // /compact falls through to applyCommand, injecting "/compact " into the text
-    expect(useDraftStore.getState().draft?.text).toBe('/compact ')
+    expect(screen.queryByText('/compact')).not.toBeInTheDocument()
   })
 })

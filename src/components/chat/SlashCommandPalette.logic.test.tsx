@@ -47,11 +47,11 @@ describe('extractSlashQuery', () => {
 
 describe('filterCommands', () => {
   const cmds: SlashCommand[] = [
-    { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin' },
-    { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin' },
-    { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin' },
-    { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin' },
-    { id: 'fmt', name: 'fmt', description: 'Format code', kind: 'skill' },
+    { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin', availableIn: ['chat', 'code'] },
+    { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin', availableIn: ['chat', 'code'] },
+    { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
+    { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },
+    { id: 'fmt', name: 'fmt', description: 'Format code', kind: 'skill', availableIn: ['chat', 'code'] },
   ]
 
   it('returns all commands when query is empty', () => {
@@ -110,6 +110,14 @@ describe('buildCommandList', () => {
     expect(skillCommands[0].name).toBe('my-skill')
   })
 
+  it('defaults to chat surface and excludes code-only builtins', () => {
+    const list = buildCommandList()
+    expect(list.map((c) => c.name)).toEqual(['help', 'clear', 'config'])
+    expect(list.map((c) => c.name)).not.toContain('diff')
+    expect(list.map((c) => c.name)).not.toContain('init')
+    expect(list.map((c) => c.name)).not.toContain('compact')
+  })
+
   it('ranks builtins before skills', () => {
     const list = buildCommandList([
       { id: 's1', name: 'help', description: 'Skill help', scope: 'global', autoInvoke: false, dir: '/tmp/s1', hasScripts: false },
@@ -150,6 +158,7 @@ describe('SlashCommand interface', () => {
       name: 'test',
       description: 'A test command',
       kind: 'builtin',
+      availableIn: ['chat', 'code'],
       onSelect: () => {},
     }
     expect(cmd.onSelect).toBeDefined()
@@ -163,6 +172,7 @@ describe('SlashCommand interface', () => {
       name: 'test',
       description: 'A test command',
       kind: 'builtin',
+      availableIn: ['chat', 'code'],
     }
     expect(cmd.id).toBe('test')
     expect(cmd.onSelect).toBeUndefined()
@@ -170,8 +180,8 @@ describe('SlashCommand interface', () => {
 
   it('objects with onSelect pass through filterCommands unchanged', () => {
     const cmds: SlashCommand[] = [
-      { id: 'a', name: 'alpha', description: 'Alpha cmd', kind: 'builtin', onSelect: () => {} },
-      { id: 'b', name: 'beta', description: 'Beta cmd', kind: 'builtin' },
+      { id: 'a', name: 'alpha', description: 'Alpha cmd', kind: 'builtin', availableIn: ['chat', 'code'], onSelect: () => {} },
+      { id: 'b', name: 'beta', description: 'Beta cmd', kind: 'builtin', availableIn: ['chat', 'code'] },
     ]
     const result = filterCommands(cmds, '')
     expect(result).toHaveLength(2)
@@ -189,6 +199,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -206,6 +218,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -220,6 +234,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -237,6 +253,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -255,6 +273,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -268,6 +288,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={onDismiss}
       />,
@@ -281,6 +303,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={onSelect}
         onDismiss={vi.fn()}
       />,
@@ -298,6 +322,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={onSelect}
         onDismiss={vi.fn()}
       />,
@@ -313,6 +339,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
@@ -328,6 +356,8 @@ describe('SlashCommandPalette keyboard navigation', () => {
     render(
       <SlashCommandPalette
         value="/"
+        surface="code"
+        sessionId="s1"
         onSelect={onSelect}
         onDismiss={vi.fn()}
       />,
@@ -340,10 +370,82 @@ describe('SlashCommandPalette keyboard navigation', () => {
     const { container } = render(
       <SlashCommandPalette
         value="hello"
+        surface="code"
+        sessionId="s1"
         onSelect={vi.fn()}
         onDismiss={vi.fn()}
       />,
     )
     expect(container.firstChild).toBeNull()
+  })
+})
+
+describe('buildCommandList surface filtering', () => {
+  it('includes only universal builtins in chat surface', () => {
+    const list = buildCommandList([], { surface: 'chat', sessionId: 's1' })
+    expect(list.map((c) => c.name)).toEqual(['help', 'clear', 'config'])
+  })
+
+  it('includes all builtins in code surface with a session', () => {
+    const list = buildCommandList([], { surface: 'code', sessionId: 's1' })
+    expect(list.map((c) => c.name)).toContain('diff')
+    expect(list.map((c) => c.name)).toContain('init')
+    expect(list.map((c) => c.name)).toContain('compact')
+  })
+
+  it('excludes compact in code surface when sessionId is null', () => {
+    const list = buildCommandList([], { surface: 'code', sessionId: null })
+    expect(list.map((c) => c.name)).toContain('diff')
+    expect(list.map((c) => c.name)).toContain('init')
+    expect(list.map((c) => c.name)).not.toContain('compact')
+  })
+})
+
+describe('SlashCommandPalette surface rendering', () => {
+  beforeEach(() => {
+    cleanup()
+  })
+
+  it('hides code-only commands in chat surface', () => {
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="chat"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('slash-cmd-diff')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-init')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-help')).toBeInTheDocument()
+  })
+
+  it('shows code-only commands in code surface', () => {
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('slash-cmd-diff')).toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-init')).toBeInTheDocument()
+  })
+
+  it('hides compact in code surface when sessionId is null', () => {
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId={null}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.queryByTestId('slash-cmd-diff')).toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-compact')).not.toBeInTheDocument()
   })
 })

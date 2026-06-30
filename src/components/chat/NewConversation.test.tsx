@@ -3,14 +3,33 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { NewConversation } from './NewConversation'
+import * as domain from '@/domain'
+import { sessionService, useDomainStore } from '@/domain'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 
+// ── Mocks ──────────────────────────────────────────────────────────────────────
+
 vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
+}))
+
+const mockSetActiveView = vi.fn()
+const mockSetTab = vi.fn()
+
+vi.mock('@/store/uiStore', () => ({
+  useUiStore: Object.assign(
+    (selector?: (s: { setActiveView: typeof mockSetActiveView; setTab: typeof mockSetTab }) => unknown) => {
+      if (typeof selector === 'function') {
+        return selector({ setActiveView: mockSetActiveView, setTab: mockSetTab })
+      }
+      return { setActiveView: mockSetActiveView, setTab: mockSetTab }
+    },
+    { getState: () => ({ setActiveView: mockSetActiveView, setTab: mockSetTab }) },
+  ),
 }))
 
 const catalog = {
@@ -36,17 +55,21 @@ function setDraftModel(modelKey: string) {
   })
 }
 
+// ── Tests ──────────────────────────────────────────────────────────────────────
+
 describe('NewConversation', () => {
   beforeEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    mockSetActiveView.mockClear()
+    mockSetTab.mockClear()
     providersStore.useProvidersStore.setState({
       catalog,
       config: { providers: {}, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },
       keyConfigured: {},
-      loaded: true,
+      loaded: false,
     })
-    hipConfigStore.useHipConfigStore.setState({ config: { version: 1, agents: [] }, loaded: true, error: null })
+    hipConfigStore.useHipConfigStore.setState({ config: { version: 1, agents: [] }, loaded: false, error: null })
     useDraftStore.setState({ draft: null })
     useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
   })
@@ -88,5 +111,85 @@ describe('NewConversation', () => {
     expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-config')).toBeInTheDocument()
+  })
+
+  // ── Slash command handler tests ──────────────────────────────────────────────
+
+  it('/help command injects help message and clears input', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+    const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/h', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const helpButton = screen.getByText('/help')
+    expect(helpButton).toBeInTheDocument()
+
+    fireEvent.click(helpButton)
+
+    expect(appendSpy).toHaveBeenCalledTimes(1)
+    const [sessionId, message] = appendSpy.mock.calls[0]
+    expect(sessionId).toBe('s1')
+    expect(message.role).toBe('assistant')
+    expect(message.content).toContain('Available commands:')
+    expect(message.content).toContain('/help')
+    expect(message.content).toContain('/clear')
+    expect(message.content).toContain('/config')
+    expect(message.content).toContain('/diff')
+    expect(message.content).toContain('/init')
+    // Draft text should be cleared
+    expect(useDraftStore.getState().draft?.text).toBe('')
+  })
+
+  it('/diff command calls requestDiff and switches to changes tab', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/dif', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const diffButton = screen.getByText('/diff')
+    expect(diffButton).toBeInTheDocument()
+
+    fireEvent.click(diffButton)
+
+    expect(requestDiffSpy).toHaveBeenCalledWith('s1')
+    expect(mockSetTab).toHaveBeenCalledWith('changes')
+    expect(useDraftStore.getState().draft?.text).toBe('')
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('/init command calls gitInitWorkspace and clears input', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+    const gitInitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/in', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const initButton = screen.getByText('/init')
+    expect(initButton).toBeInTheDocument()
+
+    fireEvent.click(initButton)
+
+    expect(gitInitSpy).toHaveBeenCalledWith('s1')
+    expect(useDraftStore.getState().draft?.text).toBe('')
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
+  it('/compact command injects text without clearing input', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/comp', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const compactButton = screen.getByText('/compact')
+    expect(compactButton).toBeInTheDocument()
+
+    fireEvent.click(compactButton)
+
+    // /compact falls through to applyCommand, injecting "/compact " into the text
+    expect(useDraftStore.getState().draft?.text).toBe('/compact ')
   })
 })

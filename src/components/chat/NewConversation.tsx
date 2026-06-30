@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
+import { nanoid } from 'nanoid'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useSkillsStore } from '@/store/skillsStore'
-import { sessionService } from '@/domain'
+import { sessionService, useDomainStore, useActiveSessionId } from '@/domain'
 import { Composer } from './Composer'
-import { SlashCommandPalette, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
+import { SlashCommandPalette, BUILTIN_COMMANDS, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
@@ -24,6 +25,7 @@ export function NewConversation() {
   const surface = activeView === 'code' ? 'code' : 'chat'
   const draft = useDraftStore((s) => s.draft)
   const text = draft?.text ?? ''
+  const activeId = useActiveSessionId()
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
 
   // Ensure a draft exists; keep Chat drafts in chat mode so a leftover project draft (e.g. a
@@ -73,6 +75,20 @@ export function NewConversation() {
     if (cmd.kind === 'builtin') {
       if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
       if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'init') { if (activeId) sessionService.gitInitWorkspace(activeId); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'diff') { if (activeId) sessionService.requestDiff(activeId); useUiStore.getState().setTab('changes'); setText(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'help') {
+        const lines = ['Available commands:']
+        for (const c of BUILTIN_COMMANDS) { lines.push(`/${c.name} — ${c.description}`) }
+        if (skills.length > 0) {
+          for (const sk of skills) { lines.push(`/${sk.name} — ${sk.description || sk.name}`) }
+        }
+        const helpText = lines.join('\n')
+        useDomainStore.getState().appendMessage(activeId!, { id: nanoid(), role: 'assistant', content: helpText, timestamp: Date.now() })
+        setText('')
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
     }
     setText(applyCommand(cmd, text))
     setTimeout(() => inputRef.current?.focus(), 0)

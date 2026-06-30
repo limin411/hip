@@ -2,23 +2,27 @@ import { useMemo, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { SkillMeta } from '@hip/protocol'
 
+export type ComposerSurface = 'chat' | 'code'
+
 /** One command shown in the palette. */
 export interface SlashCommand {
   id: string
   name: string
   description: string
   kind: 'builtin' | 'skill' | 'mcp-prompt'
+  availableIn: ('chat' | 'code')[]
+  requiresSession?: boolean
   onSelect?: () => void
 }
 
 /** Built-in slash commands. */
 export const BUILTIN_COMMANDS: SlashCommand[] = [
-  { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin' },
-  { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin' },
-  { id: 'config', name: 'config', description: 'Show or edit configuration', kind: 'builtin' },
-  { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin' },
-  { id: 'compact', name: 'compact', description: 'Summarize conversation to save context', kind: 'builtin' },
-  { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin' },
+  { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin', availableIn: ['chat', 'code'] },
+  { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin', availableIn: ['chat', 'code'] },
+  { id: 'config', name: 'config', description: 'Show or edit configuration', kind: 'builtin', availableIn: ['chat', 'code'] },
+  { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
+  { id: 'compact', name: 'compact', description: 'Summarize conversation to save context', kind: 'builtin', availableIn: ['code'], requiresSession: true },
+  { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },
 ]
 
 /** Pure: extract the slash command text the user is typing. Returns the raw text after `/`. */
@@ -55,8 +59,17 @@ export function filterCommands(
 }
 
 /** Pure: build the full command list from skills, etc. */
-export function buildCommandList(skills?: SkillMeta[]): SlashCommand[] {
-  const out = [...BUILTIN_COMMANDS]
+export function buildCommandList(
+  skills?: SkillMeta[],
+  opts?: { surface?: ComposerSurface; sessionId?: string | null },
+): SlashCommand[] {
+  const surface = opts?.surface ?? 'chat'
+  const sessionId = opts?.sessionId ?? null
+  const out = BUILTIN_COMMANDS.filter((cmd) => {
+    if (cmd.availableIn && !cmd.availableIn.includes(surface)) return false
+    if (cmd.requiresSession && sessionId == null) return false
+    return true
+  })
   if (skills) {
     for (const s of skills) {
       out.push({
@@ -64,6 +77,7 @@ export function buildCommandList(skills?: SkillMeta[]): SlashCommand[] {
         name: s.name,
         description: s.description || s.name,
         kind: 'skill',
+        availableIn: ['chat', 'code'],
       })
     }
   }
@@ -79,6 +93,8 @@ export function applyCommand(command: SlashCommand, currentValue: string): strin
 
 interface SlashCommandPaletteProps {
   value: string
+  surface: ComposerSurface
+  sessionId?: string | null
   skills?: SkillMeta[]
   onSelect: (command: SlashCommand) => void
   onDismiss?: () => void
@@ -89,9 +105,9 @@ interface SlashCommandPaletteProps {
  * Shows built-in commands, skill names, and (future) MCP prompts.
  * Filterable as the user types; Enter/click selects a command.
  */
-export function SlashCommandPalette({ value, skills, onSelect, onDismiss }: SlashCommandPaletteProps) {
+export function SlashCommandPalette({ value, surface, sessionId, skills, onSelect, onDismiss }: SlashCommandPaletteProps) {
   const query = useMemo(() => extractSlashQuery(value), [value])
-  const commands = useMemo(() => buildCommandList(skills), [skills])
+  const commands = useMemo(() => buildCommandList(skills, { surface, sessionId }), [skills, surface, sessionId])
   const filtered = useMemo(
     () => (query !== null ? filterCommands(commands, query) : []),
     [commands, query],

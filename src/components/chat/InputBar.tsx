@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
+import { nanoid } from 'nanoid'
 import { Composer } from './Composer'
-import { SlashCommandPalette, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
+import { SlashCommandPalette, BUILTIN_COMMANDS, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
-import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useDomainStore, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
@@ -42,6 +43,26 @@ export function InputBar() {
     if (cmd.kind === 'builtin') {
       if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
       if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'init') { if (activeId) sessionService.gitInitWorkspace(activeId); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'diff') { if (activeId) sessionService.requestDiff(activeId); useUiStore.getState().setTab('changes'); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'help') {
+        const lines = ['Available commands:']
+        for (const c of BUILTIN_COMMANDS) { lines.push(`/${c.name} — ${c.description}`) }
+        if (skills.length > 0) {
+          for (const sk of skills) { lines.push(`/${sk.name} — ${sk.description || sk.name}`) }
+        }
+        const helpText = lines.join('\n')
+        useDomainStore.getState().appendMessage(activeId!, { id: nanoid(), role: 'assistant', content: helpText, timestamp: Date.now() })
+        setValue('')
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
+      if (cmd.id === 'compact') { 
+        if (activeId) sessionService.compactSession(activeId)
+        setValue('')
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return 
+      }
     }
     setValue(applyCommand(cmd, value))
     setTimeout(() => inputRef.current?.focus(), 0)

@@ -34,6 +34,7 @@ export function SearchBox({ iconClassName, inputClassName, spinnerClassName }: S
         )}
       />
       <input
+        data-testid="session-search-input"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={t('sidebar.search')}

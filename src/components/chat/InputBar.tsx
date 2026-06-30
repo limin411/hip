@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { Composer } from './Composer'
+import { SlashCommandPalette, extractSlashQuery, applyCommand, type SlashCommand } from './SlashCommandPalette'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
@@ -13,6 +14,8 @@ import { activeModelKey } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
+import { useSkillsStore } from '@/store/skillsStore'
+import { useUiStore } from '@/store/uiStore'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -29,6 +32,25 @@ export function InputBar() {
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
   const reconnecting = status === 'running' && connection !== 'connected'
+
+  const skills = useSkillsStore((s) => s.skills.filter((sk) => sk.userInvocable !== false))
+  const query = useMemo(() => extractSlashQuery(value), [value])
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const handleCommandSelect = (cmd: SlashCommand) => {
+    if (cmd.kind === 'builtin') {
+      if (cmd.id === 'clear') { sessionService.cancel(); sessionService.newConversation(); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+      if (cmd.id === 'config') { useUiStore.getState().setActiveView('settings'); setValue(''); setTimeout(() => inputRef.current?.focus(), 0); return }
+    }
+    setValue(applyCommand(cmd, value))
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleDismiss = () => {
+    const m = value.match(/^((?:.*\s)?)\/\S*$/)
+    setValue(m ? m[1] : '')
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
 
   const draft = useDraftStore((s) => s.draft)
   const catalog = useProvidersStore((s) => s.catalog)
@@ -60,23 +82,29 @@ export function InputBar() {
             {t('chat.planApproval.reviewAbove')}
           </div>
         ) : (
-          <Composer
-            value={value}
-            onChange={setValue}
-            onSubmit={submit}
-            running={status === 'running'}
-            onStop={() => sessionService.cancel()}
-            reconnecting={reconnecting}
-            leftSlot={
-              isCode ? (
-                <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
-              ) : (
-                <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
-              )
-            }
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-          />
+          <div className="relative">
+            {query !== null && (
+              <SlashCommandPalette value={value} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+            )}
+            <Composer
+              value={value}
+              onChange={setValue}
+              onSubmit={submit}
+              inputRef={inputRef}
+              running={status === 'running'}
+              onStop={() => sessionService.cancel()}
+              reconnecting={reconnecting}
+              leftSlot={
+                isCode ? (
+                  <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+                ) : (
+                  <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                )
+              }
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+            />
+          </div>
         )}
       </div>
     </div>

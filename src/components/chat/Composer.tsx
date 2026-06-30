@@ -16,6 +16,7 @@ export function Composer({
   submitDisabled,
   attachments = [],
   onAttachmentsChange,
+  inputRef,
 }: {
   value: string
   onChange: (v: string) => void
@@ -28,6 +29,7 @@ export function Composer({
   submitDisabled?: boolean
   attachments?: LocalAttachment[]
   onAttachmentsChange?: (attachments: LocalAttachment[]) => void
+  inputRef?: React.RefObject<HTMLTextAreaElement>
 }) {
   const { t } = useTranslation()
   return (
@@ -55,6 +57,7 @@ export function Composer({
         </div>
       )}
       <Textarea
+        ref={inputRef}
         value={value}
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value)}

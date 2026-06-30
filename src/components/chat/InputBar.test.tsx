@@ -11,6 +11,23 @@ import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
 
+vi.mock('@/store/skillsStore', () => ({
+  useSkillsStore: (selector?: (s: { skills: never[] }) => unknown) => {
+    if (typeof selector === 'function') return selector({ skills: [] })
+    return { skills: [] }
+  },
+}))
+
+vi.mock('@/store/uiStore', () => ({
+  useUiStore: Object.assign(
+    (selector?: (s: { setActiveView: () => void }) => unknown) => {
+      if (typeof selector === 'function') return selector({ setActiveView: vi.fn() })
+      return { setActiveView: vi.fn() }
+    },
+    { getState: () => ({ setActiveView: vi.fn() }) },
+  ),
+}))
+
 vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
 }))

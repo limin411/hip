@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { cn } from '@/lib/utils'
 import type { SkillMeta } from '@hip/protocol'
 
 /** One command shown in the palette. */
@@ -7,6 +8,7 @@ export interface SlashCommand {
   name: string
   description: string
   kind: 'builtin' | 'skill' | 'mcp-prompt'
+  onSelect?: () => void
 }
 
 /** Built-in slash commands. */
@@ -79,6 +81,7 @@ interface SlashCommandPaletteProps {
   value: string
   skills?: SkillMeta[]
   onSelect: (command: SlashCommand) => void
+  onDismiss?: () => void
 }
 
 /**
@@ -86,7 +89,7 @@ interface SlashCommandPaletteProps {
  * Shows built-in commands, skill names, and (future) MCP prompts.
  * Filterable as the user types; Enter/click selects a command.
  */
-export function SlashCommandPalette({ value, skills, onSelect }: SlashCommandPaletteProps) {
+export function SlashCommandPalette({ value, skills, onSelect, onDismiss }: SlashCommandPaletteProps) {
   const query = useMemo(() => extractSlashQuery(value), [value])
   const commands = useMemo(() => buildCommandList(skills), [skills])
   const filtered = useMemo(
@@ -94,15 +97,64 @@ export function SlashCommandPalette({ value, skills, onSelect }: SlashCommandPal
     [commands, query],
   )
 
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => setActiveIndex(0), [query])
+
+  useEffect(() => {
+    if (filtered.length === 0) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        if (activeIndex <= 0) {
+          onDismiss?.()
+        } else {
+          setActiveIndex((i) => i - 1)
+        }
+        return
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        if (filtered[activeIndex]) onSelect(filtered[activeIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        onDismiss?.()
+        return
+      }
+    }
+    document.addEventListener('keydown', handler, true)
+    return () => document.removeEventListener('keydown', handler, true)
+  }, [activeIndex, filtered, onSelect, onDismiss])
+
   if (query === null || filtered.length === 0) return null
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-border bg-surface shadow-overlay max-h-48 overflow-y-auto z-50">
-      {filtered.map((cmd) => (
+    <div
+      role="listbox"
+      className="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-border bg-surface shadow-overlay max-h-48 overflow-y-auto z-50"
+    >
+      {filtered.map((cmd, i) => (
         <button
           key={cmd.id}
+          role="option"
+          aria-selected={i === activeIndex}
           onClick={() => onSelect(cmd)}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-accent-subtle first:rounded-t-lg last:rounded-b-lg"
+          onMouseEnter={() => setActiveIndex(i)}
+          className={cn(
+            'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-accent-subtle first:rounded-t-lg last:rounded-b-lg',
+            i === activeIndex && 'bg-accent-subtle',
+          )}
         >
           <span className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-caption font-mono text-accent">
             /{cmd.name}

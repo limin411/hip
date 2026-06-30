@@ -141,12 +141,10 @@ describe('agent loop graph', () => {
     })
   })
 
-  it('plan node generates a plan and pauses for approval', async () => {
+  it('routeAfterCompact always routes to agent (planNode removed)', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()
-      const runner = fakeRunner([
-        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'create foo', status: 'pending' }] }, id: 'p1' }] }),
-      ])
+      const runner = fakeRunner([new AIMessage('hello from agent')])
       const out = await app.invoke(
         {
           messages: [new HumanMessage('create a project with multiple files')],
@@ -156,19 +154,15 @@ describe('agent loop graph', () => {
         },
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
-      expect(out.status).toBe('awaiting_user')
-      expect(out.planningMode).toBe('plan')
-      expect(out.planStatus).toBe('ready')
-      expect(out.plan).toEqual([{ content: 'create foo', status: 'pending' }])
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('hello from agent')
     })
   })
 
-  it('plan node regenerates plan on amendment', async () => {
+  it('plan amendment continues through agent node (planNode removed)', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()
-      const runner = fakeRunner([
-        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'amended step', status: 'pending' }] }, id: 'p2' }] }),
-      ])
+      const runner = fakeRunner([new AIMessage('amended plan accepted')])
       const out = await app.invoke(
         {
           messages: [new HumanMessage('plan something'), new HumanMessage('add more detail')],
@@ -178,8 +172,7 @@ describe('agent loop graph', () => {
         },
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
-      expect(out.status).toBe('awaiting_user')
-      expect(out.plan).toEqual([{ content: 'amended step', status: 'pending' }])
+      expect(out.status).toBe('running')
       expect(out.messages.some((m) => m instanceof HumanMessage && m.content === 'add more detail')).toBe(true)
     })
   })
@@ -248,41 +241,24 @@ describe('agent loop graph', () => {
     })
   })
 
-  it('plan node streams deltas via planDelta before publishing', async () => {
+  it('planPause still reachable via routeAfterTools when planStatus is ready', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()
-      const deltas: { itemId: string; delta: string }[] = []
-      const planDeltaEmit: GraphEmit = { ...noopEmit, planDelta: (itemId, delta) => deltas.push({ itemId, delta }) }
-      const runner: ModelRunner = {
-        async run(messages, opts) {
-          opts.onText('analyze req')
-          opts.onText('uirements ')
-          opts.onText('and make plan')
-          const msg = new AIMessage({
-            content: 'analyze requirements and make plan',
-            tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'step one', status: 'pending' }] }, id: 'd1' }],
-          })
-          return msg
-        },
-      }
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'pp1' }] }),
+      ])
       const out = await app.invoke(
         {
-          messages: [new HumanMessage('make a big plan')],
+          messages: [new HumanMessage('check plan readiness')],
           steps: 0,
           planningMode: 'plan',
-          planStatus: 'none',
+          planStatus: 'ready',
         },
-        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: planDeltaEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
       )
       expect(out.status).toBe('awaiting_user')
-      expect(out.plan).toEqual([{ content: 'step one', status: 'pending' }])
-      expect(deltas.length).toBe(3)
-      expect(deltas[0].delta).toBe('analyze req')
-      expect(deltas[1].delta).toBe('uirements ')
-      expect(deltas[2].delta).toBe('and make plan')
-      expect(deltas[0].itemId).toBeTruthy()
-      expect(deltas[0].itemId).toBe(deltas[1].itemId)
-      expect(deltas[0].itemId).toBe(deltas[2].itemId)
+      expect(out.planningMode).toBe('plan')
+      expect(out.planStatus).toBe('ready')
     })
   })
 
@@ -312,6 +288,7 @@ describe('agent loop graph', () => {
       const app = buildGraph()
       const runner = fakeRunner([
         new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [[{ content: 'x' }]] }, id: 'arr1' }] }),
+        new AIMessage('done'),
       ])
       const out = await app.invoke(
         {
@@ -333,6 +310,7 @@ describe('agent loop graph', () => {
       const app = buildGraph()
       const runner = fakeRunner([
         new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ status: 'pending' }] }, id: 'miss1' }] }),
+        new AIMessage('done'),
       ])
       const out = await app.invoke(
         {

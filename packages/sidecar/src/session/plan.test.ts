@@ -11,30 +11,24 @@ describe('shouldPlan', () => {
     expect(shouldPlan(longMessage)).toBe(true)
   })
 
-  it('returns true for multi-step keywords', () => {
-    expect(shouldPlan('first do this then do that')).toBe(true)
-    expect(shouldPlan('步骤 1: create file, 步骤 2: edit file')).toBe(true)
-    expect(shouldPlan('plan the refactor')).toBe(true)
-  })
-
-  it('returns true when file intent mentions multiple paths', () => {
-    expect(shouldPlan('create src/foo.ts and src/bar.ts')).toBe(true)
-    expect(shouldPlan('edit packages/a/index.ts and packages/b/index.ts')).toBe(true)
-  })
-
-  it('returns false for file intent with a single path', () => {
-    expect(shouldPlan('edit src/foo.ts')).toBe(false)
-  })
-
   it('respects forcePlan', () => {
     expect(shouldPlan('hi', { forcePlan: true })).toBe(true)
   })
 
   it('respects disablePlan', () => {
-    expect(shouldPlan('first do this then do that', { disablePlan: true })).toBe(false)
+    expect(shouldPlan('a'.repeat(201), { disablePlan: true })).toBe(false)
   })
 
   it('disablePlan overrides forcePlan', () => {
     expect(shouldPlan('hi', { forcePlan: true, disablePlan: true })).toBe(false)
+  })
+
+  it('returns false for messages at exactly 200 chars', () => {
+    expect(shouldPlan('a'.repeat(200))).toBe(false)
+  })
+
+  it('returns false for messages under 200 chars with old plan keywords (keyword detection removed)', () => {
+    expect(shouldPlan('first do this then do that')).toBe(false)
+    expect(shouldPlan('plan the refactor')).toBe(false)
   })
 })

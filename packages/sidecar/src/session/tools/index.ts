@@ -1,5 +1,6 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { PermissionMode } from '@hip/protocol'
+import type { PlanMode } from '../plan-mode.js'
 import { buildFileTools } from './file.js'
 import { buildPlanningTools } from './planning.js'
 import { buildGitTools } from './git.js'
@@ -9,6 +10,8 @@ import { buildSubagentTools, buildTaskBatchTools } from './subagent.js'
 import { buildScriptTools } from './script.js'
 import { buildPluginInstallTool } from './plugin.js'
 import { buildMediaTools } from './media.js'
+import { EnterPlanModeTool } from './enter-plan-mode.js'
+import { ExitPlanModeTool } from './exit-plan-mode.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
 import type { BuildToolsOpts, DispatchSpec } from './helpers.js'
 
@@ -30,6 +33,7 @@ export function buildAllTools(
   retrySubagent?: (agentId: string) => Promise<string>,
   stopBackgroundTask?: (taskId: string, reason?: string) => string,
   getBackgroundTaskOutput?: (taskId: string) => string,
+  planMode?: PlanMode,
 ): StructuredToolInterface[] {
   // Enabled-skill dirs (~/.hip/skills/<id>), DISJOINT from the project root. read_file may ALSO reach
   // bundled reference files under these (read-only); every other path stays jailed to `root` via real().
@@ -56,6 +60,12 @@ export function buildAllTools(
 
   // ── Git tools (only for a real on-disk cwd) ────────────────────────────────────
   base.push(...buildGitTools(cwd))
+
+  // ── Plan-mode tool ─────────────────────────────────────────────────────────────
+  if (planMode && opts.sessionId) {
+    base.push(new EnterPlanModeTool(planMode, opts.sessionId))
+    base.push(new ExitPlanModeTool(planMode))
+  }
 
   // ── Skill / script / MCP extras (apply on hip's own loop, every assembly path) ─
   const extras: StructuredToolInterface[] = []

@@ -47,6 +47,8 @@ describe('plan profile', () => {
       'glob',
       'grep',
       'write_todos',
+      'EnterPlanMode',
+      'ExitPlanMode',
       'use_skill',
       'web_search',
       'web_fetch',
@@ -92,12 +94,10 @@ describe('plan profile', () => {
     }
   })
 
-  it('routeAfterCompact routes to planner when planningMode is plan and plan not approved', async () => {
+  it('routeAfterCompact routes to agent when planningMode is plan and plan not approved (planNode removed)', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()
-      const runner = fakeRunner([
-        new AIMessage({ content: '', tool_calls: [{ name: 'write_todos', args: { todos: [{ content: 'step 1', status: 'pending' }] }, id: 'p1' }] }),
-      ])
+      const runner = fakeRunner([new AIMessage('planning not triggered by automatic detection')])
       const out = await app.invoke(
         {
           messages: [new HumanMessage('plan a project')],
@@ -111,10 +111,10 @@ describe('plan profile', () => {
           },
         },
       )
-      expect(out.status).toBe('awaiting_user')
+      // With planNode removed, routeAfterCompact always routes to agent. The agent runs
+      // normally without triggering plan generation automatically.
+      expect(out.status).toBe('running')
       expect(out.planningMode).toBe('plan')
-      expect(out.planStatus).toBe('ready')
-      expect(out.plan).toEqual([{ content: 'step 1', status: 'pending' }])
     })
   })
 

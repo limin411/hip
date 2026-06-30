@@ -20,6 +20,36 @@ import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js
 import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
+import type { PlanMode } from './plan-mode.js'
+
+function fullPlanReminder(planFilePath: string): string {
+  return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
+
+Workflow:
+1. Understand — explore the codebase with Glob, Grep, Read.
+2. Design — converge on the best approach.
+3. Write Plan — modify the plan file with Write or Edit.
+4. Call write_todos — with structured plan items.
+5. Exit — call ExitPlanMode for user approval.
+
+Your turn must end with either AskUserQuestion (to clarify requirements) or ExitPlanMode (to request plan approval).
+Plan file: ${planFilePath}`
+}
+
+function sparsePlanReminder(planFilePath: string): string {
+  return `Plan mode still active (see full instructions earlier). Prefer read-only tools except the current plan file. Use Bash only for read operations. End turns with AskUserQuestion or ExitPlanMode.
+Plan file: ${planFilePath}`
+}
+
+function reentryPlanReminder(planFilePath: string): string {
+  return `Plan mode is active. A plan file already exists. Before proceeding:
+1. Read the existing plan file to understand what was previously planned.
+2. Evaluate the user's current request against that plan.
+3. Update the plan file as needed.
+4. Call write_todos with updated plan items.
+5. Call ExitPlanMode for user approval.
+Plan file: ${planFilePath}`
+}
 
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
 export interface GraphEmit {
@@ -54,6 +84,7 @@ export interface GraphCtx {
   toolParallelism?: number
   /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
   maxSteps?: number
+  planMode?: PlanMode
 }
 
 const LoopState = Annotation.Root({
@@ -69,6 +100,7 @@ const LoopState = Annotation.Root({
   verifyMemo: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   compacted: Annotation<boolean>({ reducer: (_prev, next) => next, default: () => false }),
   deferredMessages: Annotation<BaseMessage[]>({ reducer: (prev, next) => [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(next) ? next : [])], default: () => [] }),
+  planStepsSinceInjection: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
 })
 
 type State = typeof LoopState.State
@@ -169,6 +201,30 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const stepCap = ctx.maxSteps ?? maxSteps
     const capped = state.steps >= stepCap - 1
 
+    // Determine plan-mode reminder (if any) — computed once so both execution
+    // paths use the same reminder and counter.
+    let planReminder: string | null = null
+    let planStepsSinceInjection = state.planStepsSinceInjection
+    if (state.planningMode === 'plan' && ctx.planMode?.isActive) {
+      const planFilePath = ctx.planMode.planFilePath ?? 'not set'
+      const counter = state.planStepsSinceInjection
+      if (counter === 0) {
+        const existingContent = await ctx.planMode.readPlan()
+        if (existingContent.trim().length > 0) {
+          planReminder = reentryPlanReminder(planFilePath)
+        } else {
+          planReminder = fullPlanReminder(planFilePath)
+        }
+      } else if (counter % 5 === 0) {
+        planReminder = fullPlanReminder(planFilePath)
+      } else if (counter % 2 === 0) {
+        planReminder = sparsePlanReminder(planFilePath)
+      }
+      if (planReminder) {
+        planStepsSinceInjection = counter + 1
+      }
+    }
+
     function prepareMessages(list: BaseMessage[]): BaseMessage[] {
       const next = [...list]
       if (systemPrompt !== undefined) {
@@ -177,6 +233,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         } else {
           next.unshift(new SystemMessage(systemPrompt))
         }
+      }
+      if (planReminder) {
+        next.unshift(new SystemMessage(planReminder))
       }
       return next
     }
@@ -205,6 +264,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         ...result,
         messages: [...(deferredResolved.messages ?? []), ...(result.messages ?? [])],
         deferredMessages: deferredResolved.deferredMessages,
+        planStepsSinceInjection,
       }
     } catch (err) {
       if (state.compacted || !isOverflowError(err)) throw err
@@ -216,7 +276,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const compactedState = applyCompaction(state.messages, result)
       const retryMessages = prepareMessages(compactedState)
       const msgResult = await execute(retryMessages)
-      return { ...msgResult, messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])], compacted: true, deferredMessages: deferredResolved.deferredMessages }
+      return { ...msgResult, messages: [...(deferredResolved.messages ?? []), ...compactedMessages, ...(msgResult.messages ?? [])], compacted: true, deferredMessages: deferredResolved.deferredMessages, planStepsSinceInjection }
     }
   }
 
@@ -266,6 +326,27 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         }))
         continue
       }
+      if (ctx.planMode?.isActive && ctx.planMode.planFilePath) {
+        if (call.name === 'write_file' || call.name === 'edit_file') {
+          const targetPath = (call.args as Record<string, unknown>)?.path as string | undefined
+          if (targetPath !== ctx.planMode.planFilePath) {
+            blockedCalls.push(new ToolMessage({
+              content: `Plan mode is active. Write/Edit is only allowed to the plan file: ${ctx.planMode.planFilePath}`,
+              tool_call_id: call.id ?? call.name,
+              name: call.name,
+            }))
+            continue
+          }
+        }
+        if (call.name === 'git_commit' || call.name === 'run_script') {
+          blockedCalls.push(new ToolMessage({
+            content: `Plan mode is active. The "${call.name}" tool is not allowed during plan mode.`,
+            tool_call_id: call.id ?? call.name,
+            name: call.name,
+          }))
+          continue
+        }
+      }
       calls.push(call)
     }
 
@@ -307,12 +388,33 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       name: result.name,
     }))
 
+    // Detect ExitPlanMode / EnterPlanMode results and set state accordingly
+    let planStatus: State['planStatus'] | undefined
+    let planningMode: State['planningMode'] | undefined
+    for (let i = 0; i < calls.length; i++) {
+      const call = calls[i]
+      const result = results[i]
+      if (!result) continue
+      if (call.name === 'ExitPlanMode' && !result.content.startsWith('Error')) {
+        planStatus = 'ready'
+      }
+      if (call.name === 'EnterPlanMode' && !result.content.startsWith('Error')) {
+        planningMode = 'plan'
+        planStatus = 'generating'
+      }
+    }
+
     const updatedPlan = deriveUpdatedPlan(state.plan, last.tool_calls ?? [])
 
     const sig = sigOf(last.tool_calls ?? [])
 
+    const planOverride = {
+      ...(planStatus !== undefined ? { planStatus } : {}),
+      ...(planningMode !== undefined ? { planningMode } : {}),
+    }
+
     if (allResolved) {
-      return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
+      return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan, ...planOverride }
     }
     // Some tool calls did not resolve yet: show resolved results in messages,
     // include placeholder entries for all calls in deferredMessages for tracking.
@@ -329,7 +431,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           name: c.name,
         })),
     ]
-    return { messages: [...blockedCalls, ...out], deferredMessages: deferredEntries, recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan }
+    return { messages: [...blockedCalls, ...out], deferredMessages: deferredEntries, recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan, ...planOverride }
   }
 
   /** Corrective note after the Nth identical batch; recorded against the offending signature. */
@@ -342,41 +444,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { status: 'awaiting_user', pendingQuestion: PAUSE_QUESTION }
   }
 
-  const PLANNING_SYSTEM_PROMPT = `You are a planning assistant. Analyze the user's request and break it into concrete, ordered steps. Call the write_todos tool with the plan, then output a one-sentence summary of the plan.`
-
-  async function planNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
-    const { runner, tools, emit, systemPrompt } = ctxOf(config)
-    const messages: BaseMessage[] = [...state.messages]
-    const planPrompt = systemPrompt ? `${PLANNING_SYSTEM_PROMPT}\n\n${systemPrompt}` : PLANNING_SYSTEM_PROMPT
-    if (messages[0] instanceof SystemMessage) {
-      messages[0] = new SystemMessage(planPrompt)
-    } else {
-      messages.unshift(new SystemMessage(planPrompt))
-    }
-    const itemId = `plan-${config.runId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`
-    const msg = await runner.run(messages, {
-      tools,
-      bindTools: true,
-      signal: config.signal,
-      onText: (d) => {
-        emit.token(d)
-        emit.planDelta(itemId, d)
-      },
-      onReasoning: (d) => emit.reasoning(d),
-    })
-    const u = msg.usage_metadata
-    if (u) emit.usage({ inputTokens: u.input_tokens, outputTokens: u.output_tokens, totalTokens: u.total_tokens })
-    const plan = extractPlanFromMessages([...messages, msg])
-    return { messages: [msg], steps: state.steps + 1, planningMode: 'plan', planStatus: 'ready', plan }
-  }
-
   function planPause(state: State): Partial<State> {
     return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
-  }
-
-  function routeAfterCompact(state: State, _config: LangGraphRunnableConfig): 'plan' | 'agent' {
-    if (state.planningMode === 'plan' && state.planStatus !== 'approved') return 'plan'
-    return 'agent'
   }
 
   function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
@@ -386,7 +455,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return wantsTools && state.steps < stepCap ? 'tools' : END
   }
 
-  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | typeof END {
+  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | 'planPause' | typeof END {
+    if (state.planStatus === 'ready') return 'planPause'
     if (state.planningMode === 'plan' && state.planStatus === 'approved') {
       const hasToolFailure = state.messages.some((m) => m instanceof ToolMessage && m.content.toString().startsWith('Error'))
       if (hasToolFailure) {
@@ -411,35 +481,15 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addNode('tools', toolsNode)
     .addNode('nudge', nudge)
     .addNode('pause', pause)
-    .addNode('planner', planNode)
     .addNode('planPause', planPause)
     .addEdge(START, 'compact')
-    .addConditionalEdges('compact', routeAfterCompact, { plan: 'planner', agent: 'agent' })
-    .addEdge('planner', 'planPause')
+    .addEdge('compact', 'agent')
     .addEdge('planPause', END)
     .addConditionalEdges('agent', routeAfterAgent, { tools: 'tools', [END]: END })
-    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact', [END]: END })
+    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact', planPause: 'planPause', [END]: END })
     .addEdge('nudge', 'agent')
     .addEdge('pause', END)
     .compile()
-}
-
-function extractPlanFromMessages(messages: BaseMessage[]): PlanItem[] | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (msg instanceof AIMessage) {
-      const calls = msg.tool_calls ?? []
-      for (const call of calls) {
-    if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
-          const todos = (call.args as Record<string, unknown>).todos
-          if (Array.isArray(todos)) {
-            return todos.map((item) => todoToPlanItem(item))
-          }
-        }
-      }
-    }
-  }
-  return undefined
 }
 
 function todoToPlanItem(item: unknown): PlanItem {

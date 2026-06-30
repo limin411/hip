@@ -65,22 +65,35 @@ class PlanRunner implements ModelRunner {
   async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
     this.callCount += 1
     if (this.callCount === 1) {
-      // Planner call: stream 'plan' deltas and return AIMessage with write_todos tool_call
-      opts.onText('plan')
+      // Planner call: stream tokens and emit EnterPlanMode → write_todos → ExitPlanMode
+      opts.onText('planning')
       return new AIMessage({
-        content: 'plan',
+        content: 'planning',
         tool_calls: [
+          {
+            name: 'EnterPlanMode',
+            args: {},
+            id: 'plan-enter',
+            type: 'tool_call' as const,
+          },
           {
             name: 'write_todos',
             args: { todos: [{ content: 'step 1', status: 'pending' }, { content: 'step 2', status: 'pending' }] },
             id: 'plan-1',
             type: 'tool_call' as const,
           },
+          {
+            name: 'ExitPlanMode',
+            args: {},
+            id: 'plan-exit',
+            type: 'tool_call' as const,
+          },
         ],
       })
     }
-    // Execution call
+    // Execution call (after plan approval)
     this.executed = true
+    opts.onText('executing plan')
     return new AIMessage('plan executed')
   }
 }
@@ -99,12 +112,8 @@ describe('plan lifecycle integration', () => {
     const events: ServerMessage[] = []
     await session.sendMessage('plan something', (m) => events.push(m))
 
-    // Verify plan:delta events streamed with 'plan' content
-    const deltaEvents = events.filter((e) => e.type === 'plan:delta')
-    expect(deltaEvents.length).toBeGreaterThan(0)
-    expect(deltaEvents.some((e) => (e as { delta: string }).delta.includes('plan'))).toBe(true)
-
-    // Verify plan:published with 2 PlanItems
+    // Verify plan:published with 2 PlanItems (from the new tool-based flow:
+    // EnterPlanMode → write_todos → ExitPlanMode → planPause → awaiting_user)
     const publishedEvent = events.find((e) => e.type === 'plan:published')
     expect(publishedEvent).toBeTruthy()
     const plan = (publishedEvent as { plan: Array<{ content: string; status: string }> }).plan

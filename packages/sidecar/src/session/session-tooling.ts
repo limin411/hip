@@ -15,6 +15,7 @@ import type { GoalManager } from './goal.js'
 import { buildGoalTools } from './tools/goal.js'
 import type { CronManager } from './cron.js'
 import { buildCronTools } from './cron.js'
+import type { PlanMode } from './plan-mode.js'
 export interface SessionTooling {
   tools: StructuredToolInterface[]
   toolRunner: ToolRunner
@@ -48,6 +49,7 @@ export interface BuildSessionToolingInput {
   emitRisk: (toolName: string, risk: 'low' | 'medium' | 'high', approval: string) => void
   goalManager?: GoalManager
   cronManager?: CronManager
+  planMode?: PlanMode
 }
 
 export async function buildSessionTooling(input: BuildSessionToolingInput): Promise<SessionTooling> {
@@ -75,6 +77,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
     input.retrySubagent,
     input.stopBackgroundTask,
     input.getBackgroundTaskOutput,
+    input.planMode,
   )
   for (const t of builtInTools) {
     registry.register(t)

@@ -296,9 +296,11 @@ export interface BuildToolsOpts {
   blockedTools?: string[]
   /** Optional network policy applied to web_fetch/web_search before the SSRF check. */
   networkPolicy?: NetworkPolicy
-  /** Enable the read_media tool for images and video frame extraction.
+    /** Enable the read_media tool for images and video frame extraction.
    *  Only enable when the active model supports vision. */
   mediaEnabled?: boolean
+  /** PlanMode instance for Enter/Exit plan-mode tools. */
+  planMode?: import('../plan-mode.js').PlanMode
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -312,4 +314,4 @@ export function isApproved(d: ApprovalDecision): boolean {
  *  (via requestApproval), rather than being gated by a pre-execution policy
  *  check. Currently only run_script — the tool fires, asks the user, and
  *  respects the answer. */
-export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script'])
+export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script', 'EnterPlanMode'])

@@ -48,11 +48,17 @@ class SmokeRunner implements ModelRunner {
     // ── Call sequencing ──────────────────────────────────────────────────────
 
     if (callN === 1) {
-      // Plan node via plan profile: emit plan delta + write_todos tool_call
-      opts.onText('plan')
+      // Plan profile: EnterPlanMode → write_todos → ExitPlanMode (new tool-based flow)
+      opts.onText('planning')
       return new AIMessage({
-        content: 'plan',
+        content: 'planning',
         tool_calls: [
+          {
+            name: 'EnterPlanMode',
+            args: {},
+            id: 'plan-enter',
+            type: 'tool_call' as const,
+          },
           {
             name: 'write_todos',
             args: {
@@ -62,6 +68,12 @@ class SmokeRunner implements ModelRunner {
               ],
             },
             id: 'plan-1',
+            type: 'tool_call' as const,
+          },
+          {
+            name: 'ExitPlanMode',
+            args: {},
+            id: 'plan-exit',
             type: 'tool_call' as const,
           },
         ],
@@ -192,16 +204,7 @@ describe('agent architecture end-to-end smoke', () => {
     const planEvents: ServerMessage[] = []
     await session.sendMessage('plan a feature', (m) => planEvents.push(m))
 
-    // Verify plan:delta events streamed with 'plan' content
-    const deltaEvents = planEvents.filter((e) => e.type === 'plan:delta')
-    expect(deltaEvents.length).toBeGreaterThan(0)
-    expect(
-      deltaEvents.some((e) =>
-        (e as { delta: string }).delta.includes('plan'),
-      ),
-    ).toBe(true)
-
-    // Verify plan:published with 2 PlanItems
+    // Verify plan:published with 2 PlanItems (tool-based flow: EnterPlanMode → write_todos → ExitPlanMode)
     const publishedEvent = planEvents.find((e) => e.type === 'plan:published')
     expect(publishedEvent).toBeTruthy()
     const plan = (publishedEvent as { plan: Array<{ content: string; status: string }> })

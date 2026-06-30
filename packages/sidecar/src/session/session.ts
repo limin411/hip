@@ -47,6 +47,7 @@ import { runWorkflowTurn as runWorkflowTurnFn } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
 import { AgentProfileManager } from './agent-profile-manager.js'
 import type { AgentProfile } from './agent-profile.js'
+import { PlanMode } from './plan-mode.js'
 import { ToolOutputStore } from './tool-output-store.js'
 import { NetworkPolicy, loadNetworkPolicyConfig } from './network-policy.js'
 import { GuardianReviewer } from './guardian.js'
@@ -172,6 +173,7 @@ export class Session {
   private stopContinued = false
   private goalContinued = false
   readonly usesEnvModel: boolean
+  private readonly planMode: PlanMode
   private readonly titleGenerator?: TitleGenerator
   private readonly invokerFactory: (cwd: string) => AgentInvoker
   readonly backgroundManager: BackgroundManager
@@ -374,6 +376,7 @@ export class Session {
     this.injectedSummarizer = summarizer
     this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd))
     this.usesEnvModel = !model && !runner
+    this.planMode = new PlanMode()
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
 
     this.backgroundManager = new BackgroundManager(id, {
@@ -1246,6 +1249,8 @@ export class Session {
 
     const t0 = Date.now()
 
+    const planMode: PlanMode | undefined = this._config.disablePlan ? undefined : this.planMode
+
     if (!this.agentProv.isExternalAgent()) {
       const contextState: SessionContextState = {
         cwd,
@@ -1304,6 +1309,7 @@ export class Session {
         },
         goalManager: this.goalManager,
         cronManager: this.cronManager,
+        planMode,
       })
       logDebug('session', 'phase:toolingDone', { sessionId: this.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
       // After reconcile: status reflects actual connection state
@@ -1311,7 +1317,7 @@ export class Session {
     }
 
     const maxSteps = this.activeActivity?.stepsRemaining ?? MAX_STEPS
-    const ctx: GraphCtx = { runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner: tooling?.toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps }
+    const ctx: GraphCtx = { runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: this.hooks, sessionId: this.id, toolRunner: tooling?.toolRunner, toolPolicy: this.toolPolicy, approvalCache: this.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps, planMode }
 
     let finalState: LoopState | undefined
     try {
@@ -1338,10 +1344,11 @@ export class Session {
         })
         const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
         const stepsBefore = base?.steps ?? 0
+        const forcePlanMessages = this._config.forcePlan ? [new SystemMessage('Plan mode is required for this task. Call EnterPlanMode first, then proceed with planning.')] : []
         logDebug('session', 'phase:invokeGraph', { sessionId: this.id, elapsedMs: Date.now() - t0, msgCount: effectiveMessages.length })
         finalState = await this.app.invoke(
           {
-            messages: [new SystemMessage(system), ...cronMessages, ...contextMessages, ...effectiveMessages],
+            messages: [new SystemMessage(system), ...forcePlanMessages, ...cronMessages, ...contextMessages, ...effectiveMessages],
             steps: base?.steps ?? 0,
             recentSigs: [],
             nudgedSig: undefined,
@@ -1356,7 +1363,7 @@ export class Session {
         this.consumeActivitySteps(finalState.steps - stepsBefore)
         closeReasoning('supervisor'); finishRemaining()
 
-        const ephemeralPrefix = 1 + cronMessages.length + contextMessages.length
+        const ephemeralPrefix = 1 + forcePlanMessages.length + cronMessages.length + contextMessages.length
         if (finalState.compacted && this.store) {
           new ContextEpoch(this.store.getDb()).requestReplacement(this.id, 0)
         }
@@ -1608,6 +1615,7 @@ export class Session {
     if (!this.awaitingResume || !this.paused) return
     switch (action) {
       case 'approve': {
+        this.planMode.exit()
         // Persist the approved plan to .hip/plans/<sessionId>.json atomically
         try {
           const cwd = this._config.cwd ?? process.cwd()
@@ -1639,6 +1647,7 @@ export class Session {
         break
       }
       case 'reject': {
+        this.planMode.cancel()
         this.awaitingResume = false; this.paused = null
         send({ type: 'error', sessionId: this.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
         break

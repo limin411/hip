@@ -7,6 +7,27 @@ export class ChatPage {
   // ── slash command palette ──
   get slashPalette() { return browser.$('[data-testid="slash-palette"]') }
   slashCmd(name: string) { return browser.$(`[data-testid="slash-cmd-${name}"]`) }
+
   /** Active textarea in the chat view — works for both new-conversation and existing sessions. */
   get activeTextarea() { return browser.$('textarea') }
+
+  // ── new getters ──
+  get messageBubbles() { return browser.$$('[data-message-id]') }
+  messageBubble(index: number) { return browser.$(`[data-message-id]:nth-child(${index + 1})`) }
+  get lastMessageText() { return browser.$('[data-message-id]:last-child') }
+  get jumpToLatest() { return browser.$('[data-testid="jump-to-latest"]') }
+  get chatError() { return browser.$('[data-testid="chat-error"]') }
+  get chatErrorRetry() { return browser.$('[data-testid="chat-error-retry"]') }
+  get chatInterrupt() { return browser.$('[data-testid="chat-interrupt"]') }
+  get composerStop() { return browser.$('[data-testid="composer-stop"]') }
+  get attachmentButton() { return browser.$('[data-testid="attachment-button"]') }
+  get attachmentChips() { return browser.$$('[data-testid="attachment-chip"]') }
+  get modelChip() { return browser.$('[data-testid="model-chip"]') }
+  get permissionChip() { return browser.$('[data-testid="permission-chip"]') }
+  get planApprovalCard() { return browser.$('[data-testid="plan-approval-card"]') }
+  get planApprove() { return browser.$('[data-testid="plan-approve"]') }
+  get planAmend() { return browser.$('[data-testid="plan-amend"]') }
+  get planReject() { return browser.$('[data-testid="plan-reject"]') }
+  get permissionModal() { return browser.$('[data-testid="permission-modal"]') }
+  permissionOption(id: string) { return browser.$(`[data-testid="permission-option-${id}"]`) }
 }

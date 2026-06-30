@@ -59,6 +59,20 @@ export class SessionManager {
       case 'session:destroy':
         await this.destroySession(msg.sessionId)
         break
+      case 'message:compact': {
+        const session = this.sessions.get(msg.sessionId)
+        if (!session) {
+          send({ type: 'compact:result', sessionId: msg.sessionId, ok: false, inputTokens: 0, outputTokens: 0, messagesBefore: 0, messagesAfter: 0, error: 'session not found' })
+          return
+        }
+        try {
+          const result = await session.compactNow()
+          send({ type: 'compact:result', sessionId: msg.sessionId, ok: true, ...result })
+        } catch (e) {
+          send({ type: 'compact:result', sessionId: msg.sessionId, ok: false, inputTokens: 0, outputTokens: 0, messagesBefore: 0, messagesAfter: 0, error: String(e) })
+        }
+        return
+      }
       case 'message:send':
         await this.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id, msg.attachments)
         break

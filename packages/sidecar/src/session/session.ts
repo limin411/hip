@@ -25,7 +25,7 @@ import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
-import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
+import { compactMessages, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
@@ -432,6 +432,28 @@ export class Session {
   private summarizer(): Summarizer {
     if (this.injectedSummarizer) return this.injectedSummarizer
     return this.usesEnvModel ? createSummarizer() : NOOP_SUMMARIZER
+  }
+
+  /** Compact the in-memory message history on demand (e.g. from the /compact slash command).
+   *  Returns token counts and message counts before/after for the UI to display. */
+  async compactNow(): Promise<{ inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number }> {
+    const before = this.messages.length
+    const tokensBefore = estimateTokens(this.messages)
+    const result = await compactMessages(this.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: this.summarizer() })
+    if (!result) {
+      return { inputTokens: tokensBefore, outputTokens: 0, messagesBefore: before, messagesAfter: before }
+    }
+    const idsToRemove = new Set([result.summary.id, ...result.removeIds])
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const id = this.messages[i].id
+      if (id && idsToRemove.has(id)) {
+        this.messages.splice(i, 1)
+      }
+    }
+    this.messages.push(result.summary)
+    const after = this.messages.length
+    const tokensAfter = estimateTokens(this.messages)
+    return { inputTokens: tokensBefore, outputTokens: tokensAfter, messagesBefore: before, messagesAfter: after }
   }
 
   // ── Git delegation ──

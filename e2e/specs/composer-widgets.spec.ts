@@ -18,11 +18,16 @@ describe('composer widgets', () => {
     const chip = await chat.modelChip
     await chip.waitForExist({ timeout: 10000 })
     await chip.waitForClickable({ timeout: 10000 })
+    // WebKit/Tauri WebDriver in this headless session does not reliably trigger
+    // Radix dropdowns with `.click()`, so dispatch `pointerdown` directly.
     await browser.execute((el) => {
       el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
     }, chip)
     const menu = await browser.$('[role="menu"]')
     await menu.waitForExist({ timeout: 10000 })
+    // CSS animations do not advance in the headless WebKit session, so
+    // `isDisplayed()` stays `false` even after the menu opens. Assert
+    // `data-state="open"` instead.
     await browser.waitUntil(async () => (await menu.getAttribute('data-state')) === 'open', { timeout: 10000 })
     await browser.keys('Escape')
   })
@@ -30,6 +35,9 @@ describe('composer widgets', () => {
   it('shows the permission mode picker and lists all three modes', async () => {
     const chip = await chat.permissionChip
     await chip.waitForExist({ timeout: 10000 })
+    await chip.waitForClickable({ timeout: 10000 })
+    // WebKit/Tauri WebDriver in this headless session does not reliably trigger
+    // Radix dropdowns with `.click()`, so dispatch `pointerdown` directly.
     await browser.execute((el) => {
       el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
     }, chip)

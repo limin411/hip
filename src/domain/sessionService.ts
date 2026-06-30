@@ -148,6 +148,15 @@ export class SessionService {
       this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
       const tab = useUiStore.getState().activeTab
       if (tab === 'changes') { this.requestDiff(msg.sessionId); this.requestCommitLog(msg.sessionId) }
+    } else if (msg.type === 'compact:result') {
+      if (msg.ok) {
+        useDomainStore.getState().appendMessage(msg.sessionId, {
+          id: nanoid(),
+          role: 'assistant',
+          content: `Conversation compacted: ${msg.messagesBefore} messages → ${msg.messagesAfter} messages`,
+          timestamp: Date.now(),
+        })
+      }
     }
   }
 
@@ -284,6 +293,13 @@ export class SessionService {
    *  a cancellation) so the blocked tool proceeds or is denied. The caller clears the local queue. */
   respondPermission(sessionId: string, requestId: string, choice: { optionId: string } | { cancelled: true }): void {
     this.transport.send({ type: 'permission:respond', sessionId, requestId, ...('optionId' in choice ? { optionId: choice.optionId } : { cancelled: true }) })
+  }
+
+  /** Compact the in-memory conversation history (summarize the middle), freeing token budget
+   *  for longer sessions. Fires a message:compact WS message; the backend responds with a
+   *  compact:result that injects an informational message into the session. */
+  compactSession(sessionId: string): void {
+    this.transport.send({ type: 'message:compact', sessionId })
   }
 
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */

@@ -142,11 +142,13 @@ export function SlashCommandPalette({ value, skills, onSelect, onDismiss }: Slas
   return (
     <div
       role="listbox"
+      data-testid="slash-palette"
       className="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-border bg-surface shadow-overlay max-h-48 overflow-y-auto z-50"
     >
       {filtered.map((cmd, i) => (
         <button
           key={cmd.id}
+          data-testid={`slash-cmd-${cmd.name}`}
           role="option"
           aria-selected={i === activeIndex}
           onClick={() => onSelect(cmd)}

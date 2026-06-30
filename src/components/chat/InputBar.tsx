@@ -33,7 +33,8 @@ export function InputBar() {
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
   const reconnecting = status === 'running' && connection !== 'connected'
 
-  const skills = useSkillsStore(useShallow((s) => s.skills.filter((sk) => sk.userInvocable !== false)))
+  const allSkills = useSkillsStore((s) => s.skills)
+  const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
   const query = useMemo(() => extractSlashQuery(value), [value])
   const inputRef = useRef<HTMLTextAreaElement>(null)
 

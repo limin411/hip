@@ -42,6 +42,7 @@ export function InputBar() {
   const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
     sessionId: activeId,
     skills,
+    value,
     setText: setValue,
     inputRef,
   })

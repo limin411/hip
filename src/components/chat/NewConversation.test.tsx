@@ -142,6 +142,44 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
 
+  it('/help command is selected by pressing Enter after typing', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+    const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/h' } })
+    expect(screen.getByTestId('slash-cmd-help')).toBeInTheDocument()
+
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+
+    expect(appendSpy).toHaveBeenCalledTimes(1)
+    const [sessionId, message] = appendSpy.mock.calls[0]
+    expect(sessionId).toBe('s1')
+    expect(message.role).toBe('assistant')
+    expect(message.content).toContain('Available commands:')
+    expect(useDraftStore.getState().draft?.text).toBe('')
+  })
+
+  it('uses controlled value instead of ref value when selecting a skill by Enter', async () => {
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
+    useSkillsStore.setState({ skills: [{ id: 'sk1', name: 'my-skill', description: 'A skill', dir: '/tmp', hasScripts: false }], enabled: {}, loaded: false })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: 'do /my' } })
+    expect(screen.getByTestId('slash-cmd-my-skill')).toBeInTheDocument()
+
+    ;(textarea as HTMLTextAreaElement).value = ''
+
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
+
+    expect(useDraftStore.getState().draft?.text).toBe('do /my-skill ')
+  })
+
   it('/diff command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 

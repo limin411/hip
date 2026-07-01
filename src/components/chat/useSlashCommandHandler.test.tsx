@@ -36,6 +36,7 @@ function setup(
     useSlashCommandHandler(surface, {
       sessionId,
       skills,
+      value,
       setText,
       inputRef,
       onDismiss,

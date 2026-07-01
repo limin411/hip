@@ -14,6 +14,7 @@ import {
 export interface UseSlashCommandHandlerOptions {
   sessionId: string | null
   skills: SkillMeta[]
+  value: string
   setText: (value: string) => void
   inputRef: React.RefObject<HTMLTextAreaElement | null>
   onDismiss?: () => void
@@ -23,7 +24,7 @@ export function useSlashCommandHandler(
   surface: ComposerSurface,
   options: UseSlashCommandHandlerOptions,
 ) {
-  const { sessionId, skills, setText, inputRef, onDismiss } = options
+  const { sessionId, skills, value, setText, inputRef, onDismiss } = options
 
   const availableCommands = useMemo(
     () => buildCommandList(skills, { surface, sessionId }),
@@ -36,8 +37,6 @@ export function useSlashCommandHandler(
 
   const handleCommandSelect = useCallback(
     (cmd: SlashCommand) => {
-      const currentValue = inputRef.current?.value ?? ''
-
       // The palette already filters by surface/session, but guard programmatic
       // invocations (e.g. tests or future callers) against unavailable commands.
       if (!availableCommands.some((c) => c.id === cmd.id && c.kind === cmd.kind)) {
@@ -101,23 +100,22 @@ export function useSlashCommandHandler(
         }
       }
 
-      setText(applyCommand(cmd, currentValue))
+      setText(applyCommand(cmd, value))
       focusInput()
     },
-    [availableCommands, sessionId, setText, focusInput],
+    [availableCommands, sessionId, value, setText, focusInput],
   )
 
   const handleDismiss = useCallback(() => {
-    const currentValue = inputRef.current?.value ?? ''
-    if (extractSlashQuery(currentValue) === null) {
+    if (extractSlashQuery(value) === null) {
       onDismiss?.()
       return
     }
-    const m = currentValue.match(/^((?:.*\s)?)\/\S*$/)
+    const m = value.match(/^((?:.*\s)?)\/\S*$/)
     setText(m ? m[1] : '')
     focusInput()
     onDismiss?.()
-  }, [setText, focusInput, onDismiss])
+  }, [value, setText, focusInput, onDismiss])
 
   return { handleCommandSelect, handleDismiss }
 }

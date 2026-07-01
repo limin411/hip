@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { useDraftStore } from '@/store/draftStore'
@@ -64,7 +64,7 @@ export function NewConversation() {
 
   const greeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
 
-  const setText = (value: string) => useDraftStore.getState().setText(value)
+  const setText = useCallback((value: string) => useDraftStore.getState().setText(value), [])
 
   const allSkills = useSkillsStore((s) => s.skills)
   const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
@@ -74,6 +74,7 @@ export function NewConversation() {
   const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
     sessionId: activeId,
     skills,
+    value: text,
     setText,
     inputRef,
   })

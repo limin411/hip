@@ -16,12 +16,15 @@ export function ChangesView() {
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
   const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
+  const activeTab = useUiStore((s) => s.activeTab)
 
+  // Refresh diff + commit log when the tab becomes active (Radix may keep the
+  // component mounted while hidden) or when the session changes.
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || activeTab !== 'changes') return
     sessionService.requestDiff(sessionId)
     sessionService.requestCommitLog(sessionId)
-  }, [sessionId])
+  }, [sessionId, activeTab])
 
   if (!sessionId) return <Empty title={t('artifact.diffView.noSession')} desc={t('artifact.diffView.noSessionDesc')} />
 

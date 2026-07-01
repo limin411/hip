@@ -80,19 +80,16 @@ class SmokeRunner implements ModelRunner {
       })
     }
 
-    if (hasWriteTodosTm) {
-      // Tools node executed write_todos → confirm
-      return new AIMessage('todos recorded')
-    }
-
     if (callN === 2) {
-      // After plan approval: plan-profile agent returns text (no tool_calls —
-      // plan profile does not have the `task` tool).
+      // After plan approval: resume turn returns text (no tool_calls — the
+      // approved-plan continuation is still bound to the plan profile).
       return new AIMessage('plan noted')
     }
 
     if (callN === 3) {
-      // Supervisor agent: spawn a background subagent via the `task` tool
+      // Supervisor agent: spawn a background subagent via the `task` tool.
+      // The history still contains the write_todos ToolMessage from the plan
+      // phase, so check call number before the ToolMessage heuristics.
       return new AIMessage({
         content: '',
         tool_calls: [
@@ -120,6 +117,12 @@ class SmokeRunner implements ModelRunner {
       // Background subagent — no ToolMessages in state
       opts.onText('subagent done')
       return new AIMessage('subagent done')
+    }
+
+    if (hasWriteTodosTm) {
+      // Tools node executed write_todos → confirm (defensive fallback for
+      // any plan-phase continuation that does not match the numbered calls).
+      return new AIMessage('todos recorded')
     }
 
     // Fallback (should never be reached)

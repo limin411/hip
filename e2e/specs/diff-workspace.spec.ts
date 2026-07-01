@@ -3,16 +3,20 @@ import { expect } from 'expect-webdriverio'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
+import { CodePage } from '../page-objects/CodePage.js'
 
 // A disposable NON-repo folder — init must never touch the repo-tracked fixtures.
 // Created in before() (not at module load) so an E2E_GREP-filtered run never leaks it.
 let dir: string
+const codePage = new CodePage()
 
 async function initGitAndOpenChanges(): Promise<void> {
-  // The init button lives in the Files tab GitInitBanner before the workspace is a repo.
-  await (await browser.$('button*=初始化 git 仓库')).click()
+  const init = await codePage.gitInitButton
+  await init.waitForExist({ timeout: 30000 })
+  await init.click()
   // The Changes tab is git-gated and only appears once init makes this a repo.
   const changesTab = await browser.$('[data-testid="tab-changes"]')
   await changesTab.waitForExist({ timeout: 30000 })
@@ -22,35 +26,33 @@ async function initGitAndOpenChanges(): Promise<void> {
 
 describe('workspace git diff', () => {
   before(async () => {
+    await waitForAppReady()
+    await skipLoginIfPresent()
+    await waitForMainApp()
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-diff-'))
     fs.writeFileSync(path.join(dir, 'hello.txt'), 'hello\n')
-    await browser.pause(2500)
-    await skipLoginIfPresent()
-    await browser.execute((d: string) => {
-      ;(window as unknown as { __hipPickDir?: () => Promise<string> }).__hipPickDir = () => Promise.resolve(d)
-    }, dir)
     await switchToCodeSurface()
   })
 
   after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }) })
 
   it('commits a session bound to the temp folder', async () => {
-    await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 120000 })
-    await (await browser.$('[data-testid="pick-folder"]')).click()
-    await (await browser.$(`[data-testid="tree-entry"][data-path$="/hello.txt"]`)).waitForExist({ timeout: 60000 })
+    await codePage.newConversation.waitForExist({ timeout: 120000 })
+    await codePage.pickDirectory(dir)
+    await (await codePage.entry('/hello.txt')).waitForExist({ timeout: 60000 })
     const ta = await browser.$('[data-testid="new-conversation"] textarea')
     await ta.click()
     await browser.keys('diff e2e')
     const send = await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')
     await send.waitForEnabled({ timeout: 10000 })
     await send.click()
-    await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ reverse: true, timeout: 30000 })
+    await codePage.newConversation.waitForExist({ reverse: true, timeout: 30000 })
   })
 
   it('shows the not-a-repo state with an init button on the Files tab', async () => {
     // The Changes tab is git-gated and hidden before init.
     expect(await (await browser.$('[data-testid="tab-changes"]')).isExisting()).toBe(false)
-    await (await browser.$('button*=初始化 git 仓库')).waitForExist({ timeout: 30000 })
+    await (await codePage.gitInitButton).waitForExist({ timeout: 30000 })
   })
 
   it('one-click init produces a clean baseline and reveals the Changes tab', async () => {
@@ -59,11 +61,27 @@ describe('workspace git diff', () => {
     expect(await (await browser.$('[data-testid="diff-file"]')).isExisting()).toBe(false)
   })
 
+  it('shows the baseline commit in the commit log', async () => {
+    // Changes tab is already open from the previous test.
+    const row = await browser.$('[data-testid="commit-row"]')
+    await row.waitForExist({ timeout: 30000 })
+    expect(await row.getText()).toContain('hip baseline')
+  })
+
   it('an out-of-band file change appears in the changes view', async () => {
+    // The sidecar has no live fs watcher, so re-activate the Changes tab to
+    // trigger a fresh diff pull after the external edit.
+    const filesTab = await browser.$('[data-testid="tab-files"]')
+    await filesTab.waitForExist({ timeout: 10000 })
+    await filesTab.click()
+
     fs.writeFileSync(path.join(dir, 'hello.txt'), 'changed\n')
-    // ChangesView re-requests the diff on (re)mount. Re-activate the tab to force a refresh.
-    await (await browser.$('[data-testid="tab-files"]')).click()
-    await (await browser.$('[data-testid="tab-changes"]')).click()
+
+    const changesTab = await browser.$('[data-testid="tab-changes"]')
+    await changesTab.waitForExist({ timeout: 10000 })
+    await changesTab.click()
+    await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 10000 })
+
     const file = await browser.$('[data-testid="diff-file"]')
     await file.waitForExist({ timeout: 30000 })
     await browser.waitUntil(async () => (await file.getText()).includes('hello.txt'), { timeout: 10000, interval: 500 })

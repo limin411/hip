@@ -1,5 +1,6 @@
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
+import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
@@ -7,45 +8,53 @@ import { CodePage } from '../page-objects/CodePage.js'
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const codePage = new CodePage()
 const sessionItems = () => browser.$$('[data-testid="session-item"]')
-const entry = (suffix: string) => browser.$(`[data-testid="tree-entry"][data-path$="${suffix}"]`)
 
 describe('new conversation', () => {
   before(async () => {
+    await waitForAppReady()
     await skipLoginIfPresent()
+    await waitForMainApp()
     await switchToCodeSurface()
   })
 
-  it('a new code conversation shows the centered composer landing with a folder picker', async () => {
+  it('shows the centered composer landing with a folder picker', async () => {
     await codePage.newConversation.waitForExist({ timeout: 120000 })
     expect(await codePage.pickFolder.isExisting()).toBe(true)
   })
 
-  it('picking a folder opens the tree without creating a sidebar row', async () => {
+  it('picking a folder opens the file tree without creating a sidebar session row', async () => {
     const before = await (await sessionItems()).length
     await codePage.pickDirectory(FIXTURE)
-    await (await entry('/README.md')).waitForExist({ timeout: 60000 })
+    await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
     expect(await (await sessionItems()).length).toBe(before)
   })
 
-  it('the composer chip ✕ returns to pure-chat (then re-pick restores the tree)', async () => {
-    await (await browser.$('[data-testid="clear-folder"]')).click()
-    await codePage.pickFolder.waitForExist({ timeout: 10000 })
-    await codePage.pickDirectory(FIXTURE)
-    await (await entry('/README.md')).waitForExist({ timeout: 60000 })
+  it('displays the selected folder as a chip with change and clear actions', async () => {
+    await codePage.folderChip.waitForExist({ timeout: 10000 })
+    expect(await codePage.folderChip.getText()).toContain(path.basename(FIXTURE))
+    expect(await codePage.changeFolder.isExisting()).toBe(true)
+    expect(await codePage.clearFolder.isExisting()).toBe(true)
   })
 
-  it('the Files-panel exit returns the tree to sandbox-pending (then re-pick restores it)', async () => {
-    await (await browser.$('[data-testid="tree-back-to-chat"]')).click()
+  it('clearing the folder returns to the folder picker', async () => {
+    await codePage.clearFolder.click()
+    await codePage.pickFolder.waitForExist({ timeout: 10000 })
+    await codePage.pickDirectory(FIXTURE)
+    await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
+  })
+
+  it('the file-tree back-to-chat action returns the tree to sandbox-pending', async () => {
+    await codePage.treeBackToChat.click()
     await browser.waitUntil(
-      async () => !(await (await entry('/README.md')).isExisting()),
+      async () => !(await (await codePage.entry('/README.md')).isExisting()),
       { timeout: 10000, interval: 200 }
     )
     await codePage.pickDirectory(FIXTURE)
-    await (await entry('/README.md')).waitForExist({ timeout: 60000 })
+    await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
   })
 
   it('renders a Markdown preview (rendered, not source)', async () => {
-    await (await entry('/README.md')).click()
+    await (await codePage.entry('/README.md')).click()
     const md = await browser.$('[data-testid="preview-markdown"]')
     await md.waitForExist({ timeout: 30000 })
     await browser.waitUntil(
@@ -55,14 +64,14 @@ describe('new conversation', () => {
   })
 
   it('renders HTML in a sandboxed iframe', async () => {
-    await (await entry('/index.html')).click()
+    await (await codePage.entry('/index.html')).click()
     const frame = await browser.$('[data-testid="preview-html"]')
     await frame.waitForExist({ timeout: 30000 })
     expect(await frame.getAttribute('sandbox')).toBe('')
   })
 
   it('renders an image as a data URL', async () => {
-    await (await entry('/logo.png')).click()
+    await (await codePage.entry('/logo.png')).click()
     const img = await browser.$('[data-testid="preview-image"] img')
     await img.waitForExist({ timeout: 30000 })
     await browser.waitUntil(
@@ -72,9 +81,9 @@ describe('new conversation', () => {
   })
 
   it('lazily expands a directory and previews a text file', async () => {
-    await (await entry('/src')).click()
-    await (await entry('/a.ts')).waitForExist({ timeout: 30000 })
-    await (await entry('/a.ts')).click()
+    await (await codePage.entry('/src')).click()
+    await (await codePage.entry('/a.ts')).waitForExist({ timeout: 30000 })
+    await (await codePage.entry('/a.ts')).click()
     const txt = await browser.$('[data-testid="preview-text"]')
     await txt.waitForExist({ timeout: 30000 })
     await browser.waitUntil(

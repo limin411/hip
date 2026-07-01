@@ -9,6 +9,7 @@ export async function sendChatMessage(text: string): Promise<void> {
   const ta = await chat.composerTextarea
   await ta.waitForExist({ timeout: 10000 })
   await ta.click()
+  await ta.clearValue()
   await browser.keys(text)
   const send = await chat.composerSend
   await send.waitForEnabled({ timeout: 10000 })

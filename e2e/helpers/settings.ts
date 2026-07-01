@@ -7,7 +7,7 @@ export async function openSettings(): Promise<void> {
   await footer.waitForExist({ timeout: 10000 })
   // WebKit/Tauri WebDriver does not reliably trigger Radix dropdowns with
   // `.click()`, so dispatch `pointerdown` directly (matches composer-widgets).
-  await browser.execute((el) => {
+  await browser.execute((el: HTMLElement) => {
     el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerType: 'mouse' }))
   }, footer)
   const menuItem = await settings.settingsMenuItem

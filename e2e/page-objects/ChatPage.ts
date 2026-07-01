@@ -13,8 +13,8 @@ export class ChatPage {
 
   // ── new getters ──
   get messageBubbles() { return browser.$$('[data-message-id]') }
-  messageBubble(index: number) { return browser.$(`[data-message-id]:nth-child(${index + 1})`) }
-  get lastMessageText() { return browser.$('[data-message-id]:last-child') }
+  messageBubble(index: number) { return browser.$(`(//*[@data-message-id])[${index + 1}]`) }
+  get lastMessageText() { return browser.$('(//*[@data-message-id])[last()]') }
   get jumpToLatest() { return browser.$('[data-testid="jump-to-latest"]') }
   get chatError() { return browser.$('[data-testid="chat-error"]') }
   get chatErrorRetry() { return browser.$('[data-testid="chat-error-retry"]') }
@@ -30,4 +30,17 @@ export class ChatPage {
   get planReject() { return browser.$('[data-testid="plan-reject"]') }
   get permissionModal() { return browser.$('[data-testid="permission-modal"]') }
   permissionOption(id: string) { return browser.$(`[data-testid="permission-option-${id}"]`) }
+
+  // ── title bar / usage ──
+  get sessionUsage() { return browser.$('[data-testid="session-usage"]') }
+  get messageUsage() { return browser.$('[data-testid="message-usage"]') }
+  get messageTime() { return browser.$('[data-testid="message-time"]') }
+
+  // ── surface tabs ──
+  get surfaceTabChat() { return browser.$('[data-testid="surface-tab-chat"]') }
+  get surfaceTabCode() { return browser.$('[data-testid="surface-tab-code"]') }
+  get surfaceTabDomain() { return browser.$('[data-testid="surface-tab-domain"]') }
+
+  // ── attachment removal ──
+  get attachmentRemove() { return browser.$('[data-testid="attachment-remove"]') }
 }

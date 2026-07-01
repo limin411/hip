@@ -1,8 +1,7 @@
 # AGENTS.md
 
-Behavioral guidelines to reduce common LLM coding
-mistakes. Merge with project-specific instructions
-as needed.
+General agent behavioral guidelines for this repository.
+For project-specific context — stack, commands, and gotchas — see `CLAUDE.md`.
 
 Tradeoff: These guidelines bias toward caution
 over speed. For trivial tasks, use judgment.

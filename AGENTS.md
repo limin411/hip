@@ -16,10 +16,6 @@ Before implementing:
 - If a simpler approach exists, say so.
 - If something is unclear, stop. Name what's confusing.
 - Look up information online promptly; never trust your own knowledge.
-- When a reference path is provided, check the code design there first if it exists, and supplement with external web/GitHub searches for current best practices.
-
-Reference path:
-- `/Users/lijiamin/data/code-repository/20260427/`
 
 ## 2. Simplicity First
 Minimum code that solves the problem. Nothing speculative.
@@ -46,4 +42,3 @@ Transform tasks into verifiable goals:
 - “Fix the bug” → “Reproduce it in a test, then fix”
 - “Refactor X” → “Ensure tests pass before and after”
 - Commit code promptly after completing each phase of work.
-- After each coding task, run the local Alibaba `open-code-review` agent for code review and promptly fix any issues it reports.

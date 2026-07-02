@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PluginMeta } from '@hip/protocol'
 import { usePluginsStore } from '@/store/pluginsStore'
+import { useSkillsStore } from '@/store/skillsStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDomainStore } from '@/domain/sessionStore'
 import { wsClient } from '@/ipc/ws-client'
 import { Button } from '@/components/ui/Button'
@@ -13,6 +15,8 @@ export function PluginConfig() {
   const { plugins, loaded, load, remove } = usePluginsStore()
   const pluginInstall = useDomainStore((s) => s.pluginInstall)
   const clearPluginInstall = useDomainStore((s) => s.clearPluginInstall)
+  const reloadSkills = useSkillsStore((s) => s.load)
+  const reloadHipConfig = useHipConfigStore((s) => s.load)
   const [showForm, setShowForm] = useState(false)
   const [url, setUrl] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -105,7 +109,13 @@ export function PluginConfig() {
                 size="sm"
                 onClick={() => {
                   remove(deleting.id)
-                    .then(() => setDeleting(null))
+                    .then(() => {
+                      setDeleting(null)
+                      // Propagate removal to skill/MCP stores and the sidecar runtime.
+                      void reloadSkills()
+                      void reloadHipConfig()
+                      wsClient.send({ type: 'plugin:delete', pluginId: deleting.id })
+                    })
                     .catch((err: Error) => {
                       setDeleting(null)
                       setError(err.message ?? t('settings.plugins.deleteError'))

@@ -363,6 +363,23 @@ export class SessionManager {
       case 'plugin:install:url':
         await this.handlePluginInstallUrl(msg.url, send)
         break
+      case 'plugin:delete': {
+        const pluginId = msg.pluginId
+        if (!pluginId || typeof pluginId !== 'string') {
+          send({ type: 'plugin:delete:result', pluginId: pluginId ?? '', ok: false, error: 'pluginId is required' })
+          break
+        }
+        // Re-read plugin registry so any sessions still running see the removal.
+        for (const session of this.sessions.values()) {
+          try {
+            session.reloadPlugins()
+          } catch (err) {
+            console.warn(`[session-manager] failed to reload plugins for session ${session.id}:`, err instanceof Error ? err.message : String(err))
+          }
+        }
+        send({ type: 'plugin:delete:result', pluginId, ok: true })
+        break
+      }
       case 'replay:session': {
         if (!this.store) {
           send({ type: 'error', sessionId: msg.sessionId, code: 'NO_STORE', message: 'No persistence store available for replay' })

@@ -72,6 +72,27 @@ function repoSlugFromUrl(urlString: string): string | undefined {
 }
 
 /**
+ * Infer a plugin version from `stagingDir`.
+ *
+ * Reads `package.json` `version` field if present and valid; otherwise falls
+ * back to `'0.0.0'`.
+ */
+export function inferPluginVersion(stagingDir: string): string {
+  const pkgPath = join(stagingDir, 'package.json')
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: unknown }
+      if (typeof pkg.version === 'string' && pkg.version.length > 0) {
+        return pkg.version
+      }
+    } catch {
+      /* ignore malformed package.json */
+    }
+  }
+  return '0.0.0'
+}
+
+/**
  * Infer a human-readable plugin name from `stagingDir` and optional `sourceUrl`.
  *
  * Preference order:
@@ -179,7 +200,7 @@ export function generatePluginManifest(stagingDir: string, sourceUrl?: string): 
 
   const generated: Record<string, unknown> = {
     name: inferPluginName(stagingDir, sourceUrl),
-    version: '0.0.0',
+    version: inferPluginVersion(stagingDir),
   }
   if (skills.length > 0) generated.skills = skills
   if (mcpServers !== undefined) generated.mcpServers = mcpServers

@@ -300,6 +300,30 @@ describe('generatePluginManifest', () => {
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('uses version from package.json when present', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-version-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'versioned-plugin', version: '2.3.4' }), 'utf8')
+      const result = generatePluginManifest(dir)
+      expect(result.version).toBe('2.3.4')
+      expect(result.name).toBe('versioned-plugin')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('falls back to 0.0.0 when package.json has no version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-no-version-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'no-version-plugin' }), 'utf8')
+      const result = generatePluginManifest(dir)
+      expect(result.version).toBe('0.0.0')
+      expect(result.name).toBe('no-version-plugin')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('resolveInstallSlug', () => {

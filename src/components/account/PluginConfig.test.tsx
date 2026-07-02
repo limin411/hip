@@ -31,6 +31,21 @@ vi.mock('@/ipc/plugins', () => ({
   deletePlugin: vi.fn().mockResolvedValue(undefined),
 }))
 
+const { mockReloadSkills, mockReloadHipConfig } = vi.hoisted(() => ({
+  mockReloadSkills: vi.fn(),
+  mockReloadHipConfig: vi.fn(),
+}))
+
+vi.mock('@/store/skillsStore', () => ({
+  useSkillsStore: vi.fn((selector: (s: { load: typeof mockReloadSkills }) => typeof mockReloadSkills) =>
+    selector({ load: mockReloadSkills })),
+}))
+
+vi.mock('@/store/hipConfigStore', () => ({
+  useHipConfigStore: vi.fn((selector: (s: { load: typeof mockReloadHipConfig }) => typeof mockReloadHipConfig) =>
+    selector({ load: mockReloadHipConfig })),
+}))
+
 function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
   return {
     id: 'test-plugin',
@@ -221,5 +236,21 @@ describe('PluginConfig', () => {
         url: 'https://github.com/owner/repo.git',
       })
     })
+  })
+
+  it('notifies sidecar and refreshes dependent stores after uninstall', async () => {
+    const plugin = basePlugin({ id: 'test-plugin', name: 'Test Plugin' })
+    usePluginsStore.setState({ plugins: [plugin], loaded: true })
+
+    render(<PluginConfig />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'settings.plugins.uninstall' })[0])
+    fireEvent.click(screen.getAllByText('settings.plugins.uninstall').at(-1)!)
+
+    await waitFor(() => {
+      expect(wsClient.send).toHaveBeenCalledWith({ type: 'plugin:delete', pluginId: 'test-plugin' })
+    })
+    expect(mockReloadSkills).toHaveBeenCalled()
+    expect(mockReloadHipConfig).toHaveBeenCalled()
   })
 })

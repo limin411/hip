@@ -478,6 +478,7 @@ export type ClientMessage =
   | { type: 'agent:setConfigOption'; sessionId: string; configId: string; value: string }
   | { type: 'plugin:install:url'; url: string }
   | { type: 'plugin:install:github'; url: string }
+  | { type: 'plugin:delete'; pluginId: string }
   | { type: 'git:worktree:create'; sessionId: string; branch: string }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
@@ -553,6 +554,7 @@ export type ServerMessage =
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
+  | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
   | { type: 'compact:result'; sessionId: string; ok: boolean; inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number; error?: string }
 

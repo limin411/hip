@@ -34,7 +34,7 @@ export function buildPluginInstallTool(): StructuredToolInterface {
 
         let manifest
         try {
-          manifest = readOrGenerateManifest(dir)
+          manifest = readOrGenerateManifest(dir, url)
         } catch (err) {
           cleanupStagingDir(dir)
           return fail((err as Error).message)

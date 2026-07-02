@@ -55,6 +55,75 @@ export function slugifyPlugin(name: string): string {
 }
 
 /**
+ * Extract the repository slug from a URL string.
+ * Drops `.git`, trailing slashes, query/hash, and returns the last path segment.
+ */
+function repoSlugFromUrl(urlString: string): string | undefined {
+  let parsed: URL
+  try {
+    parsed = new URL(urlString)
+  } catch {
+    return undefined
+  }
+  const pathname = parsed.pathname.replace(/\/+$/, '').replace(/\.git$/, '')
+  const lastSlash = pathname.lastIndexOf('/')
+  const slug = lastSlash >= 0 ? pathname.slice(lastSlash + 1) : pathname
+  return slug || undefined
+}
+
+/**
+ * Infer a human-readable plugin name from `stagingDir` and optional `sourceUrl`.
+ *
+ * Preference order:
+ * 1. `package.json` `name` field in `stagingDir` (strip npm scope).
+ * 2. Git remote origin URL from `stagingDir/.git/config`.
+ * 3. `sourceUrl` repo slug.
+ * 4. `basename(stagingDir)` fallback.
+ *
+ * The result is passed through `slugifyPlugin` to match manifest constraints.
+ */
+export function inferPluginName(stagingDir: string, sourceUrl?: string): string {
+  const pkgPath = join(stagingDir, 'package.json')
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { name?: unknown }
+      if (typeof pkg.name === 'string') {
+        const scoped = pkg.name
+        const lastSlash = scoped.lastIndexOf('/')
+        const rawName = lastSlash >= 0 ? scoped.slice(lastSlash + 1) : scoped
+        return slugifyPlugin(rawName)
+      }
+    } catch {
+      /* ignore malformed package.json */
+    }
+  }
+
+  const gitDir = join(stagingDir, '.git')
+  if (existsSync(gitDir)) {
+    try {
+      const remote = execFileSync('git', ['config', '--get', 'remote.origin.url'], {
+        cwd: stagingDir,
+        timeout: 5_000,
+        stdio: 'pipe',
+      })
+        .toString('utf8')
+        .trim()
+      const slug = repoSlugFromUrl(remote)
+      if (slug) return slugifyPlugin(slug)
+    } catch {
+      /* ignore missing/invalid git config */
+    }
+  }
+
+  if (sourceUrl) {
+    const slug = repoSlugFromUrl(sourceUrl)
+    if (slug) return slugifyPlugin(slug)
+  }
+
+  return slugifyPlugin(basename(stagingDir))
+}
+
+/**
  * Auto-generate a minimal plugin.json manifest by scanning common plugin layouts
  * inside `stagingDir`. This is used when the cloned repo has no `.plugin/plugin.json`.
  *
@@ -64,7 +133,7 @@ export function slugifyPlugin(name: string): string {
  * - `hooks/**` (any files) → `hooks: "./hooks/hooks.cjs"`
  * - `agents/**` (any files) → `agents: "./agents.json"`
  */
-export function generatePluginManifest(stagingDir: string): Record<string, unknown> {
+export function generatePluginManifest(stagingDir: string, sourceUrl?: string): Record<string, unknown> {
   const skills: string[] = []
   const skillsDir = join(stagingDir, 'skills')
   if (existsSync(skillsDir)) {
@@ -109,7 +178,7 @@ export function generatePluginManifest(stagingDir: string): Record<string, unkno
   }
 
   const generated: Record<string, unknown> = {
-    name: basename(stagingDir),
+    name: inferPluginName(stagingDir, sourceUrl),
     version: '0.0.0',
   }
   if (skills.length > 0) generated.skills = skills
@@ -198,7 +267,7 @@ export function prepareStaging(
  * Read or generate the plugin manifest from `stagingDir`.
  * Returns the parsed PluginManifest. Throws on invalid manifest.
  */
-export function readOrGenerateManifest(stagingDir: string): PluginManifest {
+export function readOrGenerateManifest(stagingDir: string, sourceUrl?: string): PluginManifest {
   const manifestDir = join(stagingDir, '.plugin')
   const manifestPath = join(manifestDir, 'plugin.json')
 
@@ -207,7 +276,7 @@ export function readOrGenerateManifest(stagingDir: string): PluginManifest {
   }
 
   // Auto-generate
-  const generated = generatePluginManifest(stagingDir)
+  const generated = generatePluginManifest(stagingDir, sourceUrl)
   mkdirSync(manifestDir, { recursive: true })
   writeFileSync(manifestPath, JSON.stringify(generated, null, 2), 'utf8')
   return parsePluginManifest(stagingDir)

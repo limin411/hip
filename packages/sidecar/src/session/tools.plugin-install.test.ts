@@ -7,6 +7,7 @@ import type { PluginInstallSuccess, PluginInstallFailure } from './plugin-instal
 import {
   validatePluginUrl,
   slugifyPlugin,
+  inferPluginName,
   generatePluginManifest,
   resolveInstallSlug,
   prepareStaging,
@@ -132,12 +133,106 @@ describe('slugifyPlugin', () => {
   })
 })
 
+describe('inferPluginName', () => {
+  it('uses package.json name when present', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-pkg-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'my-awesome-plugin' }), 'utf8')
+      expect(inferPluginName(dir)).toBe('my-awesome-plugin')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('strips npm scope from package.json name', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-scope-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: '@hip/my-plugin' }), 'utf8')
+      expect(inferPluginName(dir)).toBe('my-plugin')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses git remote origin URL when package.json is absent', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-git-'))
+    try {
+      mkdirSync(join(dir, '.git'), { recursive: true })
+      mockExecFileSync.mockReturnValue(Buffer.from('https://github.com/org/repo-name.git\n'))
+      expect(inferPluginName(dir)).toBe('repo-name')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('prefers package.json over git remote', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-prefer-pkg-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'pkg-name' }), 'utf8')
+      mkdirSync(join(dir, '.git'), { recursive: true })
+      mockExecFileSync.mockReturnValue(Buffer.from('https://github.com/org/git-name.git\n'))
+      expect(inferPluginName(dir)).toBe('pkg-name')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('falls back to sourceUrl repo slug', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-url-'))
+    try {
+      expect(inferPluginName(dir, 'https://example.com/path/plugin-repo.git')).toBe('plugin-repo')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('prefers git remote over sourceUrl', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-prefer-git-'))
+    try {
+      mkdirSync(join(dir, '.git'), { recursive: true })
+      mockExecFileSync.mockReturnValue(Buffer.from('https://github.com/org/git-name.git\n'))
+      expect(inferPluginName(dir, 'https://example.com/url-name')).toBe('git-name')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('falls back to basename(stagingDir) when nothing else is available', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-base-'))
+    try {
+      expect(inferPluginName(dir)).toBe(slugifyPlugin(basename(dir)))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('strips .git, trailing slashes, and query from sourceUrl', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-infer-url-strip-'))
+    try {
+      expect(inferPluginName(dir, 'https://example.com/path/my-plugin.git/?ref=main')).toBe('my-plugin')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('generatePluginManifest', () => {
   it('generates a minimal manifest with name and version', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hip-gen-'))
     try {
       const result = generatePluginManifest(dir)
-      expect(result.name).toBe(basename(dir))
+      expect(result.name).toBe(slugifyPlugin(basename(dir)))
+      expect(result.version).toBe('0.0.0')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('uses inferPluginName with optional sourceUrl', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hip-gen-url-'))
+    try {
+      const result = generatePluginManifest(dir, 'https://example.com/path/url-plugin.git')
+      expect(result.name).toBe('url-plugin')
       expect(result.version).toBe('0.0.0')
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -268,7 +363,7 @@ describe('readOrGenerateManifest', () => {
       writeFileSync(join(dir, 'skills', 'demo', 'SKILL.md'), '# Demo', 'utf8')
 
       const manifest = readOrGenerateManifest(dir)
-      expect(manifest.name).toBe(basename(dir))
+      expect(manifest.name).toBe(slugifyPlugin(basename(dir)))
       expect(manifest.version).toBe('0.0.0')
       // parsePluginManifest resolves relative paths to absolute
       expect(Array.isArray(manifest.skills)).toBe(true)
@@ -379,6 +474,29 @@ describe('plugin_install tool — happy path', () => {
       expect(success.components.mcpServers).toBe(0)
       expect(success.components.agents).toBe(0)
       expect(success.components.hooks).toBe(0)
+    } finally {
+      rmSync(stagingDir, { recursive: true, force: true })
+    }
+  })
+
+  it('installs a plugin with auto-generated manifest derived from URL when no package.json or git config', async () => {
+    const stagingDir = mkdtempSync(join(tmpdir(), 'hip-install-url-'))
+    const tool = findTool('plugin_install')
+
+    try {
+      makeBareRepo(stagingDir)
+      mkdirSync(join(stagingDir, 'skills', 'url-skill'), { recursive: true })
+      writeFileSync(join(stagingDir, 'skills', 'url-skill', 'SKILL.md'), '# URL Skill', 'utf8')
+
+      const raw = String(await tool.invoke({ url: 'https://example.com/path/url-plugin.git', stagingDir }))
+      const result = parseResult(raw)
+
+      expect(result.ok).toBe(true)
+      const success = result as PluginInstallSuccess
+      expect(success.components.skills).toBe(1)
+
+      const manifestRaw = JSON.parse(readFileSync(join(stagingDir, '.plugin', 'plugin.json'), 'utf8')) as { name: string }
+      expect(manifestRaw.name).toBe('url-plugin')
     } finally {
       rmSync(stagingDir, { recursive: true, force: true })
     }

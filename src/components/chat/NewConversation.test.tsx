@@ -19,16 +19,17 @@ vi.mock('@/ipc/dialog', () => ({
 
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
+let mockActiveView: 'chat' | 'code' | 'domain' | 'settings' = 'chat'
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(
-    (selector?: (s: { setActiveView: typeof mockSetActiveView; setTab: typeof mockSetTab }) => unknown) => {
+    (selector?: (s: { activeView: typeof mockActiveView; setActiveView: typeof mockSetActiveView; setTab: typeof mockSetTab }) => unknown) => {
       if (typeof selector === 'function') {
-        return selector({ setActiveView: mockSetActiveView, setTab: mockSetTab })
+        return selector({ activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab })
       }
-      return { setActiveView: mockSetActiveView, setTab: mockSetTab }
+      return { activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab }
     },
-    { getState: () => ({ setActiveView: mockSetActiveView, setTab: mockSetTab }) },
+    { getState: () => ({ activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab }) },
   ),
 }))
 
@@ -61,6 +62,7 @@ describe('NewConversation', () => {
   beforeEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    mockActiveView = 'chat'
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
     providersStore.useProvidersStore.setState({
@@ -93,8 +95,10 @@ describe('NewConversation', () => {
   })
 
   it('renders slash palette when typing / in composer', async () => {
-    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/cle', modelKey: 'openai/gpt-4o' } })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/cle' } })
     expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
   })
@@ -105,9 +109,52 @@ describe('NewConversation', () => {
     expect(screen.queryByTestId('slash-palette')).not.toBeInTheDocument()
   })
 
-  it('renders builtin /clear and /config in slash palette', async () => {
+  it('clears a stale slash query on mount so the palette does not open by default', async () => {
+    // Simulates a persisted draft where the user previously typed '/' and left it there.
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
+    await vi.waitFor(() => {
+      expect(useDraftStore.getState().draft?.text).toBe('')
+    })
+    expect(screen.queryByTestId('slash-palette')).not.toBeInTheDocument()
+  })
+
+  it('does not clear slash query text again when surface changes after mount', async () => {
+    mockActiveView = 'chat'
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/help', modelKey: 'openai/gpt-4o' } })
+    const { rerender } = render(<NewConversation />)
+
+    // Mount clears the stale slash query.
+    await vi.waitFor(() => {
+      expect(useDraftStore.getState().draft?.text).toBe('')
+    })
+
+    // User retypes a slash command.
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/help' } })
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+
+    // Switching to code surface must not wipe the active slash query.
+    mockActiveView = 'code'
+    rerender(<NewConversation />)
+
+    expect(useDraftStore.getState().draft?.text).toBe('/help')
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+  })
+
+  it('creates a project-mode draft on the code surface', async () => {
+    mockActiveView = 'code'
+    render(<NewConversation />)
+    await vi.waitFor(() => {
+      expect(useDraftStore.getState().draft?.mode).toBe('project')
+    })
+  })
+
+  it('renders builtin /clear and /config in slash palette', async () => {
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/' } })
     expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-config')).toBeInTheDocument()
@@ -119,9 +166,11 @@ describe('NewConversation', () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
     const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
 
-    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/h', modelKey: 'openai/gpt-4o' } })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/h' } })
     const helpButton = screen.getByText('/help')
     expect(helpButton).toBeInTheDocument()
 
@@ -173,6 +222,8 @@ describe('NewConversation', () => {
     fireEvent.change(textarea, { target: { value: 'do /my' } })
     expect(screen.getByTestId('slash-cmd-my-skill')).toBeInTheDocument()
 
+    // Simulate the DOM value being cleared behind React's back (e.g. a ref race) and
+    // verify the handler still uses the controlled React value, not the DOM value.
     ;(textarea as HTMLTextAreaElement).value = ''
 
     fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false })
@@ -183,27 +234,33 @@ describe('NewConversation', () => {
   it('/diff command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 
-    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/dif', modelKey: 'openai/gpt-4o' } })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/dif' } })
     expect(screen.queryByText('/diff')).not.toBeInTheDocument()
   })
 
   it('/init command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 
-    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/in', modelKey: 'openai/gpt-4o' } })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/in' } })
     expect(screen.queryByText('/init')).not.toBeInTheDocument()
   })
 
   it('/compact command is hidden in chat surface', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 
-    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '/comp', modelKey: 'openai/gpt-4o' } })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
 
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/comp' } })
     expect(screen.queryByText('/compact')).not.toBeInTheDocument()
   })
 })

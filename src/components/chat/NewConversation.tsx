@@ -31,10 +31,20 @@ export function NewConversation() {
   // Ensure a draft exists; keep Chat drafts in chat mode so a leftover project draft (e.g. a
   // folder picked in Code, then switched to Chat without sending) can't commit as a Code session.
   // (configFromDraft derives surface from draft.mode, so mode must match the surface here.)
+  // Also drop a stale slash query on the first mount so the slash palette doesn't pop up on a
+  // fresh screen; don't clear on surface changes or the user loses text when switching views.
+  const hasClearedStaleSlash = useRef(false)
   useEffect(() => {
-    useDraftStore.getState().ensureDraft()
+    useDraftStore.getState().ensureDraft(surface)
     if (surface === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
       useDraftStore.getState().clearProject()
+    }
+    if (!hasClearedStaleSlash.current) {
+      hasClearedStaleSlash.current = true
+      const draftText = useDraftStore.getState().draft?.text ?? ''
+      if (extractSlashQuery(draftText) !== null) {
+        useDraftStore.getState().setText('')
+      }
     }
   }, [surface])
 
@@ -45,10 +55,10 @@ export function NewConversation() {
   const attachmentsSupported = isAttachmentSupported(currentKey, agents, catalog)
 
   useEffect(() => {
-    if (!attachmentsSupported && attachments.length > 0) {
-      setAttachments([])
+    if (!attachmentsSupported) {
+      setAttachments((prev) => (prev.length > 0 ? [] : prev))
     }
-  }, [attachmentsSupported, attachments.length])
+  }, [attachmentsSupported])
 
   // Code requires a project folder before the first send; Chat is always sandboxed.
   const hasFolder = draft?.mode === 'project' && !!draft.cwd

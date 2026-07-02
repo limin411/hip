@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { Composer } from './Composer'
 import { SlashCommandPalette, extractSlashQuery, type ComposerSurface } from './SlashCommandPalette'
+import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
+import { readSkillFile } from '@/ipc/skills'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { AttachmentButton } from './AttachmentButton'
@@ -37,7 +39,31 @@ export function InputBar() {
   const allSkills = useSkillsStore((s) => s.skills)
   const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
   const query = useMemo(() => extractSlashQuery(value), [value])
+  const invocation = useMemo(() => extractSkillInvocation(value), [value])
+  const selectedSkill = useMemo(() => {
+    if (!invocation) return undefined
+    return skills.find((s) => s.name === invocation.skillName)
+  }, [invocation, skills])
+
+  const [skillBody, setSkillBody] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!selectedSkill) {
+      setSkillBody(undefined)
+      return
+    }
+    let cancelled = false
+    console.log('[InputBar] fetching skill body', selectedSkill.id, selectedSkill.name)
+    readSkillFile(selectedSkill.id, 'SKILL.md').then((body) => {
+      console.log('[InputBar] readSkillFile success', selectedSkill.id, body.length, body.slice(0, 50))
+      if (!cancelled) setSkillBody(body)
+    }).catch((err) => {
+      console.error('[InputBar] readSkillFile error', selectedSkill.id, err)
+      if (!cancelled) setSkillBody(undefined)
+    })
+    return () => { cancelled = true }
+  }, [selectedSkill])
 
   const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
     sessionId: activeId,
@@ -77,28 +103,35 @@ export function InputBar() {
             {t('chat.planApproval.reviewAbove')}
           </div>
         ) : (
-          <div className="relative">
-            {query !== null && (
-              <SlashCommandPalette value={value} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
-            )}
-            <Composer
-              value={value}
-              onChange={setValue}
-              onSubmit={submit}
-              inputRef={inputRef}
-              running={status === 'running'}
-              onStop={() => sessionService.cancel()}
-              reconnecting={reconnecting}
-              leftSlot={
-                isCode ? (
-                  <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
-                ) : (
-                  <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
-                )
-              }
+            <div className="relative">
+              {query !== null && (
+                <SlashCommandPalette value={value} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+              )}
+              <Composer
+                value={value}
+                onChange={setValue}
+                onSubmit={submit}
+                inputRef={inputRef}
+                running={status === 'running'}
+                onStop={() => sessionService.cancel()}
+                reconnecting={reconnecting}
+                leftSlot={
+                  isCode ? (
+                    <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+                  ) : (
+                    <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                  )
+                }
               attachments={attachments}
               onAttachmentsChange={setAttachments}
             />
+            {selectedSkill && (
+              <SkillArgInput
+                value={value}
+                skillBody={skillBody}
+                skillArgs={selectedSkill.arguments}
+              />
+            )}
           </div>
         )}
       </div>

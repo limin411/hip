@@ -1,0 +1,8 @@
+{
+  "name": "sample-plugin",
+  "version": "0.0.1",
+  "skills": [
+    "./skills/sample-greet",
+    "./skills/sample-format"
+  ]
+}

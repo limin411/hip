@@ -1,11 +1,14 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { InputBar } from './InputBar'
 import * as domain from '@/domain'
 import { sessionService, useDomainStore } from '@/domain'
 import type { SessionVM } from '@/domain'
+import type { SkillMeta } from '@hip/protocol'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import * as draftStore from '@/store/draftStore'
@@ -15,8 +18,29 @@ import * as draftStore from '@/store/draftStore'
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
 
+const fixturePluginDir = path.resolve(import.meta.dirname, '../../../e2e/fixtures/sample-plugin')
+
+function readFixtureSkillMeta(skillName: string): SkillMeta {
+  const dir = path.join(fixturePluginDir, 'skills', skillName)
+  const raw = readFileSync(path.join(dir, 'SKILL.md'), 'utf8')
+  const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  const frontmatter = frontmatterMatch ? frontmatterMatch[1] : ''
+  const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1].trim() ?? skillName
+  const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1].trim() ?? skillName
+  return {
+    id: skillName,
+    name,
+    description,
+    dir,
+    hasScripts: false,
+    scope: 'plugin',
+    pluginId: 'sample-plugin',
+    userInvocable: true,
+  }
+}
+
 // eslint-disable-next-line no-var
-var mockSkills: Array<{ id: string; name: string; description: string; userInvocable?: boolean }> = []
+var mockSkills: SkillMeta[] = []
 
 vi.mock('@/store/skillsStore', () => ({
   useSkillsStore: (selector?: (s: { skills: typeof mockSkills }) => unknown) => {
@@ -268,7 +292,7 @@ describe('InputBar slash commands', () => {
   it('skills appear in palette when loaded', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true }]
+    mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true, dir: '/tmp/skills/test-skill', hasScripts: false }]
 
     render(<InputBar />)
 
@@ -283,7 +307,7 @@ describe('InputBar slash commands', () => {
   it('skills with userInvocable:false are hidden', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    mockSkills = [{ id: 'hidden', name: 'hidden-skill', description: 'Should be hidden', userInvocable: false }]
+    mockSkills = [{ id: 'hidden', name: 'hidden-skill', description: 'Should be hidden', userInvocable: false, dir: '/tmp/skills/hidden-skill', hasScripts: false }]
 
     render(<InputBar />)
 
@@ -298,7 +322,7 @@ describe('InputBar slash commands', () => {
   it('skills without userInvocable field default to visible', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    mockSkills = [{ id: 'v1', name: 'visible-skill', description: 'Should be visible' }]
+    mockSkills = [{ id: 'v1', name: 'visible-skill', description: 'Should be visible', dir: '/tmp/skills/visible-skill', hasScripts: false }]
 
     render(<InputBar />)
 
@@ -313,7 +337,7 @@ describe('InputBar slash commands', () => {
   it('focus returns to textarea after selecting a skill command', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true }]
+    mockSkills = [{ id: 's1', name: 'test-skill', description: 'A test skill', userInvocable: true, dir: '/tmp/skills/test-skill', hasScripts: false }]
 
     render(<InputBar />)
 
@@ -587,5 +611,25 @@ describe('InputBar slash commands', () => {
     expect(screen.queryByText('/diff')).not.toBeInTheDocument()
     expect(screen.queryByText('/init')).not.toBeInTheDocument()
     expect(screen.queryByText('/compact')).not.toBeInTheDocument()
+  })
+
+  it('regression: selecting fixture skill /sample-greet injects "/sample-greet " into composer', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+    mockSkills = [readFixtureSkillMeta('sample-greet')]
+
+    render(<InputBar />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/' } })
+
+    const skillButton = screen.getByText('/sample-greet')
+    expect(skillButton).toBeInTheDocument()
+
+    fireEvent.click(skillButton)
+
+    await waitFor(() => {
+      expect(textarea).toHaveValue('/sample-greet ')
+    })
   })
 })

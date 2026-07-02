@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { extractPlaceholders, extractSkillInvocation } from './SkillArgInput'
+
+const sampleFormatDir = path.resolve(import.meta.dirname, '../../../e2e/fixtures/sample-plugin/skills/sample-format')
+
+function readSampleFormat() {
+  const raw = readFileSync(path.join(sampleFormatDir, 'SKILL.md'), 'utf8')
+  const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  const frontmatter = frontmatterMatch ? frontmatterMatch[1] : ''
+  const body = frontmatterMatch ? frontmatterMatch[2].trim() : raw.trim()
+
+  const args: Array<{ name: string; description: string; required?: boolean }> = []
+  const argRe = /^\s+- name:\s*(.+)\n\s+description:\s*(.+)$/gm
+  let match: RegExpExecArray | null
+  while ((match = argRe.exec(frontmatter)) !== null) {
+    args.push({ name: match[1].trim(), description: match[2].trim() })
+  }
+
+  return { body, args }
+}
 
 describe('extractSkillInvocation', () => {
   it('returns null for normal chat text', () => {
@@ -108,5 +128,26 @@ describe('extractPlaceholders', () => {
     const result = extractPlaceholders('${HIP_SKILL_DIR} is the dir')
     // ${VAR} is not a positional/named/ARGUMENTS placeholder
     expect(result.find((p) => p.raw === '${HIP_SKILL_DIR}')).toBeUndefined()
+  })
+})
+
+describe('fixture sample-format skill placeholders', () => {
+  it('extracts $file and $style named hints from sample-format body', () => {
+    const { body, args } = readSampleFormat()
+    const result = extractPlaceholders(body, args)
+    const file = result.find((p) => p.raw === '$file')
+    const style = result.find((p) => p.raw === '$style')
+    expect(file).toMatchObject({ type: 'named', hint: 'Target file path' })
+    expect(style).toMatchObject({ type: 'named', hint: 'Formatting style' })
+  })
+
+  it('extracts $ARGUMENTS hint from sample-format body', () => {
+    const { body, args } = readSampleFormat()
+    const result = extractPlaceholders(body, args)
+    const argsPlaceholder = result.find((p) => p.raw === '$ARGUMENTS')
+    expect(argsPlaceholder).toMatchObject({
+      type: 'arguments',
+      hint: 'Full arguments string (space-separated)',
+    })
   })
 })

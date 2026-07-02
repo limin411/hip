@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { SkillMeta } from '@hip/protocol'
 import {
   extractSlashQuery,
   filterCommands,
@@ -11,6 +14,37 @@ import {
   SlashCommandPalette,
   type SlashCommand,
 } from './SlashCommandPalette'
+
+const fixturePluginDir = path.resolve(import.meta.dirname, '../../../e2e/fixtures/sample-plugin')
+
+function readFixtureSkillMeta(skillName: string): SkillMeta {
+  const dir = path.join(fixturePluginDir, 'skills', skillName)
+  const raw = readFileSync(path.join(dir, 'SKILL.md'), 'utf8')
+  const frontmatterMatch = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  const frontmatter = frontmatterMatch ? frontmatterMatch[1] : ''
+  const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1].trim() ?? skillName
+  const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1].trim() ?? skillName
+
+  const args: Array<{ name: string; description: string; required?: boolean }> = []
+  const argRe = /^\s+- name:\s*(.+)\n\s+description:\s*(.+)$/gm
+  let match: RegExpExecArray | null
+  while ((match = argRe.exec(frontmatter)) !== null) {
+    args.push({ name: match[1].trim(), description: match[2].trim() })
+  }
+
+  return {
+    id: skillName,
+    name,
+    description,
+    dir,
+    hasScripts: false,
+    hasReferences: skillName === 'sample-format',
+    scope: 'plugin',
+    pluginId: 'sample-plugin',
+    userInvocable: true,
+    arguments: args.length > 0 ? args : undefined,
+  }
+}
 
 describe('extractSlashQuery', () => {
   it('returns null when there is no slash', () => {
@@ -447,5 +481,77 @@ describe('SlashCommandPalette surface rendering', () => {
     )
     expect(screen.queryByTestId('slash-cmd-diff')).toBeInTheDocument()
     expect(screen.queryByTestId('slash-cmd-compact')).not.toBeInTheDocument()
+  })
+})
+
+describe('fixture plugin skills in slash palette', () => {
+  beforeEach(() => {
+    cleanup()
+  })
+
+  it('plugin-contributed skills render with kind: skill badge', () => {
+    const skills = [readFixtureSkillMeta('sample-greet')]
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="chat"
+        sessionId="s1"
+        skills={skills}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    const option = screen.getByTestId('slash-cmd-sample-greet')
+    expect(option).toBeInTheDocument()
+    expect(option.textContent).toContain('skill')
+  })
+
+  it('plugin skills appear in both chat and code surfaces', () => {
+    const skills = [readFixtureSkillMeta('sample-greet'), readFixtureSkillMeta('sample-format')]
+    const { rerender } = render(
+      <SlashCommandPalette
+        value="/"
+        surface="chat"
+        sessionId="s1"
+        skills={skills}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('slash-cmd-sample-greet')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-sample-format')).toBeInTheDocument()
+
+    rerender(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        skills={skills}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('slash-cmd-sample-greet')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-sample-format')).toBeInTheDocument()
+  })
+
+  it('excludes skills with userInvocable: false when the consumer filters before passing to the palette', () => {
+    const allSkills = [
+      readFixtureSkillMeta('sample-greet'),
+      { ...readFixtureSkillMeta('sample-format'), userInvocable: false },
+    ]
+    const visibleSkills = allSkills.filter((sk) => sk.userInvocable !== false)
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="chat"
+        sessionId="s1"
+        skills={visibleSkills}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('slash-cmd-sample-greet')).toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-sample-format')).not.toBeInTheDocument()
   })
 })

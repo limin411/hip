@@ -3,6 +3,9 @@ import { createServer, type ViteDevServer } from 'vite'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const VITE_PORT = 1420
 const DEFAULT_BINARY = './src-tauri/target/debug/hip'
@@ -15,6 +18,71 @@ const appBinaryPath = process.env.E2E_BINARY || DEFAULT_BINARY
 let e2eDataDir: string | undefined
 
 let viteServer: ViteDevServer | undefined
+
+const FIXTURE_PLUGIN_SRC = path.resolve(__dirname, 'e2e', 'fixtures', 'sample-plugin')
+const USER_CONFIG_DIR = path.join(os.homedir(), '.hip', 'config')
+
+function stageE2eData(e2eDataDir: string): void {
+  const pluginsDir = path.join(e2eDataDir, 'plugins')
+  const configDir = path.join(e2eDataDir, 'config')
+  const fixtureDest = path.join(pluginsDir, 'sample-plugin')
+  const skillsDir = path.join(e2eDataDir, 'skills')
+
+  fs.mkdirSync(pluginsDir, { recursive: true })
+  fs.mkdirSync(configDir, { recursive: true })
+  fs.mkdirSync(skillsDir, { recursive: true })
+
+  if (!fs.existsSync(FIXTURE_PLUGIN_SRC)) {
+    throw new Error(`Fixture plugin not found at ${FIXTURE_PLUGIN_SRC}`)
+  }
+  fs.cpSync(FIXTURE_PLUGIN_SRC, fixtureDest, { recursive: true, force: true })
+
+  // Mirror the fixture plugin's skills into the skills dir so the Tauri
+  // list_skills command (which only scans <data>/skills) exposes them to the
+  // slash palette. The sidecar still loads the same skills via HIP_PLUGINS_PATH.
+  const fixtureSkillsDir = path.join(FIXTURE_PLUGIN_SRC, 'skills')
+  if (fs.existsSync(fixtureSkillsDir)) {
+    for (const entry of fs.readdirSync(fixtureSkillsDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        fs.cpSync(path.join(fixtureSkillsDir, entry.name), path.join(skillsDir, entry.name), { recursive: true, force: true })
+      }
+    }
+  }
+
+  const userAuthPath = path.join(USER_CONFIG_DIR, 'auth.json')
+  const destAuthPath = path.join(configDir, 'auth.json')
+  if (fs.existsSync(userAuthPath)) {
+    fs.copyFileSync(userAuthPath, destAuthPath)
+    if (process.platform !== 'win32') {
+      fs.chmodSync(destAuthPath, 0o600)
+    }
+  }
+
+  const realPluginPaths = readUserPluginPaths(USER_CONFIG_DIR)
+  const pluginsConfigPath = path.join(configDir, 'plugins.json')
+  fs.writeFileSync(
+    pluginsConfigPath,
+    JSON.stringify({ plugins: [fixtureDest, ...realPluginPaths] }, null, 2),
+  )
+
+  process.env.HIP_PLUGINS_PATH = pluginsConfigPath
+}
+
+function readUserPluginPaths(userConfigDir: string): string[] {
+  for (const fileName of ['plugins.json', 'hip-plugins.json']) {
+    const candidate = path.join(userConfigDir, fileName)
+    if (!fs.existsSync(candidate)) continue
+    try {
+      const raw = JSON.parse(fs.readFileSync(candidate, 'utf8'))
+      if (!Array.isArray(raw.plugins)) return []
+      return raw.plugins.filter((entry: unknown): entry is string => typeof entry === 'string').map((entry) => path.resolve(entry))
+    } catch (err) {
+      console.warn(`[e2e] failed to parse ${candidate}:`, err instanceof Error ? err.message : String(err))
+      return []
+    }
+  }
+  return []
+}
 
 async function pingVite(): Promise<boolean> {
   try {
@@ -87,6 +155,8 @@ export const config: Options.Testrunner = {
     e2eDataDir = process.env.E2E_DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-data-'))
     process.env.HIP_DATA_DIR = e2eDataDir
     console.log(`[e2e] HIP_DATA_DIR=${e2eDataDir}`)
+
+    stageE2eData(e2eDataDir)
 
     if (await pingVite()) {
       console.log(`[e2e] reusing Vite already running on :${VITE_PORT}`)

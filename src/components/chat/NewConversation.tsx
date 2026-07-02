@@ -9,7 +9,9 @@ import { useSkillsStore } from '@/store/skillsStore'
 import { sessionService, useActiveSessionId } from '@/domain'
 import { Composer } from './Composer'
 import { SlashCommandPalette, extractSlashQuery } from './SlashCommandPalette'
+import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
+import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
@@ -79,6 +81,28 @@ export function NewConversation() {
   const allSkills = useSkillsStore((s) => s.skills)
   const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
   const query = useMemo(() => extractSlashQuery(text), [text])
+  const invocation = useMemo(() => extractSkillInvocation(text), [text])
+  const selectedSkill = useMemo(() => {
+    if (!invocation) return undefined
+    return skills.find((s) => s.name === invocation.skillName)
+  }, [invocation, skills])
+
+  const [skillBody, setSkillBody] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (!selectedSkill) {
+      setSkillBody(undefined)
+      return
+    }
+    let cancelled = false
+    readSkillFile(selectedSkill.id, 'SKILL.md').then((body) => {
+      if (!cancelled) setSkillBody(body)
+    }).catch(() => {
+      if (!cancelled) setSkillBody(undefined)
+    })
+    return () => { cancelled = true }
+  }, [selectedSkill])
+
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
@@ -124,6 +148,13 @@ export function NewConversation() {
             attachments={attachments}
             onAttachmentsChange={setAttachments}
           />
+          {selectedSkill && (
+            <SkillArgInput
+              value={text}
+              skillBody={skillBody}
+              skillArgs={selectedSkill.arguments}
+            />
+          )}
         </div>
         {surface === 'code' && (
           <div className="mt-2 flex flex-col items-center gap-1">

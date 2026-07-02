@@ -110,13 +110,13 @@ export function SkillArgInput({ value, skillBody, skillArgs }: SkillArgInputProp
   if (!invocation || placeholders.length === 0) return null
 
   return (
-    <div className="rounded-lg border border-accent/30 bg-surface-subtle px-3 py-2 text-caption">
+    <div data-testid="skill-arg-input" className="rounded-lg border border-accent/30 bg-surface-subtle px-3 py-2 text-caption">
       <div className="font-medium text-ink-secondary">
         /{invocation.skillName} arguments:
       </div>
-      <ul className="mt-1 space-y-0.5">
+      <ul data-testid="skill-arg-list" className="mt-1 space-y-0.5">
         {placeholders.map((p) => (
-          <li key={p.raw} className="text-ink-tertiary">
+          <li key={p.raw} data-testid={`skill-arg-hint-${p.raw.replace(/\$/g, '')}`} className="text-ink-tertiary">
             <code className="rounded bg-accent/10 px-1 py-0.5 text-caption font-mono text-accent">
               {p.raw}
             </code>

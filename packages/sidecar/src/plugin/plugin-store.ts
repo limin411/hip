@@ -15,7 +15,7 @@ export interface InstalledPlugin {
   installedAt: number
 }
 
-/** On-disk shape of ~/.hip/config/plugins.json.
+/** On-disk shape of ~/.hip/config/hip-plugins.json.
  *  The `plugins` array preserves backward compat with readPluginsConfig().
  *  `entries` holds the richer metadata used by the PluginManager. */
 interface PluginsFile {
@@ -25,7 +25,7 @@ interface PluginsFile {
 
 function configPath(): string {
   return process.env.HIP_PLUGINS_PATH?.trim()
-    || join(homedir(), '.hip', 'config', 'plugins.json')
+    || join(homedir(), '.hip', 'config', 'hip-plugins.json')
 }
 
 function readConfig(): PluginsFile {
@@ -48,7 +48,7 @@ function writeConfig(config: PluginsFile): void {
 }
 
 /**
- * Persistent store for installed plugins, backed by ~/.hip/config/plugins.json.
+ * Persistent store for installed plugins, backed by ~/.hip/config/hip-plugins.json.
  * Extends the existing `{ plugins: string[] }` format with a richer `entries` field.
  */
 export class PluginStore {

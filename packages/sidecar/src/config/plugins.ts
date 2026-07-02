@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import type { PluginsConfig } from '@hip/protocol'
 
-/** Read the configured plugins from HIP_PLUGINS_PATH. Missing/corrupt file → { plugins: [] }.
- *  Non-string entries in the plugins array are filtered out with a console.warn. */
+/** Read the plugin registry from HIP_PLUGINS_PATH. Missing/corrupt file → { plugins: [] }.
+ *  Non-string entries are filtered out with a console.warn. */
 export function readPluginsConfig(): PluginsConfig {
   const file = process.env.HIP_PLUGINS_PATH?.trim()
   if (!file) return { plugins: [] }

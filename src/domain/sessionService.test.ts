@@ -244,12 +244,14 @@ describe('SessionService', () => {
     expect(useFsStore.getState().bySession['/proj'].preview).toMatchObject({ status: 'ready', content: '# Hi' })
   })
 
-  it('newConversation ensures a draft and deselects the active session', () => {
+  it('newConversation ensures a fresh draft and deselects the active session', () => {
     useDomainStore.setState({ activeSessionId: 's1' })
+    useDraftStore.setState({ draft: { tempId: 'd1', mode: 'chat', text: '/stale' } })
     const t = new FakeTransport()
     new SessionService(t).newConversation()
     expect(useDomainStore.getState().activeSessionId).toBeNull()
     expect(useDraftStore.getState().draft).not.toBeNull()
+    expect(useDraftStore.getState().draft?.text).toBe('')
   })
 
   it('regenerate optimistically drops the trailing assistant and sends message:regenerate', () => {

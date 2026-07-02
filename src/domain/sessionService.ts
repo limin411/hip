@@ -367,6 +367,7 @@ export class SessionService {
   /** Start a fresh new-conversation draft (no committed session yet). */
   newConversation(surface?: Surface): void {
     useDraftStore.getState().ensureDraft(surface)
+    useDraftStore.getState().setText('')
     useDomainStore.getState().deselect()
     this.rememberActiveForSurface(null)
   }
@@ -395,7 +396,7 @@ export class SessionService {
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     if (active?.interrupt) { this.resume(text, attachments); return }
-    let { activeSessionId } = useDomainStore.getState()
+    let { activeSessionId } = st
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
       const draft = useDraftStore.getState().draft

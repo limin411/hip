@@ -1,5 +1,10 @@
-import { vi, describe, it, expect } from 'vitest'
-import { renderToStaticMarkup } from 'react-dom/server'
+// @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { SkillMeta, PluginMeta } from '@hip/protocol'
+import { useSkillsStore } from '@/store/skillsStore'
+import { usePluginsStore } from '@/store/pluginsStore'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -28,8 +33,7 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
   }
 })
 
-import { SkillCard, derivePluginSkills } from './SkillConfig'
-import type { SkillMeta } from '@hip/protocol'
+import { SkillConfig, SkillCard, derivePluginSkills } from './SkillConfig'
 
 function skill(overrides: Partial<SkillMeta> = {}): SkillMeta {
   return {
@@ -42,9 +46,31 @@ function skill(overrides: Partial<SkillMeta> = {}): SkillMeta {
   }
 }
 
+function plugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
+  return {
+    id: 'test-plugin',
+    name: 'Test Plugin',
+    version: '1.0.0',
+    description: 'A test plugin',
+    dir: '/tmp/plugins/test',
+    skills: [] as string[],
+    mcpServers: [],
+    agents: [],
+    hookCount: 0,
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  useSkillsStore.setState({ skills: [], enabled: {}, loaded: true })
+  usePluginsStore.setState({ plugins: [], loaded: true })
+})
+
+afterEach(() => cleanup())
+
 describe('SkillCard plugin variant', () => {
   it('renders skill name, description, and a "via plugin" badge', () => {
-    const html = renderToStaticMarkup(
+    render(
       <SkillCard
         skill={skill({ id: 'plugin-skill', name: 'Plugin Skill', pluginId: 'p1', scope: 'plugin' })}
         enabled={false}
@@ -54,13 +80,13 @@ describe('SkillCard plugin variant', () => {
         readOnly={{ pluginName: 'TestPlugin' }}
       />,
     )
-    expect(html).toContain('Plugin Skill')
-    expect(html).toContain('A standalone skill')
-    expect(html).toContain('via TestPlugin')
+    expect(screen.getByText('Plugin Skill')).toBeInTheDocument()
+    expect(screen.getByText('A standalone skill')).toBeInTheDocument()
+    expect(screen.getByText('via TestPlugin')).toBeInTheDocument()
   })
 
   it('renders a dimmed, disabled switch', () => {
-    const html = renderToStaticMarkup(
+    render(
       <SkillCard
         skill={skill({ id: 'plugin-skill', pluginId: 'p1', scope: 'plugin' })}
         enabled={false}
@@ -70,12 +96,13 @@ describe('SkillCard plugin variant', () => {
         readOnly={{ pluginName: 'TestPlugin' }}
       />,
     )
-    expect(html).toContain('disabled=""')
-    expect(html).toContain('aria-disabled="true"')
+    const toggle = screen.getByRole('switch')
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('omits the delete menu item', () => {
-    const html = renderToStaticMarkup(
+    render(
       <SkillCard
         skill={skill({ id: 'plugin-skill', pluginId: 'p1', scope: 'plugin' })}
         enabled={false}
@@ -85,14 +112,14 @@ describe('SkillCard plugin variant', () => {
         readOnly={{ pluginName: 'TestPlugin' }}
       />,
     )
-    expect(html).toContain('settings.skill.view')
-    expect(html).not.toContain('settings.skill.delete')
+    expect(screen.getByText('settings.skill.view')).toBeInTheDocument()
+    expect(screen.queryByText('settings.skill.delete')).not.toBeInTheDocument()
   })
 })
 
 describe('SkillCard standalone variant', () => {
   it('remains interactive and keeps the delete menu item', () => {
-    const html = renderToStaticMarkup(
+    render(
       <SkillCard
         skill={skill()}
         enabled={true}
@@ -101,10 +128,56 @@ describe('SkillCard standalone variant', () => {
         onDelete={() => {}}
       />,
     )
-    expect(html).not.toContain('disabled=""')
-    expect(html).not.toContain('aria-disabled="true"')
-    expect(html).toContain('settings.skill.view')
-    expect(html).toContain('settings.skill.delete')
+    const toggle = screen.getByRole('switch')
+    expect(toggle).not.toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('settings.skill.view')).toBeInTheDocument()
+    expect(screen.getByText('settings.skill.delete')).toBeInTheDocument()
+  })
+
+  it('calls onToggle when the switch is clicked', () => {
+    const onToggle = vi.fn()
+    render(
+      <SkillCard
+        skill={skill()}
+        enabled={false}
+        onToggle={onToggle}
+        onView={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('switch'))
+    expect(onToggle).toHaveBeenCalledWith(true)
+  })
+
+  it('calls onView when the view menu item is clicked', () => {
+    const onView = vi.fn()
+    render(
+      <SkillCard
+        skill={skill()}
+        enabled={true}
+        onToggle={() => {}}
+        onView={onView}
+        onDelete={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByText('settings.skill.view'))
+    expect(onView).toHaveBeenCalled()
+  })
+
+  it('calls onDelete when the delete menu item is clicked', () => {
+    const onDelete = vi.fn()
+    render(
+      <SkillCard
+        skill={skill()}
+        enabled={true}
+        onToggle={() => {}}
+        onView={() => {}}
+        onDelete={onDelete}
+      />,
+    )
+    fireEvent.click(screen.getByText('settings.skill.delete'))
+    expect(onDelete).toHaveBeenCalled()
   })
 })
 
@@ -125,5 +198,50 @@ describe('derivePluginSkills duplicate policy', () => {
     ]
     const result = derivePluginSkills(plugins, new Set(['shared']))
     expect(result.map((r) => r.skill.id)).toEqual(['unique'])
+  })
+})
+
+describe('SkillConfig list layout', () => {
+  it('renders the empty state when there are no standalone or plugin skills', () => {
+    render(<SkillConfig />)
+    expect(screen.getByText('settings.skill.empty')).toBeInTheDocument()
+    expect(screen.getByText('settings.skill.emptyHint')).toBeInTheDocument()
+  })
+
+  it('renders standalone skills and plugin skills with the section header', () => {
+    useSkillsStore.setState({
+      skills: [
+        skill({ id: 's1', name: 'Standalone One' }),
+        skill({ id: 's2', name: 'Standalone Two' }),
+      ],
+      enabled: { s1: true, s2: false },
+      loaded: true,
+    })
+    usePluginsStore.setState({
+      plugins: [plugin({ skills: ['ps1', 'ps2'] })],
+      loaded: true,
+    })
+
+    render(<SkillConfig />)
+
+    expect(screen.getByText('Standalone One')).toBeInTheDocument()
+    expect(screen.getByText('Standalone Two')).toBeInTheDocument()
+    expect(screen.getByText('settings.skill.pluginSkills')).toBeInTheDocument()
+    expect(screen.getByText('ps1')).toBeInTheDocument()
+    expect(screen.getByText('ps2')).toBeInTheDocument()
+    expect(screen.queryByText('settings.skill.empty')).not.toBeInTheDocument()
+  })
+
+  it('does not render the plugin section when there are no plugin skills', () => {
+    useSkillsStore.setState({
+      skills: [skill({ id: 's1', name: 'Standalone One' })],
+      enabled: { s1: true },
+      loaded: true,
+    })
+
+    render(<SkillConfig />)
+
+    expect(screen.getByText('Standalone One')).toBeInTheDocument()
+    expect(screen.queryByText('settings.skill.pluginSkills')).not.toBeInTheDocument()
   })
 })

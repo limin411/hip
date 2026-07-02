@@ -126,7 +126,7 @@ export function SkillConfig() {
         </div>
       )}
 
-      <div className="mt-5 flex flex-col gap-2.5">
+      <div className="mt-5">
         {skills.length === 0 && pluginSkills.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center">
             <Sparkles size={22} className="mx-auto text-ink-tertiary" />
@@ -135,20 +135,22 @@ export function SkillConfig() {
           </div>
         ) : (
           <>
-            {skills.map((skill) => (
-              <SkillCard
-                key={skill.id}
-                skill={skill}
-                enabled={enabled[skill.id] !== false}
-                onToggle={(on) => void toggle(skill.id, on)}
-                onView={() => setViewing(skill)}
-                onDelete={() => setDeleting(skill)}
-              />
-            ))}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {skills.map((skill) => (
+                <SkillCard
+                  key={skill.id}
+                  skill={skill}
+                  enabled={enabled[skill.id] !== false}
+                  onToggle={(on) => void toggle(skill.id, on)}
+                  onView={() => setViewing(skill)}
+                  onDelete={() => setDeleting(skill)}
+                />
+              ))}
+            </div>
             {pluginSkills.length > 0 && (
-              <div className="mt-2">
-                <h3 className="text-meta font-medium text-ink-secondary mb-2">{t('settings.skill.pluginSkills')}</h3>
-                <div className="flex flex-col gap-2.5">
+              <div className="mt-6">
+                <h3 className="text-meta font-medium text-ink-secondary">{t('settings.skill.pluginSkills')}</h3>
+                <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {pluginSkills.map(({ skill, pluginName }) => (
                     <SkillCard
                       key={skill.id}
@@ -223,90 +225,94 @@ export function SkillCard({
   const refLabel = refCountLabel(skill)
   const toolsPreview = toolAllowlistPreview(skill)
   return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <Avatar name={skill.name} shape="square" size={38} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{skill.name}</span>
-          {skill.hasScripts && (
-            <Badge title={t('settings.skill.hasScriptsTitle')}>
-              <TerminalSquare size={11} />
-              {t('settings.skill.hasScripts')}
-            </Badge>
-          )}
-          {autoBadge && (
-            <Badge
-              className={
-                autoBadge.variant === 'auto'
-                  ? 'bg-success/10 text-success'
-                  : 'bg-surface-muted text-ink-tertiary'
-              }
-            >
-              <Zap size={11} />
-              {autoBadge.label}
-            </Badge>
-          )}
-          {ctxBadge && (
-            <Badge className="bg-accent/10 text-accent">
-              <GitFork size={11} />
-              {ctxBadge.label}
-            </Badge>
-          )}
-          {refLabel && (
-            <Badge>
-              <BookOpen size={11} />
-              {refLabel}
-            </Badge>
-          )}
-          {toolsPreview && (
-            <Badge title={skill.allowedTools?.join(', ')}>
-              <Wrench size={11} />
-              {toolsPreview}
-            </Badge>
-          )}
+    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-start gap-3">
+        <Avatar name={skill.name} shape="square" size={38} />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{skill.name}</span>
           {readOnly && (
-            <Badge className="bg-accent/10 text-accent">
+            <Badge variant="accent" className="shrink-0">
               via {readOnly.pluginName}
             </Badge>
           )}
         </div>
-        {skill.description && (
-          <div className="mt-1 truncate text-caption text-ink-tertiary">{skill.description}</div>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          <Switch
+            checked={enabled}
+            onCheckedChange={onToggle}
+            disabled={readOnly !== undefined}
+            ariaDisabled={readOnly ? true : undefined}
+            ariaLabel={t('settings.skill.enableThis')}
+          />
+          {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};
+              stacking them leaves the lock stuck after close. A kebab needs no trap, so non-modal is safe. */}
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                aria-label={t('settings.skill.menuMore')}
+              >
+                <MoreVertical size={16} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onView}>
+                <Eye size={14} /> {t('settings.skill.view')}
+              </DropdownMenuItem>
+              {!readOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
+                    <Trash2 size={14} /> {t('settings.skill.delete')}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2.5">
-        <Switch
-          checked={enabled}
-          onCheckedChange={onToggle}
-          disabled={readOnly !== undefined}
-          ariaDisabled={readOnly ? true : undefined}
-          ariaLabel={t('settings.skill.enableThis')}
-        />
-        {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};
-            stacking them leaves the lock stuck after close. A kebab needs no trap, so non-modal is safe. */}
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              aria-label={t('settings.skill.menuMore')}
-            >
-              <MoreVertical size={16} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onView}>
-              <Eye size={14} /> {t('settings.skill.view')}
-            </DropdownMenuItem>
-            {!readOnly && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
-                  <Trash2 size={14} /> {t('settings.skill.delete')}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+      {skill.description && (
+        <p className="truncate text-caption text-ink-tertiary">{skill.description}</p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {skill.hasScripts && (
+          <Badge title={t('settings.skill.hasScriptsTitle')}>
+            <TerminalSquare size={11} />
+            {t('settings.skill.hasScripts')}
+          </Badge>
+        )}
+        {autoBadge && (
+          <Badge
+            className={
+              autoBadge.variant === 'auto'
+                ? 'bg-success/10 text-success'
+                : 'bg-surface-muted text-ink-tertiary'
+            }
+          >
+            <Zap size={11} />
+            {autoBadge.label}
+          </Badge>
+        )}
+        {ctxBadge && (
+          <Badge variant="accent">
+            <GitFork size={11} />
+            {ctxBadge.label}
+          </Badge>
+        )}
+        {refLabel && (
+          <Badge>
+            <BookOpen size={11} />
+            {refLabel}
+          </Badge>
+        )}
+        {toolsPreview && (
+          <Badge title={skill.allowedTools?.join(', ')}>
+            <Wrench size={11} />
+            {toolsPreview}
+          </Badge>
+        )}
       </div>
     </div>
   )

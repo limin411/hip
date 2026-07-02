@@ -131,42 +131,46 @@ export function PluginConfigView({
         </div>
       )}
 
-      <div className="mt-5 flex flex-col gap-2.5">
-        {plugins.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center">
-            <Package size={22} className="mx-auto text-ink-tertiary" />
-            <div className="mt-2 text-body text-ink-secondary">{t('settings.plugins.empty')}</div>
-            <div className="mt-1 text-meta text-ink-tertiary">{t('settings.plugins.emptyHint')}</div>
-          </div>
-        ) : (
-          plugins.map((plugin) => (
+      {plugins.length === 0 ? (
+        <div className="mt-5 rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center">
+          <Package size={22} className="mx-auto text-ink-tertiary" />
+          <div className="mt-2 text-body text-ink-secondary">{t('settings.plugins.empty')}</div>
+          <div className="mt-1 text-meta text-ink-tertiary">{t('settings.plugins.emptyHint')}</div>
+        </div>
+      ) : (
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {plugins.map((plugin) => (
             <PluginCard key={plugin.id} plugin={plugin} onDelete={() => onDelete(plugin)} t={t} />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 function PluginCard({ plugin, onDelete, t }: { plugin: PluginMeta; onDelete: () => void; t: Translate }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-        <Package size={18} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-body font-medium text-ink">{plugin.name}</span>
-          <span className="text-caption text-ink-tertiary">{plugin.version}</span>
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+            <Package size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-body font-medium text-ink">{plugin.name}</span>
+              <span className="shrink-0 text-caption text-ink-tertiary">{plugin.version}</span>
+            </div>
+          </div>
         </div>
-        {plugin.description && (
-          <div className="mt-0.5 truncate text-caption text-ink-tertiary">{plugin.description}</div>
-        )}
-        <div className="mt-1 text-meta text-ink-secondary">{formatComponentCounts(plugin, t)}</div>
+        <Button variant="outline" size="sm" onClick={onDelete}>
+          <Trash2 size={14} /> {t('settings.plugins.uninstall')}
+        </Button>
       </div>
-      <Button variant="outline" size="sm" onClick={onDelete}>
-        <Trash2 size={14} /> {t('settings.plugins.uninstall')}
-      </Button>
+      {plugin.description && (
+        <div className="mt-3 truncate text-body text-ink-secondary">{plugin.description}</div>
+      )}
+      <div className="mt-3 text-caption text-ink-tertiary">{formatComponentCounts(plugin, t)}</div>
     </div>
   )
 }

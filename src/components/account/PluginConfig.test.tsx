@@ -135,7 +135,21 @@ describe('PluginConfigView', () => {
     ]
     render(<PluginConfigView {...baseProps} plugins={plugins} />)
     expect(screen.getByText('Test Plugin')).toBeInTheDocument()
+    expect(screen.getByText('A test plugin')).toBeInTheDocument()
     expect(screen.getByText('1 skills · 1 MCP · 1 agents · 2 hooks')).toBeInTheDocument()
+  })
+
+  it('calls onDelete with the correct plugin when uninstall is clicked', () => {
+    const plugins = [
+      basePlugin({ id: 'plugin-a', name: 'Plugin A' }),
+      basePlugin({ id: 'plugin-b', name: 'Plugin B' }),
+    ]
+    render(<PluginConfigView {...baseProps} plugins={plugins} />)
+    const uninstallButtons = screen.getAllByRole('button', { name: 'settings.plugins.uninstall' })
+    expect(uninstallButtons).toHaveLength(2)
+    fireEvent.click(uninstallButtons[0])
+    expect(baseProps.onDelete).toHaveBeenCalledTimes(1)
+    expect(baseProps.onDelete).toHaveBeenCalledWith(plugins[0])
   })
 
   it('toggles install form visibility', () => {

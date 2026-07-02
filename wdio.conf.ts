@@ -26,28 +26,14 @@ function stageE2eData(e2eDataDir: string): void {
   const pluginsDir = path.join(e2eDataDir, 'plugins')
   const configDir = path.join(e2eDataDir, 'config')
   const fixtureDest = path.join(pluginsDir, 'sample-plugin')
-  const skillsDir = path.join(e2eDataDir, 'skills')
 
   fs.mkdirSync(pluginsDir, { recursive: true })
   fs.mkdirSync(configDir, { recursive: true })
-  fs.mkdirSync(skillsDir, { recursive: true })
 
   if (!fs.existsSync(FIXTURE_PLUGIN_SRC)) {
     throw new Error(`Fixture plugin not found at ${FIXTURE_PLUGIN_SRC}`)
   }
   fs.cpSync(FIXTURE_PLUGIN_SRC, fixtureDest, { recursive: true, force: true })
-
-  // Mirror the fixture plugin's skills into the skills dir so the Tauri
-  // list_skills command (which only scans <data>/skills) exposes them to the
-  // slash palette. The sidecar still loads the same skills via HIP_PLUGINS_PATH.
-  const fixtureSkillsDir = path.join(FIXTURE_PLUGIN_SRC, 'skills')
-  if (fs.existsSync(fixtureSkillsDir)) {
-    for (const entry of fs.readdirSync(fixtureSkillsDir, { withFileTypes: true })) {
-      if (entry.isDirectory()) {
-        fs.cpSync(path.join(fixtureSkillsDir, entry.name), path.join(skillsDir, entry.name), { recursive: true, force: true })
-      }
-    }
-  }
 
   const userAuthPath = path.join(USER_CONFIG_DIR, 'auth.json')
   const destAuthPath = path.join(configDir, 'auth.json')
@@ -59,7 +45,7 @@ function stageE2eData(e2eDataDir: string): void {
   }
 
   const realPluginPaths = readUserPluginPaths(USER_CONFIG_DIR)
-  const pluginsConfigPath = path.join(configDir, 'plugins.json')
+  const pluginsConfigPath = path.join(configDir, 'hip-plugins.json')
   fs.writeFileSync(
     pluginsConfigPath,
     JSON.stringify({ plugins: [fixtureDest, ...realPluginPaths] }, null, 2),

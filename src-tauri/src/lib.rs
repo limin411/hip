@@ -860,7 +860,7 @@ fn install_plugin(app: tauri::AppHandle, zip_path: String) -> Result<String, Str
 
     // Register in hip-plugins.json
     if let Some(config_path) = paths::plugins_config_path(&app) {
-        plugins::register_plugin(&config_path, manifest)?;
+        plugins::register_plugin(&config_path, &final_dir)?;
     }
 
     Ok(slug)
@@ -966,7 +966,16 @@ fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<Str
     if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
         return Err("非法 skill id".to_string());
     }
-    let skill_dir = paths::skills_dir(&app).ok_or("no skills dir")?.join(&id);
+    let standalone_dir = paths::skills_dir(&app)
+        .map(|d| d.join(&id))
+        .filter(|d| d.is_dir());
+    let skill_dir = match standalone_dir {
+        Some(d) => d,
+        None => {
+            let plugins_dir = paths::plugins_dir(&app).ok_or("no plugin dir")?;
+            skills::find_plugin_skill_dir(&plugins_dir, &id).ok_or("skill not found")?
+        }
+    };
     let target = skills::safe_join(&skill_dir, &rel).ok_or("非法文件路径")?;
     std::fs::read_to_string(&target).map_err(|e| e.to_string())
 }

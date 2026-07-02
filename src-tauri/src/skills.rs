@@ -219,6 +219,7 @@ fn scan_one_dir(root: &Path, scope: &str) -> Vec<SkillMeta> {
     out
 }
 
+#[cfg(test)]
 /// Pure core: scan from explicit directories. Testable without AppHandle.
 fn scan_skills_from_dirs(global_root: Option<&Path>, project_root: Option<&Path>) -> Vec<SkillMeta> {
     let mut metas: Vec<SkillMeta> = if let Some(dir) = global_root {
@@ -240,13 +241,110 @@ fn scan_skills_from_dirs(global_root: Option<&Path>, project_root: Option<&Path>
     metas
 }
 
-/// Scan global skills (`~/.hip/skills`) and optionally project skills
-/// (`<project_root>/.hip/skills`). When both exist, project skills with the
-/// same id overwrite global ones. Never panics; a missing root yields an empty
-/// list for that level.
+fn plugin_skill_paths(plugin_dir: &Path, manifest: &serde_json::Value) -> Vec<PathBuf> {
+    match manifest.get("skills") {
+        Some(serde_json::Value::String(s)) => vec![plugin_dir.join(s.as_str())],
+        Some(serde_json::Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| plugin_dir.join(s)))
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Discover plugin-contained skills by reading each `.plugin/plugin.json`.
+fn scan_plugin_skills(plugins_dir: &Path) -> Vec<SkillMeta> {
+    let mut out = Vec::new();
+    let entries = match std::fs::read_dir(plugins_dir) {
+        Ok(e) => e,
+        Err(_) => return out,
+    };
+    for entry in entries.flatten() {
+        let plugin_dir = entry.path();
+        if !plugin_dir.is_dir() {
+            continue;
+        }
+        let plugin_id = plugin_dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string());
+
+        let manifest_path = plugin_dir.join(".plugin").join("plugin.json");
+        let manifest_raw = match std::fs::read_to_string(&manifest_path) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let manifest: serde_json::Value = match serde_json::from_str(&manifest_raw) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let skill_paths = plugin_skill_paths(&plugin_dir, &manifest);
+        let mut seen_parents = std::collections::HashSet::new();
+        for skill_path in skill_paths {
+            let parent = match skill_path.parent() {
+                Some(p) => p.to_path_buf(),
+                None => continue,
+            };
+            if !seen_parents.insert(parent.clone()) {
+                continue;
+            }
+            let mut metas = scan_one_dir(&parent, "plugin");
+            for m in &mut metas {
+                m.plugin_id = plugin_id.clone();
+            }
+            out.extend(metas);
+        }
+    }
+    out
+}
+
+pub fn find_plugin_skill_dir(plugins_dir: &Path, skill_id: &str) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(plugins_dir).ok()?;
+    for entry in entries.flatten() {
+        let plugin_dir = entry.path();
+        if !plugin_dir.is_dir() {
+            continue;
+        }
+        let manifest_path = plugin_dir.join(".plugin").join("plugin.json");
+        let manifest_raw = std::fs::read_to_string(&manifest_path).ok()?;
+        let manifest: serde_json::Value = serde_json::from_str(&manifest_raw).ok()?;
+
+        for skill_path in plugin_skill_paths(&plugin_dir, &manifest) {
+            if skill_path.file_name().and_then(|s| s.to_str()) == Some(skill_id) {
+                return Some(skill_path);
+            }
+        }
+    }
+    None
+}
+
+/// Scan global, plugin, and optional project skill directories. Later scopes
+/// override earlier ones by skill id.
 pub fn scan_skills(app: &AppHandle, project_root: Option<&Path>) -> Vec<SkillMeta> {
-    let global_dir = paths::skills_dir(app);
-    scan_skills_from_dirs(global_dir.as_deref(), project_root)
+    let mut metas = Vec::new();
+
+    if let Some(global_dir) = paths::skills_dir(app) {
+        metas.extend(scan_one_dir(&global_dir, "global"));
+    }
+
+    if let Some(plugins_dir) = paths::plugins_dir(app) {
+        for pm in scan_plugin_skills(&plugins_dir) {
+            metas.retain(|m| m.id != pm.id);
+            metas.push(pm);
+        }
+    }
+
+    if let Some(root) = project_root {
+        let project_skills_dir = root.join(".hip").join("skills");
+        for ps in scan_one_dir(&project_skills_dir, "project") {
+            metas.retain(|m| m.id != ps.id);
+            metas.push(ps);
+        }
+    }
+
+    metas.sort_by(|a, b| a.id.cmp(&b.id));
+    metas
 }
 
 /// Extract every entry of `zip_path` into `dest`, skipping any entry whose
@@ -687,5 +785,59 @@ body
 
         let _ = std::fs::remove_dir_all(&dest);
         let _ = std::fs::remove_dir_all(&dest2);
+    }
+
+    #[test]
+    fn scan_plugin_skills_reads_manifest_and_tags_plugin_id() {
+        let root = unique_dir("plugin-skills");
+        let _ = std::fs::remove_dir_all(&root);
+        let plugin_dir = root.join("sample-plugin");
+        std::fs::create_dir_all(plugin_dir.join(".plugin")).unwrap();
+        std::fs::create_dir_all(plugin_dir.join("skills").join("sample-greet")).unwrap();
+        std::fs::write(
+            plugin_dir.join("skills").join("sample-greet").join("SKILL.md"),
+            "---\nname: Sample Greet\ndescription: Greets\n---\nbody",
+        )
+        .unwrap();
+        std::fs::write(
+            plugin_dir.join(".plugin").join("plugin.json"),
+            r#"{"name": "Sample Plugin", "version": "1.0.0", "skills": ["skills/sample-greet"]}"#,
+        )
+        .unwrap();
+
+        let metas = super::scan_plugin_skills(&root);
+        assert_eq!(metas.len(), 1);
+        assert_eq!(metas[0].id, "sample-greet");
+        assert_eq!(metas[0].name, "Sample Greet");
+        assert_eq!(metas[0].scope, "plugin");
+        assert_eq!(metas[0].plugin_id.as_deref(), Some("sample-plugin"));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn find_plugin_skill_dir_resolves_by_skill_id() {
+        let root = unique_dir("plugin-skill-find");
+        let _ = std::fs::remove_dir_all(&root);
+        let plugin_dir = root.join("sample-plugin");
+        let skill_dir = plugin_dir.join("skills").join("sample-format");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::create_dir_all(plugin_dir.join(".plugin")).unwrap();
+        std::fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: Sample Format\n---\nbody",
+        )
+        .unwrap();
+        std::fs::write(
+            plugin_dir.join(".plugin").join("plugin.json"),
+            r#"{"name": "Sample Plugin", "version": "1.0.0", "skills": ["skills/sample-format"]}"#,
+        )
+        .unwrap();
+
+        let found = super::find_plugin_skill_dir(&root, "sample-format").unwrap();
+        assert_eq!(found, skill_dir);
+        assert!(super::find_plugin_skill_dir(&root, "missing").is_none());
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

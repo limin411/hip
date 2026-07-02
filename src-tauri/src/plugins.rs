@@ -386,49 +386,88 @@ pub fn slugify_plugin(name: &str) -> String {
     }
 }
 
-/// Read the current plugin config JSON, append a manifest, and write back.
-/// Missing/corrupt config starts fresh with an empty array.
-pub fn register_plugin(config_path: &Path, manifest: serde_json::Value) -> Result<(), String> {
-    let mut plugins: Vec<serde_json::Value> = match std::fs::read_to_string(config_path) {
-        Ok(raw) if !raw.trim().is_empty() => {
-            serde_json::from_str::<serde_json::Value>(&raw)
-                .ok()
-                .and_then(|v| v.get("plugins").cloned())
-                .and_then(|v| serde_json::from_value(v).ok())
-                .unwrap_or_default()
-        }
-        _ => Vec::new(),
+fn read_plugins_config(config_path: &Path) -> (Vec<String>, Vec<serde_json::Value>) {
+    let raw: serde_json::Value = match std::fs::read_to_string(config_path) {
+        Ok(body) if !body.trim().is_empty() => serde_json::from_str(&body).unwrap_or_default(),
+        _ => serde_json::Value::Null,
     };
-    plugins.push(manifest);
-    let cfg = serde_json::json!({ "plugins": plugins });
+
+    let mut plugins: Vec<String> = Vec::new();
+    if let Some(arr) = raw.get("plugins").and_then(|v| v.as_array()) {
+        for v in arr {
+            if let Some(path) = v.as_str() {
+                plugins.push(path.to_string());
+            } else if let Some(obj) = v.as_object() {
+                if let Some(dir) = obj.get("dir").and_then(|d| d.as_str()) {
+                    plugins.push(dir.to_string());
+                }
+            }
+        }
+    }
+
+    let entries: Vec<serde_json::Value> = raw
+        .get("entries")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    (plugins, entries)
+}
+
+fn write_plugins_config(
+    config_path: &Path,
+    plugins: &[String],
+    entries: &[serde_json::Value],
+) -> Result<(), String> {
+    let cfg = serde_json::json!({
+        "plugins": plugins,
+        "entries": entries,
+    });
     let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     std::fs::write(config_path, json).map_err(|e| e.to_string())
 }
 
-/// Remove a plugin from the config JSON by id.
+/// Register an installed plugin directory so the sidecar can discover it.
+pub fn register_plugin(config_path: &Path, plugin_dir: &Path) -> Result<(), String> {
+    let dir_str = plugin_dir.to_string_lossy().into_owned();
+    let (mut plugins, entries) = read_plugins_config(config_path);
+    if !plugins.contains(&dir_str) {
+        plugins.push(dir_str);
+    }
+    write_plugins_config(config_path, &plugins, &entries)
+}
+
+/// Remove a plugin directory from the registry by its slug/id.
 pub fn unregister_plugin(config_path: &Path, plugin_id: &str) -> Result<(), String> {
-    let plugins: Vec<serde_json::Value> = match std::fs::read_to_string(config_path) {
-        Ok(raw) if !raw.trim().is_empty() => {
-            serde_json::from_str::<serde_json::Value>(&raw)
-                .ok()
-                .and_then(|v| v.get("plugins").cloned())
-                .and_then(|v| serde_json::from_value(v).ok())
-                .unwrap_or_default()
+    let (mut plugins, mut entries) = read_plugins_config(config_path);
+
+    plugins.retain(|p| {
+        Path::new(p)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(|name| name != plugin_id)
+            .unwrap_or(true)
+    });
+
+    entries.retain(|e| {
+        if let Some(obj) = e.as_object() {
+            let id_matches = obj
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(|id| id == plugin_id)
+                .unwrap_or(false);
+            let slug_matches = obj
+                .get("slug")
+                .and_then(|v| v.as_str())
+                .map(|slug| slug == plugin_id)
+                .unwrap_or(false);
+            !id_matches && !slug_matches
+        } else {
+            true
         }
-        _ => return Ok(()),
-    };
-    let filtered: Vec<_> = plugins
-        .into_iter()
-        .filter(|v| {
-            v.get("id")
-                .and_then(|id| id.as_str())
-                .map(|id| id != plugin_id)
-                .unwrap_or(true)
-        })
-        .collect();
-    let cfg = serde_json::json!({ "plugins": filtered });
-    let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(config_path, json).map_err(|e| e.to_string())
+    });
+
+    write_plugins_config(config_path, &plugins, &entries)
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -880,5 +919,122 @@ mod tests {
         let metas = scan_plugins(&tmp.path);
         // name is empty/missing → skipped
         assert_eq!(metas.len(), 0);
+    }
+
+    #[test]
+    fn register_plugin_writes_path_string() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("my-plugin");
+
+        register_plugin(&config_path, &plugin_dir).unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].as_str().unwrap(), plugin_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn register_plugin_dedupes_same_dir() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("my-plugin");
+
+        register_plugin(&config_path, &plugin_dir).unwrap();
+        register_plugin(&config_path, &plugin_dir).unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        assert_eq!(plugins.len(), 1);
+    }
+
+    #[test]
+    fn register_plugin_preserves_sidecar_entries() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("my-plugin");
+        let entries = serde_json::json!({
+            "plugins": [],
+            "entries": [{ "slug": "existing", "name": "Existing" }],
+        });
+        fs::write(&config_path, serde_json::to_string(&entries).unwrap()).unwrap();
+
+        register_plugin(&config_path, &plugin_dir).unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let entries = cfg.get("entries").unwrap().as_array().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].get("slug").unwrap().as_str().unwrap(), "existing");
+    }
+
+    #[test]
+    fn register_plugin_migrates_legacy_manifest_objects() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let plugin_dir = tmp.child("my-plugin");
+        let legacy = serde_json::json!({
+            "plugins": [
+                { "name": "Legacy Plugin", "dir": plugin_dir.to_string_lossy() }
+            ],
+        });
+        fs::write(&config_path, serde_json::to_string(&legacy).unwrap()).unwrap();
+
+        register_plugin(&config_path, &plugin_dir).unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].as_str().unwrap(), plugin_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn unregister_plugin_removes_path_by_slug() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        let keep_dir = tmp.child("keep-plugin");
+        let remove_dir = tmp.child("remove-plugin");
+
+        register_plugin(&config_path, &keep_dir).unwrap();
+        register_plugin(&config_path, &remove_dir).unwrap();
+        unregister_plugin(&config_path, "remove-plugin").unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].as_str().unwrap(), keep_dir.to_string_lossy());
+    }
+
+    #[test]
+    fn unregister_plugin_removes_sidecar_entries_by_slug() {
+        let tmp = TempDir::new();
+        let config_path = tmp.child("hip-plugins.json");
+        fs::write(
+            &config_path,
+            serde_json::to_string(&serde_json::json!({
+                "plugins": ["/path/remove-plugin"],
+                "entries": [
+                    { "slug": "remove-plugin", "name": "Remove" },
+                    { "slug": "keep-plugin", "name": "Keep" },
+                ],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        unregister_plugin(&config_path, "remove-plugin").unwrap();
+
+        let raw = fs::read_to_string(&config_path).unwrap();
+        let cfg: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let plugins = cfg.get("plugins").unwrap().as_array().unwrap();
+        let entries = cfg.get("entries").unwrap().as_array().unwrap();
+        assert!(plugins.is_empty());
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].get("slug").unwrap().as_str().unwrap(), "keep-plugin");
     }
 }

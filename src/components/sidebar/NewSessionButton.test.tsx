@@ -20,4 +20,10 @@ describe('NewSessionButton', () => {
     const html = renderToStaticMarkup(<NewSessionButton surface="code" />)
     expect(html).toContain('sidebar.newCodeTask')
   })
+
+  it('renders icon button with aria-label when iconOnly', () => {
+    const html = renderToStaticMarkup(<NewSessionButton surface="code" iconOnly />)
+    expect(html).toContain('aria-label="sidebar.newCodeTask"')
+    expect(html).toContain('<svg')
+  })
 })

@@ -1,17 +1,35 @@
 import { useTranslation } from 'react-i18next'
+import { Plus } from 'lucide-react'
 import { sessionService } from '@/domain'
 import type { Surface } from '@/store/uiStore'
 import { Button } from '@/components/ui/Button'
 
 interface NewSessionButtonProps {
   surface: Surface
+  iconOnly?: boolean
 }
 
-export function NewSessionButton({ surface }: NewSessionButtonProps) {
+export function NewSessionButton({ surface, iconOnly = false }: NewSessionButtonProps) {
   const { t } = useTranslation()
   const label =
     surface === 'code' ? t('sidebar.newCodeTask')
     : t('sidebar.newChat')
+
+  if (iconOnly) {
+    return (
+      <Button
+        variant="primary"
+        size="icon"
+        className="h-9 w-9 shrink-0"
+        aria-label={label}
+        data-testid="new-session-button"
+        onClick={() => sessionService.newConversation(surface)}
+      >
+        <Plus size={18} />
+      </Button>
+    )
+  }
+
   return (
     <Button
       variant="primary"

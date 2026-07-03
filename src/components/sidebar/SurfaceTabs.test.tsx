@@ -7,11 +7,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 describe('SurfaceTabs', () => {
-  it('renders chat, code, and domain labels', () => {
+  it('renders chat and code labels', () => {
     const html = renderToStaticMarkup(<SurfaceTabs active="chat" onChange={() => {}} />)
     expect(html).toContain('nav.chat')
     expect(html).toContain('nav.code')
-    expect(html).toContain('nav.domain')
   })
 
   it('marks active tab with selected styling', () => {

@@ -12,7 +12,7 @@ export function SurfaceTabs({ active, onChange }: SurfaceTabsProps) {
   const { t } = useTranslation()
   return (
     <div className="flex rounded-lg bg-surface-subtle p-0.5">
-      {(['chat', 'code', 'domain'] as const).map((view) => {
+      {(['chat', 'code'] as const).map((view) => {
         const isActive = active === view
         return (
           <button

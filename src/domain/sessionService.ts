@@ -203,12 +203,8 @@ export class SessionService {
     if (cur === 'chat') useUiStore.getState().setChatSessionId(activeId)
     else if (cur === 'code') useUiStore.getState().setCodeSessionId(activeId)
     useUiStore.getState().setActiveView(view)
-    if ((view === 'chat' || view === 'domain') && useDraftStore.getState().draft?.mode === 'project') {
+    if (view === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
       useDraftStore.getState().clearProject()
-    }
-    if (view === 'domain') {
-      useDomainStore.getState().deselect()
-      return
     }
     const want = view === 'chat' ? useUiStore.getState().chatSessionId : useUiStore.getState().codeSessionId
     const sessions = useDomainStore.getState().sessions

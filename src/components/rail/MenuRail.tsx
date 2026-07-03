@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquare, FolderGit2, Globe, Settings, LogOut } from 'lucide-react'
+import { MessageSquare, FolderGit2, Settings, LogOut } from 'lucide-react'
 import { sessionService } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
@@ -52,13 +52,6 @@ export function MenuRail() {
           active={activeView === 'code'}
           data-testid="rail-code"
           onClick={() => sessionService.setSurface('code')}
-        />
-        <RailButton
-          icon={Globe}
-          label={t('nav.domain')}
-          active={activeView === 'domain'}
-          data-testid="rail-domain"
-          onClick={() => sessionService.setSurface('domain')}
         />
       </nav>
 

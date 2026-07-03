@@ -19,7 +19,6 @@ export function filterBySurface<T extends { config: Pick<SessionConfig, 'surface
   sessions: T[],
   surface: Surface,
 ): T[] {
-  if (surface === 'domain') return []
   return sessions.filter((s) => surfaceOf(s.config) === surface)
 }
 

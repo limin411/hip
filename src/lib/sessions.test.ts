@@ -53,11 +53,8 @@ describe('filterBySurface', () => {
     const list = [mk('a'), mk('b', 'chat')]
     expect(filterBySurface(list, 'code').map((s) => s.id)).toEqual(['a'])
   })
-  it('returns empty for the placeholder domain surface', () => {
-    const list = [mk('a', 'chat'), mk('b', 'code')]
-    expect(filterBySurface(list, 'domain')).toEqual([])
-  })
 })
+
 
 describe('groupSessionsByRelativeDate', () => {
   const now = new Date('2026-06-25T14:00:00').getTime()

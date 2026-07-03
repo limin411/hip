@@ -9,7 +9,7 @@ import { SessionItem } from './SessionItem'
 export function SessionList() {
   const { t } = useTranslation()
   const activeView = useUiStore((s) => s.activeView)
-  const surface: Surface = activeView === 'code' ? 'code' : activeView === 'domain' ? 'domain' : 'chat'
+  const surface: Surface = activeView === 'code' ? 'code' : 'chat'
   const sessions = filterBySurface(useSessions(), surface)
   const search = useUiStore((s) => s.search)
   const activeSessionId = useActiveSessionId()

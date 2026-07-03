@@ -8,7 +8,7 @@ import { AccountFooter } from './AccountFooter'
 
 export function Sidebar() {
   const activeView = useUiStore((s) => s.activeView)
-  const surface: Surface = activeView === 'code' ? 'code' : activeView === 'domain' ? 'domain' : 'chat'
+  const surface: Surface = activeView === 'code' ? 'code' : 'chat'
 
   return (
     <div data-testid="sidebar-root" className="flex h-full flex-col bg-[var(--glass-bg)] backdrop-blur-xl border-r border-[var(--glass-border)]">

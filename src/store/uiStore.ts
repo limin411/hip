@@ -4,8 +4,8 @@ import type { CheckpointMode } from '@hip/protocol'
 
 export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
 
-export type ActiveView = 'chat' | 'code' | 'domain' | 'settings'
-export type Surface = 'chat' | 'code' | 'domain'
+export type ActiveView = 'chat' | 'code' | 'settings'
+export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 

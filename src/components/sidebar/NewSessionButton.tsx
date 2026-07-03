@@ -11,7 +11,6 @@ export function NewSessionButton({ surface }: NewSessionButtonProps) {
   const { t } = useTranslation()
   const label =
     surface === 'code' ? t('sidebar.newCodeTask')
-    : surface === 'domain' ? t('sidebar.newDomainTask')
     : t('sidebar.newChat')
   return (
     <Button

@@ -19,7 +19,7 @@ vi.mock('@/ipc/dialog', () => ({
 
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
-let mockActiveView: 'chat' | 'code' | 'domain' | 'settings' = 'chat'
+let mockActiveView: 'chat' | 'code' | 'settings' = 'chat'
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(

@@ -156,7 +156,6 @@ export const zhCN = {
       renameSession: '重命名',
       newChat: '新建会话',
       newCodeTask: '新建代码任务',
-      newDomainTask: '新建领域任务',
       dateGroup: {
         today: '今天',
         yesterday: '昨天',
@@ -522,7 +521,6 @@ export const zhCN = {
     nav: {
       chat: '办公',
       code: '编码',
-      domain: '领域',
       settings: '设置',
     },
     common: {

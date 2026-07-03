@@ -156,7 +156,6 @@ export const en = {
       renameSession: 'Rename',
       newChat: 'New Chat',
       newCodeTask: 'New Code Task',
-      newDomainTask: 'New Domain Task',
       dateGroup: {
         today: 'Today',
         yesterday: 'Yesterday',
@@ -522,7 +521,6 @@ export const en = {
     nav: {
       chat: 'Work',
       code: 'Coding',
-      domain: 'Domain',
       settings: 'Settings',
     },
     common: {

@@ -38,14 +38,17 @@ export function AgentManagement() {
 
   return (
     <div className="flex h-full flex-col p-6">
-      <div>
-        <h2 className="text-title font-semibold text-ink">{t('settings.agentsLabel')}</h2>
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-title font-semibold text-ink">{t('settings.agents.title')}</h2>
+          <p className="mt-1 text-body text-ink-secondary">{t('settings.agents.intro')}</p>
+        </div>
+        <AgentToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onAdd={(kind) => setEditing({ mode: 'add', kind })}
+        />
       </div>
-      <AgentToolbar
-        search={search}
-        onSearchChange={setSearch}
-        onAdd={(kind) => setEditing({ mode: 'add', kind })}
-      />
 
       <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
         <Content

@@ -16,7 +16,7 @@ export function AgentToolbar({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-1 items-center justify-end gap-3 min-w-0">
       <div className="relative max-w-md flex-1">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
         <input

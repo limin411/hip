@@ -6,7 +6,7 @@ import { resolveEffectiveConfig } from '../../config/hip-config.js'
 import { parseFrontmatter } from './frontmatter.js'
 
 /** Build the enabled/disabled map from hip.toml (global + project). Missing/corrupt → {} (everything enabled). */
-function readEnabledMap(cwd: string, effectiveConfig?: HipConfig): Record<string, boolean> {
+export function readEnabledMap(cwd: string, effectiveConfig?: HipConfig): Record<string, boolean> {
   try {
     const entries = (effectiveConfig ?? resolveEffectiveConfig(cwd)).skills ?? []
     const map: Record<string, boolean> = {}

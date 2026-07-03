@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import type { SkillMeta, PluginMeta } from '@hip/protocol'
 import { useSkillsStore } from '@/store/skillsStore'
 import { usePluginsStore } from '@/store/pluginsStore'
@@ -85,11 +85,11 @@ describe('SkillCard plugin variant', () => {
     expect(screen.getByText('via TestPlugin')).toBeInTheDocument()
   })
 
-  it('renders a dimmed, disabled switch', () => {
+  it('renders an interactive switch that defaults to enabled', () => {
     render(
       <SkillCard
         skill={skill({ id: 'plugin-skill', pluginId: 'p1', scope: 'plugin' })}
-        enabled={false}
+        enabled={true}
         onToggle={() => {}}
         onView={() => {}}
         onDelete={() => {}}
@@ -97,8 +97,24 @@ describe('SkillCard plugin variant', () => {
       />,
     )
     const toggle = screen.getByRole('switch')
-    expect(toggle).toBeDisabled()
-    expect(toggle).toHaveAttribute('aria-disabled', 'true')
+    expect(toggle).not.toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('calls onToggle when the plugin skill switch is clicked', () => {
+    const onToggle = vi.fn()
+    render(
+      <SkillCard
+        skill={skill({ id: 'plugin-skill', pluginId: 'p1', scope: 'plugin' })}
+        enabled={true}
+        onToggle={onToggle}
+        onView={() => {}}
+        onDelete={() => {}}
+        readOnly={{ pluginName: 'TestPlugin' }}
+      />,
+    )
+    fireEvent.click(screen.getByRole('switch'))
+    expect(onToggle).toHaveBeenCalledWith(false)
   })
 
   it('omits the delete menu item', () => {
@@ -243,5 +259,27 @@ describe('SkillConfig list layout', () => {
 
     expect(screen.getByText('Standalone One')).toBeInTheDocument()
     expect(screen.queryByText('settings.skill.pluginSkills')).not.toBeInTheDocument()
+  })
+
+  it('reflects the enabled map for plugin skills and toggles them', async () => {
+    useSkillsStore.setState({
+      skills: [],
+      enabled: { ps1: false },
+      loaded: true,
+    })
+    usePluginsStore.setState({
+      plugins: [plugin({ skills: ['ps1'] })],
+      loaded: true,
+    })
+
+    render(<SkillConfig />)
+
+    const toggle = screen.getByRole('switch')
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+    fireEvent.click(toggle)
+    await waitFor(() => {
+      expect(useSkillsStore.getState().enabled.ps1).toBe(true)
+    })
   })
 })

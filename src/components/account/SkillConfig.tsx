@@ -155,8 +155,8 @@ export function SkillConfig() {
                     <SkillCard
                       key={skill.id}
                       skill={skill}
-                      enabled={false}
-                      onToggle={() => {}}
+                      enabled={enabled[skill.id] !== false}
+                      onToggle={(on) => void toggle(skill.id, on)}
                       onView={() => setViewing(skill)}
                       onDelete={() => {}}
                       readOnly={{ pluginName }}
@@ -240,8 +240,6 @@ export function SkillCard({
           <Switch
             checked={enabled}
             onCheckedChange={onToggle}
-            disabled={readOnly !== undefined}
-            ariaDisabled={readOnly ? true : undefined}
             ariaLabel={t('settings.skill.enableThis')}
           />
           {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};

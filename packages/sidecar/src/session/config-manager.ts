@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { readPluginsConfig } from '../config/plugins.js'
-import { readEnabledSkills, mergeSkills, extractSkillMetaFromData } from './skills/registry.js'
+import { readEnabledSkills, mergeSkills, extractSkillMetaFromData, readEnabledMap } from './skills/registry.js'
 import { parseFrontmatter } from './skills/frontmatter.js'
 import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
 import { synthesizePlugin } from './plugins/synthesizer.js'
@@ -59,6 +59,7 @@ export class ConfigManager {
     const cfg = resolveEffectiveConfig(cwd)
     try { this.cachedSkills = readEnabledSkills(this.getConfig().cwd, cfg) } catch { this.cachedSkills = [] }
     this.cachedMcpConfigs = cfg.mcpServers ?? []
+    const enabled = readEnabledMap(cwd, cfg)
     const pluginAgents: AgentConfig[] = []
     try {
       for (const pluginDir of readPluginsConfig().plugins) {
@@ -67,6 +68,7 @@ export class ConfigManager {
           const synth = synthesizePlugin(manifest)
           const pluginSkills: SkillMeta[] = []
           for (const se of synth.skills) {
+            if (enabled[se.id] === false) continue
             const meta = skillMetaFromDir(se.dir, se.id)
             if (meta) pluginSkills.push(meta)
           }

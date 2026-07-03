@@ -18,14 +18,14 @@ export function NewSessionButton({ surface, iconOnly = false }: NewSessionButton
   if (iconOnly) {
     return (
       <Button
-        variant="primary"
+        variant="outline"
         size="icon"
-        className="h-9 w-9 shrink-0"
+        className="h-9 w-9 shrink-0 rounded-lg"
         aria-label={label}
         data-testid="new-session-button"
         onClick={() => sessionService.newConversation(surface)}
       >
-        <Plus size={18} />
+        <Plus size={15} />
       </Button>
     )
   }

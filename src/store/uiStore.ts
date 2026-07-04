@@ -121,14 +121,12 @@ export const useUiStore = create<UiState>()(
       setActiveView: (v) =>
         set((s) => {
           if (s.activeView === v) return s
+          const isSpecial = (view: ActiveView) => view === 'settings' || view === 'history'
+          const enteringSpecial = isSpecial(v) && !isSpecial(s.activeView)
+          const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)
           return {
             activeView: v,
-            previousView:
-              v === 'settings' && s.activeView !== 'settings'
-                ? s.activeView
-                : s.activeView === 'settings'
-                  ? null
-                  : s.previousView,
+            previousView: enteringSpecial ? s.activeView : leavingSpecial ? null : s.previousView,
           }
         }),
 

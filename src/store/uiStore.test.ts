@@ -138,6 +138,49 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState().previousView).toBeNull()
   })
 
+  it('remembers previousView when entering history from code', () => {
+    useUiStore.setState({ activeView: 'code', previousView: null })
+    useUiStore.getState().setActiveView('history')
+    expect(useUiStore.getState().previousView).toBe('code')
+  })
+
+  it('remembers previousView when entering settings from chat', () => {
+    useUiStore.setState({ activeView: 'chat', previousView: null })
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().previousView).toBe('chat')
+  })
+
+  it('clears previousView when leaving history to chat', () => {
+    useUiStore.setState({ activeView: 'chat', previousView: null })
+    useUiStore.getState().setActiveView('history')
+    expect(useUiStore.getState().previousView).toBe('chat')
+
+    useUiStore.getState().setActiveView('chat')
+    expect(useUiStore.getState().previousView).toBeNull()
+  })
+
+  it('clears previousView when leaving settings to code', () => {
+    useUiStore.setState({ activeView: 'code', previousView: null })
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().previousView).toBe('code')
+
+    useUiStore.getState().setActiveView('code')
+    expect(useUiStore.getState().previousView).toBeNull()
+  })
+
+  it('preserves the original non-special previousView when switching between special views', () => {
+    useUiStore.setState({ activeView: 'code', previousView: null })
+    useUiStore.getState().setActiveView('settings')
+    expect(useUiStore.getState().previousView).toBe('code')
+
+    useUiStore.getState().setActiveView('history')
+    expect(useUiStore.getState().activeView).toBe('history')
+    expect(useUiStore.getState().previousView).toBe('code')
+
+    useUiStore.getState().setActiveView('chat')
+    expect(useUiStore.getState().previousView).toBeNull()
+  })
+
   it('setActiveView to the same value is a no-op (same reference)', () => {
     useUiStore.getState().setActiveView('chat')
     const before = useUiStore.getState()

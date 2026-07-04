@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { NewConversation } from './NewConversation'
 import * as domain from '@/domain'
-import { useDomainStore } from '@/domain'
+import { useDomainStore, sessionService } from '@/domain'
+import i18n from '@/i18n'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
@@ -59,9 +60,10 @@ function setDraftModel(modelKey: string) {
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 describe('NewConversation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     cleanup()
     vi.restoreAllMocks()
+    await i18n.changeLanguage('en')
     mockActiveView = 'chat'
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
@@ -262,5 +264,28 @@ describe('NewConversation', () => {
     const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
     fireEvent.change(textarea, { target: { value: '/comp' } })
     expect(screen.queryByText('/compact')).not.toBeInTheDocument()
+  })
+})
+
+describe('NewConversation surface toggle', () => {
+  beforeEach(async () => {
+    cleanup()
+    vi.restoreAllMocks()
+    mockActiveView = 'chat'
+    await i18n.changeLanguage('en')
+    useDraftStore.setState({ draft: null })
+  })
+
+  it('renders Chat and Code toggle', () => {
+    render(<NewConversation />)
+    expect(screen.getByRole('button', { name: /work/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /coding/i })).toBeInTheDocument()
+  })
+
+  it('switches surface when the code toggle is clicked', () => {
+    const setSurfaceSpy = vi.spyOn(sessionService, 'setSurface').mockImplementation(() => {})
+    render(<NewConversation />)
+    fireEvent.click(screen.getByRole('button', { name: /coding/i }))
+    expect(setSurfaceSpy).toHaveBeenCalledWith('code')
   })
 })

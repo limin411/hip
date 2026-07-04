@@ -36,10 +36,6 @@ export class ChatPage {
   get messageUsage() { return browser.$('[data-testid="message-usage"]') }
   get messageTime() { return browser.$('[data-testid="message-time"]') }
 
-  // ── surface toggle (on the new-conversation landing) ──
-  get surfaceTabChat() { return browser.$('[data-testid="surface-toggle-chat"]') }
-  get surfaceTabCode() { return browser.$('[data-testid="surface-toggle-code"]') }
-
   // ── attachment removal ──
   get attachmentRemove() { return browser.$('[data-testid="attachment-remove"]') }
 }

@@ -9,9 +9,31 @@ async function dismissSlashPalette(): Promise<void> {
 async function openNewSessionMenu(): Promise<void> {
   const button = await browser.$('[data-testid="new-session-button"]')
   await button.waitForExist({ timeout: 20000 })
-  // Headless WebKit sometimes reports the button as not clickable when an
-  // overlay or animation is present; use a synthetic click to bypass hit-testing.
-  await browser.execute((el: HTMLElement) => el.click(), button)
+
+  try {
+    await button.click()
+  } catch {
+    // Headless WebKit sometimes reports the button as not clickable when an
+    // overlay or animation is present; dispatch the pointer events Radix uses.
+    await browser.execute((el: HTMLElement) => {
+      const rect = el.getBoundingClientRect()
+      const x = rect.left + rect.width / 2
+      const y = rect.top + rect.height / 2
+      el.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse', clientX: x, clientY: y }),
+      )
+      el.dispatchEvent(
+        new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse', clientX: x, clientY: y }),
+      )
+      el.click()
+    }, button)
+  }
+
+  // Wait for the Radix portal to render the menu items.
+  await browser.waitUntil(
+    async () => (await browser.$('[data-testid="new-session-chat"]')).isExisting(),
+    { timeout: 5000, interval: 100, timeoutMsg: 'new-session menu did not open' },
+  )
 }
 
 async function clickMenuItem(testid: string): Promise<void> {

@@ -531,6 +531,9 @@ export const zhCN = {
       code: '编码',
       settings: '设置',
     },
+    tabs: {
+      closeTab: '关闭标签页',
+    },
     common: {
       clear: '清除',
       cancel: '取消',

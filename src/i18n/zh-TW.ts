@@ -531,6 +531,9 @@ export const zhTW = {
       code: '編碼',
       settings: '設定',
     },
+    tabs: {
+      closeTab: '關閉標籤頁',
+    },
     common: {
       clear: '清除',
       cancel: '取消',

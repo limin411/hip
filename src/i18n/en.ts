@@ -531,6 +531,9 @@ export const en = {
       code: 'Coding',
       settings: 'Settings',
     },
+    tabs: {
+      closeTab: 'Close tab',
+    },
     common: {
       clear: 'Clear',
       cancel: 'Cancel',

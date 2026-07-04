@@ -37,4 +37,20 @@ describe('SessionTab', () => {
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('renders capsule shape and active state classes', () => {
+    render(<SessionTab session={session} active onSelect={vi.fn()} onClose={vi.fn()} />)
+    const tab = screen.getByTestId('session-tab').parentElement
+    expect(tab).toHaveClass('rounded-md')
+    expect(tab).toHaveClass('bg-state-active')
+    expect(tab).toHaveClass('text-ink')
+  })
+
+  it('renders inactive state classes', () => {
+    render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
+    const tab = screen.getByTestId('session-tab').parentElement
+    expect(tab).toHaveClass('rounded-md')
+    expect(tab).toHaveClass('text-ink-secondary')
+    expect(tab).not.toHaveClass('bg-state-active')
+  })
 })

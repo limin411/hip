@@ -82,4 +82,11 @@ describe('SessionTabBar', () => {
     fireEvent.click(screen.getByText('dropdown.newCode'))
     expect(sessionService.newConversation).toHaveBeenCalledWith('code')
   })
+
+  it('centers tabs vertically in the tab list', () => {
+    render(<SessionTabBar onNewSession={() => {}} />)
+    const tablist = screen.getByRole('tablist')
+    expect(tablist).toHaveClass('items-center')
+    expect(tablist).not.toHaveClass('items-end')
+  })
 })

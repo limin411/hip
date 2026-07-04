@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Layout Refine Prototype</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #16191f;
+      --surface-muted: #1e222b;
+      --surface-subtle: #252a36;
+      --border: #2a2f3a;
+      --glass-bg: rgba(22, 25, 31, 0.85);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --ink: #f0f2f5;
+      --ink-secondary: #9aa3b2;
+      --ink-tertiary: #6b7280;
+      --accent: #3b82f6;
+      --accent-subtle: rgba(59, 130, 246, 0.12);
+      --accent-strong: #60a5fa;
+      --accent-active: rgba(59, 130, 246, 0.22);
+      --danger: #ef4444;
+      --titlebar-height: 44px;
+      --traffic-light-width: 90px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); overflow: hidden; }
+    .app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* TitleBar */
+    .titlebar { display: flex; align-items: center; height: var(--titlebar-height); flex-shrink: 0; background: var(--glass-bg); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(20px); -webkit-app-region: drag; app-region: drag; }
+    .traffic-spacer { width: var(--traffic-light-width); flex-shrink: 0; -webkit-app-region: drag; app-region: drag; }
+    .titlebar-content { display: flex; flex: 1; align-items: center; min-width: 0; height: 100%; -webkit-app-region: no-drag; app-region: no-drag; }
+    .tabbar { display: flex; align-items: flex-end; gap: 2px; flex: 1; height: 100%; padding: 0 4px; overflow-x: auto; }
+    .tab { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px 8px 0 0; font-size: 13px; color: var(--ink-secondary); cursor: pointer; border: 1px solid transparent; border-bottom: none; background: transparent; white-space: nowrap; }
+    .tab.active { background: var(--surface); color: var(--ink); border-color: var(--border); }
+    .tab .close { opacity: 0; }
+    .tab:hover .close { opacity: 1; }
+    .new-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: var(--ink-tertiary); cursor: pointer; margin-bottom: 2px; position: relative; }
+    .new-btn:hover { background: var(--surface-muted); color: var(--ink); }
+    .dropdown { position: absolute; top: 32px; left: 0; width: 180px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 100; display: none; }
+    .dropdown.open { display: block; }
+    .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px; color: var(--ink); cursor: pointer; }
+    .dropdown-item:hover { background: var(--surface-muted); }
+    .dropdown-item .icon { width: 16px; color: var(--ink-secondary); }
+    .titlebar-right { display: flex; align-items: center; gap: 8px; padding-right: 12px; -webkit-app-region: no-drag; app-region: no-drag; }
+    .titlebar-title { flex: 1; text-align: center; font-size: 14px; font-weight: 500; color: var(--ink); }
+    .back-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; color: var(--ink-secondary); cursor: pointer; font-size: 13px; }
+    .back-btn:hover { background: var(--surface-muted); color: var(--ink); }
+
+    /* Main */
+    .main { flex: 1; min-height: 0; display: flex; position: relative; }
+    .workspace { flex: 1; display: flex; min-width: 0; background: var(--bg); }
+    .panel { width: 280px; border-left: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+    .avatar { position: absolute; bottom: 16px; left: 16px; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+    .avatar:hover { border-color: var(--border); }
+    .avatar-menu { position: absolute; bottom: 48px; left: 0; width: 180px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); display: none; }
+    .avatar-menu.open { display: block; }
+
+    /* New Conversation */
+    .new-conversation { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; }
+    .new-card { width: 100%; max-width: 680px; text-align: center; }
+    .logo { width: 140px; height: 40px; background: linear-gradient(90deg, var(--accent), #a78bfa); border-radius: 8px; margin: 0 auto 24px; opacity: 0.9; }
+    .greeting { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+    .sub { color: var(--ink-secondary); font-size: 14px; margin-bottom: 24px; }
+    .composer { display: flex; align-items: flex-end; gap: 8px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+    .composer textarea { flex: 1; background: transparent; border: none; color: var(--ink); font-size: 15px; resize: none; outline: none; min-height: 24px; font-family: inherit; }
+    .composer-actions { display: flex; align-items: center; gap: 8px; }
+    .composer .btn { padding: 6px 10px; border-radius: 8px; font-size: 12px; color: var(--ink-secondary); background: var(--surface-subtle); border: none; cursor: pointer; }
+    .composer .send { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--accent); color: white; cursor: pointer; }
+
+    /* History */
+    .history { flex: 1; display: flex; flex-direction: column; padding: 24px 32px; overflow-y: auto; }
+    .history h2 { font-size: 20px; margin: 0 0 16px; }
+    .search { width: 100%; max-width: 400px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-size: 14px; outline: none; margin-bottom: 20px; }
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+    .history-item:hover { border-color: var(--accent); }
+    .history-item .meta { display: flex; flex-direction: column; gap: 2px; }
+    .history-item .title { font-size: 14px; font-weight: 500; }
+    .history-item .preview { font-size: 12px; color: var(--ink-secondary); }
+    .history-item .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--surface-subtle); color: var(--ink-secondary); }
+    .badge.code { background: var(--accent-subtle); color: var(--accent-strong); }
+
+    /* Settings */
+    .settings { flex: 1; display: flex; min-height: 0; background: var(--bg); }
+    .settings-nav { width: 220px; border-right: 1px solid var(--border); background: var(--surface); padding: 12px; display: flex; flex-direction: column; }
+    .settings-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: var(--ink-secondary); cursor: pointer; font-size: 14px; }
+    .settings-nav-item:hover { background: var(--surface-muted); color: var(--ink); }
+    .settings-nav-item.active { background: var(--accent-active); color: var(--accent-strong); }
+    .settings-content { flex: 1; padding: 24px 32px; overflow-y: auto; }
+    .settings-content h3 { margin-top: 0; }
+    .placeholder-row { height: 16px; background: var(--surface-muted); border-radius: 4px; margin-bottom: 12px; }
+
+    /* Nav helper */
+    .nav-note { position: fixed; bottom: 16px; right: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 12px; color: var(--ink-secondary); max-width: 260px; }
+    .nav-note strong { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <!-- TitleBar -->
+    <header class="titlebar" id="titlebar">
+      <div class="traffic-spacer"></div>
+      <div class="titlebar-content" id="titlebar-content">
+        <!-- Normal mode -->
+        <div class="tabbar" id="tabbar">
+          <div class="tab active"><span>Chat A</span><span class="close">×</span></div>
+          <div class="tab"><span>Code B</span><span class="close">×</span></div>
+          <div class="new-btn" id="new-btn" onclick="toggleDropdown()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <div class="dropdown" id="dropdown">
+              <div class="dropdown-item" onclick="showView('chat')"><span class="icon">💬</span> 新建 Chat</div>
+              <div class="dropdown-item" onclick="showView('code')"><span class="icon">💻</span> 新建 Code</div>
+            </div>
+          </div>
+        </div>
+        <div class="titlebar-right" id="titlebar-right">
+          <span style="font-size:12px;color:var(--ink-tertiary);">●</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-secondary);cursor:pointer;"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="workspace" id="workspace">
+        <!-- Chat view -->
+        <div class="new-conversation" id="view-chat">
+          <div class="new-card">
+            <div class="logo"></div>
+            <div class="greeting">今天想聊点什么？</div>
+            <div class="sub">选择一个模型开始新对话</div>
+            <div class="composer">
+              <textarea rows="1" placeholder="输入消息..."></textarea>
+              <div class="composer-actions">
+                <button class="btn">模型</button>
+                <button class="btn">附件</button>
+                <div class="send">➤</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History view -->
+        <div class="history" id="view-history" style="display:none;">
+          <h2>历史会话</h2>
+          <input class="search" placeholder="搜索会话..." />
+          <div class="history-list">
+            <div class="history-item">
+              <div class="meta">
+                <div class="title">Chat A</div>
+                <div class="preview">上次讨论了 React 状态管理...</div>
+              </div>
+              <span class="badge">Chat</span>
+            </div>
+            <div class="history-item">
+              <div class="meta">
+                <div class="title">Code B</div>
+                <div class="preview">/Users/lijiamin/project · 12 个文件变更</div>
+              </div>
+              <span class="badge code">Code</span>
+            </div>
+            <div class="history-item">
+              <div class="meta">
+                <div class="title">工具函数重构</div>
+                <div class="preview">辅助生成单元测试...</div>
+              </div>
+              <span class="badge code">Code</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings view -->
+        <div class="settings" id="view-settings" style="display:none;">
+          <div class="settings-nav">
+            <div class="settings-nav-item active">通用</div>
+            <div class="settings-nav-item">模型</div>
+            <div class="settings-nav-item">Agent</div>
+            <div class="settings-nav-item">外部工具</div>
+            <div class="settings-nav-item">技能</div>
+            <div class="settings-nav-item">插件</div>
+          </div>
+          <div class="settings-content">
+            <h3>通用设置</h3>
+            <div class="placeholder-row" style="width:60%;"></div>
+            <div class="placeholder-row" style="width:80%;"></div>
+            <div class="placeholder-row" style="width:70%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" id="right-panel"></div>
+
+      <!-- Avatar -->
+      <div class="avatar" id="avatar" onclick="toggleAvatar()">
+        U
+        <div class="avatar-menu" id="avatar-menu">
+          <div class="dropdown-item" onclick="showView('history')"><span class="icon">🕘</span> 历史会话</div>
+          <div class="dropdown-item" onclick="showView('settings')"><span class="icon">⚙️</span> 设置</div>
+          <div style="height:1px;background:var(--border);margin:6px 0;"></div>
+          <div class="dropdown-item"><span class="icon">↪</span> 退出登录</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-note">
+    <strong>原型说明</strong><br/>
+    点击标题栏「+」切换下拉（仅 Chat / Code）；点击左下角头像 → 历史会话 / 设置，观察标题栏始终可见并带返回按钮。
+  </div>
+
+  <script>
+    function toggleDropdown() {
+      document.getElementById('dropdown').classList.toggle('open');
+    }
+    function toggleAvatar() {
+      document.getElementById('avatar-menu').classList.toggle('open');
+    }
+    function showView(view) {
+      document.getElementById('dropdown').classList.remove('open');
+      document.getElementById('avatar-menu').classList.remove('open');
+      document.getElementById('view-chat').style.display = view === 'chat' || view === 'code' ? 'flex' : 'none';
+      document.getElementById('view-history').style.display = view === 'history' ? 'flex' : 'none';
+      document.getElementById('view-settings').style.display = view === 'settings' ? 'flex' : 'none';
+      document.getElementById('right-panel').style.display = view === 'chat' || view === 'code' ? 'block' : 'none';
+
+      const tbContent = document.getElementById('titlebar-content');
+      if (view === 'history' || view === 'settings') {
+        tbContent.innerHTML = `
+          <div class="back-btn" onclick="showView('chat')">← 返回</div>
+          <div class="titlebar-title">${view === 'history' ? '历史会话' : '设置'}</div>
+          <div style="width:90px;"></div>
+        `;
+      } else {
+        tbContent.innerHTML = `
+          <div class="tabbar" id="tabbar">
+            <div class="tab ${view === 'chat' ? 'active' : ''}"><span>Chat A</span><span class="close">×</span></div>
+            <div class="tab ${view === 'code' ? 'active' : ''}"><span>Code B</span><span class="close">×</span></div>
+            <div class="new-btn" id="new-btn" onclick="toggleDropdown()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <div class="dropdown" id="dropdown">
+                <div class="dropdown-item" onclick="showView('chat')"><span class="icon">💬</span> 新建 Chat</div>
+                <div class="dropdown-item" onclick="showView('code')"><span class="icon">💻</span> 新建 Code</div>
+              </div>
+            </div>
+          </div>
+          <div class="titlebar-right" id="titlebar-right">
+            <span style="font-size:12px;color:var(--ink-tertiary);">●</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--ink-secondary);cursor:pointer;"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+          </div>
+        `;
+      }
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#new-btn')) document.getElementById('dropdown')?.classList.remove('open');
+      if (!e.target.closest('#avatar')) document.getElementById('avatar-menu')?.classList.remove('open');
+    });
+  </script>
+</body>
+</html>

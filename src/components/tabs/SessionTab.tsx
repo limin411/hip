@@ -23,7 +23,7 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
 
   return (
     <div
-      data-testid="session-tab"
+      data-testid="session-tab-container"
       className={cn(
         'group flex h-[28px] min-w-[140px] max-w-[200px] items-center gap-1 rounded-md px-2.5 text-body transition-colors',
         active
@@ -33,6 +33,7 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
     >
       <div
         role="tab"
+        data-testid="session-tab"
         tabIndex={0}
         aria-selected={active}
         onClick={onSelect}

@@ -5,7 +5,6 @@ import { useUiStore } from './uiStore'
 beforeEach(() => {
   useUiStore.setState({
     settingsNavCollapsed: false,
-    search: '',
     panelOpen: false,
     activeTab: 'agents',
     theme: 'system',

@@ -14,9 +14,6 @@ interface UiState {
   setSettingsNavCollapsed: (v: boolean) => void
   toggleSettingsNav: () => void
 
-  search: string
-  setSearch: (q: string) => void
-
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
 
@@ -85,9 +82,6 @@ export const useUiStore = create<UiState>()(
       setSettingsNavCollapsed: (v) =>
         set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
       toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
-
-      search: '',
-      setSearch: (q) => set({ search: q }),
 
       scrollTargetMessageId: null,
       setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),

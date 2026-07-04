@@ -64,7 +64,7 @@ beforeEach(() => {
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
   useDiffStore.setState({ bySession: {} })
-  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents' })
+  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents', openSessionIds: [] })
   useProvidersStore.setState({ catalog: multimodalCatalog, config: textActiveConfig, keyConfigured: {}, loaded: true })
   useHipConfigStore.setState({ config: { version: 1, agents: [visionAgent] }, loaded: true, error: null })
 })
@@ -116,6 +116,16 @@ describe('SessionService', () => {
     const id = new SessionService(t).createSession()
     expect(useDomainStore.getState().activeSessionId).toBe(id)
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id })
+  })
+
+  it('closeSession removes from open tabs and deletes session', () => {
+    const svc = new SessionService(new FakeTransport())
+    const id = svc.createSession()
+    expect(useUiStore.getState().openSessionIds).toContain(id)
+
+    svc.closeSession(id)
+    expect(useUiStore.getState().openSessionIds).not.toContain(id)
+    expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
   })
 
   it('connect updates connection status', async () => {

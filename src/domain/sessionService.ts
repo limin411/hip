@@ -165,12 +165,14 @@ export class SessionService {
     const enriched: SessionConfig = { ...config, language: currentLanguage() }
     useDomainStore.getState().createSession(id, enriched)
     this.rememberActiveForSurface(id)
+    useUiStore.getState().addOpenSession(id)
     this.transport.send({ type: 'session:create', id, config: enriched })
     return id
   }
 
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
+    useUiStore.getState().addOpenSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)
     this.rememberActiveForSurface(id)
     // Lazily fetch history the first time a summary-only session is opened.
@@ -212,6 +214,19 @@ export class SessionService {
       this.selectSession(want)
     } else {
       useDomainStore.getState().deselect()
+    }
+  }
+
+  closeSession(id: string): void {
+    useUiStore.getState().removeOpenSession(id)
+    this.deleteSession(id)
+    const remaining = useUiStore.getState().openSessionIds
+    if (remaining.length > 0) {
+      this.selectSession(remaining[0])
+    } else {
+      useDomainStore.getState().deselect()
+      useUiStore.getState().setChatSessionId(null)
+      useUiStore.getState().setCodeSessionId(null)
     }
   }
 

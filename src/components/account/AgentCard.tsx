@@ -55,7 +55,7 @@ export function AgentCard({
 
   if (viewMode === 'grid') {
     return (
-      <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
+      <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">
         <div className={cn('flex flex-1 flex-col transition-opacity', !agent.enabled && 'opacity-60')}>
           <div className="flex items-start gap-3">
             <Avatar name={agent.name} shape="square" size={40} />

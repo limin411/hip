@@ -521,8 +521,8 @@ export const zhTW = {
       tabList: '開啟的工作階段',
     },
     dropdown: {
-      newChat: '新建 Chat',
-      newCode: '新建 Code',
+      newChat: '新增辦公對話',
+      newCode: '新增編碼任務',
     },
     common: {
       clear: '清除',

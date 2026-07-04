@@ -521,8 +521,8 @@ export const en = {
       tabList: 'Open sessions',
     },
     dropdown: {
-      newChat: 'New Chat',
-      newCode: 'New Code',
+      newChat: 'New Work Chat',
+      newCode: 'New Coding Task',
     },
     common: {
       clear: 'Clear',

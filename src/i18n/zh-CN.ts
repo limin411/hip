@@ -521,8 +521,8 @@ export const zhCN = {
       tabList: '打开的会话',
     },
     dropdown: {
-      newChat: '新建 Chat',
-      newCode: '新建 Code',
+      newChat: '新建办公对话',
+      newCode: '新建编码任务',
     },
     common: {
       clear: '清除',

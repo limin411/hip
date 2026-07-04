@@ -129,7 +129,7 @@ export function NewConversation() {
           </p>
         </div>
         <div className="mb-6 flex justify-center">
-          <SurfaceToggle active={surface} onChange={(v) => sessionService.setSurface(v)} />
+          <SurfaceToggle active={surface} onChange={(v) => sessionService.previewSurface(v)} />
         </div>
         <div className="relative">
           {query !== null && (

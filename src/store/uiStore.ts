@@ -108,7 +108,10 @@ export const useUiStore = create<UiState>()(
 
       openSessionIds: [],
       addOpenSession: (id) =>
-        set((s) => (s.openSessionIds.includes(id) ? s : { openSessionIds: [id, ...s.openSessionIds] })),
+        set((s) => {
+          const without = s.openSessionIds.filter((x) => x !== id)
+          return { openSessionIds: [id, ...without] }
+        }),
       removeOpenSession: (id) =>
         set((s) => ({ openSessionIds: s.openSessionIds.filter((x) => x !== id) })),
       reorderOpenSessions: (ids) => set({ openSessionIds: ids }),

@@ -174,9 +174,12 @@ export class SessionService {
     useDomainStore.getState().selectSession(id)
     useUiStore.getState().addOpenSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)
-    this.rememberActiveForSurface(id)
-    // Lazily fetch history the first time a summary-only session is opened.
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
+    if (s) {
+      useUiStore.getState().setActiveView(surfaceOf(s.config))
+      this.rememberActiveForSurface(id)
+    }
+    // Lazily fetch history the first time a summary-only session is opened.
     if (s && !s.loaded) this.transport.send({ type: 'session:load', sessionId: id })
     // Refresh the Diff-tab change badge on open (cheap numstat) so pending changes are
     // advertised without the user first opening the Diff tab. No-cwd/non-repo → no summary → no badge.
@@ -217,13 +220,26 @@ export class SessionService {
     }
   }
 
+  /** Update the active surface without restoring a remembered session. Used on the New Conversation
+   *  page, where the user is choosing the surface for a *new* draft rather than returning to history. */
+  previewSurface(view: Surface): void {
+    useUiStore.getState().setActiveView(view)
+    if (view === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
+      useDraftStore.getState().clearProject()
+    }
+  }
+
   closeSession(id: string): void {
+    const wasActive = useDomainStore.getState().activeSessionId === id
+    const ids = useUiStore.getState().openSessionIds
+    const index = ids.indexOf(id)
     useUiStore.getState().removeOpenSession(id)
     this.deleteSession(id)
     const remaining = useUiStore.getState().openSessionIds
-    if (remaining.length > 0) {
-      this.selectSession(remaining[0])
-    } else {
+    if (wasActive && remaining.length > 0) {
+      const nextIndex = Math.min(index, remaining.length - 1)
+      this.selectSession(remaining[nextIndex])
+    } else if (remaining.length === 0) {
       useDomainStore.getState().deselect()
       useUiStore.getState().setChatSessionId(null)
       useUiStore.getState().setCodeSessionId(null)
@@ -231,6 +247,7 @@ export class SessionService {
   }
 
   deleteSession(id: string): void {
+    useUiStore.getState().removeOpenSession(id)
     useDomainStore.getState().deleteSession(id)
     if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
     if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)

@@ -283,9 +283,9 @@ describe('NewConversation surface toggle', () => {
   })
 
   it('switches surface when the code toggle is clicked', () => {
-    const setSurfaceSpy = vi.spyOn(sessionService, 'setSurface').mockImplementation(() => {})
+    const previewSurfaceSpy = vi.spyOn(sessionService, 'previewSurface').mockImplementation(() => {})
     render(<NewConversation />)
     fireEvent.click(screen.getByTestId('surface-toggle-code'))
-    expect(setSurfaceSpy).toHaveBeenCalledWith('code')
+    expect(previewSurfaceSpy).toHaveBeenCalledWith('code')
   })
 })

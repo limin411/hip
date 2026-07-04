@@ -254,4 +254,11 @@ describe('uiStore open sessions', () => {
     useUiStore.getState().reorderOpenSessions(['s2', 's1'])
     expect(useUiStore.getState().openSessionIds).toEqual(['s2', 's1'])
   })
+
+  it('moves an existing id to the front when re-added', () => {
+    useUiStore.getState().addOpenSession('s1')
+    useUiStore.getState().addOpenSession('s2')
+    useUiStore.getState().addOpenSession('s1')
+    expect(useUiStore.getState().openSessionIds).toEqual(['s1', 's2'])
+  })
 })

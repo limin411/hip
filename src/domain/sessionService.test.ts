@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionService } from './sessionService'
-import { useDomainStore } from './sessionStore'
+import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useUiStore } from '@/store/uiStore'
@@ -126,6 +126,55 @@ describe('SessionService', () => {
     svc.closeSession(id)
     expect(useUiStore.getState().openSessionIds).not.toContain(id)
     expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
+  })
+
+  it('closing the active tab falls back to the tab at the same index', () => {
+    const svc = new SessionService(new FakeTransport())
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
+
+    const a = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    const b = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    const c = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    // Tab order is newest-first because createSession prepends; click order is a -> b -> c.
+    svc.selectSession(a)
+    svc.selectSession(b)
+    svc.selectSession(c)
+    expect(useUiStore.getState().openSessionIds).toEqual([c, b, a])
+    expect(useDomainStore.getState().activeSessionId).toBe(c)
+
+    svc.closeSession(c)
+    expect(useDomainStore.getState().activeSessionId).toBe(b)
+    expect(useUiStore.getState().openSessionIds).toEqual([b, a])
+
+    svc.closeSession(b)
+    expect(useDomainStore.getState().activeSessionId).toBe(a)
+  })
+
+  it('closing an inactive tab keeps the active tab', () => {
+    const svc = new SessionService(new FakeTransport())
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
+
+    const a = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    const b = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    svc.selectSession(a)
+    expect(useDomainStore.getState().activeSessionId).toBe(a)
+
+    svc.closeSession(b)
+    expect(useDomainStore.getState().activeSessionId).toBe(a)
+    expect(useUiStore.getState().openSessionIds).toEqual([a])
+  })
+
+  it('previewSurface changes activeView without restoring a remembered session', () => {
+    const svc = new SessionService(new FakeTransport())
+    const id = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    useUiStore.setState({ chatSessionId: id, activeView: 'chat' })
+    useDomainStore.getState().deselect()
+
+    svc.previewSurface('code')
+    expect(useUiStore.getState().activeView).toBe('code')
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
   })
 
   it('connect updates connection status', async () => {

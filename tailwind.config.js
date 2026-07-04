@@ -65,8 +65,7 @@ export default {
         '3xl': '12px',
         full: '9999px',
       },
-      // 扁平化：界面主体不用阴影（保持平面外壳）。
-      // 唯一例外：真正的浮层（菜单、弹窗）用克制的柔和阴影，避免与画布同色「贴」在一起。
+      // 扁平化：界面主体不用阴影。唯一例外是真正的浮层（菜单、弹窗）用克制的柔和阴影。
       boxShadow: {
         none: 'none',
         sm: 'none',
@@ -80,8 +79,8 @@ export default {
         float: 'none',
         menu: '0 6px 20px -6px rgba(17, 17, 17, 0.14), 0 2px 6px -2px rgba(17, 17, 17, 0.08)',
         overlay: '0 16px 48px -12px rgba(17, 17, 17, 0.22), 0 6px 16px -8px rgba(17, 17, 17, 0.12)',
-        'card-hover': '0 4px 16px -4px rgba(17, 17, 17, 0.08)',
-        'sticky-top': '0 1px 3px rgba(17, 17, 17, 0.06)',
+        'card-hover': 'none',
+        'sticky-top': 'none',
       },
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },

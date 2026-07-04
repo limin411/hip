@@ -533,6 +533,7 @@ export const zhCN = {
     },
     tabs: {
       closeTab: '关闭标签页',
+      newSession: '新建会话',
     },
     common: {
       clear: '清除',

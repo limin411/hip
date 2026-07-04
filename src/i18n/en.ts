@@ -533,6 +533,7 @@ export const en = {
     },
     tabs: {
       closeTab: 'Close tab',
+      newSession: 'New session',
     },
     common: {
       clear: 'Clear',

@@ -533,6 +533,7 @@ export const zhTW = {
     },
     tabs: {
       closeTab: '關閉標籤頁',
+      newSession: '新增工作階段',
     },
     common: {
       clear: '清除',

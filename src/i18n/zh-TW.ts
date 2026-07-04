@@ -493,9 +493,9 @@ export const zhTW = {
 
     },
     history: {
-      title: '歷史',
-      searchPlaceholder: '搜尋工作階段…',
-      empty: '找不到工作階段',
+      title: '歷史會話',
+      searchPlaceholder: '搜尋會話…',
+      empty: '暫無歷史會話',
     },
     account: {
       menu: '賬戶選單',
@@ -512,7 +512,7 @@ export const zhTW = {
     nav: {
       chat: '辦公',
       code: '編碼',
-      history: '歷史',
+      history: '歷史會話',
       settings: '設定',
     },
     tabs: {
@@ -521,8 +521,8 @@ export const zhTW = {
       tabList: '開啟的工作階段',
     },
     dropdown: {
-      newChat: '新對話',
-      newCode: '新程式碼',
+      newChat: '新建 Chat',
+      newCode: '新建 Code',
     },
     common: {
       clear: '清除',

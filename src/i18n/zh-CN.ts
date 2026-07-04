@@ -493,9 +493,9 @@ export const zhCN = {
 
     },
     history: {
-      title: '历史',
+      title: '历史会话',
       searchPlaceholder: '搜索会话…',
-      empty: '未找到会话',
+      empty: '暂无历史会话',
     },
     account: {
       menu: '账户菜单',
@@ -512,7 +512,7 @@ export const zhCN = {
     nav: {
       chat: '办公',
       code: '编码',
-      history: '历史',
+      history: '历史会话',
       settings: '设置',
     },
     tabs: {
@@ -521,8 +521,8 @@ export const zhCN = {
       tabList: '打开的会话',
     },
     dropdown: {
-      newChat: '新对话',
-      newCode: '新代码',
+      newChat: '新建 Chat',
+      newCode: '新建 Code',
     },
     common: {
       clear: '清除',

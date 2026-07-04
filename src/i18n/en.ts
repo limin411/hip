@@ -494,8 +494,8 @@ export const en = {
     },
     history: {
       title: 'History',
-      searchPlaceholder: 'Search sessions…',
-      empty: 'No sessions found',
+      searchPlaceholder: 'Search conversations…',
+      empty: 'No conversations yet',
     },
     account: {
       menu: 'Account menu',

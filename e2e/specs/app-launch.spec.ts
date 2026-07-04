@@ -50,8 +50,7 @@ describe('hip desktop app', () => {
     const greetingText = await greeting.getText()
     expect(greetingText).toContain(CHAT_GREETING)
 
-    const newChat = await browser.$('button=新建会话')
-    await newChat.waitForDisplayed({ timeout: 10000 })
-    expect(await newChat.getText()).toContain('新建会话')
+    const newSessionBtn = await browser.$('[data-testid="new-session-button"]')
+    await newSessionBtn.waitForDisplayed({ timeout: 10000 })
   })
 })

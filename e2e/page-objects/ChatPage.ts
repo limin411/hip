@@ -2,7 +2,7 @@ export class ChatPage {
   get newConversation() { return browser.$('[data-testid="new-conversation"]') }
   get composerTextarea() { return browser.$('[data-testid="new-conversation"] textarea') }
   get composerSend() { return browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]') }
-  get sessionItems() { return browser.$$('[data-testid="session-item"]') }
+  get sessionItems() { return browser.$$('[data-testid="session-tab"]') }
 
   // ── slash command palette ──
   get slashPalette() { return browser.$('[data-testid="slash-palette"]') }
@@ -36,10 +36,9 @@ export class ChatPage {
   get messageUsage() { return browser.$('[data-testid="message-usage"]') }
   get messageTime() { return browser.$('[data-testid="message-time"]') }
 
-  // ── surface tabs ──
-  get surfaceTabChat() { return browser.$('[data-testid="surface-tab-chat"]') }
-  get surfaceTabCode() { return browser.$('[data-testid="surface-tab-code"]') }
-  get surfaceTabDomain() { return browser.$('[data-testid="surface-tab-domain"]') }
+  // ── surface toggle (on the new-conversation landing) ──
+  get surfaceTabChat() { return browser.$('[data-testid="surface-toggle-chat"]') }
+  get surfaceTabCode() { return browser.$('[data-testid="surface-toggle-code"]') }
 
   // ── attachment removal ──
   get attachmentRemove() { return browser.$('[data-testid="attachment-remove"]') }

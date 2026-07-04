@@ -22,5 +22,5 @@ export async function waitForMainApp(timeoutMs = 60000): Promise<void> {
     { timeout: timeoutMs, interval: 500 }
   )
   // Wait for main chrome.
-  await (await browser.$('[data-testid="sidebar-root"]')).waitForExist({ timeout: 30000 })
+  await (await browser.$('[data-testid="titlebar"]')).waitForExist({ timeout: 30000 })
 }

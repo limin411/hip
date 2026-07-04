@@ -28,6 +28,7 @@ export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvata
     <div ref={ref} className="absolute bottom-4 left-4 z-50">
       <button
         type="button"
+        data-testid="account-menu-button"
         onClick={() => setOpen(!open)}
         className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-subtle text-accent-strong ring-1 ring-transparent transition-all hover:scale-105 hover:ring-border"
         aria-label={t('account.menu')}
@@ -45,6 +46,7 @@ export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvata
         >
           <button
             type="button"
+            data-testid="account-settings-menu-item"
             onClick={() => { setOpen(false); onOpenSettings() }}
             className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-ink transition-colors hover:bg-surface-muted"
             role="menuitem"

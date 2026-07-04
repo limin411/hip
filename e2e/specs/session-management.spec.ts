@@ -18,10 +18,7 @@ async function ensureNewConversationDraft(): Promise<void> {
 }
 
 async function clearSessionSearch(): Promise<void> {
-  const input = await browser.$('[data-testid="session-search-input"]')
-  if (await input.isExisting()) {
-    await input.setValue('')
-  }
+  // Session search was removed with the sidebar; no-op for compatibility.
 }
 
 describe('session management', () => {
@@ -40,7 +37,7 @@ describe('session management', () => {
     await clearSessionSearch()
   })
 
-  it('creates a new conversation draft from the sidebar', async () => {
+  it('creates a new conversation draft from the title bar', async () => {
     const newBtn = await browser.$('[data-testid="new-session-button"]')
     await newBtn.waitForClickable({ timeout: 10000 })
     await newBtn.click()
@@ -59,21 +56,22 @@ describe('session management', () => {
     expect(await bubble.getText()).toContain('hello e2e')
   })
 
-  it('switches between sessions by clicking session items', async () => {
+  it('switches between sessions by clicking session tabs', async () => {
     await sendChatMessage('second session')
     await browser.waitUntil(
       async () => await (await chat.sessionItems).length >= 2,
       { timeout: 30000, interval: 500 },
     )
     const items = await chat.sessionItems
+    // Tabs are newest-first; the most recent session is first.
     const first = items[0]
     await first.click()
-    const active = await browser.$('[data-testid="session-item"][data-active="true"]')
+    const active = await browser.$('[data-testid="session-tab"][aria-selected="true"]')
     await active.waitForExist({ timeout: 10000 })
     expect(await active.getText()).toContain('second session')
   })
 
-  it('filters sessions via the search box', async () => {
+  it.skip('filters sessions via the search box (search removed with sidebar)', async () => {
     // Make sure at least one session contains the search term from earlier tests.
     await sendChatMessage('e2e search target')
     await browser.waitUntil(
@@ -94,7 +92,7 @@ describe('session management', () => {
     }
   })
 
-  it('clears the search filter and shows all chat sessions again', async () => {
+  it.skip('clears the search filter and shows all chat sessions again (search removed with sidebar)', async () => {
     const search = await browser.$('[data-testid="session-search-input"]')
     await search.setValue('e2e')
     await browser.pause(600)

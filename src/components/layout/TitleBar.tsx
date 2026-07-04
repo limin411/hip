@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/store/uiStore'
+import { useDomainStore } from '@/domain'
 import { SessionTabBar } from '@/components/tabs/SessionTabBar'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PanelToggle } from './PanelToggle'
@@ -16,6 +17,7 @@ export function TitleBar() {
   return (
     <header
       data-tauri-drag-region
+      data-testid="titlebar"
       className="relative flex h-11 shrink-0 items-center border-b border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl shadow-sticky-top"
     >
       {/* 为 macOS 红绿灯整簇让位（约 x19→77），留足间距后再放内容，避免与绿灯相撞 */}
@@ -27,7 +29,7 @@ export function TitleBar() {
         </span>
       ) : (
         <>
-          <SessionTabBar onNewSession={() => {}} />
+          <SessionTabBar onNewSession={() => useDomainStore.getState().deselect()} />
           <div className="flex shrink-0 items-center gap-2 pr-3" data-tauri-drag-region="false">
             <ConnectionStatus />
             <PanelToggle />

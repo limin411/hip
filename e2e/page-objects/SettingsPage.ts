@@ -1,6 +1,6 @@
 export class SettingsPage {
-  get accountFooter() { return browser.$('[data-testid="account-footer"]') }
-  get settingsMenuItem() { return browser.$('[data-testid="settings-menu-item"]') }
+  get accountMenuButton() { return browser.$('[data-testid="account-menu-button"]') }
+  get settingsMenuItem() { return browser.$('[data-testid="account-settings-menu-item"]') }
   nav(page: 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins') {
     return browser.$(`[data-testid="settings-nav-${page}"]`)
   }

@@ -7,7 +7,7 @@ import { CodePage } from '../page-objects/CodePage.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const codePage = new CodePage()
-const sessionItems = () => browser.$$('[data-testid="session-item"]')
+const sessionItems = () => browser.$$('[data-testid="session-tab"]')
 
 describe('new conversation', () => {
   before(async () => {
@@ -22,7 +22,7 @@ describe('new conversation', () => {
     expect(await codePage.pickFolder.isExisting()).toBe(true)
   })
 
-  it('picking a folder opens the file tree without creating a sidebar session row', async () => {
+  it('picking a folder opens the file tree without creating a session tab', async () => {
     const before = await (await sessionItems()).length
     await codePage.pickDirectory(FIXTURE)
     await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })

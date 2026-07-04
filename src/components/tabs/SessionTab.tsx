@@ -26,6 +26,7 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
       role="tab"
       tabIndex={0}
       aria-selected={active}
+      data-testid="session-tab"
       onClick={onSelect}
       onMouseDown={(e) => e.button === 1 && onClose()}
       onKeyDown={(e) => {

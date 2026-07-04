@@ -41,6 +41,7 @@ src-tauri/gen
 
 # Superpowers brainstorm sessions
 .superpowers/
+.completion-check
 tsconfig.node.tsbuildinfo
 .omo/
 .claude/

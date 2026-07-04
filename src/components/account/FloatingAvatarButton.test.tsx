@@ -8,14 +8,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
-vi.mock('@/store/uiStore', () => ({
-  useUiStore: () => ({ activeView: 'chat' }),
-}))
-
-vi.mock('@/store/authStore', () => ({
-  useAuthStore: () => ({ logout: vi.fn() }),
-}))
-
 afterEach(() => {
   cleanup()
 })

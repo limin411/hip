@@ -278,14 +278,14 @@ describe('NewConversation surface toggle', () => {
 
   it('renders Chat and Code toggle', () => {
     render(<NewConversation />)
-    expect(screen.getByRole('button', { name: /work/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /coding/i })).toBeInTheDocument()
+    expect(screen.getByTestId('surface-toggle-chat')).toBeInTheDocument()
+    expect(screen.getByTestId('surface-toggle-code')).toBeInTheDocument()
   })
 
   it('switches surface when the code toggle is clicked', () => {
     const setSurfaceSpy = vi.spyOn(sessionService, 'setSurface').mockImplementation(() => {})
     render(<NewConversation />)
-    fireEvent.click(screen.getByRole('button', { name: /coding/i }))
+    fireEvent.click(screen.getByTestId('surface-toggle-code'))
     expect(setSurfaceSpy).toHaveBeenCalledWith('code')
   })
 })

@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useUiStore, type Surface } from '@/store/uiStore'
 import { sessionService } from '@/domain'
 import { SurfaceTabs } from './SurfaceTabs'
@@ -5,8 +7,11 @@ import { NewSessionButton } from './NewSessionButton'
 import { SessionSearch } from './SessionSearch'
 import { SessionList } from './SessionList'
 import { AccountFooter } from './AccountFooter'
+import { SessionsDialog } from '@/components/sessions/SessionsDialog'
 
 export function Sidebar() {
+  const { t } = useTranslation()
+  const [dialogOpen, setDialogOpen] = useState(false)
   const activeView = useUiStore((s) => s.activeView)
   const surface: Surface = activeView === 'code' ? 'code' : 'chat'
 
@@ -24,9 +29,18 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-3">
         <SessionList />
       </div>
-      <div className="px-3 pb-3">
+      <div className="flex flex-col gap-1 px-3 pb-3">
+        <button
+          type="button"
+          data-testid="view-all-sessions"
+          onClick={() => setDialogOpen(true)}
+          className="w-full rounded-md px-2.5 py-2 text-left text-body text-ink-secondary transition-colors hover:bg-surface-muted"
+        >
+          {t('sidebar.viewAllSessions')}
+        </button>
         <AccountFooter />
       </div>
+      <SessionsDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   )
 }

@@ -14,7 +14,7 @@ export function SessionList() {
   const activeSessionId = useActiveSessionId()
 
   const q = search.trim()
-  const local = filterSessions(sessions, q).slice(0, 5)
+  const local = filterSessions(sessions.slice(0, 5), q)
 
   if (local.length === 0) {
     return (

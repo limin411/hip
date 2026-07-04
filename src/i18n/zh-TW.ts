@@ -168,6 +168,8 @@ export const zhTW = {
       filterAll: '全部',
       filterChat: '辦公',
       filterCode: '編碼',
+      previousPage: '上一頁',
+      nextPage: '下一頁',
     },
     artifact: {
       files: '文件',

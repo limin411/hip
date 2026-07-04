@@ -168,6 +168,8 @@ export const zhCN = {
       filterAll: '全部',
       filterChat: '办公',
       filterCode: '编码',
+      previousPage: '上一页',
+      nextPage: '下一页',
     },
     artifact: {
       files: '文件',

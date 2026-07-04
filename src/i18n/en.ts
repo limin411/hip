@@ -168,6 +168,8 @@ export const en = {
       filterAll: 'All',
       filterChat: 'Work',
       filterCode: 'Code',
+      previousPage: 'Previous',
+      nextPage: 'Next',
     },
     artifact: {
       files: 'Files',

@@ -10,19 +10,26 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
+let mockActiveView = 'chat'
+
 const toggleChatPanel = vi.fn()
 const togglePanel = vi.fn()
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: (selector: (state: any) => any) =>
     selector({
-      activeView: 'chat',
+      activeView: mockActiveView,
       toggleChatPanel,
       togglePanel,
     }),
 }))
 
 describe('PanelToggle', () => {
+  afterEach(() => {
+    mockActiveView = 'chat'
+    vi.clearAllMocks()
+  })
+
   it('renders toggle button', () => {
     render(<PanelToggle />)
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
@@ -33,5 +40,13 @@ describe('PanelToggle', () => {
     fireEvent.click(screen.getByTestId('toggle-panel'))
     expect(toggleChatPanel).toHaveBeenCalled()
     expect(togglePanel).not.toHaveBeenCalled()
+  })
+
+  it('calls togglePanel when active view is code', () => {
+    mockActiveView = 'code'
+    render(<PanelToggle />)
+    fireEvent.click(screen.getByTestId('toggle-panel'))
+    expect(togglePanel).toHaveBeenCalled()
+    expect(toggleChatPanel).not.toHaveBeenCalled()
   })
 })

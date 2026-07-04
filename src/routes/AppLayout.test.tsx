@@ -1,9 +1,17 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { useUiStore } from '@/store/uiStore'
 import { AppLayout } from './AppLayout'
+
+vi.mock('@/components/history/SessionHistory', () => ({ SessionHistory: () => <div data-testid="session-history" /> }))
+
+afterEach(() => {
+  cleanup()
+  useUiStore.setState({ activeView: 'chat' })
+})
 
 vi.mock('react-resizable-panels', () => ({
   PanelGroup: ({ children, className }: { children: any; className?: string }) => (
@@ -30,5 +38,19 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('title-bar')).toBeInTheDocument()
     expect(screen.getByTestId('floating-avatar')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-root')).not.toBeInTheDocument()
+  })
+
+  it('renders history view below title bar', () => {
+    useUiStore.setState({ activeView: 'history' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('session-history')).toBeInTheDocument()
+    expect(screen.getByTestId('title-bar')).toBeInTheDocument()
+  })
+
+  it('renders settings view below title bar', () => {
+    useUiStore.setState({ activeView: 'settings' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('settings-page')).toBeInTheDocument()
+    expect(screen.getByTestId('title-bar')).toBeInTheDocument()
   })
 })

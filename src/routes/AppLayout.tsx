@@ -12,6 +12,7 @@ import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { TitleBar } from '@/components/layout/TitleBar'
 import { SettingsPage } from '@/components/account/SettingsPage'
+import { SessionHistory } from '@/components/history/SessionHistory'
 import { FloatingAvatarButton } from '@/components/account/FloatingAvatarButton'
 
 export function AppLayout() {
@@ -60,20 +61,26 @@ export function AppLayout() {
     else if (activeView === 'chat') setChatPanelOpen(true)
   }
 
+  const renderMainContent = () => {
+    if (activeView === 'history') return <SessionHistory />
+    if (activeView === 'settings') return <SettingsPage />
+    return activeSessionId == null ? (
+      <NewConversation />
+    ) : (
+      <>
+        <ChatPane />
+        <InputBar />
+      </>
+    )
+  }
+
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-surface">
       <TitleBar />
       <div className="relative flex min-h-0 flex-1">
         <PanelGroup direction="horizontal" className="flex-1">
           <Panel minSize={34} className="flex min-w-0 flex-col">
-            {activeSessionId == null ? (
-              <NewConversation />
-            ) : (
-              <>
-                <ChatPane />
-                <InputBar />
-              </>
-            )}
+            {renderMainContent()}
           </Panel>
 
           <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
@@ -97,20 +104,14 @@ export function AppLayout() {
         </PanelGroup>
 
         <FloatingAvatarButton
-          onOpenSettings={() => setActiveView('settings')}
           onOpenHistory={() => setActiveView('history')}
+          onOpenSettings={() => setActiveView('settings')}
           onLogout={() => {
             logout()
             navigate('/login')
           }}
         />
       </div>
-
-      {activeView === 'settings' && (
-        <div className="absolute inset-0 z-20 bg-surface">
-          <SettingsPage />
-        </div>
-      )}
     </div>
   )
 }

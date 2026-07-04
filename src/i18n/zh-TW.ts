@@ -517,6 +517,10 @@ export const zhTW = {
       newSession: '新增工作階段',
       tabList: '開啟的工作階段',
     },
+    dropdown: {
+      newChat: '新對話',
+      newCode: '新程式碼',
+    },
     common: {
       clear: '清除',
       cancel: '取消',

@@ -517,6 +517,10 @@ export const zhCN = {
       newSession: '新建会话',
       tabList: '打开的会话',
     },
+    dropdown: {
+      newChat: '新对话',
+      newCode: '新代码',
+    },
     common: {
       clear: '清除',
       cancel: '取消',

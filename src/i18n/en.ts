@@ -517,6 +517,10 @@ export const en = {
       newSession: 'New session',
       tabList: 'Open sessions',
     },
+    dropdown: {
+      newChat: 'New Chat',
+      newCode: 'New Code',
+    },
     common: {
       clear: 'Clear',
       cancel: 'Cancel',

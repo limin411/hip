@@ -10,6 +10,19 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }))
 
+vi.mock('@radix-ui/react-dropdown-menu', () => ({
+  Root: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Trigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  Content: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-content">{children}</div>,
+  Item: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+    <button type="button" onClick={onClick}>{children}</button>
+  ),
+  Separator: () => <hr />,
+  Group: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Label: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
 vi.mock('@/domain', () => ({
   useSessions: () => [
     { id: 's1', title: 'Chat A', config: { surface: 'chat' } },
@@ -19,6 +32,7 @@ vi.mock('@/domain', () => ({
   sessionService: {
     selectSession: vi.fn(),
     closeSession: vi.fn(),
+    newConversation: vi.fn(),
   },
 }))
 
@@ -49,5 +63,23 @@ describe('SessionTabBar', () => {
     render(<SessionTabBar onNewSession={() => {}} />)
     fireEvent.click(screen.getAllByRole('button', { name: /close/i }).at(-1)!)
     expect(sessionService.closeSession).toHaveBeenCalledWith('s2')
+  })
+
+  it('renders chat and code dropdown options', () => {
+    render(<SessionTabBar onNewSession={() => {}} />)
+    expect(screen.getByText('dropdown.newChat')).toBeInTheDocument()
+    expect(screen.getByText('dropdown.newCode')).toBeInTheDocument()
+  })
+
+  it('calls newConversation with "chat" when new chat is clicked', () => {
+    render(<SessionTabBar onNewSession={() => {}} />)
+    fireEvent.click(screen.getByText('dropdown.newChat'))
+    expect(sessionService.newConversation).toHaveBeenCalledWith('chat')
+  })
+
+  it('calls newConversation with "code" when new code is clicked', () => {
+    render(<SessionTabBar onNewSession={() => {}} />)
+    fireEvent.click(screen.getByText('dropdown.newCode'))
+    expect(sessionService.newConversation).toHaveBeenCalledWith('code')
   })
 })

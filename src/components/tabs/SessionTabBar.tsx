@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { useSessions, useActiveSessionId, sessionService } from '@/domain'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { SessionTab } from './SessionTab'
 
 interface SessionTabBarProps {
@@ -9,6 +10,7 @@ interface SessionTabBarProps {
 }
 
 export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
+  void onNewSession
   const { t } = useTranslation()
   const openIds = useUiStore((s) => s.openSessionIds)
   const sessions = useSessions()
@@ -17,6 +19,14 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
   const openSessions = openIds
     .map((id) => sessions.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => Boolean(s))
+
+  const handleNewChat = () => {
+    sessionService.newConversation('chat')
+  }
+
+  const handleNewCode = () => {
+    sessionService.newConversation('code')
+  }
 
   return (
     <div
@@ -33,15 +43,27 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
           onClose={() => sessionService.closeSession(session.id)}
         />
       ))}
-      <button
-        type="button"
-        onClick={onNewSession}
-        title={t('tabs.newSession')}
-        data-testid="new-session-button"
-        className="mb-[3px] ml-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
-      >
-        <Plus size={14} />
-      </button>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            title={t('tabs.newSession')}
+            data-testid="new-session-button"
+            className="mb-[3px] ml-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <Plus size={14} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={handleNewChat}>
+            <span className="truncate">{t('dropdown.newChat')}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleNewCode}>
+            <span className="truncate">{t('dropdown.newCode')}</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

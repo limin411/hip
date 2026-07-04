@@ -4,12 +4,38 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { waitForHipVite, isHipViteReady } from './e2e/helpers/vite-port'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const VITE_PORT = 1420
 const DEFAULT_BINARY = './src-tauri/target/debug/hip'
 const appBinaryPath = process.env.E2E_BINARY || DEFAULT_BINARY
+
+// Fail fast at config load time if a foreign dev server is occupying the port
+// the compiled Tauri binary will use. WDIO runs service onPrepare hooks in
+// parallel with the config onPrepare hook, so an async check cannot prevent
+// the Tauri service from spawning the app against the wrong frontend.
+if (process.env.HIP_E2E_SKIP_PORT_GUARD !== '1') {
+  const { execSync } = await import('node:child_process')
+  try {
+    const body = execSync(
+      `node -e "fetch('http://localhost:${VITE_PORT}').then(r => r.text()).then(t => console.log(t)).catch(() => process.exit(1))"`,
+      { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+    if (!body.includes('<title>hip</title>')) {
+      throw new Error(
+        `Port ${VITE_PORT} is already occupied by a non-hip server. ` +
+        `Stop the other dev server (e.g. from the stocker project) and try again.`,
+      )
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('non-hip server')) {
+      throw err
+    }
+    // No server running or fetch failed: safe to proceed.
+  }
+}
 
 // Run-level isolated data dir. The embedded Tauri WebDriver provider spawns a
 // single shared app process in its onPrepare hook, so per-worker dirs cannot be
@@ -70,24 +96,6 @@ function readUserPluginPaths(userConfigDir: string): string[] {
   return []
 }
 
-async function pingVite(): Promise<boolean> {
-  try {
-    await fetch(`http://localhost:${VITE_PORT}`)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function waitForVite(timeoutMs = 30000): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeoutMs) {
-    if (await pingVite()) return
-    await new Promise((r) => setTimeout(r, 200))
-  }
-  throw new Error(`Vite did not become ready on port ${VITE_PORT}`)
-}
-
 export const config: Options.Testrunner = {
   runner: 'local',
   specs: ['./e2e/**/*.spec.ts'],
@@ -144,12 +152,12 @@ export const config: Options.Testrunner = {
 
     stageE2eData(e2eDataDir)
 
-    if (await pingVite()) {
-      console.log(`[e2e] reusing Vite already running on :${VITE_PORT}`)
+    if (await isHipViteReady()) {
+      console.log(`[e2e] reusing hip Vite already running on :${VITE_PORT}`)
     } else {
       viteServer = await createServer()
       await viteServer.listen()
-      await waitForVite()
+      await waitForHipVite()
       console.log(`[e2e] started Vite on :${VITE_PORT}`)
     }
     // Give the sidecar a moment to cold-start after the app spawns.

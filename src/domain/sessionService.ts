@@ -398,6 +398,9 @@ export class SessionService {
     useDraftStore.getState().setText('')
     useDomainStore.getState().deselect()
     this.rememberActiveForSurface(null)
+    if (surface) {
+      useUiStore.getState().setActiveView(surface)
+    }
   }
 
   // Draft FS: fsStore is keyed by an arbitrary scope string — a committed session's

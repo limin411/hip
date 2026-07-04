@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, ChevronLeft } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/uiStore'
 
@@ -27,9 +27,6 @@ export function SettingsPanel() {
   const navRef = useRef<ImperativePanelHandle>(null)
   const navCollapsed = useUiStore((s) => s.settingsNavCollapsed)
   const setNavCollapsed = useUiStore((s) => s.setSettingsNavCollapsed)
-  const previousView = useUiStore((s) => s.previousView)
-  const setActiveView = useUiStore((s) => s.setActiveView)
-  const handleBack = () => setActiveView(previousView ?? 'chat')
 
   // 折叠态由 store 驱动（标题栏统一按钮 → settingsNavCollapsed），命令式同步到 Panel，
   // 与对话侧栏（AppLayout 同款 effect）完全一致。
@@ -83,17 +80,6 @@ export function SettingsPanel() {
                 )
               })}
             </TabsPrimitive.List>
-            <div className="p-2">
-              <button
-                type="button"
-                data-testid="settings-back"
-                onClick={handleBack}
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                <ChevronLeft size={16} className="shrink-0" />
-                <span>{t('common.back')}</span>
-              </button>
-            </div>
           </div>
         </Panel>
 

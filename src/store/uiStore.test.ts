@@ -4,12 +4,12 @@ import { useUiStore } from './uiStore'
 
 beforeEach(() => {
   useUiStore.setState({
-    collapsed: false,
     settingsNavCollapsed: false,
     search: '',
     panelOpen: false,
     activeTab: 'agents',
     theme: 'system',
+    openSessionIds: [],
   })
 })
 
@@ -107,9 +107,8 @@ describe('uiStore - settingsNavCollapsed', () => {
     expect(useUiStore.getState()).toBe(before)
   })
 
-  it('chat collapsed and settings nav collapse are independent', () => {
+  it('settings nav collapse toggles independently', () => {
     useUiStore.getState().setSettingsNavCollapsed(true)
-    expect(useUiStore.getState().collapsed).toBe(false)
     expect(useUiStore.getState().settingsNavCollapsed).toBe(true)
   })
 })
@@ -233,5 +232,27 @@ describe('uiStore - theme', () => {
     const before = useUiStore.getState()
     useUiStore.getState().setTheme('system')
     expect(useUiStore.getState()).toBe(before)
+  })
+})
+
+describe('uiStore open sessions', () => {
+  beforeEach(() => {
+    useUiStore.setState({ openSessionIds: [] })
+  })
+
+  it('adds and removes open session ids', () => {
+    useUiStore.getState().addOpenSession('s1')
+    useUiStore.getState().addOpenSession('s2')
+    expect(useUiStore.getState().openSessionIds).toEqual(['s2', 's1'])
+
+    useUiStore.getState().removeOpenSession('s1')
+    expect(useUiStore.getState().openSessionIds).toEqual(['s2'])
+  })
+
+  it('reorders open session ids', () => {
+    useUiStore.getState().addOpenSession('s1')
+    useUiStore.getState().addOpenSession('s2')
+    useUiStore.getState().reorderOpenSessions(['s2', 's1'])
+    expect(useUiStore.getState().openSessionIds).toEqual(['s2', 's1'])
   })
 })

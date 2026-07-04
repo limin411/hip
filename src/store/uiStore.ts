@@ -10,9 +10,6 @@ export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 
 interface UiState {
-  collapsed: boolean
-  setCollapsed: (v: boolean) => void
-  toggleCollapsed: () => void
   sidebarWidth: number
   setSidebarWidth: (v: number) => void
 
@@ -50,6 +47,12 @@ interface UiState {
   codeSessionId: string | null
   setCodeSessionId: (id: string | null) => void
 
+  // Browser-style session tabs in the title bar.
+  openSessionIds: string[]
+  addOpenSession: (id: string) => void
+  removeOpenSession: (id: string) => void
+  reorderOpenSessions: (ids: string[]) => void
+
   activeView: ActiveView
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
@@ -81,9 +84,6 @@ const storage = createJSONStorage<{ codeSessionId: string | null; theme: Theme }
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
-      collapsed: false,
-      setCollapsed: (v) => set((s) => (s.collapsed === v ? s : { collapsed: v })),
-      toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       sidebarWidth: 18,
       setSidebarWidth: (v) => set((s) => (s.sidebarWidth === v ? s : { sidebarWidth: v })),
 
@@ -117,6 +117,13 @@ export const useUiStore = create<UiState>()(
       setChatSessionId: (id) => set((s) => (s.chatSessionId === id ? s : { chatSessionId: id })),
       codeSessionId: null,
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
+
+      openSessionIds: [],
+      addOpenSession: (id) =>
+        set((s) => (s.openSessionIds.includes(id) ? s : { openSessionIds: [id, ...s.openSessionIds] })),
+      removeOpenSession: (id) =>
+        set((s) => ({ openSessionIds: s.openSessionIds.filter((x) => x !== id) })),
+      reorderOpenSessions: (ids) => set({ openSessionIds: ids }),
 
       activeView: 'chat',
       previousView: null,

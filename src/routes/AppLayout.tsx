@@ -15,11 +15,9 @@ import { SettingsPage } from '@/components/account/SettingsPage'
 
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
-  const collapsed = useUiStore((s) => s.collapsed)
   const sidebarWidth = useUiStore((s) => s.sidebarWidth)
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const panelOpen = useUiStore((s) => s.panelOpen)
-  const setCollapsed = useUiStore((s) => s.setCollapsed)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
   const chatPanelOpen = useUiStore((s) => s.chatPanelOpen)
   const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen)
@@ -38,25 +36,15 @@ export function AppLayout() {
     return () => sessionService.disconnect()
   }, [])
 
-  useEffect(() => {
-    const p = sidebarRef.current
-    if (!p) return
-    const t = setTimeout(() => {
-      if (collapsed && !p.isCollapsed()) p.collapse()
-      if (!collapsed && p.isCollapsed()) p.expand()
-    }, 0)
-    return () => clearTimeout(t)
-  }, [collapsed])
-
   // 在设置页调整宽度后返回主界面时，同步主侧边栏的宽度。
   useEffect(() => {
     const p = sidebarRef.current
-    if (!p || collapsed || sidebarWidth <= 0) return
+    if (!p || sidebarWidth <= 0) return
     const current = p.getSize()
     if (Math.abs(current - sidebarWidth) > 0.1) {
       p.resize(sidebarWidth)
     }
-  }, [sidebarWidth, collapsed])
+  }, [sidebarWidth])
 
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-surface">
@@ -70,19 +58,13 @@ export function AppLayout() {
           defaultSize={sidebarWidth}
           minSize={12}
           maxSize={22}
-          collapsible
-          collapsedSize={0}
-          onCollapse={() => setCollapsed(true)}
-          onExpand={() => setCollapsed(false)}
           onResize={(size) => {
-            if (!collapsed && size > 0) setSidebarWidth(size)
+            if (size > 0) setSidebarWidth(size)
           }}
         >
-          {!collapsed && (
-            <div className="h-full bg-surface">
-              <Sidebar />
-            </div>
-          )}
+          <div className="h-full bg-surface">
+            <Sidebar />
+          </div>
         </Panel>
 
         <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">

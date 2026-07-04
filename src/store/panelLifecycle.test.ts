@@ -4,7 +4,6 @@ import { useUiStore } from './uiStore'
 
 beforeEach(() => {
   useUiStore.setState({
-    collapsed: false,
     search: '',
     panelOpen: true,
     activeTab: 'agents',

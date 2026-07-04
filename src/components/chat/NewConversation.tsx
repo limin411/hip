@@ -20,7 +20,6 @@ import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
 import type { LocalAttachment } from './attachmentTypes'
 import { HipLogo } from '@/components/login/HipLogo'
-import { SurfaceToggle } from './SurfaceToggle'
 
 export function NewConversation() {
   const { t } = useTranslation()
@@ -127,9 +126,6 @@ export function NewConversation() {
           <p className="mb-4 text-center text-body text-ink-secondary">
             {t('chat.greetingSub.default', '')}
           </p>
-        </div>
-        <div className="mb-6 flex justify-center">
-          <SurfaceToggle active={surface} onChange={(v) => sessionService.previewSurface(v)} />
         </div>
         <div className="relative">
           {query !== null && (

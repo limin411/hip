@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { NewConversation } from './NewConversation'
 import * as domain from '@/domain'
-import { useDomainStore, sessionService } from '@/domain'
+import { useDomainStore } from '@/domain'
 import i18n from '@/i18n'
 import * as providersStore from '@/store/providersStore'
 import * as hipConfigStore from '@/store/hipConfigStore'
@@ -265,27 +265,10 @@ describe('NewConversation', () => {
     fireEvent.change(textarea, { target: { value: '/comp' } })
     expect(screen.queryByText('/compact')).not.toBeInTheDocument()
   })
-})
 
-describe('NewConversation surface toggle', () => {
-  beforeEach(async () => {
-    cleanup()
-    vi.restoreAllMocks()
-    mockActiveView = 'chat'
-    await i18n.changeLanguage('en')
-    useDraftStore.setState({ draft: null })
-  })
-
-  it('renders Chat and Code toggle', () => {
+  it('does not render surface toggle', () => {
     render(<NewConversation />)
-    expect(screen.getByTestId('surface-toggle-chat')).toBeInTheDocument()
-    expect(screen.getByTestId('surface-toggle-code')).toBeInTheDocument()
-  })
-
-  it('switches surface when the code toggle is clicked', () => {
-    const previewSurfaceSpy = vi.spyOn(sessionService, 'previewSurface').mockImplementation(() => {})
-    render(<NewConversation />)
-    fireEvent.click(screen.getByTestId('surface-toggle-code'))
-    expect(previewSurfaceSpy).toHaveBeenCalledWith('code')
+    expect(screen.queryByTestId('surface-toggle-chat')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('surface-toggle-code')).not.toBeInTheDocument()
   })
 })

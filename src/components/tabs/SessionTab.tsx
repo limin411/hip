@@ -24,10 +24,10 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
   return (
     <div
       className={cn(
-        'group flex h-[33px] min-w-[140px] max-w-[200px] items-center gap-1 rounded-t-md border border-transparent border-b-0 px-2.5 text-body transition-colors',
+        'group flex h-[28px] min-w-[140px] max-w-[200px] items-center gap-1 rounded-md px-2.5 text-body transition-colors',
         active
-          ? 'bg-app border-border text-ink'
-          : 'text-ink-tertiary hover:bg-surface-muted hover:text-ink',
+          ? 'bg-state-active text-ink'
+          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
       <div

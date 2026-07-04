@@ -24,7 +24,6 @@ export function Switch({ checked, onCheckedChange, disabled, ariaDisabled, id, a
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors',
-        'hover:shadow-[0_0_0_3px_rgba(0,98,173,0.1)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
         'disabled:cursor-not-allowed disabled:opacity-50',
         checked ? 'bg-accent' : 'bg-border',

@@ -1,0 +1,354 @@
+Task 1 review fix — remove sidebarWidth/setSidebarWidth
+Run at: 2026-07-04T08:31:25Z
+
+Verification:
+- yarn type-check: PASS
+- yarn test: 286 passed | 1 skipped | 0 failed (3182 tests passed, 2 skipped)
+
+Commit: dc6912148a03694c407d1eb4448bd4d731aab3e4 fix(uiStore): remove sidebarWidth/setSidebarWidth from obsolete sidebar
+
+Task 1 re-review (after fixes)
+Run at: 2026-07-04T08:33:29Z
+
+Verification:
+- yarn test src/store/uiStore.test.ts: PASS (32 passed)
+- yarn type-check: PASS
+- yarn test: 286 passed | 1 skipped | 0 failed (3182 tests passed, 2 skipped)
+
+Assessment: Approved
+- Important finding resolved: sidebarWidth/setSidebarWidth removed
+- open-session state matches brief
+- tests adequate and green
+
+Task 2
+Run at: 2026-07-04T08:36:00Z
+
+Verification:
+- yarn test src/domain/sessionService.test.ts -t "closeSession": PASS
+- yarn type-check: PASS
+- yarn test: 283 passed | 2 skipped | 2 failed | 3 tests failed (unrelated sidecar integration tests)
+
+Commit: 578578f feat(sessionService): manage open session tabs
+
+Assessment: Completed per brief
+- createSession adds new session to openSessionIds
+- selectSession ensures session is in openSessionIds
+- closeSession removes from openSessionIds, deletes session, and falls back to next open session or deselects
+- TDD evidence captured (RED/GREEN)
+
+Task 2 review
+Run at: 2026-07-04T08:39:55Z
+
+Verification:
+- yarn test src/domain/sessionService.test.ts -t "closeSession": PASS
+- yarn type-check: PASS
+
+Assessment: Approved
+- Implementation matches brief exactly
+- createSession/selectSession/closeSession lifecycle wired to openSessionIds
+- Test added and beforeEach reset prevents order-dependent failures
+- Minor: closeSession may call selectSession twice via deleteSession surface reconciliation, producing redundant transport messages
+
+Task 3
+Run at: 2026-07-04T08:43:47Z
+
+Verification:
+- yarn test src/components/tabs/SessionTab.test.tsx: PASS (3 passed)
+- yarn type-check: PASS
+- yarn test: 287 passed | 1 skipped | 0 failed (3186 tests passed, 2 skipped)
+
+Commit: 96adf5a feat(tabs): add SessionTab component
+
+Assessment: Completed per brief
+- Created SessionTab component in src/components/tabs/ matching brief
+- Added SessionTab.test.tsx with TDD RED/GREEN evidence
+- Added localized tabs.closeTab key to en, zh-CN, and zh-TW translations
+- Full suite and type-check remain green
+
+Task 3 review
+Run at: 2026-07-04T08:48:32Z
+
+Verification:
+- Reviewed diff .superpowers/sdd/review-578578f..96adf5a.diff
+- Compared close-button pattern with src/components/sidebar/SessionItem.tsx
+- yarn test / yarn type-check not re-run per review instructions (implementer reported green)
+
+Assessment: Needs fixes
+- Component and test match brief verbatim
+- Found Important plan-mandated defects inherited from brief:
+  - Nested interactive element: <span role="button"> inside outer <button> in SessionTab.tsx (invalid HTML; deviates from SessionItem.tsx pattern)
+  - Misleading test name: SessionTab.test.tsx "renders title and surface icon" only asserts title
+- Minor: close button lacks focus-visible opacity; middle-click close untested
+
+Task 3 review fixes
+Run at: 2026-07-04T08:52:34Z
+
+Verification:
+- yarn test src/components/tabs/SessionTab.test.tsx: PASS (3 passed)
+- yarn type-check: PASS
+- yarn test: 287 passed | 1 skipped | 0 failed (3186 tests passed, 2 skipped)
+
+Commit: d9c9007 fix(tabs): correct SessionTab a11y and test coverage
+
+Assessment: Approved
+- Important finding resolved: outer <button> replaced by focusable <div role="tab">; close control is now a real <button>
+- Surface icon assertion added to match test title
+- Close button visible on focus via focus-visible:opacity-100
+- Full suite and type-check remain green
+
+Task 4
+Run at: 2026-07-04T08:59:27Z
+
+Verification:
+- yarn test src/components/tabs/SessionTabBar.test.tsx: PASS (1 passed)
+- yarn type-check: PASS
+- yarn test: 285 passed | 2 skipped | 3 failed (unrelated sidecar integration tests)
+
+Commit: e9d17af feat(tabs): add SessionTabBar component
+
+Assessment: Completed per brief
+- Created SessionTabBar component in src/components/tabs/ matching brief
+- Added SessionTabBar.test.tsx with TDD RED/GREEN evidence
+- Added localized tabs.newSession key to en, zh-CN, and zh-TW translations
+- Full suite has pre-existing sidecar integration failures not caused by this task
+
+Task 4 review
+Run at: 2026-07-04T09:04:38Z
+
+Verification:
+- yarn test src/components/tabs/SessionTabBar.test.tsx: PASS (1 passed)
+- yarn type-check: PASS
+
+Commit: e9d17af feat(tabs): add SessionTabBar component
+
+Assessment: Needs fixes
+- Implementation matches brief; consumes correct hooks/services; i18n keys added
+- Important: undefined Tailwind utility `scrollbar-hide` at src/components/tabs/SessionTabBar.tsx:22 will leave horizontal scrollbar visible
+- Minor: test does not reset useUiStore after; tablist role/label missing; coverage is render-only
+
+Task 4 review fixes
+Run at: 2026-07-04T09:05:20Z
+
+Verification:
+- yarn test src/components/tabs/SessionTabBar.test.tsx: PASS (1 passed)
+- yarn type-check: PASS
+- yarn test: 288 passed | 1 skipped | 0 failed (3187 tests passed, 2 skipped)
+
+Commit: 697a6bad56a7d63e5a08d97352e8926c439109b1 fix(tabs): add scrollbar-hide utility and SessionTabBar a11y polish
+
+Assessment: Approved
+- Important finding resolved: `scrollbar-hide` utility added to src/styles/tokens.css
+- Minor fixes applied: useUiStore reset in afterEach; tablist role/aria-label added; tabs.tabList localized in en, zh-CN, zh-TW
+- Full suite and type-check remain green
+
+Task 4 re-review (after fixes)
+Run at: 2026-07-04T09:08:53Z
+
+Verification:
+- Focused test: PASS (per implementer report — not re-run per read-only review instructions)
+- Type check: PASS (per implementer report)
+- Full suite: PASS (per implementer report)
+
+Commit: 697a6ba fix(tabs): add scrollbar-hide utility and SessionTabBar a11y polish
+
+Assessment: Approved
+- Undefined scrollbar-hide utility: resolved in src/styles/tokens.css
+- Test state leak: resolved via afterEach reset of useUiStore.openSessionIds
+- Missing tablist role/label: resolved with role="tablist" and aria-label={t('tabs.tabList')}
+- Public props and behavior unchanged
+- No new Important/Critical issues introduced
+
+Task 5
+Run at: 2026-07-04T09:16:46Z
+
+Verification:
+- yarn test src/components/layout/TitleBar.test.tsx src/components/layout/ConnectionStatus.test.tsx src/components/layout/PanelToggle.test.tsx: PASS (4 passed)
+- yarn type-check: PASS
+- yarn test: 291 passed | 2 skipped | 0 failed (3191 tests passed, 2 skipped)
+
+Commit: 43ed96a94826ad43103eca7a43b07ce1c58c01fb feat(layout): TitleBar hosts SessionTabBar and title-right actions
+
+Assessment: Completed per brief
+- TitleBar rewritten to host SessionTabBar and title-right action group (ConnectionStatus + PanelToggle)
+- SidebarToggle and ChatTitleBar removed from TitleBar
+- ConnectionStatus and PanelToggle extracted into separate components with tests
+- ChatTitleBar.tsx deleted (no remaining consumers)
+- Full suite and type-check remain green
+- Concerns: SidebarToggle.tsx is now unused dead code; token usage UI removed from title bar may need new home
+
+
+Task 5 review
+Run at: 2026-07-04T09:20:02Z
+
+Verification:
+- Reviewed diff .superpowers/sdd/review-697a6ba..43ed96a.diff
+- Focused tests: PASS (per implementer report — not re-run per read-only review instructions)
+- Type check: PASS (per implementer report)
+- Full suite: PASS (per implementer report)
+
+Commit: 43ed96a feat(layout): TitleBar hosts SessionTabBar and title-right actions
+
+Assessment: Approved
+- TitleBar rewritten per brief to host SessionTabBar and title-right actions
+- ConnectionStatus and PanelToggle extracted with focused tests
+- ChatTitleBar.tsx deleted
+- Minor: PanelToggle test does not cover code-view branch; ConnectionStatus test only covers connected state
+- Cannot verify from diff: existing i18n key presence in en/zh-CN/zh-TW; SessionTabBar tab-close behavior; whether ChatTitleBar.test.tsx was cleaned up
+
+
+Task 5 review fix — cover PanelToggle code view branch
+Run at: 2026-07-04T09:22:42Z
+
+Verification:
+- yarn test src/components/layout/PanelToggle.test.tsx: PASS (3 passed)
+- yarn type-check: PASS
+- yarn test: 291 passed | 2 skipped | 0 failed (3192 tests passed, 2 skipped)
+
+Commit: e4f8193 test(layout): cover PanelToggle code view branch
+
+Assessment: Approved
+- Added test for activeView === 'code' branch in PanelToggle.test.tsx
+- Existing chat branch test retained
+- Mocked uiStore activeView made mutable per test with afterEach reset
+- Full suite and type-check remain green
+
+Task 5 re-review (after fixes)
+Run at: 2026-07-04T09:24:28Z
+
+Verification:
+- Reviewed diff .superpowers/sdd/review-697a6ba..e4f8193.diff
+- Focused tests: PASS (per implementer report — not re-run per read-only review instructions)
+- Type check: PASS (per implementer report)
+- Full suite: PASS (per implementer report)
+
+Commit: e4f8193 test(layout): cover PanelToggle code view branch
+
+Assessment: Approved
+- Important finding resolved: PanelToggle.test.tsx now covers activeView === 'code' branch and asserts togglePanel is called while toggleChatPanel is not
+- Existing chat branch test retained with correct inverted assertions
+- TitleBar/ConnectionStatus/PanelToggle implementation remains aligned with brief
+- No new Important/Critical issues introduced
+
+Task 6
+Run at: 2026-07-04T09:30:07Z
+
+Verification:
+- yarn test src/components/account/FloatingAvatarButton.test.tsx: PASS (3 passed)
+- yarn type-check: PASS
+- yarn test: 292 passed | 1 skipped | 0 failed (3195 tests passed, 2 skipped)
+
+Commit: b09f2d6 feat(account): add floating avatar menu
+
+Assessment: Completed per brief
+- Created FloatingAvatarButton component at src/components/account/FloatingAvatarButton.tsx
+- Created tests at src/components/account/FloatingAvatarButton.test.tsx
+- Component renders circular avatar button at bottom-left
+- Click opens menu with Settings and Logout items
+- Menu closes on outside click or when an item is selected
+- Added account.menu translations to en/zh-CN/zh-TW
+
+Notes:
+- Test adjusted to match Avatar rendering "US" for name="User"
+- Test mocks react-i18next to match project conventions
+
+Task 6 review
+Run at: 2026-07-04T09:36:12Z
+
+Verification:
+- Reviewed diff .superpowers/sdd/review-e4f8193..b09f2d6.diff
+- Focused tests: PASS (per implementer report — not re-run per read-only review instructions)
+- Type check: PASS (per implementer report)
+- Full suite: PASS (per implementer report)
+
+Commit: b09f2d6 feat(account): add floating avatar menu
+
+Assessment: Needs fixes
+- Implementation matches brief code snippet; tests and type-check reported green
+- Important: undefined Tailwind utility `bg-app` at src/components/account/FloatingAvatarButton.tsx:38 (should be `bg-surface`)
+- Important: menu trigger and popup lack ARIA semantics (`aria-expanded`, `role="menu"`, etc.)
+- Minor: hardcoded Avatar name="User"; unnecessary store mocks in test; listener registered when menu closed; no click-outside/Escape tests
+
+Task 6 review fixes
+Run at: 2026-07-04T09:38:54Z
+
+Verification:
+- yarn test src/components/account/FloatingAvatarButton.test.tsx: PASS (3 passed)
+- yarn type-check: PASS
+- yarn test: 292 passed | 1 skipped | 0 failed (3195 tests passed, 2 skipped)
+
+Commit: 7eaf4474863992fd82f5bd8f261e8f35f66fbd57 fix(account): correct FloatingAvatarButton styles and a11y
+
+Assessment: Approved
+- Replaced invalid Tailwind utility bg-app with bg-surface
+- Added ARIA semantics: aria-expanded, aria-haspopup="menu", role="menu", role="menuitem"
+- Gated document mousedown listener on open state
+- Removed unused useUiStore/useAuthStore mocks from test
+- Full suite and type-check remain green
+
+Task 6 re-review (after fixes)
+Run at: 2026-07-04T09:39:22Z
+
+Verification:
+- Reviewed diff .superpowers/sdd/review-e4f8193..7eaf447.diff
+- Focused tests: PASS (3 passed, per implementer report — not re-run per review instructions)
+- Type check: PASS (per implementer report)
+- Full suite: PASS (3195 passed, 2 skipped, per implementer report)
+
+Commit: 7eaf447 fix(account): correct FloatingAvatarButton styles and a11y
+
+Assessment: Approved
+- All four previously flagged Important issues resolved in diff
+  - bg-app replaced with bg-surface at src/components/account/FloatingAvatarButton.tsx:42
+  - Trigger has aria-expanded and aria-haspopup="menu" (:34-35)
+  - Menu container has role="menu" and aria-label (:43-44)
+  - Menu items have role="menuitem" (:50, :60)
+  - Document mousedown listener gated on open state (:16-25)
+- Unused useUiStore/useAuthStore mocks removed from test
+- Component matches brief structure, callback API, styling tokens, and i18n requirements
+- Minor: menu separator lacks role="separator"/aria-hidden; no outside-click test
+
+Task 7
+Run at: 2026-07-04T09:43:21Z
+
+Verification:
+- yarn test src/routes/AppLayout.test.tsx: PASS (1 passed)
+- yarn type-check: PASS
+- yarn test: 293 passed | 1 skipped | 0 failed (3196 tests passed, 2 skipped)
+
+Commit: a6ce0bc feat(layout): AppLayout without sidebar, with floating avatar
+
+Assessment: Completed per brief
+- Rewrote AppLayout to render TitleBar, main content, optional right-side panel, and FloatingAvatarButton
+- Removed Sidebar, SidebarPeek, and react-resizable-panels usage
+- Added AppLayout.test.tsx with TDD RED/GREEN evidence
+- Full suite and type-check remain green
+
+Task 7 review (reviewer)
+Run at: 2026-07-04T09:46:50Z
+
+Verification:
+- Diff inspection: PASS
+- Tests not re-run per review instructions (implementer reported: yarn test src/routes/AppLayout.test.tsx 1 passed; full suite 293 passed, 1 skipped, 0 failed)
+
+Assessment: Approved
+- AppLayout matches brief: sidebar/rail removed, TitleBar and FloatingAvatarButton rendered
+- AppLayout.test.tsx asserts required no-sidebar contract
+- Tab-closing behavior is out of AppLayout scope and not verifiable from this diff
+
+Task 8
+Run at: 2026-07-04T09:51:27Z
+
+Verification:
+- yarn test src/components/chat/NewConversation.test.tsx -t "surface toggle": PASS (2 passed)
+- yarn test src/components/chat/NewConversation.test.tsx: PASS (15 passed)
+- yarn type-check: PASS
+- yarn test: 293 passed | 1 skipped | 0 failed (3198 tests passed, 2 skipped)
+
+Commit: b8c0999 feat(new-conversation): add Chat/Code surface toggle
+
+Assessment: Completed per brief
+- Created local SurfaceToggle component at src/components/chat/SurfaceToggle.tsx
+- Rendered toggle in NewConversation between greeting and composer
+- Toggle uses existing surface derived from useUiStore.activeView and calls sessionService.setSurface
+- Added surface toggle tests with TDD RED/GREEN evidence
+- Full suite and type-check remain green

@@ -310,7 +310,7 @@ function StatCard({
     muted: 'bg-surface-muted text-ink-secondary',
   }
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover">
+    <div className="rounded-xl border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">
       <div className="flex items-center gap-2">
         <span className={cn('flex h-8 w-8 items-center justify-center rounded-lg', toneClasses[tone])}>
           <Icon size={16} />
@@ -387,7 +387,7 @@ function McpServerCard({
   return (
     <div
       className={cn(
-        'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-shadow hover:shadow-card-hover',
+        'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle',
         !server.enabled && 'opacity-60',
       )}
     >

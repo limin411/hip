@@ -162,6 +162,12 @@ export const en = {
         older: 'Earlier',
       },
       searchResults: 'Search Results',
+      viewAllSessions: 'View all sessions',
+      allSessions: 'All Sessions',
+      sessionCount: '{{count}} sessions',
+      filterAll: 'All',
+      filterChat: 'Work',
+      filterCode: 'Code',
     },
     artifact: {
       files: 'Files',

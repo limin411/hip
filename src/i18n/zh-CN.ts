@@ -162,6 +162,12 @@ export const zhCN = {
         older: '更早',
       },
       searchResults: '搜索结果',
+      viewAllSessions: '查看全部会话',
+      allSessions: '全部会话',
+      sessionCount: '共 {{count}} 个会话',
+      filterAll: '全部',
+      filterChat: '办公',
+      filterCode: '编码',
     },
     artifact: {
       files: '文件',

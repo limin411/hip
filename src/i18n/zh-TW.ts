@@ -162,6 +162,12 @@ export const zhTW = {
         older: '更早',
       },
       searchResults: '搜尋結果',
+      viewAllSessions: '查看全部會話',
+      allSessions: '全部會話',
+      sessionCount: '共 {{count}} 個會話',
+      filterAll: '全部',
+      filterChat: '辦公',
+      filterCode: '編碼',
     },
     artifact: {
       files: '文件',

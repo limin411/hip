@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
@@ -13,6 +14,7 @@ import { PanelToggle } from './PanelToggle'
 export function TitleBar() {
   const { t } = useTranslation()
   const activeView = useUiStore((s) => s.activeView)
+  const onNewSession = useCallback(() => useDomainStore.getState().deselect(), [])
 
   return (
     <header
@@ -29,7 +31,7 @@ export function TitleBar() {
         </span>
       ) : (
         <>
-          <SessionTabBar onNewSession={() => useDomainStore.getState().deselect()} />
+          <SessionTabBar onNewSession={onNewSession} />
           <div className="flex shrink-0 items-center gap-2 pr-3" data-tauri-drag-region="false">
             <ConnectionStatus />
             <PanelToggle />

@@ -5,6 +5,16 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { AppLayout } from './AppLayout'
 
+vi.mock('react-resizable-panels', () => ({
+  PanelGroup: ({ children, className }: { children: any; className?: string }) => (
+    <div className={className}>{children}</div>
+  ),
+  Panel: ({ children, className }: { children: any; className?: string }) => (
+    <div className={className}>{children}</div>
+  ),
+  PanelResizeHandle: ({ className }: { className?: string }) => <div className={className} data-testid="resize-handle" />,
+}))
+
 vi.mock('@/components/layout/TitleBar', () => ({ TitleBar: () => <div data-testid="title-bar" /> }))
 vi.mock('@/components/account/FloatingAvatarButton', () => ({
   FloatingAvatarButton: () => <div data-testid="floating-avatar" />,

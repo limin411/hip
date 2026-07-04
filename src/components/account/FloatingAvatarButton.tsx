@@ -24,8 +24,15 @@ export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvata
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  const handleLogout = () => {
+    const confirmed = window.confirm(`${t('common.logoutConfirmTitle')}\n\n${t('common.logoutConfirmDesc')}`)
+    if (!confirmed) return
+    setOpen(false)
+    onLogout()
+  }
+
   return (
-    <div ref={ref} className="absolute bottom-4 left-4 z-50">
+    <div ref={ref} className="absolute bottom-4 left-4 z-10">
       <button
         type="button"
         data-testid="account-menu-button"
@@ -57,7 +64,8 @@ export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvata
           <div className="my-1 h-px bg-border" />
           <button
             type="button"
-            onClick={() => { setOpen(false); onLogout() }}
+            data-testid="account-logout-menu-item"
+            onClick={handleLogout}
             className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-danger transition-colors hover:bg-danger/10"
             role="menuitem"
           >

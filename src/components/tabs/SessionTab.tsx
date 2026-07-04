@@ -23,44 +23,40 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
 
   return (
     <div
-      role="tab"
-      tabIndex={0}
-      aria-selected={active}
-      data-testid="session-tab"
-      onClick={onSelect}
-      onMouseDown={(e) => e.button === 1 && onClose()}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onSelect()
-        }
-      }}
       className={cn(
-        'group flex h-[33px] min-w-[140px] max-w-[200px] items-center gap-2 rounded-t-md border border-transparent border-b-0 px-2.5 text-body transition-colors',
+        'group flex h-[33px] min-w-[140px] max-w-[200px] items-center gap-1 rounded-t-md border border-transparent border-b-0 px-2.5 text-body transition-colors',
         active
           ? 'bg-app border-border text-ink'
           : 'text-ink-tertiary hover:bg-surface-muted hover:text-ink',
       )}
     >
-      <Icon
-        size={14}
-        data-testid="surface-icon"
-        aria-label={surface}
-        className={cn('shrink-0', active ? 'text-accent-strong' : 'text-ink-tertiary')}
-      />
-      <span className="min-w-0 flex-1 truncate text-left">{session.title}</span>
+      <div
+        role="tab"
+        tabIndex={0}
+        aria-selected={active}
+        data-testid="session-tab"
+        onClick={onSelect}
+        onMouseDown={(e) => e.button === 1 && onClose()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onSelect()
+          }
+        }}
+        className="flex min-w-0 flex-1 items-center gap-2 outline-none"
+      >
+        <Icon
+          size={14}
+          data-testid="surface-icon"
+          aria-label={surface}
+          className={cn('shrink-0', active ? 'text-accent-strong' : 'text-ink-tertiary')}
+        />
+        <span className="min-w-0 flex-1 truncate text-left">{session.title}</span>
+      </div>
       <button
         type="button"
         aria-label={t('tabs.closeTab')}
-        onClick={(e) => {
-          e.stopPropagation()
-          onClose()
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.stopPropagation()
-          }
-        }}
+        onClick={onClose}
         className={cn(
           'flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity',
           'group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-muted',

@@ -27,7 +27,7 @@ describe('SessionTab', () => {
   it('calls onSelect when clicked', () => {
     const onSelect = vi.fn()
     render(<SessionTab session={session} active={false} onSelect={onSelect} onClose={vi.fn()} />)
-    fireEvent.click(screen.getByText('Test Session'))
+    fireEvent.click(screen.getByText('Test Session', { selector: 'span' }))
     expect(onSelect).toHaveBeenCalled()
   })
 

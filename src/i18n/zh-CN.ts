@@ -517,6 +517,9 @@ export const zhCN = {
       },
 
     },
+    account: {
+      menu: '账户菜单',
+    },
     login: {
       slogan: '没有人比我更懂摸鱼',
       title: '登录到 hip',

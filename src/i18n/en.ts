@@ -517,6 +517,9 @@ export const en = {
       },
 
     },
+    account: {
+      menu: 'Account menu',
+    },
     login: {
       slogan: 'Nobody knows slacking better than me',
       title: 'Log in to hip',

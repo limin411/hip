@@ -517,6 +517,9 @@ export const zhTW = {
       },
 
     },
+    account: {
+      menu: '賬戶選單',
+    },
     login: {
       slogan: '沒有人比我更懂摸魚',
       title: '登錄到 hip',

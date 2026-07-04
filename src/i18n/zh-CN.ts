@@ -492,6 +492,9 @@ export const zhCN = {
       },
 
     },
+    history: {
+      title: '历史',
+    },
     account: {
       menu: '账户菜单',
     },

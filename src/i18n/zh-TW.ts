@@ -492,6 +492,9 @@ export const zhTW = {
       },
 
     },
+    history: {
+      title: '歷史',
+    },
     account: {
       menu: '賬戶選單',
     },

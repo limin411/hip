@@ -492,6 +492,9 @@ export const en = {
       },
 
     },
+    history: {
+      title: 'History',
+    },
     account: {
       menu: 'Account menu',
     },

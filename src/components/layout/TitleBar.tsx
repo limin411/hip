@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronLeft } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { SessionTabBar } from '@/components/tabs/SessionTabBar'
@@ -14,7 +15,16 @@ import { PanelToggle } from './PanelToggle'
 export function TitleBar() {
   const { t } = useTranslation()
   const activeView = useUiStore((s) => s.activeView)
+  const previousView = useUiStore((s) => s.previousView)
+  const setActiveView = useUiStore((s) => s.setActiveView)
   const onNewSession = useCallback(() => useDomainStore.getState().deselect(), [])
+
+  const handleBack = () => {
+    setActiveView(previousView ?? 'chat')
+  }
+
+  const isSpecialView = activeView === 'settings' || activeView === 'history'
+  const titleKey = activeView === 'settings' ? 'settings.title' : 'history.title'
 
   return (
     <header
@@ -25,10 +35,22 @@ export function TitleBar() {
       {/* 为 macOS 红绿灯整簇让位（约 x19→77），留足间距后再放内容，避免与绿灯相撞 */}
       <div className="shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
 
-      {activeView === 'settings' ? (
-        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 truncate text-body font-medium text-ink">
-          {t('settings.title')}
-        </span>
+      {isSpecialView ? (
+        <>
+          <button
+            type="button"
+            data-testid="titlebar-back"
+            onClick={handleBack}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <ChevronLeft size={16} />
+            {t('common.back')}
+          </button>
+          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 truncate text-body font-medium text-ink">
+            {t(titleKey)}
+          </span>
+          <div className="ml-auto shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
+        </>
       ) : (
         <>
           <SessionTabBar onNewSession={onNewSession} />

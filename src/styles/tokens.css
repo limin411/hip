@@ -32,8 +32,8 @@
   /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
   --titlebar-lights-inset: 90px;
   /* 毛玻璃效果：仅标题栏使用，半透明背景 + 模糊 */
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.05);
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
@@ -67,8 +67,8 @@
   --role-reviewer: #ffab40;
   --role-worker: #2ee6e6;
   /* 毛玻璃效果：暗色半透明背景 + 浅色描边 */
-  --glass-bg: rgba(20, 20, 20, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(20, 20, 20, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
   /* 公共交互状态 —— 复用暗色令牌 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);

@@ -40,7 +40,7 @@ describe('SessionTab', () => {
 
   it('renders capsule shape and active state classes', () => {
     render(<SessionTab session={session} active onSelect={vi.fn()} onClose={vi.fn()} />)
-    const tab = screen.getByTestId('session-tab').parentElement
+    const tab = screen.getByTestId('session-tab')
     expect(tab).toHaveClass('rounded-md')
     expect(tab).toHaveClass('bg-state-active')
     expect(tab).toHaveClass('text-ink')
@@ -48,7 +48,7 @@ describe('SessionTab', () => {
 
   it('renders inactive state classes', () => {
     render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
-    const tab = screen.getByTestId('session-tab').parentElement
+    const tab = screen.getByTestId('session-tab')
     expect(tab).toHaveClass('rounded-md')
     expect(tab).toHaveClass('text-ink-secondary')
     expect(tab).not.toHaveClass('bg-state-active')

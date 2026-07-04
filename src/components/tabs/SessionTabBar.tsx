@@ -19,7 +19,11 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
     .filter((s): s is NonNullable<typeof s> => Boolean(s))
 
   return (
-    <div className="flex h-full flex-1 items-end gap-0.5 overflow-x-auto scrollbar-hide">
+    <div
+      role="tablist"
+      aria-label={t('tabs.tabList')}
+      className="flex h-full flex-1 items-end gap-0.5 overflow-x-auto scrollbar-hide"
+    >
       {openSessions.map((session) => (
         <SessionTab
           key={session.id}

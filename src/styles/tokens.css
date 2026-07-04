@@ -150,6 +150,16 @@ a:hover {
 }
 
 
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ── Greeting text fade-in (triggered by key change on animName) ── */
 @keyframes greeting-enter {
   from { opacity: 0; transform: translateY(8px); }

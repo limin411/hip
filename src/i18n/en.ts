@@ -534,6 +534,7 @@ export const en = {
     tabs: {
       closeTab: 'Close tab',
       newSession: 'New session',
+      tabList: 'Open sessions',
     },
     common: {
       clear: 'Clear',

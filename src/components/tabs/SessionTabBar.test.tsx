@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { SessionTabBar } from './SessionTabBar'
 import { useUiStore } from '@/store/uiStore'
@@ -24,6 +24,10 @@ vi.mock('@/domain', () => ({
 describe('SessionTabBar', () => {
   beforeEach(() => {
     useUiStore.setState({ openSessionIds: ['s1', 's2'] })
+  })
+
+  afterEach(() => {
+    useUiStore.setState({ openSessionIds: [] })
   })
 
   it('renders one tab per open session', () => {

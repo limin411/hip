@@ -7,7 +7,7 @@ interface AvatarProps {
   shape?: 'circle' | 'square'
   /** Apply Sage Gray gradient background to initials fallback (no effect when src is set). */
   gradient?: boolean
-  /** Apply hover ring border for clickable affordance (matches MenuRail pattern). */
+  /** Apply hover ring border for clickable affordance. */
   ring?: boolean
   className?: string
 }

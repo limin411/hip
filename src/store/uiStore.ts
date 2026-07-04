@@ -10,9 +10,6 @@ export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 
 interface UiState {
-  sidebarWidth: number
-  setSidebarWidth: (v: number) => void
-
   settingsNavCollapsed: boolean
   setSettingsNavCollapsed: (v: boolean) => void
   toggleSettingsNav: () => void
@@ -84,9 +81,6 @@ const storage = createJSONStorage<{ codeSessionId: string | null; theme: Theme }
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
-      sidebarWidth: 18,
-      setSidebarWidth: (v) => set((s) => (s.sidebarWidth === v ? s : { sidebarWidth: v })),
-
       settingsNavCollapsed: false,
       setSettingsNavCollapsed: (v) =>
         set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),

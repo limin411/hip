@@ -15,8 +15,6 @@ import { SettingsPage } from '@/components/account/SettingsPage'
 
 export function AppLayout() {
   const sidebarRef = useRef<ImperativePanelHandle>(null)
-  const sidebarWidth = useUiStore((s) => s.sidebarWidth)
-  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth)
   const panelOpen = useUiStore((s) => s.panelOpen)
   const setPanelOpen = useUiStore((s) => s.setPanelOpen)
   const chatPanelOpen = useUiStore((s) => s.chatPanelOpen)
@@ -36,16 +34,6 @@ export function AppLayout() {
     return () => sessionService.disconnect()
   }, [])
 
-  // 在设置页调整宽度后返回主界面时，同步主侧边栏的宽度。
-  useEffect(() => {
-    const p = sidebarRef.current
-    if (!p || sidebarWidth <= 0) return
-    const current = p.getSize()
-    if (Math.abs(current - sidebarWidth) > 0.1) {
-      p.resize(sidebarWidth)
-    }
-  }, [sidebarWidth])
-
   return (
     <div className="flex h-dvh w-screen flex-col overflow-hidden bg-surface">
       {/* 贯穿全宽的标题栏 —— 红绿灯与统一折叠按钮的唯一归属，下方各列不再预留偏移 */}
@@ -55,12 +43,9 @@ export function AppLayout() {
           <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={sidebarRef}
-          defaultSize={sidebarWidth}
+          defaultSize={18}
           minSize={12}
           maxSize={22}
-          onResize={(size) => {
-            if (size > 0) setSidebarWidth(size)
-          }}
         >
           <div className="h-full bg-surface">
             <Sidebar />

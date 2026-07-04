@@ -30,7 +30,7 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
       list = filterBySurface(list, filter)
     }
     list = filterSessions(list, query)
-    return list.sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+    return [...list].sort((a, b) => b.updatedAtMs - a.updatedAtMs)
   }, [sessions, filter, query])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))

@@ -116,7 +116,7 @@ export function ChatPane() {
                 // Transition lives on the always-present base classes so the highlight fades on the
                 // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
-                  'transition-[background-color,box-shadow] duration-700',
+                  'transition-colors duration-700',
                   isNew && (m.role === 'user' ? 'animate-msg-enter-right' : 'animate-msg-enter-left'),
                   highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
                 )}

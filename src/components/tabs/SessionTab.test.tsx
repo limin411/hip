@@ -21,6 +21,7 @@ describe('SessionTab', () => {
   it('renders title and surface icon', () => {
     render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByText('Test Session')).toBeInTheDocument()
+    expect(screen.getByTestId('surface-icon')).toBeInTheDocument()
   })
 
   it('calls onSelect when clicked', () => {

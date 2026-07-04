@@ -1,14 +1,4 @@
-async function ensureNewConversationLanding(): Promise<void> {
-  const newConversation = await browser.$('[data-testid="new-conversation"]')
-  if (!(await newConversation.isExisting())) {
-    const newSession = await browser.$('[data-testid="new-session-button"]')
-    await newSession.waitForExist({ timeout: 10000 })
-    await browser.execute((el: HTMLElement) => el.click(), newSession)
-  }
-  await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 60000 })
-
-  // Dismiss any leftover slash-palette overlay from a previous spec; otherwise it
-  // intercepts clicks on the surface toggle in headless WebKit.
+async function dismissSlashPalette(): Promise<void> {
   const palette = await browser.$('[data-testid="slash-palette"]')
   if (await palette.isExisting()) {
     await browser.keys('Escape')
@@ -16,25 +6,35 @@ async function ensureNewConversationLanding(): Promise<void> {
   }
 }
 
-async function clickSurfaceToggle(testid: 'surface-toggle-code' | 'surface-toggle-chat'): Promise<void> {
-  const btn = await browser.$(`[data-testid="${testid}"]`)
-  await btn.waitForExist({ timeout: 20000 })
-  const pressed = await btn.getAttribute('aria-pressed')
-  if (pressed === 'true') return
-  // Headless WebKit sometimes reports the toggle as not clickable when an
+async function openNewSessionMenu(): Promise<void> {
+  const button = await browser.$('[data-testid="new-session-button"]')
+  await button.waitForExist({ timeout: 20000 })
+  // Headless WebKit sometimes reports the button as not clickable when an
   // overlay or animation is present; use a synthetic click to bypass hit-testing.
-  await browser.execute((el: HTMLElement) => el.click(), btn)
+  await browser.execute((el: HTMLElement) => el.click(), button)
 }
 
-export async function switchToCodeSurface(): Promise<void> {
-  await ensureNewConversationLanding()
-  await clickSurfaceToggle('surface-toggle-code')
+async function clickMenuItem(label: string): Promise<void> {
+  const item = await browser.$(`//div[@role="menuitem"][contains(., "${label}")]`)
+  await item.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+}
+
+async function switchToSurface(surface: 'chat' | 'code'): Promise<void> {
+  await dismissSlashPalette()
+  await openNewSessionMenu()
+
+  const label = surface === 'code' ? 'New Code' : 'New Chat'
+  await clickMenuItem(label)
 
   // Re-query after the surface switch because the DOM may have been recreated.
   await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 60000 })
 }
 
+export async function switchToCodeSurface(): Promise<void> {
+  await switchToSurface('code')
+}
+
 export async function switchToChatSurface(): Promise<void> {
-  await ensureNewConversationLanding()
-  await clickSurfaceToggle('surface-toggle-chat')
+  await switchToSurface('chat')
 }

@@ -510,6 +510,7 @@ export const zhTW = {
     nav: {
       chat: '辦公',
       code: '編碼',
+      history: '歷史',
       settings: '設定',
     },
     tabs: {

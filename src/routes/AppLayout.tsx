@@ -98,6 +98,7 @@ export function AppLayout() {
 
         <FloatingAvatarButton
           onOpenSettings={() => setActiveView('settings')}
+          onOpenHistory={() => setActiveView('history')}
           onLogout={() => {
             logout()
             navigate('/login')

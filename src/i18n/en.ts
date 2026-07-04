@@ -510,6 +510,7 @@ export const en = {
     nav: {
       chat: 'Work',
       code: 'Coding',
+      history: 'History',
       settings: 'Settings',
     },
     tabs: {

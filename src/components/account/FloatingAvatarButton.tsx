@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings, LogOut } from 'lucide-react'
+import { Settings, History, LogOut } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 
 interface FloatingAvatarButtonProps {
   onOpenSettings: () => void
+  onOpenHistory: () => void
   onLogout: () => void
 }
 
-export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvatarButtonProps) {
+export function FloatingAvatarButton({ onOpenSettings, onOpenHistory, onLogout }: FloatingAvatarButtonProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -51,6 +52,17 @@ export function FloatingAvatarButton({ onOpenSettings, onLogout }: FloatingAvata
           role="menu"
           aria-label={t('account.menu')}
         >
+          <button
+            type="button"
+            data-testid="account-history-menu-item"
+            onClick={() => { setOpen(false); onOpenHistory() }}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-ink transition-colors hover:bg-surface-muted"
+            role="menuitem"
+          >
+            <History size={14} className="text-ink-secondary" />
+            {t('nav.history')}
+          </button>
+          <div className="my-1 h-px bg-border" />
           <button
             type="button"
             data-testid="account-settings-menu-item"

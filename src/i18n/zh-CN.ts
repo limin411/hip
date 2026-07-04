@@ -510,6 +510,7 @@ export const zhCN = {
     nav: {
       chat: '办公',
       code: '编码',
+      history: '历史',
       settings: '设置',
     },
     tabs: {

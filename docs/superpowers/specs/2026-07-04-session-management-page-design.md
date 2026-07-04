@@ -13,7 +13,7 @@ Add a dedicated page to manage all conversations, while the sidebar only shows t
 | Phase 1 features | List all sessions, filter by chat/code/all, search, rename, delete, show total count. |
 | Sidebar limit | Per-surface: show up to 5 most-recent sessions of the current surface. |
 | Sidebar search | The sidebar search only filters those 5 sessions. For full search, open the dialog. |
-| Pagination | 20 sessions per page, simple numbered pagination. |
+| Pagination | 10 sessions per page, simple numbered pagination. |
 
 ## 3. Architecture
 
@@ -68,7 +68,7 @@ Three tabs: 全部 / 办公 / 编码 (all / chat / code). Defaults to "全部". 
 
 ### SessionPagination
 
-- Page size: 20 (constant).
+- Page size: 10 (constant).
 - Controls: previous, next, and a small set of page numbers.
 - Changing page scrolls the list body to top.
 

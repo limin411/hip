@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 import { SessionFilters, type SessionFilter } from './SessionFilters'
 import { SessionPagination } from './SessionPagination'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 interface SessionsDialogProps {
   open: boolean

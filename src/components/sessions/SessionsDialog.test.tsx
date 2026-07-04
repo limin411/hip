@@ -57,13 +57,13 @@ describe('SessionsDialog', () => {
   })
 
   it('paginates results', () => {
-    mockSessions = Array.from({ length: 25 }, (_, i) => baseSession(`s-${i}`, 'chat', Date.now() - i))
+    mockSessions = Array.from({ length: 15 }, (_, i) => baseSession(`s-${i}`, 'chat', Date.now() - i))
     render(<SessionsDialog open onOpenChange={vi.fn()} />)
     expect(screen.getByText('s-0')).toBeInTheDocument()
-    expect(screen.getByText('s-19')).toBeInTheDocument()
-    expect(screen.queryByText('s-20')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    expect(screen.getByText('s-20')).toBeInTheDocument()
+    expect(screen.getByText('s-9')).toBeInTheDocument()
+    expect(screen.queryByText('s-10')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('pagination-next'))
+    expect(screen.getByText('s-10')).toBeInTheDocument()
   })
 
   it('selects a session and closes', () => {

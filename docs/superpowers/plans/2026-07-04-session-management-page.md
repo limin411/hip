@@ -13,7 +13,7 @@
 - Sidebar must show at most 5 sessions per surface.
 - Sidebar search filters only those 5 sessions (no sidecar FTS).
 - The session manager is a modal dialog opened from the sidebar footer.
-- Pagination page size is 20.
+- Pagination page size is 10.
 - All i18n changes must be mirrored in `zh-CN.ts`, `zh-TW.ts`, and `en.ts`.
 - Match existing component style, naming, and file layout.
 
@@ -619,7 +619,7 @@ import { cn } from '@/lib/utils'
 import { SessionFilters, type SessionFilter } from './SessionFilters'
 import { SessionPagination } from './SessionPagination'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 interface SessionsDialogProps {
   open: boolean

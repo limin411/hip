@@ -494,6 +494,8 @@ export const zhTW = {
     },
     history: {
       title: '歷史',
+      searchPlaceholder: '搜尋工作階段…',
+      empty: '找不到工作階段',
     },
     account: {
       menu: '賬戶選單',

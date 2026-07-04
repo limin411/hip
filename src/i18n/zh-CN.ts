@@ -494,6 +494,8 @@ export const zhCN = {
     },
     history: {
       title: '历史',
+      searchPlaceholder: '搜索会话…',
+      empty: '未找到会话',
     },
     account: {
       menu: '账户菜单',

@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll, afterEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { SearchHit } from '@hip/protocol'
 import type { SessionVM } from '@/domain/sessionStore'
 import { SessionList } from './SessionList'
 
@@ -21,12 +20,10 @@ vi.mock('@/store/uiStore', () => ({
 
 let mockSessions: SessionVM[] = []
 let mockActiveSessionId: string | null = null
-let mockHits: SearchHit[] = []
 
 vi.mock('@/domain', () => ({
   useSessions: () => mockSessions,
   useActiveSessionId: () => mockActiveSessionId,
-  useSearchHits: () => mockHits,
   useSearching: () => false,
   sessionService: {
     selectSession: vi.fn(),
@@ -60,6 +57,7 @@ describe('SessionList empty', () => {
 describe('SessionList grouped', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSearch = ''
     mockSessions = []
     mockActiveSessionId = null
   })
@@ -80,6 +78,30 @@ describe('SessionList grouped', () => {
     expect(html).toContain('Yesterday Session')
     expect(html).toContain('Older Session')
   })
+
+  it('renders at most 5 recent chat sessions', () => {
+    mockSessions = Array.from({ length: 7 }, (_, i) => ({
+      id: `s${i}`,
+      title: `Session ${i}`,
+      preview: '',
+      updatedAtMs: now - i * 60_000,
+      config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' },
+      loaded: true,
+      messages: [],
+      status: 'idle',
+      error: null,
+    }))
+
+    const html = renderToStaticMarkup(<SessionList />)
+
+    expect(html).toContain('Session 0')
+    expect(html).toContain('Session 1')
+    expect(html).toContain('Session 2')
+    expect(html).toContain('Session 3')
+    expect(html).toContain('Session 4')
+    expect(html).not.toContain('Session 5')
+    expect(html).not.toContain('Session 6')
+  })
 })
 
 describe('SessionList search results', () => {
@@ -90,18 +112,18 @@ describe('SessionList search results', () => {
       { id: 's1', title: 'query match', preview: '', updatedAtMs: now - 60_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
       { id: 's2', title: 'Another chat', preview: '', updatedAtMs: now - 120_000, config: { llmProvider: 'openai', model: 'gpt-4', tools: [], surface: 'chat' }, loaded: true, messages: [], status: 'idle', error: null },
     ]
-    mockHits = [
-      { sessionId: 's2', messageId: 'm1', title: 'Another chat', snippet: 'this is a <mark>query</mark> hit', timestamp: now - 120_000 },
-    ]
     mockActiveSessionId = null
   })
 
-  it('renders flat search results with title match and FTS hit', () => {
+  afterEach(() => {
+    mockSearch = ''
+  })
+
+  it('renders flat search results with title match', () => {
     const html = renderToStaticMarkup(<SessionList />)
 
     expect(html).toContain('sidebar.searchResults')
     expect(html).toContain('query match')
-    expect(html).toContain('Another chat')
-    expect(html).toContain('this is a')
+    expect(html).not.toContain('Another chat')
   })
 })

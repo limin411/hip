@@ -9,9 +9,10 @@ interface SearchBoxProps {
   iconClassName?: string
   inputClassName?: string
   spinnerClassName?: string
+  disableFts?: boolean
 }
 
-export function SearchBox({ iconClassName, inputClassName, spinnerClassName }: SearchBoxProps = {}) {
+export function SearchBox({ iconClassName, inputClassName, spinnerClassName, disableFts }: SearchBoxProps = {}) {
   const { t } = useTranslation()
   const search = useUiStore((s) => s.search)
   const setSearch = useUiStore((s) => s.setSearch)
@@ -21,9 +22,10 @@ export function SearchBox({ iconClassName, inputClassName, spinnerClassName }: S
   // in SessionList stays instant, so typing never feels laggy.
   useEffect(() => {
     clearTimeout(timer.current)
+    if (disableFts) return
     timer.current = setTimeout(() => sessionService.search(search.trim()), 200)
     return () => clearTimeout(timer.current)
-  }, [search])
+  }, [search, disableFts])
   return (
     <div className="relative">
       <Search

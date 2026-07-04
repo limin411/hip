@@ -6,6 +6,7 @@ export function SessionSearch() {
       iconClassName="left-3"
       inputClassName="rounded-lg pl-9"
       spinnerClassName="right-3"
+      disableFts
     />
   )
 }

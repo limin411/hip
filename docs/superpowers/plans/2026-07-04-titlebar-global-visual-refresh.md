@@ -308,18 +308,17 @@
 
 **Interfaces:**
 - Consumes: 无
-- Produces: 移除 box-shadow 过渡的消息容器
+- Produces: 保留 ring fade-out 所需 box-shadow 过渡的消息容器
 
 - [ ] **Step 1: 修改过渡属性**
 
-  将第 119 行从：
+  第 119 行原本就是：
   ```tsx
   'transition-[background-color,box-shadow] duration-700',
   ```
-  改为：
-  ```tsx
-  'transition-colors duration-700',
-  ```
+  保持不变。
+
+  > 说明：最初计划改为 `transition-colors` 以配合去阴影方向，但 `highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50'` 中的 `ring-*` 使用 `box-shadow` 实现。若移除 `box-shadow` 过渡，高亮 ring 的淡出效果会丢失（与上方注释矛盾）。因此保留 `transition-[background-color,box-shadow]`，只去掉其他非必要的 shadow 使用。
 
 - [ ] **Step 2: 运行相关测试**
 

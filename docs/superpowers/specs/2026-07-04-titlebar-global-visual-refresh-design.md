@@ -80,12 +80,12 @@
 
 ## 验收标准
 
-- [ ] `TitleBar` 不再使用 `shadow-sticky-top` 和底部 border（可选滚动 hairline 除外）。
-- [ ] 亮色/暗色模式下标题栏均呈现干净毛玻璃效果，无明显"脏边"。
-- [ ] 全局非浮层组件不再使用 `shadow-*` 做层级分隔，改用 border 或背景色。
-- [ ] 菜单、弹窗、下拉面板等浮层仍保留适当阴影。
-- [ ] `yarn test` 通过（包括 `TitleBar.test.tsx` 相关快照/断言）。
-- [ ] `yarn tsc` 通过。
+- [x] `TitleBar` 不再使用 `shadow-sticky-top` 和底部 border（可选滚动 hairline 除外）。
+- [x] 亮色/暗色模式下标题栏均呈现干净毛玻璃效果，无明显"脏边"。
+- [x] 全局非浮层组件不再使用 `shadow-*` 做层级分隔，改用 border 或背景色。
+- [x] 菜单、弹窗、下拉面板等浮层仍保留适当阴影。
+- [x] `yarn test` 通过（包括 `TitleBar.test.tsx` 相关快照/断言）。
+- [x] `yarn tsc` 通过。
 
 ## 参考
 

@@ -14,8 +14,8 @@ async function openNewSessionMenu(): Promise<void> {
   await browser.execute((el: HTMLElement) => el.click(), button)
 }
 
-async function clickMenuItem(label: string): Promise<void> {
-  const item = await browser.$(`//div[@role="menuitem"][contains(., "${label}")]`)
+async function clickMenuItem(testid: string): Promise<void> {
+  const item = await browser.$(`[data-testid="${testid}"]`)
   await item.waitForExist({ timeout: 10000 })
   await browser.execute((el: HTMLElement) => el.click(), item)
 }
@@ -24,8 +24,8 @@ async function switchToSurface(surface: 'chat' | 'code'): Promise<void> {
   await dismissSlashPalette()
   await openNewSessionMenu()
 
-  const label = surface === 'code' ? 'New Code' : 'New Chat'
-  await clickMenuItem(label)
+  const testid = surface === 'code' ? 'new-session-code' : 'new-session-chat'
+  await clickMenuItem(testid)
 
   // Re-query after the surface switch because the DOM may have been recreated.
   await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 60000 })

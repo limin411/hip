@@ -56,10 +56,10 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
-          <DropdownMenuItem onClick={handleNewChat}>
+          <DropdownMenuItem data-testid="new-session-chat" onClick={handleNewChat}>
             <span className="truncate">{t('dropdown.newChat')}</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleNewCode}>
+          <DropdownMenuItem data-testid="new-session-code" onClick={handleNewCode}>
             <span className="truncate">{t('dropdown.newCode')}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

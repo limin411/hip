@@ -1,5 +1,5 @@
 // src/domain/sessionStore.test.ts
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { applyServerMessage, clearPermission, emptySession, useDomainStore, type SessionVM } from './sessionStore'
 import type { SessionSummary } from '@hip/protocol'
 
@@ -663,5 +663,52 @@ describe('agent:profiles reducer', () => {
     ]
     const next = applyServerMessage(s0, { type: 'agent:profiles', sessionId: 's1', profiles }, 1)
     expect(next.sessions[0].agentProfiles).toEqual(profiles)
+  })
+})
+
+describe('session-scoped panel state', () => {
+  beforeEach(() => {
+    useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
+  })
+
+  it('new sessions default both panel flags to false', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const s = useDomainStore.getState().sessions.find((x) => x.id === 's1')!
+    expect(s.codePanelOpen).toBe(false)
+    expect(s.chatPanelOpen).toBe(false)
+  })
+
+  it('setSessionCodePanelOpen updates only the target session', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s2', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().setSessionCodePanelOpen('s1', true)
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.codePanelOpen).toBe(true)
+    expect(useDomainStore.getState().sessions.find((s) => s.id === 's2')!.codePanelOpen).toBe(false)
+  })
+
+  it('setSessionChatPanelOpen is a no-op when value unchanged', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const before = useDomainStore.getState().sessions[0]
+    useDomainStore.getState().setSessionChatPanelOpen('s1', false)
+    expect(useDomainStore.getState().sessions[0]).toBe(before)
+  })
+
+  it('toggleSessionCodePanel flips the flag', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().toggleSessionCodePanel('s1')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
+    useDomainStore.getState().toggleSessionCodePanel('s1')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(false)
+  })
+
+  it('session:loaded preserves existing panel state', () => {
+    const s0 = { sessions: [{ ...emptySession('s1'), loaded: false, codePanelOpen: true, chatPanelOpen: true }] }
+    const next = applyServerMessage(s0, {
+      type: 'session:loaded',
+      sessionId: 's1',
+      messages: [{ id: 'a1', role: 'assistant', content: 'x', timestamp: 1 }],
+    }, 0)
+    expect(next.sessions[0].codePanelOpen).toBe(true)
+    expect(next.sessions[0].chatPanelOpen).toBe(true)
   })
 })

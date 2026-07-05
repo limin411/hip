@@ -35,6 +35,8 @@ export interface SessionVM {
   planDeltaDraft?: Record<string, string>  // incremental plan text keyed by itemId, accumulated from plan:delta
   planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
   agentProfiles?: AgentProfileInfo[]  // list of available agent profiles from agent:profiles message
+  codePanelOpen?: boolean
+  chatPanelOpen?: boolean
 }
 
 /** Turn-end sweep for a Message-level ToolCall[]: coerce any tool still 'running' to error so a delivered/finalized message matches the persisted trace after a cancel/interruption. */
@@ -137,7 +139,7 @@ function finalizeAssistant(messages: Message[], message: Message): Message[] {
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: { ...DEFAULT_CONFIG, surface: s.surface }, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null }
+  return { id: s.id, config: { ...DEFAULT_CONFIG, surface: s.surface }, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null, codePanelOpen: false, chatPanelOpen: false }
 }
 
 /** Surface state for a plugin installation driven by WebSocket messages. */
@@ -388,7 +390,7 @@ export function clearPermission(state: { sessions: SessionVM[] }, requestId: str
 export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
 
 export function emptySession(id: string): SessionVM {
-  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false }
+  return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, codePanelOpen: false, chatPanelOpen: false }
 }
 
 export type Connection = 'connecting' | 'connected' | 'error' | 'disconnected'
@@ -425,6 +427,10 @@ interface DomainStore {
   setConnection: (c: Connection) => void
   setSearching: (v: boolean) => void
   clearPluginInstall: () => void
+  setSessionCodePanelOpen: (sessionId: string, open: boolean) => void
+  setSessionChatPanelOpen: (sessionId: string, open: boolean) => void
+  toggleSessionCodePanel: (sessionId: string) => void
+  toggleSessionChatPanel: (sessionId: string) => void
 }
 
 export const useDomainStore = create<DomainStore>((set) => ({
@@ -504,4 +510,40 @@ export const useDomainStore = create<DomainStore>((set) => ({
   setSearching: (v) => set({ searching: v }),
 
   clearPluginInstall: () => set({ pluginInstall: null }),
+
+  setSessionCodePanelOpen: (sessionId, open) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId
+          ? sess
+          : sess.codePanelOpen === open
+            ? sess
+            : { ...sess, codePanelOpen: open }
+      ),
+    })),
+
+  setSessionChatPanelOpen: (sessionId, open) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId
+          ? sess
+          : sess.chatPanelOpen === open
+            ? sess
+            : { ...sess, chatPanelOpen: open }
+      ),
+    })),
+
+  toggleSessionCodePanel: (sessionId) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId ? sess : { ...sess, codePanelOpen: !sess.codePanelOpen }
+      ),
+    })),
+
+  toggleSessionChatPanel: (sessionId) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id !== sessionId ? sess : { ...sess, chatPanelOpen: !sess.chatPanelOpen }
+      ),
+    })),
 }))

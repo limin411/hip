@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProvidersStore } from '@/store/providersStore'
-import { sessionService, useActiveSessionId } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useDomainStore } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
 import { NewConversation } from '@/components/chat/NewConversation'
@@ -18,14 +18,11 @@ import { FloatingAvatarButton } from '@/components/account/FloatingAvatarButton'
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
   const navigate = useNavigate()
+  const activeSession = useActiveSession()
   const activeSessionId = useActiveSessionId()
   const activeView = useUiStore((s) => s.activeView)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const logout = useAuthStore((s) => s.logout)
-  const panelOpen = useUiStore((s) => s.panelOpen)
-  const setPanelOpen = useUiStore((s) => s.setPanelOpen)
-  const chatPanelOpen = useUiStore((s) => s.chatPanelOpen)
-  const setChatPanelOpen = useUiStore((s) => s.setChatPanelOpen)
 
   useEffect(() => {
     if (!useProvidersStore.getState().loaded) {
@@ -37,8 +34,8 @@ export function AppLayout() {
     return () => sessionService.disconnect()
   }, [])
 
-  const codeOpen = activeView === 'code' && panelOpen
-  const chatOpen = activeView === 'chat' && chatPanelOpen
+  const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true
+  const chatOpen = activeView === 'chat' && activeSession?.chatPanelOpen === true
   const rightOpen = codeOpen || chatOpen
 
   useEffect(() => {
@@ -52,13 +49,15 @@ export function AppLayout() {
   }, [rightOpen])
 
   const handleCollapse = () => {
-    if (activeView === 'code') setPanelOpen(false)
-    else if (activeView === 'chat') setChatPanelOpen(false)
+    if (!activeSessionId) return
+    if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, false)
+    else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, false)
   }
 
   const handleExpand = () => {
-    if (activeView === 'code') setPanelOpen(true)
-    else if (activeView === 'chat') setChatPanelOpen(true)
+    if (!activeSessionId) return
+    if (activeView === 'code') useDomainStore.getState().setSessionCodePanelOpen(activeSessionId, true)
+    else if (activeView === 'chat') useDomainStore.getState().setSessionChatPanelOpen(activeSessionId, true)
   }
 
   const renderMainContent = () => {

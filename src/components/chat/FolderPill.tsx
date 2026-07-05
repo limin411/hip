@@ -1,7 +1,6 @@
 import { Folder, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDraftStore } from '@/store/draftStore'
-import { useUiStore } from '@/store/uiStore'
 import { pickDirectory } from '@/ipc/dialog'
 
 function basename(p: string): string {
@@ -18,9 +17,6 @@ export function FolderPill() {
     const dir = await pickDirectory()
     if (!dir) return
     useDraftStore.getState().pickProject(dir)
-    // "pick a folder → Files panel opens" (D1)
-    useUiStore.getState().setPanelOpen(true)
-    useUiStore.getState().setTab('files')
   }
 
   if (bound) {

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { FileText, FileImage, FileCode, FileType } from 'lucide-react'
 import type { ToolCall } from '@hip/protocol'
-import { sessionService } from '@/domain'
+import { sessionService, useActiveSessionId } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
@@ -18,30 +19,31 @@ export function iconFor(kind: RenderedArtifact['kind']) {
 export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
   const { t } = useTranslation()
   const { scopeId, isDraft } = useFsScope()
+  const activeSessionId = useActiveSessionId()
+  const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
+  const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const artifacts = extractRenderedArtifacts(toolCalls)
   if (artifacts.length === 0) return null
 
   const canPreview = scopeId != null
 
   const open = (path: string) => {
-    if (!scopeId) return
-    // Drive the existing FS preview pipeline (same as FileTree's Node.onClick).
+    if (!scopeId || !activeSessionId) return
     useFsStore.getState().setActive(scopeId, path)
     if (isDraft) sessionService.readDraftFile(scopeId, path)
     else sessionService.readFile(scopeId, path)
     const ui = useUiStore.getState()
     if (ui.activeView === 'code') {
-      // Code: open the artifact panel's Files tab (defer the tab switch one tick if it was closed).
-      if (!ui.panelOpen) {
-        ui.setPanelOpen(true)
+      const session = useDomainStore.getState().sessions.find((s) => s.id === activeSessionId)
+      if (!session?.codePanelOpen) {
+        setSessionCodePanelOpen(activeSessionId, true)
         setTimeout(() => useUiStore.getState().setTab('files'), 0)
       } else {
         ui.setTab('files')
       }
     } else {
-      // Chat: open the slim preview panel and select this artifact.
       ui.setSelectedArtifactPath(path)
-      ui.setChatPanelOpen(true)
+      setSessionChatPanelOpen(activeSessionId, true)
     }
   }
 

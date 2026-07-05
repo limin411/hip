@@ -34,6 +34,16 @@ describe('Session-scoped panel lifecycle', () => {
     expect(useUiStore.getState().activeTab).toBe('files')
   })
 
+  it('open chat panel → toggle chat panel on the active session', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+
+    useDomainStore.getState().setSessionChatPanelOpen('s1', true)
+    expect(useDomainStore.getState().sessions[0].chatPanelOpen).toBe(true)
+
+    useDomainStore.getState().toggleSessionChatPanel('s1')
+    expect(useDomainStore.getState().sessions[0].chatPanelOpen).toBe(false)
+  })
+
   it('setSessionCodePanelOpen(false) when already closed is a no-op (same reference)', () => {
     useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     useDomainStore.getState().toggleSessionCodePanel('s1')

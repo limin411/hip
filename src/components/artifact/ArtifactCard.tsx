@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { FileText, FileImage, FileCode, FileType } from 'lucide-react'
 import type { ToolCall } from '@hip/protocol'
-import { sessionService, useActiveSessionId } from '@/domain'
-import { useDomainStore } from '@/domain/sessionStore'
+import { sessionService, useActiveSession, useDomainStore } from '@/domain'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
@@ -19,7 +18,8 @@ export function iconFor(kind: RenderedArtifact['kind']) {
 export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
   const { t } = useTranslation()
   const { scopeId, isDraft } = useFsScope()
-  const activeSessionId = useActiveSessionId()
+  const activeSession = useActiveSession()
+  const activeSessionId = activeSession?.id ?? null
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const artifacts = extractRenderedArtifacts(toolCalls)
@@ -29,13 +29,13 @@ export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
 
   const open = (path: string) => {
     if (!scopeId || !activeSessionId) return
+    // Drive the existing FS preview pipeline (same as FileTree's Node.onClick).
     useFsStore.getState().setActive(scopeId, path)
     if (isDraft) sessionService.readDraftFile(scopeId, path)
     else sessionService.readFile(scopeId, path)
     const ui = useUiStore.getState()
     if (ui.activeView === 'code') {
-      const session = useDomainStore.getState().sessions.find((s) => s.id === activeSessionId)
-      if (!session?.codePanelOpen) {
+      if (!activeSession?.codePanelOpen) {
         setSessionCodePanelOpen(activeSessionId, true)
         setTimeout(() => useUiStore.getState().setTab('files'), 0)
       } else {

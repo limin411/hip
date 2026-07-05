@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProvidersStore } from '@/store/providersStore'
-import { sessionService, useActiveSession, useActiveSessionId, useDomainStore } from '@/domain'
+import { sessionService, useActiveSession, useDomainStore } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import { useAuthStore } from '@/store/authStore'
 import { NewConversation } from '@/components/chat/NewConversation'
@@ -19,7 +19,7 @@ export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
   const navigate = useNavigate()
   const activeSession = useActiveSession()
-  const activeSessionId = useActiveSessionId()
+  const activeSessionId = activeSession?.id ?? null
   const activeView = useUiStore((s) => s.activeView)
   const setActiveView = useUiStore((s) => s.setActiveView)
   const logout = useAuthStore((s) => s.logout)

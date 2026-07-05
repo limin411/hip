@@ -17,6 +17,9 @@ export function FolderPill() {
     const dir = await pickDirectory()
     if (!dir) return
     useDraftStore.getState().pickProject(dir)
+    // Intentionally not opening any panel here. FolderPill is rendered in
+    // NewConversation, which has no active session; session-scoped panels
+    // require an active session to know where to write their open state.
   }
 
   if (bound) {

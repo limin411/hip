@@ -18,16 +18,10 @@ interface UiState {
   setScrollTarget: (id: string | null) => void
 
   // Code surface: the four-tab ArtifactPanel.
-  panelOpen: boolean
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
-  togglePanel: () => void
-  setPanelOpen: (v: boolean) => void
 
   // Chat surface: the slim preview/artifacts panel.
-  chatPanelOpen: boolean
-  toggleChatPanel: () => void
-  setChatPanelOpen: (v: boolean) => void
   chatActiveTab: ChatTab
   setChatActiveTab: (v: ChatTab) => void
   resetChatActiveTab: () => void
@@ -86,15 +80,9 @@ export const useUiStore = create<UiState>()(
       scrollTargetMessageId: null,
       setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),
 
-      panelOpen: false,
       activeTab: 'agents',
       setTab: (t) => set({ activeTab: t }),
-      togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
-      setPanelOpen: (v) => set((s) => (s.panelOpen === v ? s : { panelOpen: v })),
 
-      chatPanelOpen: false,
-      toggleChatPanel: () => set((s) => ({ chatPanelOpen: !s.chatPanelOpen })),
-      setChatPanelOpen: (v) => set((s) => (s.chatPanelOpen === v ? s : { chatPanelOpen: v })),
       chatActiveTab: 'files',
       setChatActiveTab: (v) => set((s) => (s.chatActiveTab === v ? s : { chatActiveTab: v })),
       resetChatActiveTab: () => set((s) => (s.chatActiveTab === 'files' ? s : { chatActiveTab: 'files' })),

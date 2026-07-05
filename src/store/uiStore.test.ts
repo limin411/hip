@@ -5,56 +5,9 @@ import { useUiStore } from './uiStore'
 beforeEach(() => {
   useUiStore.setState({
     settingsNavCollapsed: false,
-    panelOpen: false,
     activeTab: 'agents',
     theme: 'system',
     openSessionIds: [],
-  })
-})
-
-describe('uiStore - panel state management', () => {
-  it('initial state: panel is closed', () => {
-    const s = useUiStore.getState()
-    expect(s.panelOpen).toBe(false)
-  })
-
-  // ---- panelOpen ↔ togglePanel / setPanelOpen ----
-
-  it('togglePanel toggles panelOpen', () => {
-    useUiStore.getState().togglePanel()
-    expect(useUiStore.getState().panelOpen).toBe(true)
-
-    useUiStore.getState().togglePanel()
-    expect(useUiStore.getState().panelOpen).toBe(false)
-  })
-
-  it('setPanelOpen(true) opens panel', () => {
-    useUiStore.getState().setPanelOpen(false)
-    expect(useUiStore.getState().panelOpen).toBe(false)
-
-    useUiStore.getState().setPanelOpen(true)
-    expect(useUiStore.getState().panelOpen).toBe(true)
-  })
-
-  // ---- setPanelOpen with zero-width panel (collapsing the react-resizable-panel) ----
-
-  it('setPanelOpen to same value is a no-op (optimistic guard)', () => {
-    const before = useUiStore.getState()
-    useUiStore.getState().setPanelOpen(false)
-    expect(useUiStore.getState()).toBe(before) // same reference
-  })
-
-  // ---- activeTab switching ----
-
-  it('setTab switches active tab', () => {
-    useUiStore.getState().setTab('files')
-    expect(useUiStore.getState().activeTab).toBe('files')
-
-    useUiStore.getState().setTab('files')
-    expect(useUiStore.getState().activeTab).toBe('files')
-
-    useUiStore.getState().setTab('timeline')
-    expect(useUiStore.getState().activeTab).toBe('timeline')
   })
 })
 
@@ -190,17 +143,11 @@ describe('uiStore - activeView', () => {
 })
 
 describe('uiStore - code surface', () => {
-  beforeEach(() => useUiStore.setState({ activeView: 'chat', chatPanelOpen: false, selectedArtifactPath: null, chatSessionId: null, codeSessionId: null }))
+  beforeEach(() => useUiStore.setState({ activeView: 'chat', selectedArtifactPath: null, chatSessionId: null, codeSessionId: null }))
 
   it('setActiveView accepts code', () => {
     useUiStore.getState().setActiveView('code')
     expect(useUiStore.getState().activeView).toBe('code')
-  })
-  it('toggleChatPanel / setChatPanelOpen drive the chat preview panel', () => {
-    useUiStore.getState().toggleChatPanel()
-    expect(useUiStore.getState().chatPanelOpen).toBe(true)
-    useUiStore.getState().setChatPanelOpen(false)
-    expect(useUiStore.getState().chatPanelOpen).toBe(false)
   })
   it('setSelectedArtifactPath stores + clears the selected file', () => {
     useUiStore.getState().setSelectedArtifactPath('/a.md')

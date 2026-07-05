@@ -1,53 +1,62 @@
 // src/store/panelLifecycle.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
+import { useDomainStore } from '@/domain/sessionStore'
 import { useUiStore } from './uiStore'
 
-beforeEach(() => {
-  useUiStore.setState({
-    panelOpen: true,
-    activeTab: 'agents',
-  })
-})
+function reset() {
+  useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
+}
 
+describe('Session-scoped panel lifecycle', () => {
+  beforeEach(reset)
 
-describe('ArtifactPanel — lifecycle state transitions', () => {
-  // ── Normal operation ──
+  it('open panel → switch tabs → close panel on the active session', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    const ui = useUiStore.getState()
 
-  it('open panel → switch tabs → close panel', () => {
-    const s = useUiStore.getState()
-
-    s.setTab('files')
+    ui.setTab('files')
     expect(useUiStore.getState().activeTab).toBe('files')
 
-    s.setTab('files')
-    expect(useUiStore.getState().activeTab).toBe('files')
+    useDomainStore.getState().setSessionCodePanelOpen('s1', true)
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
 
-    s.setTab('timeline')
-    expect(useUiStore.getState().activeTab).toBe('timeline')
-
-    s.setTab('agents')
-    expect(useUiStore.getState().activeTab).toBe('agents')
-
-    s.togglePanel()
-    expect(useUiStore.getState().panelOpen).toBe(false)
+    useDomainStore.getState().toggleSessionCodePanel('s1')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(false)
   })
 
-  // ── setPanelOpen edge cases ──
-
-  it('setPanelOpen(true) when already open is safe (no state change)', () => {
+  it('setSessionCodePanelOpen(true) when already open is safe', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().setSessionCodePanelOpen('s1', true)
     useUiStore.getState().setTab('files')
-    useUiStore.getState().setPanelOpen(true)
 
-    expect(useUiStore.getState().panelOpen).toBe(true)
+    useDomainStore.getState().setSessionCodePanelOpen('s1', true)
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
     expect(useUiStore.getState().activeTab).toBe('files')
   })
 
-  it('setPanelOpen(false) when already closed is a no-op', () => {
-    useUiStore.getState().togglePanel()
-    const before = useUiStore.getState()
+  it('setSessionCodePanelOpen(false) when already closed is a no-op (same reference)', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().toggleSessionCodePanel('s1')
+    useDomainStore.getState().toggleSessionCodePanel('s1')
+    const before = useDomainStore.getState().sessions[0]
 
-    useUiStore.getState().setPanelOpen(false)
-    expect(useUiStore.getState()).toBe(before)
+    useDomainStore.getState().setSessionCodePanelOpen('s1', false)
+    expect(useDomainStore.getState().sessions[0]).toBe(before)
+  })
+
+  it('panel state is isolated between sessions', () => {
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.getState().createSession('s2', { llmProvider: 'deepseek', model: 'm', tools: [] })
+
+    useDomainStore.getState().setSessionCodePanelOpen('s1', true)
+    useDomainStore.getState().setSessionChatPanelOpen('s2', true)
+
+    const s1 = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    const s2 = useDomainStore.getState().sessions.find((s) => s.id === 's2')!
+
+    expect(s1.codePanelOpen).toBe(true)
+    expect(s1.chatPanelOpen).toBe(false)
+    expect(s2.codePanelOpen).toBe(false)
+    expect(s2.chatPanelOpen).toBe(true)
   })
 })
-

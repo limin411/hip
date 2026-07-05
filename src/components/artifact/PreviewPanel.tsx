@@ -4,7 +4,8 @@ import type { ChatTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
-import { useActiveMessages, sessionService } from '@/domain'
+import { useActiveMessages, sessionService, useActiveSessionId } from '@/domain'
+import { useDomainStore } from '@/domain/sessionStore'
 import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
@@ -27,7 +28,8 @@ export function PreviewPanel() {
   const messages = useActiveMessages()
   const artifacts = collectConversationArtifacts(messages)
   const selected = useUiStore((s) => s.selectedArtifactPath)
-  const toggleChatPanel = useUiStore((s) => s.toggleChatPanel)
+  const activeSessionId = useActiveSessionId()
+  const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const chatActiveTab = useUiStore((s) => s.chatActiveTab)
   const setChatActiveTab = useUiStore((s) => s.setChatActiveTab)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
@@ -58,7 +60,7 @@ export function PreviewPanel() {
 
   const close = () => {
     resetChatActiveTab()
-    toggleChatPanel()
+    if (activeSessionId) setSessionChatPanelOpen(activeSessionId, false)
   }
 
   return (

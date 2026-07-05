@@ -3,6 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { useTranslation } from 'react-i18next'
 import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
+import { useActiveSessionId } from '@/domain'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { Button } from '@/components/ui/Button'
 import { FileTree } from './FileTree'
@@ -19,7 +20,8 @@ export function ArtifactPanel() {
   const { t } = useTranslation()
   const activeTab = useUiStore((s) => s.activeTab)
   const setTab = useUiStore((s) => s.setTab)
-  const togglePanel = useUiStore((s) => s.togglePanel)
+  const activeSessionId = useActiveSessionId()
+  const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
   const diffCount = useDiffStore((s) => (sid ? s.bySession[sid]?.summary?.totalFiles : 0)) ?? 0
@@ -51,7 +53,7 @@ export function ArtifactPanel() {
           </TabsList>
           <div className="flex items-center gap-2" data-tauri-drag-region="false">
             {isGitRepo && <BranchSwitcher />}
-            <Button variant="ghost" size="icon" onClick={togglePanel} title={t('artifact.closePanel')}>
+            <Button variant="ghost" size="icon" onClick={() => activeSessionId && setSessionCodePanelOpen(activeSessionId, false)} title={t('artifact.closePanel')}>
               <X size={16} />
             </Button>
           </div>

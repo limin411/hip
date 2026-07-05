@@ -17,6 +17,7 @@ export function PanelToggle() {
       onClick={onToggle}
       title={t('chat.togglePanel')}
       data-tauri-drag-region="false"
+      data-no-drag
       data-testid="toggle-panel"
     >
       <PanelRight size={17} />

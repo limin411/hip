@@ -17,6 +17,7 @@
         "width": 1800,
         "height": 1100,
         "maximized": false,
+        "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": {

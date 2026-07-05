@@ -32,7 +32,6 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
     <div
       role="tablist"
       aria-label={t('tabs.tabList')}
-      data-tauri-drag-region="false"
       className="flex h-full flex-1 items-center gap-0.5 overflow-x-auto scrollbar-hide"
     >
       {openSessions.map((session) => (
@@ -52,6 +51,7 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
             title={t('tabs.newSession')}
             data-testid="new-session-button"
             data-tauri-drag-region="false"
+            data-no-drag
             className="ml-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
           >
             <Plus size={14} />

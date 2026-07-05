@@ -14,7 +14,7 @@ export function ConnectionStatus() {
   const hasApiKey = useHasApiKey()
 
   return (
-    <div className="flex items-center gap-2 pl-2" data-tauri-drag-region="false">
+    <div className="flex items-center gap-2 pl-2">
       {status === 'connected' && !hasApiKey ? (
         <>
           <span className="h-2 w-2 rounded-full bg-warning" />
@@ -33,6 +33,8 @@ export function ConnectionStatus() {
           </span>
           {(status === 'error' || status === 'disconnected') && (
             <button
+              data-tauri-drag-region="false"
+              data-no-drag
               onClick={() => sessionService.reconnect()}
               className="text-caption text-accent-strong transition-colors hover:text-accent-hover hover:underline"
             >

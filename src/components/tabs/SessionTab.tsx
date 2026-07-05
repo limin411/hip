@@ -24,6 +24,7 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
   return (
     <div
       data-testid="session-tab-container"
+      data-tauri-drag-region="false"
       className={cn(
         'group flex h-[28px] min-w-[140px] max-w-[200px] items-center gap-1 rounded-md px-2.5 text-body transition-colors',
         active
@@ -57,6 +58,7 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
       <button
         type="button"
         aria-label={t('tabs.closeTab')}
+        data-no-drag
         onClick={onClose}
         className={cn(
           'flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity',

@@ -61,4 +61,11 @@ describe('TitleBar', () => {
     screen.getByTestId('titlebar-back').click()
     expect(useUiStore.getState().activeView).toBe('chat')
   })
+
+  it('marks the header as draggable and the back button as non-draggable', () => {
+    useUiStore.setState({ activeView: 'settings', previousView: 'chat' })
+    render(<TitleBar />)
+    expect(screen.getByTestId('titlebar')).toHaveAttribute('data-tauri-drag-region')
+    expect(screen.getByTestId('titlebar-back')).toHaveAttribute('data-tauri-drag-region', 'false')
+  })
 })

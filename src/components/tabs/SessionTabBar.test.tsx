@@ -89,4 +89,14 @@ describe('SessionTabBar', () => {
     expect(tablist).toHaveClass('items-center')
     expect(tablist).not.toHaveClass('items-end')
   })
+
+  it('keeps the tab list background draggable while tabs and the new-session button remain clickable', () => {
+    render(<SessionTabBar onNewSession={() => {}} />)
+    const tablist = screen.getByRole('tablist')
+    expect(tablist).not.toHaveAttribute('data-tauri-drag-region', 'false')
+    screen.getAllByTestId('session-tab-container').forEach((tab) => {
+      expect(tab).toHaveAttribute('data-tauri-drag-region', 'false')
+    })
+    expect(screen.getByTestId('new-session-button')).toHaveAttribute('data-tauri-drag-region', 'false')
+  })
 })

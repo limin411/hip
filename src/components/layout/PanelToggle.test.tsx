@@ -50,10 +50,10 @@ describe('PanelToggle', () => {
     expect(screen.getByTestId('toggle-panel')).toBeInTheDocument()
   })
 
-  it('is disabled when no session is active', () => {
+  it('is hidden when no session is active', () => {
     mockActiveSessionId = null
     render(<PanelToggle />)
-    expect(screen.getByTestId('toggle-panel')).toBeDisabled()
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
   it('calls toggleSessionChatPanel when active view is chat', () => {

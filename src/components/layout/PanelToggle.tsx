@@ -12,8 +12,9 @@ export function PanelToggle() {
   const toggleSessionCodePanel = useDomainStore((s) => s.toggleSessionCodePanel)
   const toggleSessionChatPanel = useDomainStore((s) => s.toggleSessionChatPanel)
 
+  if (!activeSessionId) return null
+
   const onToggle = () => {
-    if (!activeSessionId) return
     if (activeView === 'code') toggleSessionCodePanel(activeSessionId)
     else if (activeView === 'chat') toggleSessionChatPanel(activeSessionId)
   }
@@ -23,7 +24,6 @@ export function PanelToggle() {
       variant="ghost"
       size="icon"
       onClick={onToggle}
-      disabled={activeSessionId == null}
       title={t('chat.togglePanel')}
       data-tauri-drag-region="false"
       data-no-drag

@@ -7,11 +7,11 @@ export interface RunWorkflowOpts { runId: string; runInputs?: NodeOutput; signal
 export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, opts: RunWorkflowOpts): Promise<RunState> {
   const sink = ports.eventSink
   let state = initRunState(def, opts.runId)
-  const apply = (e: OrchestratorEvent) => {
+  const apply = async (e: OrchestratorEvent) => {
     sink?.emit(e)
     state = reduce(state, def, e)
     // Auto-persist after every reduce when a store is configured
-    ports.store?.saveRun(state)
+    await ports.store?.saveRun(state)
     ports.store?.appendEvent?.(opts.runId, e)
   }
   // reduce 的 propagate() 会在 node:succeeded 里把级联的下游节点直接置为 skipped,

@@ -80,8 +80,8 @@ export function ModelPicker() {
             className={cn(
               'px-1.5 py-0.5 text-meta rounded-sm transition-colors',
               orchMode === 'fast'
-                ? 'bg-accent text-accent-ink font-medium'
-                : 'text-ink-tertiary hover:text-ink-secondary',
+                ? 'bg-accent-subtle text-accent font-medium'
+                : 'text-ink-tertiary hover:text-ink-secondary hover:bg-accent-subtle/50',
             )}
             aria-pressed={orchMode === 'fast'}
             onClick={() => sessionService.setOrchMode(activeId, 'fast')}
@@ -93,8 +93,8 @@ export function ModelPicker() {
             className={cn(
               'px-1.5 py-0.5 text-meta rounded-sm transition-colors',
               orchMode === 'dag'
-                ? 'bg-accent text-accent-ink font-medium'
-                : 'text-ink-tertiary hover:text-ink-secondary',
+                ? 'bg-accent-subtle text-accent font-medium'
+                : 'text-ink-tertiary hover:text-ink-secondary hover:bg-accent-subtle/50',
             )}
             aria-pressed={orchMode === 'dag'}
             onClick={() => sessionService.setOrchMode(activeId, 'dag')}

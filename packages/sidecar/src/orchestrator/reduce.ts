@@ -36,12 +36,16 @@ function edgeState(def: WorkflowDef, state: RunState, from: NodeId, when: EdgeCo
   return 'unresolved'
 }
 
-/** 收集 ParallelNode 所有子孙节点的 id。 */
+/** 收集 ParallelNode 所有叶子子孙节点的 id（跳过中间 ParallelNode 自身 id）。
+ *  嵌套 ParallelNode 通过其叶子节点的 resolved 状态自底向上合并。 */
 function collectChildIds(n: ParallelNode): NodeId[] {
   const ids: NodeId[] = []
   for (const child of n.nodes) {
-    ids.push(child.id)
-    if (child.type === 'parallel') ids.push(...collectChildIds(child))
+    if (child.type === 'parallel') {
+      ids.push(...collectChildIds(child))
+    } else {
+      ids.push(child.id)
+    }
   }
   return ids
 }
@@ -51,6 +55,8 @@ function resolveParallelMerge(
   strategy: MergeStrategy,
   childStatuses: string[]
 ): NodeRunState {
+  if (childStatuses.length === 0) return { status: 'failed' }
+
   const succeeded = childStatuses.filter(s => s === 'succeeded').length
   const total = childStatuses.length
 
@@ -67,6 +73,8 @@ function resolveParallelMerge(
       return succeeded > total / 2
         ? { status: 'succeeded' }
         : { status: 'failed' }
+    default:
+      return { status: 'failed' }
   }
 }
 
@@ -117,13 +125,28 @@ export function reduce(state: RunState, def: WorkflowDef, event: OrchestratorEve
       propagate(def, s); break
     case 'node:failed':
       s.nodes[event.nodeId] = { status: 'failed', error: event.error }
-      s.status = 'failed'; break // fail-fast
+      s.status = 'failed'
+      // fail-fast cascade: 级联 pending / running 节点为 skipped
+      // 跳过 ParallelNode（由 propagate 基于子节点终态自底向上合并）
+      const parallelIds = new Set(def.nodes.filter(n => n.type === 'parallel').map(n => n.id))
+      for (const id of Object.keys(s.nodes)) {
+        if (parallelIds.has(id)) continue
+        if (s.nodes[id].status === 'pending' || s.nodes[id].status === 'running') {
+          s.nodes[id] = { status: 'skipped' }
+        }
+      }
+      propagate(def, s); break
     case 'node:skipped':
       s.nodes[event.nodeId] = { status: 'skipped' }
       propagate(def, s); break
     case 'run:cancelled':
       s.status = 'cancelled'
-      for (const id of Object.keys(s.nodes)) if (s.nodes[id].status === 'running') s.nodes[id] = { ...s.nodes[id], status: 'cancelled' }
+      // cascade: 级联所有 pending / running 节点为 cancelled
+      for (const id of Object.keys(s.nodes)) {
+        if (s.nodes[id].status === 'pending' || s.nodes[id].status === 'running') {
+          s.nodes[id] = { ...s.nodes[id], status: 'cancelled' }
+        }
+      }
       break
     case 'run:finished': s.status = event.status; break
   }
@@ -132,7 +155,8 @@ export function reduce(state: RunState, def: WorkflowDef, event: OrchestratorEve
 
 /** 用上游产物 + 运行输入渲染 inputTemplate。 */
 export function resolveInput(node: WorkflowNode, state: RunState, runInputs?: NodeOutput): NodeOutput {
-  const text = node.inputTemplate.replace(TEMPLATE_RE, (_m, ref: string) => {
+  if (!('inputTemplate' in node)) return { text: '' }
+  const text = node.inputTemplate.replace(TEMPLATE_RE, (_m: string, ref: string) => {
     if (ref === 'input') return runInputs?.text ?? ''
     if (ref.startsWith('input.')) { const k = ref.slice('input.'.length); const d = runInputs?.data as Record<string, unknown> | undefined; return String(d?.[k] ?? '') }
     return state.nodes[ref]?.output?.text ?? ''

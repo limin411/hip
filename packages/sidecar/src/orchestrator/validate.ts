@@ -13,8 +13,10 @@ export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): Val
   const errors: ValidationError[] = []
   const ids = new Set(def.nodes.map((n) => n.id))
 
-  // 1. unknown-agent
-  for (const n of def.nodes) if (!registry.has(n.agentId)) errors.push({ code: 'unknown-agent', detail: `${n.id} → ${n.agentId}` })
+  // 1. unknown-agent (only check agent-type nodes)
+  for (const n of def.nodes) {
+    if ('agentId' in n && !registry.has(n.agentId)) errors.push({ code: 'unknown-agent', detail: `${n.id} → ${n.agentId}` })
+  }
 
   // 2. dangling-edge
   for (const e of def.edges) {
@@ -87,6 +89,7 @@ export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): Val
     return seen
   }
   for (const n of def.nodes) {
+    if (!('inputTemplate' in n)) continue
     const anc = hasCycle ? null : ancestorsOf(n.id)
     for (const m of n.inputTemplate.matchAll(TEMPLATE_RE)) {
       const ref = m[1]

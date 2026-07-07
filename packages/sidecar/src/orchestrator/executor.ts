@@ -32,6 +32,7 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
       if (inFlight.size >= maxCon) break
       if (inFlight.has(id)) continue
       const node = nodeById.get(id)!
+      if (!('agentId' in node)) continue
       const input = resolveInput(node, state, opts.runInputs)
       apply({ type: 'node:started', nodeId: id })
       const p = ports.agentRunner

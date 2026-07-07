@@ -141,7 +141,7 @@ describe('reduce — fail-fast', () => {
 })
 
 describe('reduce — cancel', () => {
-  it('run:cancelled → run cancelled,running 节点变 cancelled', () => {
+  it('run:cancelled → cascade: running/pending 节点都变为 cancelled', () => {
     const def = wf({
       nodes: [node('a'), node('b')],
       edges: [{ from: 'a', to: 'b' } as WorkflowEdge],
@@ -153,7 +153,7 @@ describe('reduce — cancel', () => {
     state = reduce(state, def, { type: 'run:cancelled' })
     expect(state.status).toBe('cancelled')
     expect(state.nodes.a.status).toBe('cancelled')
-    expect(state.nodes.b.status).toBe('pending') // 非 running 节点不变
+    expect(state.nodes.b.status).toBe('cancelled') // pending 也级联为 cancelled
   })
 })
 
@@ -212,18 +212,13 @@ describe('reduce with extended node types', () => {
       ], mergeStrategy: 'all' },
     ])
     let state = initRunState(def, 'r1')
-    // 子节点初始为 pending（因不在 entry 中且无入边）
-    // 直接设置为 succeeded 模拟执行完成
-    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
-    state.nodes['a2'] = { status: 'succeeded', output: { text: 'ok' } }
 
-    // propagate 应该把 p1 设置为 succeeded
     state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
     state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a2', output: { text: 'ok' } })
     expect(state.nodes['p1'].status).toBe('succeeded')
   })
 
-  it('ParallelNode with merge=any succeeds when one child succeeds', () => {
+  it('ParallelNode with merge=any resolves to succeeded when one succeeds (fail-fast cascades siblings)', () => {
     const def = makeDef([
       { type: 'parallel', id: 'p1', nodes: [
         { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
@@ -231,15 +226,16 @@ describe('reduce with extended node types', () => {
       ], mergeStrategy: 'any' },
     ])
     let state = initRunState(def, 'r1')
-    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
-    state.nodes['a2'] = { status: 'failed', error: 'boom' }
 
     state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+    // a2 失败触发 fail-fast cascade；但 p1 是 parallel 跳过 cascade，
+    // 由 propagate 自底向上合并为 succeeded（any 策略：一个子节点成功足够）
     state = reduce(state, def, { type: 'node:failed', nodeId: 'a2', error: 'boom' })
     expect(state.nodes['p1'].status).toBe('succeeded')
+    expect(state.status).toBe('failed') // 整个 run 仍是 failed
   })
 
-  it('ParallelNode with merge=vote fails when < majority succeed', () => {
+  it('ParallelNode with merge=vote: propagate resolves to failed after fail-fast cascade', () => {
     const def = makeDef([
       { type: 'parallel', id: 'p1', nodes: [
         { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
@@ -248,14 +244,13 @@ describe('reduce with extended node types', () => {
       ], mergeStrategy: 'vote' },
     ])
     let state = initRunState(def, 'r1')
-    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
-    state.nodes['a2'] = { status: 'failed', error: 'boom' }
-    state.nodes['a3'] = { status: 'failed', error: 'boom' }
 
     state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+    // a2 失败触发 fail-fast cascade；p1 是 parallel 跳过，a3 pending → skipped
+    // propagate 随后将 p1 合并为 failed（1 succeed + 1 failed + 1 skipped，未过半数）
     state = reduce(state, def, { type: 'node:failed', nodeId: 'a2', error: 'boom' })
-    state = reduce(state, def, { type: 'node:failed', nodeId: 'a3', error: 'boom' })
     expect(state.nodes['p1'].status).toBe('failed')
+    expect(state.status).toBe('failed')
   })
 
   it('node:failed on any node triggers fail-fast for the run', () => {
@@ -284,5 +279,79 @@ describe('reduce with extended node types', () => {
     expect(state.status).toBe('cancelled')
     expect(state.nodes['a1'].status).toBe('cancelled')
     expect(state.nodes['a2'].status).toBe('cancelled')
+  })
+
+  describe('edge cases', () => {
+    it('ParallelNode with empty nodes resolves to failed', () => {
+      const def: WorkflowDef = {
+        id: 'test-wf', name: 'test',
+        nodes: [
+          node('trigger'),
+          { type: 'parallel', id: 'p1', nodes: [], mergeStrategy: 'all' },
+        ],
+        edges: [],
+        entry: ['trigger'],
+      }
+      let state = initRunState(def, 'r1')
+      // trigger 成功后 propagate 运行，p1 空子节点 → failed
+      state = reduce(state, def, succeeded('trigger'))
+      expect(state.nodes['p1'].status).toBe('failed')
+    })
+
+    it('vote with exact tie (2/4 succeed) resolves to failed', () => {
+      const def = makeDef([
+        { type: 'parallel', id: 'p1', nodes: [
+          { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a3', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a4', agentId: 'x', inputTemplate: '' },
+        ], mergeStrategy: 'vote' },
+      ])
+      let state = initRunState(def, 'r1')
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a2', output: { text: 'ok' } })
+      state = reduce(state, def, { type: 'node:failed', nodeId: 'a3', error: 'nope' })
+      state = reduce(state, def, { type: 'node:failed', nodeId: 'a4', error: 'nope' })
+      expect(state.nodes['p1'].status).toBe('failed')
+    })
+
+    it('vote with majority (3/4 succeed) resolves to succeeded', () => {
+      const def = makeDef([
+        { type: 'parallel', id: 'p1', nodes: [
+          { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a3', agentId: 'x', inputTemplate: '' },
+          { type: 'agent', id: 'a4', agentId: 'x', inputTemplate: '' },
+        ], mergeStrategy: 'vote' },
+      ])
+      let state = initRunState(def, 'r1')
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a2', output: { text: 'ok' } })
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a3', output: { text: 'ok' } })
+      state = reduce(state, def, { type: 'node:failed', nodeId: 'a4', error: 'nope' })
+      expect(state.nodes['p1'].status).toBe('succeeded')
+    })
+
+    it('ParallelNode with single child resolves correctly', () => {
+      const def = makeDef([
+        { type: 'parallel', id: 'p1', nodes: [
+          { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+        ], mergeStrategy: 'all' },
+      ])
+      let state = initRunState(def, 'r1')
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+      expect(state.nodes['p1'].status).toBe('succeeded')
+    })
+
+    it('unknown merge strategy resolves to failed', () => {
+      const def = makeDef([
+        { type: 'parallel', id: 'p1', nodes: [
+          { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+        ], mergeStrategy: 'unknown' as any },
+      ])
+      let state = initRunState(def, 'r1')
+      state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+      expect(state.nodes['p1'].status).toBe('failed')
+    })
   })
 })

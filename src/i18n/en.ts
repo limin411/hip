@@ -418,8 +418,6 @@ export const en = {
       agents: {
         title: 'Agent Management',
         intro: 'Register external agents. The built-in hip agent is always the default.',
-        builtinName: 'hip (built-in)',
-        builtinDesc: 'The default agent. Cannot be edited.',
         add: 'Add agent',
         empty: 'No external agents yet.',
         name: 'Name',
@@ -456,6 +454,9 @@ export const en = {
         quirksPlaceholder: 'e.g. opencode (optional)',
         badgeInternal: 'Internal',
         badgeGlobalModel: 'Global model',
+        fixedCoderDesc: 'Default sub-agent. Reads, writes files, executes commands, searches code, and implements changes.',
+        fixedExploreDesc: 'Codebase exploration only. Read-only — search, read, and summarize without modifying files.',
+        fixedPlanDesc: 'Planning and architecture design. No shell commands — focused on designing the approach, not implementing it.',
         searchPlaceholder: 'Search agents…',
         searchEmpty: 'No matching agents',
         overviewTotal: 'Total agents',

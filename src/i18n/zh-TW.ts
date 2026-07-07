@@ -418,8 +418,6 @@ export const zhTW = {
       agents: {
         title: '智能體管理',
         intro: '接入外部智能體。內建 hip 智能體始終為預設。',
-        builtinName: 'hip（內建）',
-        builtinDesc: '預設智能體，不可編輯。',
         add: '新增智能體',
         empty: '尚無外部智能體。',
         name: '名稱',
@@ -456,6 +454,9 @@ export const zhTW = {
         quirksPlaceholder: '如 opencode（可留空）',
         badgeInternal: '內部',
         badgeGlobalModel: '全域模型',
+        fixedCoderDesc: '預設子 Agent，通用軟體工程助手，可讀寫檔案、執行命令、搜尋程式碼並落實具體改動。',
+        fixedExploreDesc: '程式碼庫探索專用，唯讀操作，不修改檔案。適合快速搜尋、閱讀和摘要倉庫。',
+        fixedPlanDesc: '實作規劃與架構設計專用，不提供 Shell 命令，專注於「想清楚怎麼做」。',
         searchPlaceholder: '搜尋智能體…',
         searchEmpty: '沒有符合的智能體',
         overviewTotal: '智能體總數',

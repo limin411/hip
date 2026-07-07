@@ -418,8 +418,6 @@ export const zhCN = {
       agents: {
         title: '智能体管理',
         intro: '接入外部智能体',
-        builtinName: 'hip（内置）',
-        builtinDesc: '默认智能体，不可编辑。',
         add: '添加智能体',
         empty: '暂无外部智能体。',
         name: '名称',
@@ -456,6 +454,9 @@ export const zhCN = {
         quirksPlaceholder: '如 opencode（可留空）',
         badgeInternal: '内部',
         badgeGlobalModel: '全局模型',
+        fixedCoderDesc: '默认子 Agent，通用软件工程助手，可读写文件、执行命令、搜索代码并落地具体改动。',
+        fixedExploreDesc: '代码库探索专用，只读操作，不修改文件。适合快速搜索、阅读和总结仓库。',
+        fixedPlanDesc: '实现规划与架构设计专用，不提供 Shell 命令，专注于"想清楚怎么做"。',
         searchPlaceholder: '搜索智能体…',
         searchEmpty: '没有匹配的智能体',
         overviewTotal: '智能体总数',

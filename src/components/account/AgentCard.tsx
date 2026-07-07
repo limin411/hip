@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Bot, Lock, Cpu, Terminal, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import { Cpu, Terminal, Pencil, Trash2, MoreVertical } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { agentCategory } from '@/lib/agentCategory'
@@ -14,26 +14,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
-
-/** Pinned, non-editable built-in agent. */
-export function BuiltinCard() {
-  const { t } = useTranslation()
-  return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-subtle px-4 py-3.5">
-      <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent text-white">
-        <Bot size={20} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-body font-medium text-ink">{t('settings.agents.builtinName')}</span>
-          <Badge className="bg-accent-subtle text-accent-strong">{t('settings.agents.builtin')}</Badge>
-        </div>
-        <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.agents.builtinDesc')}</div>
-      </div>
-      <Lock size={15} className="shrink-0 text-ink-tertiary" />
-    </div>
-  )
-}
 
 export function AgentCard({
   agent,

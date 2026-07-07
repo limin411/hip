@@ -279,8 +279,8 @@ describe('orchestrator concurrency — cancel propagation', () => {
     expect(state.status).toBe('cancelled')
     expect(state.nodes.a.status).toBe('succeeded')
     expect(state.nodes.b.status).toBe('cancelled')
-    // c was pending (waiting for b) and was never launched — stays pending
-    expect(state.nodes.c.status).toBe('pending')
+    // c was pending (waiting for b) — cascaded to cancelled by Phase 1 fix
+    expect(state.nodes.c.status).toBe('cancelled')
     expect(runner.calls.map((c) => c.nodeId)).not.toContain('c')
     // No node stuck in running
     expect(Object.values(state.nodes).filter((n) => n.status === 'running')).toEqual([])

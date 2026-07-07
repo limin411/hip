@@ -14,7 +14,7 @@ export const FIXED_AGENTS: AgentConfig[] = [
     id: 'coder',
     name: 'Coder',
     description:
-      '默认子 Agent，通用软件工程助手，可读写文件、执行命令、搜索代码并落地具体改动。',
+      'Default sub-agent. Reads, writes files, executes commands, searches code, and implements changes.',
     kind: 'internal',
     command: '',
     args: [],
@@ -37,7 +37,7 @@ export const FIXED_AGENTS: AgentConfig[] = [
     id: 'explore',
     name: 'Explore',
     description:
-      '代码库探索专用，只读操作，不修改文件。适合快速搜索、阅读和总结仓库。',
+      'Codebase exploration only. Read-only — search, read, and summarize without modifying files.',
     kind: 'internal',
     command: '',
     args: [],
@@ -57,7 +57,7 @@ export const FIXED_AGENTS: AgentConfig[] = [
     id: 'plan',
     name: 'Plan',
     description:
-      '实现规划与架构设计专用，不提供 Shell 命令，专注于"想清楚怎么做"。',
+      'Planning and architecture design. No shell commands — focused on designing the approach, not implementing it.',
     kind: 'internal',
     command: '',
     args: [],

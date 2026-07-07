@@ -15,6 +15,10 @@ interface FixedAgentCardProps {
 export function FixedAgentCard({ agent, enabled, onToggle }: FixedAgentCardProps) {
   const { t } = useTranslation()
 
+  // Look up the description from i18n using the agent id; fall back to agent.description.
+  const descKey = `settings.agents.fixed${agent.id.charAt(0).toUpperCase() + agent.id.slice(1)}Desc`
+  const description = t(descKey, { defaultValue: agent.description })
+
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-subtle px-4 py-3.5">
       <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent text-white">
@@ -33,9 +37,9 @@ export function FixedAgentCard({ agent, enabled, onToggle }: FixedAgentCardProps
               {t('settings.agents.badgeGlobalModel')}
             </Badge>
           </div>
-          {agent.description && (
+          {description && (
             <div className="mt-1 truncate text-caption text-ink-tertiary">
-              {agent.description}
+              {description}
             </div>
           )}
         </div>

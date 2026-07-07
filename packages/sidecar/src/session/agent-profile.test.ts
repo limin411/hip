@@ -3,14 +3,15 @@ import { BUILTIN_PROFILES } from './agent-profile.js'
 import type { AgentProfile } from './agent-profile.js'
 
 describe('BUILTIN_PROFILES', () => {
-  it('has exactly 4 entries', () => {
-    expect(BUILTIN_PROFILES).toHaveLength(4)
+  it('has exactly 5 entries', () => {
+    expect(BUILTIN_PROFILES).toHaveLength(5)
 
     const ids = BUILTIN_PROFILES.map((p) => p.id)
     expect(ids).toContain('supervisor')
     expect(ids).toContain('plan')
     expect(ids).toContain('explore')
     expect(ids).toContain('worker')
+    expect(ids).toContain('coder')
   })
 
   it('supervisor has primary mode', () => {

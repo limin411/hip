@@ -10,6 +10,7 @@ import { IdleWatchdog } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -515,9 +516,14 @@ export class Session {
   reloadPlugins(): void { this.configMgr.reloadPlugins() }
 
   // ── Profile delegation ──
-  setAgentProfile(id: string): boolean { return this.profileMgr.setActiveProfile(id) }
-  getActiveProfile(): AgentProfile { return this.profileMgr.getActiveProfile() }
-  listProfiles(): AgentProfile[] { return this.profileMgr.listProfiles(this._config.cwd) }
+  private getFixedAgents(): Record<string, boolean> | undefined {
+    const cwd = this._config.cwd ?? process.cwd()
+    return resolveEffectiveConfig(cwd).fixedAgents
+  }
+
+  setAgentProfile(id: string): boolean { return this.profileMgr.setActiveProfile(id, this.getFixedAgents()) }
+  getActiveProfile(): AgentProfile { return this.profileMgr.getActiveProfile(this.getFixedAgents()) }
+  listProfiles(): AgentProfile[] { return this.profileMgr.listProfiles(this._config.cwd, this.getFixedAgents()) }
 
   // ── FS helpers ──
   async lsDir(absPath: string): Promise<{ entries?: FsEntry[]; error?: string }> {

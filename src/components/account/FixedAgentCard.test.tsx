@@ -7,12 +7,12 @@ import type { AgentConfig } from '@hip/protocol'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
-      // Return human-readable values matching the English translations in en.ts
+    t: (key: string, options?: { defaultValue?: string }) => {
       if (key === 'settings.agents.builtin') return 'Built-in'
       if (key === 'settings.agents.badgeGlobalModel') return 'Global model'
       if (key === 'settings.agents.enableThis') return 'Available as sub-agent'
-      return key
+      if (key === 'settings.agents.fixedCoderDesc') return 'Default sub-agent. Reads, writes files, executes commands, searches code, and implements changes.'
+      return options?.defaultValue ?? key
     },
     i18n: { language: 'en', changeLanguage: vi.fn() },
   }),
@@ -25,7 +25,7 @@ afterEach(() => {
 const coder: AgentConfig = {
   id: 'coder',
   name: 'Coder',
-  description: '默认子 Agent，通用软件工程助手。',
+  description: 'Default sub-agent. Reads, writes, files.',
   kind: 'internal',
   command: '',
   args: [],
@@ -37,7 +37,7 @@ describe('FixedAgentCard', () => {
   it('renders agent name and description', () => {
     render(<FixedAgentCard agent={coder} enabled onToggle={() => {}} />)
     expect(screen.getByText('Coder')).toBeInTheDocument()
-    expect(screen.getByText('默认子 Agent，通用软件工程助手。')).toBeInTheDocument()
+    expect(screen.getByText('Default sub-agent. Reads, writes files, executes commands, searches code, and implements changes.')).toBeInTheDocument()
   })
 
   it('shows built-in badge', () => {

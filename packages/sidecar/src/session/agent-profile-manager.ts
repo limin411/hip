@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentProfile } from './agent-profile.js'
-import { BUILTIN_PROFILES, ALL_BUILTIN_TOOLS } from './agent-profile.js'
+import { BUILTIN_PROFILES, ALL_BUILTIN_TOOLS, FIXED_AGENT_IDS } from './agent-profile.js'
 
 // ---------------------------------------------------------------------------
 // Loader types
@@ -168,7 +168,7 @@ export class AgentProfileManager {
    * profile (so non-overridden fields from the lower layer are preserved).
    * Invalid profiles are dropped with a console warning.
    */
-  resolveConfig(cwd?: string): AgentProfile[] {
+  resolveConfig(cwd?: string, fixedAgents?: Record<string, boolean>): AgentProfile[] {
     const projectCwd = cwd ?? process.cwd()
 
     // Start with builtins
@@ -185,22 +185,31 @@ export class AgentProfileManager {
     const project = this.loaders.readProjectAgents(projectCwd)
     this.mergeLayer(map, project.profiles ?? [])
 
+    // Filter out disabled fixed agents
+    if (fixedAgents) {
+      for (const id of FIXED_AGENT_IDS) {
+        if (fixedAgents[id] === false) {
+          map.delete(id)
+        }
+      }
+    }
+
     return [...map.values()]
   }
 
   /**
    * Return the resolved profile list (alias for resolveConfig).
    */
-  listProfiles(cwd?: string): AgentProfile[] {
-    return this.resolveConfig(cwd)
+  listProfiles(cwd?: string, fixedAgents?: Record<string, boolean>): AgentProfile[] {
+    return this.resolveConfig(cwd, fixedAgents)
   }
 
   /**
    * Set the active profile by id. Returns true if the profile exists in the
    * resolved list; false otherwise.
    */
-  setActiveProfile(id: string): boolean {
-    const profiles = this.resolveConfig()
+  setActiveProfile(id: string, fixedAgents?: Record<string, boolean>): boolean {
+    const profiles = this.resolveConfig(undefined, fixedAgents)
     if (profiles.some((p) => p.id === id)) {
       this.activeProfileId = id
       return true
@@ -212,8 +221,8 @@ export class AgentProfileManager {
    * Return the currently active AgentProfile. If the active profile id is no
    * longer in the resolved list, falls back to the supervisor builtin.
    */
-  getActiveProfile(): AgentProfile {
-    const profiles = this.resolveConfig()
+  getActiveProfile(fixedAgents?: Record<string, boolean>): AgentProfile {
+    const profiles = this.resolveConfig(undefined, fixedAgents)
     const profile =
       profiles.find((p) => p.id === this.activeProfileId) ??
       profiles.find((p) => p.id === 'supervisor') ??

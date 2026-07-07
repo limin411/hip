@@ -19,6 +19,12 @@ export interface AgentProfile {
   temperature?: number
 }
 
+/**
+ * IDs of the fixed (non-deletable) built-in agent profiles whose enable/disable
+ * state is controlled by the `[fixedAgents]` section in hip.toml.
+ */
+export const FIXED_AGENT_IDS = ['coder', 'explore', 'plan']
+
 export const ALL_BUILTIN_TOOLS: string[] = [
   'write_file',
   'read_file',

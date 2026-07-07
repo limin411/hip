@@ -28,7 +28,7 @@ describe('SessionManager agent profiles', () => {
       | Extract<ServerMessage, { type: 'agent:profiles' }>
       | undefined
     expect(profilesMsg).toBeDefined()
-    expect(profilesMsg!.profiles).toHaveLength(4)
+    expect(profilesMsg!.profiles).toHaveLength(5)
     expect(profilesMsg!.sessionId).toBe('s1')
     expect(sent.some((msg) => msg.type === 'error')).toBe(false)
   })
@@ -50,7 +50,7 @@ describe('SessionManager agent profiles', () => {
     expect(sent.some((msg) => msg.type === 'agent:profiles')).toBe(false)
   })
 
-  it('agent:profiles includes exactly the 4 builtin profiles', () => {
+  it('agent:profiles includes exactly the builtin profiles', () => {
     const m = mgr()
     const sent: ServerMessage[] = []
     m.handle({ type: 'session:create', id: 's1', config: cfg }, (msg) => sent.push(msg))
@@ -63,12 +63,13 @@ describe('SessionManager agent profiles', () => {
       | undefined
     expect(profilesMsg).toBeDefined()
     const { profiles } = profilesMsg!
-    expect(profiles).toHaveLength(4)
+    expect(profiles).toHaveLength(5)
 
     const byId = new Map(profiles.map((p) => [p.id, p]))
     expect(byId.get('supervisor')).toMatchObject({ id: 'supervisor', name: 'Supervisor', mode: 'primary' })
     expect(byId.get('plan')).toMatchObject({ id: 'plan', name: 'Plan', mode: 'primary' })
     expect(byId.get('explore')).toMatchObject({ id: 'explore', name: 'Explore', mode: 'primary' })
     expect(byId.get('worker')).toMatchObject({ id: 'worker', name: 'Worker', mode: 'subagent' })
+    expect(byId.get('coder')).toMatchObject({ id: 'coder', name: 'Coder', mode: 'subagent' })
   })
 })

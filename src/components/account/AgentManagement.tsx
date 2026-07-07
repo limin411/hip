@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import type { AgentConfig } from '@hip/protocol'
 import { useAgentsStore } from '@/store/agentsStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
@@ -51,10 +52,17 @@ export function AgentManagement() {
 
   const handleFixedToggle = async (id: string, enabled: boolean) => {
     const next = { ...(fixedAgentsEnabled ?? {}), [id]: enabled }
+    const prev = fixedAgentsEnabled // snapshot BEFORE optimistic update
     try {
       await updateSection('fixedAgents', next)
     } catch (err) {
       console.error('Failed to toggle fixed agent:', err)
+      // Revert Zustand state (updateSection already did optimistic set; we must undo it)
+      useHipConfigStore.setState((state) => ({
+        config: { ...state.config, fixedAgents: prev },
+        error: null,
+      }))
+      toast.error(t('settings.agents.toggleFailed'))
     }
   }
 

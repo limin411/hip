@@ -464,6 +464,7 @@ export const zhTW = {
         overviewTotal: '智能體總數',
         overviewEnabled: '已啟用',
         addAgent: '新增智能體',
+        toggleFailed: '儲存智能體設定失敗',
         gridEmptyTitle: '尚無外部智能體',
         gridEmptyHint: '新增一個內部智能體或 ACP 智能體以開始使用。',
         acpPickTitle: '新增 ACP — 選擇提供方',

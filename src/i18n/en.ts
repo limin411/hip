@@ -464,6 +464,7 @@ export const en = {
         overviewTotal: 'Total agents',
         overviewEnabled: 'Enabled',
         addAgent: 'Add agent',
+        toggleFailed: 'Failed to save agent setting',
         gridEmptyTitle: 'No external agents yet',
         gridEmptyHint: 'Add an internal or ACP agent to get started.',
         acpPickTitle: 'New ACP agent — pick a provider',

@@ -464,6 +464,7 @@ export const zhCN = {
         overviewTotal: '智能体总数',
         overviewEnabled: '已启用',
         addAgent: '添加智能体',
+        toggleFailed: '保存智能体设置失败',
         gridEmptyTitle: '暂无外部智能体',
         gridEmptyHint: '添加一个内部智能体或 ACP 智能体以开始使用。',
         acpPickTitle: '新增 ACP — 选择提供方',

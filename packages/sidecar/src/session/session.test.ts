@@ -297,3 +297,33 @@ describe.skipIf(!hasKey)('NetworkPolicy config reload between turns', () => {
     expect(np.getResponseSizeCap()).toBe(10 * 1024 * 1024)
   })
 })
+
+describe('Session orchMode', () => {
+  const testConfig = { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }
+
+  it('defaults orchMode to "fast" when not provided in config', () => {
+    const session = new Session('test-om-default', testConfig)
+    expect((session as any).orchMode).toBe('fast')
+  })
+
+  it('respects orchMode="dag" set in config', () => {
+    const session = new Session('test-om-dag', { ...testConfig, orchMode: 'dag' })
+    expect((session as any).orchMode).toBe('dag')
+  })
+
+  it('respects orchMode="fast" set in config', () => {
+    const session = new Session('test-om-fast', { ...testConfig, orchMode: 'fast' })
+    expect((session as any).orchMode).toBe('fast')
+  })
+
+  it('falls through to graph loop when orchMode is "dag" but no pendingWorkflowDef', async () => {
+    // When orchMode is 'dag' but pendingWorkflowDef is null/undefined,
+    // the session should behave like fast mode (fall through to the graph loop).
+    const events: Array<{ type: string; [k: string]: unknown }> = []
+    const session = new Session('test-om-fallthrough', { ...testConfig, orchMode: 'dag' })
+    await session.sendMessage('say hello', (msg) => events.push(msg))
+    // The session should still process messages normally (no crash, no error)
+    expect(events.some((e) => e.type === 'message:complete')).toBe(true)
+    expect(events.some((e) => e.type === 'error')).toBe(false)
+  })
+})

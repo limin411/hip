@@ -646,6 +646,7 @@ export interface AgentNode {
   /** 含 {{nodeId}} / {{input}} / {{input.key}} 占位,引用上游产物或运行输入。 */
   inputTemplate: string
 }
+export type OrchestrationMode = import('./orchestration-types.js').OrchestrationMode
 export type WorkflowNode = import('./orchestration-types.js').WorkflowNode
 
 export interface EdgeCondition { kind: 'always' | 'contains' | 'equals'; value?: string }

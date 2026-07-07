@@ -1,4 +1,4 @@
-import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart, OrchestrationMode } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -43,7 +43,7 @@ import { PermissionManager } from './permission-manager.js'
 import { AgentProviderManager } from './agent-provider.js'
 import { ConfigManager } from './config-manager.js'
 import { deriveTitle, sanitizeTitle, buildDefaultTitleGenerator, type TitleGenerator } from './title-generator.js'
-import { runWorkflowTurn as runWorkflowTurnFn } from './workflow-runner.js'
+import { runWorkflowTurn as runWorkflowTurnFn, type WorkflowRunDeps } from './workflow-runner.js'
 import { shouldPlan } from './plan.js'
 import { AgentProfileManager } from './agent-profile-manager.js'
 import type { AgentProfile } from './agent-profile.js'
@@ -153,6 +153,9 @@ export class Session {
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
+  readonly orchMode: OrchestrationMode
+  /** When set, the next runTurn in 'dag' mode delegates to the workflow runner. */
+  pendingWorkflowDef: WorkflowDef | null = null
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
   private resumeAbortController: AbortController | null = null
@@ -378,6 +381,7 @@ export class Session {
     this.usesEnvModel = !model && !runner
     this.planMode = new PlanMode()
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
+    this.orchMode = config.orchMode ?? 'fast'
 
     this.backgroundManager = new BackgroundManager(id, {
       maxTasks: Session.MAX_BACKGROUND_TASKS,
@@ -432,6 +436,23 @@ export class Session {
   private summarizer(): Summarizer {
     if (this.injectedSummarizer) return this.injectedSummarizer
     return this.usesEnvModel ? createSummarizer() : NOOP_SUMMARIZER
+  }
+
+  private get workflowDeps(): WorkflowRunDeps {
+    return {
+      id: this.id,
+      config: this._config,
+      modelRunner: () => this.modelRunner(),
+      summarizer: () => this.summarizer(),
+      invokerFactory: this.agentProv.invoker,
+      store: this.store,
+      idleTimeoutMs: this.idleTimeoutMs,
+      pendingPermissions: this.permissions.pendingPermissions,
+      orchestratorRunner: this.orchestratorRunner,
+      networkPolicy: this.networkPolicy,
+      toolOutputStore: this.toolOutputStore,
+      guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
+    }
   }
 
   /** Compact the in-memory message history on demand (e.g. from the /compact slash command).
@@ -1092,6 +1113,20 @@ export class Session {
     planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
     plan?: PlanItem[]
   }): Promise<string> {
+    // ── DAG mode branch ──
+    // When orchMode is 'dag' and a workflow def is pending, delegate directly
+    // to the workflow runner instead of the existing StateGraph loop.
+    if (this.orchMode === 'dag' && this.pendingWorkflowDef) {
+      const def = this.pendingWorkflowDef
+      this.pendingWorkflowDef = null
+      return runWorkflowTurnFn(
+        this.workflowDeps,
+        def,
+        rawSend,
+        (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
+      )
+    }
+
     this.abortController = new AbortController(); this.running = true
 
     // Reload network policy config at the top of each turn so that
@@ -1498,16 +1533,7 @@ export class Session {
 
   async runWorkflowTurn(def: WorkflowDef, send: SendFn): Promise<string> {
     return runWorkflowTurnFn(
-      {
-        id: this.id, config: this._config,
-        modelRunner: () => this.modelRunner(), summarizer: () => this.summarizer(),
-        invokerFactory: this.agentProv.invoker, store: this.store,
-        idleTimeoutMs: this.idleTimeoutMs, pendingPermissions: this.permissions.pendingPermissions,
-        orchestratorRunner: this.orchestratorRunner,
-        networkPolicy: this.networkPolicy,
-        toolOutputStore: this.toolOutputStore,
-        guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
-      },
+      this.workflowDeps,
       def, send,
       (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
     )

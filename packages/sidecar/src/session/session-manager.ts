@@ -400,7 +400,7 @@ export class SessionManager {
   }
 
   private createSession(id: string, config: SessionConfig, send: SendFn): void {
-    let cfg = config
+    let cfg: SessionConfig = { ...config, orchMode: config.orchMode ?? 'fast' }
     if (!cfg.cwd) cfg = { ...cfg, cwd: ensureScratchDir(id, this.scratchRoot) }
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })

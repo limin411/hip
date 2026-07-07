@@ -1,4 +1,5 @@
 import type { ServerMessage, SessionConfig, AgentRole, Message, AgentRun, FsEntry, TurnUsage, DiffBase, DiffFile, DiffState, DiffSummary, Checkpoint, CommitLogEntry, CheckpointMode, Branch, PermissionMode, WorkflowDef, Hook, SkillMeta, AgentConfig, McpServerConfig, PlanItem, SessionEvent, TimelineStep, Attachment, ContentPart, OrchestrationMode } from '@hip/protocol'
+import { FIXED_AGENTS } from '@hip/protocol'
 import { mkdir, writeFile, rename } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
@@ -378,7 +379,7 @@ export class Session {
     this.injectedModel = model
     this.injectedRunner = runner
     this.injectedSummarizer = summarizer
-    this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd))
+    this.invokerFactory = invokerFactory ?? ((cwd) => createAgentInvoker(cwd, { readAgents: () => [...FIXED_AGENTS.filter(a => this.getFixedAgents()?.[a.id] !== false), ...readAgentsConfig(cwd)].filter(a => a.enabled) }))
     this.usesEnvModel = !model && !runner
     this.planMode = new PlanMode()
     this.titleGenerator = titleGenerator ?? (this.usesEnvModel ? buildDefaultTitleGenerator(config) : undefined)
@@ -1286,7 +1287,8 @@ export class Session {
       return text
     }
 
-    const enabledAgents = [...readAgentsConfig(cwd).filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin')]
+    const enabledFixedAgents = FIXED_AGENTS.filter(a => this.getFixedAgents()?.[a.id] !== false)
+    const enabledAgents = [...readAgentsConfig(cwd).filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin'), ...enabledFixedAgents]
     const invoker = this.agentProv.invoker(cwd)
     const requestApproval = this.permissions.buildRequestApproval(send, this.id, turnId, nextSeq, mode, this.hooks)
 

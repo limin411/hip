@@ -17,7 +17,7 @@ export function FixedAgentCard({ agent, enabled, onToggle }: FixedAgentCardProps
 
   // Look up the description from i18n using the agent id; fall back to agent.description.
   const descKey = `settings.agents.fixed${agent.id.charAt(0).toUpperCase() + agent.id.slice(1)}Desc`
-  const description = t(descKey, { defaultValue: agent.description })
+  const description = t(descKey, { defaultValue: agent.description ?? '' })
 
   return (
     <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">

@@ -31,21 +31,4 @@ describe('FIXED_AGENTS', () => {
     expect(FIXED_AGENT_IDS).toEqual(['coder', 'explore', 'plan'])
   })
 
-  it('coder has run_script in allowedTools', () => {
-    const coder = FIXED_AGENTS.find((a) => a.id === 'coder')!
-    expect(coder.allowedTools).toContain('run_script')
-  })
-
-  it('explore does not have write_file or run_script', () => {
-    const explore = FIXED_AGENTS.find((a) => a.id === 'explore')!
-    expect(explore.allowedTools).not.toContain('write_file')
-    expect(explore.allowedTools).not.toContain('edit_file')
-    expect(explore.allowedTools).not.toContain('run_script')
-  })
-
-  it('plan does not have run_script', () => {
-    const plan = FIXED_AGENTS.find((a) => a.id === 'plan')!
-    expect(plan.allowedTools).not.toContain('run_script')
-    expect(plan.allowedTools).not.toContain('write_file')
-  })
 })

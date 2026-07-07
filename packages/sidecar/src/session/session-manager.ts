@@ -166,6 +166,13 @@ export class SessionManager {
         send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
         break
       }
+      case 'session:setOrchMode': {
+        const s = this.ensureSession(msg.sessionId, send)
+        const applied = s.setOrchMode(msg.orchMode)
+        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+        send({ type: 'session:orchMode', sessionId: msg.sessionId, orchMode: s.orchMode })
+        break
+      }
       case 'session:setThinking': {
         const s = this.ensureSession(msg.sessionId, send)
         const applied = s.setThinking(msg.thinking)

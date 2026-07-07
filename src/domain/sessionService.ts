@@ -1,5 +1,5 @@
 // src/domain/sessionService.ts
-import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode, PermissionMode } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode, PermissionMode, OrchestrationMode } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -292,6 +292,12 @@ export class SessionService {
   setSystemPrompt(id: string, systemPrompt: string | null): void {
     useDomainStore.getState().apply({ type: 'session:systemPrompt', sessionId: id, systemPrompt }) // optimistic
     this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
+  }
+
+  /** Switch the session's orchestration mode (fast / dag). */
+  setOrchMode(id: string, orchMode: OrchestrationMode): void {
+    useDomainStore.getState().apply({ type: 'session:orchMode', sessionId: id, orchMode }) // optimistic
+    this.transport.send({ type: 'session:setOrchMode', sessionId: id, orchMode })
   }
 
   /** Switch the global current model live (no sidecar restart). */

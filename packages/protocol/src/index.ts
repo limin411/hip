@@ -492,6 +492,7 @@ export type ClientMessage =
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
   | { type: 'mcp:reconnect'; servers: McpServerConfig[] }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
+  | { type: 'session:setOrchMode'; sessionId: string; orchMode: OrchestrationMode }
   | { type: 'agent:setProfile'; sessionId: string; id: string }
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
@@ -512,6 +513,7 @@ export type ServerMessage =
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
+  | { type: 'session:orchMode'; sessionId: string; orchMode: OrchestrationMode }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }

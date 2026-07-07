@@ -288,6 +288,9 @@ export function applyServerMessage(
     case 'session:model':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, llmProvider: msg.llmProvider, model: msg.model } }))
 
+    case 'session:orchMode':
+      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, orchMode: msg.orchMode } }))
+
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state
@@ -387,7 +390,7 @@ export function clearPermission(state: { sessions: SessionVM[] }, requestId: str
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [] }
+export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], orchMode: 'fast' }
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, codePanelOpen: false, chatPanelOpen: false }

@@ -504,6 +504,13 @@ export class Session {
   setThinking(thinking: boolean): boolean { return this.configMgr.setThinking(thinking) }
   setModel(llmProvider: string): boolean { return this.configMgr.setModel(llmProvider) }
   setSystemPrompt(systemPrompt: string | null): boolean { return this.configMgr.setSystemPrompt(systemPrompt) }
+  setOrchMode(orchMode: OrchestrationMode): boolean {
+    if (this.running) return false
+    const changed = this.orchMode !== orchMode
+    this._config = { ...this._config, orchMode }
+    this.orchMode = orchMode
+    return changed
+  }
   applyActiveModel(): boolean { return this.configMgr.applyActiveModel() }
   reloadPlugins(): void { this.configMgr.reloadPlugins() }
 

@@ -23,3 +23,57 @@ describe('orchestration types', () => {
     expect(d.capabilities.hitl).toBe(true)
   })
 })
+
+describe('OrchestrationMode', () => {
+  it('accepts "fast"', () => {
+    const mode: import('./orchestration-types.js').OrchestrationMode = 'fast'
+    expect(mode).toBe('fast')
+  })
+
+  it('accepts "dag"', () => {
+    const mode: import('./orchestration-types.js').OrchestrationMode = 'dag'
+    expect(mode).toBe('dag')
+  })
+})
+
+describe('WorkflowNode', () => {
+  it('ToolNode has correct shape', () => {
+    const node: import('./orchestration-types.js').ToolNode = {
+      type: 'tool',
+      id: 'n1',
+      toolName: 'read_file',
+      inputTemplate: '{{input}}',
+    }
+    expect(node.type).toBe('tool')
+  })
+
+  it('ParallelNode with vote merge', () => {
+    const node: import('./orchestration-types.js').ParallelNode = {
+      type: 'parallel',
+      id: 'n1',
+      nodes: [],
+      mergeStrategy: 'vote',
+    }
+    expect(node.mergeStrategy).toBe('vote')
+  })
+
+  it('GateNode with lint config', () => {
+    const node: import('./orchestration-types.js').GateNode = {
+      type: 'gate',
+      id: 'n1',
+      gateKind: 'lint',
+      config: { command: 'eslint .' },
+    }
+    expect(node.gateKind).toBe('lint')
+  })
+
+  it('HumanNode with timeout', () => {
+    const node: import('./orchestration-types.js').HumanNode = {
+      type: 'human',
+      id: 'n1',
+      question: 'Approve changes?',
+      timeoutMs: 30000,
+    }
+    expect(node.timeoutMs).toBe(30000)
+  })
+})

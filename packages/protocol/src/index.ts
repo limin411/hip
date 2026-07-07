@@ -42,6 +42,9 @@ export interface SessionConfig {
    *  session_message projection instead of relying on LangGraph checkpointing or the legacy
    *  messages table. Set to false to opt out during the dual-write transition. */
   useEventSource?: boolean
+  /** Orchestration mode: 'fast' (default, existing single-agent loop)
+   *  or 'dag' (DAG workflow via the orchestrator). */
+  orchMode?: import('./orchestration-types.js').OrchestrationMode
 }
 
 /** Global current model the whole app uses. */
@@ -768,4 +771,10 @@ export interface NetworkPolicyConfig {
   maxRequestsPerMinute?: number
   maxResponseBytes?: number
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Orchestration types re-export
+// ──────────────────────────────────────────────────────────────────
+
+export * from './orchestration-types.js'
 

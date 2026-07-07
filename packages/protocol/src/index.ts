@@ -763,6 +763,9 @@ export interface HipConfig {
   mcpServers?: McpServerConfig[]
   skills?: SkillEntry[]
   agents?: AgentConfig[]
+  /** Enable/disable state for fixed built-in agents (coder, explore, plan).
+   *  Keyed by agent id; missing entries default to enabled. */
+  fixedAgents?: Record<string, boolean>
   /** Agent teams defined in hip.toml under `[[teams]]`. */
   teams?: import('./team-types.js').TeamConfig[]
 }

@@ -140,7 +140,7 @@ export const en = {
         label: 'Orchestration Mode',
         fast: 'Single Instance',
         fastDesc: 'Single agent loop, max 25 steps',
-        dag: 'Graph Mode',
+        dag: 'Cluster Mode',
         dagDesc: 'DAG workflow with parallelism and verification gates',
       },
       activity: {

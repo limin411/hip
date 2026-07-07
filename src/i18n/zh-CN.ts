@@ -140,7 +140,7 @@ export const zhCN = {
         label: '编排模式',
         fast: '单实例模式',
         fastDesc: '单 Agent 循环，最大 25 步',
-        dag: '图模式',
+        dag: '集群模式',
         dagDesc: 'DAG 工作流，支持并行与验证门控',
       },
       activity: {

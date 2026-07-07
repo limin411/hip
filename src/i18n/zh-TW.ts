@@ -140,7 +140,7 @@ export const zhTW = {
         label: '編排模式',
         fast: '單實例模式',
         fastDesc: '單 Agent 迴圈，最大 25 步',
-        dag: '圖模式',
+        dag: '集群模式',
         dagDesc: 'DAG 工作流，支援並行與驗證門控',
       },
       activity: {

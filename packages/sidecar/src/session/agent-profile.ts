@@ -110,4 +110,24 @@ export const BUILTIN_PROFILES: AgentProfile[] = [
     ],
     blockedTools: ['write_todos'],
   },
+  {
+    id: 'coder',
+    name: 'Coder',
+    description:
+      'General software engineering sub-agent. Reads, writes, edits files, runs scripts, and searches code. Blocked from write_todos so planning stays with the primary agent.',
+    mode: 'subagent',
+    allowedTools: [
+      'read_file',
+      'ls',
+      'glob',
+      'grep',
+      'write_file',
+      'edit_file',
+      'run_script',
+      'use_skill',
+      'web_search',
+      'web_fetch',
+    ],
+    blockedTools: ['write_todos'],
+  },
 ]

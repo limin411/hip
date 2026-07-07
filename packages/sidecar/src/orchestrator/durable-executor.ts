@@ -8,12 +8,15 @@ import type {
 import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 import type { SqliteWorkflowStore } from '../persistence/workflow-store.js'
+import type { Blackboard } from './blackboard.js'
 
 export interface DurableRunOpts {
   runId: string
   runInputs?: NodeOutput
   signal: AbortSignal
   maxConcurrency?: number
+  /** Shared per-workflow key-value store; agents access their run's namespace. */
+  blackboard?: Blackboard
 }
 
 export class DurableExecutor {
@@ -88,6 +91,7 @@ export class DurableExecutor {
               nodeId: id,
               agentId: (node as any).agentId ?? '',
               input,
+              blackboard: opts.blackboard,
             },
             opts.signal,
           )

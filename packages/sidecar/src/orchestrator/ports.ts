@@ -1,6 +1,7 @@
 import type { AgentId, NodeId, NodeOutput, RunState, WorkflowDef, OrchestratorEvent } from '@hip/protocol'
+import type { Blackboard } from './blackboard.js'
 
-export interface AgentRunRequest { runId: string; nodeId: NodeId; agentId: AgentId; input: NodeOutput }
+export interface AgentRunRequest { runId: string; nodeId: NodeId; agentId: AgentId; input: NodeOutput; blackboard?: Blackboard }
 
 /** 跑一个节点 = 一个外部 agent 的一整个回合。真实实现(后续切片)包 createAgentProvider().runTurn。 */
 export interface AgentRunner {

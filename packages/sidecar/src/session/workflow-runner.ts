@@ -8,6 +8,7 @@ import { runWorkflow } from '../orchestrator/executor.js'
 import { createSessionAgentRunner } from './orchestrator-adapter.js'
 import { runSubagent } from './subagent.js'
 import { CHILD_MAX_STEPS } from './loop-control.js'
+import { SqliteWorkflowStore } from '../persistence/workflow-store.js'
 import type { OrchestratorEventSink, AgentRunner } from '../orchestrator/ports.js'
 import type { GraphEmit } from './graph.js'
 import type { AgentInvoker } from './agents/invoker.js'
@@ -172,8 +173,10 @@ export async function runWorkflowTurn(
     },
   }
 
+  const workflowStore = deps.store ? new SqliteWorkflowStore(deps.store.getDb()) : undefined
+
   try {
-    const runState = await runWorkflow(def, { agentRunner: runner, eventSink }, { runId: turnId, signal: abortController.signal })
+    const runState = await runWorkflow(def, { agentRunner: runner, eventSink, store: workflowStore }, { runId: turnId, signal: abortController.signal })
     finishRemaining()
 
     const outputs = Object.values(runState.nodes)

@@ -1,4 +1,4 @@
-import type { WorkflowDef, RunState, NodeOutput, NodeId } from '@hip/protocol'
+import type { WorkflowDef, RunState, NodeOutput, NodeId, OrchestratorEvent } from '@hip/protocol'
 import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 
@@ -7,7 +7,13 @@ export interface RunWorkflowOpts { runId: string; runInputs?: NodeOutput; signal
 export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, opts: RunWorkflowOpts): Promise<RunState> {
   const sink = ports.eventSink
   let state = initRunState(def, opts.runId)
-  const apply = (e: Parameters<typeof reduce>[2]) => { sink?.emit(e); state = reduce(state, def, e) }
+  const apply = (e: OrchestratorEvent) => {
+    sink?.emit(e)
+    state = reduce(state, def, e)
+    // Auto-persist after every reduce when a store is configured
+    ports.store?.saveRun(state)
+    ports.store?.appendEvent?.(opts.runId, e)
+  }
   // reduce 的 propagate() 会在 node:succeeded 里把级联的下游节点直接置为 skipped,
   // 这些转移不经过 apply,因此不入 eventSink。为让『仅凭事件流重建状态』的下游(WS 透传)
   // 与权威 RunState 一致(设计文档:每个转移都喂 eventSink),这里在 succeeded 落定后,
@@ -78,6 +84,5 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
   } else {
     apply({ type: 'run:finished', status: state.status })
   }
-  ports.store && (await ports.store.saveRun(state))
   return state
 }

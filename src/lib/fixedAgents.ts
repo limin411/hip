@@ -1,4 +1,5 @@
 import type { AgentConfig } from '@hip/protocol'
+import { FIXED_AGENT_IDS } from '@hip/protocol'
 
 /**
  * Three fixed, non-deletable internal agents.
@@ -78,4 +79,4 @@ export const FIXED_AGENTS: AgentConfig[] = [
   },
 ]
 
-export const FIXED_AGENT_IDS = FIXED_AGENTS.map((a) => a.id)
+export { FIXED_AGENT_IDS }

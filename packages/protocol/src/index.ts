@@ -101,6 +101,13 @@ export interface AgentConfig {
 
 export interface AgentsConfig { agents: AgentConfig[] }
 
+/**
+ * IDs of the fixed (non-deletable) built-in agents whose enable/disable state is
+ * persisted under `fixedAgents` in HipConfig. Kept here as a single source of truth
+ * so the renderer and the sidecar agree on which agents are fixed.
+ */
+export const FIXED_AGENT_IDS = ['coder', 'explore', 'plan'] as const
+
 // ──────────────────────────────────────────────────────────────────
 // MCP server config (persisted as the mcpServers array in ~/.hip/config/hip.toml)
 // ──────────────────────────────────────────────────────────────────

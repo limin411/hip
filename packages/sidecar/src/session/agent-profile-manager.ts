@@ -11,7 +11,8 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { AgentProfile } from './agent-profile.js'
-import { BUILTIN_PROFILES, ALL_BUILTIN_TOOLS, FIXED_AGENT_IDS } from './agent-profile.js'
+import { BUILTIN_PROFILES, ALL_BUILTIN_TOOLS } from './agent-profile.js'
+import { FIXED_AGENT_IDS } from '@hip/protocol'
 
 // ---------------------------------------------------------------------------
 // Loader types

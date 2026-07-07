@@ -1,3 +1,5 @@
+import { FIXED_AGENT_IDS } from '@hip/protocol'
+
 /**
  * AgentProfile — typed agent configuration that gates tool access per role.
  *
@@ -23,7 +25,19 @@ export interface AgentProfile {
  * IDs of the fixed (non-deletable) built-in agent profiles whose enable/disable
  * state is controlled by the `[fixedAgents]` section in hip.toml.
  */
-export const FIXED_AGENT_IDS = ['coder', 'explore', 'plan']
+export { FIXED_AGENT_IDS }
+
+const SUBAGENT_BASE_TOOLS: string[] = [
+  'read_file',
+  'ls',
+  'glob',
+  'grep',
+  'write_file',
+  'edit_file',
+  'use_skill',
+  'web_search',
+  'web_fetch',
+]
 
 export const ALL_BUILTIN_TOOLS: string[] = [
   'write_file',
@@ -103,17 +117,7 @@ export const BUILTIN_PROFILES: AgentProfile[] = [
     description:
       'Subagent for focused implementation tasks: reads, writes, and edits files. Explicitly blocked from write_todos so planning stays with the primary agent.',
     mode: 'subagent',
-    allowedTools: [
-      'read_file',
-      'ls',
-      'glob',
-      'grep',
-      'write_file',
-      'edit_file',
-      'use_skill',
-      'web_search',
-      'web_fetch',
-    ],
+    allowedTools: SUBAGENT_BASE_TOOLS,
     blockedTools: ['write_todos'],
   },
   {
@@ -122,18 +126,7 @@ export const BUILTIN_PROFILES: AgentProfile[] = [
     description:
       'General software engineering sub-agent. Reads, writes, edits files, runs scripts, and searches code. Blocked from write_todos so planning stays with the primary agent.',
     mode: 'subagent',
-    allowedTools: [
-      'read_file',
-      'ls',
-      'glob',
-      'grep',
-      'write_file',
-      'edit_file',
-      'run_script',
-      'use_skill',
-      'web_search',
-      'web_fetch',
-    ],
+    allowedTools: [...SUBAGENT_BASE_TOOLS, 'run_script'],
     blockedTools: ['write_todos'],
   },
 ]

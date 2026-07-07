@@ -194,3 +194,95 @@ describe('resolveInput', () => {
     expect(resolveInput(n, state).text).toBe('a= in= ik=')
   })
 })
+
+describe('reduce with extended node types', () => {
+  const makeDef = (nodes: WorkflowNode[]): WorkflowDef => ({
+    id: 'test-wf',
+    name: 'test',
+    nodes,
+    edges: [],
+    entry: nodes.filter(n => n.type !== 'parallel').map(n => n.id),
+  })
+
+  it('ParallelNode with merge=all succeeds when all children succeed', () => {
+    const def = makeDef([
+      { type: 'parallel', id: 'p1', nodes: [
+        { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+        { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+      ], mergeStrategy: 'all' },
+    ])
+    let state = initRunState(def, 'r1')
+    // 子节点初始为 pending（因不在 entry 中且无入边）
+    // 直接设置为 succeeded 模拟执行完成
+    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
+    state.nodes['a2'] = { status: 'succeeded', output: { text: 'ok' } }
+
+    // propagate 应该把 p1 设置为 succeeded
+    state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+    state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a2', output: { text: 'ok' } })
+    expect(state.nodes['p1'].status).toBe('succeeded')
+  })
+
+  it('ParallelNode with merge=any succeeds when one child succeeds', () => {
+    const def = makeDef([
+      { type: 'parallel', id: 'p1', nodes: [
+        { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+        { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+      ], mergeStrategy: 'any' },
+    ])
+    let state = initRunState(def, 'r1')
+    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
+    state.nodes['a2'] = { status: 'failed', error: 'boom' }
+
+    state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+    state = reduce(state, def, { type: 'node:failed', nodeId: 'a2', error: 'boom' })
+    expect(state.nodes['p1'].status).toBe('succeeded')
+  })
+
+  it('ParallelNode with merge=vote fails when < majority succeed', () => {
+    const def = makeDef([
+      { type: 'parallel', id: 'p1', nodes: [
+        { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+        { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+        { type: 'agent', id: 'a3', agentId: 'x', inputTemplate: '' },
+      ], mergeStrategy: 'vote' },
+    ])
+    let state = initRunState(def, 'r1')
+    state.nodes['a1'] = { status: 'succeeded', output: { text: 'ok' } }
+    state.nodes['a2'] = { status: 'failed', error: 'boom' }
+    state.nodes['a3'] = { status: 'failed', error: 'boom' }
+
+    state = reduce(state, def, { type: 'node:succeeded', nodeId: 'a1', output: { text: 'ok' } })
+    state = reduce(state, def, { type: 'node:failed', nodeId: 'a2', error: 'boom' })
+    state = reduce(state, def, { type: 'node:failed', nodeId: 'a3', error: 'boom' })
+    expect(state.nodes['p1'].status).toBe('failed')
+  })
+
+  it('node:failed on any node triggers fail-fast for the run', () => {
+    const def = makeDef([
+      { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+    ])
+    let state = initRunState(def, 'r1')
+    state = reduce(state, def, { type: 'run:started' })
+    state = reduce(state, def, { type: 'node:started', nodeId: 'a1' })
+    state = reduce(state, def, { type: 'node:failed', nodeId: 'a1', error: 'test error' })
+    expect(state.status).toBe('failed')
+    expect(state.nodes['a1'].status).toBe('failed')
+    expect(state.nodes['a1'].error).toBe('test error')
+  })
+
+  it('run:cancelled marks all running nodes as cancelled', () => {
+    const def = makeDef([
+      { type: 'agent', id: 'a1', agentId: 'x', inputTemplate: '' },
+      { type: 'agent', id: 'a2', agentId: 'x', inputTemplate: '' },
+    ])
+    let state = initRunState(def, 'r1')
+    state = reduce(state, def, { type: 'run:started' })
+    state.nodes['a1'] = { status: 'running' }
+    state.nodes['a2'] = { status: 'running' }
+    state = reduce(state, def, { type: 'run:cancelled' })
+    expect(state.status).toBe('cancelled')
+    expect(state.nodes['a1'].status).toBe('cancelled')
+    expect(state.nodes['a2'].status).toBe('cancelled')
+  })
+})

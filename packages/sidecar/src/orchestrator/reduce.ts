@@ -1,11 +1,19 @@
-import type { WorkflowDef, RunState, NodeRunState, NodeId, NodeOutput, OrchestratorEvent, EdgeCondition, WorkflowNode } from '@hip/protocol'
+import type { WorkflowDef, RunState, NodeRunState, NodeId, NodeOutput, OrchestratorEvent, EdgeCondition, WorkflowNode, ParallelNode, MergeStrategy } from '@hip/protocol'
 
 const TEMPLATE_RE = /\{\{\s*([^}\s]+)\s*\}\}/g
 
 export function initRunState(def: WorkflowDef, runId: string): RunState {
   const nodes: Record<NodeId, NodeRunState> = {}
   const entry = new Set(def.entry)
-  for (const n of def.nodes) nodes[n.id] = { status: entry.has(n.id) ? 'ready' : 'pending' }
+
+  const initNode = (n: WorkflowNode) => {
+    if (n.type === 'parallel') {
+      for (const child of n.nodes) initNode(child)
+    }
+    nodes[n.id] = { status: entry.has(n.id) ? 'ready' : 'pending' }
+  }
+
+  for (const n of def.nodes) initNode(n)
   return { runId, workflowId: def.id, status: 'running', nodes }
 }
 
@@ -28,15 +36,67 @@ function edgeState(def: WorkflowDef, state: RunState, from: NodeId, when: EdgeCo
   return 'unresolved'
 }
 
-/** 把所有 pending 节点按 join 语义推进到 ready/skipped,直到不动点(skip 会级联)。 */
+/** 收集 ParallelNode 所有子孙节点的 id。 */
+function collectChildIds(n: ParallelNode): NodeId[] {
+  const ids: NodeId[] = []
+  for (const child of n.nodes) {
+    ids.push(child.id)
+    if (child.type === 'parallel') ids.push(...collectChildIds(child))
+  }
+  return ids
+}
+
+/** 根据 merge 策略决定 ParallelNode 的终态。 */
+function resolveParallelMerge(
+  strategy: MergeStrategy,
+  childStatuses: string[]
+): NodeRunState {
+  const succeeded = childStatuses.filter(s => s === 'succeeded').length
+  const total = childStatuses.length
+
+  switch (strategy) {
+    case 'all':
+      return succeeded === total
+        ? { status: 'succeeded' }
+        : { status: 'failed' }
+    case 'any':
+      return succeeded > 0
+        ? { status: 'succeeded' }
+        : { status: 'failed' }
+    case 'vote':
+      return succeeded > total / 2
+        ? { status: 'succeeded' }
+        : { status: 'failed' }
+  }
+}
+
+/** 把所有 pending 节点按 join 语义推进到 ready/skipped,直到不动点(skip 会级联)。
+ *  ParallelNode 通过收集子孙节点状态 + merge 策略独立于边图解析。 */
 function propagate(def: WorkflowDef, state: RunState): RunState {
   let changed = true
   while (changed) {
     changed = false
     for (const n of def.nodes) {
       if (state.nodes[n.id].status !== 'pending') continue
+
+      if (n.type === 'parallel') {
+        const parNode = n as ParallelNode
+        const childIds = collectChildIds(parNode)
+        const statuses = childIds.map(id => state.nodes[id]?.status ?? 'pending')
+        const allResolved = statuses.every(s =>
+          ['succeeded', 'failed', 'skipped', 'cancelled'].includes(s))
+
+        if (!allResolved) continue
+
+        const next = resolveParallelMerge(parNode.mergeStrategy, statuses)
+        state.nodes[n.id] = next
+        changed = true
+        continue
+      }
+
+      // 原有逻辑: 基于 incoming edges 的 join 语义
       const incoming = def.edges.filter((e) => e.to === n.id)
-      if (incoming.length === 0) continue // 仅入口无入边,init 已置 ready
+      if (incoming.length === 0) continue
       const states = incoming.map((e) => edgeState(def, state, e.from, e.when))
       if (states.some((s) => s === 'unresolved')) continue
       const next: NodeRunState = states.some((s) => s === 'active') ? { status: 'ready' } : { status: 'skipped' }

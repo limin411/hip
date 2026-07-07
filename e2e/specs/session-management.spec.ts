@@ -17,10 +17,6 @@ async function ensureNewConversationDraft(): Promise<void> {
   }
 }
 
-async function clearSessionSearch(): Promise<void> {
-  // Session search was removed with the sidebar; no-op for compatibility.
-}
-
 describe('session management', () => {
   before(async () => {
     await waitForAppReady()
@@ -34,7 +30,6 @@ describe('session management', () => {
   beforeEach(async () => {
     await switchToChatSurface()
     await ensureNewConversationDraft()
-    await clearSessionSearch()
   })
 
   it('creates a new conversation draft from the title bar', async () => {
@@ -69,39 +64,5 @@ describe('session management', () => {
     const active = await browser.$('[data-testid="session-tab"][aria-selected="true"]')
     await active.waitForExist({ timeout: 10000 })
     expect(await active.getText()).toContain('second session')
-  })
-
-  it.skip('filters sessions via the search box (search removed with sidebar)', async () => {
-    // Make sure at least one session contains the search term from earlier tests.
-    await sendChatMessage('e2e search target')
-    await browser.waitUntil(
-      async () => await (await chat.sessionItems).length >= 1,
-      { timeout: 30000, interval: 500 },
-    )
-
-    const search = await browser.$('[data-testid="session-search-input"]')
-    await search.click()
-    await search.clearValue()
-    await browser.keys('e2e')
-    await browser.pause(600)
-
-    const items = await chat.sessionItems
-    expect(await items.length).toBeGreaterThanOrEqual(1)
-    for (const item of items) {
-      expect(await item.getText()).toMatch(/e2e/i)
-    }
-  })
-
-  it.skip('clears the search filter and shows all chat sessions again (search removed with sidebar)', async () => {
-    const search = await browser.$('[data-testid="session-search-input"]')
-    await search.setValue('e2e')
-    await browser.pause(600)
-    const filtered = await (await chat.sessionItems).length
-
-    await search.setValue('')
-    await browser.pause(600)
-    const all = await (await chat.sessionItems).length
-
-    expect(all).toBeGreaterThanOrEqual(filtered)
   })
 })

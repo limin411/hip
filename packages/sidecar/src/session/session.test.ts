@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ChatOpenAI } from '@langchain/openai'
 import { ChatAnthropic } from '@langchain/anthropic'
+import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { Session } from './session.js'
 import { NetworkPolicy } from './network-policy.js'
 import { writeFileSync, existsSync, readFileSync, unlinkSync, renameSync, mkdirSync } from 'node:fs'
@@ -330,8 +331,9 @@ describe('Session orchMode', () => {
   it('falls through to graph loop when orchMode is "dag" but no pendingWorkflowDef', async () => {
     // When orchMode is 'dag' but pendingWorkflowDef is null/undefined,
     // the session should behave like fast mode (fall through to the graph loop).
+    const fakeModel = new FakeListChatModel({ responses: ['Hello! I received your message.'] })
     const events: Array<{ type: string; [k: string]: unknown }> = []
-    const session = new Session('test-om-fallthrough', { ...testConfig, orchMode: 'dag' })
+    const session = new Session('test-om-fallthrough', { ...testConfig, orchMode: 'dag' }, fakeModel)
     await session.sendMessage('say hello', (msg) => events.push(msg))
     // The session should still process messages normally (no crash, no error)
     expect(events.some((e) => e.type === 'message:complete')).toBe(true)

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Lock, Cpu } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/Avatar'
@@ -20,32 +20,24 @@ export function FixedAgentCard({ agent, enabled, onToggle }: FixedAgentCardProps
   const description = t(descKey, { defaultValue: agent.description })
 
   return (
-    <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface-subtle px-4 py-3.5">
-      <span className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-lg bg-accent text-white">
-        <Avatar name={agent.name} shape="square" size={38} />
-      </span>
-
-      <div className={cn('flex min-w-0 flex-1 items-center gap-3.5 transition-opacity', !enabled && 'opacity-60')}>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-body font-medium text-ink">{agent.name}</span>
-            <Badge className="bg-accent-subtle text-accent-strong">
+    <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">
+      <div className={cn('flex flex-1 flex-col transition-opacity', !enabled && 'opacity-60')}>
+        <div className="flex items-start gap-3">
+          <Avatar name={agent.name} shape="square" size={40} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-body font-medium text-ink">{agent.name}</div>
+            <Badge className="mt-1 bg-accent-subtle text-accent-strong">
               {t('settings.agents.builtin')}
             </Badge>
-            <Badge>
-              <Cpu size={11} />
-              {t('settings.agents.badgeGlobalModel')}
-            </Badge>
           </div>
-          {description && (
-            <div className="mt-1 truncate text-caption text-ink-tertiary">
-              {description}
-            </div>
-          )}
+        </div>
+        <div className="mt-3 flex-1">
+          <p className="line-clamp-2 text-body text-ink-secondary">
+            {description}
+          </p>
         </div>
       </div>
-
-      <div className="flex shrink-0 items-center gap-2.5">
+      <div className="mt-4 flex items-center justify-between">
         <Switch
           checked={enabled}
           onCheckedChange={onToggle}

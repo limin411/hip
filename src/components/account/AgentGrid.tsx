@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { AgentCard } from './AgentCard'
@@ -20,7 +21,7 @@ export function AgentGrid({
   return (
     <div>
       {agents.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyHint} />
+        <EmptyState icon={Bot} title={emptyTitle} description={emptyHint} />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => (

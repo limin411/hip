@@ -459,6 +459,8 @@ export const en = {
         fixedPlanDesc: 'Planning and architecture design. No shell commands — focused on designing the approach, not implementing it.',
         searchPlaceholder: 'Search agents…',
         searchEmpty: 'No matching agents',
+        sectionBuiltin: 'Built-in agents',
+        customSection: 'Custom agents',
         overviewTotal: 'Total agents',
         overviewEnabled: 'Enabled',
         addAgent: 'Add agent',

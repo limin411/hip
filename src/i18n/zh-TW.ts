@@ -430,6 +430,8 @@ export const zhTW = {
         editTitle: '編輯智能體',
         error: '操作失敗，請重試。',
         builtin: '內建',
+        sectionBuiltin: '內建智能體',
+        customSection: '自訂智能體',
         description: '使用場景',
         descriptionPlaceholder: '描述 hip 何時應委派給該智能體…',
         enableThis: '作為子智能體啟用',

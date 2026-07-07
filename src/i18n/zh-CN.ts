@@ -430,6 +430,8 @@ export const zhCN = {
         editTitle: '编辑智能体',
         error: '操作失败，请重试。',
         builtin: '内置',
+        sectionBuiltin: '内置智能体',
+        customSection: '自定义智能体',
         description: '使用场景',
         descriptionPlaceholder: '描述 hip 何时应委派给该智能体…',
         enableThis: '作为子智能体启用',

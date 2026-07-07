@@ -10,6 +10,9 @@ export const MAX_STEPS_NOTE =
   'MAXIMUM STEPS REACHED. Tools are now disabled. Do not attempt any tool call. ' +
   'Respond with a short plain-text summary of what you have done so far and what remains.'
 
+/** Sub-agent max recursion depth. At depth >= MAX_DEPTH the task/dispatch_agent tools are filtered out. */
+export const MAX_DEPTH = 3
+
 /** LangGraph recursion limit for a loop capped at `maxSteps`. Each model turn now visits ~3 nodes
  *  (compact + agent + tools), plus occasional nudge/pause detours, so reserve headroom above
  *  3*maxSteps; our own step cap (not this limit) is the real stop condition. The arg-less default

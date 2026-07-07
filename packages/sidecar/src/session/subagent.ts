@@ -7,7 +7,7 @@ import { buildTools, type ApprovalFn } from './tools.js'
 import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
-import { recursionLimit } from './loop-control.js'
+import { recursionLimit, MAX_DEPTH } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
 
 const NOOP_EMIT: GraphEmit = {
@@ -48,6 +48,9 @@ export interface RunSubagentArgs {
   toolOutputStore?: ToolOutputStore
   /** Guardian reviewer for approval escalation; created per-turn with the parent model. */
   guardianReviewer?: GuardianReviewer
+  /** Current delegation depth. 0 for top-level session, increments with each `task` delegation.
+   *  At depth >= MAX_DEPTH, task/task_batch/dispatch_agent tools are filtered. */
+  depth?: number
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
@@ -65,20 +68,41 @@ export function lastAiText(messages: BaseMessage[]): string {
 }
 
 /**
- * Run a depth-1 sub-agent to completion and return its final assistant text.
+ * Run a sub-agent to completion and return its final assistant text.
  *
- * - Child toolset = buildTools(root) with NO spawn closure → no `task` tool (depth-1, P3-D3).
  * - Shares the parent cwd (`root`) and the parent AbortSignal (cancel propagates into the child stream).
  * - Capped at `childMaxSteps` (independent of the parent MAX_STEPS).
  * - If the child would HITL-pause (status === 'awaiting_user'), it does NOT escalate: returns its
  *   partial assistant text with the pending question appended as context (P3-D3, no agent:interrupt).
+ * - Depth-aware: when currentDepth < MAX_DEPTH, the child gets `task`/`task_batch` tools for
+ *   recursive delegation. At depth >= MAX_DEPTH, those tools are filtered out.
  */
 export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const { runner, root, summarizer, emit, signal, description, childMaxSteps, permissionMode, requestApproval, existingMessages, mode, sessionId, networkPolicy, toolOutputStore, guardianReviewer } = args
-  // depth-1: no task tool (no spawn closure). Cascade the conversation's permission mode + approval
-  // seam so a chat worker is read-only, an edit worker can write + HITL-gate run_script, and a full
-  // worker un-jails files + auto-approves — mirroring how dispatch_agent cascades the same mode.
-  const tools = buildTools(root, undefined, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true, sessionId, networkPolicy })
+  const currentDepth = args.depth ?? 0
+
+  // Create a spawn function for recursive delegation that increments depth on each call.
+  const childSpawn = async (desc: string, submode?: 'foreground' | 'background'): Promise<string> => {
+    return runSubagent({
+      ...args,
+      depth: currentDepth + 1,
+      description: desc,
+      mode: submode,
+      existingMessages: undefined, // each delegation is a fresh sub-agent
+    })
+  }
+
+  // Build tools WITH child spawn so delegation tools are available for the child.
+  // Cascade the conversation's permission mode + approval seam so a chat worker is read-only,
+  // an edit worker can write + HITL-gate run_script, and a full worker un-jails files + auto-approves
+  // — mirroring how dispatch_agent cascades the same mode.
+  let tools = buildTools(root, childSpawn, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true, sessionId, networkPolicy })
+
+  // At max depth, strip delegation tools so the sub-agent cannot spawn further children.
+  if (currentDepth >= MAX_DEPTH) {
+    const blocked = new Set(['task', 'task_batch', 'dispatch_agent'])
+    tools = tools.filter((t) => !blocked.has(t.name))
+  }
   const ctx: GraphCtx = { runner, tools, emit: mode === 'background' ? NOOP_EMIT : emit, summarizer, sessionId: sessionId ?? 'subagent', toolOutputStore, guardianReviewer }
   const app = buildGraph(childMaxSteps)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0

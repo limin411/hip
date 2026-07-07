@@ -86,9 +86,10 @@ describe('runSubagent', () => {
     })
   })
 
-  it('is depth-1: the child toolset has no task tool', async () => {
+  it('filters task/task_batch tools when depth >= MAX_DEPTH', async () => {
     await withTmp(async (root) => {
-      // Child asks for `task`; toolsNode returns an unknown-tool ToolMessage, then the child answers.
+      // At depth=MAX_DEPTH (3), delegation tools are stripped from the child's toolset.
+      // The child asks for `task`; toolsNode returns an unknown-tool ToolMessage, then the child answers.
       const text = await runSubagent({
         runner: fakeRunner([
           new AIMessage({ content: '', tool_calls: [{ name: 'task', args: { description: 'recurse' }, id: 'c1' }] }),
@@ -96,9 +97,23 @@ describe('runSubagent', () => {
         ]),
         root, summarizer: noopSummarizer, emit: noopEmit,
         signal: new AbortController().signal, description: 'try to recurse', childMaxSteps: 15,
+        depth: 3,
       })
       expect(buildTools(root).map((t) => t.name)).not.toContain('task')
       expect(text).toBe('无法继续委派，已直接处理')
+    })
+  })
+
+  it('includes task/task_batch tools when depth < MAX_DEPTH', async () => {
+    await withTmp(async (root) => {
+      const runner = new ToolCapturingRunner()
+      await runSubagent({
+        runner, root, summarizer: noopSummarizer, emit: noopEmit,
+        signal: new AbortController().signal, description: 'test', childMaxSteps: 15,
+        depth: 1,
+      })
+      expect(runner.toolNames).toContain('task')
+      expect(runner.toolNames).toContain('task_batch')
     })
   })
 
@@ -144,6 +159,17 @@ class CapturingChildRunner implements ModelRunner {
     if (tc) {
       return new AIMessage({ content: '', tool_calls: [{ name: tc.name, args: tc.args, id: `c${this.call}` }] })
     }
+    opts.onText('done')
+    return new AIMessage('done')
+  }
+}
+
+/** A ModelRunner that captures the tool list it receives, then immediately answers. */
+class ToolCapturingRunner implements ModelRunner {
+  toolNames: string[] = []
+  async run(messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMsg> {
+    opts.signal?.throwIfAborted?.()
+    this.toolNames = opts.tools.map((t) => t.name)
     opts.onText('done')
     return new AIMessage('done')
   }

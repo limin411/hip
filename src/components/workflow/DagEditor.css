@@ -1,0 +1,253 @@
+/* ──────────────────────────────────────────────────────────────
+ * DagEditor — React Flow canvas overrides & node card styling
+ * Dark mode compatible (uses CSS variables set by Tailwind theme)
+ * ────────────────────────────────────────────────────────────── */
+
+/* ── Canvas background ── */
+.react-flow {
+  --xy-background-color-default: var(--bg-app);
+  --xy-background-pattern-dot-color-default: var(--border);
+}
+.react-flow__background {
+  background-color: var(--bg-app) !important;
+}
+
+/* ── Controls ── */
+.react-flow__controls {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  fill: var(--ink-secondary);
+}
+.react-flow__controls-button:hover {
+  background: var(--surface-muted);
+}
+
+/* ── Minimap ── */
+.react-flow__minimap {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Edge styling ── */
+.react-flow__edge-path {
+  stroke: var(--border);
+  stroke-width: 2;
+}
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--accent);
+}
+.react-flow__edge .react-flow__edge-textbg {
+  fill: var(--surface);
+}
+.react-flow__edge .react-flow__edge-text {
+  fill: var(--ink-secondary);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* ── Node card base ── */
+.dag-node {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.15s, border-color 0.15s;
+  overflow: hidden;
+  cursor: pointer;
+  min-width: 200px;
+}
+.dag-node:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: var(--ink-tertiary);
+}
+
+/* ── Status overlays ── */
+.dag-node.status-succeeded {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1.5px var(--success/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dag-node.status-running {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dag-node.status-failed {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1.5px var(--danger/30), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.dag-node.status-pending {
+  opacity: 0.7;
+}
+.dag-node.status-skipped {
+  opacity: 0.45;
+}
+
+/* ── Role-specific header bars ── */
+.dag-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border);
+}
+.dag-node-header.agent   { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.dag-node-header.tool    { background: color-mix(in srgb, var(--warning) 15%, transparent); color: oklch(0.65 0.14 60); }
+.dag-node-header.gate    { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.dag-node-header.parallel { background: color-mix(in srgb, var(--accent) 8%, transparent); color: var(--ink-secondary); }
+.dag-node-header.human   { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); }
+
+.dag-node-body {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.dag-node-body .label {
+  font-weight: 500;
+  margin-bottom: 2px;
+  word-break: break-word;
+}
+.dag-node-body .meta {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Gate node diamond shape ── */
+.dag-node.gate {
+  min-width: 80px;
+  min-height: 80px;
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+.dag-node.gate > * {
+  transform: rotate(-45deg);
+}
+.dag-node.gate .dag-node-header,
+.dag-node.gate .dag-node-body {
+  border: none;
+  background: transparent;
+  text-align: center;
+}
+
+/* ── Parallel container ── */
+.dag-node.parallel {
+  min-width: 280px;
+  min-height: 160px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--accent));
+  border-style: dashed;
+}
+.dag-node.parallel .dag-node-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dag-parallel-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.dag-parallel-child .child-role {
+  font-weight: 600;
+  color: var(--ink);
+}
+.dag-parallel-child .child-meta {
+  color: var(--ink-tertiary);
+  font-size: 10px;
+}
+
+/* ── Tooltip ── */
+.dag-tooltip {
+  position: absolute;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 320px;
+  pointer-events: none;
+}
+.dag-tooltip .tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dag-tooltip .tooltip-body {
+  color: var(--ink-secondary);
+  white-space: pre-wrap;
+}
+
+/* ── Status badge dot ── */
+.dag-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.dag-status-dot.succeeded { background: var(--success); }
+.dag-status-dot.running   { background: var(--accent); animation: pulse-dot 1.5s ease-in-out infinite; }
+.dag-status-dot.failed    { background: var(--danger); }
+.dag-status-dot.pending   { background: var(--ink-tertiary); }
+.dag-status-dot.skipped   { background: var(--ink-tertiary); opacity: 0.5; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Legend panel ── */
+.dag-legend {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  min-width: 130px;
+}
+.dag-legend-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.dag-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  color: var(--ink-secondary);
+}
+.dag-legend-item .count {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--ink);
+}

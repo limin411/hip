@@ -15,6 +15,8 @@ import { GitInitBanner } from './GitInitBanner'
 import { BranchSwitcher } from './BranchSwitcher'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
+import { DagEditor } from '@/components/workflow/DagEditor'
+import { useWorkflowStore } from '@/store/workflowStore'
 
 export function ArtifactPanel() {
   const { t } = useTranslation()
@@ -25,13 +27,17 @@ export function ArtifactPanel() {
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
   const diffCount = useDiffStore((s) => (sid ? s.bySession[sid]?.summary?.totalFiles : 0)) ?? 0
+  const activeWorkflow = useWorkflowStore((s) => s.activeWorkflow)
+  const runState = useWorkflowStore((s) => s.runState)
 
   // Git-gated tabs only appear in a git repo. The two always-on tabs are 文件 / 智能体.
+  // DAG tab always visible — shows empty state when no workflow is active.
   const TABS: { value: ArtifactTab; label: string; gated?: boolean; badge?: number }[] = [
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
     { value: 'timeline', label: t('artifact.timeline'), gated: true },
     { value: 'changes', label: t('artifact.changes'), gated: true, badge: diffCount },
+    { value: 'dag', label: 'DAG' },
   ]
   const visible = TABS.filter((tab) => !tab.gated || isGitRepo)
   // If the active tab got gated out (cwd changed to a non-repo), fall back to 文件.
@@ -74,6 +80,15 @@ export function ArtifactPanel() {
         <TabsContent value="agents" className="p-3"><AgentDashboard /></TabsContent>
         {isGitRepo && <TabsContent value="timeline" className="p-0"><TimelineView /></TabsContent>}
         {isGitRepo && <TabsContent value="changes" className="p-0"><ChangesView /></TabsContent>}
+        <TabsContent value="dag" className="overflow-hidden p-0">
+          {activeWorkflow ? (
+            <DagEditor workflow={activeWorkflow} runState={runState ?? undefined} />
+          ) : (
+            <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary">
+              No workflow active. Run a DAG workflow from the model picker to see the visual editor.
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   )

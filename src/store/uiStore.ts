@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { CheckpointMode } from '@hip/protocol'
 
-export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes'
+export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes' | 'dag'
 
 export type ActiveView = 'chat' | 'code' | 'settings' | 'history'
 export type Surface = 'chat' | 'code'

@@ -8,6 +8,9 @@ import type {
   ProviderEntry,
   SkillEntry,
   ActiveModel,
+  TeamConfig,
+  TeamMember,
+  TeamPipelineStep,
 } from '@hip/protocol'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -94,6 +97,42 @@ function normalizeAgentEntry(raw: Record<string, unknown>): AgentConfig {
   return raw as unknown as AgentConfig
 }
 
+function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
+  // Normalize TeamMember entries (agentId ← agent_id, customRole ← custom_role)
+  const members = raw.members as Record<string, unknown>[] | undefined
+  if (Array.isArray(members)) {
+    for (const m of members) {
+      if (m.agent_id !== undefined && m.agentId === undefined) {
+        m.agentId = m.agent_id
+      }
+      if (m.custom_role !== undefined && m.customRole === undefined) {
+        m.customRole = m.custom_role
+      }
+      delete m.agent_id
+      delete m.custom_role
+    }
+    raw.members = members as unknown as TeamMember[]
+  }
+
+  // Normalize TeamPipelineStep entries (agentId ← agent_id, input_template ← inputTemplate)
+  const pipeline = raw.pipeline as Record<string, unknown>[] | undefined
+  if (Array.isArray(pipeline)) {
+    for (const p of pipeline) {
+      if (p.agent_id !== undefined && p.agentId === undefined) {
+        p.agentId = p.agent_id
+      }
+      if (p.input_template !== undefined && p.inputTemplate === undefined) {
+        p.inputTemplate = p.input_template
+      }
+      delete p.agent_id
+      delete p.input_template
+    }
+    raw.pipeline = pipeline as unknown as TeamPipelineStep[]
+  }
+
+  return raw as unknown as TeamConfig
+}
+
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
   if (!parsed || typeof parsed !== 'object') {
@@ -132,6 +171,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const agents = obj.agents
   if (Array.isArray(agents)) {
     config.agents = (agents as Record<string, unknown>[]).map(normalizeAgentEntry)
+  }
+
+  const teams = obj.teams
+  if (Array.isArray(teams)) {
+    config.teams = (teams as Record<string, unknown>[]).map(normalizeTeamEntry)
   }
 
   return config
@@ -188,6 +232,9 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   }
   if (project.agents !== undefined) {
     merged.agents = project.agents
+  }
+  if (project.teams !== undefined) {
+    merged.teams = project.teams
   }
 
   return merged

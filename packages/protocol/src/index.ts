@@ -763,6 +763,8 @@ export interface HipConfig {
   mcpServers?: McpServerConfig[]
   skills?: SkillEntry[]
   agents?: AgentConfig[]
+  /** Agent teams defined in hip.toml under `[[teams]]`. */
+  teams?: import('./team-types.js').TeamConfig[]
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.
@@ -780,4 +782,10 @@ export interface NetworkPolicyConfig {
 // ──────────────────────────────────────────────────────────────────
 
 export * from './orchestration-types.js'
+
+// ──────────────────────────────────────────────────────────────────
+// Agent team types re-export
+// ──────────────────────────────────────────────────────────────────
+
+export * from './team-types.js'
 

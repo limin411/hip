@@ -21,6 +21,7 @@ import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { PlanMode } from './plan-mode.js'
+import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
 
 function fullPlanReminder(planFilePath: string): string {
   return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
@@ -85,6 +86,8 @@ export interface GraphCtx {
   /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
   maxSteps?: number
   planMode?: PlanMode
+  /** Optional circuit breaker that detects stalled agent loops and budget exhaustion. */
+  circuitBreaker?: CircuitBreaker
 }
 
 const LoopState = Annotation.Root({
@@ -260,6 +263,32 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const messages = prepareMessages(state.messages)
     try {
       const result = await execute(messages)
+
+      // Circuit breaker check
+      if (ctx.circuitBreaker) {
+        const lastMsg = result.messages?.[result.messages.length - 1]
+        if (lastMsg instanceof AIMessage) {
+          const usage = lastMsg.usage_metadata
+          const tokensUsed = (usage?.input_tokens ?? 0) + (usage?.output_tokens ?? 0)
+          const hadFileWrite = lastMsg.tool_calls?.some(
+            (tc) => tc.name === 'write_file' || tc.name === 'edit_file',
+          ) ?? false
+          const decision = ctx.circuitBreaker.step(tokensUsed, hadFileWrite)
+          if (decision.action === 'terminate') {
+            return {
+              messages: [new AIMessage(`CIRCUIT BREAKER TRIPPED: ${decision.reason}\n\nTerminating execution.`)],
+              steps: state.steps + 1,
+              status: 'awaiting_user' as const,
+              deferredMessages: deferredResolved.deferredMessages,
+              planStepsSinceInjection,
+            }
+          }
+          if (decision.action === 'warn') {
+            state.messages.push(new SystemMessage(`⚠️ ${decision.reason}`))
+          }
+        }
+      }
+
       return {
         ...result,
         messages: [...(deferredResolved.messages ?? []), ...(result.messages ?? [])],

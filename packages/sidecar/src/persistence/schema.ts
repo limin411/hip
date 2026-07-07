@@ -367,3 +367,38 @@ export function tryEnableFts(db: DatabaseSync): boolean {
     return false
   }
 }
+
+// ── Workflow store tables (Task 1.3) ──
+
+export const WORKFLOW_DEFS_DDL = `
+CREATE TABLE IF NOT EXISTS workflow_defs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  def_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+)`
+
+export const WORKFLOW_RUNS_DDL = `
+CREATE TABLE IF NOT EXISTS workflow_runs (
+  run_id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL REFERENCES workflow_defs(id),
+  status TEXT NOT NULL DEFAULT 'running',
+  state_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+)`
+
+export const WORKFLOW_EVENTS_DDL = `
+CREATE TABLE IF NOT EXISTS workflow_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),
+  event_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+)`
+
+/** All DDL statements for the workflow subsystem. */
+export const WORKFLOW_DDL = [
+  WORKFLOW_DEFS_DDL,
+  WORKFLOW_RUNS_DDL,
+  WORKFLOW_EVENTS_DDL,
+]

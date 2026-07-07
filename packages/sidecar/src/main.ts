@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { WsServer } from './server/ws-server.js'
 import { openDatabase } from './persistence/open.js'
 import { SessionStore } from './persistence/store.js'
+import { WORKFLOW_DDL } from './persistence/schema.js'
 import { watchParentViaStdin } from './parent-watch.js'
 import { loadActiveModelFromEnv } from './config/providers.js'
 import { acpConnections } from './session/agents/acp-connection.js'
@@ -13,6 +14,12 @@ async function main(): Promise<void> {
   const dbPath = process.env.HIP_DB_PATH?.trim() || ':memory:'
   loadActiveModelFromEnv()
   const { db, ftsEnabled } = openDatabase(dbPath)
+
+  // Ensure workflow store tables exist
+  for (const ddl of WORKFLOW_DDL) {
+    db.exec(ddl)
+  }
+
   const store = new SessionStore(db, ftsEnabled)
 
   const port = await WsServer.findAvailablePort()

@@ -178,6 +178,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
     config.teams = (teams as Record<string, unknown>[]).map(normalizeTeamEntry)
   }
 
+  const fixedAgents = obj.fixedAgents ?? obj.fixed_agents
+  if (fixedAgents && typeof fixedAgents === 'object' && !Array.isArray(fixedAgents)) {
+    config.fixedAgents = fixedAgents as Record<string, boolean>
+  }
+
   return config
 }
 
@@ -235,6 +240,9 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   }
   if (project.teams !== undefined) {
     merged.teams = project.teams
+  }
+  if (project.fixedAgents !== undefined) {
+    merged.fixedAgents = project.fixedAgents
   }
 
   return merged

@@ -217,6 +217,8 @@ struct HipConfig {
     skills: Vec<SkillEntry>,
     #[serde(default)]
     agents: Vec<AgentEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fixed_agents: Option<HashMap<String, bool>>,
     #[serde(default)]
     permissions: Option<PermissionEntry>,
 }
@@ -367,6 +369,8 @@ struct TomlHipConfig {
     skills: Vec<TomlSkillEntry>,
     #[serde(default)]
     agents: Vec<TomlAgentEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixedAgents")]
+    fixed_agents: Option<HashMap<String, bool>>,
     #[serde(default)]
     permissions: Option<TomlPermissionEntry>,
 }
@@ -576,6 +580,7 @@ impl From<HipConfig> for TomlHipConfig {
             mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
             skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
+            fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
         }
     }
@@ -590,6 +595,7 @@ impl From<TomlHipConfig> for HipConfig {
             mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
             skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
+            fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
         }
     }
@@ -638,6 +644,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 mcp_servers: vec![],
                 skills: vec![],
                 agents: vec![],
+                fixed_agents: None,
                 permissions: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
@@ -1183,6 +1190,7 @@ mod tests {
                 allowed_mcp_servers: None,
                 enabled: true,
             }],
+            fixed_agents: None,
             permissions: Some(super::PermissionEntry {
                 coarse_mode: "edit".into(),
                 tool_permissions: None,
@@ -1361,6 +1369,7 @@ mod tests {
                 super::SkillEntry { id: "pdf-tools".into(), enabled: true },
                 super::SkillEntry { id: "image-gen".into(), enabled: false },
             ],
+            fixed_agents: None,
             permissions: Some(super::PermissionEntry {
                 coarse_mode: "allow".into(),
                 tool_permissions: None,
@@ -1521,6 +1530,7 @@ mod tests {
                     enabled: false,
                 },
             ],
+            fixed_agents: None,
             permissions: Some(super::TomlPermissionEntry {
                 coarse_mode: "allow".into(),
                 tool_permissions: Some(super::TomlToolPermissionConfig {
@@ -1643,6 +1653,7 @@ mod tests {
             mcp_servers: vec![],
             skills: vec![],
             agents: vec![],
+            fixed_agents: None,
             permissions: None,
         };
 
@@ -1653,6 +1664,7 @@ mod tests {
         assert!(from_json.mcp_servers.is_empty());
         assert!(from_json.skills.is_empty());
         assert!(from_json.agents.is_empty());
+        assert!(from_json.fixed_agents.is_none());
         assert!(from_json.permissions.is_none());
     }
 
@@ -1711,6 +1723,7 @@ mod tests {
         assert!(cfg.mcp_servers.is_empty());
         assert!(cfg.skills.is_empty());
         assert!(cfg.agents.is_empty());
+        assert!(cfg.fixed_agents.is_none());
         assert!(cfg.permissions.is_none());
     }
 

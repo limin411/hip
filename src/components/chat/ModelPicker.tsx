@@ -75,7 +75,7 @@ export function ModelPicker() {
 
       {/* Orchestration mode toggle: shown only when a session is active */}
       {activeId && session && (
-        <div className="flex items-center gap-0.5 rounded-md border border-border px-0.5 py-0.5" title="Orchestration mode">
+        <div className="flex items-center gap-0.5 rounded-md border border-border px-0.5 py-0.5" title={t('chat.orchMode.label')}>
           <button
             className={cn(
               'px-1.5 py-0.5 text-meta rounded-sm transition-colors',
@@ -85,8 +85,9 @@ export function ModelPicker() {
             )}
             aria-pressed={orchMode === 'fast'}
             onClick={() => sessionService.setOrchMode(activeId, 'fast')}
+            title={t('chat.orchMode.fastDesc')}
           >
-            Fast
+            {t('chat.orchMode.fast')}
           </button>
           <button
             className={cn(
@@ -97,9 +98,10 @@ export function ModelPicker() {
             )}
             aria-pressed={orchMode === 'dag'}
             onClick={() => sessionService.setOrchMode(activeId, 'dag')}
+            title={t('chat.orchMode.dagDesc')}
           >
             <GitCompare size={11} className="inline-block mr-0.5 -mt-0.5" aria-hidden />
-            DAG
+            {t('chat.orchMode.dag')}
           </button>
         </div>
       )}

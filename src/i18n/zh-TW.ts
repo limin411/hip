@@ -136,6 +136,13 @@ export const zhTW = {
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
       },
+      orchMode: {
+        label: '編排模式',
+        fast: '單實例模式',
+        fastDesc: '單 Agent 迴圈，最大 25 步',
+        dag: '圖模式',
+        dagDesc: 'DAG 工作流，支援並行與驗證門控',
+      },
       activity: {
         completed: '已完成',
         toolCount: '{{finished}}/{{total}} 個工具',

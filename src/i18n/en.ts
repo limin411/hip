@@ -136,6 +136,13 @@ export const en = {
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens ({{percent}}%)',
       },
+      orchMode: {
+        label: 'Orchestration Mode',
+        fast: 'Single Instance',
+        fastDesc: 'Single agent loop, max 25 steps',
+        dag: 'Graph Mode',
+        dagDesc: 'DAG workflow with parallelism and verification gates',
+      },
       activity: {
         completed: 'Completed',
         toolCount: '{{finished}}/{{total}} tools',

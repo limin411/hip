@@ -16,6 +16,7 @@ import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
 import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
+import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { ToolOutputStore } from './tool-output-store.js'
@@ -184,6 +185,22 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     if (state.compacted) return deferredResolved
     const ctx = ctxOf(config)
+
+    // Apply sliding window first: when the message count exceeds the threshold,
+    // keep the first task message + last N turns and summarize the middle span.
+    // This runs BEFORE token-budget summarization to reduce context pressure early.
+    const windowResult = applySlidingWindow(state.messages)
+    if (windowResult.removed.length > 0) {
+      const summary = await ctx.summarizer.summarize(windowResult.removed)
+      const summaryMsg = new SystemMessage(`[Earlier conversation summary]\n${summary}`)
+      ctx.emit.compaction(`Sliding window: ${windowResult.removed.length} messages summarized`)
+      return {
+        messages: [...(deferredResolved.messages ?? []), summaryMsg, ...windowResult.kept],
+        compacted: true,
+        deferredMessages: deferredResolved.deferredMessages,
+      }
+    }
+
     const overBudget = estimateTokens(state.messages) > compactBudget
     if (!overBudget) return deferredResolved
     const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })

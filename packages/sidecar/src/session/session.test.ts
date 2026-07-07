@@ -316,6 +316,17 @@ describe('Session orchMode', () => {
     expect((session as any).orchMode).toBe('fast')
   })
 
+  it('setOrchMode updates the field and config', () => {
+    const session = new Session('test-om-set', { ...testConfig, orchMode: 'fast' })
+    expect(session.setOrchMode('dag')).toBe(true)
+    expect(session.orchMode).toBe('dag')
+    expect(session.config.orchMode).toBe('dag')
+    // Calling again with the same value returns false (no change)
+    expect(session.setOrchMode('dag')).toBe(false)
+    expect(session.orchMode).toBe('dag')
+    expect(session.config.orchMode).toBe('dag')
+  })
+
   it('falls through to graph loop when orchMode is "dag" but no pendingWorkflowDef', async () => {
     // When orchMode is 'dag' but pendingWorkflowDef is null/undefined,
     // the session should behave like fast mode (fall through to the graph loop).

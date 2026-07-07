@@ -153,7 +153,7 @@ export class Session {
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
-  readonly orchMode: OrchestrationMode
+  orchMode: OrchestrationMode
   /** When set, the next runTurn in 'dag' mode delegates to the workflow runner. */
   pendingWorkflowDef: WorkflowDef | null = null
   private readonly messages: BaseMessage[] = []

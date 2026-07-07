@@ -83,6 +83,7 @@ export function ModelPicker() {
                 ? 'bg-accent text-accent-ink font-medium'
                 : 'text-ink-tertiary hover:text-ink-secondary',
             )}
+            aria-pressed={orchMode === 'fast'}
             onClick={() => sessionService.setOrchMode(activeId, 'fast')}
           >
             Fast
@@ -94,6 +95,7 @@ export function ModelPicker() {
                 ? 'bg-accent text-accent-ink font-medium'
                 : 'text-ink-tertiary hover:text-ink-secondary',
             )}
+            aria-pressed={orchMode === 'dag'}
             onClick={() => sessionService.setOrchMode(activeId, 'dag')}
           >
             <GitCompare size={11} className="inline-block mr-0.5 -mt-0.5" aria-hidden />

@@ -507,6 +507,12 @@ export const en = {
       title: 'History',
       searchPlaceholder: 'Search conversations…',
       empty: 'No conversations yet',
+      filterAll: 'All',
+      filterChat: 'Work',
+      filterCode: 'Coding',
+      previous: 'Previous',
+      next: 'Next',
+      pageInfo: 'Page {{page}} of {{total}}',
     },
     account: {
       menu: 'Account menu',

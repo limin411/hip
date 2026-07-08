@@ -507,6 +507,12 @@ export const zhCN = {
       title: '历史会话',
       searchPlaceholder: '搜索会话…',
       empty: '暂无历史会话',
+      filterAll: '全部',
+      filterChat: '办公',
+      filterCode: '编码',
+      previous: '上一页',
+      next: '下一页',
+      pageInfo: '第 {{page}} 页 / 共 {{total}} 页',
     },
     account: {
       menu: '账户菜单',

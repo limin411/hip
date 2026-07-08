@@ -507,6 +507,12 @@ export const zhTW = {
       title: '歷史會話',
       searchPlaceholder: '搜尋會話…',
       empty: '暫無歷史會話',
+      filterAll: '全部',
+      filterChat: '辦公',
+      filterCode: '編碼',
+      previous: '上一頁',
+      next: '下一頁',
+      pageInfo: '第 {{page}} 頁 / 共 {{total}} 頁',
     },
     account: {
       menu: '賬戶選單',

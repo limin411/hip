@@ -650,7 +650,7 @@ export class Session {
   rebuildMessagesFromEvents(sessionId: string): BaseMessage[] {
     if (!this.store) return []
     const rows = loadProjection(this.store.getDb(), sessionId)
-    return rows.map((r) => rowToBaseMessage(r.data))
+    return rows.flatMap((r) => rowToBaseMessage(r.data))
   }
 
   private requireCompatibleModel(send: SendFn): boolean {
@@ -1886,17 +1886,26 @@ function isRichContentParts(parts: ContentPart[] | undefined): boolean {
   return !!parts && parts.length > 0 && !(parts.length === 1 && parts[0].type === 'text')
 }
 
-function rowToBaseMessage(d: SessionMessageData): BaseMessage {
+function rowToBaseMessage(d: SessionMessageData): BaseMessage[] {
   if (d.role === 'user') {
     const validParts = d.contentParts?.filter((p): p is ContentPart => isContentPart(p as Record<string, unknown>))
     if (isRichContentParts(validParts)) {
-      return new HumanMessage({ content: validParts })
+      return [new HumanMessage({ content: validParts })]
     }
-    return new HumanMessage(d.content)
+    return [new HumanMessage(d.content)]
   }
-  if (d.role === 'assistant' && 'kind' in d) return new SystemMessage(d.summary)
+  if (d.role === 'assistant' && 'kind' in d) return [new SystemMessage(d.summary)]
   const toolCalls = d.toolCalls.length > 0 ? d.toolCalls.map(projectedToolCallToToolCall) : undefined
-  return new AIMessage({ content: d.content, ...(toolCalls ? { tool_calls: toolCalls } : {}) })
+  const messages: BaseMessage[] = [
+    new AIMessage({ content: d.content, ...(toolCalls ? { tool_calls: toolCalls } : {}) }),
+  ]
+  if (toolCalls) {
+    for (const tc of d.toolCalls) {
+      const content = tc.status === 'error' ? `Error: ${tc.error ?? 'tool failed'}` : (tc.output ?? '')
+      messages.push(new ToolMessage({ content, tool_call_id: tc.callId, name: tc.name }))
+    }
+  }
+  return messages
 }
 
 function projectedToolCallToToolCall(t: ProjectedToolCall) {

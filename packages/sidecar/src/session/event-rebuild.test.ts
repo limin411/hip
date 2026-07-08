@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { SessionConfig } from '@hip/protocol'
 import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
@@ -169,13 +169,33 @@ describe('LangGraph ↔ event-store boundary', () => {
     session.hydrate()
 
     const messages = getMessages(session)
-    expect(messages).toHaveLength(2)
+    expect(messages).toHaveLength(3)
     const assistant = messages[1]
     expect(assistant).toBeInstanceOf(AIMessage)
     const ai = assistant as AIMessage
     expect(ai.tool_calls).toHaveLength(1)
     expect(ai.tool_calls?.[0].name).toBe('ls')
     expect(ai.tool_calls?.[0].id).toBe('c-1')
+    const tool = messages[2]
+    expect(tool).toBeInstanceOf(ToolMessage)
+    expect((tool as ToolMessage).tool_call_id).toBe('c-1')
+    expect((tool as ToolMessage).content).toBe('a b c')
+  })
+
+  it('projection row with errored tool calls synthesizes error ToolMessages', () => {
+    publishEvent(db, eventStore, 's1', 'user_message', { messageId: 'u-1', content: 'hi', timestamp: 1 })
+    publishEvent(db, eventStore, 's1', 'step_started', { stepId: 'a-1', agentId: 'supervisor', startedAt: 2 })
+    publishEvent(db, eventStore, 's1', 'tool_called', { callId: 'c-1', stepId: 'a-1', name: 'ls', input: '{"path":"/"}', seq: 3 })
+    publishEvent(db, eventStore, 's1', 'tool_failed', { callId: 'c-1', stepId: 'a-1', error: 'boom' })
+
+    const session = new Session('s1', { ...baseCfg, cwd: root }, undefined, st)
+    session.hydrate()
+
+    const messages = getMessages(session)
+    expect(messages).toHaveLength(3)
+    const tool = messages[2] as ToolMessage
+    expect(tool.tool_call_id).toBe('c-1')
+    expect(tool.content).toBe('Error: boom')
   })
 
   it('compaction projection row becomes SystemMessage', () => {

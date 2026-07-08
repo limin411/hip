@@ -31,6 +31,22 @@ vi.mock('@/domain', () => ({
   },
 }))
 
+vi.mock('@/components/ui/Tabs', async () => {
+  const React = await import('react')
+  const TabsContext = React.createContext<{ onValueChange?: (value: string) => void }>({})
+
+  return {
+    Tabs: ({ children, onValueChange }: { children: React.ReactNode; onValueChange?: (value: string) => void }) => (
+      <TabsContext.Provider value={{ onValueChange }}>{children}</TabsContext.Provider>
+    ),
+    TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) => {
+      const ctx = React.useContext(TabsContext)
+      return <button onClick={() => ctx.onValueChange?.(value)}>{children}</button>
+    },
+  }
+})
+
 describe('SessionHistory', () => {
   afterEach(() => {
     cleanup()

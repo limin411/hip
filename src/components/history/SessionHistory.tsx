@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, MessageSquare, Code2 } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
@@ -38,11 +38,6 @@ export function SessionHistory() {
     [filtered.length],
   )
 
-  // If the underlying list shrinks (e.g. a session was deleted), clamp the page.
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
-
   const handleQueryChange = (value: string) => {
     setQuery(value)
     setPage(1)
@@ -78,9 +73,9 @@ export function SessionHistory() {
         className="mb-4"
       >
         <TabsList>
-          <TabsTrigger value="all" onClick={() => handleSurfaceChange('all')}>{t('history.filterAll')}</TabsTrigger>
-          <TabsTrigger value="chat" onClick={() => handleSurfaceChange('chat')}>{t('history.filterChat')}</TabsTrigger>
-          <TabsTrigger value="code" onClick={() => handleSurfaceChange('code')}>{t('history.filterCode')}</TabsTrigger>
+          <TabsTrigger value="all">{t('history.filterAll')}</TabsTrigger>
+          <TabsTrigger value="chat">{t('history.filterChat')}</TabsTrigger>
+          <TabsTrigger value="code">{t('history.filterCode')}</TabsTrigger>
         </TabsList>
       </Tabs>
 

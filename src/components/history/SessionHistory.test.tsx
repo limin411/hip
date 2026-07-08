@@ -132,6 +132,14 @@ describe('SessionHistory', () => {
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
   })
 
+  it('renders pagination in the same toolbar row as surface tabs', () => {
+    render(<SessionHistory />)
+    const toolbar = screen.getByTestId('session-history-toolbar')
+    expect(toolbar).toContainElement(screen.getByRole('navigation'))
+    expect(toolbar).toContainElement(screen.getByText('history.filterAll'))
+    expect(toolbar).toContainElement(screen.getByText('Page 1 of 3'))
+  })
+
   it('resets to page 1 when search query changes after navigating', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))

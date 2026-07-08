@@ -87,17 +87,42 @@ export function SessionHistory() {
         />
       </div>
 
-      <Tabs
-        value={surfaceFilter}
-        onValueChange={(v) => handleSurfaceChange(v as SurfaceFilter)}
-        className="mb-4"
+      <div
+        className="mb-4 flex items-center justify-between gap-4"
+        data-testid="session-history-toolbar"
       >
-        <TabsList>
-          <TabsTrigger value="all">{t('history.filterAll')}</TabsTrigger>
-          <TabsTrigger value="chat">{t('history.filterChat')}</TabsTrigger>
-          <TabsTrigger value="code">{t('history.filterCode')}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        <Tabs
+          value={surfaceFilter}
+          onValueChange={(v) => handleSurfaceChange(v as SurfaceFilter)}
+        >
+          <TabsList className="h-9 gap-2">
+            <TabsTrigger className="px-4" value="all">
+              {t('history.filterAll')}
+            </TabsTrigger>
+            <TabsTrigger className="px-4" value="chat">
+              {t('history.filterChat')}
+            </TabsTrigger>
+            <TabsTrigger className="px-4" value="code">
+              {t('history.filterCode')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {totalPages > 1 && (
+          <div className="flex items-center gap-3">
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              onChange={setPage}
+              previousLabel={t('history.previous')}
+              nextLabel={t('history.next')}
+            />
+            <span className="text-caption text-ink-secondary">
+              {t('history.pageInfo', { page: safePage, total: totalPages })}
+            </span>
+          </div>
+        )}
+      </div>
 
       {filtered.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-ink-secondary">
@@ -149,20 +174,6 @@ export function SessionHistory() {
               )
             })}
           </div>
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <Pagination
-                currentPage={safePage}
-                totalPages={totalPages}
-                onChange={setPage}
-                previousLabel={t('history.previous')}
-                nextLabel={t('history.next')}
-              />
-              <span className="text-caption text-ink-secondary">
-                {t('history.pageInfo', { page: safePage, total: totalPages })}
-              </span>
-            </div>
-          )}
         </>
       )}
       {deletingSession && (

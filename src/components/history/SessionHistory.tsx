@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, MessageSquare, Code2 } from 'lucide-react'
+import { Search, MessageSquare, Code2, Trash2 } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Pagination } from '@/components/ui/Pagination'
+import { DeleteSessionDialog } from './DeleteSessionDialog'
+import { ClearAllSessionsDialog } from './ClearAllSessionsDialog'
 
 const PAGE_SIZE = 20
 
@@ -17,6 +20,15 @@ export function SessionHistory() {
   const [query, setQuery] = useState('')
   const [surfaceFilter, setSurfaceFilter] = useState<SurfaceFilter>('all')
   const [page, setPage] = useState(1)
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
+  const [clearAllOpen, setClearAllOpen] = useState(false)
+
+  // ... 现有派生计算不变
+
+  const deletingSession = useMemo(
+    () => sessions.find((s) => s.id === deletingSessionId) ?? null,
+    [sessions, deletingSessionId],
+  )
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -56,7 +68,14 @@ export function SessionHistory() {
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="session-history">
-      <h2 className="mb-4 text-display font-semibold text-ink">{t('history.title')}</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
+        {sessions.length > 0 && (
+          <Button variant="danger" size="sm" onClick={() => setClearAllOpen(true)}>
+            {t('history.clearAll')}
+          </Button>
+        )}
+      </div>
       <div className="relative mb-4 max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
         <input
@@ -91,28 +110,42 @@ export function SessionHistory() {
               const surface = surfaceOf(session.config)
               const Icon = surface === 'code' ? Code2 : MessageSquare
               return (
-                <button
+                <div
                   key={session.id}
-                  type="button"
-                  onClick={() => sessionService.selectSession(session.id)}
                   className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent"
                 >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-body font-medium text-ink">{session.title}</span>
-                    <span className="truncate text-meta text-ink-secondary">{session.preview}</span>
-                  </div>
-                  <span
-                    className={cn(
-                      'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
-                      surface === 'code'
-                        ? 'bg-accent-subtle text-accent-strong'
-                        : 'bg-surface-subtle text-ink-secondary',
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => sessionService.selectSession(session.id)}
+                    className="flex min-w-0 flex-1 items-center justify-between text-left"
                   >
-                    <Icon size={12} />
-                    {t(`nav.${surface}`)}
-                  </span>
-                </button>
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate text-body font-medium text-ink">{session.title}</span>
+                      <span className="truncate text-meta text-ink-secondary">{session.preview}</span>
+                    </div>
+                    <span
+                      className={cn(
+                        'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
+                        surface === 'code'
+                          ? 'bg-accent-subtle text-accent-strong'
+                          : 'bg-surface-subtle text-ink-secondary',
+                      )}
+                    >
+                      <Icon size={12} />
+                      {t(`nav.${surface}`)}
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-2 shrink-0 text-ink-secondary hover:text-accent"
+                    title={t('history.deleteSession')}
+                    aria-label={t('history.deleteSession')}
+                    onClick={() => setDeletingSessionId(session.id)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
               )
             })}
           </div>
@@ -131,6 +164,25 @@ export function SessionHistory() {
             </div>
           )}
         </>
+      )}
+      {deletingSession && (
+        <DeleteSessionDialog
+          title={deletingSession.title}
+          onConfirm={() => {
+            sessionService.deleteSession(deletingSession.id)
+            setDeletingSessionId(null)
+          }}
+          onCancel={() => setDeletingSessionId(null)}
+        />
+      )}
+      {clearAllOpen && (
+        <ClearAllSessionsDialog
+          onConfirm={() => {
+            sessions.forEach((s) => sessionService.deleteSession(s.id))
+            setClearAllOpen(false)
+          }}
+          onCancel={() => setClearAllOpen(false)}
+        />
       )}
     </div>
   )

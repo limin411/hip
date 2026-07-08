@@ -22,6 +22,7 @@ vi.mock('react-i18next', () => ({
       if (key === 'history.pageInfo' && params) {
         return `Page ${params.page} of ${params.total}`
       }
+      if (params) return `${key}:${JSON.stringify(params)}`
       return key
     },
   }),
@@ -31,6 +32,7 @@ vi.mock('@/domain', () => ({
   useSessions: () => mockSessions,
   sessionService: {
     selectSession: vi.fn(),
+    deleteSession: vi.fn(),
   },
 }))
 
@@ -155,5 +157,54 @@ describe('SessionHistory', () => {
 
     expect(screen.queryByText('Session 21')).not.toBeInTheDocument()
     expect(screen.getByText('Session 1')).toBeInTheDocument()
+  })
+
+  it('renders a delete button for each session', () => {
+    render(<SessionHistory />)
+    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(20)
+  })
+
+  it('renders clear-all button when sessions exist', () => {
+    render(<SessionHistory />)
+    expect(screen.getByText('history.clearAll')).toBeInTheDocument()
+  })
+
+  it('hides clear-all button when there are no sessions', () => {
+    mockSessions = []
+    render(<SessionHistory />)
+    expect(screen.queryByText('history.clearAll')).not.toBeInTheDocument()
+  })
+
+  it('deletes a session after confirming in dialog', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getAllByLabelText('history.deleteSession')[4])
+    expect(screen.getByText('history.deleteSessionConfirmTitle:{"title":"Session 5"}')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('history.delete'))
+    expect(sessionService.deleteSession).toHaveBeenCalledWith('s5')
+  })
+
+  it('does not delete a session when dialog is cancelled', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getAllByLabelText('history.deleteSession')[4])
+    fireEvent.click(screen.getByText('common.cancel'))
+    expect(sessionService.deleteSession).not.toHaveBeenCalled()
+  })
+
+  it('clears all sessions after confirming in dialog', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getByText('history.clearAll'))
+    expect(screen.getByText('history.clearAllConfirmTitle')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('history.clearAllConfirmAction'))
+    expect(sessionService.deleteSession).toHaveBeenCalledTimes(mockSessions.length)
+    mockSessions.forEach((s) => {
+      expect(sessionService.deleteSession).toHaveBeenCalledWith(s.id)
+    })
+  })
+
+  it('does not clear sessions when clear-all dialog is cancelled', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getByText('history.clearAll'))
+    fireEvent.click(screen.getByText('common.cancel'))
+    expect(sessionService.deleteSession).not.toHaveBeenCalled()
   })
 })

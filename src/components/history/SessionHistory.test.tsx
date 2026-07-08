@@ -167,7 +167,7 @@ describe('SessionHistory', () => {
   it('renders delete buttons on page 2', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('2'))
-    expect(screen.getAllByLabelText('history.deleteSession').length).toBeGreaterThan(0)
+    expect(screen.getAllByLabelText('history.deleteSession')).toHaveLength(20)
     expect(screen.getByText('Session 21')).toBeInTheDocument()
   })
 

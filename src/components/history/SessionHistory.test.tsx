@@ -1,17 +1,20 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { SessionHistory } from './SessionHistory'
 import { sessionService } from '@/domain'
 
-const mockSessions = Array.from({ length: 25 }, (_, i) => ({
-  id: `s${i + 1}`,
-  title: `Session ${i + 1}`,
-  preview: `Preview ${i + 1}`,
-  updatedAtMs: (25 - i) * 1000,
-  config: { surface: i < 12 ? 'chat' : 'code' },
-}))
+const createMockSessions = () =>
+  Array.from({ length: 25 }, (_, i) => ({
+    id: `s${i + 1}`,
+    title: `Session ${i + 1}`,
+    preview: `Preview ${i + 1}`,
+    updatedAtMs: (25 - i) * 1000,
+    config: { surface: i < 12 ? 'chat' : 'code' },
+  }))
+
+let mockSessions = createMockSessions()
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -48,6 +51,10 @@ vi.mock('@/components/ui/Tabs', async () => {
 })
 
 describe('SessionHistory', () => {
+  beforeEach(() => {
+    mockSessions = createMockSessions()
+  })
+
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
@@ -115,5 +122,37 @@ describe('SessionHistory', () => {
       target: { value: 'nonexistent' },
     })
     expect(screen.getByText('history.empty')).toBeInTheDocument()
+  })
+
+  it('renders pageInfo with current and total pages', () => {
+    render(<SessionHistory />)
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+  })
+
+  it('resets to page 1 when search query changes after navigating', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getByText('2'))
+    expect(screen.getByText('Session 21')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByPlaceholderText('history.searchPlaceholder'), {
+      target: { value: 'Session' },
+    })
+    expect(screen.getByText('Session 1')).toBeInTheDocument()
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+  })
+
+  it('clamps to page 1 when the filtered list shrinks while on a later page', () => {
+    const { rerender } = render(<SessionHistory />)
+    fireEvent.click(screen.getByText('2'))
+    expect(screen.getByText('Session 21')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+
+    // Shrink the session list so only one page remains.
+    mockSessions = createMockSessions().slice(0, 20)
+    rerender(<SessionHistory />)
+
+    expect(screen.queryByText('Session 21')).not.toBeInTheDocument()
+    expect(screen.getByText('Session 1')).toBeInTheDocument()
   })
 })

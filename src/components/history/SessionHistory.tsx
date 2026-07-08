@@ -48,10 +48,11 @@ export function SessionHistory() {
     setPage(1)
   }
 
+  const safePage = useMemo(() => Math.min(page, totalPages), [page, totalPages])
+
   const paged = useMemo(() => {
-    const safePage = Math.min(page, totalPages)
     return filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-  }, [filtered, page, totalPages])
+  }, [filtered, safePage])
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="session-history">
@@ -118,14 +119,14 @@ export function SessionHistory() {
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
               <Pagination
-                currentPage={page}
+                currentPage={safePage}
                 totalPages={totalPages}
                 onChange={setPage}
                 previousLabel={t('history.previous')}
                 nextLabel={t('history.next')}
               />
               <span className="text-caption text-ink-secondary">
-                {t('history.pageInfo', { page, total: totalPages })}
+                {t('history.pageInfo', { page: safePage, total: totalPages })}
               </span>
             </div>
           )}

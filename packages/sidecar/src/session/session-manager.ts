@@ -1,4 +1,4 @@
-import type { AgentProfileInfo, ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
+import type { AgentProfileInfo, ClientMessage, SessionConfig, FsEntry } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
@@ -20,9 +20,10 @@ import { EventStore } from '../persistence/event-store.js'
 import { AttachmentError } from './attachments.js'
 import { handleWorkspaceMessage, isWorkspaceMessage } from './handlers/workspace.js'
 import { handleMcpMessage, isMcpMessage } from './handlers/mcp.js'
-import type { SessionManagerContext } from './handlers/types.js'
+import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
+import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
+import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
 
-type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
 
 /** Normalize a user-typed rename: one line, bounded length, blank → default. */
@@ -55,240 +56,84 @@ export class SessionManager {
     const t0 = Date.now()
     logDebug('mgr', 'msg:handle', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined })
 
-    // Domain handlers: sync type-gate first so session lifecycle stays synchronous
-    // until the first real await (handle() fire-and-forget tests rely on create before set*).
+    // Sync type-gates first — never await an async handler for non-matching types
+    // (session:create must complete before fire-and-forget set* messages).
     if (isWorkspaceMessage(msg)) {
       await handleWorkspaceMessage(this.handlerCtx(), msg, send)
-      logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
-      return
-    }
-    if (isMcpMessage(msg)) {
+    } else if (isMcpMessage(msg)) {
       await handleMcpMessage(msg, send)
-      logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
-      return
+    } else if (isSessionMessage(msg)) {
+      const r = handleSessionMessage(this.lifecycleCtx(), msg, send)
+      if (r) await r
+    } else if (isPluginMessage(msg)) {
+      const r = handlePluginMessage(this.pluginCtx(), msg, send)
+      if (r) await r
     }
 
-    switch (msg.type) {
-      case 'session:create':
-        this.createSession(msg.id, msg.config, send)
-        break
-      case 'session:destroy':
-        await this.destroySession(msg.sessionId)
-        break
-      case 'message:compact': {
-        const session = this.sessions.get(msg.sessionId)
-        if (!session) {
-          send({ type: 'compact:result', sessionId: msg.sessionId, ok: false, inputTokens: 0, outputTokens: 0, messagesBefore: 0, messagesAfter: 0, error: 'session not found' })
-          return
-        }
-        try {
-          const result = await session.compactNow()
-          send({ type: 'compact:result', sessionId: msg.sessionId, ok: true, ...result })
-        } catch (e) {
-          send({ type: 'compact:result', sessionId: msg.sessionId, ok: false, inputTokens: 0, outputTokens: 0, messagesBefore: 0, messagesAfter: 0, error: String(e) })
-        }
-        return
-      }
-      case 'message:send':
-        await this.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id, msg.attachments)
-        break
-      case 'input:enqueue': {
-        const s = this.ensureSession(msg.sessionId, send)
-        s.enqueueInput({ type: 'message', content: msg.content, messageId: msg.id })
-        await s.drainInputQueue(send)
-        break
-      }
-      case 'input:steer': {
-        const s = this.ensureSession(msg.sessionId, send)
-        s.enqueueInput({ type: 'steer', content: msg.content, messageId: msg.id })
-        await s.drainInputQueue(send)
-        break
-      }
-      case 'message:cancel':
-        this.sessions.get(msg.sessionId)?.cancel()
-        break
-      case 'message:regenerate':
-        await this.ensureSession(msg.sessionId, send).regenerate(send)
-        break
-      case 'message:resume':
-        await this.ensureSession(msg.sessionId, send).resume(msg.content, send, msg.attachments)
-        break
-      case 'subagent:background': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const ac = new AbortController()
-        void s.runBackgroundSubagent(msg.taskId, msg.description, ac.signal, send)
-        break
-      }
-      case 'subagent:resume':
-        await this.ensureSession(msg.sessionId, send).resumeSubagent(msg.taskId, msg.message, send)
-        break
-      case 'plan:respond':
-        await this.ensureSession(msg.sessionId, send).handlePlanResponse(msg.action, send, msg.amendContent)
-        break
-      case 'agent:setConfigOption':
-        await this.ensureSession(msg.sessionId, send).setAgentConfigOption(msg.configId, msg.value)
-        break
-      case 'agent:setProfile': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const ok = s.setAgentProfile(msg.id)
-        if (ok) {
-          send({ type: 'agent:profiles', sessionId: msg.sessionId, profiles: this.profileListFor(s) })
-        } else {
-          send({ type: 'error', sessionId: msg.sessionId, code: 'INVALID_PROFILE', message: 'Unknown agent profile id' })
-        }
-        break
-      }
-      case 'permission:respond':
-        this.sessions.get(msg.sessionId)?.respondPermission(msg.requestId, msg.cancelled ? { cancelled: true } : { optionId: msg.optionId! })
-        break
-      case 'session:list':
-        send({ type: 'session:list:result', sessions: this.store?.listSessions() ?? [] })
-        break
-      case 'session:load': {
+    logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
+  }
+
+  private handlerCtx() {
+    return {
+      ensureSession: (id: string, send: SendFn) => this.ensureSession(id, send),
+      lsCwd: (cwd: string, p: string) => this.lsCwd(cwd, p),
+      readCwd: (cwd: string, p: string) => this.readCwd(cwd, p),
+      profileListFor: (session: Session) => this.profileListFor(session),
+      store: this.store,
+    }
+  }
+
+  private lifecycleCtx(): SessionLifecycleContext {
+    return {
+      ...this.handlerCtx(),
+      createSession: (id, config, send) => this.createSession(id, config, send),
+      destroySession: (id) => this.destroySession(id),
+      getSession: (id) => this.sessions.get(id),
+      deleteSessionSync: (id, send) => this.deleteSessionSync(id, send),
+      listSessions: () => this.store?.listSessions() ?? [],
+      loadSession: (id) => {
         const config = this.store
-          ? (JSON.parse(this.store.getSession(msg.sessionId)?.config ?? 'null') ?? undefined)
+          ? (JSON.parse(this.store.getSession(id)?.config ?? 'null') ?? undefined)
           : undefined
-        send({ type: 'session:loaded', sessionId: msg.sessionId, messages: this.store?.loadMessagesWithRuns(msg.sessionId) ?? [], config })
-        break
-      }
-      case 'session:search':
-        send({ type: 'session:search:result', query: msg.query, hits: this.store?.search(msg.query) ?? [] })
-        break
-      case 'session:delete': {
-        // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
-        // store delete + session:deleted being immediate — no await before them). The shadow-ref
-        // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
-        const delCwd = this.resolveSessionCwd(msg.sessionId)
-        this.store?.deleteSession(msg.sessionId)
-        this.sessions.delete(msg.sessionId)
-        removeScratchDir(msg.sessionId, this.scratchRoot)
-        if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, msg.sessionId).catch(() => {})
-        send({ type: 'session:deleted', sessionId: msg.sessionId })
-        break
-      }
-      case 'session:rename': {
-        const title = sanitizeRename(msg.title)
-        this.store?.setCustomTitle(msg.sessionId, title)
-        send({ type: 'session:title', sessionId: msg.sessionId, title })
-        break
-      }
-      case 'session:setCwd': {
-        const s = this.ensureSession(msg.sessionId, send)
-        s.setCwd(msg.cwd)
-        this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        // Re-anchor the "since session start" snapshot to the newly-bound cwd so session-start
-        // diff works for the common "new chat → bind project dir → agent edits" flow.
-        void s.captureSnapshot().catch(() => {})
-        send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
-        break
-      }
-      case 'session:setOrchMode': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const applied = s.setOrchMode(msg.orchMode)
-        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        send({ type: 'session:orchMode', sessionId: msg.sessionId, orchMode: s.orchMode })
-        break
-      }
-      case 'session:setThinking': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const applied = s.setThinking(msg.thinking)
-        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        // Echo the session's REAL thinking state (true by default) so the client syncs to truth
-        // even if the toggle was rejected mid-turn.
-        send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: s.config.thinking ?? true })
-        break
-      }
-      case 'session:setSystemPrompt': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const applied = s.setSystemPrompt(msg.systemPrompt)
-        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        send({ type: 'session:systemPrompt', sessionId: msg.sessionId, systemPrompt: s.config.systemPrompt ?? null })
-        break
-      }
-      case 'session:setPermissionMode': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const applied = s.setPermissionMode(msg.permissionMode)
-        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        // Echo the session's REAL mode (default 'edit') so the client syncs to truth even if the set
-        // was rejected mid-turn.
-        send({ type: 'session:permissionMode', sessionId: msg.sessionId, permissionMode: s.config.permissionMode ?? 'edit' })
-        break
-      }
-      case 'session:setModel': {
-        // Change the global active model AND clear the session's pinned model so
-        // resolveModelChoice falls back to the newly-set global default.
-        setActiveModel({ providerID: msg.llmProvider, modelID: msg.model, baseURL: msg.baseURL ?? '' })
-        const s = this.ensureSession(msg.sessionId, send)
-        const applied = s.setModel(msg.llmProvider)
-        if (applied) this.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-        // Also apply to other sessions — they follow the global model if unpinned.
-        for (const other of this.sessions.values()) {
-          if (other !== s) other.applyActiveModel()
-        }
-        const hasApiKey = !!resolveApiKey(msg.llmProvider)
-        send({ type: 'config:activeModel', providerID: msg.llmProvider, modelID: msg.model, hasApiKey })
-        send({ type: 'session:model', sessionId: msg.sessionId, llmProvider: msg.llmProvider, model: msg.model })
-        break
-      }
-      case 'config:setActiveModel': {
-        setActiveModel({ providerID: msg.providerID, modelID: msg.modelID, baseURL: msg.baseURL })
-        // Apply to every in-memory session at its next idle turn (no restart).
+        return { messages: this.store?.loadMessagesWithRuns(id) ?? [], config }
+      },
+      searchSessions: (query) => this.store?.search(query) ?? [],
+      setCustomTitle: (id, title) => {
+        const sanitized = sanitizeRename(title)
+        this.store?.setCustomTitle(id, sanitized)
+        return sanitized
+      },
+      setGlobalActiveModel: (providerID, modelID, baseURL) => {
+        setActiveModel({ providerID, modelID, baseURL })
+      },
+      applyActiveModelToAll: () => {
         for (const s of this.sessions.values()) s.applyActiveModel()
-        // Re-emit key status for the NEW active provider — `ready` is sent only once per connection,
-        // so without this the chat header's "no key" banner would lag until the next reconnect.
-        const hasApiKey = !!resolveApiKey(msg.providerID)
-        send({ type: 'config:activeModel', providerID: msg.providerID, modelID: msg.modelID, hasApiKey })
-        break
-      }
-      case 'workflow:run':
-        await this.ensureSession(msg.sessionId, send).runWorkflowTurn(msg.def, send)
-        break
-      case 'plugin:install:url':
-        await this.handlePluginInstallUrl(msg.url, send)
-        break
-      case 'plugin:delete': {
-        const pluginId = msg.pluginId
-        if (!pluginId || typeof pluginId !== 'string') {
-          send({ type: 'plugin:delete:result', pluginId: pluginId ?? '', ok: false, error: 'pluginId is required' })
-          break
-        }
-        // Re-read plugin registry so any sessions still running see the removal.
-        for (const session of this.sessions.values()) {
-          try {
-            session.reloadPlugins()
-          } catch (err) {
-            console.warn(`[session-manager] failed to reload plugins for session ${session.id}:`, err instanceof Error ? err.message : String(err))
-          }
-        }
-        send({ type: 'plugin:delete:result', pluginId, ok: true })
-        break
-      }
-      case 'replay:session': {
+      },
+      hasApiKey: (providerID) => !!resolveApiKey(providerID),
+      forEachSession: (fn) => {
+        for (const s of this.sessions.values()) fn(s)
+      },
+    }
+  }
+
+  private pluginCtx(): PluginHandlerContext {
+    return {
+      ...this.lifecycleCtx(),
+      installPluginFromUrl: (url, send) => this.handlePluginInstallUrl(url, send),
+      replayTurn: async (sessionId, turnIndex, send) => {
         if (!this.store) {
-          send({ type: 'error', sessionId: msg.sessionId, code: 'NO_STORE', message: 'No persistence store available for replay' })
-          break
+          send({ type: 'error', sessionId, code: 'NO_STORE', message: 'No persistence store available for replay' })
+          return
         }
         try {
           const eventStore = new EventStore(this.store.getDb())
           const replay = new SessionReplay(eventStore)
-          const result = await replay.replayTurn(msg.sessionId, msg.turnIndex)
-          send({ type: 'replay:result', sessionId: msg.sessionId, result })
+          const result = await replay.replayTurn(sessionId, turnIndex)
+          send({ type: 'replay:result', sessionId, result })
         } catch (err) {
-          send({ type: 'error', sessionId: msg.sessionId, code: 'REPLAY_FAILED', message: safeErrorMessage(err) })
+          send({ type: 'error', sessionId, code: 'REPLAY_FAILED', message: safeErrorMessage(err) })
         }
-        break
-      }
-    }
-    logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
-  }
-
-  private handlerCtx(): SessionManagerContext {
-    return {
-      ensureSession: (id, send) => this.ensureSession(id, send),
-      lsCwd: (cwd, p) => this.lsCwd(cwd, p),
-      readCwd: (cwd, p) => this.readCwd(cwd, p),
-      profileListFor: (session) => this.profileListFor(session),
-      store: this.store,
+      },
     }
   }
 
@@ -334,6 +179,18 @@ export class SessionManager {
     try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
   }
 
+  private deleteSessionSync(id: string, send: SendFn): void {
+    // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
+    // store delete + session:deleted being immediate — no await before them). The shadow-ref
+    // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
+    const delCwd = this.resolveSessionCwd(id)
+    this.store?.deleteSession(id)
+    this.sessions.delete(id)
+    removeScratchDir(id, this.scratchRoot)
+    if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})
+    send({ type: 'session:deleted', sessionId: id })
+  }
+
   private profileListFor(session: Session): AgentProfileInfo[] {
     return session.listProfiles().map((p) => ({ id: p.id, name: p.name, description: p.description, mode: p.mode }))
   }
@@ -343,8 +200,15 @@ export class SessionManager {
     this.sessions.delete(id)
   }
 
-  /** Cancel every in-flight turn — called when the sole client disconnects (ws close).
-   *  Safe no-op for idle sessions (Session.cancel() aborts only if a turn is running). */
+  /**
+   * Cancel every in-flight turn — called when the sole UI client disconnects (ws close).
+   *
+   * **Single-client assumption:** the desktop shell opens one WebSocket per sidecar.
+   * On close we cancel all turns. Multi-client would need per-connection turn ownership
+   * before this can become selective; until then this is intentional and documented.
+   *
+   * Safe no-op for idle sessions (Session.cancel() aborts only if a turn is running).
+   */
   cancelAllRunning(): void {
     for (const s of this.sessions.values()) s.cancel()
   }

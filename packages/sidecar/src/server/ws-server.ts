@@ -71,6 +71,8 @@ export class WsServer {
         send({ type: 'error', code: 'PARSE_ERROR', message: String(err) })
       }
     })
+    // Single-client model: the Tauri shell holds one WS. Closing it cancels all in-flight
+    // turns (see SessionManager.cancelAllRunning). Multi-client would need per-connection ownership.
     ws.on('close', () => this.sessionManager.cancelAllRunning())
     ws.on('error', (err) => console.error('[ws] client error', err))
   }

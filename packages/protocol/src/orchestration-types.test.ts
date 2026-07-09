@@ -8,7 +8,8 @@ describe('orchestration types', () => {
               { id: 'b', type: 'agent', agentId: 'mock', inputTemplate: 'use {{a}}' }],
       edges: [{ from: 'a', to: 'b', when: { kind: 'contains', value: 'ok' } }] }
     const rt = JSON.parse(JSON.stringify(def)) as WorkflowDef
-    expect(rt.nodes[1].inputTemplate).toBe('use {{a}}')
+    const nodeB = rt.nodes[1]
+    expect(nodeB.type === 'agent' ? nodeB.inputTemplate : undefined).toBe('use {{a}}')
     expect(rt.edges[0].when?.kind).toBe('contains')
     expect(rt.entry).toEqual(['a'])
   })

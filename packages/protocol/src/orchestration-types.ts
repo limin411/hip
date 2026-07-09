@@ -1,4 +1,5 @@
-import type { NodeId } from './index.js'
+/** Workflow node identifier (shared with workflow-protocol). */
+export type NodeId = string
 
 // ── 编排模式 ──
 /** Per-session orchestration mode. 'fast' uses the existing single-agent

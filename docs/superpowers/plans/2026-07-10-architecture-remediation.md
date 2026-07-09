@@ -178,13 +178,13 @@ Required fields (`llmProvider`, `model`, `tools`) are left as provided; do not i
 
 ---
 
-## Phase 2+ backlog (not in this wave)
+## Phase 2+ backlog
 
-### Phase 2
+### Phase 2 — completed 2026-07-10
 
-1. Split `packages/protocol/src/index.ts` into domain files (`session-messages.ts`, `workspace-messages.ts`, …) with barrel re-export.
-2. Finish SessionManager routing for session/plugin/workflow/plan (same handler pattern).
-3. Connection-close policy: cancel only turns owned by the disconnecting client when multi-client appears; until then document single-client assumption.
+1. [x] Split `packages/protocol/src/index.ts` into domain modules with barrel re-export (`session-core`, `messages`, `workspace-types`, `hooks`, `plugins`, …).
+2. [x] Finish SessionManager routing for session / plugin / workflow / plan / replay (void|Promise pattern for sync create).
+3. [x] Document single-client WS close → `cancelAllRunning` assumption (ws-server + SessionManager).
 
 ### Phase 3
 

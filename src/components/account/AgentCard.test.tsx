@@ -1,0 +1,173 @@
+// @vitest-environment happy-dom
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { AgentCard } from './AgentCard'
+import type { AgentConfig } from '@hip/protocol'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const map: Record<string, string> = {
+        'settings.agents.catAcp': 'ACP agent',
+        'settings.agents.badgeInternal': 'Internal',
+        'settings.agents.enableThis': 'Available as sub-agent',
+        'settings.agents.statusInstalled': 'Installed',
+        'settings.agents.statusNotInstalled': 'Not installed',
+        'settings.agents.edit': 'Edit',
+        'settings.agents.delete': 'Delete',
+        'settings.agents.menuMore': 'More',
+      }
+      if (map[key]) return map[key]
+      return options?.defaultValue ?? key
+    },
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
+}))
+
+afterEach(() => {
+  cleanup()
+})
+
+const acpAgent = (overrides?: Partial<AgentConfig>): AgentConfig => ({
+  id: 'a1',
+  name: 'OpenCode',
+  description: 'OpenCode agent',
+  kind: 'acp',
+  command: 'opencode',
+  args: ['acp', '--pure'],
+  enabled: true,
+  quirks: 'opencode',
+  ...overrides,
+})
+
+const internalAgent = (): AgentConfig => ({
+  id: 'i1',
+  name: 'Coder',
+  description: 'Internal agent',
+  kind: 'internal',
+  command: '',
+  args: [],
+  enabled: true,
+  prompt: 'You are a coder.',
+})
+
+describe('AgentCard — grid view', () => {
+  it('renders ACP agent and calls onToggle when binary is installed', () => {
+    const onToggle = vi.fn()
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="grid"
+        installed={{ opencode: true }}
+        detectionChecked
+        onToggle={onToggle}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    expect(screen.getByText('OpenCode')).toBeInTheDocument()
+    const sw = screen.getByRole('switch')
+    expect(sw).toBeChecked()
+    expect(sw).not.toBeDisabled()
+    fireEvent.click(sw)
+    expect(onToggle).toHaveBeenCalledWith(false)
+  })
+
+  it('forces switch off and disables it when the ACP binary is missing', () => {
+    const onToggle = vi.fn()
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="grid"
+        installed={{ opencode: false }}
+        detectionChecked
+        onToggle={onToggle}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).not.toBeChecked()
+    expect(sw).toBeDisabled()
+    expect(screen.getByText('Not installed')).toBeInTheDocument()
+    fireEvent.click(sw)
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it('does not show install status for internal agents', () => {
+    render(
+      <AgentCard
+        agent={internalAgent()}
+        viewMode="grid"
+        installed={{}}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    expect(screen.queryByText('Not installed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Installed')).not.toBeInTheDocument()
+    const sw = screen.getByRole('switch')
+    expect(sw).toBeChecked()
+    expect(sw).not.toBeDisabled()
+  })
+
+  it('does not force off before detection has run', () => {
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="grid"
+        installed={{}}
+        detectionChecked={false}
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).toBeChecked()
+    expect(sw).not.toBeDisabled()
+    expect(screen.queryByText('Not installed')).not.toBeInTheDocument()
+  })
+})
+
+describe('AgentCard — list view', () => {
+  it('shows not-installed badge and disables switch when binary is missing', () => {
+    const onToggle = vi.fn()
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="list"
+        installed={{ opencode: false }}
+        detectionChecked
+        onToggle={onToggle}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).not.toBeChecked()
+    expect(sw).toBeDisabled()
+    expect(screen.getByText('Not installed')).toBeInTheDocument()
+  })
+
+  it('shows installed badge when binary is present', () => {
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="list"
+        installed={{ opencode: true }}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).toBeChecked()
+    expect(sw).not.toBeDisabled()
+    expect(screen.getByText('Installed')).toBeInTheDocument()
+  })
+})

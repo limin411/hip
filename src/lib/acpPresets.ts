@@ -69,3 +69,14 @@ export function presetInstalled(preset: AcpPreset, installed: Record<string, boo
 export function presetAdded(preset: AcpPreset, agents: Pick<AgentConfig, 'quirks'>[]): boolean {
   return agents.some((a) => a.quirks === preset.id)
 }
+
+/** For an agent created from an ACP preset, return the matching preset and whether its
+ *  detect binary is currently installed. Returns undefined for non-preset agents. */
+export function agentBinaryStatus(
+  agent: Pick<AgentConfig, 'quirks'>,
+  installed: Record<string, boolean>,
+): { preset: AcpPreset; installed: boolean } | undefined {
+  const preset = acpPresetById(agent.quirks ?? '')
+  if (!preset) return undefined
+  return { preset, installed: presetInstalled(preset, installed) }
+}

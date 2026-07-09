@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import React from 'react'
+import type { WorkflowDef, RunState } from '@hip/protocol'
 
 // ── Mocks ──
 
@@ -97,7 +98,10 @@ vi.mock('@/store/diffStore', () => ({
   useDiffStore: (sel: (s: typeof mockDiffState) => unknown) => sel(mockDiffState),
 }))
 
-let mockWorkflowState = { activeWorkflow: null, runState: null }
+let mockWorkflowState: { activeWorkflow: WorkflowDef | null; runState: RunState | null } = {
+  activeWorkflow: null,
+  runState: null,
+}
 vi.mock('@/store/workflowStore', () => ({
   useWorkflowStore: (sel: (s: typeof mockWorkflowState) => unknown) => sel(mockWorkflowState),
 }))

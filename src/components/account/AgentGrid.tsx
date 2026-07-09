@@ -7,6 +7,8 @@ export function AgentGrid({
   agents,
   emptyTitle,
   emptyHint,
+  installed,
+  detectionChecked,
   onEdit,
   onToggle,
   onDelete,
@@ -14,6 +16,8 @@ export function AgentGrid({
   agents: AgentConfig[]
   emptyTitle: string
   emptyHint?: string
+  installed?: Record<string, boolean>
+  detectionChecked?: boolean
   onEdit: (agent: AgentConfig) => void
   onToggle: (agent: AgentConfig, enabled: boolean) => void
   onDelete: (agent: AgentConfig) => void
@@ -29,6 +33,8 @@ export function AgentGrid({
               key={agent.id}
               agent={agent}
               viewMode="grid"
+              installed={installed}
+              detectionChecked={detectionChecked}
               onToggle={(enabled) => onToggle(agent, enabled)}
               onEdit={() => onEdit(agent)}
               onDelete={() => onDelete(agent)}

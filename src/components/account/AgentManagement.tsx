@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import type { AgentConfig } from '@hip/protocol'
 import { useAgentsStore } from '@/store/agentsStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useDetectionStore } from '@/store/detectionStore'
 import { FIXED_AGENTS } from '@/lib/fixedAgents'
 import { AgentToolbar } from './AgentToolbar'
 import { AgentGrid } from './AgentGrid'
@@ -21,6 +22,9 @@ export function AgentManagement() {
   const { agents, loaded, load, addAgent, updateAgent, removeAgent } = useAgentsStore()
   const fixedAgentsEnabled = useHipConfigStore((s) => s.config.fixedAgents)
   const updateSection = useHipConfigStore((s) => s.updateSection)
+  const installed = useDetectionStore((s) => s.installed)
+  const detectionChecked = useDetectionStore((s) => s.checked)
+  const refreshDetection = useDetectionStore((s) => s.refresh)
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Editing>(null)
   const [deleting, setDeleting] = useState<AgentConfig | null>(null)
@@ -28,6 +32,10 @@ export function AgentManagement() {
   useEffect(() => {
     if (!loaded) void load()
   }, [loaded, load])
+
+  useEffect(() => {
+    void refreshDetection()
+  }, [refreshDetection])
 
   const filteredAgents = useMemo(() => {
     const s = search.trim().toLowerCase()
@@ -134,6 +142,8 @@ export function AgentManagement() {
                   ? t('settings.agents.gridEmptyHint')
                   : undefined
               }
+              installed={installed}
+              detectionChecked={detectionChecked}
               onEdit={(a) => setEditing({ mode: 'edit', agent: a })}
               onToggle={(a, enabled) => void updateAgent(a.id, { enabled })}
               onDelete={(a) => setDeleting(a)}

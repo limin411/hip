@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { ACP_PRESETS, acpPresetById, presetInstalled, presetAdded, type AcpPreset } from './acpPresets'
+import type { AgentConfig } from '@hip/protocol'
+import { ACP_PRESETS, acpPresetById, presetInstalled, presetAdded, agentBinaryStatus, type AcpPreset } from './acpPresets'
 
 describe('ACP_PRESETS', () => {
   it('lists the four supported providers with unique ids', () => {
@@ -68,5 +69,48 @@ describe('presetAdded', () => {
     expect(presetAdded(p, [{ quirks: 'opencode' }, { quirks: 'codex' }])).toBe(true)
     expect(presetAdded(p, [{ quirks: 'opencode' }])).toBe(false)
     expect(presetAdded(p, [{}])).toBe(false)
+  })
+})
+
+describe('agentBinaryStatus', () => {
+  const agent = (quirks: string): AgentConfig =>
+    ({
+      id: 'a1',
+      name: 'Test',
+      kind: 'acp',
+      command: quirks,
+      args: [],
+      enabled: true,
+      quirks,
+    }) as AgentConfig
+
+  it('returns undefined for agents that do not match a preset', () => {
+    expect(agentBinaryStatus(agent('custom-tool'), {})).toBeUndefined()
+    expect(agentBinaryStatus({ ...agent('opencode'), quirks: undefined }, {})).toBeUndefined()
+  })
+
+  it('reports installed when the preset binary is present', () => {
+    expect(agentBinaryStatus(agent('opencode'), { opencode: true })).toEqual({
+      preset: acpPresetById('opencode'),
+      installed: true,
+    })
+  })
+
+  it('reports not installed when the preset binary is missing', () => {
+    expect(agentBinaryStatus(agent('opencode'), { opencode: false })).toEqual({
+      preset: acpPresetById('opencode'),
+      installed: false,
+    })
+    expect(agentBinaryStatus(agent('opencode'), {})).toEqual({
+      preset: acpPresetById('opencode'),
+      installed: false,
+    })
+  })
+
+  it('maps kimi-code to the kimi detect binary', () => {
+    expect(agentBinaryStatus(agent('kimi-code'), { kimi: true })).toEqual({
+      preset: acpPresetById('kimi-code'),
+      installed: true,
+    })
   })
 })

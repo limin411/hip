@@ -49,7 +49,7 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
       },
       i18n: { language: 'en', changeLanguage: vi.fn() },
     }),
-  }
+  } as any
 })
 
 // Mock @/store/agentsStore
@@ -62,6 +62,18 @@ vi.mock('@/store/agentsStore', () => ({
     updateAgent: vi.fn(),
     removeAgent: vi.fn(),
   })),
+}))
+
+// Mock @/store/detectionStore
+const refreshDetection = vi.fn()
+vi.mock('@/store/detectionStore', () => ({
+  useDetectionStore: vi.fn((selector) =>
+    selector({
+      installed: {},
+      checked: true,
+      refresh: refreshDetection,
+    }),
+  ),
 }))
 
 beforeEach(async () => {
@@ -120,5 +132,15 @@ describe('AgentManagement — toggle failure handling', () => {
     const state = useHipConfigStore.getState()
     // fixedAgents still has { coder: true } (reverted from { coder: false, ... })
     expect(state.config.fixedAgents).toEqual({ coder: true, explore: true, plan: true })
+  })
+})
+
+describe('AgentManagement — binary detection', () => {
+  it('refreshes binary detection on mount', async () => {
+    refreshDetection.mockResolvedValue(undefined)
+    render(<AgentManagement />)
+    await waitFor(() => {
+      expect(refreshDetection).toHaveBeenCalledTimes(1)
+    })
   })
 })

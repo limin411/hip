@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { Cpu, Terminal, Pencil, Trash2, MoreVertical } from 'lucide-react'
+import { Cpu, Terminal, Pencil, Trash2, MoreVertical, CircleCheck, AlertCircle } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { agentCategory } from '@/lib/agentCategory'
 import { agentCommandLine } from '@/lib/agentCommandLine'
+import { agentBinaryStatus } from '@/lib/acpPresets'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
@@ -18,12 +19,16 @@ import {
 export function AgentCard({
   agent,
   viewMode = 'list',
+  installed = {},
+  detectionChecked = false,
   onToggle,
   onEdit,
   onDelete,
 }: {
   agent: AgentConfig
   viewMode?: 'grid' | 'list'
+  installed?: Record<string, boolean>
+  detectionChecked?: boolean
   onToggle: (enabled: boolean) => void
   onEdit: () => void
   onDelete: () => void
@@ -32,11 +37,15 @@ export function AgentCard({
   const cat = agentCategory(agent)
   const catLabel = cat === 'acp' ? t('settings.agents.catAcp') : t('settings.agents.badgeInternal')
   const cmdline = agentCommandLine(agent)
+  const binaryStatus = detectionChecked ? agentBinaryStatus(agent, installed) : undefined
+  const missingBinary = binaryStatus && !binaryStatus.installed
+  const switchChecked = agent.enabled && !missingBinary
+  const switchDisabled = !!missingBinary
 
   if (viewMode === 'grid') {
     return (
       <div className="relative flex min-h-[160px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle">
-        <div className={cn('flex flex-1 flex-col transition-opacity', !agent.enabled && 'opacity-60')}>
+        <div className={cn('flex flex-1 flex-col transition-opacity', !switchChecked && 'opacity-60')}>
           <div className="flex items-start gap-3">
             <Avatar name={agent.name} shape="square" size={40} />
             <div className="min-w-0 flex-1">
@@ -59,10 +68,28 @@ export function AgentCard({
                 <span className="font-mono text-ink-tertiary">{cmdline}</span>
               )}
             </p>
+            {missingBinary && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center gap-1 text-caption text-danger">
+                  <AlertCircle size={12} />
+                  {t('settings.agents.statusNotInstalled')}
+                </div>
+                {binaryStatus.preset.installCmd && (
+                  <code className="block select-all rounded bg-surface-muted px-1.5 py-1 font-mono text-caption text-ink-secondary">
+                    {binaryStatus.preset.installCmd}
+                  </code>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between">
-          <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />
+          <Switch
+            checked={switchChecked}
+            disabled={switchDisabled}
+            onCheckedChange={onToggle}
+            ariaLabel={t('settings.agents.enableThis')}
+          />
           <div className="flex items-center gap-1 opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100">
             <ActionButton icon={<Pencil size={14} />} label={t('settings.agents.edit')} onClick={onEdit} />
             <ActionButton icon={<Trash2 size={14} />} label={t('settings.agents.delete')} onClick={onDelete} danger />
@@ -74,7 +101,7 @@ export function AgentCard({
 
   return (
     <div className="flex items-center gap-3.5 rounded-lg border border-border bg-surface px-4 py-3.5">
-      <div className={cn('flex min-w-0 flex-1 items-center gap-3.5 transition-opacity', !agent.enabled && 'opacity-60')}>
+      <div className={cn('flex min-w-0 flex-1 items-center gap-3.5 transition-opacity', !switchChecked && 'opacity-60')}>
         <Avatar name={agent.name} shape="square" size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -85,6 +112,27 @@ export function AgentCard({
               <Badge>
                 <Cpu size={11} />
                 {agent.boundModel ? agent.boundModel.modelID : t('settings.agents.badgeGlobalModel')}
+              </Badge>
+            )}
+            {binaryStatus && (
+              <Badge
+                className={
+                  binaryStatus.installed
+                    ? 'bg-success/10 text-success'
+                    : 'bg-danger/10 text-danger'
+                }
+              >
+                {binaryStatus.installed ? (
+                  <>
+                    <CircleCheck size={11} />
+                    {t('settings.agents.statusInstalled')}
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={11} />
+                    {t('settings.agents.statusNotInstalled')}
+                  </>
+                )}
               </Badge>
             )}
           </div>
@@ -102,7 +150,12 @@ export function AgentCard({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
-        <Switch checked={agent.enabled} onCheckedChange={onToggle} ariaLabel={t('settings.agents.enableThis')} />
+        <Switch
+          checked={switchChecked}
+          disabled={switchDisabled}
+          onCheckedChange={onToggle}
+          ariaLabel={t('settings.agents.enableThis')}
+        />
         {/* modal={false}: a modal menu + the dialog its items open both lock `body { pointer-events: none }`;
             stacking them leaves the lock stuck after the dialog closes (whole app unclickable). A kebab needs
             no scroll/focus trapping, so non-modal avoids the race for both 编辑 and 删除. */}

@@ -11,7 +11,6 @@ import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { AgentDashboard } from './AgentDashboard'
 import { Button } from '@/components/ui/Button'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { cn } from '@/lib/utils'
 
 /** Decode a base64 string to bytes (for downloading image/pdf artifacts). */
@@ -20,6 +19,10 @@ function base64ToBytes(b64: string): Uint8Array {
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
   return out
+}
+
+function tabLabel(tab: ChatTab, t: (key: string) => string): string {
+  return t(`artifact.${tab}`)
 }
 
 export function PreviewPanel() {
@@ -31,7 +34,6 @@ export function PreviewPanel() {
   const activeSessionId = useActiveSessionId()
   const setSessionChatPanelOpen = useDomainStore((s) => s.setSessionChatPanelOpen)
   const chatActiveTab = useUiStore((s) => s.chatActiveTab)
-  const setChatActiveTab = useUiStore((s) => s.setChatActiveTab)
   const resetChatActiveTab = useUiStore((s) => s.resetChatActiveTab)
   const preview = useFsStore((s) => (scopeId ? s.bySession[scopeId]?.preview : undefined))
 
@@ -65,24 +67,33 @@ export function PreviewPanel() {
 
   return (
     <div className="flex h-full animate-panel-in flex-col bg-surface">
-      <Tabs value={chatActiveTab} onValueChange={(v) => setChatActiveTab(v as ChatTab)} className="flex h-full flex-col">
-        <div data-tauri-drag-region className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
-          <TabsList className="h-full gap-4" data-tauri-drag-region="false">
-            <TabsTrigger value="files">{t('artifact.files')}</TabsTrigger>
-            <TabsTrigger value="agents">{t('artifact.agents')}</TabsTrigger>
-          </TabsList>
-          <Button variant="ghost" size="icon" onClick={close} title={t('artifact.closePanel')} data-tauri-drag-region="false">
-            <X size={16} />
-          </Button>
-        </div>
+      <div data-tauri-drag-region className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
+        <span
+          className="truncate px-1 text-body font-medium text-ink"
+          data-tauri-drag-region="false"
+          data-testid="panel-title"
+        >
+          {tabLabel(chatActiveTab, t)}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={close}
+          title={t('artifact.closePanel')}
+          data-tauri-drag-region="false"
+        >
+          <X size={16} />
+        </Button>
+      </div>
 
-        <TabsContent value="files" className="flex-1 overflow-hidden p-0">
-          {artifacts.length === 0 ? (
+      <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>
+        {chatActiveTab === 'files' && (
+          artifacts.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary" data-testid="preview-no-artifacts">
               {t('artifact.noArtifacts')}
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1">
+            <div className="flex h-full min-h-0">
               <ul className="w-40 shrink-0 overflow-y-auto border-r border-border py-1">
                 {artifacts.map((a) => {
                   const Icon = iconFor(a.kind)
@@ -118,13 +129,14 @@ export function PreviewPanel() {
                 <FilePreview />
               </div>
             </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="agents" className="flex-1 overflow-auto p-3">
-          <AgentDashboard />
-        </TabsContent>
-      </Tabs>
+          )
+        )}
+        {chatActiveTab === 'agents' && (
+          <div className="h-full overflow-auto p-3">
+            <AgentDashboard />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

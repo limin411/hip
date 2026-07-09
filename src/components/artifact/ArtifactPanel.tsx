@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import type { ArtifactTab } from '@/store/uiStore'
 import { useUiStore } from '@/store/uiStore'
 import { useActiveSessionId } from '@/domain'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { Button } from '@/components/ui/Button'
 import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
@@ -18,54 +17,52 @@ import { useDiffStore } from '@/store/diffStore'
 import { DagEditor } from '@/components/workflow/DagEditor'
 import { useWorkflowStore } from '@/store/workflowStore'
 
+const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
+
+function tabLabel(tab: ArtifactTab, t: (key: string) => string): string {
+  if (tab === 'dag') return 'DAG'
+  return t(`artifact.${tab}`)
+}
+
 export function ArtifactPanel() {
   const { t } = useTranslation()
   const activeTab = useUiStore((s) => s.activeTab)
-  const setTab = useUiStore((s) => s.setTab)
   const activeSessionId = useActiveSessionId()
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
-  const diffCount = useDiffStore((s) => (sid ? s.bySession[sid]?.summary?.totalFiles : 0)) ?? 0
   const activeWorkflow = useWorkflowStore((s) => s.activeWorkflow)
   const runState = useWorkflowStore((s) => s.runState)
 
-  // Git-gated tabs only appear in a git repo. The two always-on tabs are 文件 / 智能体.
-  // DAG tab always visible — shows empty state when no workflow is active.
-  const TABS: { value: ArtifactTab; label: string; gated?: boolean; badge?: number }[] = [
-    { value: 'files', label: t('artifact.files') },
-    { value: 'agents', label: t('artifact.agents') },
-    { value: 'timeline', label: t('artifact.timeline'), gated: true },
-    { value: 'changes', label: t('artifact.changes'), gated: true, badge: diffCount },
-    { value: 'dag', label: 'DAG' },
-  ]
-  const visible = TABS.filter((tab) => !tab.gated || isGitRepo)
   // If the active tab got gated out (cwd changed to a non-repo), fall back to 文件.
-  const effectiveTab = visible.some((tab) => tab.value === activeTab) ? activeTab : 'files'
+  const effectiveTab: ArtifactTab =
+    GIT_GATED.has(activeTab) && !isGitRepo ? 'files' : activeTab
 
   return (
-    <div className="h-full animate-panel-in bg-surface">
-      <Tabs value={effectiveTab} onValueChange={(v) => setTab(v as ArtifactTab)} className="flex h-full flex-col">
-        <div data-tauri-drag-region className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
-          <TabsList className="h-full gap-4" data-tauri-drag-region="false">
-            {visible.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
-                {tab.label}
-                {tab.value === 'changes' && (tab.badge ?? 0) > 0 && (
-                  <span data-testid="changes-badge" className="ml-1.5 rounded-full bg-accent/15 px-1.5 text-caption text-accent">{tab.badge}</span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="flex items-center gap-2" data-tauri-drag-region="false">
-            {isGitRepo && <BranchSwitcher />}
-            <Button variant="ghost" size="icon" onClick={() => activeSessionId && setSessionCodePanelOpen(activeSessionId, false)} title={t('artifact.closePanel')}>
-              <X size={16} />
-            </Button>
-          </div>
+    <div className="flex h-full animate-panel-in flex-col bg-surface">
+      <div data-tauri-drag-region className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
+        <span
+          className="truncate px-1 text-body font-medium text-ink"
+          data-tauri-drag-region="false"
+          data-testid="panel-title"
+        >
+          {tabLabel(effectiveTab, t)}
+        </span>
+        <div className="flex items-center gap-2" data-tauri-drag-region="false">
+          {isGitRepo && <BranchSwitcher />}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => activeSessionId && setSessionCodePanelOpen(activeSessionId, false)}
+            title={t('artifact.closePanel')}
+          >
+            <X size={16} />
+          </Button>
         </div>
+      </div>
 
-        <TabsContent value="files" className="overflow-hidden p-0">
+      <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${effectiveTab}`}>
+        {effectiveTab === 'files' && (
           <div className="flex h-full flex-col">
             {!isGitRepo && <GitInitBanner />}
             <PanelGroup direction="horizontal" className="min-h-0 flex-1">
@@ -76,20 +73,24 @@ export function ArtifactPanel() {
               <Panel minSize={30}><FilePreview /></Panel>
             </PanelGroup>
           </div>
-        </TabsContent>
-        <TabsContent value="agents" className="p-3"><AgentDashboard /></TabsContent>
-        {isGitRepo && <TabsContent value="timeline" className="p-0"><TimelineView /></TabsContent>}
-        {isGitRepo && <TabsContent value="changes" className="p-0"><ChangesView /></TabsContent>}
-        <TabsContent value="dag" className="overflow-hidden p-0">
-          {activeWorkflow ? (
+        )}
+        {effectiveTab === 'agents' && (
+          <div className="h-full overflow-auto p-3">
+            <AgentDashboard />
+          </div>
+        )}
+        {effectiveTab === 'timeline' && isGitRepo && <TimelineView />}
+        {effectiveTab === 'changes' && isGitRepo && <ChangesView />}
+        {effectiveTab === 'dag' && (
+          activeWorkflow ? (
             <DagEditor workflow={activeWorkflow} runState={runState ?? undefined} />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary">
               No workflow active. Run a DAG workflow from the model picker to see the visual editor.
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          )
+        )}
+      </div>
     </div>
   )
 }

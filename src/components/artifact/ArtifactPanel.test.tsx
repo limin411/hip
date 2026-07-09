@@ -26,21 +26,6 @@ vi.mock('lucide-react', () => ({
   X: () => React.createElement('span', { 'data-testid': 'icon-x' }),
 }))
 
-// Mock UI components
-vi.mock('@/components/ui/Tabs', async () => {
-  const React = await import('react')
-  return {
-    Tabs: ({ children, value }: { children: React.ReactNode; value: string }) =>
-      React.createElement('div', { 'data-testid': 'tabs', 'data-value': value }, children),
-    TabsList: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'tabs-list' }, children),
-    TabsTrigger: ({ children, value }: { children: React.ReactNode; value: string }) =>
-      React.createElement('button', { 'data-testid': `tab-${value}` }, children),
-    TabsContent: ({ children, value }: { children: React.ReactNode; value: string }) =>
-      React.createElement('div', { 'data-testid': `tab-content-${value}` }, children),
-  }
-})
-
 vi.mock('@/components/ui/Button', () => ({
   Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) =>
     React.createElement('button', { 'data-testid': 'close-btn', onClick }, children),
@@ -125,31 +110,26 @@ describe('ArtifactPanel', () => {
     cleanup()
   })
 
-  it('renders all always-visible tabs (Files, Agents, DAG)', () => {
+  it('shows the active view title (no in-panel tab bar)', () => {
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('tab-files')).toBeInTheDocument()
-    expect(screen.getByTestId('tab-agents')).toBeInTheDocument()
-    expect(screen.getByTestId('tab-dag')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
+    expect(screen.queryByTestId('tabs-list')).toBeNull()
   })
 
-  it('hides git-gated tabs (Timeline, Changes) when not in a git repo', () => {
+  it('falls back to files when a git-gated tab is active outside a git repo', () => {
+    mockUiState = { activeTab: 'timeline' }
     render(<ArtifactPanel />)
-    expect(screen.queryByTestId('tab-timeline')).toBeNull()
-    expect(screen.queryByTestId('tab-changes')).toBeNull()
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
+    expect(screen.getByTestId('panel-view-files')).toBeInTheDocument()
+    expect(screen.queryByTestId('timeline-view')).toBeNull()
   })
 
-  it('shows git-gated tabs when in a git repo', () => {
-    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true, summary: { totalFiles: 3 } } } }
+  it('renders TimelineView when timeline is active in a git repo', () => {
+    mockUiState = { activeTab: 'timeline' }
+    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true } } }
     render(<ArtifactPanel />)
-    expect(screen.getByTestId('tab-timeline')).toBeInTheDocument()
-    expect(screen.getByTestId('tab-changes')).toBeInTheDocument()
-  })
-
-  it('shows changes badge count when in a git repo with diffs', () => {
-    mockDiffState = { bySession: { 'sess-1': { isGitRepo: true, summary: { totalFiles: 5 } } } }
-    render(<ArtifactPanel />)
-    expect(screen.getByTestId('changes-badge')).toBeInTheDocument()
-    expect(screen.getByTestId('changes-badge').textContent).toBe('5')
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Timeline')
+    expect(screen.getByTestId('timeline-view')).toBeInTheDocument()
   })
 
   it('renders FileTree and FilePreview when files tab is active', () => {
@@ -161,6 +141,7 @@ describe('ArtifactPanel', () => {
   it('renders AgentDashboard when agents tab is active', () => {
     mockUiState = { activeTab: 'agents' }
     render(<ArtifactPanel />)
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Agents')
     expect(screen.getByTestId('agent-dashboard')).toBeInTheDocument()
   })
 

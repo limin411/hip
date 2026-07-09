@@ -39,7 +39,7 @@ export function ArtifactPanel() {
     GIT_GATED.has(activeTab) && !isGitRepo ? 'files' : activeTab
 
   return (
-    <div className="flex h-full animate-panel-in flex-col bg-surface">
+    <div className="flex h-full min-h-0 flex-col bg-surface">
       <div data-tauri-drag-region className="flex h-11 shrink-0 items-center justify-between border-b border-border px-2">
         <span
           className="truncate px-1 text-body font-medium text-ink"

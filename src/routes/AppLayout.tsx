@@ -82,8 +82,11 @@ export function AppLayout() {
             {renderMainContent()}
           </Panel>
 
-          <PanelResizeHandle className="group relative z-10 w-2 -mx-1 bg-transparent">
-            <div className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent" />
+          <PanelResizeHandle className="group relative z-10 w-2 bg-transparent">
+            {/* Soft edge cue only when the floating card is open — no hard splitter line. */}
+            {rightOpen ? (
+              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40 group-data-[resize-handle-state=drag]:bg-accent" />
+            ) : null}
           </PanelResizeHandle>
 
           <Panel
@@ -95,9 +98,18 @@ export function AppLayout() {
             collapsedSize={0}
             onCollapse={handleCollapse}
             onExpand={handleExpand}
+            className="min-w-0"
           >
             {rightOpen ? (
-              codeOpen ? <ArtifactPanel /> : <PreviewPanel />
+              // Visual float shell only — resize/collapse/open state stay on the Panel above.
+              // Equal inset on all sides so the soft shadow is not clipped into a hard edge
+              // at the bottom / left (especially near the window corner).
+              <div className="flex h-full min-h-0 flex-col p-3" data-testid="right-panel-float">
+                {/* Low-offset shadow so it sits inside the p-3 gutter and doesn't clip into a hard line. */}
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_2px_12px_-2px_rgba(17,17,17,0.12),0_1px_3px_rgba(17,17,17,0.06)] animate-panel-in dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.45),0_1px_3px_rgba(0,0,0,0.25)]">
+                  {codeOpen ? <ArtifactPanel /> : <PreviewPanel />}
+                </div>
+              </div>
             ) : null}
           </Panel>
         </PanelGroup>

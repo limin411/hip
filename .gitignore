@@ -50,3 +50,9 @@ tsconfig.node.tsbuildinfo
 
 # Worktrees
 .worktrees/
+
+# Accidental relative home paths (e.g. Users/.../.hip written into the repo tree)
+Users/
+
+# Stale create-dmg intermediate images break `yarn tauri build`
+**/rw.*.dmg

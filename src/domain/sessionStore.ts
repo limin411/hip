@@ -1,6 +1,7 @@
 // src/domain/sessionStore.ts
 import { create } from 'zustand'
 import type { AcpConfigOption, AgentFrame, AgentProfileInfo, AgentRole, AgentRun, Message, PermissionOption, PermissionRequestPayload, PlanItem, SearchHit, ServerMessage, SessionConfig, SessionSummary, TimelineStep, ToolCall } from '@hip/protocol'
+import { normalizeSessionConfig } from '@hip/protocol'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 
 /** A surfaced server error tied to a session (e.g. NO_API_KEY, AGENT_ERROR). */
@@ -390,7 +391,11 @@ export function clearPermission(state: { sessions: SessionVM[] }, requestId: str
   }
 }
 
-export const DEFAULT_CONFIG: SessionConfig = { llmProvider: 'deepseek', model: '', tools: [], orchMode: 'fast' }
+export const DEFAULT_CONFIG: SessionConfig = normalizeSessionConfig({
+  llmProvider: 'deepseek',
+  model: '',
+  tools: [],
+})
 
 export function emptySession(id: string): SessionVM {
   return { id, config: DEFAULT_CONFIG, title: '新对话', preview: '开始一段新的对话…', updatedAtMs: Date.now(), loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, codePanelOpen: false, chatPanelOpen: false }

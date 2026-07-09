@@ -830,6 +830,22 @@ export interface NetworkPolicyConfig {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Session config defaults + inbound message guard
+// ──────────────────────────────────────────────────────────────────
+
+export {
+  normalizeSessionConfig,
+  SESSION_CONFIG_DEFAULTS,
+  type SessionConfigLike,
+} from './session-config.js'
+export {
+  parseClientMessage,
+  isClientMessageType,
+  CLIENT_MESSAGE_TYPES,
+  type ClientMessageType,
+} from './message-guard.js'
+
+// ──────────────────────────────────────────────────────────────────
 // Orchestration types re-export
 // ──────────────────────────────────────────────────────────────────
 

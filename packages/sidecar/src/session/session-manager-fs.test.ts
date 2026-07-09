@@ -53,7 +53,8 @@ describe('session-manager fs', () => {
     ;(mgr.getSessionForTest('s1') as unknown as { running: boolean }).running = true
     mgr.handle({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' }, send)
     expect(sent).toContainEqual({ type: 'session:permissionMode', sessionId: 's1', permissionMode: 'edit' })
-    expect(mgr.getSessionForTest('s1')!.config.permissionMode).toBeUndefined()
+    // createSession normalizes defaults; rejected mid-turn must not flip to 'full'.
+    expect(mgr.getSessionForTest('s1')!.config.permissionMode).toBe('edit')
   })
 
   it('fs:ls returns directory entries', async () => {

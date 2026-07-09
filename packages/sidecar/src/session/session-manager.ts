@@ -1,4 +1,5 @@
 import type { AgentProfileInfo, ClientMessage, ServerMessage, SessionConfig, FsEntry } from '@hip/protocol'
+import { normalizeSessionConfig } from '@hip/protocol'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -7,11 +8,9 @@ import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
 import * as workspaceGit from './workspace-git.js'
-import { getWorktreesDir } from './worktree-config.js'
 import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
-import { promptRegistry } from './mcp/prompt-registry.js'
 import { safeErrorMessage } from './error.js'
 import { logDebug } from '../debug-logger.js'
 import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js'
@@ -19,6 +18,9 @@ import { buildTools } from './tools.js'
 import { SessionReplay } from './replay.js'
 import { EventStore } from '../persistence/event-store.js'
 import { AttachmentError } from './attachments.js'
+import { handleWorkspaceMessage, isWorkspaceMessage } from './handlers/workspace.js'
+import { handleMcpMessage, isMcpMessage } from './handlers/mcp.js'
+import type { SessionManagerContext } from './handlers/types.js'
 
 type SendFn = (msg: ServerMessage) => void
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
@@ -52,6 +54,20 @@ export class SessionManager {
   async handleAsync(msg: ClientMessage, send: SendFn): Promise<void> {
     const t0 = Date.now()
     logDebug('mgr', 'msg:handle', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined })
+
+    // Domain handlers: sync type-gate first so session lifecycle stays synchronous
+    // until the first real await (handle() fire-and-forget tests rely on create before set*).
+    if (isWorkspaceMessage(msg)) {
+      await handleWorkspaceMessage(this.handlerCtx(), msg, send)
+      logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
+      return
+    }
+    if (isMcpMessage(msg)) {
+      await handleMcpMessage(msg, send)
+      logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
+      return
+    }
+
     switch (msg.type) {
       case 'session:create':
         this.createSession(msg.id, msg.config, send)
@@ -224,149 +240,9 @@ export class SessionManager {
         send({ type: 'config:activeModel', providerID: msg.providerID, modelID: msg.modelID, hasApiKey })
         break
       }
-      case 'fs:ls': {
-        const r = await this.ensureSession(msg.sessionId, send).lsDir(msg.path)
-        send({ type: 'fs:ls:result', sessionId: msg.sessionId, path: msg.path, entries: r.entries ?? [], error: r.error })
-        break
-      }
-      case 'fs:read': {
-        const r = await this.ensureSession(msg.sessionId, send).readForPreview(msg.path)
-        send(
-          'error' in r
-            ? { type: 'fs:read:result', sessionId: msg.sessionId, path: msg.path, error: r.error }
-            : { type: 'fs:read:result', sessionId: msg.sessionId, path: msg.path, content: r.content, encoding: r.encoding, mimeType: r.mimeType, truncated: r.truncated },
-        )
-        break
-      }
-      case 'fs:lsCwd': {
-        const r = await this.lsCwd(msg.cwd, msg.path)
-        send({ type: 'fs:lsCwd:result', cwd: msg.cwd, path: msg.path, entries: r.entries ?? [], error: r.error })
-        break
-      }
-      case 'fs:readCwd': {
-        const r = await this.readCwd(msg.cwd, msg.path)
-        send(
-          'error' in r
-            ? { type: 'fs:readCwd:result', cwd: msg.cwd, path: msg.path, error: r.error }
-            : { type: 'fs:readCwd:result', cwd: msg.cwd, path: msg.path, content: r.content, encoding: r.encoding, mimeType: r.mimeType, truncated: r.truncated },
-        )
-        break
-      }
-      case 'fs:diff': {
-        const r = await this.ensureSession(msg.sessionId, send).workspaceDiff(msg.base ?? 'session-start')
-        send({ type: 'fs:diff:result', sessionId: msg.sessionId, ...r })
-        break
-      }
-      case 'fs:diffSummary': {
-        const r = await this.ensureSession(msg.sessionId, send).workspaceDiffSummary(msg.base ?? 'session-start')
-        send({ type: 'fs:diffSummary:result', sessionId: msg.sessionId, ...r })
-        break
-      }
-      case 'fs:diffFile': {
-        const r = await this.ensureSession(msg.sessionId, send).workspaceDiffFile(msg.path, msg.base ?? 'session-start', msg.context)
-        send({ type: 'fs:diffFile:result', sessionId: msg.sessionId, path: msg.path, base: msg.base ?? 'session-start', state: r.state, file: r.file, error: r.error })
-        break
-      }
-      case 'fs:gitInit': {
-        const r = await this.ensureSession(msg.sessionId, send).workspaceGitInit()
-        send({ type: 'fs:gitInit:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
-        break
-      }
-      case 'git:checkpoint:list': {
-        const r = await this.ensureSession(msg.sessionId, send).listCheckpoints()
-        send({ type: 'git:checkpoint:list:result', sessionId: msg.sessionId, checkpoints: r.checkpoints, isGitRepo: r.isGitRepo, currentBranch: r.currentBranch })
-        break
-      }
-      case 'git:checkpoint:diff': {
-        const r = await this.ensureSession(msg.sessionId, send).checkpointDiff(msg.checkpointId, msg.mode)
-        send({ type: 'git:checkpoint:diff:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, mode: msg.mode, state: r.state, files: r.files, summary: r.summary, error: r.error })
-        break
-      }
-      case 'git:commitLog': {
-        const r = await this.ensureSession(msg.sessionId, send).commitLog()
-        send({ type: 'git:commitLog:result', sessionId: msg.sessionId, commits: r.commits ?? [], state: r.state, error: r.error })
-        break
-      }
-      case 'git:branch:list': {
-        const r = await this.ensureSession(msg.sessionId, send).listBranches()
-        send({ type: 'git:branch:list:result', sessionId: msg.sessionId, branches: r.branches, currentBranch: r.currentBranch })
-        break
-      }
-      case 'git:branch:switch': {
-        const r = await this.ensureSession(msg.sessionId, send).switchBranch(msg.branch)
-        send({ type: 'git:branch:switch:result', sessionId: msg.sessionId, branch: msg.branch, ok: r.ok, currentBranch: r.currentBranch, ...(r.error ? { error: r.error } : {}) })
-        break
-      }
-      case 'git:revert': {
-        const r = await this.ensureSession(msg.sessionId, send).revertCheckpoint(msg.checkpointId, send)
-        send({ type: 'git:revert:result', sessionId: msg.sessionId, checkpointId: msg.checkpointId, ok: r.ok, ...(r.safetyCheckpointId ? { safetyCheckpointId: r.safetyCheckpointId } : {}), ...(r.error ? { error: r.error } : {}) })
-        break
-      }
-      case 'git:worktree:create': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const cwd = s.config.cwd
-        if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
-        const worktreePath = path.join(getWorktreesDir(), msg.branch)
-        const r = await workspaceGit.createWorktree(cwd, msg.branch, worktreePath)
-        send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: r.ok, ...(r.path ? { path: r.path } : {}), ...(r.error ? { error: r.error } : {}) })
-        break
-      }
-      case 'git:worktree:list': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const cwd = s.config.cwd
-        if (!cwd) { send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: [] }); break }
-        const r = await workspaceGit.listWorktrees(cwd)
-        send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: r.worktrees ?? [] })
-        break
-      }
-      case 'git:worktree:remove': {
-        const s = this.ensureSession(msg.sessionId, send)
-        const cwd = s.config.cwd
-        if (!cwd) { send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); break }
-        const r = await workspaceGit.removeWorktree(cwd, msg.worktreePath)
-        send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
-        break
-      }
       case 'workflow:run':
         await this.ensureSession(msg.sessionId, send).runWorkflowTurn(msg.def, send)
         break
-      case 'mcp:listResources': {
-        const resources = mcpManager.allResources().filter((r) => r.serverId === msg.serverId)
-        send({ type: 'mcp:listResources:result', serverId: msg.serverId, resources })
-        break
-      }
-      case 'mcp:readResource': {
-        const r = await mcpManager.readResource(msg.serverId, msg.uri)
-        send(
-          r.error
-            ? { type: 'mcp:readResource:result', serverId: msg.serverId, uri: msg.uri, contents: [], error: r.error }
-            : { type: 'mcp:readResource:result', serverId: msg.serverId, uri: msg.uri, contents: r.contents },
-        )
-        break
-      }
-      case 'mcp:listPrompts': {
-        const prompts = promptRegistry.listAll().filter((p) => p.serverId === msg.serverId)
-        send({ type: 'mcp:listPrompts:result', serverId: msg.serverId, prompts })
-        break
-      }
-      case 'mcp:getPrompt': {
-        const r = await promptRegistry.execute(msg.serverId, msg.name, msg.arguments)
-        send(
-          r.error
-            ? { type: 'mcp:getPrompt:result', serverId: msg.serverId, name: msg.name, messages: [], error: r.error }
-            : { type: 'mcp:getPrompt:result', serverId: msg.serverId, name: msg.name, messages: r.messages },
-        )
-        break
-      }
-      case 'mcp:reconnect': {
-        // Force-disconnect all servers, then reconnect with the provided configs.
-        // This gives immediate feedback: the frontend sends its latest config state
-        // so the sidecar doesn't need to re-read TOML.
-        await mcpManager.reconcile([])
-        await mcpManager.reconcile(msg.servers)
-        send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(msg.servers) })
-        break
-      }
       case 'plugin:install:url':
         await this.handlePluginInstallUrl(msg.url, send)
         break
@@ -406,8 +282,18 @@ export class SessionManager {
     logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }
 
+  private handlerCtx(): SessionManagerContext {
+    return {
+      ensureSession: (id, send) => this.ensureSession(id, send),
+      lsCwd: (cwd, p) => this.lsCwd(cwd, p),
+      readCwd: (cwd, p) => this.readCwd(cwd, p),
+      profileListFor: (session) => this.profileListFor(session),
+      store: this.store,
+    }
+  }
+
   private createSession(id: string, config: SessionConfig, send: SendFn): void {
-    let cfg: SessionConfig = { ...config, orchMode: config.orchMode ?? 'fast' }
+    let cfg: SessionConfig = normalizeSessionConfig(config)
     if (!cfg.cwd) cfg = { ...cfg, cwd: ensureScratchDir(id, this.scratchRoot) }
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
@@ -423,7 +309,8 @@ export class SessionManager {
     const existing = this.sessions.get(id)
     if (existing) return existing
     const row = this.store?.getSession(id)
-    const config: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
+    const raw: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
+    const config = normalizeSessionConfig(raw)
     const session = new Session(id, config, this.modelFactory(config), this.store, undefined, undefined, undefined, undefined, undefined, this.scratchRoot)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)

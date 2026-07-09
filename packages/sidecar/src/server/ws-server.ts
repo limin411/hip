@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage } from 'http'
 import { createServer } from 'net'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
+import { parseClientMessage } from '@hip/protocol'
 import { SessionManager } from '../session/session-manager.js'
 import type { SessionStore } from '../persistence/store.js'
 import { getActiveModel } from '../config/providers.js'
@@ -15,12 +16,15 @@ const ALLOWED_ORIGINS = new Set([
   'https://tauri.localhost',
 ])
 
+/** Loopback only — never expose the agent WS on non-local interfaces. */
+const BIND_HOST = '127.0.0.1'
+
 export class WsServer {
   private readonly wss: WebSocketServer
   private readonly sessionManager: SessionManager
 
   constructor(private readonly port: number, private readonly token: string, store?: SessionStore) {
-    this.wss = new WebSocketServer({ port })
+    this.wss = new WebSocketServer({ port, host: BIND_HOST })
     this.sessionManager = new SessionManager(store)
   }
 
@@ -55,9 +59,14 @@ export class WsServer {
     send({ type: 'ready', hasApiKey: !!resolveApiKey(getActiveModel().providerID) })
     ws.on('message', (data) => {
       try {
-        const msg = JSON.parse(data.toString()) as ClientMessage
-        logDebug('ws', 'msg:received', { type: (msg as any).type, sessionId: (msg as any).sessionId })
-        this.sessionManager.handle(msg, send)
+        const raw: unknown = JSON.parse(data.toString())
+        const msg = parseClientMessage(raw)
+        if (!msg) {
+          send({ type: 'error', code: 'INVALID_MESSAGE', message: 'unknown or malformed client message' })
+          return
+        }
+        logDebug('ws', 'msg:received', { type: msg.type, sessionId: 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined })
+        this.sessionManager.handle(msg as ClientMessage, send)
       } catch (err) {
         send({ type: 'error', code: 'PARSE_ERROR', message: String(err) })
       }
@@ -69,7 +78,7 @@ export class WsServer {
   static findAvailablePort(): Promise<number> {
     return new Promise((resolve, reject) => {
       const srv = createServer()
-      srv.listen(0, () => {
+      srv.listen(0, BIND_HOST, () => {
         const addr = srv.address()
         if (!addr || typeof addr === 'string') return reject(new Error('no address'))
         srv.close(() => resolve(addr.port))

@@ -1,5 +1,6 @@
 // src/domain/sessionService.ts
 import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode, PermissionMode, OrchestrationMode } from '@hip/protocol'
+import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
 import { WsTransport } from './wsTransport'
@@ -14,6 +15,7 @@ import { resolveModelConfig } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
 import { surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
+import { applyServerMessageEffects } from './serverMessageEffects'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -57,112 +59,18 @@ export class SessionService {
 
   private receive(msg: ServerMessage): void {
     useDomainStore.getState().apply(msg)
-    if (msg.type === 'ready') {
-      useDiffStore.getState().resetTransient()
-      this.transport.send({ type: 'session:list' })
-      this.resyncActiveIfRunning()
-    } else if (msg.type === 'fs:ls:result') {
-      useFsStore.getState().setEntries(msg.sessionId, msg.path, msg.entries)
-    } else if (msg.type === 'fs:read:result') {
-      useFsStore.getState().setPreview(msg.sessionId, {
-        status: 'ready', path: msg.path, content: msg.content, encoding: msg.encoding, mimeType: msg.mimeType, truncated: msg.truncated, error: msg.error,
-      })
-    } else if (msg.type === 'fs:lsCwd:result') {
-      useFsStore.getState().setEntries(msg.cwd, msg.path, msg.entries)
-    } else if (msg.type === 'fs:readCwd:result') {
-      useFsStore.getState().setPreview(msg.cwd, {
-        status: 'ready', path: msg.path, content: msg.content, encoding: msg.encoding, mimeType: msg.mimeType, truncated: msg.truncated, error: msg.error,
-      })
-    } else if (msg.type === 'fs:diff:result') {
-      useDiffStore.getState().setResult(msg.sessionId, { state: msg.state, files: msg.files, summary: msg.summary, base: msg.base, hasSessionStart: msg.hasSessionStart, error: msg.error })
-    } else if (msg.type === 'fs:diffSummary:result') {
-      if (msg.summary) useDiffStore.getState().setSummary(msg.sessionId, msg.summary, msg.base, msg.hasSessionStart)
-    } else if (msg.type === 'fs:diffFile:result') {
-      if (msg.file) useDiffStore.getState().setFileExpanded(msg.sessionId, msg.path, msg.file)
-    } else if (msg.type === 'fs:gitInit:result') {
-      useDiffStore.getState().setInitPending(msg.sessionId, false)
-      if (msg.ok) {
-        // Init flipped the cwd into a repo; refresh the repo gate so the git-gated tabs appear.
-        this.requestDiff(msg.sessionId)
-        this.requestCheckpoints(msg.sessionId)
-      } else {
-        useDiffStore.getState().setResult(msg.sessionId, { state: 'not_a_repo', base: 'head', hasSessionStart: false, error: msg.error })
-      }
-    } else if (msg.type === 'git:checkpoint:list:result') {
-      useDiffStore.getState().setCheckpoints(msg.sessionId, msg.checkpoints, msg.isGitRepo, msg.currentBranch)
-    } else if (msg.type === 'checkpoint:created') {
-      useDiffStore.getState().addCheckpoint(msg.sessionId, msg.checkpoint)
-    } else if (msg.type === 'git:checkpoint:diff:result') {
-      useDiffStore.getState().setCheckpointDiffResult(msg.sessionId, `${msg.checkpointId}|${msg.mode}`, { state: msg.state, files: msg.files, summary: msg.summary, error: msg.error })
-    } else if (msg.type === 'git:commitLog:result') {
-      useDiffStore.getState().setCommitLogResult(msg.sessionId, { state: msg.state, commits: msg.commits, error: msg.error })
-    } else if (msg.type === 'git:branch:list:result') {
-      useDiffStore.getState().setBranches(msg.sessionId, msg.branches, msg.currentBranch)
-    } else if (msg.type === 'git:branch:switch:result') {
-      if (msg.ok) {
-        useDiffStore.getState().setBranches(msg.sessionId, useDiffStore.getState().bySession[msg.sessionId]?.branches ?? [], msg.currentBranch)
-        // Working tree changed → the live-tree-relative checkpoint diffs are now stale.
-        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
-        // Branch changed → re-pull branches (current flag) + checkpoints (branch labels) + diff summary.
-        this.transport.send({ type: 'git:branch:list', sessionId: msg.sessionId })
-        this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-        const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-        this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      } else {
-        // Failure (e.g. a dirty tree) → record the error so the confirm modal can clear its spinner
-        // and surface it, instead of bricking the modal on a stuck 'switching' state.
-        useDiffStore.getState().setSwitchError(msg.sessionId, msg.error ?? 'switch_failed')
-      }
-    } else if (msg.type === 'git:revert:result') {
-      if (msg.ok) {
-        // Worktree changed → the live-tree-relative checkpoint diffs are now stale.
-        useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
-        // Worktree changed → refresh the checkpoint list (safety checkpoint was added) + diff badge.
-        this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-        const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-        this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      } else {
-        // Failure → record the error so the confirm modal can clear its 'reverting' spinner + surface it.
-        useDiffStore.getState().setRevertError(msg.sessionId, msg.error ?? 'revert_failed')
-      }
-    } else if (msg.type === 'session:created') {
-      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-    } else if (msg.type === 'session:cwd') {
-      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-    } else if (msg.type === 'message:complete') {
-      // The agent may have written files this turn — re-pull every loaded dir + the open file.
-      const fsState = useFsStore.getState().bySession[msg.sessionId]
-      if (fsState) {
-        for (const dir of Object.keys(fsState.entriesByDir)) this.transport.send({ type: 'fs:ls', sessionId: msg.sessionId, path: dir })
-        if (fsState.activePath) this.transport.send({ type: 'fs:read', sessionId: msg.sessionId, path: fsState.activePath })
-      }
-      // 改完文件 → 工作区变了,相对实时工作树的检查点 diff 缓存失效。
-      useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
-      // 改完文件 → 总是刷新角标(便宜) + 检查点列表(新一轮可能新建了 checkpoint)。
-      const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'
-      this.transport.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
-      this.transport.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
-      const tab = useUiStore.getState().activeTab
-      if (tab === 'changes') { this.requestDiff(msg.sessionId); this.requestCommitLog(msg.sessionId) }
-    } else if (msg.type === 'compact:result') {
-      if (msg.ok) {
-        useDomainStore.getState().appendMessage(msg.sessionId, {
-          id: nanoid(),
-          role: 'assistant',
-          content: `Conversation compacted: ${msg.messagesBefore} messages → ${msg.messagesAfter} messages`,
-          timestamp: Date.now(),
-        })
-      }
-    }
+    applyServerMessageEffects(msg, {
+      send: (m) => this.transport.send(m),
+      requestDiff: (sessionId) => this.requestDiff(sessionId),
+      requestCheckpoints: (sessionId) => this.requestCheckpoints(sessionId),
+      requestCommitLog: (sessionId) => this.requestCommitLog(sessionId),
+      resyncActiveIfRunning: () => this.resyncActiveIfRunning(),
+    })
   }
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
     const id = nanoid()
-    const enriched: SessionConfig = { ...config, language: currentLanguage() }
+    const enriched: SessionConfig = normalizeSessionConfig({ ...config, language: currentLanguage() })
     useDomainStore.getState().createSession(id, enriched)
     this.rememberActiveForSurface(id)
     useUiStore.getState().addOpenSession(id)

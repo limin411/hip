@@ -7,6 +7,7 @@ mod path_env;
 mod logging;
 mod hip_config;
 mod path_tools;
+mod pty;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -444,6 +445,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_wdio_webdriver::init())
         .manage(SidecarState::new())
+        .manage(pty::PtyManager::new())
         .setup(|app| {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -483,20 +485,27 @@ pub fn run() {
             install_plugin,
             delete_plugin,
             list_worktrees,
-            path_tools::which_binaries
+            path_tools::which_binaries,
+            pty::pty_open,
+            pty::pty_write,
+            pty::pty_resize,
+            pty::pty_kill,
+            pty::pty_list,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
 
     app.run(|app_handle, event| match event {
-        // Graceful quit (Cmd+Q / AppHandle::exit): kill the managed sidecar.
+        // Graceful quit (Cmd+Q / AppHandle::exit): kill the managed sidecar + PTYs.
         // NOTE: this fires ONLY for GUI/programmatic exits — a SIGTERM/SIGKILL to
         // this process (e.g. E2E teardown) runs no handler, so the sidecar also
         // self-terminates when our stdin pipe closes (HIP_PARENT_WATCH; sidecar.rs).
+        // Interactive shells have no parent-death watchdog (accepted; design D orphan policy).
         tauri::RunEvent::ExitRequested { .. } => {
             if let Some(child) = app_handle.state::<SidecarState>().child.lock().unwrap().take() {
                 let _ = child.kill();
             }
+            app_handle.state::<pty::PtyManager>().kill_all();
         }
         // On macOS, closing the (single) window does not quit the app by default,
         // which would leave the sidecar running. For this single-window app, treat

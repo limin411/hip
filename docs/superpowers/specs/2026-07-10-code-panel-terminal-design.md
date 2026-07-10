@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | TBD |
 | 日期 | 2026-07-10 |
-| 状态 | PR-1 已实现（tab/flag/i18n/空壳）；PR-2+ 未实现；`CODE_TERMINAL=false` 暗发；Open Qs 已产品拍板 |
+| 状态 | PR-1 + PR-2 已实现（UI 空壳 + Rust PTY）；PR-3+ 未实现；`CODE_TERMINAL=false` 暗发 |
 | 相关代码 | `src/routes/AppLayout.tsx`, `src/components/artifact/ArtifactPanel.tsx`, `src/components/layout/PanelToggle.tsx`, `src/store/uiStore.ts`, `src/store/useFsScope.ts`, `src/ipc/dialog.ts`, `src/components/theme/ThemeProvider.tsx`, `src-tauri/src/path_env.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json` |
 | 竞品参考 | `docs/research/2026-07-05-claude-desktop.md`, `docs/research/2026-07-05-codex-desktop.md`, `docs/research/2026-07-05-competitive-feature-gap-analysis.md` |
 | 前置能力 | 无 xterm / node-pty / 交互式 PTY；`tauri-plugin-shell` 仅用于 sidecar 与 `open()` URL；`src/` 内尚无 `@tauri-apps/api/event` 用法 |

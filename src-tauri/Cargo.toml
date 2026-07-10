@@ -36,4 +36,9 @@ serde_yaml = "0.9"
 # Unified TOML config I/O (skill-mcp-overhaul wave 1).
 toml = "0.8"
 dirs = "6"
+# Interactive code-panel terminal (PR-2): PTY + base64 event payloads.
+portable-pty = "0.9"
+base64 = "0.22"
+# Process-group kill for PTY children (Unix).
+libc = "0.2"
 

@@ -17,8 +17,9 @@
 | **Sprint B** | [`2026-07-10-sprint-b-code-agents-experience-design.md`](./2026-07-10-sprint-b-code-agents-experience-design.md) | Code 闭环可感、Agents 可懂、上下文更省、安装失败可读 | ~2 周 · **主干已实现**（B3 验收 / 完整 e2e → polish） |
 | **Sprint C** | [`2026-07-10-sprint-c-architecture-convergence-design.md`](./2026-07-10-sprint-c-architecture-convergence-design.md) | 持久化/命名/死路径收敛，降低长期债务 | 按需 1–3 周 · **主干已实现**（C5 文案扫尾 → polish） |
 | **Polish** | [`2026-07-10-pre-public-polish-index.md`](./2026-07-10-pre-public-polish-index.md) | B3 确认框验收、write→Changes e2e、orchMode 死键清理 | 约 2–4 天 · **P1–P3 已实现** |
+| **E2E 计划** | [`2026-07-10-e2e-test-plan.md`](./2026-07-10-e2e-test-plan.md) | 完整 E2E 分层、标签门禁、缺口与分阶段落地 | 持续 · **计划已写** |
 
-**执行顺序：A → B → C → Polish(P3∥P1 → P2)。** 未完成 A 的验收标准前，不启动 B 的大功能；B 未完成前不做 C 的破坏性删除。
+**执行顺序：A → B → C → Polish(P3∥P1 → P2)。** 未完成 A 的验收标准前，不启动 B 的大功能；B 未完成前不做 C 的破坏性删除。公开前 e2e 门禁按 E2E 计划 Phase 1 推进。
 
 ---
 

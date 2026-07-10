@@ -181,4 +181,124 @@ describe('runWorkflowTurn workflow UI events', () => {
     const events = sent.filter((m) => m.type === 'workflow:event') as Array<Extract<ServerMessage, { type: 'workflow:event' }>>
     expect(events.every((m) => m.runId === started.runId)).toBe(true)
   })
+
+  it('emits agent:started/finished for supervisor during the workflow turn', async () => {
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-supervisor-agent',
+      name: 'Supervisor Agent Test',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'Do the task' }],
+      edges: [],
+      entry: ['n1'],
+    }
+
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const sent: ServerMessage[] = []
+    const finalize = (
+      _s: (msg: ServerMessage) => void,
+      _turnId: string,
+      text: string,
+      _trajectory: Map<string, TraceRun>,
+      _stopped: boolean,
+    ): string => text
+
+    await runWorkflowTurn(deps, def, (m) => sent.push(m), finalize)
+
+    const started = sent.filter((m) => m.type === 'agent:started') as Array<Extract<ServerMessage, { type: 'agent:started' }>>
+    const finished = sent.filter((m) => m.type === 'agent:finished') as Array<Extract<ServerMessage, { type: 'agent:finished' }>>
+    expect(started.some((m) => m.agentId === 'supervisor' && m.role === 'supervisor')).toBe(true)
+    expect(finished.some((m) => m.agentId === 'supervisor')).toBe(true)
+  })
+})
+
+describe('runWorkflowTurn external abort signal', () => {
+  it('links opts.signal so aborting the external controller aborts the executor signal', async () => {
+    let executorSignal: AbortSignal | undefined
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string; signal?: AbortSignal }) => {
+      executorSignal = opts.signal
+      await gate
+      if (opts.signal?.aborted) {
+        const err = new Error('Aborted')
+        err.name = 'AbortError'
+        throw err
+      }
+      return { runId: opts.runId, workflowId: 'wf-abort', status: 'succeeded' as const, nodes: {} }
+    })
+
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-abort',
+      name: 'Abort Wire Test',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'Do the task' }],
+      edges: [],
+      entry: ['n1'],
+    }
+
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const external = new AbortController()
+    const sent: ServerMessage[] = []
+    const finalize = (
+      _s: (msg: ServerMessage) => void,
+      _turnId: string,
+      text: string,
+      _trajectory: Map<string, TraceRun>,
+      _stopped: boolean,
+    ): string => text
+
+    const p = runWorkflowTurn(deps, def, (m) => sent.push(m), finalize, { signal: external.signal })
+    // Wait until runWorkflow has been entered and captured the signal.
+    await vi.waitFor(() => {
+      expect(executorSignal).toBeDefined()
+    })
+    expect(executorSignal!.aborted).toBe(false)
+
+    external.abort()
+    expect(executorSignal!.aborted).toBe(true)
+
+    release()
+    const result = await p
+    expect(result).toBe('')
+    expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'CANCELLED')).toBe(true)
+  })
+
+  it('immediately aborts when opts.signal is already aborted', async () => {
+    runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string; signal?: AbortSignal }) => {
+      if (opts.signal?.aborted) {
+        const err = new Error('Aborted')
+        err.name = 'AbortError'
+        throw err
+      }
+      return { runId: opts.runId, workflowId: 'wf-pre-abort', status: 'succeeded' as const, nodes: {} }
+    })
+
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-pre-abort',
+      name: 'Pre-abort Test',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'Do the task' }],
+      edges: [],
+      entry: ['n1'],
+    }
+
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const external = new AbortController()
+    external.abort()
+    const sent: ServerMessage[] = []
+    const finalize = (
+      _s: (msg: ServerMessage) => void,
+      _turnId: string,
+      text: string,
+      _trajectory: Map<string, TraceRun>,
+      _stopped: boolean,
+    ): string => text
+
+    const result = await runWorkflowTurn(deps, def, (m) => sent.push(m), finalize, { signal: external.signal })
+    expect(result).toBe('')
+    expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'CANCELLED')).toBe(true)
+  })
 })

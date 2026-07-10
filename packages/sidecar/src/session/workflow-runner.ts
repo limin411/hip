@@ -41,9 +41,15 @@ export async function runWorkflowTurn(
   def: WorkflowDef,
   send: SendFn,
   finalize: (send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean) => string,
-  opts?: { runInputs?: { text: string; data?: unknown } },
+  opts?: { runInputs?: { text: string; data?: unknown }; signal?: AbortSignal },
 ): Promise<string> {
+  // Local controller for idle watchdog + executor; link Session.cancel via opts.signal.
   const abortController = new AbortController()
+  const external = opts?.signal
+  if (external) {
+    if (external.aborted) abortController.abort()
+    else external.addEventListener('abort', () => abortController.abort(), { once: true })
+  }
   deps.orchestratorRunner = undefined // local ref for mutation
   let timedOut = false
   const watchdog = new IdleWatchdog(deps.idleTimeoutMs, () => { timedOut = true; abortController.abort() })
@@ -183,6 +189,8 @@ export async function runWorkflowTurn(
     // RunState and a crash can resume the same runId. Without a store, fall back to
     // the in-memory runWorkflow path (tests / ephemeral sidecar).
     send({ type: 'workflow:started', sessionId: deps.id, runId: turnId, def })
+    // Live Agents panel: supervisor owns the DAG turn for the duration of the run.
+    ensureStarted('supervisor', 'supervisor')
     const cwd = deps.config.cwd ?? process.cwd()
     const runState = workflowStore
       ? await new DurableExecutor(workflowStore).runWorkflow(
@@ -195,6 +203,7 @@ export async function runWorkflowTurn(
           { agentRunner: runner, eventSink },
           { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id, runInputs: opts?.runInputs },
         )
+    // finishRemaining closes supervisor + any in-flight node agents.
     finishRemaining()
     send({ type: 'workflow:snapshot', sessionId: deps.id, runId: turnId, def, state: runState })
 

@@ -526,7 +526,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     // runWorkflowTurnFn is free-standing and does not touch host.running — set the
     // busy flag here so concurrent workflow:run / message:send see BUSY. Cleanup
     // mirrors the fast-path finally block below (running + abortController).
-    // Note: workflow-runner keeps its own AbortController; cancel wiring is separate.
+    // Pass host.abortController.signal so Session.cancel() aborts the DAG turn.
     host.abortController = new AbortController()
     host.running = true
     try {
@@ -535,7 +535,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         dagDef,
         rawSend,
         (s, turnId, text, traj, stopped) => host.finalizeAndPersist(s, turnId, text, traj, stopped),
-        { runInputs: { text: userText } },
+        { runInputs: { text: userText }, signal: host.abortController.signal },
       )
     } finally {
       host.running = false

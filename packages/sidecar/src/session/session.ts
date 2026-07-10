@@ -685,7 +685,7 @@ export class Session {
         this.workflowDeps,
         def, send,
         (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
-        opts,
+        { ...opts, signal: this.abortController.signal },
       )
     } finally {
       // Mirror fast-path cleanup in session-turn-runner (running + abortController).

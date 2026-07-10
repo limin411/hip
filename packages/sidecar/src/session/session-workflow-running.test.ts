@@ -103,4 +103,61 @@ describe('runTurn DAG branch running lifecycle', () => {
     expect(result).toBe('dag-done')
     expect(session.running).toBe(false)
   })
+
+  it('passes host.abortController.signal into runWorkflowTurnFn so cancel aborts the DAG turn', async () => {
+    let release!: (value: string) => void
+    const gate = new Promise<string>((resolve) => {
+      release = resolve
+    })
+    runWorkflowTurnMock.mockReturnValue(gate)
+
+    const session = new Session('dag-cancel-signal', { ...cfg, orchMode: 'dag' })
+    ;(session as unknown as { messages: HumanMessage[] }).messages.push(new HumanMessage('dag task'))
+
+    const p = (session as unknown as {
+      runTurn: (send: (m: ServerMessage) => void) => Promise<string>
+    }).runTurn(() => {})
+
+    await Promise.resolve()
+    expect(runWorkflowTurnMock).toHaveBeenCalledTimes(1)
+    const opts = runWorkflowTurnMock.mock.calls[0][4] as { signal?: AbortSignal; runInputs?: { text: string } }
+    expect(opts.signal).toBeInstanceOf(AbortSignal)
+    expect(opts.signal!.aborted).toBe(false)
+    expect(opts.runInputs?.text).toBe('dag task')
+
+    session.cancel()
+    expect(opts.signal!.aborted).toBe(true)
+
+    release!('cancelled-path')
+    await p
+  })
+})
+
+describe('Session.runWorkflowTurn cancel signal', () => {
+  beforeEach(() => {
+    runWorkflowTurnMock.mockReset()
+  })
+
+  it('passes session abortController.signal and aborting cancel() marks it aborted', async () => {
+    let release!: (value: string) => void
+    const gate = new Promise<string>((resolve) => {
+      release = resolve
+    })
+    runWorkflowTurnMock.mockReturnValue(gate)
+
+    const session = new Session('wf-cancel-signal', cfg)
+    const p = session.runWorkflowTurn(def, () => {})
+    await Promise.resolve()
+
+    expect(runWorkflowTurnMock).toHaveBeenCalledTimes(1)
+    const opts = runWorkflowTurnMock.mock.calls[0][4] as { signal?: AbortSignal }
+    expect(opts.signal).toBeInstanceOf(AbortSignal)
+    expect(opts.signal!.aborted).toBe(false)
+
+    session.cancel()
+    expect(opts.signal!.aborted).toBe(true)
+
+    release!('done')
+    await p
+  })
 })

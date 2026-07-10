@@ -141,3 +141,44 @@ describe('runWorkflowTurn runInputs', () => {
     expect(opts.runInputs?.text).toBe('hello world')
   })
 })
+
+describe('runWorkflowTurn workflow UI events', () => {
+  it('emits workflow:started, workflow:event, and workflow:snapshot', async () => {
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-ui-events',
+      name: 'UI Events Test',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'Do the task' }],
+      edges: [],
+      entry: ['n1'],
+    }
+
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+
+    const sent: ServerMessage[] = []
+    const finalize = (
+      _s: (msg: ServerMessage) => void,
+      _turnId: string,
+      text: string,
+      _trajectory: Map<string, TraceRun>,
+      _stopped: boolean,
+    ): string => text
+
+    await runWorkflowTurn(deps, def, (m) => sent.push(m), finalize, { runInputs: { text: 'hi' } })
+
+    expect(sent.some((m) => m.type === 'workflow:started')).toBe(true)
+    expect(sent.some((m) => m.type === 'workflow:event')).toBe(true)
+    expect(sent.some((m) => m.type === 'workflow:snapshot')).toBe(true)
+
+    const started = sent.find((m) => m.type === 'workflow:started') as Extract<ServerMessage, { type: 'workflow:started' }>
+    expect(started.def.id).toBe('wf-ui-events')
+    expect(started.sessionId).toBe(deps.id)
+
+    const snapshot = sent.find((m) => m.type === 'workflow:snapshot') as Extract<ServerMessage, { type: 'workflow:snapshot' }>
+    expect(snapshot.def.id).toBe('wf-ui-events')
+    expect(snapshot.runId).toBe(started.runId)
+
+    const events = sent.filter((m) => m.type === 'workflow:event') as Array<Extract<ServerMessage, { type: 'workflow:event' }>>
+    expect(events.every((m) => m.runId === started.runId)).toBe(true)
+  })
+})

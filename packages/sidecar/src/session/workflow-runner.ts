@@ -152,6 +152,7 @@ export async function runWorkflowTurn(
 
   const eventSink: OrchestratorEventSink = {
     emit(e: OrchestratorEvent) {
+      send({ type: 'workflow:event', sessionId: deps.id, runId: turnId, event: e })
       switch (e.type) {
         case 'node:started':
           ensureStarted(e.nodeId, 'worker', 'supervisor')
@@ -181,6 +182,7 @@ export async function runWorkflowTurn(
     // Prefer DurableExecutor when SQLite is available so each reduce() checkpoints
     // RunState and a crash can resume the same runId. Without a store, fall back to
     // the in-memory runWorkflow path (tests / ephemeral sidecar).
+    send({ type: 'workflow:started', sessionId: deps.id, runId: turnId, def })
     const cwd = deps.config.cwd ?? process.cwd()
     const runState = workflowStore
       ? await new DurableExecutor(workflowStore).runWorkflow(
@@ -194,6 +196,7 @@ export async function runWorkflowTurn(
           { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id, runInputs: opts?.runInputs },
         )
     finishRemaining()
+    send({ type: 'workflow:snapshot', sessionId: deps.id, runId: turnId, def, state: runState })
 
     const outputs = Object.values(runState.nodes)
       .filter((n) => n.status === 'succeeded' && n.output)

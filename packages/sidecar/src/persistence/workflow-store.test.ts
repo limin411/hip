@@ -88,4 +88,55 @@ describe('SqliteWorkflowStore', () => {
     expect(store.replayEvents('r1')).toEqual([])
     await expect(store.loadRun('r1')).resolves.toBeNull()
   })
+
+  it('binds runs to a session and loads the latest for that session', async () => {
+    await store.saveDef(sampleDef)
+    const older = {
+      runId: 'r-old',
+      workflowId: 'wf-1',
+      status: 'succeeded' as const,
+      nodes: { n1: { status: 'succeeded' as const } },
+    }
+    const newer = {
+      runId: 'r-new',
+      workflowId: 'wf-1',
+      status: 'running' as const,
+      nodes: { n1: { status: 'ready' as const } },
+    }
+    await store.saveRun(older, { sessionId: 'sess-a' })
+    await store.saveRun(newer, { sessionId: 'sess-a' })
+    // Force deterministic ordering (unixepoch is second-resolution)
+    db.prepare(`UPDATE workflow_runs SET updated_at = 1000 WHERE run_id = 'r-old'`).run()
+    db.prepare(`UPDATE workflow_runs SET updated_at = 2000 WHERE run_id = 'r-new'`).run()
+    await store.saveRun(
+      {
+        runId: 'r-other',
+        workflowId: 'wf-1',
+        status: 'running',
+        nodes: {},
+      },
+      { sessionId: 'sess-b' },
+    )
+
+    const latest = store.loadLatestRunForSession('sess-a')
+    expect(latest).not.toBeNull()
+    expect(latest!.state.runId).toBe('r-new')
+    expect(latest!.def).toEqual(sampleDef)
+
+    expect(store.loadLatestRunForSession('sess-missing')).toBeNull()
+  })
+
+  it('preserves session_id across saveRun without meta', async () => {
+    await store.saveDef(sampleDef)
+    const state = {
+      runId: 'r-preserve',
+      workflowId: 'wf-1',
+      status: 'running' as const,
+      nodes: {},
+    }
+    await store.saveRun(state, { sessionId: 'sess-keep' })
+    await store.saveRun({ ...state, status: 'succeeded' })
+    const latest = store.loadLatestRunForSession('sess-keep')
+    expect(latest?.state.status).toBe('succeeded')
+  })
 })

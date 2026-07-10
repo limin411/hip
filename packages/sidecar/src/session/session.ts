@@ -119,7 +119,8 @@ export class Session {
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
   private resumeAbortController: AbortController | null = null
-  private running = false
+  /** Public so handlers can busy-check without casting (workflow:run). */
+  running = false
   private awaitingResume = false
   private readonly inputQueue: SessionInput[] = []
   private steerAbortFlag = false

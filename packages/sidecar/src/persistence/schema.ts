@@ -384,6 +384,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   workflow_id TEXT NOT NULL REFERENCES workflow_defs(id),
   status TEXT NOT NULL DEFAULT 'running',
   state_json TEXT NOT NULL,
+  session_id TEXT,
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 )`

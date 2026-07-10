@@ -1,4 +1,5 @@
 import type { ClientMessage } from '@hip/protocol'
+import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
 
 export const SESSION_MESSAGE_TYPES = new Set([
@@ -30,6 +31,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setModel',
   'config:setActiveModel',
   'workflow:run',
+  'workflow:getActive',
 ])
 
 export function isSessionMessage(msg: ClientMessage): boolean {
@@ -225,8 +227,30 @@ export function handleSessionMessage(
       })
       return
     }
-    case 'workflow:run':
-      return ctx.ensureSession(msg.sessionId, send).runWorkflowTurn(msg.def, send)
+    case 'workflow:run': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      if (s.running) {
+        send({ type: 'error', sessionId: msg.sessionId, code: 'BUSY', message: 'Session is busy' })
+        return
+      }
+      return s.runWorkflowTurn(msg.def, send, { runInputs: msg.runInputs })
+    }
+    case 'workflow:getActive': {
+      const wfStore = ctx.store?.getDb ? new SqliteWorkflowStore(ctx.store.getDb()) : undefined
+      const latest = wfStore?.loadLatestRunForSession(msg.sessionId) ?? null
+      if (latest) {
+        send({
+          type: 'workflow:snapshot',
+          sessionId: msg.sessionId,
+          runId: latest.state.runId,
+          def: latest.def,
+          state: latest.state,
+        })
+      } else {
+        send({ type: 'workflow:cleared', sessionId: msg.sessionId })
+      }
+      return
+    }
     default:
       return
   }

@@ -19,6 +19,9 @@ async function main(): Promise<void> {
   for (const ddl of WORKFLOW_DDL) {
     db.exec(ddl)
   }
+  // Migrate existing DBs that predate session-bound workflow runs.
+  try { db.exec(`ALTER TABLE workflow_runs ADD COLUMN session_id TEXT`) } catch { /* exists */ }
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_workflow_runs_session ON workflow_runs(session_id, updated_at DESC)`) } catch { /* ignore */ }
 
   const store = new SessionStore(db, ftsEnabled)
 

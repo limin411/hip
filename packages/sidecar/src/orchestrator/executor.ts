@@ -20,7 +20,7 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
     sink?.emit(e)
     state = reduce(state, def, e)
     // Auto-persist after every reduce when a store is configured
-    await ports.store?.saveRun(state)
+    await ports.store?.saveRun(state, { sessionId: opts.sessionId })
     ports.store?.appendEvent?.(opts.runId, e)
   }
   // reduce 的 propagate() 会在 node:succeeded 里把级联的下游节点直接置为 skipped,

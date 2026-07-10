@@ -52,7 +52,7 @@ export class DurableExecutor {
       state = reduce(state, def, event)
       // Persist run state first so the workflow_runs row exists
       // before appendEvent references it via FK.
-      this.store.saveRun(state)
+      this.store.saveRun(state, { sessionId: opts.sessionId })
       this.store.appendEvent(opts.runId, event)
     }
 

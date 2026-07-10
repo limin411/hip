@@ -21,6 +21,7 @@ export interface SessionManagerContext {
   profileListFor(session: Session): AgentProfileInfo[]
   store?: {
     updateConfig(id: string, config: string): void
+    getDb?(): import('../../persistence/sqlite.js').DatabaseSync
     listSessions?(): SessionSummary[]
     getSession?(id: string): { config: string } | undefined
     loadMessagesWithRuns?(id: string): Message[]

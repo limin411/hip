@@ -10,7 +10,7 @@ export interface AgentRunner {
 export interface WorkflowStore {
   saveDef(def: WorkflowDef): Promise<void>
   loadDef(id: string): Promise<WorkflowDef | null>
-  saveRun(run: RunState): Promise<void>
+  saveRun(run: RunState, meta?: { sessionId?: string }): Promise<void>
   loadRun(runId: string): Promise<RunState | null>
   /** Append one event to the event log. Optional; not all stores implement event-level persistence. */
   appendEvent?(runId: string, event: OrchestratorEvent): void
@@ -47,7 +47,7 @@ export class InMemoryWorkflowStore implements WorkflowStore {
   private events = new Map<string, OrchestratorEvent[]>()
   async saveDef(def: WorkflowDef) { this.defs.set(def.id, structuredClone(def)) }
   async loadDef(id: string) { const d = this.defs.get(id); return d ? structuredClone(d) : null }
-  async saveRun(run: RunState) { this.runs.set(run.runId, structuredClone(run)) }
+  async saveRun(run: RunState, _meta?: { sessionId?: string }) { this.runs.set(run.runId, structuredClone(run)) }
   async loadRun(runId: string) { const r = this.runs.get(runId); return r ? structuredClone(r) : null }
   appendEvent(runId: string, event: OrchestratorEvent): void {
     const evts = this.events.get(runId) ?? []

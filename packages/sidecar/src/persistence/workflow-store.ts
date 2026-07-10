@@ -7,6 +7,7 @@ export class SqliteWorkflowStore implements WorkflowStore {
   private selectDef: ReturnType<DatabaseSync['prepare']>
   private upsertRun: ReturnType<DatabaseSync['prepare']>
   private selectRun: ReturnType<DatabaseSync['prepare']>
+  private selectLatestBySession: ReturnType<DatabaseSync['prepare']>
   private insertEvent: ReturnType<DatabaseSync['prepare']>
   private selectEvents: ReturnType<DatabaseSync['prepare']>
 
@@ -18,12 +19,26 @@ export class SqliteWorkflowStore implements WorkflowStore {
       `SELECT def_json FROM workflow_defs WHERE id = ?`,
     )
     this.upsertRun = db.prepare(
-      `INSERT OR REPLACE INTO workflow_runs
-       (run_id, workflow_id, status, state_json, updated_at)
-       VALUES (?, ?, ?, ?, unixepoch())`,
+      `INSERT INTO workflow_runs
+         (run_id, workflow_id, status, state_json, session_id, updated_at)
+       VALUES (?, ?, ?, ?, ?, unixepoch())
+       ON CONFLICT(run_id) DO UPDATE SET
+         workflow_id = excluded.workflow_id,
+         status = excluded.status,
+         state_json = excluded.state_json,
+         session_id = COALESCE(excluded.session_id, workflow_runs.session_id),
+         updated_at = unixepoch()`,
     )
     this.selectRun = db.prepare(
       `SELECT state_json, status FROM workflow_runs WHERE run_id = ?`,
+    )
+    this.selectLatestBySession = db.prepare(
+      `SELECT r.state_json, d.def_json
+       FROM workflow_runs r
+       JOIN workflow_defs d ON d.id = r.workflow_id
+       WHERE r.session_id = ?
+       ORDER BY r.updated_at DESC
+       LIMIT 1`,
     )
     this.insertEvent = db.prepare(
       `INSERT INTO workflow_events (run_id, event_json) VALUES (?, ?)`,
@@ -42,12 +57,13 @@ export class SqliteWorkflowStore implements WorkflowStore {
     return row ? (JSON.parse(row.def_json) as WorkflowDef) : null
   }
 
-  async saveRun(run: RunState): Promise<void> {
+  async saveRun(run: RunState, meta?: { sessionId?: string }): Promise<void> {
     this.upsertRun.run(
       run.runId,
       run.workflowId,
       run.status,
       JSON.stringify(run),
+      meta?.sessionId ?? null,
     )
   }
 
@@ -57,6 +73,18 @@ export class SqliteWorkflowStore implements WorkflowStore {
       | undefined
     if (!row) return null
     return JSON.parse(row.state_json) as RunState
+  }
+
+  /** Latest run bound to a session (by updated_at), with its workflow def. */
+  loadLatestRunForSession(sessionId: string): { def: WorkflowDef; state: RunState } | null {
+    const row = this.selectLatestBySession.get(sessionId) as
+      | { state_json: string; def_json: string }
+      | undefined
+    if (!row) return null
+    return {
+      def: JSON.parse(row.def_json) as WorkflowDef,
+      state: JSON.parse(row.state_json) as RunState,
+    }
   }
 
   /** Append one event to the event log. Called after every reduce() transition. */

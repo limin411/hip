@@ -568,6 +568,15 @@ export const zhTW = {
       searchPlaceholder: '輸入命令…',
       noResults: '無結果',
       emptyHint: '命令即將上線',
+      groups: {
+        navigation: '導航',
+        actions: '操作',
+        theme: '主題',
+        sessions: '最近對話',
+      },
+      actions: {
+        newConversation: '新增對話',
+      },
     },
   },
 } as const

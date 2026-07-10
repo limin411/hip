@@ -568,6 +568,15 @@ export const en = {
       searchPlaceholder: 'Type a command…',
       noResults: 'No results',
       emptyHint: 'Commands coming soon',
+      groups: {
+        navigation: 'Navigation',
+        actions: 'Actions',
+        theme: 'Theme',
+        sessions: 'Recent sessions',
+      },
+      actions: {
+        newConversation: 'New conversation',
+      },
     },
   },
 } as const

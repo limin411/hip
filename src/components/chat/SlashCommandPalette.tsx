@@ -20,7 +20,7 @@ export interface SlashCommand {
 export const BUILTIN_COMMANDS: SlashCommand[] = [
   { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin', availableIn: ['chat', 'code'] },
   { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin', availableIn: ['chat', 'code'] },
-  { id: 'config', name: 'config', description: 'Show or edit configuration', kind: 'builtin', availableIn: ['chat', 'code'] },
+  // /config removed: open Settings via global command palette (⌘K → Settings).
   { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
   { id: 'compact', name: 'compact', description: 'Summarize conversation to save context', kind: 'builtin', availableIn: ['code'], requiresSession: true },
   { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },

@@ -159,14 +159,15 @@ describe('NewConversation', () => {
     })
   })
 
-  it('renders builtin /clear and /config in slash palette', async () => {
+  it('renders builtin /clear and /help in slash palette (no /config)', async () => {
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
     render(<NewConversation />)
     const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
     fireEvent.change(textarea, { target: { value: '/' } })
     expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
     expect(screen.getByTestId('slash-cmd-clear')).toBeInTheDocument()
-    expect(screen.getByTestId('slash-cmd-config')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-cmd-help')).toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-config')).not.toBeInTheDocument()
   })
 
   // ── Slash command handler tests ──────────────────────────────────────────────
@@ -192,7 +193,7 @@ describe('NewConversation', () => {
     expect(message.content).toContain('Available commands:')
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
-    expect(message.content).toContain('/config')
+    expect(message.content).not.toContain('/config')
     expect(message.content).not.toContain('/diff')
     expect(message.content).not.toContain('/init')
     expect(message.content).not.toContain('/compact')

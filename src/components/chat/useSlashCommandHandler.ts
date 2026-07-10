@@ -76,12 +76,6 @@ export function useSlashCommandHandler(
           focusInput()
           return
         }
-        if (cmd.id === 'config') {
-          useUiStore.getState().setActiveView('settings')
-          setText('')
-          focusInput()
-          return
-        }
         if (cmd.id === 'init') {
           if (sessionId) sessionService.gitInitWorkspace(sessionId)
           setText('')

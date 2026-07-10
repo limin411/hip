@@ -97,21 +97,13 @@ describe('useSlashCommandHandler', () => {
     expect(setText).toHaveBeenCalledWith('')
   })
 
-  it('/config opens settings in chat surface', () => {
+  it('/config is no longer a builtin (removed in favor of global palette Settings)', () => {
     const { result, setText } = setup('chat', null)
 
     result.current.handleCommandSelect(builtin('config'))
 
-    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
-    expect(setText).toHaveBeenCalledWith('')
-  })
-
-  it('/config opens settings in code surface', () => {
-    const { result, setText } = setup('code', 's1')
-
-    result.current.handleCommandSelect(builtin('config'))
-
-    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
+    // Guard: unavailable commands only clear input
+    expect(mockSetActiveView).not.toHaveBeenCalled()
     expect(setText).toHaveBeenCalledWith('')
   })
 
@@ -187,7 +179,7 @@ describe('useSlashCommandHandler', () => {
     const [, message] = appendSpy.mock.calls[0]
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
-    expect(message.content).toContain('/config')
+    expect(message.content).not.toContain('/config')
     expect(message.content).not.toContain('/diff')
     expect(message.content).not.toContain('/init')
     expect(message.content).not.toContain('/compact')
@@ -204,7 +196,7 @@ describe('useSlashCommandHandler', () => {
     const [, message] = appendSpy.mock.calls[0]
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
-    expect(message.content).toContain('/config')
+    expect(message.content).not.toContain('/config')
     expect(message.content).toContain('/diff')
     expect(message.content).toContain('/init')
     expect(message.content).toContain('/compact')
@@ -223,7 +215,7 @@ describe('useSlashCommandHandler', () => {
     expect(title).toBe('Available commands')
     expect(opts.description).toContain('/help')
     expect(opts.description).toContain('/clear')
-    expect(opts.description).toContain('/config')
+    expect(opts.description).not.toContain('/config')
     expect(opts.description).not.toContain(' — ')
     expect(setText).toHaveBeenCalledWith('')
   })

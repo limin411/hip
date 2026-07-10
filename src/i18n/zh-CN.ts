@@ -568,6 +568,15 @@ export const zhCN = {
       searchPlaceholder: '输入命令…',
       noResults: '无结果',
       emptyHint: '命令即将上线',
+      groups: {
+        navigation: '导航',
+        actions: '操作',
+        theme: '主题',
+        sessions: '最近会话',
+      },
+      actions: {
+        newConversation: '新建对话',
+      },
     },
   },
 } as const

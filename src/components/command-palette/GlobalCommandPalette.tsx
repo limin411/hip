@@ -2,41 +2,69 @@ import { useEffect, useMemo, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Command } from 'cmdk'
 import { useTranslation } from 'react-i18next'
+import { sessionService } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
+import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
-import { buildGlobalCommandGroups } from './buildGlobalCommands'
+import {
+  buildGlobalCommandGroups,
+  type GlobalCommandLabels,
+} from './buildGlobalCommands'
 import { rankGroups } from './rankGlobalCommands'
 
 /**
- * Global ⌘K command palette shell.
- * Groups/actions land in PR-5/6; this ships Dialog + cmdk + empty state only.
+ * Global ⌘K command palette.
+ * PR-5: navigation, theme, new conversation. PR-6: recent sessions.
  */
 export function GlobalCommandPalette() {
   const { t } = useTranslation()
   const open = useCommandPaletteStore((s) => s.open)
   const setOpen = useCommandPaletteStore((s) => s.setOpen)
+  const activeView = useUiStore((s) => s.activeView)
+  const theme = useUiStore((s) => s.theme)
+  const setActiveView = useUiStore((s) => s.setActiveView)
+  const setTheme = useUiStore((s) => s.setTheme)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
     if (!open) setSearch('')
   }, [open])
 
-  // Skeleton context: empty until PR-5 wires real actions.
+  const labels = useMemo<GlobalCommandLabels>(
+    () => ({
+      groupNavigation: t('commandPalette.groups.navigation'),
+      groupActions: t('commandPalette.groups.actions'),
+      groupTheme: t('commandPalette.groups.theme'),
+      groupSessions: t('commandPalette.groups.sessions'),
+      navChat: t('nav.chat'),
+      navCode: t('nav.code'),
+      navHistory: t('nav.history'),
+      navSettings: t('nav.settings'),
+      actionNewConversation: t('commandPalette.actions.newConversation'),
+      themeLight: t('settings.themes.light'),
+      themeDark: t('settings.themes.dark'),
+      themeSystem: t('settings.themes.system'),
+    }),
+    [t],
+  )
+
   const groups = useMemo(
     () =>
       buildGlobalCommandGroups({
         sessions: [],
-        activeView: 'chat',
-        theme: 'system',
-        setActiveView: () => {},
-        setTheme: () => {},
-        newConversation: () => {},
-        selectSession: () => {},
+        activeView,
+        theme,
+        labels,
+        setActiveView,
+        setTheme,
+        newConversation: (surface) => sessionService.newConversation(surface),
+        selectSession: (id) => sessionService.selectSession(id),
       }),
-    [],
+    [activeView, theme, labels, setActiveView, setTheme],
   )
 
   const visible = useMemo(() => rankGroups(groups, search), [groups, search])
+  const hasItems = visible.some((g) => g.items.length > 0)
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -61,21 +89,19 @@ export function GlobalCommandPalette() {
               className="h-11 w-full border-b border-border bg-transparent px-4 text-body text-ink outline-none placeholder:text-ink-tertiary"
             />
             <Command.List className="max-h-[min(20rem,56vh)] overflow-y-auto p-1">
-              {visible.length === 0 && (
+              {!hasItems && (
                 <div
                   className="px-3 py-6 text-center text-meta text-ink-secondary"
                   data-testid="global-command-palette-empty"
                 >
-                  {search.trim()
-                    ? t('commandPalette.noResults')
-                    : t('commandPalette.emptyHint')}
+                  {t('commandPalette.noResults')}
                 </div>
               )}
               {visible.map((group, gi) => (
                 <Command.Group
                   key={group.heading ?? `group-${gi}`}
                   heading={group.heading}
-                  className="px-1 py-1 text-caption text-ink-tertiary"
+                  className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-tertiary"
                 >
                   {group.items.map((item) => (
                     <Command.Item

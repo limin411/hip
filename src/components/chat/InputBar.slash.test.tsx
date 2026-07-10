@@ -162,25 +162,17 @@ describe('InputBar slash commands', () => {
     expect(textarea).toHaveValue('')
   })
 
-  it('/config command opens settings via setActiveView', async () => {
+  it('/config is no longer offered in the slash palette', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
     render(<InputBar />)
 
     const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
-
-    // Type /con — palette shows /config
     fireEvent.change(textarea, { target: { value: '/con' } })
 
-    const configButton = screen.getByText('/config')
-    expect(configButton).toBeInTheDocument()
-
-    fireEvent.click(configButton)
-
-    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
-    // Value should be cleared
-    expect(textarea).toHaveValue('')
+    expect(screen.queryByText('/config')).not.toBeInTheDocument()
+    expect(mockSetActiveView).not.toHaveBeenCalled()
   })
 
   it('/init command calls gitInitWorkspace and clears input', async () => {
@@ -254,7 +246,7 @@ describe('InputBar slash commands', () => {
     expect(message.content).toContain('Available commands:')
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
-    expect(message.content).toContain('/config')
+    expect(message.content).not.toContain('/config')
     expect(textarea).toHaveValue('')
   })
 
@@ -270,7 +262,6 @@ describe('InputBar slash commands', () => {
     // No slash command text should appear
     expect(screen.queryByText('/help')).not.toBeInTheDocument()
     expect(screen.queryByText('/clear')).not.toBeInTheDocument()
-    expect(screen.queryByText('/config')).not.toBeInTheDocument()
   })
 
   it('hides palette when slash is removed (backspace)', async () => {
@@ -453,13 +444,14 @@ describe('InputBar slash commands', () => {
     const options = screen.getAllByRole('option')
     expect(options[0]).toHaveAttribute('aria-selected', 'true')
 
-    // Navigate to /compact (index 4, after help/clear/config/diff) with ArrowDown
+    // Navigate to /compact (index 3, after help/clear/diff) with ArrowDown
     fireEvent.keyDown(document, { key: 'ArrowDown' })
     fireEvent.keyDown(document, { key: 'ArrowDown' })
     fireEvent.keyDown(document, { key: 'ArrowDown' })
-    fireEvent.keyDown(document, { key: 'ArrowDown' })
-    expect(options[4]).toHaveAttribute('aria-selected', 'true')
-    expect(options[0]).toHaveAttribute('aria-selected', 'false')
+    // Re-query after keyboard updates
+    const afterNav = screen.getAllByRole('option')
+    expect(afterNav[3]).toHaveAttribute('aria-selected', 'true')
+    expect(afterNav[0]).toHaveAttribute('aria-selected', 'false')
 
     // Press Enter to select /compact
     fireEvent.keyDown(document, { key: 'Enter' })
@@ -498,7 +490,7 @@ describe('InputBar slash commands', () => {
     expect(sendSpy).not.toHaveBeenCalled()
   })
 
-  // ── Regression guards: /clear and /config (must not break when new branches added) ──
+  // ── Regression guards: /clear (must not break when new branches added) ──
 
   it('regression: selecting /clear still calls cancel() and newConversation() and clears input', async () => {
     baseMocks()
@@ -527,29 +519,7 @@ describe('InputBar slash commands', () => {
     expect(textarea).toHaveValue('')
   })
 
-  it('regression: selecting /config still opens settings via setActiveView("settings") and clears input', async () => {
-    baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    mockSetActiveView.mockClear()
-
-    render(<InputBar />)
-
-    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
-
-    // Type /co — palette shows /config
-    fireEvent.change(textarea, { target: { value: '/co' } })
-    const configButton = screen.getByText('/config')
-    expect(configButton).toBeInTheDocument()
-
-    fireEvent.click(configButton)
-
-    expect(mockSetActiveView).toHaveBeenCalledTimes(1)
-    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
-    // Input must be cleared
-    expect(textarea).toHaveValue('')
-  })
-
-  it('regression: /clear and /config appear BEFORE /init, /diff, /help in palette order', async () => {
+  it('regression: /clear appears BEFORE /diff and /init; /config is absent', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
 
@@ -562,21 +532,16 @@ describe('InputBar slash commands', () => {
     const options = screen.getAllByRole('option')
     const labels = options.map((opt) => opt.textContent ?? '')
 
-    // Expected order: /help, /clear, /config, /diff, /init, /compact
-    // (SlashCommandPalette builds from BUILTIN_COMMANDS array)
+    // Expected order: /help, /clear, /diff, /compact, /init
     const clearIdx = labels.findIndex((l) => l.includes('/clear'))
-    const configIdx = labels.findIndex((l) => l.includes('/config'))
     const initIdx = labels.findIndex((l) => l.includes('/init'))
     const diffIdx = labels.findIndex((l) => l.includes('/diff'))
+    const configIdx = labels.findIndex((l) => l.includes('/config'))
 
-    // /clear and /config must be present
     expect(clearIdx).toBeGreaterThanOrEqual(0)
-    expect(configIdx).toBeGreaterThanOrEqual(0)
-    // /clear and /config appear before /diff and /init (the newer handlers)
+    expect(configIdx).toBe(-1)
     expect(clearIdx).toBeLessThan(diffIdx)
     expect(clearIdx).toBeLessThan(initIdx)
-    expect(configIdx).toBeLessThan(diffIdx)
-    expect(configIdx).toBeLessThan(initIdx)
   })
 
   it('shows all built-in commands including code-only ones in the default code session surface', async () => {
@@ -590,7 +555,7 @@ describe('InputBar slash commands', () => {
 
     expect(screen.getByText('/help')).toBeInTheDocument()
     expect(screen.getByText('/clear')).toBeInTheDocument()
-    expect(screen.getByText('/config')).toBeInTheDocument()
+    expect(screen.queryByText('/config')).not.toBeInTheDocument()
     expect(screen.getByText('/diff')).toBeInTheDocument()
     expect(screen.getByText('/init')).toBeInTheDocument()
     expect(screen.getByText('/compact')).toBeInTheDocument()
@@ -607,7 +572,7 @@ describe('InputBar slash commands', () => {
 
     expect(screen.getByText('/help')).toBeInTheDocument()
     expect(screen.getByText('/clear')).toBeInTheDocument()
-    expect(screen.getByText('/config')).toBeInTheDocument()
+    expect(screen.queryByText('/config')).not.toBeInTheDocument()
     expect(screen.queryByText('/diff')).not.toBeInTheDocument()
     expect(screen.queryByText('/init')).not.toBeInTheDocument()
     expect(screen.queryByText('/compact')).not.toBeInTheDocument()

@@ -41,6 +41,7 @@ export async function runWorkflowTurn(
   def: WorkflowDef,
   send: SendFn,
   finalize: (send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean) => string,
+  opts?: { runInputs?: { text: string; data?: unknown } },
 ): Promise<string> {
   const abortController = new AbortController()
   deps.orchestratorRunner = undefined // local ref for mutation
@@ -185,12 +186,12 @@ export async function runWorkflowTurn(
       ? await new DurableExecutor(workflowStore).runWorkflow(
           def,
           { agentRunner: runner, eventSink },
-          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id },
+          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id, runInputs: opts?.runInputs },
         )
       : await runWorkflow(
           def,
           { agentRunner: runner, eventSink },
-          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id },
+          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id, runInputs: opts?.runInputs },
         )
     finishRemaining()
 

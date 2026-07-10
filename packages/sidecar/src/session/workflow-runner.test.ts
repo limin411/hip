@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,8 +13,9 @@ import { ToolOutputStore } from './tool-output-store.js'
 import { GuardianReviewer } from './guardian.js'
 import type { WorkflowRunDeps } from './workflow-runner.js'
 
-const { capturedRunSubagentArgs } = vi.hoisted(() => ({
+const { capturedRunSubagentArgs, runWorkflowMock } = vi.hoisted(() => ({
   capturedRunSubagentArgs: [] as Array<Record<string, unknown>>,
+  runWorkflowMock: vi.fn(),
 }))
 
 vi.mock('./subagent.js', async (importOriginal) => {
@@ -25,6 +26,15 @@ vi.mock('./subagent.js', async (importOriginal) => {
       capturedRunSubagentArgs.push(args)
       return Promise.resolve('mock subagent result')
     },
+  }
+})
+
+vi.mock('../orchestrator/executor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../orchestrator/executor.js')>()
+  runWorkflowMock.mockImplementation(actual.runWorkflow)
+  return {
+    ...actual,
+    runWorkflow: (...args: unknown[]) => runWorkflowMock(...args),
   }
 })
 
@@ -52,6 +62,12 @@ function makeDeps(overrides?: Partial<WorkflowRunDeps>): WorkflowRunDeps {
     ...overrides,
   }
 }
+
+beforeEach(async () => {
+  const actual = await vi.importActual<typeof import('../orchestrator/executor.js')>('../orchestrator/executor.js')
+  runWorkflowMock.mockReset()
+  runWorkflowMock.mockImplementation(actual.runWorkflow)
+})
 
 describe('runWorkflowTurn safety-dependency wiring', () => {
   it('passes networkPolicy, toolOutputStore, and guardianReviewer to worker runSubagent calls', async () => {
@@ -88,5 +104,40 @@ describe('runWorkflowTurn safety-dependency wiring', () => {
     expect(args.networkPolicy).toBe(policy)
     expect(args.toolOutputStore).toBe(store)
     expect(args.guardianReviewer).toBe(guardian)
+  })
+})
+
+describe('runWorkflowTurn runInputs', () => {
+  it('forwards opts.runInputs to runWorkflow', async () => {
+    runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string; runInputs?: { text: string } }) => {
+      return { runId: opts.runId, workflowId: 'wf-test', status: 'succeeded' as const, nodes: {} }
+    })
+
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-test',
+      name: 'RunInputs Test',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: '{{input}}' }],
+      edges: [],
+      entry: ['n1'],
+    }
+
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+
+    const send = (_msg: ServerMessage): void => {}
+    const finalize = (
+      _s: (msg: ServerMessage) => void,
+      _turnId: string,
+      text: string,
+      _trajectory: Map<string, TraceRun>,
+      _stopped: boolean,
+    ): string => text
+
+    runWorkflowMock.mockClear()
+    await runWorkflowTurn(deps, def, send, finalize, { runInputs: { text: 'hello world' } })
+
+    expect(runWorkflowMock).toHaveBeenCalled()
+    const opts = runWorkflowMock.mock.calls[0][2] as { runInputs?: { text: string } }
+    expect(opts.runInputs?.text).toBe('hello world')
   })
 })

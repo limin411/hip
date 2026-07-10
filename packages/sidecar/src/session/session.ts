@@ -663,11 +663,16 @@ export class Session {
   }
 
 
-  async runWorkflowTurn(def: WorkflowDef, send: SendFn): Promise<string> {
+  async runWorkflowTurn(
+    def: WorkflowDef,
+    send: SendFn,
+    opts?: { runInputs?: { text: string; data?: unknown } },
+  ): Promise<string> {
     return runWorkflowTurnFn(
       this.workflowDeps,
       def, send,
       (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
+      opts,
     )
   }
 

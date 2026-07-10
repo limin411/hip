@@ -13,6 +13,7 @@ export async function waitForHipE2E(timeoutMs = 30000): Promise<void> {
 }
 
 type HipE2E = {
+  injectServerMessage: (msg: Record<string, unknown>) => void
   getActiveSessionId: () => string | null
   simulateAgentWriteFinished: (s: string) => { turnId: string; callId: string }
   createChatSessionForE2e: () => string
@@ -34,6 +35,15 @@ export async function getActiveSessionId(): Promise<string | null> {
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     return hooks?.getActiveSessionId() ?? null
   })
+}
+
+/** Inject a ServerMessage through the same pipeline as the WS transport (DEV only). */
+export async function injectServerMessage(msg: Record<string, unknown>): Promise<void> {
+  await browser.execute((m: Record<string, unknown>) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    hooks.injectServerMessage(m)
+  }, msg)
 }
 
 /** Simulate agent write_file finish so diff refresh runs (file must already exist on disk). */

@@ -130,6 +130,24 @@ export const config: Options.Testrunner = {
 
   reporters: ['spec'],
 
+  // Flake governance: capture PNG on failure (default /tmp/hip-e2e-screenshots).
+  afterTest: async (test, _context, { error }) => {
+    if (!error) return
+    try {
+      const shotDir = process.env.E2E_SCREENSHOT_DIR || path.join(os.tmpdir(), 'hip-e2e-screenshots')
+      fs.mkdirSync(shotDir, { recursive: true })
+      const safeTitle = String(test.title ?? 'test').replace(/[^\w.-]+/g, '_').slice(0, 80)
+      const file = path.join(shotDir, `${Date.now()}-${safeTitle}.png`)
+      await browser.saveScreenshot(file)
+      console.error(`[e2e] failure screenshot: ${file}`)
+    } catch (shotErr) {
+      console.error(
+        '[e2e] failed to save screenshot:',
+        shotErr instanceof Error ? shotErr.message : String(shotErr),
+      )
+    }
+  },
+
   onWorkerStart: async (_cid, _caps, specs) => {
     // The embedded WebDriver provider spawns a single shared app process, so
     // per-worker data isolation is not possible. Log the active dir for debugging.

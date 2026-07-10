@@ -652,6 +652,21 @@ describe('workspace diff', () => {
     expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(2)
   })
 
+  it('revertCheckpoint auto-succeeds when e2e checkpoint seed is pinned', async () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedCheckpoints('s1')
+    svc.revertCheckpoint('s1', 's1:t1')
+    expect(t.sent.filter((m) => m.type === 'git:revert')).toHaveLength(0)
+    await Promise.resolve() // flush queueMicrotask
+    const slice = useDiffStore.getState().bySession['s1']
+    expect(slice.lastRevertResult).toMatchObject({
+      checkpointId: 's1:t1',
+      ok: true,
+      safetyCheckpointId: 's1:t1:e2e-safety',
+    })
+  })
+
   it('openCommandPaletteForE2e toggles command palette store', async () => {
     const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
     useCommandPaletteStore.setState({ open: false, page: null })

@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **计划中 · Phase 0–2 已落地（待全量 gate 绿）** |
+| 状态 | **计划中 · Phase 0–3 已落地（待全量 gate 绿）** |
 | 前提 | A/B/C 主干 + polish P1–P3 已落地；栈为 WDIO + `@wdio/tauri-service` + Mocha |
 | 入口 | `yarn test:e2e` → `wdio.conf.ts`；过滤：`E2E_GREP` / `E2E_INVERT` / `--spec` |
 | 相关 | [`pre-public-roadmap-index`](./2026-07-10-pre-public-roadmap-index.md)、[`polish-e2e-write-to-changes`](./2026-07-10-polish-e2e-write-to-changes-design.md)、Sprint A/B |
@@ -210,8 +210,8 @@ e2e/
 | H4 | 复制调试信息 | ✅ | `harness-copy-debug` | `chat-copy-debug` 可用；payload 无 apiKey |
 | H5 | Permission modal | ✅ | `harness-permission` | modal + option 可点；关闭 |
 | H6 | Agents 面板有卡片 | ✅ | `harness-agents` | `agent-card` 或结构条可见 |
-| H7 | 委派行 / jump to turn | ⬜ | 注入 multi-agent turn | `delegation-row` / `agent-jump-turn` |
-| H8 | 检查点 revert 确认流 | ⬜ | mock checkpoints + 点 revert | modal 确认/取消；成功关闭（可弱于组件测） |
+| H7 | 委派行 / jump to turn | ✅ | `harness-delegation` + `seedAgentCollaboration` | `delegation-row` / `agent-jump-turn` |
+| H8 | 检查点 revert 确认流 | ✅ | `timeline-revert` + seed auto-success | modal 确认/取消；成功关闭（可弱于组件测） |
 
 **H2–H8 优先用注入**，不调用付费 API。sidecar 侧 cancel 正确性继续靠 L2。
 
@@ -238,7 +238,7 @@ e2e/
 
 | ID | 用例 | 状态 | 条件 |
 |----|------|------|------|
-| L1 | Chat 一轮短回复 | ⬜ | `auth.json` + 网络；断言非空 assistant |
+| L1 | Chat 一轮短回复 | ✅ | `live-chat`；`E2E_LIVE_LLM=1 yarn test:e2e:live` |
 | L2 | Code 会话 write 真工具 | ⬜ | 高成本；优先 H1 替代 |
 
 **门禁：** 仅 `E2E_GREP=@live` 显式跑；失败不挡 merge。
@@ -346,17 +346,17 @@ Helpers 同步扩：`e2e/helpers/e2e-hooks.ts`。
 - [x] 全局命令面板 S5 — `command-palette.spec.ts`  
 - [x] helpers：`e2e/helpers/git-workspace.ts` + write-to-changes 改 `createCodeSessionForE2e`  
 
-### Phase 2 补充（可选后续）
+### Phase 2 补充
 
-- H7 委派行 jump-to-turn  
-- H8 Timeline revert e2e（现 L1 足够）
+- [x] H7 委派行 jump-to-turn — `harness-delegation.spec.ts`  
+- [x] H8 Timeline revert e2e — `timeline-revert.spec.ts`（seed 下 `revertCheckpoint` 自动成功）
 
 ### Phase 3 — 可选与硬化
 
-- `@live` L1 一条  
-- flake 治理：超时分级、截图失败附件、减少 `browser.pause`  
-- 目录迁到 `specs/{smoke,core,harness,...}`  
-- 评估第二 worker（若 Tauri service 支持多实例）— **当前默认不做**  
+- [x] `@live` L1 — `live-chat.spec.ts` + `yarn test:e2e:live`（默认 skip）  
+- [x] flake 治理：`afterTest` 失败截图、README 超时分级；既有 `browser.pause` 仅保留 Radix 动画点  
+- [ ] 目录迁到 `specs/{smoke,core,harness,...}` — **延后**（扁平 `e2e/specs/*` 保持稳定 `--spec`）  
+- [x] 评估第二 worker — **不做**（embedded Tauri service 单实例）  
 
 ---
 

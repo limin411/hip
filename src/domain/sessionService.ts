@@ -580,8 +580,24 @@ export class SessionService {
     this.transport.send({ type: 'git:branch:switch', sessionId, branch })
   }
 
-  /** Revert the worktree to a checkpoint (worktree-only; a safety checkpoint is written first). */
+  /**
+   * Revert the worktree to a checkpoint (worktree-only; a safety checkpoint is written first).
+   * When `seedCheckpoints` is pinned for this session (E2E), auto-succeed without real git so
+   * Timeline revert confirm can close deterministically (H8).
+   */
   revertCheckpoint(sessionId: string, checkpointId: string): void {
+    if (this.e2eCheckpointSeed?.sessionId === sessionId) {
+      queueMicrotask(() => {
+        this.receive({
+          type: 'git:revert:result',
+          sessionId,
+          checkpointId,
+          ok: true,
+          safetyCheckpointId: `${checkpointId}:e2e-safety`,
+        })
+      })
+      return
+    }
     this.transport.send({ type: 'git:revert', sessionId, checkpointId })
   }
 

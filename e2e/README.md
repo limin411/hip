@@ -22,12 +22,14 @@ Optional env:
 | `E2E_DATA_DIR` | Fixed data dir (skip auto cleanup) |
 | `E2E_GREP` | Mocha grep (use suite tags below) |
 | `E2E_INVERT` | `1` to invert grep |
+| `E2E_LIVE_LLM` | `1` to enable `@live` suites (paid / real model) |
+| `E2E_SCREENSHOT_DIR` | Failure PNGs (default `/tmp/hip-e2e-screenshots`) |
 | `HIP_E2E_SKIP_PORT_GUARD` | `1` to skip foreign-server port check |
 
 ## Commands
 
 ```bash
-# Full suite
+# Full suite (skips @live unless E2E_LIVE_LLM=1 — live suite self-skips)
 yarn test:e2e
 
 # Smoke only
@@ -36,6 +38,9 @@ yarn test:e2e:smoke
 # Pre-public gate: smoke + core + harness (no paid LLM)
 yarn test:e2e:gate
 
+# Live LLM (opt-in; needs ~/.hip/config/auth.json staged by wdio)
+yarn test:e2e:live
+
 # Single file
 yarn test:e2e --spec e2e/specs/write-to-changes.spec.ts
 
@@ -43,6 +48,15 @@ yarn test:e2e --spec e2e/specs/write-to-changes.spec.ts
 E2E_GREP=@panel yarn test:e2e
 E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 ```
+
+## Timeouts (tiers)
+
+| Layer | Default | Notes |
+|-------|---------|-------|
+| WDIO `waitforTimeout` | 20s | Element waits unless overridden |
+| Mocha suite timeout | 180s | Per-test; live L1 uses up to 120s wait inside |
+| App ready / session tab | 30–60s | Cold start / surface switch |
+| Prefer `waitUntil` | — | Avoid fixed `browser.pause` except short Radix animation gaps |
 
 ## Tags (in `describe` titles)
 
@@ -72,8 +86,8 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 - `simulateTurnRunning` / `simulateTurnCancelled` — cancel UI (H2/H3)
 - `simulateSessionError` / `getSessionDebugBundleJson` — copy-debug (H4)
 - `simulatePermissionRequest` — HITL modal (H5)
-- `seedAgentCollaboration` — Agents panel (H6)
-- `seedCheckpoints` — Timeline rows (P4)
+- `seedAgentCollaboration` — Agents panel (H6) + chat delegation (H7)
+- `seedCheckpoints` — Timeline rows (P4); also makes `revertCheckpoint` auto-succeed (H8)
 - `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
 - `simulatePluginInstallError` — T2 (after Settings form submit)
 
@@ -92,3 +106,5 @@ Helpers: `e2e/helpers/e2e-hooks.ts`, `git-workspace.ts`, `history.ts`.
 - Radix menus: use `pointerdown` / focus+Enter (see `helpers/surface.ts`, `panel.ts`).
 - Prefer `waitUntil` over fixed `pause` unless WebKit animation requires it.
 - Shared app state: each harness file should create its own session via `__hipE2E` or explicit UI setup.
+- On failure, `wdio.conf.ts` writes a PNG under `E2E_SCREENSHOT_DIR` (or `/tmp/hip-e2e-screenshots`).
+- Spec layout stays flat under `e2e/specs/` for now (`specs/{smoke,core,…}` deferred — imports and `--spec` paths stay stable).

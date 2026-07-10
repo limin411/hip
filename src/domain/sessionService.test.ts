@@ -1,5 +1,5 @@
 // src/domain/sessionService.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { SessionService } from './sessionService'
 import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
@@ -537,6 +537,23 @@ describe('workspace diff', () => {
     useUiStore.setState({ activeTab: 'files', activeView: 'code' })
     t.push({ type: 'message:complete', sessionId: 's3', message })
     expect(t.sent.filter((m) => m.type === 'fs:diff' && m.sessionId === 's3')).toHaveLength(1)
+  })
+
+  it('simulateAgentWriteFinished seeds write_file and debounces fs:diff on code surface', () => {
+    vi.useFakeTimers()
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useUiStore.setState({ activeTab: 'changes', activeView: 'code' })
+    const ids = svc.simulateAgentWriteFinished('s1')
+    expect(ids.callId).toMatch(/^e2e-write-/)
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    const turn = sess.messages.find((m) => m.id === ids.turnId)
+    expect(turn?.toolCalls?.[0]).toMatchObject({ name: 'write_file', callId: ids.callId, status: 'finished' })
+    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
+    vi.advanceTimersByTime(300)
+    expect(t.sent.some((m) => m.type === 'fs:diff' && m.sessionId === 's1')).toBe(true)
+    expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+    vi.useRealTimers()
   })
 
   it('ready resets a wedged loading state so requestDiff works again', () => {

@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **P3/P1 已实现 · P2 待实现** |
+| 状态 | **P3/P1/P2 已实现** |
 | 前提 | Sprint **A/B/C 主干已落地**（见 [`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md)） |
 | 原则 | 小 diff、可验收、不扩产品面；补测试与去死码优先于新功能 |
 
@@ -28,7 +28,7 @@
 | ID | Spec | 一句话 | 建议工期 | 风险 |
 |----|------|--------|----------|------|
 | **P1** | [`2026-07-10-polish-checkpoint-revert-confirm-design.md`](./2026-07-10-polish-checkpoint-revert-confirm-design.md) | 检查点回退确认：稳健关闭 + 组件测 +（可选）成功反馈 | 0.5–1.5 天 | 低 · **已实现** |
-| **P2** | [`2026-07-10-polish-e2e-write-to-changes-design.md`](./2026-07-10-polish-e2e-write-to-changes-design.md) | 完整 e2e：写工具语义 → Changes 自动出现 path | 1–2 天 | 中；或需 e2e 桥 |
+| **P2** | [`2026-07-10-polish-e2e-write-to-changes-design.md`](./2026-07-10-polish-e2e-write-to-changes-design.md) | 完整 e2e：写工具语义 → Changes 自动出现 path | 1–2 天 | 中 · **已实现** |
 | **P3** | [`2026-07-10-polish-dead-code-orchmode-i18n-design.md`](./2026-07-10-polish-dead-code-orchmode-i18n-design.md) | 删 orchMode i18n / 测试化石；协议兼容保留 | 0.5 天 | 低 · **已实现** |
 
 ---

@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **待实现** |
+| 状态 | **已实现**（`simulateAgentWriteFinished` + `__hipE2E` + e2e spec + 单元测） |
 | 路线图 | [`2026-07-10-pre-public-polish-index.md`](./2026-07-10-pre-public-polish-index.md) |
 | 前置 | Sprint B：`diffRefreshOnWrite` + `tool:finished` → 防抖 `requestDiff`；既有 `e2e/specs/diff-workspace.spec.ts` |
 | 相关 | `2026-07-10-sprint-b-code-agents-experience-design.md` §3.1 B1/B2 |

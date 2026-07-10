@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **主干已落地**（diff 刷新、Agents v2、prompt 裁剪、AGENTS chip、安装错误人话；B3 验收与完整 e2e → [`pre-public-polish-index`](./2026-07-10-pre-public-polish-index.md) P1/P2） |
+| 状态 | **主干 + polish 已落地**（含 B3 验收 P1、write→Changes e2e P2；见 [`pre-public-polish-index`](./2026-07-10-pre-public-polish-index.md)） |
 | 路线图 | [`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md) |
 | 前置 | A 的投影正确性、cancel、调试导出可用 |
 | 相关 | `2026-07-10-code-panel-terminal-design.md`、Agents `CollaborationStructure`、architecture-remediation 中 AGENTS.md 注入 |

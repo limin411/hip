@@ -70,6 +70,64 @@ export class SessionService {
     })
   }
 
+  /**
+   * Inject a ServerMessage through the same pipeline as the WS transport.
+   * Intended for E2E / DEV harness only (see `installE2eHooks`).
+   */
+  injectServerMessage(msg: ServerMessage): void {
+    this.receive(msg)
+  }
+
+  /**
+   * Seed an in-flight write_file toolCall and emit tool:finished so the
+   * Sprint B diff-refresh path runs (debounced requestDiff). E2E uses this
+   * after writing the file on disk without a real LLM turn.
+   */
+  simulateAgentWriteFinished(sessionId: string): { turnId: string; callId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-write-${nanoid(8)}`
+    const now = Date.now()
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: st.sessions.map((s) =>
+        s.id !== sessionId
+          ? s
+          : {
+              ...s,
+              messages: [
+                ...s.messages,
+                {
+                  id: turnId,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: now,
+                  toolCalls: [
+                    {
+                      callId,
+                      agentId: 'coder',
+                      name: 'write_file',
+                      input: '{}',
+                      status: 'running' as const,
+                      seq: 1,
+                    },
+                  ],
+                },
+              ],
+            },
+      ),
+    }))
+    this.receive({
+      type: 'tool:finished',
+      sessionId,
+      turnId,
+      agentId: 'coder',
+      callId,
+      status: 'finished',
+      output: 'ok',
+    })
+    return { turnId, callId }
+  }
+
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
     const id = nanoid()
     const enriched: SessionConfig = normalizeSessionConfig({ ...config, language: currentLanguage() })
@@ -447,3 +505,29 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
 
 /** App singleton: connects to the live sidecar over WsTransport. */
 export const sessionService = new SessionService(new WsTransport())
+
+/** E2E bridge: only installed outside production builds (vite DEV / e2e). */
+export type HipE2EHooks = {
+  injectServerMessage: (msg: ServerMessage) => void
+  simulateAgentWriteFinished: (sessionId: string) => { turnId: string; callId: string }
+  getActiveSessionId: () => string | null
+}
+
+declare global {
+  interface Window {
+    __hipE2E?: HipE2EHooks
+  }
+}
+
+function installE2eHooks(svc: SessionService): void {
+  if (typeof window === 'undefined') return
+  // Production app builds must not expose inject surface.
+  if (import.meta.env.PROD) return
+  window.__hipE2E = {
+    injectServerMessage: (msg) => svc.injectServerMessage(msg),
+    simulateAgentWriteFinished: (sessionId) => svc.simulateAgentWriteFinished(sessionId),
+    getActiveSessionId: () => useDomainStore.getState().activeSessionId,
+  }
+}
+
+installE2eHooks(sessionService)

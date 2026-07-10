@@ -179,7 +179,6 @@ describe('TimelineView revert confirm', () => {
     useDiffStore.getState().setCheckpointDiffResult('s1', 's1:t1|this-turn', {
       state: 'ok',
       files: [],
-      summary: { filesChanged: 0, insertions: 0, deletions: 0 },
     })
   })
 

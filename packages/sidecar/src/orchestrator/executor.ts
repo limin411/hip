@@ -1,8 +1,17 @@
 import type { WorkflowDef, RunState, NodeOutput, NodeId, OrchestratorEvent } from '@hip/protocol'
 import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
+import { launchResolvedNode } from './node-runner.js'
 
-export interface RunWorkflowOpts { runId: string; runInputs?: NodeOutput; signal: AbortSignal; maxConcurrency?: number }
+export interface RunWorkflowOpts {
+  runId: string
+  runInputs?: NodeOutput
+  signal: AbortSignal
+  maxConcurrency?: number
+  /** Working directory for verification gates (typecheck/lint/test/script). */
+  cwd?: string
+  sessionId?: string
+}
 
 export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, opts: RunWorkflowOpts): Promise<RunState> {
   const sink = ports.eventSink
@@ -38,13 +47,17 @@ export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, op
       if (inFlight.size >= maxCon) break
       if (inFlight.has(id)) continue
       const node = nodeById.get(id)!
-      if (!('agentId' in node)) continue
+      // Agent + gate nodes are executable; other types fail closed inside launchResolvedNode.
+      if (node.type !== 'agent' && node.type !== 'gate') continue
       const input = resolveInput(node, state, opts.runInputs)
       apply({ type: 'node:started', nodeId: id })
-      const p = ports.agentRunner
-        .run({ runId: opts.runId, nodeId: id, agentId: node.agentId, input }, opts.signal)
-        .then((out) => ({ id, ok: true as const, out }))
-        .catch((e) => ({ id, ok: false as const, err: e instanceof Error ? e.message : String(e) }))
+      const p = launchResolvedNode(node, ports, {
+        runId: opts.runId,
+        signal: opts.signal,
+        input,
+        cwd: opts.cwd,
+        sessionId: opts.sessionId,
+      })
       inFlight.set(id, p)
     }
   }

@@ -199,11 +199,11 @@ Required fields (`llmProvider`, `model`, `tools`) are left as provided; do not i
 3. [x] Extract background: `session-background.ts`.
 4. [x] `session.ts` façade **~741 lines** (target ≤800 met).
 
-### Phase 4
+### Phase 4 — completed 2026-07-10
 
-1. Verification / reviewer gates on main path.
-2. Worktree isolation default for background subagents.
-3. Project memory + AGENTS.md injection.
+1. [x] Verification gates on DAG path: `launchResolvedNode` runs `gate` nodes via `runGateNode` in both `runWorkflow` and `DurableExecutor`; workflow-runner passes `cwd`/`sessionId`.
+2. [x] Background subagent worktree isolation (default on; disable with `HIP_BG_WORKTREE=0`) via `acquireBackgroundWorktree`.
+3. [x] Project guidance injection: `ProjectAgentsMdInjector` loads `AGENTS.md` / `CLAUDE.md` / `.hip/MEMORY.md` into the system context.
 
 ---
 

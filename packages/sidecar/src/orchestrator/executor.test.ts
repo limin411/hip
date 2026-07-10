@@ -25,6 +25,66 @@ const harness = (script: FakeScript = {}) => {
   return { runner, sink, ports: { agentRunner: runner, eventSink: sink } }
 }
 
+describe('runWorkflow — gate node on main path', () => {
+  it('runs a gate node after an agent and fails the run when the gate fails', async () => {
+    const { registerGate } = await import('./gates/index.js')
+    registerGate({
+      kind: 'unit-fail-gate',
+      description: 'always fail',
+      async run() {
+        return {
+          passed: false,
+          failures: [{ message: 'type error', severity: 'error' }],
+          suggestions: [],
+          durationMs: 1,
+        }
+      },
+    })
+    const def: WorkflowDef = {
+      id: 'wg',
+      name: 'with-gate',
+      entry: ['a'],
+      nodes: [
+        { type: 'agent', id: 'a', agentId: 'w', inputTemplate: '{{input}}' },
+        { type: 'gate', id: 'g', gateKind: 'unit-fail-gate' },
+      ],
+      edges: [{ from: 'a', to: 'g' }],
+    }
+    const { ports } = harness({ a: { text: 'done' } })
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'rg', signal: ac.signal, cwd: process.cwd() })
+    expect(state.nodes['a'].status).toBe('succeeded')
+    expect(state.nodes['g'].status).toBe('failed')
+    expect(state.status).toBe('failed')
+  })
+
+  it('passes the run when the gate passes', async () => {
+    const { registerGate } = await import('./gates/index.js')
+    registerGate({
+      kind: 'unit-pass-gate',
+      description: 'always pass',
+      async run() {
+        return { passed: true, failures: [], suggestions: [], durationMs: 1 }
+      },
+    })
+    const def: WorkflowDef = {
+      id: 'wg2',
+      name: 'with-gate-pass',
+      entry: ['a'],
+      nodes: [
+        { type: 'agent', id: 'a', agentId: 'w', inputTemplate: 'x' },
+        { type: 'gate', id: 'g', gateKind: 'unit-pass-gate' },
+      ],
+      edges: [{ from: 'a', to: 'g' }],
+    }
+    const { ports } = harness({ a: { text: 'ok' } })
+    const ac = new AbortController()
+    const state = await runWorkflow(def, ports, { runId: 'rg2', signal: ac.signal })
+    expect(state.nodes['g'].status).toBe('succeeded')
+    expect(state.status).toBe('succeeded')
+  })
+})
+
 describe('runWorkflow — 线性 a→b', () => {
   it('两节点 succeeded;事件序正确;a 在 b 前;b 收到 a 的产出', async () => {
     const def = wf({

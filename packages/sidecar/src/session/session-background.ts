@@ -1,4 +1,4 @@
-/** Background subagent helpers (Phase 3b). */
+/** Background subagent helpers (Phase 3b / Phase 4 worktree isolation). */
 import type { PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { runSubagent } from './subagent.js'
@@ -7,6 +7,7 @@ import { GuardianReviewer } from './guardian.js'
 import { NetworkPolicy } from './network-policy.js'
 import { safeErrorMessage } from './error.js'
 import type { SessionTurnHost, SendFn } from './session-turn-runner.js'
+import { acquireBackgroundWorktree } from './background-worktree.js'
 
 export async function runBackgroundSubagent(host: SessionTurnHost, taskId: string, description: string, signal: AbortSignal, send: SendFn): Promise<void> {
   const cwd = host._config.cwd ?? process.cwd()
@@ -24,10 +25,23 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
   let status: 'completed' | 'failed' = 'completed'
   let error: string | undefined
 
+  // Prefer an isolated git worktree so background agents do not thrash the main tree.
+  const wt = await acquireBackgroundWorktree(cwd, host.id, taskId)
+  if (wt.isolated) {
+    send({
+      type: 'agent:notification',
+      sessionId: host.id,
+      taskId,
+      description: `Background task isolated in worktree: ${wt.root}`,
+      status: 'completed',
+      result: wt.root,
+    })
+  }
+
   try {
     result = await runSubagent({
       runner,
-      root: cwd,
+      root: wt.root,
       summarizer,
       emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
       signal,
@@ -47,6 +61,8 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
     result = `Error: ${msg}`
     status = 'failed'
     error = msg
+  } finally {
+    await wt.cleanup()
   }
 
   host.backgroundManager.completeTask(taskId, status, error === undefined ? result : undefined, error)

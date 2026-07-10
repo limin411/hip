@@ -65,6 +65,7 @@ import {
   TokenBudgetInjector,
   SubagentStatusInjector,
 } from './context-injector.js'
+import { ProjectAgentsMdInjector } from './project-agents-md.js'
 import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
@@ -701,6 +702,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
 
     const injectorRegistry = new ContextInjectorRegistry()
     injectorRegistry.register(new SystemPromptInjector())
+    injectorRegistry.register(new ProjectAgentsMdInjector())
     injectorRegistry.register(new SkillsListInjector())
     injectorRegistry.register(new PermissionModeInjector())
     injectorRegistry.register(new TokenBudgetInjector())

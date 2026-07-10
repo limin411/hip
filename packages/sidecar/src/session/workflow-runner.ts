@@ -180,16 +180,17 @@ export async function runWorkflowTurn(
     // Prefer DurableExecutor when SQLite is available so each reduce() checkpoints
     // RunState and a crash can resume the same runId. Without a store, fall back to
     // the in-memory runWorkflow path (tests / ephemeral sidecar).
+    const cwd = deps.config.cwd ?? process.cwd()
     const runState = workflowStore
       ? await new DurableExecutor(workflowStore).runWorkflow(
           def,
           { agentRunner: runner, eventSink },
-          { runId: turnId, signal: abortController.signal },
+          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id },
         )
       : await runWorkflow(
           def,
           { agentRunner: runner, eventSink },
-          { runId: turnId, signal: abortController.signal },
+          { runId: turnId, signal: abortController.signal, cwd, sessionId: deps.id },
         )
     finishRemaining()
 

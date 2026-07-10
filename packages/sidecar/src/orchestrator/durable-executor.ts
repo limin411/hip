@@ -9,6 +9,7 @@ import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 import type { SqliteWorkflowStore } from '../persistence/workflow-store.js'
 import type { Blackboard } from './blackboard.js'
+import { launchResolvedNode } from './node-runner.js'
 
 export interface DurableRunOpts {
   runId: string
@@ -17,6 +18,9 @@ export interface DurableRunOpts {
   maxConcurrency?: number
   /** Shared per-workflow key-value store; agents access their run's namespace. */
   blackboard?: Blackboard
+  /** Working directory for verification gates. */
+  cwd?: string
+  sessionId?: string
 }
 
 export class DurableExecutor {
@@ -81,31 +85,17 @@ export class DurableExecutor {
         if (inFlight.has(id)) continue
 
         const node = nodeById.get(id)!
+        if (node.type !== 'agent' && node.type !== 'gate') continue
         const input = resolveInput(node, state, opts.runInputs)
         apply({ type: 'node:started', nodeId: id })
 
-        const p = ports.agentRunner
-          .run(
-            {
-              runId: opts.runId,
-              nodeId: id,
-              agentId: (node as any).agentId ?? '',
-              input,
-              blackboard: opts.blackboard,
-            },
-            opts.signal,
-          )
-          .then(
-            (out) => ({ id, ok: true as const, out }),
-            (e) => ({
-              id,
-              ok: false as const,
-              err:
-                e instanceof Error
-                  ? e.message
-                  : String(e),
-            }),
-          )
+        const p = launchResolvedNode(node, ports, {
+          runId: opts.runId,
+          signal: opts.signal,
+          input,
+          cwd: opts.cwd,
+          sessionId: opts.sessionId,
+        })
 
         inFlight.set(id, p)
       }

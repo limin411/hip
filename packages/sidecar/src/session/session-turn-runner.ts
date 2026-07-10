@@ -523,13 +523,24 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   if (dagDef) {
     host.pendingWorkflowDef = null
     const userText = extractLastUserText(host.messages)
-    return runWorkflowTurnFn(
-      host.workflowDeps,
-      dagDef,
-      rawSend,
-      (s, turnId, text, traj, stopped) => host.finalizeAndPersist(s, turnId, text, traj, stopped),
-      { runInputs: { text: userText } },
-    )
+    // runWorkflowTurnFn is free-standing and does not touch host.running — set the
+    // busy flag here so concurrent workflow:run / message:send see BUSY. Cleanup
+    // mirrors the fast-path finally block below (running + abortController).
+    // Note: workflow-runner keeps its own AbortController; cancel wiring is separate.
+    host.abortController = new AbortController()
+    host.running = true
+    try {
+      return await runWorkflowTurnFn(
+        host.workflowDeps,
+        dagDef,
+        rawSend,
+        (s, turnId, text, traj, stopped) => host.finalizeAndPersist(s, turnId, text, traj, stopped),
+        { runInputs: { text: userText } },
+      )
+    } finally {
+      host.running = false
+      host.abortController = null
+    }
   }
 
   host.abortController = new AbortController(); host.running = true

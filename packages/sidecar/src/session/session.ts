@@ -673,12 +673,25 @@ export class Session {
     send: SendFn,
     opts?: { runInputs?: { text: string; data?: unknown } },
   ): Promise<string> {
-    return runWorkflowTurnFn(
-      this.workflowDeps,
-      def, send,
-      (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
-      opts,
-    )
+    if (this.running) {
+      // Caller (workflow:run handler) should have checked; still guard.
+      send({ type: 'error', sessionId: this.id, code: 'BUSY', message: 'Session is busy' })
+      return ''
+    }
+    this.abortController = new AbortController()
+    this.running = true
+    try {
+      return await runWorkflowTurnFn(
+        this.workflowDeps,
+        def, send,
+        (s, turnId, text, traj, stopped) => this.finalizeAndPersist(s, turnId, text, traj, stopped),
+        opts,
+      )
+    } finally {
+      // Mirror fast-path cleanup in session-turn-runner (running + abortController).
+      this.running = false
+      this.abortController = null
+    }
   }
 
   /** Dual-write helper: persists the legacy representation AND publishes a durable

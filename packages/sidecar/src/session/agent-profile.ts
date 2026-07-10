@@ -112,10 +112,12 @@ export const BUILTIN_PROFILES: AgentProfile[] = [
     ],
   },
   {
+    // LEGACY: prefer `coder` / `explore` / `plan` for new delegation (Sprint C naming).
+    // Kept so existing configs and tests that reference `worker` keep working.
     id: 'worker',
     name: 'Worker',
     description:
-      'Subagent for focused implementation tasks: reads, writes, and edits files. Explicitly blocked from write_todos so planning stays with the primary agent.',
+      'Legacy generic subagent (prefer coder/explore/plan). Reads, writes, and edits files. Explicitly blocked from write_todos so planning stays with the primary agent.',
     mode: 'subagent',
     allowedTools: SUBAGENT_BASE_TOOLS,
     blockedTools: ['write_todos'],

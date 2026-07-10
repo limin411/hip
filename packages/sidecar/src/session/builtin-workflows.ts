@@ -1,6 +1,12 @@
 import type { WorkflowDef } from '@hip/protocol'
 
-/** v1 default cluster template: linear planner → coder, no gates. */
+/**
+ * Internal/test cluster template: linear planner → coder, no gates.
+ *
+ * NOT a product default. User-facing turns no longer force this via orchMode
+ * (agent-driven orchestration). Only used when pendingWorkflowDef is set
+ * explicitly (tests / advanced internal callers).
+ */
 export function buildClusterDefaultWorkflow(): WorkflowDef {
   return {
     id: 'builtin:cluster-default',
@@ -10,14 +16,15 @@ export function buildClusterDefaultWorkflow(): WorkflowDef {
       {
         type: 'agent',
         id: 'planner',
-        agentId: 'worker',
+        // Prefer real profiles over legacy worker when this template is used.
+        agentId: 'plan',
         inputTemplate:
           'You are the planner. Break down the user request into concrete steps and acceptance criteria. Be concise.\n\nUser request:\n{{input}}',
       },
       {
         type: 'agent',
         id: 'coder',
-        agentId: 'worker',
+        agentId: 'coder',
         inputTemplate:
           'You are the implementer. Execute the plan with minimal correct changes.\n\nPlan:\n{{planner}}\n\nOriginal request:\n{{input}}',
       },

@@ -159,6 +159,28 @@ describe('SessionStore', () => {
     expect(store.search('可搜索内容')).toHaveLength(0)
   })
 
+  it('deleteSession purges event log and session_message for the aggregate (Sprint C privacy)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    db.prepare(
+      `INSERT INTO event_sequence(aggregate_id, seq) VALUES(?, ?)`,
+    ).run('s1', 1)
+    db.prepare(
+      `INSERT INTO event(id, aggregate_id, seq, type, data) VALUES(?,?,?,?,?)`,
+    ).run('e1', 's1', 1, 'user_message', '{}')
+    db.prepare(
+      `INSERT INTO session_message(id, session_id, type, seq, time_created, time_updated, data) VALUES(?,?,?,?,?,?,?)`,
+    ).run('sm1', 's1', 'user', 1, 1, 1, '{}')
+    db.prepare(
+      `INSERT INTO snapshots(session_id, seq, state, timestamp) VALUES(?,?,?,?)`,
+    ).run('s1', 1, '{}', 1)
+    store.deleteSession('s1')
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM event WHERE aggregate_id=?`).get('s1') as { n: number }).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM event_sequence WHERE aggregate_id=?`).get('s1') as { n: number }).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM session_message WHERE session_id=?`).get('s1') as { n: number }).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM snapshots WHERE session_id=?`).get('s1') as { n: number }).toEqual({ n: 0 })
+  })
+
   it('round-trips tool calls + delegation through insertTurn/loadAgentRuns', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })

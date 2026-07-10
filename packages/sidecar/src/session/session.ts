@@ -402,11 +402,26 @@ export class Session {
   setThinking(thinking: boolean): boolean { return this.configMgr.setThinking(thinking) }
   setModel(llmProvider: string): boolean { return this.configMgr.setModel(llmProvider) }
   setSystemPrompt(systemPrompt: string | null): boolean { return this.configMgr.setSystemPrompt(systemPrompt) }
+  /**
+   * @deprecated Product path ignores orchMode for turn routing (agent-driven orchestration).
+   * Still persists the field for old clients; does not change runTurn behavior.
+   */
   setOrchMode(orchMode: OrchestrationMode): boolean {
     if (this.running) return false
     const changed = this.orchMode !== orchMode
     this._config = { ...this._config, orchMode }
     this.orchMode = orchMode
+    // Sprint C: log once-style deprecation when clients still call setOrchMode.
+    if (changed) {
+      try {
+        // Lazy import avoid circular — use console when logger not available at top.
+        console.debug?.(
+          `[hip] session:setOrchMode is deprecated; orchMode=${orchMode} is stored but does not force workflow turns`,
+        )
+      } catch {
+        /* ignore */
+      }
+    }
     return changed
   }
 

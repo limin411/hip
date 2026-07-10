@@ -95,6 +95,7 @@ export class SessionManager {
         const config = this.store
           ? (JSON.parse(this.store.getSession(id)?.config ?? 'null') ?? undefined)
           : undefined
+        // UI authority: messages + runs/tools — not event rebuild (see persistence-data-model.md).
         return { messages: this.store?.loadMessagesWithRuns(id) ?? [], config }
       },
       searchSessions: (query) => this.store?.search(query) ?? [],

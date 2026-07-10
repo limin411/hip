@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **草案 / 待实现**（**依赖 Sprint A、B Done**；可拆多个小 PR） |
+| 状态 | **主干已落地**（真删会话、数据模型文档、orchMode/workflow 产品路径收敛、命名注释） |
 | 路线图 | [`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md) |
 | 前置 | 主路径 harness 与 Code 体验稳定；有回归集再做破坏性删除 |
 | 相关 | `schema.ts`、`event-store`、`session_message`、`orchMode` 协议、`workflowStore`、fixed agents / `agent-profile` |

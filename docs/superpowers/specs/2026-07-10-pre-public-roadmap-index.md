@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **已规划（spec 先行，待按序实现）** |
+| 状态 | **A/B/C 主干已实现**（后续可继续打磨与 e2e） |
 | 前提 | 产品尚未面向公众；编排已切到 agent-driven（见 `2026-07-10-agent-driven-orchestration-agents-panel-design.md`） |
 | 原则 | Harness > 功能面；少开关；Code 主路径优先；本地可诊断 |
 
@@ -15,7 +15,7 @@
 |------|------|------------|----------|
 | **Sprint A** | [`2026-07-10-sprint-a-harness-quality-design.md`](./2026-07-10-sprint-a-harness-quality-design.md) | 主循环可靠、可取消、可测、可导出调试信息 | 1–2 周 · **主干已实现** |
 | **Sprint B** | [`2026-07-10-sprint-b-code-agents-experience-design.md`](./2026-07-10-sprint-b-code-agents-experience-design.md) | Code 闭环可感、Agents 可懂、上下文更省、安装失败可读 | ~2 周 · **主干已实现** |
-| **Sprint C** | [`2026-07-10-sprint-c-architecture-convergence-design.md`](./2026-07-10-sprint-c-architecture-convergence-design.md) | 持久化/命名/死路径收敛，降低长期债务 | 按需 1–3 周 |
+| **Sprint C** | [`2026-07-10-sprint-c-architecture-convergence-design.md`](./2026-07-10-sprint-c-architecture-convergence-design.md) | 持久化/命名/死路径收敛，降低长期债务 | 按需 1–3 周 · **主干已实现** |
 
 **执行顺序：A → B → C。** 未完成 A 的验收标准前，不启动 B 的大功能；B 未完成前不做 C 的破坏性删除。
 

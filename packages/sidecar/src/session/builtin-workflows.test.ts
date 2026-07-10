@@ -24,10 +24,11 @@ describe('buildClusterDefaultWorkflow', () => {
     expect(coder && 'inputTemplate' in coder && coder.inputTemplate).toMatch(/\{\{\s*input\s*\}\}/)
   })
 
-  it('uses worker agentId for both nodes', () => {
+  it('uses real plan/coder profiles (not legacy worker)', () => {
     const def = buildClusterDefaultWorkflow()
-    for (const n of def.nodes) {
-      if (n.type === 'agent') expect(n.agentId).toBe('worker')
-    }
+    const planner = def.nodes.find((n) => n.id === 'planner')
+    const coder = def.nodes.find((n) => n.id === 'coder')
+    expect(planner && 'agentId' in planner && planner.agentId).toBe('plan')
+    expect(coder && 'agentId' in coder && coder.agentId).toBe('coder')
   })
 })

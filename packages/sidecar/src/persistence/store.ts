@@ -282,8 +282,42 @@ export class SessionStore {
     return true
   }
 
+  /**
+   * Delete a session and all related rows (Sprint C option P: true delete for privacy).
+   * FK cascades cover messages/agent_runs/tool_calls/checkpoints when present.
+   * Event log / session_message / snapshots have no FK to sessions — purge explicitly.
+   * Tables that only exist after newer migrations are best-effort (ignore missing).
+   */
   deleteSession(id: string): void {
-    this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
+    const runIgnoreMissing = (sql: string, ...params: unknown[]) => {
+      try {
+        this.db.prepare(sql).run(...params)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('no such table')) return
+        throw e
+      }
+    }
+    this.db.exec('BEGIN')
+    try {
+      runIgnoreMissing(
+        `DELETE FROM workflow_events WHERE run_id IN (SELECT run_id FROM workflow_runs WHERE session_id=?)`,
+        id,
+      )
+      runIgnoreMissing(`DELETE FROM workflow_runs WHERE session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM event WHERE aggregate_id=?`, id)
+      runIgnoreMissing(`DELETE FROM event_sequence WHERE aggregate_id=?`, id)
+      runIgnoreMissing(`DELETE FROM snapshots WHERE session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM session_message WHERE session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM session_input WHERE session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM session_context_epoch WHERE session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM cron_tasks WHERE session_id=?`, id)
+      this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
+      this.db.exec('COMMIT')
+    } catch (e) {
+      this.db.exec('ROLLBACK')
+      throw e
+    }
   }
 
   /** Admit a pending input into the durable queue. */

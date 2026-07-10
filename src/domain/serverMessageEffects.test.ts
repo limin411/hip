@@ -212,14 +212,14 @@ describe('applyServerMessageEffects', () => {
       expect(useWorkflowStore.getState().bySession['s1']).toBeUndefined()
     })
 
-    it('session:loaded requests workflow:getActive', () => {
+    it('session:loaded does not request workflow:getActive (product path has no workflow UI)', () => {
       const deps = makeDeps()
       applyServerMessageEffects({
         type: 'session:loaded',
         sessionId: 's1',
         messages: [],
       }, deps)
-      expect(deps.sent).toContainEqual({ type: 'workflow:getActive', sessionId: 's1' })
+      expect(deps.sent.some((m) => m.type === 'workflow:getActive')).toBe(false)
     })
 
     it('session:deleted clears workflow session slice', () => {

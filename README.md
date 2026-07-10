@@ -41,6 +41,24 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
 > test suite all read the key from there. **`~/.hip/config/` holds plaintext API
 > keys; do not sync it to cloud drives or dotfile repos.**
 
+### Local data layout (`~/.hip/`)
+
+| Path | Purpose |
+|------|---------|
+| `~/.hip/config/` | `auth.json`, `hip.toml`, network policy (mode `0600` where applicable) |
+| `~/.hip/db/hip.db` | SQLite sessions, messages, agent runs, tools, events |
+| `~/.hip/data/tool-output/` | Large tool outputs (kept out of the DB) |
+| `~/.hip/logs/` | Sidecar / Tauri logs |
+| `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
+
+Session delete removes DB rows for that session (including event log). See
+[`docs/superpowers/specs/2026-07-10-persistence-data-model.md`](docs/superpowers/specs/2026-07-10-persistence-data-model.md).
+
+```bash
+# Optional: reclaim free pages after large deletes (app must be closed)
+sqlite3 ~/.hip/db/hip.db 'VACUUM;'
+```
+
 ```bash
 # 1. Install workspace dependencies
 yarn install

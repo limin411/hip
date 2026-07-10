@@ -210,9 +210,12 @@ export class SessionService {
     this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
   }
 
-  /** Switch the session's orchestration mode (fast / dag). */
+  /**
+   * @deprecated Agent-driven orchestration ignores orchMode for turn routing.
+   * Kept for protocol compatibility with old clients; no-op for product UI.
+   */
   setOrchMode(id: string, orchMode: OrchestrationMode): void {
-    useDomainStore.getState().apply({ type: 'session:orchMode', sessionId: id, orchMode }) // optimistic
+    useDomainStore.getState().apply({ type: 'session:orchMode', sessionId: id, orchMode })
     this.transport.send({ type: 'session:setOrchMode', sessionId: id, orchMode })
   }
 

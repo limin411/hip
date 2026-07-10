@@ -246,7 +246,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       useWorkflowStore.getState().clearSession(msg.sessionId)
       return
     case 'session:loaded':
-      deps.send({ type: 'workflow:getActive', sessionId: msg.sessionId })
+      // Sprint C: no longer request workflow:getActive — product path does not surface workflows.
       return
     case 'session:deleted':
       useWorkflowStore.getState().clearSession(msg.sessionId)

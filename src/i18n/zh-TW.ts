@@ -146,7 +146,7 @@ export const zhTW = {
         fast: '單實例模式',
         fastDesc: '單 Agent 迴圈，最大 25 步',
         dag: '集群模式',
-        dagDesc: 'DAG 工作流，支援並行與驗證門控',
+        dagDesc: 'DAG 工作流；下一則訊息將執行預設 planner→coder 圖',
       },
       activity: {
         completed: '已完成',
@@ -163,6 +163,7 @@ export const zhTW = {
       agents: '智能體',
       terminal: '終端',
       closePanel: '關閉面板',
+      dagEmpty: '目前無活躍工作流。切換到集群模式並發送訊息後，將在此顯示 DAG。',
       noArtifacts: '智慧代理產生的文件與圖片會顯示在這裡',
       copyArtifact: '複製',
       downloadArtifact: '下載',

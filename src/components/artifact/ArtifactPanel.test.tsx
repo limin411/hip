@@ -17,6 +17,8 @@ vi.mock('react-i18next', () => ({
         'artifact.changes': 'Changes',
         'artifact.terminal': 'Terminal',
         'artifact.closePanel': 'Close panel',
+        'artifact.dagEmpty':
+          'No active workflow. Switch to Cluster Mode and send a message to visualize the DAG.',
       }
       return map[key] ?? key
     },
@@ -94,9 +96,14 @@ vi.mock('@/store/diffStore', () => ({
   useDiffStore: (sel: (s: typeof mockDiffState) => unknown) => sel(mockDiffState),
 }))
 
-let mockWorkflowState: { activeWorkflow: WorkflowDef | null; runState: RunState | null } = {
-  activeWorkflow: null,
-  runState: null,
+let mockWorkflowState: {
+  getSession: (sessionId: string) => {
+    activeWorkflow: WorkflowDef | null
+    runState: RunState | null
+    runId: string | null
+  }
+} = {
+  getSession: () => ({ activeWorkflow: null, runState: null, runId: null }),
 }
 vi.mock('@/store/workflowStore', () => ({
   useWorkflowStore: (sel: (s: typeof mockWorkflowState) => unknown) => sel(mockWorkflowState),
@@ -115,7 +122,9 @@ describe('ArtifactPanel', () => {
     mockCodeTerminal = false
     mockDomainState = { activeSessionId: 'sess-1' }
     mockDiffState = { bySession: { 'sess-1': { isGitRepo: false } } }
-    mockWorkflowState = { activeWorkflow: null, runState: null }
+    mockWorkflowState = {
+      getSession: () => ({ activeWorkflow: null, runState: null, runId: null }),
+    }
   })
 
   afterEach(() => {
@@ -160,8 +169,11 @@ describe('ArtifactPanel', () => {
   it('renders DagEditor when a workflow is active and DAG tab is selected', () => {
     mockUiState = { activeTab: 'dag' }
     mockWorkflowState = {
-      activeWorkflow: { id: 'wf-1', name: 'Test', nodes: [], edges: [], entry: [] },
-      runState: null,
+      getSession: () => ({
+        activeWorkflow: { id: 'wf-1', name: 'Test', nodes: [], edges: [], entry: [] },
+        runState: null,
+        runId: null,
+      }),
     }
     render(<ArtifactPanel />)
     expect(screen.getByTestId('dag-editor')).toBeInTheDocument()
@@ -169,10 +181,12 @@ describe('ArtifactPanel', () => {
 
   it('shows empty state when DAG tab is selected but no workflow is active', () => {
     mockUiState = { activeTab: 'dag' }
-    mockWorkflowState = { activeWorkflow: null, runState: null }
+    mockWorkflowState = {
+      getSession: () => ({ activeWorkflow: null, runState: null, runId: null }),
+    }
     render(<ArtifactPanel />)
     expect(screen.queryByTestId('dag-editor')).toBeNull()
-    expect(screen.getByText(/No workflow active/)).toBeInTheDocument()
+    expect(screen.getByText(/No active workflow/)).toBeInTheDocument()
   })
 
   it('shows GitInitBanner in files tab when not in a git repo', () => {

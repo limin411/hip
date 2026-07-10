@@ -4,6 +4,7 @@ import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
+import { useWorkflowStore } from '@/store/workflowStore'
 
 /** Dependencies the side-effect router needs from SessionService (avoid circular imports). */
 export interface ServerMessageEffectDeps {
@@ -188,6 +189,34 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           timestamp: Date.now(),
         })
       }
+      return
+
+    case 'workflow:started': {
+      useWorkflowStore.getState().setActiveWorkflow(msg.sessionId, msg.def, msg.runId)
+      const domain = useDomainStore.getState()
+      if (domain.activeSessionId === msg.sessionId) {
+        const session = domain.sessions.find((s) => s.id === msg.sessionId)
+        if (session?.config.surface !== 'chat') {
+          domain.setSessionCodePanelOpen(msg.sessionId, true)
+          useUiStore.getState().setTab('dag')
+        }
+      }
+      return
+    }
+    case 'workflow:event':
+      useWorkflowStore.getState().applyEvent(msg.sessionId, msg.runId, msg.event)
+      return
+    case 'workflow:snapshot':
+      useWorkflowStore.getState().setSnapshot(msg.sessionId, msg.def, msg.state)
+      return
+    case 'workflow:cleared':
+      useWorkflowStore.getState().clearSession(msg.sessionId)
+      return
+    case 'session:loaded':
+      deps.send({ type: 'workflow:getActive', sessionId: msg.sessionId })
+      return
+    case 'session:deleted':
+      useWorkflowStore.getState().clearSession(msg.sessionId)
       return
 
     default:

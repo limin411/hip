@@ -44,8 +44,11 @@ export function ArtifactPanel() {
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
-  const activeWorkflow = useWorkflowStore((s) => s.activeWorkflow)
-  const runState = useWorkflowStore((s) => s.runState)
+  const slice = useWorkflowStore((s) =>
+    sid ? s.getSession(sid) : { activeWorkflow: null, runState: null, runId: null },
+  )
+  const activeWorkflow = slice.activeWorkflow
+  const runState = slice.runState
 
   const effectiveTab = resolveEffectiveTab(activeTab, isGitRepo)
 
@@ -97,7 +100,7 @@ export function ArtifactPanel() {
             <DagEditor workflow={activeWorkflow} runState={runState ?? undefined} />
           ) : (
             <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary">
-              No workflow active. Run a DAG workflow from the model picker to see the visual editor.
+              {t('artifact.dagEmpty')}
             </div>
           )
         )}

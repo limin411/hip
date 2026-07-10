@@ -146,7 +146,7 @@ export const en = {
         fast: 'Single Instance',
         fastDesc: 'Single agent loop, max 25 steps',
         dag: 'Cluster Mode',
-        dagDesc: 'DAG workflow with parallelism and verification gates',
+        dagDesc: 'DAG workflow; the next message runs the default planner→coder graph',
       },
       activity: {
         completed: 'Completed',
@@ -163,6 +163,7 @@ export const en = {
       agents: 'Agents',
       terminal: 'Terminal',
       closePanel: 'Close Panel',
+      dagEmpty: 'No active workflow. Switch to Cluster Mode and send a message to visualize the DAG.',
       noArtifacts: 'Generated documents and images will appear here',
       copyArtifact: 'Copy',
       downloadArtifact: 'Download',

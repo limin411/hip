@@ -146,7 +146,7 @@ export const zhCN = {
         fast: '单实例模式',
         fastDesc: '单 Agent 循环，最大 25 步',
         dag: '集群模式',
-        dagDesc: 'DAG 工作流，支持并行与验证门控',
+        dagDesc: 'DAG 工作流；下一条消息将执行默认 planner→coder 图',
       },
       activity: {
         completed: '已完成',
@@ -163,6 +163,7 @@ export const zhCN = {
       agents: '智能体',
       terminal: '终端',
       closePanel: '关闭面板',
+      dagEmpty: '当前无活跃工作流。切换到集群模式并发送消息后，将在此显示 DAG。',
       noArtifacts: '智能体生成的文档与图片会显示在这里',
       copyArtifact: '复制',
       downloadArtifact: '下载',

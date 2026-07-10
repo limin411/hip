@@ -4,8 +4,9 @@
 |------|-----|
 | 作者 | Grok |
 | 日期 | 2026-07-10 |
-| 状态 | **已决议（产品点已拍板）** |
-| 相关 | `docs/superpowers/specs/2026-07-10-orch-mode-dag-panel-closure-design.md`（将部分 supersede）、`docs/agent-orchestration-plan.md`、实测会话 `2-htLtzQUV4lWh5bopLKR` |
+| 状态 | **已决议；核心已实现**（`a0ee3c7` / `70a7940`） |
+| 相关 | `2026-07-10-orch-mode-dag-panel-closure-design.md`（supersede）、`docs/agent-orchestration-plan.md`、实测会话 `2-htLtzQUV4lWh5bopLKR` |
+| 后续 | 公开前三阶段：[`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md)（A 质量 → B 体验 → C 收敛） |
 | 代码锚点 | `session-turn-runner.ts`、`workflow-runner.ts`、`builtin-workflows.ts`、`orchestrator-adapter.ts`、`ModelPicker.tsx`、`ArtifactPanel.tsx`、`AgentDashboard.tsx`、`workflowStore.ts` |
 
 ### 已拍板决策（2026-07-10）

@@ -15,9 +15,36 @@ const codePage = new CodePage()
 async function openPanelTab(tab: string): Promise<void> {
   const toggle = await browser.$('[data-testid="toggle-panel"]')
   await toggle.waitForExist({ timeout: 30000 })
-  await browser.execute((el: HTMLElement) => el.click(), toggle)
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await browser.execute((el: HTMLElement) => {
+      el.focus()
+      el.click()
+    }, toggle)
+    const menu = await browser.$('[data-testid="panel-tab-menu"]')
+    try {
+      await menu.waitForExist({ timeout: 2000 })
+      break
+    } catch {
+      // Retry open — Radix dropdown can miss a single pointer event under WDIO.
+    }
+  }
+
+  const menu = await browser.$('[data-testid="panel-tab-menu"]')
+  await menu.waitForExist({ timeout: 10000 })
+
+  // Debug aid: list available tab testids if terminal is missing.
   const item = await browser.$(`[data-testid="panel-tab-${tab}"]`)
-  await item.waitForExist({ timeout: 10000 })
+  try {
+    await item.waitForExist({ timeout: 10000 })
+  } catch (err) {
+    const labels = await browser.execute(() =>
+      Array.from(document.querySelectorAll('[data-testid^="panel-tab-"]'))
+        .map((el) => el.getAttribute('data-testid'))
+        .filter(Boolean),
+    )
+    throw new Error(`panel-tab-${tab} not found; menu items: ${JSON.stringify(labels)}`)
+  }
   await browser.execute((el: HTMLElement) => el.click(), item)
 }
 

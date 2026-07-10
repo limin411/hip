@@ -16,13 +16,9 @@ import { TerminalView } from './TerminalView'
 import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
-import { DagEditor } from '@/components/workflow/DagEditor'
-import { useWorkflowStore } from '@/store/workflowStore'
-
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
 function tabLabel(tab: ArtifactTab, t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.timeline' | 'artifact.changes' | 'artifact.terminal') => string): string {
-  if (tab === 'dag') return 'DAG'
   if (tab === 'files') return t('artifact.files')
   if (tab === 'agents') return t('artifact.agents')
   if (tab === 'timeline') return t('artifact.timeline')
@@ -44,11 +40,6 @@ export function ArtifactPanel() {
   const setSessionCodePanelOpen = useDomainStore((s) => s.setSessionCodePanelOpen)
   const sid = useDomainStore((s) => s.activeSessionId)
   const isGitRepo = useDiffStore((s) => (sid ? s.bySession[sid]?.isGitRepo : false)) ?? false
-  const slice = useWorkflowStore((s) =>
-    sid ? s.getSession(sid) : { activeWorkflow: null, runState: null, runId: null },
-  )
-  const activeWorkflow = slice.activeWorkflow
-  const runState = slice.runState
 
   const effectiveTab = resolveEffectiveTab(activeTab, isGitRepo)
 
@@ -95,15 +86,6 @@ export function ArtifactPanel() {
         )}
         {effectiveTab === 'timeline' && isGitRepo && <TimelineView />}
         {effectiveTab === 'changes' && isGitRepo && <ChangesView />}
-        {effectiveTab === 'dag' && (
-          activeWorkflow ? (
-            <DagEditor workflow={activeWorkflow} runState={runState ?? undefined} />
-          ) : (
-            <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary">
-              {t('artifact.dagEmpty')}
-            </div>
-          )
-        )}
         {effectiveTab === 'terminal' && CODE_TERMINAL && <TerminalView />}
       </div>
     </div>

@@ -104,6 +104,8 @@ describe('runWorkflowTurn safety-dependency wiring', () => {
     expect(args.networkPolicy).toBe(policy)
     expect(args.toolOutputStore).toBe(store)
     expect(args.guardianReviewer).toBe(guardian)
+    // Inherits session permissionMode (default edit), never forced full.
+    expect(args.permissionMode).toBe('edit')
   })
 })
 
@@ -262,7 +264,8 @@ describe('runWorkflowTurn external abort signal', () => {
 
     release()
     const result = await p
-    expect(result).toBe('')
+    // Cancel still finalizes a stopped partial (at least a cancel note).
+    expect(result).toContain('cancelled')
     expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'CANCELLED')).toBe(true)
   })
 
@@ -289,16 +292,21 @@ describe('runWorkflowTurn external abort signal', () => {
     const external = new AbortController()
     external.abort()
     const sent: ServerMessage[] = []
+    let finalizeStopped: boolean | undefined
     const finalize = (
       _s: (msg: ServerMessage) => void,
       _turnId: string,
       text: string,
       _trajectory: Map<string, TraceRun>,
-      _stopped: boolean,
-    ): string => text
+      stopped: boolean,
+    ): string => {
+      finalizeStopped = stopped
+      return text
+    }
 
     const result = await runWorkflowTurn(deps, def, (m) => sent.push(m), finalize, { signal: external.signal })
-    expect(result).toBe('')
+    expect(result).toContain('cancelled')
+    expect(finalizeStopped).toBe(true)
     expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'CANCELLED')).toBe(true)
   })
 })

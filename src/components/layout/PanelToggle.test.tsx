@@ -128,7 +128,7 @@ describe('PanelToggle', () => {
     render(<PanelToggle />)
     expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
     expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
-    expect(screen.getByTestId('panel-tab-dag')).toBeInTheDocument()
+    expect(screen.queryByTestId('panel-tab-dag')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-timeline')).not.toBeInTheDocument()
     expect(screen.queryByTestId('panel-tab-changes')).not.toBeInTheDocument()
   })

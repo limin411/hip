@@ -4,6 +4,7 @@ import { useActiveMessages, useActiveSessionStatus } from '@/domain'
 import { groupAllAgents, type GroupedTurn } from '@/lib/turnAgents'
 import { formatClockTime } from '@/lib/datetime'
 import { AgentCard } from './AgentCard'
+import { CollaborationStructure } from './CollaborationStructure'
 
 export function AgentDashboard() {
   const { t, i18n } = useTranslation()
@@ -33,7 +34,14 @@ export function AgentDashboard() {
           <div key={group.messageId} className="flex flex-col gap-2">
             <div className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
               {t('artifact.timelineView.turn', { n: group.turnIndex })} · {formatClockTime(group.timestamp, locale)}
+              {children.length > 0
+                ? ` · ${t('artifact.subAgentCount', { count: children.length })}`
+                : ''}
             </div>
+            {/* D2: structure only when sub-agents exist */}
+            {children.length > 0 && (
+              <CollaborationStructure agents={group.agents} live={turnLive} />
+            )}
             {supervisor && <AgentCard agent={supervisor} live={turnLive} />}
             {children.length > 0 && (
               <>

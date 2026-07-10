@@ -75,7 +75,18 @@ export function launchResolvedNode(
         },
         opts.signal,
       )
-      .then((out) => ({ id, ok: true as const, out }))
+      .then((out) => {
+        // Empty text is not a successful deliverable — fail so the graph cannot
+        // feed a blank plan into downstream nodes (e.g. planner → coder).
+        if (!out?.text?.trim()) {
+          return {
+            id,
+            ok: false as const,
+            err: 'Agent produced empty output',
+          }
+        }
+        return { id, ok: true as const, out }
+      })
       .catch((e) => ({
         id,
         ok: false as const,

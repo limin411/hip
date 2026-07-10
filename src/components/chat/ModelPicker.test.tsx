@@ -143,45 +143,10 @@ describe('ModelPicker', () => {
     expect(screen.getByTestId('dropdown-item')).toBeInTheDocument()
   })
 
-  it('shows orchMode toggle when a session is active', () => {
-    render(<ModelPicker />)
-    expect(screen.getByText('Fast')).toBeInTheDocument()
-    expect(screen.getByText('DAG')).toBeInTheDocument()
-  })
-
-  it('does not show orchMode toggle when no session is active', () => {
-    mockActiveSessionId = null
-    mockSession = null
+  it('does not show orchMode toggle (agent-driven orchestration)', () => {
     render(<ModelPicker />)
     expect(screen.queryByText('Fast')).toBeNull()
     expect(screen.queryByText('DAG')).toBeNull()
-  })
-
-  it('highlights "Fast" as pressed when orchMode is fast', () => {
-    mockSession = { config: { orchMode: 'fast' } }
-    render(<ModelPicker />)
-    const fastBtn = screen.getByText('Fast')
-    expect(fastBtn.getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it('highlights "DAG" as pressed when orchMode is dag', () => {
-    mockSession = { config: { orchMode: 'dag' } }
-    render(<ModelPicker />)
-    const dagBtn = screen.getByText('DAG')
-    expect(dagBtn.getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it('renders DAG icon inside the DAG toggle button', () => {
-    mockSession = { config: { orchMode: 'dag' } }
-    render(<ModelPicker />)
-    expect(screen.getByTestId('icon-dag')).toBeInTheDocument()
-  })
-
-  it('disables orch mode buttons when session status is running', () => {
-    mockActiveSessionStatus = 'running'
-    render(<ModelPicker />)
-    expect(screen.getByText('Fast')).toBeDisabled()
-    expect(screen.getByText('DAG')).toBeDisabled()
   })
 
   it('has tooltip attributes for accessibility', () => {

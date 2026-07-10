@@ -84,4 +84,19 @@ describe('launchResolvedNode', () => {
     expect(result.ok).toBe(false)
     expect(result.err).toContain('Unsupported')
   })
+
+  it('fails agent nodes that produce empty text', async () => {
+    const runner = new FakeAgentRunner({ a: { text: '   ' } })
+    const result = await launchResolvedNode(
+      { type: 'agent', id: 'a', agentId: 'worker', inputTemplate: '{{input}}' },
+      { agentRunner: runner, eventSink: new CollectingEventSink() },
+      {
+        runId: 'r1',
+        signal: new AbortController().signal,
+        input: { text: 'in' },
+      },
+    )
+    expect(result.ok).toBe(false)
+    expect(result.err).toContain('empty output')
+  })
 })

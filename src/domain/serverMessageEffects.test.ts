@@ -77,7 +77,7 @@ describe('applyServerMessageEffects', () => {
   })
 
   describe('workflow messages', () => {
-    it('workflow:started projects into store and auto-opens DAG tab for code surface', () => {
+    it('workflow:started projects into store and focuses Agents tab for code surface', () => {
       const deps = makeDeps()
       applyServerMessageEffects({
         type: 'workflow:started',
@@ -91,7 +91,7 @@ describe('applyServerMessageEffects', () => {
       expect(slice.runId).toBe('r1')
       expect(slice.runState?.status).toBe('pending')
       expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.codePanelOpen).toBe(true)
-      expect(useUiStore.getState().activeTab).toBe('dag')
+      expect(useUiStore.getState().activeTab).toBe('agents')
     })
 
     it('workflow:started does not open DAG for chat surface', () => {

@@ -21,6 +21,17 @@ import { safeErrorMessage } from './error.js'
 
 type SendFn = (msg: ServerMessage) => void
 
+/** Best-effort final text from in-flight agent trajectory (supervisor last, else any non-empty). */
+export function collectTrajectoryText(trajectory: Map<string, TraceRun>): string {
+  const runs = [...trajectory.entries()]
+  const supervisor = runs.find(([id]) => id === 'supervisor')?.[1]
+  if (supervisor?.output?.trim()) return supervisor.output
+  const withOutput = runs.map(([, r]) => r.output).filter((t) => typeof t === 'string' && t.trim())
+  if (withOutput.length === 1) return withOutput[0]!
+  if (withOutput.length > 1) return withOutput.join('\n\n')
+  return ''
+}
+
 export interface WorkflowRunDeps {
   id: string
   config: SessionConfig
@@ -144,7 +155,8 @@ export async function runWorkflowTurn(
           signal,
           description: input,
           childMaxSteps: CHILD_MAX_STEPS,
-          permissionMode: 'full',
+          // Inherit session permission mode (never force full — HITL/edit must apply).
+          permissionMode: deps.config.permissionMode ?? 'edit',
           requestApproval: undefined,
           networkPolicy: deps.networkPolicy,
           toolOutputStore: deps.toolOutputStore,
@@ -242,6 +254,8 @@ export async function runWorkflowTurn(
   } catch (err) {
     const isAbort = err instanceof Error && err.name === 'AbortError'
     finishRemaining()
+    // Always project trajectory so cancel/timeout leaves a partial assistant message.
+    const partialText = collectTrajectoryText(trajectory)
     if (isAbort) {
       send({
         type: 'error',
@@ -249,7 +263,13 @@ export async function runWorkflowTurn(
         code: timedOut ? 'TIMEOUT' : 'CANCELLED',
         message: timedOut ? '' : 'User cancelled the request',
       })
-      return ''
+      const stoppedNote = timedOut
+        ? '(timed out)'
+        : '(cancelled)'
+      const text = partialText.trim()
+        ? `${partialText.trim()}\n\n${stoppedNote}`
+        : stoppedNote
+      return finalize(send, turnId, text, trajectory, true)
     }
     send({
       type: 'error',
@@ -257,7 +277,10 @@ export async function runWorkflowTurn(
       code: timedOut ? 'TIMEOUT' : 'AGENT_ERROR',
       message: timedOut ? '' : safeErrorMessage(err),
     })
-    return ''
+    const text = partialText.trim()
+      ? `${partialText.trim()}\n\n(error)`
+      : `(error: ${safeErrorMessage(err)})`
+    return finalize(send, turnId, text, trajectory, true)
   } finally {
     watchdog.stop()
     if (deps.pendingPermissions.size) {

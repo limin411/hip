@@ -9,7 +9,7 @@ import { READ_TOOLS, defaultToolPolicy } from './tool-runner/tool-policy.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
-import { ToolRunner } from './tool-runner/tool-runner.js'
+import { ToolRunner, resolveToolName } from './tool-runner/tool-runner.js'
 import type { ToolCallResult } from './tool-runner/tool-runner.js'
 import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
@@ -353,8 +353,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const blockedCalls: ToolMessage[] = []
     const calls: typeof last.tool_calls = []
     for (const call of last.tool_calls ?? []) {
-      const isMcp = call.name.startsWith('mcp__')
-      if (ctx.allowedTools && ctx.allowedTools.length > 0 && !isMcp && !ctx.allowedTools.includes(call.name)) {
+      const resolvedName = resolveToolName(call.name)
+      // Normalize aliases (bash→run_script) before profile / plan-mode gates.
+      const normalized =
+        resolvedName === call.name ? call : { ...call, name: resolvedName }
+      const isMcp = resolvedName.startsWith('mcp__')
+      if (ctx.allowedTools && ctx.allowedTools.length > 0 && !isMcp && !ctx.allowedTools.includes(resolvedName)) {
         console.warn(`Blocked tool call "${call.name}" by allowedTools profile filter`)
         blockedCalls.push(new ToolMessage({
           content: `Error: Tool "${call.name}" is not available in the current agent profile.`,
@@ -363,7 +367,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         }))
         continue
       }
-      if (ctx.blockedTools && ctx.blockedTools.length > 0 && ctx.blockedTools.includes(call.name)) {
+      if (ctx.blockedTools && ctx.blockedTools.length > 0 && ctx.blockedTools.includes(resolvedName)) {
         console.warn(`Blocked tool call "${call.name}" by blockedTools profile filter`)
         blockedCalls.push(new ToolMessage({
           content: `Error: Tool "${call.name}" is blocked in the current agent profile.`,
@@ -373,8 +377,8 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         continue
       }
       if (ctx.planMode?.isActive && ctx.planMode.planFilePath) {
-        if (call.name === 'write_file' || call.name === 'edit_file') {
-          const targetPath = (call.args as Record<string, unknown>)?.path as string | undefined
+        if (resolvedName === 'write_file' || resolvedName === 'edit_file') {
+          const targetPath = (normalized.args as Record<string, unknown>)?.path as string | undefined
           if (targetPath !== ctx.planMode.planFilePath) {
             blockedCalls.push(new ToolMessage({
               content: `Plan mode is active. Write/Edit is only allowed to the plan file: ${ctx.planMode.planFilePath}`,
@@ -384,16 +388,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
             continue
           }
         }
-        if (call.name === 'git_commit' || call.name === 'run_script') {
+        if (resolvedName === 'git_commit' || resolvedName === 'run_script') {
           blockedCalls.push(new ToolMessage({
-            content: `Plan mode is active. The "${call.name}" tool is not allowed during plan mode.`,
+            content: `Plan mode is active. The "${resolvedName}" tool is not allowed during plan mode.`,
             tool_call_id: call.id ?? call.name,
             name: call.name,
           }))
           continue
         }
       }
-      calls.push(call)
+      calls.push(normalized)
     }
 
     const parallelism = ctx.toolParallelism ?? 5

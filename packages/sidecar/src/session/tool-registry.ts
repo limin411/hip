@@ -30,6 +30,17 @@ interface Registration {
 /** Error string returned for any tool call whose registry has moved on. */
 const STALE_MESSAGE = 'Tool registration changed after materialization'
 
+/** Map model-hallucinated shell tool names onto the real built-in. */
+const TOOL_NAME_ALIASES: Readonly<Record<string, string>> = {
+  bash: 'run_script',
+  shell: 'run_script',
+  sh: 'run_script',
+}
+
+function resolveToolName(name: string): string {
+  return TOOL_NAME_ALIASES[name] ?? name
+}
+
 // ── ToolRegistry ─────────────────────────────────────────────────────────────
 
 /**
@@ -156,7 +167,8 @@ export class ToolRegistry {
         }
       }
 
-      const tool = self.lookup(call.name)
+      const resolvedName = resolveToolName(call.name)
+      const tool = self.lookup(resolvedName)
       if (!tool) {
         return {
           content: `Error: unknown tool: ${call.name}`,
@@ -170,14 +182,14 @@ export class ToolRegistry {
         return {
           content,
           tool_call_id: call.callId,
-          name: call.name,
+          name: resolvedName,
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         return {
           content: `Error: ${message}`,
           tool_call_id: call.callId,
-          name: call.name,
+          name: resolvedName,
         }
       }
     }

@@ -4,7 +4,6 @@ import {
   resolveWorkflowDefForTurn,
   extractLastUserText,
 } from './session-turn-runner.js'
-import { buildClusterDefaultWorkflow } from './builtin-workflows.js'
 import type { WorkflowDef } from '@hip/protocol'
 
 const customDef: WorkflowDef = {
@@ -16,20 +15,14 @@ const customDef: WorkflowDef = {
 }
 
 describe('resolveWorkflowDefForTurn', () => {
-  it('returns null when orchMode is not dag', () => {
+  it('ignores orchMode and returns null when no pending def (no forced cluster-default)', () => {
     expect(resolveWorkflowDefForTurn({ orchMode: 'fast', pendingWorkflowDef: null })).toBeNull()
-    expect(resolveWorkflowDefForTurn({ orchMode: 'fast', pendingWorkflowDef: customDef })).toBeNull()
+    expect(resolveWorkflowDefForTurn({ orchMode: 'dag', pendingWorkflowDef: null })).toBeNull()
   })
 
-  it('returns pendingWorkflowDef when orchMode is dag and pending is set', () => {
-    const result = resolveWorkflowDefForTurn({ orchMode: 'dag', pendingWorkflowDef: customDef })
-    expect(result).toBe(customDef)
-  })
-
-  it('returns builtin cluster-default when orchMode is dag and pending is null', () => {
-    const result = resolveWorkflowDefForTurn({ orchMode: 'dag', pendingWorkflowDef: null })
-    expect(result).toEqual(buildClusterDefaultWorkflow())
-    expect(result?.id).toBe('builtin:cluster-default')
+  it('returns explicit pendingWorkflowDef regardless of orchMode', () => {
+    expect(resolveWorkflowDefForTurn({ orchMode: 'fast', pendingWorkflowDef: customDef })).toBe(customDef)
+    expect(resolveWorkflowDefForTurn({ orchMode: 'dag', pendingWorkflowDef: customDef })).toBe(customDef)
   })
 })
 

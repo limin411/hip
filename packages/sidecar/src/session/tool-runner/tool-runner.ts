@@ -17,6 +17,30 @@ function isApproved(d: ApprovalDecision): boolean {
   return 'kind' in d && d.kind.startsWith('allow')
 }
 
+/** Map model-hallucinated shell tool names onto the real built-in. */
+export const TOOL_NAME_ALIASES: Readonly<Record<string, string>> = {
+  bash: 'run_script',
+  shell: 'run_script',
+  sh: 'run_script',
+}
+
+export function resolveToolName(name: string): string {
+  return TOOL_NAME_ALIASES[name] ?? name
+}
+
+/** Paths under .git/objects are almost never useful to agents and cause thrash. */
+export function isGitObjectsPath(path: unknown): boolean {
+  if (typeof path !== 'string' || !path) return false
+  return /(?:^|[/\\])\.git[/\\]objects(?:[/\\]|$)/i.test(path)
+}
+
+export function gitObjectsBlockedMessage(toolName: string, path: string): string {
+  return (
+    `Error: refusing ${toolName} on git object path "${path}". ` +
+    'Do not browse .git/objects; use run_script with git commands (e.g. git log) or stop and summarize.'
+  )
+}
+
 // ── Public types ─────────────────────────────────────────────────────────────
 
 /** Dependencies injected into ToolRunner. */
@@ -83,16 +107,28 @@ export class ToolRunner {
       sessionId,
     } = this.deps
 
-    // ── 1. Resolve tool by name ────────────────────────────────────────────
-    const tool = tools.get(call.name)
+    // ── 1. Resolve tool by name (with aliases) ─────────────────────────────
+    const resolvedName = resolveToolName(call.name)
+    const tool = tools.get(resolvedName)
     if (!tool) {
       return this.errorResult(call, `unknown tool: ${call.name}`)
     }
 
+    // Block thrashing through git object store (common when shell tools missing).
+    const pathArg =
+      (call.args as { path?: unknown }).path ??
+      (call.args as { pattern?: unknown }).pattern
+    if (
+      (resolvedName === 'read_file' || resolvedName === 'ls' || resolvedName === 'glob') &&
+      isGitObjectsPath(pathArg)
+    ) {
+      return this.errorResult(call, gitObjectsBlockedMessage(resolvedName, String(pathArg)))
+    }
+
     // ── 2. Classify via ToolPolicy ─────────────────────────────────────────
-    const classification = toolPolicy.classify(call.name, permissionMode, new Set(tools.keys()))
+    const classification = toolPolicy.classify(resolvedName, permissionMode, new Set(tools.keys()))
     if (classification.risk === 'medium' || classification.risk === 'high') {
-      this.deps.emitRisk?.(call.name, classification.risk, classification.approval)
+      this.deps.emitRisk?.(resolvedName, classification.risk, classification.approval)
     }
 
     // ── 3. PreToolUse hooks ────────────────────────────────────────────────
@@ -105,7 +141,7 @@ export class ToolRunner {
       try {
         preResult = await hooks.fire('PreToolUse', {
           sessionId,
-          toolName: call.name,
+          toolName: resolvedName,
           toolInput: call.args,
         })
       } catch (err) {

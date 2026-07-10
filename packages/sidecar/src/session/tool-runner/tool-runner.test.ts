@@ -101,6 +101,33 @@ describe('ToolRunner', () => {
       expect(onToolStarted).toHaveBeenCalledWith('nope', 'c1', undefined)
       expect(onToolFinished).toHaveBeenCalledWith('c1', 'error', undefined, 'unknown tool: nope')
     })
+
+    it('aliases bash/shell/sh to run_script when registered', async () => {
+      const t = mockTool('run_script', async () => 'ok-from-script')
+      const deps = makeDeps({ tools: new Map([['run_script', t]]) })
+      const runner = new ToolRunner(deps)
+      for (const name of ['bash', 'shell', 'sh'] as const) {
+        const result = await runner.runToolCall({ name, callId: `c-${name}`, args: { command: 'echo hi' } })
+        expect(result.content).toBe('ok-from-script')
+      }
+    })
+
+    it('blocks read_file/ls under .git/objects', async () => {
+      let invoked = false
+      const t = mockTool('read_file', () => {
+        invoked = true
+        return 'blob'
+      })
+      const deps = makeDeps({ tools: new Map([['read_file', t]]) })
+      const runner = new ToolRunner(deps)
+      const result = await runner.runToolCall({
+        name: 'read_file',
+        callId: 'c-git',
+        args: { path: '/proj/.git/objects/ab/cdef' },
+      })
+      expect(result.content).toMatch(/refusing read_file on git object path/)
+      expect(invoked).toBe(false)
+    })
   })
 
   // ── 2. PreToolUse deny → error, no invoke ────────────────────────────────

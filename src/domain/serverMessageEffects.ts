@@ -193,12 +193,13 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
 
     case 'workflow:started': {
       useWorkflowStore.getState().setActiveWorkflow(msg.sessionId, msg.def, msg.runId)
+      // Focus Agents panel (DAG tab removed — collaboration lives under Agents).
       const domain = useDomainStore.getState()
       if (domain.activeSessionId === msg.sessionId) {
         const session = domain.sessions.find((s) => s.id === msg.sessionId)
         if (session?.config.surface !== 'chat') {
           domain.setSessionCodePanelOpen(msg.sessionId, true)
-          useUiStore.getState().setTab('dag')
+          useUiStore.getState().setTab('agents')
         }
       }
       return

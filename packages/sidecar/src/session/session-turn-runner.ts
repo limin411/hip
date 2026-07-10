@@ -49,7 +49,6 @@ import type { EventStore } from '../persistence/event-store.js'
 import type { SkillMeta } from '@hip/protocol'
 import { deriveTitle } from './title-generator.js'
 import { runWorkflowTurn as runWorkflowTurnFn, type WorkflowRunDeps } from './workflow-runner.js'
-import { buildClusterDefaultWorkflow } from './builtin-workflows.js'
 import { shouldPlan } from './plan.js'
 import type { AgentProfile } from './agent-profile.js'
 import type { PlanMode } from './plan-mode.js'
@@ -96,13 +95,19 @@ export type TurnBase = {
   plan?: PlanItem[]
 }
 
-/** When orchMode is dag, always resolve a workflow (pending or builtin cluster-default). */
+/**
+ * Resolve an explicit pending workflow for this turn.
+ * Product path no longer forces `builtin:cluster-default` when orchMode is dag
+ * (agent-driven orchestration: supervisor + task/dispatch only).
+ * `pendingWorkflowDef` remains for tests / internal callers that set it explicitly.
+ */
 export function resolveWorkflowDefForTurn(host: {
   orchMode: OrchestrationMode
   pendingWorkflowDef: WorkflowDef | null
 }): WorkflowDef | null {
-  if (host.orchMode !== 'dag') return null
-  return host.pendingWorkflowDef ?? buildClusterDefaultWorkflow()
+  // Ignore orchMode — user mode toggle is deprecated (D1).
+  void host.orchMode
+  return host.pendingWorkflowDef
 }
 
 /** Last HumanMessage text content (string or first text part in array content). */

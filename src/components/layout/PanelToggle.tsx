@@ -43,7 +43,6 @@ export function PanelToggle() {
     { value: 'agents', label: t('artifact.agents') },
     { value: 'timeline', label: t('artifact.timeline'), gated: true },
     { value: 'changes', label: t('artifact.changes'), gated: true },
-    { value: 'dag', label: 'DAG' },
     ...(CODE_TERMINAL
       ? [{ value: 'terminal' as const, label: t('artifact.terminal') }]
       : []),

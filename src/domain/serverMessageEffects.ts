@@ -159,7 +159,13 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'git:revert:result':
+      useDiffStore.getState().setLastRevertResult(msg.sessionId, {
+        checkpointId: msg.checkpointId,
+        ok: msg.ok,
+        safetyCheckpointId: msg.safetyCheckpointId,
+      })
       if (msg.ok) {
+        useDiffStore.getState().setRevertError(msg.sessionId, null)
         useDiffStore.getState().clearCheckpointDiffCache(msg.sessionId)
         deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
         const base = useDiffStore.getState().bySession[msg.sessionId]?.base ?? 'session-start'

@@ -223,6 +223,8 @@ export const en = {
         reverting: 'Reverting…',
         revertFailed: 'Revert failed',
         revertRetry: 'Retry',
+        revertSuccess: 'Reverted. A safety checkpoint was created so you can undo this.',
+        revertBlockedRunning: 'Stop the current run before reverting to a checkpoint.',
         crossBranchWarn: 'This checkpoint was created on branch "{{branch}}", which differs from the current branch.',
       },
       branch: {

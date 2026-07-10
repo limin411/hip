@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **待实现**（UI 主干已存在；本阶段补验收、边角与回归） |
+| 状态 | **已实现**（`lastRevertResult` 关 Modal、running 门禁、成功 toast、`TimelineView` 组件测） |
 | 路线图 | [`2026-07-10-pre-public-polish-index.md`](./2026-07-10-pre-public-polish-index.md) |
 | 前置 | Sprint B 主干；`TimelineView` + `git:revert` 协议 |
 | 相关 | `2026-07-10-sprint-b-code-agents-experience-design.md` §3.2 B3 |

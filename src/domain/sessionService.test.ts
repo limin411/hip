@@ -521,17 +521,22 @@ describe('workspace diff', () => {
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
   })
 
-  it('message:complete refreshes the diff only while the 更改 tab is active', () => {
+  it('message:complete refreshes full diff on Code surface or when Changes tab is active', () => {
     const t = new FakeTransport()
     new SessionService(t)
     const message = { id: 'm1', role: 'assistant' as const, content: 'x', timestamp: 1 }
+    // Chat surface + non-changes tab: summary/checkpoint only, no full fs:diff
+    useUiStore.setState({ activeTab: 'files', activeView: 'chat' })
     t.push({ type: 'message:complete', sessionId: 's1', message })
     expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
-    useUiStore.setState({ activeTab: 'changes' })
+    // Changes tab: full diff
+    useUiStore.setState({ activeTab: 'changes', activeView: 'chat' })
     t.push({ type: 'message:complete', sessionId: 's2', message })
-    const diffs = t.sent.filter((m) => m.type === 'fs:diff')
-    expect(diffs).toHaveLength(1)
-    expect(diffs[0]).toMatchObject({ sessionId: 's2' })
+    expect(t.sent.filter((m) => m.type === 'fs:diff' && m.sessionId === 's2')).toHaveLength(1)
+    // Code surface always refreshes full diff (Sprint B)
+    useUiStore.setState({ activeTab: 'files', activeView: 'code' })
+    t.push({ type: 'message:complete', sessionId: 's3', message })
+    expect(t.sent.filter((m) => m.type === 'fs:diff' && m.sessionId === 's3')).toHaveLength(1)
   })
 
   it('ready resets a wedged loading state so requestDiff works again', () => {
@@ -707,6 +712,11 @@ describe('branches + revert', () => {
     t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: true, safetyCheckpointId: 's1:pre-revert-1' })
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(true)
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
+    expect(useDiffStore.getState().bySession['s1'].lastRevertResult).toMatchObject({
+      checkpointId: 's1:t1',
+      ok: true,
+      safetyCheckpointId: 's1:pre-revert-1',
+    })
   })
 
   it('git:branch:switch:result on FAILURE records switchError so the confirm modal can recover', () => {
@@ -730,6 +740,10 @@ describe('branches + revert', () => {
     const t = new FakeTransport(); new SessionService(t)
     t.push({ type: 'git:revert:result', sessionId: 's1', checkpointId: 's1:t1', ok: false, error: 'safety checkpoint failed' })
     expect(useDiffStore.getState().bySession['s1'].revertError).toBe('safety checkpoint failed')
+    expect(useDiffStore.getState().bySession['s1'].lastRevertResult).toMatchObject({
+      checkpointId: 's1:t1',
+      ok: false,
+    })
     // no refresh requests fire on a failed revert
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
   })

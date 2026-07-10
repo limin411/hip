@@ -81,7 +81,16 @@ describe('diffStore', () => {
     expect(EMPTY_DIFF).toMatchObject({
       isGitRepo: false, currentBranch: null, checkpoints: [], activeCheckpointId: null,
       checkpointDiff: {}, commitLog: { status: 'idle', commits: [] },
+      lastRevertResult: null, revertError: null,
     })
+  })
+  it('setLastRevertResult records ok/fail and clears to null', () => {
+    useDiffStore.getState().setLastRevertResult('s1', { checkpointId: 's1:t1', ok: true, safetyCheckpointId: 's1:pre' })
+    const r = useDiffStore.getState().bySession['s1'].lastRevertResult
+    expect(r).toMatchObject({ checkpointId: 's1:t1', ok: true, safetyCheckpointId: 's1:pre' })
+    expect(typeof r?.at).toBe('number')
+    useDiffStore.getState().setLastRevertResult('s1', null)
+    expect(useDiffStore.getState().bySession['s1'].lastRevertResult).toBeNull()
   })
   it('setCheckpoints replaces the list and stores git meta', () => {
     useDiffStore.getState().setCheckpoints('s1', [cp('s1:start'), cp('s1:t1')], true, 'feature')

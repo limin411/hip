@@ -223,6 +223,8 @@ export const zhTW = {
         reverting: '回退中…',
         revertFailed: '回退失敗',
         revertRetry: '重試',
+        revertSuccess: '已回退。已自動建立安全檢查點，因此此操作可撤銷。',
+        revertBlockedRunning: '請先停止目前執行，再回退到檢查點。',
         crossBranchWarn: '此檢查點是在分支「{{branch}}」上建立的，與目前分支不同。',
       },
       branch: {

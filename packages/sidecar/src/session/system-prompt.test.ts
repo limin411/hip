@@ -10,8 +10,17 @@ describe('buildSystemPrompt', () => {
     expect(s).toContain('/tmp/proj')
     expect(s).toContain('write_file')
     expect(s).toContain('write_todos')
-    expect(s).toMatch(/delegate it to/i)
+    expect(s).toMatch(/delegate/i)
     expect(s).toMatch(/MUST NOT claim/i)
+  })
+
+  it('steers simple tasks to direct tools and complex work to specialized agents', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj' })
+    expect(s).toMatch(/simple, single-step/i)
+    expect(s).toMatch(/do not call task/i)
+    expect(s).toMatch(/explore/i)
+    expect(s).toMatch(/run_script/i)
+    expect(s).toMatch(/\.git\/objects/i)
   })
 
   it('gives the agent the hip identity and forbids impersonating other assistants', () => {

@@ -4,10 +4,13 @@
 |------|-----|
 | 作者 | Grok (design pass) |
 | 日期 | 2026-07-10 |
-| 状态 | **已实现** |
+| 状态 | **已 supersede** — 产品语义由 `docs/superpowers/specs/2026-07-10-agent-driven-orchestration-agents-panel-design.md` 取代（无用户 fast/dag 开关；无独立 DAG tab；无强制 cluster-default） |
 | 相关代码 | `packages/protocol`（orch/workflow messages）、`packages/sidecar/src/session/{session,session-turn-runner,workflow-runner,handlers}`、`packages/sidecar/src/orchestrator/*`、`packages/sidecar/src/persistence/{schema,workflow-store}`、`src/components/chat/ModelPicker.tsx`、`src/components/workflow/*`、`src/store/workflowStore.ts`、`src/components/artifact/ArtifactPanel.tsx`、`src/domain/*` |
 | 前置文档 | `docs/agent-orchestration-plan.md`、`docs/superpowers/plans/2026-07-10-architecture-remediation.md` |
 | 外部实践参考 | Temporal durable execution + event history；Temporal Flow / React Flow 只读可视化；AWS Step Functions 状态机可视化 |
+
+> **2026-07-10 产品决策：** 用户不再选择编排模式；默认永远 supervisor 主循环；协作观察并入 Agents 面板。  
+> 本文保留为历史设计记录（引擎/耐久/协议仍有参考价值），**勿再按「用户开集群模式」实现产品行为**。
 
 ---
 

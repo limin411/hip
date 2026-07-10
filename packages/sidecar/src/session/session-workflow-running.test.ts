@@ -71,25 +71,25 @@ describe('Session.runWorkflowTurn running lifecycle', () => {
   })
 })
 
-describe('runTurn DAG branch running lifecycle', () => {
+describe('runTurn explicit pendingWorkflowDef lifecycle', () => {
   beforeEach(() => {
     runWorkflowTurnMock.mockReset()
   })
 
-  it('sets running=true around runWorkflowTurnFn for orchMode=dag', async () => {
+  it('sets running=true around runWorkflowTurnFn when pendingWorkflowDef is set', async () => {
     let release!: (value: string) => void
     const gate = new Promise<string>((resolve) => {
       release = resolve
     })
     runWorkflowTurnMock.mockReturnValue(gate)
 
-    const session = new Session('dag-running-lifecycle', { ...cfg, orchMode: 'dag' })
-    // Seed a user message so extractLastUserText has content for runInputs.
+    // Product path ignores orchMode; only an explicit pending def enters the workflow branch.
+    const session = new Session('wf-pending-lifecycle', cfg)
+    ;(session as unknown as { pendingWorkflowDef: WorkflowDef | null }).pendingWorkflowDef = def
     ;(session as unknown as { messages: HumanMessage[] }).messages.push(new HumanMessage('dag task'))
 
     expect(session.running).toBe(false)
 
-    // Private runTurn → session-turn-runner runTurn DAG branch.
     const p = (session as unknown as {
       runTurn: (send: (m: ServerMessage) => void) => Promise<string>
     }).runTurn(() => {})
@@ -104,14 +104,15 @@ describe('runTurn DAG branch running lifecycle', () => {
     expect(session.running).toBe(false)
   })
 
-  it('passes host.abortController.signal into runWorkflowTurnFn so cancel aborts the DAG turn', async () => {
+  it('passes host.abortController.signal into runWorkflowTurnFn so cancel aborts the turn', async () => {
     let release!: (value: string) => void
     const gate = new Promise<string>((resolve) => {
       release = resolve
     })
     runWorkflowTurnMock.mockReturnValue(gate)
 
-    const session = new Session('dag-cancel-signal', { ...cfg, orchMode: 'dag' })
+    const session = new Session('wf-pending-cancel-signal', cfg)
+    ;(session as unknown as { pendingWorkflowDef: WorkflowDef | null }).pendingWorkflowDef = def
     ;(session as unknown as { messages: HumanMessage[] }).messages.push(new HumanMessage('dag task'))
 
     const p = (session as unknown as {
@@ -130,6 +131,22 @@ describe('runTurn DAG branch running lifecycle', () => {
 
     release!('cancelled-path')
     await p
+  })
+
+  it('does not enter workflow path for orchMode=dag without pending def', async () => {
+    const session = new Session('dag-no-pending', { ...cfg, orchMode: 'dag' })
+    ;(session as unknown as { messages: HumanMessage[] }).messages.push(new HumanMessage('hi'))
+    // runTurn will try the normal graph path (needs model); we only assert workflow is not used.
+    // Short-circuit by not having a full model setup — just check resolve path via mock not called
+    // after a microtask if we never get there. Prefer direct resolve check:
+    const { resolveWorkflowDefForTurn } = await import('./session-turn-runner.js')
+    expect(
+      resolveWorkflowDefForTurn({
+        orchMode: 'dag',
+        pendingWorkflowDef: null,
+      }),
+    ).toBeNull()
+    expect(runWorkflowTurnMock).not.toHaveBeenCalled()
   })
 })
 

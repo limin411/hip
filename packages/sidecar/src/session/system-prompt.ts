@@ -62,9 +62,14 @@ const BASE =
   'When the task is done, finish with a short plain-text summary of what you changed. ' +
   'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
   'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
-  'For a large, self-contained chunk of work or isolated research, you may call task to delegate it to ' +
-  'a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
-  'For a simple, single-step request, just do it directly — do not over-plan or call write_todos.'
+  'For a large, self-contained chunk of work or isolated research, you may call task or dispatch_agent ' +
+  'to delegate it to a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
+  'Prefer specialized agents when available: explore for read-only codebase search, plan for design-only ' +
+  'planning, coder for implementation with scripts. ' +
+  'For a simple, single-step request (greetings, list a directory, read one file, answer a short question), ' +
+  'do it yourself with tools and answer directly — do not call task, write_todos, or spawn sub-agents. ' +
+  'Never thrash on .git/objects or invent shell tool names; use run_script for shell, and stop probing ' +
+  'when a tool fails or returns binary/unreadable content — summarize what you know instead.'
 
 function cwdBlock(cwd: string, permissionMode?: PermissionMode): string {
   if (permissionMode === 'full') {

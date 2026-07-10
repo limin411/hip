@@ -58,4 +58,11 @@
 
 ---
 
-Execute order: 0.1 → 0.2 → 0.3 → 0.4 → 0.5 → 1.x → 2.x
+Execute order: 0.1 → 0.2 → 0.3 → 0.4 → 0.5 → 1.x → 2.x → 3.x
+
+## Status (2026-07-10)
+
+- [x] Phase 0 harness 止血 (commit `a0ee3c7`)
+- [x] Phase 1 统一主路径 / 去 orchMode UI
+- [x] Phase 2 Agents 面板 + CollaborationStructure
+- [x] Phase 3 follow-up: docs supersede, system-prompt harness guidance, pendingWorkflowDef tests (not orchMode)

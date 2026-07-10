@@ -632,4 +632,21 @@ describe('InputBar slash commands', () => {
       expect(textarea).toHaveValue('/sample-greet ')
     })
   })
+
+  it('shows empty state for unmatched slash query and Enter does not sendMessage', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+
+    render(<InputBar />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/zzz' } })
+
+    expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Enter' })
+
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(textarea).toHaveValue('/zzz')
+  })
 })

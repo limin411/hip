@@ -7,6 +7,11 @@ export const en = {
       newChatDesc: 'Start a new conversation…',
       sendMessage: 'Send a message to start the conversation',
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
+      slash: {
+        listLabel: 'Commands',
+        noMatch: 'No matching commands',
+        helpTitle: 'Available commands',
+      },
       send: 'Send',
       user: 'User',
       you: 'You',

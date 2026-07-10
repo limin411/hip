@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { SkillMeta } from '@hip/protocol'
 
@@ -27,8 +28,10 @@ export const BUILTIN_COMMANDS: SlashCommand[] = [
 
 /** Pure: extract the slash command text the user is typing. Returns the raw text after `/`. */
 export function extractSlashQuery(value: string): string | null {
-  // Match `/` at start, optionally after leading whitespace
-  const m = value.match(/(?:^|\s)\/(\S*)$/)
+  // Match `/` at start or after whitespace. The token must not contain `/` so
+  // path-like fragments (`/tmp/file`, `check /tmp/file`) do not open the palette
+  // and intercept Enter (which would block sending legitimate path text).
+  const m = value.match(/(?:^|\s)\/([^\s/]*)$/)
   if (!m) return null
   return m[1]
 }
@@ -86,7 +89,7 @@ export function buildCommandList(
 
 /** Pure: format the replacement text when a command is selected. */
 export function applyCommand(command: SlashCommand, currentValue: string): string {
-  const m = currentValue.match(/^((?:.*\s)?)\/\S*$/)
+  const m = currentValue.match(/^((?:.*\s)?)\/[^\s/]*$/)
   const prefix = m ? m[1] : ''
   return `${prefix}/${command.name} `
 }
@@ -106,6 +109,7 @@ interface SlashCommandPaletteProps {
  * Filterable as the user types; Enter/click selects a command.
  */
 export function SlashCommandPalette({ value, surface, sessionId, skills, onSelect, onDismiss }: SlashCommandPaletteProps) {
+  const { t } = useTranslation()
   const query = useMemo(() => extractSlashQuery(value), [value])
   const commands = useMemo(() => buildCommandList(skills, { surface, sessionId }), [skills, surface, sessionId])
   const filtered = useMemo(
@@ -114,32 +118,55 @@ export function SlashCommandPalette({ value, surface, sessionId, skills, onSelec
   )
 
   const [activeIndex, setActiveIndex] = useState(0)
+  const activeRef = useRef<HTMLButtonElement | null>(null)
 
-  useEffect(() => setActiveIndex(0), [query])
+  // User changed the query: reset highlight to first match.
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [query])
+
+  // List shrank (skills load, surface switch, etc.): clamp so Enter never no-ops on OOB.
+  useEffect(() => {
+    setActiveIndex((i) =>
+      filtered.length === 0 ? 0 : Math.min(i, filtered.length - 1),
+    )
+  }, [filtered])
+
+  const safeIndex =
+    filtered.length === 0 ? 0 : Math.min(activeIndex, filtered.length - 1)
 
   useEffect(() => {
     if (filtered.length === 0) return
+    activeRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [safeIndex, filtered])
+
+  // Always attach while mounted so empty-state Enter cannot fall through to Composer submit.
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         e.stopImmediatePropagation()
-        setActiveIndex((i) => Math.min(i + 1, filtered.length - 1))
+        if (filtered.length === 0) return
+        setActiveIndex((i) => {
+          const cur = Math.min(i, filtered.length - 1)
+          return Math.min(cur + 1, filtered.length - 1)
+        })
         return
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault()
         e.stopImmediatePropagation()
-        if (activeIndex <= 0) {
+        if (filtered.length === 0 || safeIndex <= 0) {
           onDismiss?.()
         } else {
-          setActiveIndex((i) => i - 1)
+          setActiveIndex(safeIndex - 1)
         }
         return
       }
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         e.stopImmediatePropagation()
-        if (filtered[activeIndex]) onSelect(filtered[activeIndex])
+        if (filtered[safeIndex]) onSelect(filtered[safeIndex])
         return
       }
       if (e.key === 'Escape') {
@@ -151,38 +178,53 @@ export function SlashCommandPalette({ value, surface, sessionId, skills, onSelec
     }
     document.addEventListener('keydown', handler, true)
     return () => document.removeEventListener('keydown', handler, true)
-  }, [activeIndex, filtered, onSelect, onDismiss])
+  }, [safeIndex, filtered, onSelect, onDismiss])
 
-  if (query === null || filtered.length === 0) return null
+  if (query === null) return null
 
   return (
     <div
       role="listbox"
+      aria-label={t('chat.slash.listLabel')}
       data-testid="slash-palette"
       className="absolute bottom-full left-0 right-0 mb-2 rounded-lg border border-border bg-surface shadow-overlay max-h-48 overflow-y-auto z-50"
     >
-      {filtered.map((cmd, i) => (
-        <button
-          key={cmd.id}
-          data-testid={`slash-cmd-${cmd.name}`}
-          role="option"
-          aria-selected={i === activeIndex}
-          onClick={() => onSelect(cmd)}
-          onMouseEnter={() => setActiveIndex(i)}
-          className={cn(
-            'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-accent-subtle first:rounded-t-lg last:rounded-b-lg',
-            i === activeIndex && 'bg-accent-subtle',
-          )}
+      {filtered.length === 0 ? (
+        <div
+          data-testid="slash-palette-empty"
+          className="px-3 py-4 text-center text-meta text-ink-secondary"
+          role="presentation"
         >
-          <span className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-caption font-mono text-accent">
-            /{cmd.name}
-          </span>
-          <span className="flex-1 truncate text-ink-secondary">{cmd.description}</span>
-          <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">
-            {cmd.kind}
-          </span>
-        </button>
-      ))}
+          {t('chat.slash.noMatch')}
+        </div>
+      ) : (
+        filtered.map((cmd, i) => (
+          <button
+            key={`${cmd.kind}:${cmd.id}`}
+            id={`slash-opt-${cmd.kind}-${cmd.id}`}
+            type="button"
+            data-testid={`slash-cmd-${cmd.name}`}
+            role="option"
+            aria-selected={i === safeIndex}
+            ref={i === safeIndex ? activeRef : undefined}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onSelect(cmd)}
+            onMouseEnter={() => setActiveIndex(i)}
+            className={cn(
+              'flex w-full items-center gap-2 px-3 py-2 text-left text-body text-ink transition-colors hover:bg-accent-subtle first:rounded-t-lg last:rounded-b-lg',
+              i === safeIndex && 'bg-accent-subtle',
+            )}
+          >
+            <span className="shrink-0 rounded bg-accent/10 px-1.5 py-0.5 text-caption font-mono text-accent">
+              /{cmd.name}
+            </span>
+            <span className="flex-1 truncate text-ink-secondary">{cmd.description}</span>
+            <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-caption text-ink-tertiary">
+              {cmd.kind}
+            </span>
+          </button>
+        ))
+      )}
     </div>
   )
 }

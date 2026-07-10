@@ -7,6 +7,11 @@ export const zhCN = {
       newChatDesc: '开始一段新的对话…',
       sendMessage: '发送一条消息开始对话',
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
+      slash: {
+        listLabel: '命令',
+        noMatch: '无匹配命令',
+        helpTitle: '可用命令',
+      },
       send: '发送',
       user: '用户',
       you: '你',

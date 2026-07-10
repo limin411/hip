@@ -18,6 +18,12 @@ vi.mock('@/ipc/dialog', () => ({
   pickAttachmentFiles: vi.fn(),
 }))
 
+const toastMessage = vi.fn()
+vi.mock('sonner', () => ({
+  toast: { message: (...args: unknown[]) => toastMessage(...args) },
+  Toaster: () => null,
+}))
+
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
 let mockActiveView: 'chat' | 'code' | 'settings' = 'chat'
@@ -67,6 +73,7 @@ describe('NewConversation', () => {
     mockActiveView = 'chat'
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
+    toastMessage.mockClear()
     providersStore.useProvidersStore.setState({
       catalog,
       config: { providers: {}, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },
@@ -190,6 +197,27 @@ describe('NewConversation', () => {
     expect(message.content).not.toContain('/init')
     expect(message.content).not.toContain('/compact')
     // Draft text should be cleared
+    expect(useDraftStore.getState().draft?.text).toBe('')
+  })
+
+  it('/help with null session shows toast and does not appendMessage', async () => {
+    // Production NewConversation path: no active session (do not mock to 's1').
+    vi.spyOn(domain, 'useActiveSessionId').mockReturnValue(null)
+    const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
+
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/h' } })
+    fireEvent.click(screen.getByText('/help'))
+
+    expect(appendSpy).not.toHaveBeenCalled()
+    expect(toastMessage).toHaveBeenCalledTimes(1)
+    const [title, opts] = toastMessage.mock.calls[0]
+    expect(title).toBe('Available commands')
+    expect(opts.description).toContain('/help')
+    expect(opts.description).not.toContain(' — ')
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
 

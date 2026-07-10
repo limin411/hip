@@ -5,6 +5,7 @@ import path from 'path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import type { SkillMeta } from '@hip/protocol'
+import '@/i18n'
 import {
   extractSlashQuery,
   filterCommands,
@@ -76,6 +77,17 @@ describe('extractSlashQuery', () => {
 
   it('handles multiple words with slash at end', () => {
     expect(extractSlashQuery('hello world /my')).toBe('my')
+  })
+
+  it('does not treat path-like tokens with multiple slashes as slash queries', () => {
+    expect(extractSlashQuery('/tmp/file')).toBeNull()
+    expect(extractSlashQuery('check /tmp/file')).toBeNull()
+    expect(extractSlashQuery('see /a/b/c')).toBeNull()
+  })
+
+  it('still matches a single path segment after slash (ambiguous with command names)', () => {
+    expect(extractSlashQuery('/tmp')).toBe('tmp')
+    expect(extractSlashQuery('check /tmp')).toBe('tmp')
   })
 })
 
@@ -411,6 +423,183 @@ describe('SlashCommandPalette keyboard navigation', () => {
       />,
     )
     expect(container.firstChild).toBeNull()
+  })
+
+  it('shows empty state when query matches nothing', () => {
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+    expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
+    expect(screen.queryAllByRole('option')).toHaveLength(0)
+  })
+
+  it('Escape on empty state calls onDismiss', () => {
+    const onDismiss = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('ArrowUp on empty state calls onDismiss', () => {
+    const onDismiss = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'ArrowUp' })
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it('Enter on empty state does not call onSelect', () => {
+    const onSelect = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={onSelect}
+        onDismiss={vi.fn()}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('ArrowDown on empty state is a no-op', () => {
+    const onDismiss = vi.fn()
+    render(
+      <SlashCommandPalette
+        value="/zzz"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(screen.getByTestId('slash-palette-empty')).toBeInTheDocument()
+  })
+
+  it('clamps highlight when filtered list shrinks via query', () => {
+    const { rerender } = render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    // Move to last item
+    for (let i = 0; i < BUILTIN_COMMANDS.length; i++) {
+      fireEvent.keyDown(document, { key: 'ArrowDown' })
+    }
+    // Narrow to a single match so previous index would be OOB without clamp
+    rerender(
+      <SlashCommandPalette
+        value="/help"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(1)
+    expect(options[0]).toHaveAttribute('aria-selected', 'true')
+    expect(options[0]).toHaveAttribute('id', 'slash-opt-builtin-help')
+  })
+
+  it('uses kind:id for React option identity and stable DOM ids', () => {
+    const skills: SkillMeta[] = [
+      {
+        id: 'help',
+        name: 'help-skill',
+        description: 'Skill help',
+        scope: 'global',
+        dir: '/tmp/help',
+        hasScripts: false,
+      },
+    ]
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="chat"
+        sessionId="s1"
+        skills={skills}
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(document.getElementById('slash-opt-builtin-help')).toBeTruthy()
+    expect(document.getElementById('slash-opt-skill-help')).toBeTruthy()
+  })
+
+  it('prevents mousedown default on options to keep composer focus', () => {
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    const option = screen.getAllByRole('option')[0]
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+    option.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('scrolls the active option into view on keyboard navigation', () => {
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    scrollSpy.mockClear()
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    expect(scrollSpy).toHaveBeenCalledWith({ block: 'nearest' })
+    scrollSpy.mockRestore()
+  })
+
+  it('exposes listbox aria-label for chrome a11y', () => {
+    render(
+      <SlashCommandPalette
+        value="/"
+        surface="code"
+        sessionId="s1"
+        onSelect={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('listbox')).toHaveAttribute('aria-label', 'Commands')
   })
 })
 

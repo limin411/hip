@@ -2,13 +2,23 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { useSlashCommandHandler } from './useSlashCommandHandler'
+import {
+  formatHelpToastBody,
+  useSlashCommandHandler,
+} from './useSlashCommandHandler'
 import { sessionService, useDomainStore } from '@/domain'
 import type { SkillMeta } from '@hip/protocol'
 import type { SlashCommand } from './SlashCommandPalette'
+import '@/i18n'
 
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
+const toastMessage = vi.fn()
+
+vi.mock('sonner', () => ({
+  toast: { message: (...args: unknown[]) => toastMessage(...args) },
+  Toaster: () => null,
+}))
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(
@@ -60,6 +70,7 @@ describe('useSlashCommandHandler', () => {
     vi.restoreAllMocks()
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
+    toastMessage.mockClear()
   })
 
   it('/clear cancels and starts a new conversation in chat surface', () => {
@@ -200,14 +211,38 @@ describe('useSlashCommandHandler', () => {
     expect(setText).toHaveBeenCalledWith('')
   })
 
-  it('/help does not append a message when sessionId is null', () => {
+  it('/help does not append a message when sessionId is null and shows toast', () => {
     const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
     const { result, setText } = setup('chat', null)
 
     result.current.handleCommandSelect(builtin('help'))
 
     expect(appendSpy).not.toHaveBeenCalled()
+    expect(toastMessage).toHaveBeenCalledTimes(1)
+    const [title, opts] = toastMessage.mock.calls[0]
+    expect(title).toBe('Available commands')
+    expect(opts.description).toContain('/help')
+    expect(opts.description).toContain('/clear')
+    expect(opts.description).toContain('/config')
+    expect(opts.description).not.toContain(' — ')
     expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('formatHelpToastBody caps at 12 names and appends +N more', () => {
+    const many: SlashCommand[] = Array.from({ length: 15 }, (_, i) => ({
+      id: `c${i}`,
+      name: `cmd${i}`,
+      description: `desc ${i}`,
+      kind: 'skill',
+      availableIn: ['chat', 'code'],
+    }))
+    const body = formatHelpToastBody(many)
+    expect(body.split('\n')).toHaveLength(13)
+    expect(body).toContain('/cmd0')
+    expect(body).toContain('/cmd11')
+    expect(body).not.toContain('/cmd12')
+    expect(body).toContain('+3 more')
+    expect(body).not.toContain(' — ')
   })
 
   it('skill commands apply the command text and refocus', () => {

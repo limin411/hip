@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { nanoid } from 'nanoid'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import type { SkillMeta } from '@hip/protocol'
 import { sessionService, useDomainStore } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
@@ -20,10 +22,31 @@ export interface UseSlashCommandHandlerOptions {
   onDismiss?: () => void
 }
 
+const HELP_TOAST_MAX = 12
+
+/** Toast body: command names only, capped for small toast surface. */
+export function formatHelpToastBody(commands: SlashCommand[]): string {
+  const names = commands.map((c) => `/${c.name}`)
+  if (names.length <= HELP_TOAST_MAX) return names.join('\n')
+  const head = names.slice(0, HELP_TOAST_MAX)
+  const rest = names.length - HELP_TOAST_MAX
+  return [...head, `+${rest} more`].join('\n')
+}
+
+/** Session transcript body: full name — description list. */
+export function formatHelpMessageBody(commands: SlashCommand[]): string {
+  const lines = ['Available commands:']
+  for (const c of commands) {
+    lines.push(`/${c.name} — ${c.description}`)
+  }
+  return lines.join('\n')
+}
+
 export function useSlashCommandHandler(
   surface: ComposerSurface,
   options: UseSlashCommandHandlerOptions,
 ) {
+  const { t } = useTranslation()
   const { sessionId, skills, value, setText, inputRef, onDismiss } = options
 
   const availableCommands = useMemo(
@@ -81,17 +104,16 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'help') {
-          const lines = ['Available commands:']
-          for (const c of availableCommands) {
-            lines.push(`/${c.name} — ${c.description}`)
-          }
-          const helpText = lines.join('\n')
           if (sessionId) {
             useDomainStore.getState().appendMessage(sessionId, {
               id: nanoid(),
               role: 'assistant',
-              content: helpText,
+              content: formatHelpMessageBody(availableCommands),
               timestamp: Date.now(),
+            })
+          } else {
+            toast.message(t('chat.slash.helpTitle'), {
+              description: formatHelpToastBody(availableCommands),
             })
           }
           setText('')
@@ -103,7 +125,7 @@ export function useSlashCommandHandler(
       setText(applyCommand(cmd, value))
       focusInput()
     },
-    [availableCommands, sessionId, value, setText, focusInput],
+    [availableCommands, sessionId, value, setText, focusInput, t],
   )
 
   const handleDismiss = useCallback(() => {
@@ -111,7 +133,7 @@ export function useSlashCommandHandler(
       onDismiss?.()
       return
     }
-    const m = value.match(/^((?:.*\s)?)\/\S*$/)
+    const m = value.match(/^((?:.*\s)?)\/[^\s/]*$/)
     setText(m ? m[1] : '')
     focusInput()
     onDismiss?.()

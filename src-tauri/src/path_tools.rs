@@ -1,6 +1,4 @@
 //! PATH lookup helpers (`which_binaries` command).
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
 /// True if `p` is a file and (on unix) has any execute bit set.
 pub(crate) fn is_executable(p: &std::path::Path) -> bool {

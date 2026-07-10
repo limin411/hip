@@ -19,11 +19,9 @@ use hip_config::{
 };
 
 use std::collections::HashMap;
-use std::sync::OnceLock;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
 

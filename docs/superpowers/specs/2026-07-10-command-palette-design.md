@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | TBD |
 | 日期 | 2026-07-10 |
-| 状态 | Phase A 已实现；Phase B 骨架+PR-5（导航/主题/动作、移除 /config）已合入；flag 关闭；会话组待 PR-6 |
+| 状态 | Phase A–B 全量已实现（含 PR-6 最近会话）；`GLOBAL_COMMAND_PALETTE` 默认 false 暗发 |
 | 相关代码 | `src/components/chat/SlashCommandPalette.tsx`, `useSlashCommandHandler.ts`, `InputBar.tsx`, `NewConversation.tsx` |
 | 外部参考 | hermes-agent（本地路径，**非本仓库**）`apps/desktop/src/app/command-palette/` |
 

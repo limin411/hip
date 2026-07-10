@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { Command } from 'cmdk'
 import { useTranslation } from 'react-i18next'
-import { sessionService } from '@/domain'
+import { sessionService, useSessions } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
@@ -14,12 +14,13 @@ import { rankGroups } from './rankGlobalCommands'
 
 /**
  * Global ⌘K command palette.
- * PR-5: navigation, theme, new conversation. PR-6: recent sessions.
+ * Navigation, theme, new conversation, and recent sessions.
  */
 export function GlobalCommandPalette() {
   const { t } = useTranslation()
   const open = useCommandPaletteStore((s) => s.open)
   const setOpen = useCommandPaletteStore((s) => s.setOpen)
+  const sessions = useSessions()
   const activeView = useUiStore((s) => s.activeView)
   const theme = useUiStore((s) => s.theme)
   const setActiveView = useUiStore((s) => s.setActiveView)
@@ -51,7 +52,7 @@ export function GlobalCommandPalette() {
   const groups = useMemo(
     () =>
       buildGlobalCommandGroups({
-        sessions: [],
+        sessions,
         activeView,
         theme,
         labels,
@@ -60,7 +61,7 @@ export function GlobalCommandPalette() {
         newConversation: (surface) => sessionService.newConversation(surface),
         selectSession: (id) => sessionService.selectSession(id),
       }),
-    [activeView, theme, labels, setActiveView, setTheme],
+    [sessions, activeView, theme, labels, setActiveView, setTheme],
   )
 
   const visible = useMemo(() => rankGroups(groups, search), [groups, search])

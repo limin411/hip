@@ -45,9 +45,27 @@ function surfaceForNewConversation(activeView: ActiveView): 'chat' | 'code' {
   return activeView === 'code' ? 'code' : 'chat'
 }
 
+/** Pure: most recently updated sessions, capped. */
+export function pickRecentSessions(
+  sessions: SessionVM[],
+  limit = RECENT_SESSION_LIMIT,
+): SessionVM[] {
+  return [...sessions]
+    .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+    .slice(0, limit)
+}
+
+function sessionLabel(s: SessionVM): string {
+  const title = s.title.trim()
+  if (title) return title
+  const preview = s.preview.trim()
+  if (preview) return preview.length > 48 ? `${preview.slice(0, 48)}…` : preview
+  return s.id
+}
+
 /**
  * Build command groups for the global palette.
- * PR-5: navigation, actions, theme. PR-6: recent sessions.
+ * Navigation, actions, theme, and recent sessions (by updatedAtMs).
  */
 export function buildGlobalCommandGroups(ctx: GlobalCommandContext): PaletteGroup[] {
   const { labels } = ctx
@@ -117,13 +135,25 @@ export function buildGlobalCommandGroups(ctx: GlobalCommandContext): PaletteGrou
     },
   ]
 
-  // Sessions group filled in PR-6 from ctx.sessions.
-  void ctx.sessions
-  void ctx.selectSession
+  const recent = pickRecentSessions(ctx.sessions)
+  const sessions: GlobalCommand[] = recent.map((s) => {
+    const label = sessionLabel(s)
+    return {
+      id: `session-${s.id}`,
+      label,
+      keywords: [s.id, s.preview, s.title, 'session', '会话'].filter(Boolean),
+      group: 'sessions' as const,
+      run: () => ctx.selectSession(s.id),
+    }
+  })
 
-  return [
+  const groups: PaletteGroup[] = [
     { heading: labels.groupNavigation, items: navigation },
     { heading: labels.groupActions, items: actions },
     { heading: labels.groupTheme, items: theme },
   ]
+  if (sessions.length > 0) {
+    groups.push({ heading: labels.groupSessions, items: sessions })
+  }
+  return groups
 }

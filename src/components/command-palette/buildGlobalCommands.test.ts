@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildGlobalCommandGroups, type GlobalCommandLabels } from './buildGlobalCommands'
+import type { SessionVM } from '@/domain'
+import {
+  buildGlobalCommandGroups,
+  pickRecentSessions,
+  RECENT_SESSION_LIMIT,
+  type GlobalCommandLabels,
+} from './buildGlobalCommands'
 
 const labels: GlobalCommandLabels = {
   groupNavigation: 'Navigation',
@@ -16,9 +22,23 @@ const labels: GlobalCommandLabels = {
   themeSystem: 'System',
 }
 
+function stubSession(partial: Partial<SessionVM> & { id: string }): SessionVM {
+  return {
+    config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' },
+    title: '',
+    preview: '',
+    updatedAtMs: 0,
+    loaded: true,
+    messages: [],
+    status: 'idle',
+    error: null,
+    ...partial,
+  }
+}
+
 function makeCtx(overrides: Partial<Parameters<typeof buildGlobalCommandGroups>[0]> = {}) {
   return {
-    sessions: [],
+    sessions: [] as SessionVM[],
     activeView: 'chat' as const,
     theme: 'system' as const,
     labels,
@@ -30,8 +50,20 @@ function makeCtx(overrides: Partial<Parameters<typeof buildGlobalCommandGroups>[
   }
 }
 
+describe('pickRecentSessions', () => {
+  it('sorts by updatedAtMs desc and caps at RECENT_SESSION_LIMIT', () => {
+    const sessions = Array.from({ length: 15 }, (_, i) =>
+      stubSession({ id: `s${i}`, updatedAtMs: i * 1000, title: `T${i}` }),
+    )
+    const recent = pickRecentSessions(sessions)
+    expect(recent).toHaveLength(RECENT_SESSION_LIMIT)
+    expect(recent[0].id).toBe('s14')
+    expect(recent[9].id).toBe('s5')
+  })
+})
+
 describe('buildGlobalCommandGroups', () => {
-  it('includes navigation, actions, and theme groups', () => {
+  it('includes navigation, actions, and theme groups without sessions group when empty', () => {
     const groups = buildGlobalCommandGroups(makeCtx())
     expect(groups.map((g) => g.heading)).toEqual(['Navigation', 'Actions', 'Theme'])
     expect(groups.flatMap((g) => g.items.map((i) => i.id))).toEqual([
@@ -44,6 +76,36 @@ describe('buildGlobalCommandGroups', () => {
       'theme-dark',
       'theme-system',
     ])
+  })
+
+  it('adds recent sessions group sorted by recency with title labels', () => {
+    const ctx = makeCtx({
+      sessions: [
+        stubSession({ id: 'old', title: 'Old chat', updatedAtMs: 1 }),
+        stubSession({ id: 'new', title: 'New chat', updatedAtMs: 99 }),
+        stubSession({ id: 'mid', title: '', preview: 'hello preview', updatedAtMs: 50 }),
+      ],
+    })
+    const groups = buildGlobalCommandGroups(ctx)
+    expect(groups.map((g) => g.heading)).toContain('Recent sessions')
+    const sessionGroup = groups.find((g) => g.heading === 'Recent sessions')!
+    expect(sessionGroup.items.map((i) => i.id)).toEqual([
+      'session-new',
+      'session-mid',
+      'session-old',
+    ])
+    expect(sessionGroup.items[0].label).toBe('New chat')
+    expect(sessionGroup.items[1].label).toBe('hello preview')
+  })
+
+  it('session item run calls selectSession with session id', () => {
+    const ctx = makeCtx({
+      sessions: [stubSession({ id: 'abc', title: 'Hello', updatedAtMs: 10 })],
+    })
+    const groups = buildGlobalCommandGroups(ctx)
+    const item = groups.flatMap((g) => g.items).find((i) => i.id === 'session-abc')!
+    item.run()
+    expect(ctx.selectSession).toHaveBeenCalledWith('abc')
   })
 
   it('runs setActiveView for navigation items', () => {

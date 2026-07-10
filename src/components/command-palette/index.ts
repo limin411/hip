@@ -1,7 +1,11 @@
 export { GLOBAL_COMMAND_PALETTE } from './feature'
 export { GlobalCommandPalette } from './GlobalCommandPalette'
 export { GlobalHotkeysBinder } from './GlobalHotkeysBinder'
-export { buildGlobalCommandGroups, RECENT_SESSION_LIMIT } from './buildGlobalCommands'
+export {
+  buildGlobalCommandGroups,
+  pickRecentSessions,
+  RECENT_SESSION_LIMIT,
+} from './buildGlobalCommands'
 export type {
   GlobalCommand,
   GlobalCommandContext,

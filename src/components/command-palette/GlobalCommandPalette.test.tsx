@@ -6,6 +6,7 @@ import '@/i18n'
 import { GlobalCommandPalette } from './GlobalCommandPalette'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useUiStore } from '@/store/uiStore'
+import { useDomainStore } from '@/domain'
 import { GLOBAL_COMMAND_PALETTE } from './feature'
 import * as domain from '@/domain'
 
@@ -15,11 +16,12 @@ describe('feature flag', () => {
   })
 })
 
-describe('GlobalCommandPalette PR-5 actions', () => {
+describe('GlobalCommandPalette actions and sessions', () => {
   beforeEach(() => {
     cleanup()
     useCommandPaletteStore.setState({ open: false, page: null })
     useUiStore.setState({ activeView: 'chat', theme: 'system' })
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
     vi.restoreAllMocks()
   })
 
@@ -81,5 +83,45 @@ describe('GlobalCommandPalette PR-5 actions', () => {
     useCommandPaletteStore.setState({ open: false })
     render(<GlobalCommandPalette />)
     expect(screen.queryByTestId('global-command-palette')).not.toBeInTheDocument()
+  })
+
+  it('lists recent sessions and selects one via sessionService.selectSession', () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's-old',
+          config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'chat' },
+          title: 'Older',
+          preview: '',
+          updatedAtMs: 1,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+        {
+          id: 's-new',
+          config: { llmProvider: 'openai', model: 'gpt-4o', tools: [], surface: 'code' },
+          title: 'Newest session',
+          preview: '',
+          updatedAtMs: 999,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: null,
+    })
+    const spy = vi.spyOn(domain.sessionService, 'selectSession').mockReturnValue(undefined)
+    useCommandPaletteStore.setState({ open: true })
+    render(<GlobalCommandPalette />)
+
+    expect(screen.getByTestId('global-cmd-session-s-new')).toHaveTextContent('Newest session')
+    expect(screen.getByTestId('global-cmd-session-s-old')).toHaveTextContent('Older')
+
+    fireEvent.click(screen.getByTestId('global-cmd-session-s-new'))
+    expect(spy).toHaveBeenCalledWith('s-new')
+    expect(useCommandPaletteStore.getState().open).toBe(false)
   })
 })

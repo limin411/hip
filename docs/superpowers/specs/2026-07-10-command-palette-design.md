@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | TBD |
 | 日期 | 2026-07-10 |
-| 状态 | Phase A 已实现；Phase B 延后 |
+| 状态 | Phase A 已实现；Phase B 骨架已合入（flag 关闭）；动作/会话组待 PR-5/6 |
 | 相关代码 | `src/components/chat/SlashCommandPalette.tsx`, `useSlashCommandHandler.ts`, `InputBar.tsx`, `NewConversation.tsx` |
 | 外部参考 | hermes-agent（本地路径，**非本仓库**）`apps/desktop/src/app/command-palette/` |
 

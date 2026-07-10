@@ -563,5 +563,11 @@ export const zhTW = {
       logoutConfirmTitle: '登出？',
       logoutConfirmDesc: '登出後需要重新登入才能繼續。',
     },
+    commandPalette: {
+      title: '命令面板',
+      searchPlaceholder: '輸入命令…',
+      noResults: '無結果',
+      emptyHint: '命令即將上線',
+    },
   },
 } as const

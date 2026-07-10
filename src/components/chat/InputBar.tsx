@@ -18,6 +18,7 @@ import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -72,6 +73,14 @@ export function InputBar() {
     setText: setValue,
     inputRef,
   })
+
+  // D18: when global ⌘K opens, dismiss active slash query so two palettes never stack.
+  const globalPaletteOpen = useCommandPaletteStore((s) => s.open)
+  useEffect(() => {
+    if (globalPaletteOpen && extractSlashQuery(value) !== null) {
+      handleDismiss()
+    }
+  }, [globalPaletteOpen, value, handleDismiss])
 
   const draft = useDraftStore((s) => s.draft)
   const catalog = useProvidersStore((s) => s.catalog)

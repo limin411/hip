@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useSkillsStore } from '@/store/skillsStore'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { sessionService, useActiveSessionId } from '@/domain'
 import { Composer } from './Composer'
 import { SlashCommandPalette, extractSlashQuery } from './SlashCommandPalette'
@@ -112,6 +113,14 @@ export function NewConversation() {
     setText,
     inputRef,
   })
+
+  // D18: when global ⌘K opens, dismiss active slash query so two palettes never stack.
+  const globalPaletteOpen = useCommandPaletteStore((s) => s.open)
+  useEffect(() => {
+    if (globalPaletteOpen && extractSlashQuery(text) !== null) {
+      handleDismiss()
+    }
+  }, [globalPaletteOpen, text, handleDismiss])
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5" data-testid="new-conversation">

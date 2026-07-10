@@ -563,5 +563,11 @@ export const en = {
       logoutConfirmTitle: 'Log out?',
       logoutConfirmDesc: 'You will need to log in again to continue.',
     },
+    commandPalette: {
+      title: 'Command palette',
+      searchPlaceholder: 'Type a command…',
+      noResults: 'No results',
+      emptyHint: 'Commands coming soon',
+    },
   },
 } as const

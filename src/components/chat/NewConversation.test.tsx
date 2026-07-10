@@ -200,6 +200,25 @@ describe('NewConversation', () => {
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
 
+  it('dismisses slash query when global command palette opens (D18)', async () => {
+    const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
+    useCommandPaletteStore.setState({ open: false, page: null })
+    useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
+    render(<NewConversation />)
+
+    const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
+    fireEvent.change(textarea, { target: { value: '/help' } })
+    expect(screen.getByTestId('slash-palette')).toBeInTheDocument()
+
+    useCommandPaletteStore.setState({ open: true })
+
+    await vi.waitFor(() => {
+      expect(useDraftStore.getState().draft?.text).toBe('')
+    })
+    expect(screen.queryByTestId('slash-palette')).not.toBeInTheDocument()
+    useCommandPaletteStore.setState({ open: false, page: null })
+  })
+
   it('/help with null session shows toast and does not appendMessage', async () => {
     // Production NewConversation path: no active session (do not mock to 's1').
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue(null)

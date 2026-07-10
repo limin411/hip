@@ -563,5 +563,11 @@ export const zhCN = {
       logoutConfirmTitle: '退出登录？',
       logoutConfirmDesc: '退出后需要重新登录才能继续。',
     },
+    commandPalette: {
+      title: '命令面板',
+      searchPlaceholder: '输入命令…',
+      noResults: '无结果',
+      emptyHint: '命令即将上线',
+    },
   },
 } as const

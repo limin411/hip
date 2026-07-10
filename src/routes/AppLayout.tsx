@@ -14,6 +14,11 @@ import { TitleBar } from '@/components/layout/TitleBar'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { SessionHistory } from '@/components/history/SessionHistory'
 import { FloatingAvatarButton } from '@/components/account/FloatingAvatarButton'
+import {
+  GLOBAL_COMMAND_PALETTE,
+  GlobalCommandPalette,
+  GlobalHotkeysBinder,
+} from '@/components/command-palette'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -122,6 +127,12 @@ export function AppLayout() {
             navigate('/login')
           }}
         />
+        {GLOBAL_COMMAND_PALETTE && (
+          <>
+            <GlobalCommandPalette />
+            <GlobalHotkeysBinder />
+          </>
+        )}
       </div>
     </div>
   )

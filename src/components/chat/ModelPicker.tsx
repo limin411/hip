@@ -4,7 +4,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
-import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
+import { useActiveSession, useActiveSessionId, useActiveSessionStatus, sessionService } from '@/domain'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { parseModelKey, activeModelKey } from '@/lib/modelKey'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,8 @@ export function ModelPicker() {
   const config = useProvidersStore((s) => s.config)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
+  const status = useActiveSessionStatus()
+  const orchDisabled = status === 'running'
 
   const groups = groupModelOptions(catalog, config)
 
@@ -84,6 +86,7 @@ export function ModelPicker() {
                 : 'text-ink-tertiary hover:text-ink-secondary hover:bg-accent-subtle/50',
             )}
             aria-pressed={orchMode === 'fast'}
+            disabled={orchDisabled}
             onClick={() => sessionService.setOrchMode(activeId, 'fast')}
             title={t('chat.orchMode.fastDesc')}
           >
@@ -97,6 +100,7 @@ export function ModelPicker() {
                 : 'text-ink-tertiary hover:text-ink-secondary hover:bg-accent-subtle/50',
             )}
             aria-pressed={orchMode === 'dag'}
+            disabled={orchDisabled}
             onClick={() => sessionService.setOrchMode(activeId, 'dag')}
             title={t('chat.orchMode.dagDesc')}
           >

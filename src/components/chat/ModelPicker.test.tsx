@@ -73,9 +73,11 @@ vi.mock('@/store/providersStore', () => ({
 // Mock domain hooks
 let mockActiveSessionId: string | null = 'sess-1'
 let mockSession: { config: { model?: string; llmProvider?: string; orchMode?: string } } | null = null
+let mockActiveSessionStatus: 'idle' | 'running' = 'idle'
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
   useActiveSession: () => mockSession,
+  useActiveSessionStatus: () => mockActiveSessionStatus,
   sessionService: {
     setSessionModel: vi.fn(),
     setOrchMode: vi.fn(),
@@ -112,6 +114,7 @@ describe('ModelPicker', () => {
     cleanup()
     mockActiveSessionId = 'sess-1'
     mockSession = { config: { model: 'deepseek-chat', llmProvider: 'deepseek', orchMode: 'fast' } }
+    mockActiveSessionStatus = 'idle'
     mockDraftStore.draft = null
   })
 
@@ -172,6 +175,13 @@ describe('ModelPicker', () => {
     mockSession = { config: { orchMode: 'dag' } }
     render(<ModelPicker />)
     expect(screen.getByTestId('icon-dag')).toBeInTheDocument()
+  })
+
+  it('disables orch mode buttons when session status is running', () => {
+    mockActiveSessionStatus = 'running'
+    render(<ModelPicker />)
+    expect(screen.getByText('Fast')).toBeDisabled()
+    expect(screen.getByText('DAG')).toBeDisabled()
   })
 
   it('has tooltip attributes for accessibility', () => {

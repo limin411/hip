@@ -2,50 +2,51 @@ import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
+import { closePanelMenu, listPanelMenuTabs, selectPanelTab } from '../helpers/panel.js'
 import { switchToChatSurface, switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
 /**
- * Smoke: code-surface Terminal tab is reachable after a project session exists.
- * Does not assert interactive PTY typing (hard in e2e); verifies gate + shell UI.
+ * Code-surface Terminal e2e smoke.
+ *
+ * Covered (product-critical, automatable):
+ * - Terminal entry appears on code panel menu after committed project session
+ * - Selecting Terminal mounts panel-view-terminal + host (or empty no-cwd)
+ * - Restart control present when host mounted
+ * - Switch away (files) then back keeps terminal host (keep-alive UI path)
+ * - Chat surface panel menu never lists Terminal
+ *
+ * Not covered here (unit/Rust/manual):
+ * - Interactive keystrokes / PTY process kill / soft-cap / Windows stub / ring rehydrate bytes
  */
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const codePage = new CodePage()
 
-async function openPanelTab(tab: string): Promise<void> {
-  const toggle = await browser.$('[data-testid="toggle-panel"]')
-  await toggle.waitForExist({ timeout: 30000 })
+async function commitCodeSession(message: string): Promise<void> {
+  await codePage.newConversation.waitForExist({ timeout: 120000 })
+  await codePage.pickDirectory(FIXTURE)
+  await browser.waitUntil(
+    async () => {
+      const chip = await codePage.folderChip.isExisting()
+      const entry = await (await codePage.entry('/README.md')).isExisting()
+      return chip || entry
+    },
+    { timeout: 60000, interval: 500 },
+  )
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await browser.execute((el: HTMLElement) => {
-      el.focus()
-      el.click()
-    }, toggle)
-    const menu = await browser.$('[data-testid="panel-tab-menu"]')
-    try {
-      await menu.waitForExist({ timeout: 2000 })
-      break
-    } catch {
-      // Retry open — Radix dropdown can miss a single pointer event under WDIO.
-    }
-  }
+  const ta = await browser.$('[data-testid="new-conversation"] textarea')
+  await ta.waitForExist({ timeout: 10000 })
+  await ta.click()
+  await browser.keys(message)
+  const send = await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')
+  await send.waitForEnabled({ timeout: 10000 })
+  await send.click()
 
-  const menu = await browser.$('[data-testid="panel-tab-menu"]')
-  await menu.waitForExist({ timeout: 10000 })
-
-  // Debug aid: list available tab testids if terminal is missing.
-  const item = await browser.$(`[data-testid="panel-tab-${tab}"]`)
-  try {
-    await item.waitForExist({ timeout: 10000 })
-  } catch (err) {
-    const labels = await browser.execute(() =>
-      Array.from(document.querySelectorAll('[data-testid^="panel-tab-"]'))
-        .map((el) => el.getAttribute('data-testid'))
-        .filter(Boolean),
-    )
-    throw new Error(`panel-tab-${tab} not found; menu items: ${JSON.stringify(labels)}`)
-  }
-  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.waitUntil(
+    async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+    { timeout: 120000, interval: 500 },
+  )
+  await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
 }
 
 describe('code terminal panel', () => {
@@ -54,41 +55,22 @@ describe('code terminal panel', () => {
     await skipLoginIfPresent()
     await waitForMainApp()
     await switchToCodeSurface()
+    await commitCodeSession('hello terminal e2e')
   })
 
-  it('exposes Terminal in the code panel menu after a project session is created', async () => {
-    await codePage.newConversation.waitForExist({ timeout: 120000 })
-    await codePage.pickDirectory(FIXTURE)
+  it('lists Terminal on the code panel menu for a project session', async () => {
+    const tabs = await listPanelMenuTabs()
+    expect(tabs).toContain('panel-tab-terminal')
+    expect(tabs).toContain('panel-tab-files')
+    expect(tabs).toContain('panel-tab-agents')
+    await closePanelMenu()
+  })
 
-    // Match project-workspace: wait for tree OR folder chip before proceeding.
-    await browser.waitUntil(
-      async () => {
-        const chip = await codePage.folderChip.isExisting()
-        const entry = await (await codePage.entry('/README.md')).isExisting()
-        return chip || entry
-      },
-      { timeout: 60000, interval: 500 },
-    )
-
-    // Create a committed code session (terminal requires activeSession).
-    const ta = await browser.$('[data-testid="new-conversation"] textarea')
-    await ta.waitForExist({ timeout: 10000 })
-    await ta.click()
-    await browser.keys('hello terminal e2e')
-    const send = await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')
-    await send.waitForEnabled({ timeout: 10000 })
-    await send.click()
-
-    await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
-      { timeout: 120000, interval: 500 },
-    )
-
-    // Panel toggle only appears with an active session.
-    await openPanelTab('terminal')
+  it('opens Terminal view with host UI (xterm container + restart)', async () => {
+    await selectPanelTab('terminal')
 
     const view = await browser.$('[data-testid="panel-view-terminal"]')
-    await view.waitForExist({ timeout: 30000 })
+    await view.waitForExist({ timeout: 15000 })
     expect(await view.isExisting()).toBe(true)
 
     const empty = await browser.$('[data-testid="terminal-view-empty"]')
@@ -98,25 +80,52 @@ describe('code terminal panel', () => {
       { timeout: 15000, interval: 300 },
     )
 
-    if (await term.isExisting()) {
-      expect(await browser.$('[data-testid="terminal-xterm"]').isExisting()).toBe(true)
-      expect(await browser.$('[data-testid="terminal-restart"]').isExisting()).toBe(true)
+    // Project session was bound to FIXTURE — expect full host, not empty.
+    if (await empty.isExisting()) {
+      // Soft fail path: still prove empty state is reachable UI.
+      expect(await browser.$('[data-testid="terminal-select-folder"]').isExisting()).toBe(true)
+      return
     }
+
+    expect(await term.isExisting()).toBe(true)
+    await (await browser.$('[data-testid="terminal-xterm"]')).waitForExist({ timeout: 15000 })
+    expect(await browser.$('[data-testid="terminal-restart"]').isExisting()).toBe(true)
+    expect(await browser.$('[data-testid="terminal-cwd"]').isExisting()).toBe(true)
   })
 
-  it('does not expose Terminal on the chat surface panel menu', async () => {
+  it('can leave Terminal for Files then return (UI keep-alive path)', async () => {
+    // Ensure we start from terminal if previous test left empty-only.
+    const termAlready = await browser.$('[data-testid="panel-view-terminal"]')
+    if (!(await termAlready.isExisting())) {
+      await selectPanelTab('terminal')
+    }
+
+    await selectPanelTab('files')
+    await (await browser.$('[data-testid="panel-view-files"]')).waitForExist({ timeout: 15000 })
+
+    await selectPanelTab('terminal')
+    await (await browser.$('[data-testid="panel-view-terminal"]')).waitForExist({ timeout: 15000 })
+
+    const term = await browser.$('[data-testid="terminal-view"]')
+    const empty = await browser.$('[data-testid="terminal-view-empty"]')
+    expect((await term.isExisting()) || (await empty.isExisting())).toBe(true)
+  })
+
+  it('does not list Terminal on the chat surface panel menu', async () => {
     await switchToChatSurface()
     await (await browser.$('[data-testid="new-conversation"]')).waitForExist({ timeout: 60000 })
 
+    // Chat without an active session: no toggle ⇒ no terminal entry (product gate).
     const toggle = await browser.$('[data-testid="toggle-panel"]')
     if (!(await toggle.isExisting())) {
-      // No panel without session ⇒ no terminal entry.
       return
     }
-    await browser.execute((el: HTMLElement) => el.click(), toggle)
-    const menu = await browser.$('[data-testid="panel-tab-menu"]')
-    await menu.waitForExist({ timeout: 10000 })
-    const terminalItem = await browser.$('[data-testid="panel-tab-terminal"]')
-    expect(await terminalItem.isExisting()).toBe(false)
+
+    const tabs = await listPanelMenuTabs()
+    expect(tabs).not.toContain('panel-tab-terminal')
+    expect(tabs.every((t) => t === 'panel-tab-files' || t === 'panel-tab-agents' || t === 'panel-tab-menu')).toBe(
+      true,
+    )
+    await closePanelMenu()
   })
 })

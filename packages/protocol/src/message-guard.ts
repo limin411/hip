@@ -45,6 +45,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'git:worktree:list',
   'git:worktree:remove',
   'workflow:run',
+  'workflow:getActive',
   'mcp:listResources',
   'mcp:readResource',
   'mcp:listPrompts',

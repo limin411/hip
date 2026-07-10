@@ -32,7 +32,7 @@ import type {
   McpPromptMessage,
 } from './mcp-resources.js'
 import type { PluginManifest } from './plugins.js'
-import type { WorkflowDef } from './workflow-protocol.js'
+import type { WorkflowDef, OrchestratorEvent, RunState } from './workflow-protocol.js'
 import type { OrchestrationMode } from './orchestration-types.js'
 import type { AgentProfileInfo } from './agent-profile.js'
 
@@ -78,7 +78,8 @@ export type ClientMessage =
   | { type: 'git:worktree:create'; sessionId: string; branch: string }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
-  | { type: 'workflow:run'; sessionId: string; def: WorkflowDef }
+  | { type: 'workflow:run'; sessionId: string; def: WorkflowDef; runInputs?: { text: string; data?: unknown } }
+  | { type: 'workflow:getActive'; sessionId: string }
   | { type: 'mcp:listResources'; serverId: string }
   | { type: 'mcp:readResource'; serverId: string; uri: string }
   | { type: 'mcp:listPrompts'; serverId: string }
@@ -155,4 +156,8 @@ export type ServerMessage =
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
   | { type: 'compact:result'; sessionId: string; ok: boolean; inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number; error?: string }
+  | { type: 'workflow:started'; sessionId: string; runId: string; def: WorkflowDef }
+  | { type: 'workflow:event'; sessionId: string; runId: string; event: OrchestratorEvent }
+  | { type: 'workflow:snapshot'; sessionId: string; runId: string; def: WorkflowDef; state: RunState }
+  | { type: 'workflow:cleared'; sessionId: string }
 

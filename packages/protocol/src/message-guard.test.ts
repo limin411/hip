@@ -39,4 +39,9 @@ describe('message-guard', () => {
     }
     expect(isClientMessageType('ready')).toBe(false)
   })
+
+  it('accepts workflow:getActive', () => {
+    const msg = parseClientMessage({ type: 'workflow:getActive', sessionId: 's1' })
+    expect(msg?.type).toBe('workflow:getActive')
+  })
 })

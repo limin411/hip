@@ -78,6 +78,51 @@ const _notificationGuard: Extract<ServerMessage, { type: 'agent:notification' }>
 }
 void _notificationGuard
 
+const _workflowGetActive: Extract<ClientMessage, { type: 'workflow:getActive' }> = {
+  type: 'workflow:getActive',
+  sessionId: 's',
+}
+void _workflowGetActive
+
+const _workflowRunWithInputs: Extract<ClientMessage, { type: 'workflow:run' }> = {
+  type: 'workflow:run',
+  sessionId: 's',
+  def: { id: 'w', name: 'W', nodes: [], edges: [], entry: [] },
+  runInputs: { text: 'hello' },
+}
+void _workflowRunWithInputs
+
+const _workflowStarted: Extract<ServerMessage, { type: 'workflow:started' }> = {
+  type: 'workflow:started',
+  sessionId: 's',
+  runId: 'r1',
+  def: { id: 'w', name: 'W', nodes: [], edges: [], entry: [] },
+}
+void _workflowStarted
+
+const _workflowEvent: Extract<ServerMessage, { type: 'workflow:event' }> = {
+  type: 'workflow:event',
+  sessionId: 's',
+  runId: 'r1',
+  event: { type: 'run:started' },
+}
+void _workflowEvent
+
+const _workflowSnapshot: Extract<ServerMessage, { type: 'workflow:snapshot' }> = {
+  type: 'workflow:snapshot',
+  sessionId: 's',
+  runId: 'r1',
+  def: { id: 'w', name: 'W', nodes: [], edges: [], entry: [] },
+  state: { runId: 'r1', workflowId: 'w', status: 'succeeded', nodes: {} },
+}
+void _workflowSnapshot
+
+const _workflowCleared: Extract<ServerMessage, { type: 'workflow:cleared' }> = {
+  type: 'workflow:cleared',
+  sessionId: 's',
+}
+void _workflowCleared
+
 // ──────────────────────────────────────────────────────────────────
 // SessionEvent contract
 // ──────────────────────────────────────────────────────────────────

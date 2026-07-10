@@ -67,6 +67,32 @@ describe('terminalStore ring', () => {
     expect(useTerminalStore.getState().bySession.s1.exitCode).toBe(0)
   })
 
+  it('setExit does not resurrect a cleared session', () => {
+    useTerminalStore.getState().appendRing('s1', 'x')
+    useTerminalStore.getState().clearSession('s1')
+    useTerminalStore.getState().setExit('s1', 1, 9)
+    expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
+  })
+
+  it('setExit ignores stale generation after restart', () => {
+    useTerminalStore.getState().ensureSession('s1')
+    useTerminalStore.getState().setGeneration('s1', 5)
+    useTerminalStore.getState().setStatus('s1', 'running')
+    useTerminalStore.getState().setExit('s1', 0, 4) // old gen
+    expect(useTerminalStore.getState().bySession.s1.status).toBe('running')
+    useTerminalStore.getState().setExit('s1', 0, 5)
+    expect(useTerminalStore.getState().bySession.s1.status).toBe('exited')
+  })
+
+  it('trim advances trimOffset so cursors can resync', () => {
+    for (let i = 0; i < MAX_RING_CHUNKS + 3; i++) {
+      useTerminalStore.getState().appendRing('s1', `c${i}`)
+    }
+    const s = useTerminalStore.getState().bySession.s1
+    expect(s.trimOffset).toBeGreaterThan(0)
+    expect(s.ring.length).toBeLessThanOrEqual(MAX_RING_CHUNKS)
+  })
+
   it('clearSession removes ring and clears attach', () => {
     useTerminalStore.getState().appendRing('s1', 'x')
     useTerminalStore.getState().setAttached('s1')

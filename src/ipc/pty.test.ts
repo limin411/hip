@@ -21,6 +21,8 @@ const appendRing = vi.fn()
 const setExit = vi.fn()
 const mockStore = { appendRing, setExit }
 
+// TextDecoder stream mode is used in bridge — ensure happy-dom has it.
+
 import {
   decodePtyDataB64,
   ptyKill,
@@ -50,8 +52,8 @@ describe('decodePtyDataB64', () => {
 
 describe('pty IPC wrappers', () => {
   it('ptyOpen invokes with camelCase args', async () => {
-    invoke.mockResolvedValueOnce({ reused: false })
-    await expect(ptyOpen('s1', '/tmp', 80, 24)).resolves.toEqual({ reused: false })
+    invoke.mockResolvedValueOnce({ reused: false, generation: 3 })
+    await expect(ptyOpen('s1', '/tmp', 80, 24)).resolves.toEqual({ reused: false, generation: 3 })
     expect(invoke).toHaveBeenCalledWith('pty_open', {
       sessionId: 's1',
       cwd: '/tmp',
@@ -76,7 +78,7 @@ describe('startPtyBridge', () => {
     const un1 = vi.fn()
     const un2 = vi.fn()
     let dataHandler: ((e: { payload: { sessionId: string; data: string } }) => void) | undefined
-    let exitHandler: ((e: { payload: { sessionId: string; code: number | null } }) => void) | undefined
+    let exitHandler: ((e: { payload: { sessionId: string; code: number | null; generation?: number } }) => void) | undefined
 
     listen.mockImplementation(async (event: string, cb: (e: unknown) => void) => {
       if (event === 'pty:data') dataHandler = cb as typeof dataHandler
@@ -91,8 +93,8 @@ describe('startPtyBridge', () => {
     dataHandler?.({ payload: { sessionId: 's1', data: btoa('out') } })
     expect(appendRing).toHaveBeenCalledWith('s1', 'out')
 
-    exitHandler?.({ payload: { sessionId: 's1', code: 0 } })
-    expect(setExit).toHaveBeenCalledWith('s1', 0)
+    exitHandler?.({ payload: { sessionId: 's1', code: 0, generation: 7 } })
+    expect(setExit).toHaveBeenCalledWith('s1', 0, 7)
 
     stop()
     expect(un1).toHaveBeenCalled()

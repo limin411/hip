@@ -4,6 +4,7 @@ import { useTerminalStore } from '@/store/terminalStore'
 
 export interface PtyOpenResult {
   reused: boolean
+  generation: number
 }
 
 export interface PtyDataPayload {
@@ -14,9 +15,10 @@ export interface PtyDataPayload {
 export interface PtyExitPayload {
   sessionId: string
   code: number | null
+  generation?: number
 }
 
-/** Decode base64 PTY bytes to a JS string (lossy UTF-8). */
+/** Decode a single base64 chunk with a fresh decoder (tests / one-shot). Prefer stream decoder in bridge. */
 export function decodePtyDataB64(b64: string): string {
   try {
     const bin = atob(b64)
@@ -25,6 +27,17 @@ export function decodePtyDataB64(b64: string): string {
     return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
   } catch {
     return ''
+  }
+}
+
+function b64ToBytes(b64: string): Uint8Array | null {
+  try {
+    const bin = atob(b64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    return bytes
+  } catch {
+    return null
   }
 }
 
@@ -52,18 +65,37 @@ export function ptyKill(sessionId: string): Promise<void> {
 /**
  * App-lifetime bridge. Call once when CODE_TERMINAL is enabled.
  * ONLY mutates terminalStore (appendRing / setExit). Never receives a Terminal.
+ * Uses per-session streaming TextDecoder so multi-byte UTF-8 split across events is intact.
  */
 export async function startPtyBridge(): Promise<() => void> {
+  const decoders = new Map<string, TextDecoder>()
+
   const u1: UnlistenFn = await listen<PtyDataPayload>('pty:data', (e) => {
     const { sessionId, data } = e.payload
-    const text = decodePtyDataB64(data)
+    const bytes = b64ToBytes(data)
+    if (!bytes || bytes.length === 0) return
+    let dec = decoders.get(sessionId)
+    if (!dec) {
+      dec = new TextDecoder('utf-8', { fatal: false })
+      decoders.set(sessionId, dec)
+    }
+    const text = dec.decode(bytes, { stream: true })
     if (text) useTerminalStore.getState().appendRing(sessionId, text)
   })
   const u2: UnlistenFn = await listen<PtyExitPayload>('pty:exit', (e) => {
-    useTerminalStore.getState().setExit(e.payload.sessionId, e.payload.code)
+    const { sessionId, code, generation } = e.payload
+    // Flush any pending multi-byte sequence for this session.
+    const dec = decoders.get(sessionId)
+    if (dec) {
+      const tail = dec.decode()
+      if (tail) useTerminalStore.getState().appendRing(sessionId, tail)
+      decoders.delete(sessionId)
+    }
+    useTerminalStore.getState().setExit(sessionId, code, generation)
   })
   return () => {
     u1()
     u2()
+    decoders.clear()
   }
 }

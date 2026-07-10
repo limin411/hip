@@ -89,7 +89,7 @@ describe('TerminalView', () => {
     mockSession = { config: {} }
     pickDirectory.mockReset()
     setProjectDir.mockReset()
-    ptyOpen.mockReset().mockResolvedValue({ reused: false })
+    ptyOpen.mockReset().mockResolvedValue({ reused: false, generation: 1 })
     ptyWrite.mockReset().mockResolvedValue(undefined)
     ptyResize.mockReset().mockResolvedValue(undefined)
     ptyKill.mockReset().mockResolvedValue(undefined)

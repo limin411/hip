@@ -6,7 +6,7 @@ import type { FitAddon as FitAddonType } from '@xterm/addon-fit'
 import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
 import { pickDirectory } from '@/ipc/dialog'
 import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
-import { attachDrainWrites, useTerminalStore } from '@/store/terminalStore'
+import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
 import { useUiStore } from '@/store/uiStore'
 import { buildXtermTheme, isDarkDom } from './terminalTheme'
 import { cn } from '@/lib/utils'
@@ -144,8 +144,11 @@ export function TerminalView() {
         ;({ cols, rows } = doFit())
       }
 
+      let openGen = 0
       try {
-        await ptyOpen(sessionId, cwd, cols, rows)
+        const opened = await ptyOpen(sessionId, cwd, cols, rows)
+        openGen = opened.generation ?? 0
+        useTerminalStore.getState().setGeneration(sessionId, openGen)
       } catch (e) {
         if (disposed) return
         const msg = e instanceof Error ? e.message : String(e)
@@ -156,22 +159,32 @@ export function TerminalView() {
       if (disposed || !term) return
 
       // ── Attach protocol (D6a §3) ──
-      const ringBefore = useTerminalStore.getState().getRing(sessionId)
+      // cursor is a lifetime index (accounts for ring trim via trimOffset).
+      const sess0 = useTerminalStore.getState().getSession(sessionId)
+      const ringBefore = sess0?.ring ?? []
+      const trim0 = sess0?.trimOffset ?? 0
       const snapshot = ringBefore.length
-      cursorRef.current = 0
+      cursorRef.current = trim0 // start of current retained ring in lifetime coords
 
       let attachDone = false
-      unsubStore = useTerminalStore.subscribe((state, prev) => {
+      unsubStore = useTerminalStore.subscribe((state) => {
         if (state.attachedSessionId !== sessionId) return
-        const ring = state.bySession[sessionId]?.ring
-        if (!ring) return
+        const sess = state.bySession[sessionId]
+        if (!sess) return
         if (!attachDone) return
-        if (ring.length <= cursorRef.current) return
-        void prev
-        for (let i = cursorRef.current; i < ring.length; i++) {
+        const { ring, trimOffset } = sess
+        // Lifetime cursor → current ring index after drop-oldest trims.
+        let idx = ringIndexForCursor(cursorRef.current, trimOffset)
+        if (idx < 0) {
+          // Cursor was entirely before retained ring; accept gap, resync to start.
+          idx = 0
+          cursorRef.current = trimOffset
+        }
+        if (idx >= ring.length) return
+        for (let i = idx; i < ring.length; i++) {
           writeChunk(ring[i]!)
         }
-        cursorRef.current = ring.length
+        cursorRef.current = trimOffset + ring.length
       })
 
       useTerminalStore.getState().setAttached(sessionId)
@@ -181,12 +194,16 @@ export function TerminalView() {
       const { writes, cursor } = attachDrainWrites(ringNow, snapshot)
       term.reset()
       for (const w of writes) writeChunk(w)
-      cursorRef.current = cursor
+      const trimNow = useTerminalStore.getState().getSession(sessionId)?.trimOffset ?? trim0
+      cursorRef.current = trimNow + cursor
       attachDone = true
-      const after = useTerminalStore.getState().getRing(sessionId)
-      if (after.length > cursorRef.current) {
-        for (let i = cursorRef.current; i < after.length; i++) writeChunk(after[i]!)
-        cursorRef.current = after.length
+      const afterSess = useTerminalStore.getState().getSession(sessionId)
+      if (afterSess) {
+        const idx = ringIndexForCursor(cursorRef.current, afterSess.trimOffset)
+        if (idx >= 0 && idx < afterSess.ring.length) {
+          for (let i = idx; i < afterSess.ring.length; i++) writeChunk(afterSess.ring[i]!)
+          cursorRef.current = afterSess.trimOffset + afterSess.ring.length
+        }
       }
 
       dataDisp = term.onData((data) => {

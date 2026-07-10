@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-/** ~5000 line budget + 2 MiB hard cap per session (D15 / D6a). */
+/** Chunk budget (not exact line count) + 2 MiB hard cap per session (D15 / D6a). */
 export const MAX_RING_CHUNKS = 5000
 export const MAX_RING_BYTES = 2 * 1024 * 1024
 
@@ -14,6 +14,10 @@ export interface SessionPtyUi {
   /** Decoded text chunks for rehydrate / live write. */
   ring: string[]
   ringBytes: number
+  /** Dropped from front of ring; used to keep write cursors valid after trim. */
+  trimOffset: number
+  /** Open generation from Rust; ignore pty:exit with older generation. */
+  generation: number
 }
 
 interface TerminalState {
@@ -24,11 +28,14 @@ interface TerminalState {
   ensureSession: (sessionId: string) => void
   appendRing: (sessionId: string, chunk: string) => void
   setStatus: (sessionId: string, status: PtyStatus, patch?: Partial<SessionPtyUi>) => void
-  setExit: (sessionId: string, code: number | null) => void
+  /** No-op if session missing or generation mismatch (stale exit after restart). */
+  setExit: (sessionId: string, code: number | null, generation?: number) => void
   setError: (sessionId: string, message: string) => void
+  setGeneration: (sessionId: string, generation: number) => void
   setAttached: (sessionId: string | null) => void
   clearSession: (sessionId: string) => void
   getRing: (sessionId: string) => string[]
+  getSession: (sessionId: string) => SessionPtyUi | undefined
 }
 
 function emptySession(): SessionPtyUi {
@@ -37,24 +44,34 @@ function emptySession(): SessionPtyUi {
     ring: [],
     ringBytes: 0,
     exitCode: null,
+    trimOffset: 0,
+    generation: 0,
   }
 }
 
 function trimRing(s: SessionPtyUi): SessionPtyUi {
-  let { ring, ringBytes } = s
+  let { ring, ringBytes, trimOffset } = s
   while (ring.length > MAX_RING_CHUNKS || ringBytes > MAX_RING_BYTES) {
     const dropped = ring[0]
     if (dropped === undefined) break
     ring = ring.slice(1)
     ringBytes = Math.max(0, ringBytes - dropped.length)
+    trimOffset += 1
   }
-  return { ...s, ring, ringBytes }
+  return { ...s, ring, ringBytes, trimOffset }
+}
+
+/**
+ * Map absolute write cursor (lifetime index) to current ring index after trims.
+ * Returns -1 if cursor is entirely before retained ring (gap already on screen).
+ */
+export function ringIndexForCursor(cursor: number, trimOffset: number): number {
+  return cursor - trimOffset
 }
 
 /**
  * Attach protocol drain helper (pure, unit-tested).
- * snapshot = length before setAttached; mid-append may grow ring during rehydrate.
- * Returns ordered writes and the final cursor (= ring.length after drain).
+ * snapshot = ring length before setAttached; mid-append may grow ring during rehydrate.
  */
 export function attachDrainWrites(
   ring: readonly string[],
@@ -102,9 +119,15 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     })
   },
 
-  setExit: (sessionId, code) => {
+  setExit: (sessionId, code, generation) => {
     set((st) => {
-      const prev = st.bySession[sessionId] ?? emptySession()
+      const prev = st.bySession[sessionId]
+      // Do not resurrect cleared sessions (late exit after deleteSession).
+      if (!prev) return st
+      // Ignore stale exit from a replaced PTY (restart / cwd change).
+      if (generation !== undefined && prev.generation !== 0 && generation !== prev.generation) {
+        return st
+      }
       return {
         bySession: {
           ...st.bySession,
@@ -126,6 +149,18 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     })
   },
 
+  setGeneration: (sessionId, generation) => {
+    set((st) => {
+      const prev = st.bySession[sessionId] ?? emptySession()
+      return {
+        bySession: {
+          ...st.bySession,
+          [sessionId]: { ...prev, generation },
+        },
+      }
+    })
+  },
+
   setAttached: (sessionId) => set({ attachedSessionId: sessionId }),
 
   clearSession: (sessionId) => {
@@ -139,4 +174,5 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   getRing: (sessionId) => get().bySession[sessionId]?.ring ?? [],
+  getSession: (sessionId) => get().bySession[sessionId],
 }))

@@ -193,6 +193,11 @@ describe('uiStore - chatActiveTab (Chat panel tabs)', () => {
     expect(useUiStore.getState()).toBe(before)
   })
 
+  it('accepts terminal as a code ArtifactTab', () => {
+    useUiStore.getState().setTab('terminal')
+    expect(useUiStore.getState().activeTab).toBe('terminal')
+  })
+
   it('chatActiveTab is independent of code panel activeTab', () => {
     useUiStore.getState().setTab('timeline')
     expect(useUiStore.getState().activeTab).toBe('timeline')

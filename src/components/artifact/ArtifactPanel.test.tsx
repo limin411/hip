@@ -15,6 +15,7 @@ vi.mock('react-i18next', () => ({
         'artifact.agents': 'Agents',
         'artifact.timeline': 'Timeline',
         'artifact.changes': 'Changes',
+        'artifact.terminal': 'Terminal',
         'artifact.closePanel': 'Close panel',
       }
       return map[key] ?? key
@@ -64,9 +65,19 @@ vi.mock('./BranchSwitcher', () => ({
 vi.mock('@/components/workflow/DagEditor', () => ({
   DagEditor: () => React.createElement('div', { 'data-testid': 'dag-editor' }),
 }))
+vi.mock('./TerminalView', () => ({
+  TerminalView: () => React.createElement('div', { 'data-testid': 'terminal-view' }),
+}))
+
+vi.mock('./terminalFeature', () => ({
+  get CODE_TERMINAL() {
+    return mockCodeTerminal
+  },
+}))
 
 // Mock stores with settable state
 let mockUiState = { activeTab: 'files' as string }
+let mockCodeTerminal = false
 vi.mock('@/store/uiStore', () => ({
   useUiStore: (sel: (s: typeof mockUiState) => unknown) => sel(mockUiState),
 }))
@@ -101,6 +112,7 @@ describe('ArtifactPanel', () => {
   beforeEach(() => {
     cleanup()
     mockUiState = { activeTab: 'files' }
+    mockCodeTerminal = false
     mockDomainState = { activeSessionId: 'sess-1' }
     mockDiffState = { bySession: { 'sess-1': { isGitRepo: false } } }
     mockWorkflowState = { activeWorkflow: null, runState: null }
@@ -177,5 +189,25 @@ describe('ArtifactPanel', () => {
   it('renders close button', () => {
     render(<ArtifactPanel />)
     expect(screen.getByTestId('close-btn')).toBeInTheDocument()
+  })
+
+  // G3: flag off + leftover activeTab=terminal → fallback files
+  it('falls back to files when terminal tab is active but CODE_TERMINAL is false', () => {
+    mockUiState = { activeTab: 'terminal' }
+    mockCodeTerminal = false
+    render(<ArtifactPanel />)
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Files')
+    expect(screen.getByTestId('panel-view-files')).toBeInTheDocument()
+    expect(screen.queryByTestId('terminal-view')).toBeNull()
+  })
+
+  // G4: flag on + terminal tab → TerminalView
+  it('renders TerminalView when terminal tab is active and CODE_TERMINAL is true', () => {
+    mockUiState = { activeTab: 'terminal' }
+    mockCodeTerminal = true
+    render(<ArtifactPanel />)
+    expect(screen.getByTestId('panel-title')).toHaveTextContent('Terminal')
+    expect(screen.getByTestId('panel-view-terminal')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-view')).toBeInTheDocument()
   })
 })

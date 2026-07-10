@@ -21,8 +21,8 @@ function base64ToBytes(b64: string): Uint8Array {
   return out
 }
 
-function tabLabel(tab: ChatTab, t: (key: string) => string): string {
-  return t(`artifact.${tab}`)
+function tabLabel(tab: ChatTab, t: (key: 'artifact.files' | 'artifact.agents') => string): string {
+  return tab === 'agents' ? t('artifact.agents') : t('artifact.files')
 }
 
 export function PreviewPanel() {

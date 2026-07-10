@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
+import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 
 type PanelTabOption = {
   value: ArtifactTab | ChatTab
@@ -43,6 +44,9 @@ export function PanelToggle() {
     { value: 'timeline', label: t('artifact.timeline'), gated: true },
     { value: 'changes', label: t('artifact.changes'), gated: true },
     { value: 'dag', label: 'DAG' },
+    ...(CODE_TERMINAL
+      ? [{ value: 'terminal' as const, label: t('artifact.terminal') }]
+      : []),
   ]
   const chatTabs: PanelTabOption[] = [
     { value: 'files', label: t('artifact.files') },

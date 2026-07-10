@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { CheckpointMode } from '@hip/protocol'
 
-export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes' | 'dag'
+export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes' | 'dag' | 'terminal'
 
 export type ActiveView = 'chat' | 'code' | 'settings' | 'history'
 export type Surface = 'chat' | 'code'
@@ -17,11 +17,11 @@ interface UiState {
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
 
-  // Code surface: the four-tab ArtifactPanel.
+  // Code surface: ArtifactPanel tabs (files/agents/timeline/changes/dag/terminal).
   activeTab: ArtifactTab
   setTab: (t: ArtifactTab) => void
 
-  // Chat surface: the slim preview/artifacts panel.
+  // Chat surface: the slim preview/artifacts panel (never includes terminal).
   chatActiveTab: ChatTab
   setChatActiveTab: (v: ChatTab) => void
   resetChatActiveTab: () => void

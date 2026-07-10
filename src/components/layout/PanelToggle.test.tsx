@@ -68,11 +68,18 @@ vi.mock('@/store/diffStore', () => ({
     }),
 }))
 
+vi.mock('@/components/artifact/terminalFeature', () => ({
+  get CODE_TERMINAL() {
+    return mockCodeTerminal
+  },
+}))
+
 let mockActiveSessionId: string | null = 's1'
 let mockActiveView = 'chat'
 let mockActiveTab = 'agents'
 let mockChatActiveTab = 'files'
 let mockIsGitRepo = false
+let mockCodeTerminal = false
 
 describe('PanelToggle', () => {
   beforeEach(() => {
@@ -81,6 +88,7 @@ describe('PanelToggle', () => {
     mockActiveTab = 'agents'
     mockChatActiveTab = 'files'
     mockIsGitRepo = false
+    mockCodeTerminal = false
   })
 
   afterEach(() => {
@@ -142,4 +150,34 @@ describe('PanelToggle', () => {
     expect(setSessionChatPanelOpen).not.toHaveBeenCalled()
     expect(setChatActiveTab).not.toHaveBeenCalled()
   })
+
+  // G1: chat menu never exposes terminal, even when the dark-launch flag is on.
+  it('does not show terminal tab on chat surface when CODE_TERMINAL is true', () => {
+    mockCodeTerminal = true
+    mockActiveView = 'chat'
+    render(<PanelToggle />)
+    expect(screen.queryByTestId('panel-tab-terminal')).not.toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-files')).toBeInTheDocument()
+    expect(screen.getByTestId('panel-tab-agents')).toBeInTheDocument()
+  })
+
+  // G4 (flag off): code menu has no terminal entry under dark launch.
+  it('does not show terminal tab on code surface when CODE_TERMINAL is false', () => {
+    mockActiveView = 'code'
+    render(<PanelToggle />)
+    expect(screen.queryByTestId('panel-tab-terminal')).not.toBeInTheDocument()
+  })
+
+  // G4 (flag on): code + session shows Terminal and selecting it opens the panel.
+  it('shows terminal tab on code surface when CODE_TERMINAL is true', () => {
+    mockCodeTerminal = true
+    mockActiveView = 'code'
+    render(<PanelToggle />)
+    expect(screen.getByTestId('panel-tab-terminal')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('panel-tab-terminal'))
+    expect(setTab).toHaveBeenCalledWith('terminal')
+    expect(setSessionCodePanelOpen).toHaveBeenCalledWith('s1', true)
+  })
+
+  // G7 already covered by "is hidden when no session is active"
 })

@@ -12,6 +12,8 @@ import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
 import { BranchSwitcher } from './BranchSwitcher'
+import { TerminalView } from './TerminalView'
+import { CODE_TERMINAL } from './terminalFeature'
 import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { DagEditor } from '@/components/workflow/DagEditor'
@@ -19,9 +21,20 @@ import { useWorkflowStore } from '@/store/workflowStore'
 
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
-function tabLabel(tab: ArtifactTab, t: (key: string) => string): string {
+function tabLabel(tab: ArtifactTab, t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.timeline' | 'artifact.changes' | 'artifact.terminal') => string): string {
   if (tab === 'dag') return 'DAG'
-  return t(`artifact.${tab}`)
+  if (tab === 'files') return t('artifact.files')
+  if (tab === 'agents') return t('artifact.agents')
+  if (tab === 'timeline') return t('artifact.timeline')
+  if (tab === 'changes') return t('artifact.changes')
+  return t('artifact.terminal')
+}
+
+function resolveEffectiveTab(activeTab: ArtifactTab, isGitRepo: boolean): ArtifactTab {
+  if (GIT_GATED.has(activeTab) && !isGitRepo) return 'files'
+  // Flag-off leftover: treat like gated tab fallback.
+  if (activeTab === 'terminal' && !CODE_TERMINAL) return 'files'
+  return activeTab
 }
 
 export function ArtifactPanel() {
@@ -34,9 +47,7 @@ export function ArtifactPanel() {
   const activeWorkflow = useWorkflowStore((s) => s.activeWorkflow)
   const runState = useWorkflowStore((s) => s.runState)
 
-  // If the active tab got gated out (cwd changed to a non-repo), fall back to 文件.
-  const effectiveTab: ArtifactTab =
-    GIT_GATED.has(activeTab) && !isGitRepo ? 'files' : activeTab
+  const effectiveTab = resolveEffectiveTab(activeTab, isGitRepo)
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface">
@@ -90,6 +101,7 @@ export function ArtifactPanel() {
             </div>
           )
         )}
+        {effectiveTab === 'terminal' && CODE_TERMINAL && <TerminalView />}
       </div>
     </div>
   )

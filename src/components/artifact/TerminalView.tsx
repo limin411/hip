@@ -1,40 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Folder, RotateCcw } from 'lucide-react'
+import { AlertCircle, Folder, Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import '@xterm/xterm/css/xterm.css'
+import type { Terminal as XTerm } from '@xterm/xterm'
+import type { FitAddon as FitAddonType } from '@xterm/addon-fit'
 import { useActiveSession, useActiveSessionId, sessionService } from '@/domain'
 import { pickDirectory } from '@/ipc/dialog'
 import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
 import { attachDrainWrites, useTerminalStore } from '@/store/terminalStore'
 import { useUiStore } from '@/store/uiStore'
-
-const LIGHT_THEME = {
-  background: '#ffffff',
-  foreground: '#1a1a1a',
-  cursor: '#1a1a1a',
-  selectionBackground: '#c8d6f0',
-}
-
-const DARK_THEME = {
-  background: '#0d0d0d',
-  foreground: '#e8e8e8',
-  cursor: '#e8e8e8',
-  selectionBackground: '#3a4a6a',
-}
-
-function isDarkDom(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-}
-
-function xtermTheme() {
-  return isDarkDom() ? DARK_THEME : LIGHT_THEME
-}
+import { buildXtermTheme, isDarkDom } from './terminalTheme'
+import { cn } from '@/lib/utils'
 
 /**
  * Code-panel Terminal tab: xterm UI + PTY open/resize/write.
  * Live output: store subscription only (D6a single-writer). Bridge never touches Terminal.
+ * xterm is lazy-loaded (PR-4) to keep the main chat bundle smaller.
  */
 export function TerminalView() {
   const { t } = useTranslation()
@@ -52,11 +32,12 @@ export function TerminalView() {
   )
 
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const termRef = useRef<Terminal | null>(null)
-  const fitRef = useRef<FitAddon | null>(null)
+  const termRef = useRef<XTerm | null>(null)
+  const fitRef = useRef<FitAddonType | null>(null)
   const cursorRef = useRef(0)
   const [bootKey, setBootKey] = useState(0)
   const [starting, setStarting] = useState(false)
+  const [loadingXterm, setLoadingXterm] = useState(false)
 
   const chooseFolder = useCallback(async () => {
     if (!sessionId) return
@@ -76,7 +57,7 @@ export function TerminalView() {
     setBootKey((k) => k + 1)
   }, [sessionId])
 
-  // Boot xterm + PTY when session+cwd ready.
+  // Boot xterm + PTY when session+cwd ready (lazy import modules).
   useEffect(() => {
     if (!sessionId || !cwd) return
     const el = containerRef.current
@@ -88,62 +69,74 @@ export function TerminalView() {
     let resizeTimer: ReturnType<typeof setTimeout> | undefined
     let dataDisp: { dispose: () => void } | undefined
     let mo: MutationObserver | undefined
+    let term: XTerm | null = null
 
     const store = useTerminalStore.getState()
     store.ensureSession(sessionId)
     store.setStatus(sessionId, 'starting', { cwd })
     setStarting(true)
-
-    const term = new Terminal({
-      scrollback: 5000,
-      cursorBlink: true,
-      fontSize: 13,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-      theme: xtermTheme(),
-      allowProposedApi: true,
-    })
-    const fit = new FitAddon()
-    term.loadAddon(fit)
-    term.open(el)
-    termRef.current = term
-    fitRef.current = fit
-
-    const applyTheme = () => {
-      term.options.theme = xtermTheme()
-    }
-    applyTheme()
-
-    // Theme via store + dark class mutations (system theme changes).
-    mo = new MutationObserver(applyTheme)
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
-    const writeChunk = (chunk: string) => {
-      if (!disposed && chunk) term.write(chunk)
-    }
-
-    const doFit = () => {
-      try {
-        fit.fit()
-      } catch {
-        /* container may be 0-sized briefly */
-      }
-      return { cols: term.cols || 80, rows: term.rows || 24 }
-    }
-
-    const scheduleResize = () => {
-      if (resizeTimer) clearTimeout(resizeTimer)
-      resizeTimer = setTimeout(() => {
-        if (disposed) return
-        const { cols, rows } = doFit()
-        void ptyResize(sessionId, cols, rows).catch(() => {})
-      }, 50)
-    }
-
-    ro = new ResizeObserver(scheduleResize)
-    ro.observe(el)
+    setLoadingXterm(true)
 
     void (async () => {
-      // Measure before open.
+      const [{ Terminal }, { FitAddon }] = await Promise.all([
+        import('@xterm/xterm'),
+        import('@xterm/addon-fit'),
+      ])
+      await import('@xterm/xterm/css/xterm.css')
+      if (disposed) return
+
+      setLoadingXterm(false)
+
+      term = new Terminal({
+        scrollback: 5000,
+        cursorBlink: true,
+        fontSize: 13,
+        lineHeight: 1.25,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        theme: buildXtermTheme(),
+        allowProposedApi: true,
+      })
+      const fit = new FitAddon()
+      term.loadAddon(fit)
+      term.open(el)
+      // Slight padding so glyphs don't hug the rounded panel edge.
+      el.style.padding = '4px 6px'
+      termRef.current = term
+      fitRef.current = fit
+
+      const applyTheme = () => {
+        if (term) term.options.theme = buildXtermTheme(isDarkDom())
+      }
+      applyTheme()
+
+      mo = new MutationObserver(applyTheme)
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+      const writeChunk = (chunk: string) => {
+        if (!disposed && term && chunk) term.write(chunk)
+      }
+
+      const doFit = () => {
+        try {
+          fit.fit()
+        } catch {
+          /* container may be 0-sized briefly */
+        }
+        return { cols: term!.cols || 80, rows: term!.rows || 24 }
+      }
+
+      const scheduleResize = () => {
+        if (resizeTimer) clearTimeout(resizeTimer)
+        resizeTimer = setTimeout(() => {
+          if (disposed || !term) return
+          const { cols, rows } = doFit()
+          void ptyResize(sessionId, cols, rows).catch(() => {})
+        }, 50)
+      }
+
+      ro = new ResizeObserver(scheduleResize)
+      ro.observe(el)
+
       let { cols, rows } = doFit()
       if (cols < 2 || rows < 1) {
         await new Promise((r) => requestAnimationFrame(() => r(undefined)))
@@ -160,24 +153,21 @@ export function TerminalView() {
         setStarting(false)
         return
       }
-      if (disposed) return
+      if (disposed || !term) return
 
       // ── Attach protocol (D6a §3) ──
       const ringBefore = useTerminalStore.getState().getRing(sessionId)
       const snapshot = ringBefore.length
       cursorRef.current = 0
 
-      // Subscribe first; cursor gates live writes until drain completes.
       let attachDone = false
       unsubStore = useTerminalStore.subscribe((state, prev) => {
         if (state.attachedSessionId !== sessionId) return
         const ring = state.bySession[sessionId]?.ring
         if (!ring) return
-        // Only process when our ring grew.
-        const prevLen = prev.bySession[sessionId]?.ring.length ?? 0
-        if (!attachDone) return // rehydrate path owns writes until drain
+        if (!attachDone) return
         if (ring.length <= cursorRef.current) return
-        if (ring.length === prevLen && cursorRef.current >= ring.length) return
+        void prev
         for (let i = cursorRef.current; i < ring.length; i++) {
           writeChunk(ring[i]!)
         }
@@ -187,14 +177,12 @@ export function TerminalView() {
       useTerminalStore.getState().setAttached(sessionId)
       useTerminalStore.getState().setStatus(sessionId, 'running', { cwd })
 
-      // Rehydrate snapshot + drain tail (mid-append safe).
       const ringNow = useTerminalStore.getState().getRing(sessionId)
       const { writes, cursor } = attachDrainWrites(ringNow, snapshot)
       term.reset()
       for (const w of writes) writeChunk(w)
       cursorRef.current = cursor
       attachDone = true
-      // Drain anything that landed between drain and attachDone flip.
       const after = useTerminalStore.getState().getRing(sessionId)
       if (after.length > cursorRef.current) {
         for (let i = cursorRef.current; i < after.length; i++) writeChunk(after[i]!)
@@ -205,30 +193,32 @@ export function TerminalView() {
         void ptyWrite(sessionId, data).catch(() => {})
       })
 
+      // Focus so keyboard works immediately after open.
+      term.focus()
       setStarting(false)
     })()
 
     return () => {
       disposed = true
       setStarting(false)
+      setLoadingXterm(false)
       if (resizeTimer) clearTimeout(resizeTimer)
       unsubStore?.()
       dataDisp?.dispose()
       mo?.disconnect()
       ro?.disconnect()
       useTerminalStore.getState().setAttached(null)
-      term.dispose()
+      term?.dispose()
       termRef.current = null
       fitRef.current = null
       // Do NOT pty_kill — keep-alive (D6).
     }
   }, [sessionId, cwd, bootKey])
 
-  // Re-apply theme when uiStore.theme changes (covers non-class store updates).
   useEffect(() => {
     const term = termRef.current
     if (!term) return
-    term.options.theme = xtermTheme()
+    term.options.theme = buildXtermTheme(isDarkDom())
   }, [theme])
 
   if (!sessionId) return null
@@ -258,14 +248,28 @@ export function TerminalView() {
 
   const exited = status === 'exited'
   const errored = status === 'error'
+  const showStatus = exited || errored || starting || loadingXterm
+
+  const errorLabel = (() => {
+    if (!lastError) return t('artifact.terminalView.error')
+    if (lastError.includes('Windows') || lastError.includes('not supported')) {
+      return t('artifact.terminalView.unsupportedPlatform')
+    }
+    if (lastError.includes('Too many terminals')) return t('artifact.terminalView.softCap')
+    return t('artifact.terminalView.error')
+  })()
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="terminal-view">
+    <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="terminal-view">
       <div
-        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-2"
+        className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5"
         data-tauri-drag-region="false"
       >
-        <span className="min-w-0 truncate font-mono text-meta text-ink-tertiary" title={cwd}>
+        <span
+          className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
+          title={cwd}
+          data-testid="terminal-cwd"
+        >
           {cwd}
         </span>
         <button
@@ -273,41 +277,69 @@ export function TerminalView() {
           data-testid="terminal-restart"
           onClick={() => void restart()}
           title={t('artifact.terminalView.restart')}
-          className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-meta text-ink-secondary hover:bg-surface-muted hover:text-ink"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-meta font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
         >
-          <RotateCcw size={12} />
+          <RotateCcw size={13} />
           {t('artifact.terminalView.restart')}
         </button>
       </div>
 
-      {(exited || errored || starting) && (
+      {showStatus && (
         <div
-          className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-muted/50 px-2 py-1 text-meta text-ink-secondary"
+          className={cn(
+            'flex shrink-0 items-center gap-2 border-b border-border px-2.5 py-1.5 text-meta',
+            errored && 'bg-danger/10 text-danger',
+            exited && !errored && 'bg-surface-muted/60 text-ink-secondary',
+            (starting || loadingXterm) && !errored && !exited && 'bg-surface-muted/40 text-ink-tertiary',
+          )}
           data-testid="terminal-status-bar"
+          role="status"
         >
-          {starting && <span>{t('artifact.terminalView.starting')}</span>}
-          {exited && (
-            <span>
-              {exitCode == null
-                ? t('artifact.terminalView.exitedNull')
-                : t('artifact.terminalView.exited', { code: exitCode })}
-            </span>
+          {(starting || loadingXterm) && !errored && (
+            <>
+              <Loader2 size={13} className="shrink-0 animate-spin text-accent-strong" />
+              <span>{t('artifact.terminalView.starting')}</span>
+            </>
+          )}
+          {exited && !errored && (
+            <>
+              <span className="min-w-0 flex-1">
+                {exitCode == null
+                  ? t('artifact.terminalView.exitedNull')
+                  : t('artifact.terminalView.exited', { code: exitCode })}
+              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded px-1.5 py-0.5 font-medium text-accent-strong hover:underline"
+                onClick={() => void restart()}
+                data-testid="terminal-status-restart"
+              >
+                {t('artifact.terminalView.restart')}
+              </button>
+            </>
           )}
           {errored && (
-            <span className="text-danger" title={lastError}>
-              {lastError?.includes('Windows') || lastError?.includes('not supported')
-                ? t('artifact.terminalView.unsupportedPlatform')
-                : lastError?.includes('Too many terminals')
-                  ? t('artifact.terminalView.softCap')
-                  : t('artifact.terminalView.error')}
-            </span>
+            <>
+              <AlertCircle size={13} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate" title={lastError}>
+                {errorLabel}
+              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded px-1.5 py-0.5 font-medium hover:underline"
+                onClick={() => void restart()}
+                data-testid="terminal-status-restart"
+              >
+                {t('artifact.terminalView.restart')}
+              </button>
+            </>
           )}
         </div>
       )}
 
       <div
         ref={containerRef}
-        className="min-h-0 flex-1 overflow-hidden p-1"
+        className="min-h-0 flex-1 overflow-hidden bg-[var(--bg-app)]"
         data-testid="terminal-xterm"
         data-no-drag
         data-tauri-drag-region="false"

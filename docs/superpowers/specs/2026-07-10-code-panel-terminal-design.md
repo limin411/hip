@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | TBD |
 | 日期 | 2026-07-10 |
-| 状态 | PR-1–3 已实现（UI + Rust PTY + xterm/ring/bridge）；PR-4 polish / PR-5 flag on 未做；`CODE_TERMINAL=false` |
+| 状态 | PR-1–4 已实现；PR-5（`CODE_TERMINAL=true`）未做；暗发 flag 仍为 false |
 | 相关代码 | `src/routes/AppLayout.tsx`, `src/components/artifact/ArtifactPanel.tsx`, `src/components/layout/PanelToggle.tsx`, `src/store/uiStore.ts`, `src/store/useFsScope.ts`, `src/ipc/dialog.ts`, `src/components/theme/ThemeProvider.tsx`, `src-tauri/src/path_env.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json` |
 | 竞品参考 | `docs/research/2026-07-05-claude-desktop.md`, `docs/research/2026-07-05-codex-desktop.md`, `docs/research/2026-07-05-competitive-feature-gap-analysis.md` |
 | 前置能力 | 无 xterm / node-pty / 交互式 PTY；`tauri-plugin-shell` 仅用于 sidecar 与 `open()` URL；`src/` 内尚无 `@tauri-apps/api/event` 用法 |

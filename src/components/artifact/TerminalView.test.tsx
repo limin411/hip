@@ -19,6 +19,8 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Folder: () => React.createElement('span', { 'data-testid': 'icon-folder' }),
   RotateCcw: () => React.createElement('span', { 'data-testid': 'icon-restart' }),
+  Loader2: () => React.createElement('span', { 'data-testid': 'icon-loader' }),
+  AlertCircle: () => React.createElement('span', { 'data-testid': 'icon-alert' }),
 }))
 
 vi.mock('@/ipc/dialog', () => ({
@@ -45,6 +47,7 @@ vi.mock('@/store/uiStore', () => ({
 }))
 
 // Minimal xterm stub — enough for mount/dispose without canvas.
+// Lazy import() resolves the same mocked modules.
 vi.mock('@xterm/xterm', () => {
   class Terminal {
     cols = 80
@@ -55,6 +58,7 @@ vi.mock('@xterm/xterm', () => {
     reset = vi.fn()
     dispose = vi.fn()
     loadAddon = vi.fn()
+    focus = vi.fn()
     onData = vi.fn(() => ({ dispose: vi.fn() }))
   }
   return { Terminal }
@@ -67,6 +71,11 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}))
+
+vi.mock('./terminalTheme', () => ({
+  isDarkDom: () => false,
+  buildXtermTheme: () => ({ background: '#fff', foreground: '#111', cursor: '#111' }),
+}))
 
 import { TerminalView } from './TerminalView'
 
@@ -123,8 +132,19 @@ describe('TerminalView', () => {
     render(<TerminalView />)
     expect(screen.getByTestId('terminal-view')).toBeInTheDocument()
     expect(screen.getByTestId('terminal-xterm')).toBeInTheDocument()
+    expect(screen.getByTestId('terminal-cwd')).toHaveTextContent('/Users/me/hip')
     await waitFor(() => {
       expect(ptyOpen).toHaveBeenCalledWith('s1', '/Users/me/hip', expect.any(Number), expect.any(Number))
+    })
+  })
+
+  it('shows error status bar when ptyOpen fails', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    ptyOpen.mockRejectedValueOnce(new Error('Terminal is not supported on Windows in this version'))
+    render(<TerminalView />)
+    await waitFor(() => {
+      expect(screen.getByTestId('terminal-status-bar')).toBeInTheDocument()
+      expect(screen.getByText('artifact.terminalView.unsupportedPlatform')).toBeInTheDocument()
     })
   })
 

@@ -556,6 +556,64 @@ describe('workspace diff', () => {
     vi.useRealTimers()
   })
 
+  it('simulateTurnRunning then simulateTurnCancelled keeps partial assistant stopped', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId } = svc.simulateTurnRunning('s1')
+    let sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('running')
+    expect(sess.messages.find((m) => m.id === turnId)?.content).toContain('partial e2e reply')
+    svc.simulateTurnCancelled('s1')
+    sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('idle')
+    expect(sess.error).toBeNull()
+    const turn = sess.messages.find((m) => m.id === turnId)
+    expect(turn?.content).toContain('partial e2e reply')
+    expect(turn?.stopped).toBe(true)
+  })
+
+  it('simulateSessionError surfaces error and getSessionDebugBundleJson redacts secrets', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { ...DEFAULT_CONFIG, surface: 'chat', apiKey: 'sk-secret' } as typeof DEFAULT_CONFIG,
+          title: 'T',
+          preview: 'P',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: 1 }],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: 's1',
+      connection: 'connected',
+    })
+    svc.simulateSessionError('s1', 'AGENT_ERROR', 'boom')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('error')
+    expect(sess.error).toMatchObject({ code: 'AGENT_ERROR', message: 'boom' })
+    const json = svc.getSessionDebugBundleJson()
+    expect(json).toBeTruthy()
+    expect(json).toContain('"version": 1')
+    expect(json).not.toContain('sk-secret')
+    expect(json).toContain('AGENT_ERROR')
+  })
+
+  it('seedAgentCollaboration adds supervisor and coder runs with tool', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId, callId } = svc.seedAgentCollaboration('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('running')
+    const turn = sess.messages.find((m) => m.id === turnId)!
+    expect(turn.agentRuns?.map((r) => r.agentId).sort()).toEqual(['coder-1', 'supervisor'])
+    expect(turn.toolCalls?.[0]).toMatchObject({ callId, name: 'read_file', status: 'running' })
+  })
+
   it('ready resets a wedged loading state so requestDiff works again', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

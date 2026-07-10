@@ -18,6 +18,7 @@ import { useProvidersStore } from '@/store/providersStore'
 import { surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { applyServerMessageEffects } from './serverMessageEffects'
+import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -126,6 +127,125 @@ export class SessionService {
       output: 'ok',
     })
     return { turnId, callId }
+  }
+
+  /** E2E: create a chat session without sending a user message (no LLM turn). */
+  createChatSessionForE2e(): string {
+    return this.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+  }
+
+  /** E2E: create a code session bound to cwd without an LLM turn. */
+  createCodeSessionForE2e(cwd: string): string {
+    return this.createSession({
+      ...DEFAULT_CONFIG,
+      surface: 'code',
+      cwd,
+      permissionMode: 'edit',
+    })
+  }
+
+  /**
+   * E2E H2: put session into running with partial assistant text + in-flight tool
+   * so Stop shows and CANCELLED keeps a non-empty stopped projection.
+   */
+  simulateTurnRunning(sessionId: string): { turnId: string; callId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-call-${nanoid(8)}`
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'token:stream',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      delta: 'partial e2e reply',
+    })
+    // Running tool makes finalizeCancelledMessage treat the turn as in-flight (sets stopped).
+    this.receive({
+      type: 'tool:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+      callId,
+      name: 'read_file',
+      input: '{}',
+      seq: 1,
+    })
+    return { turnId, callId }
+  }
+
+  /** E2E H2: apply CANCELLED projection (same path as sidecar cancel). */
+  simulateTurnCancelled(sessionId: string): void {
+    this.receive({ type: 'error', sessionId, code: 'CANCELLED', message: 'cancelled' })
+  }
+
+  /** E2E H4: surface inline error so copy-debug is available. */
+  simulateSessionError(
+    sessionId: string,
+    code = 'AGENT_ERROR',
+    message = 'e2e simulated error',
+  ): void {
+    this.receive({ type: 'error', sessionId, code, message })
+  }
+
+  /**
+   * E2E H6: seed supervisor + coder sub-agent so Agents panel shows structure
+   * and cards without a real LLM turn.
+   */
+  seedAgentCollaboration(sessionId: string): { turnId: string; callId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-call-${nanoid(8)}`
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'coder-1',
+      role: 'coder',
+      parentAgentId: 'supervisor',
+      taskInput: 'e2e implement feature',
+    })
+    this.receive({
+      type: 'tool:started',
+      sessionId,
+      turnId,
+      agentId: 'coder-1',
+      role: 'coder',
+      callId,
+      name: 'read_file',
+      input: '{"path":"README.md"}',
+      seq: 1,
+    })
+    return { turnId, callId }
+  }
+
+  /** E2E H4: same redacted JSON builder as ChatPane copy-debug (avoids clipboard flake). */
+  getSessionDebugBundleJson(): string | null {
+    const { activeSessionId, sessions } = useDomainStore.getState()
+    if (!activeSessionId) return null
+    const session = sessions.find((s) => s.id === activeSessionId)
+    if (!session) return null
+    return sessionDebugBundleJson({
+      sessionId: activeSessionId,
+      title: session.title,
+      config: session.config,
+      messages: session.messages,
+      recentErrors: session.error
+        ? [{ code: session.error.code, message: session.error.message, at: Date.now() }]
+        : undefined,
+    })
   }
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
@@ -511,6 +631,13 @@ export type HipE2EHooks = {
   injectServerMessage: (msg: ServerMessage) => void
   simulateAgentWriteFinished: (sessionId: string) => { turnId: string; callId: string }
   getActiveSessionId: () => string | null
+  createChatSessionForE2e: () => string
+  createCodeSessionForE2e: (cwd: string) => string
+  simulateTurnRunning: (sessionId: string) => { turnId: string; callId: string }
+  simulateTurnCancelled: (sessionId: string) => void
+  simulateSessionError: (sessionId: string, code?: string, message?: string) => void
+  seedAgentCollaboration: (sessionId: string) => { turnId: string; callId: string }
+  getSessionDebugBundleJson: () => string | null
 }
 
 declare global {
@@ -527,6 +654,13 @@ function installE2eHooks(svc: SessionService): void {
     injectServerMessage: (msg) => svc.injectServerMessage(msg),
     simulateAgentWriteFinished: (sessionId) => svc.simulateAgentWriteFinished(sessionId),
     getActiveSessionId: () => useDomainStore.getState().activeSessionId,
+    createChatSessionForE2e: () => svc.createChatSessionForE2e(),
+    createCodeSessionForE2e: (cwd) => svc.createCodeSessionForE2e(cwd),
+    simulateTurnRunning: (sessionId) => svc.simulateTurnRunning(sessionId),
+    simulateTurnCancelled: (sessionId) => svc.simulateTurnCancelled(sessionId),
+    simulateSessionError: (sessionId, code, message) => svc.simulateSessionError(sessionId, code, message),
+    seedAgentCollaboration: (sessionId) => svc.seedAgentCollaboration(sessionId),
+    getSessionDebugBundleJson: () => svc.getSessionDebugBundleJson(),
   }
 }
 

@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **计划 / 待分批落地** |
+| 状态 | **计划中 · Phase 0–1 落地中** |
 | 前提 | A/B/C 主干 + polish P1–P3 已落地；栈为 WDIO + `@wdio/tauri-service` + Mocha |
 | 入口 | `yarn test:e2e` → `wdio.conf.ts`；过滤：`E2E_GREP` / `E2E_INVERT` / `--spec` |
 | 相关 | [`pre-public-roadmap-index`](./2026-07-10-pre-public-roadmap-index.md)、[`polish-e2e-write-to-changes`](./2026-07-10-polish-e2e-write-to-changes-design.md)、Sprint A/B |
@@ -313,20 +313,20 @@ Helpers 同步扩：`e2e/helpers/e2e-hooks.ts`。
 
 ### Phase 0 — 基线固化（0.5 天）
 
-- [ ] 文档：本 plan + README/`e2e/README.md` 命令与标签  
-- [ ] 现有 specs 标题补 `@smoke` / `@core` / `@harness`（不改逻辑）  
-- [ ] 本地确认：`E2E_GREP=@core yarn test:e2e` 绿（含 write-to-changes）  
-- [ ] CI 草稿：门禁 = `@smoke|@core|@harness`；全量 nightly  
+- [x] 文档：本 plan + README/`e2e/README.md` 命令与标签  
+- [x] 现有 specs 标题补 `@smoke` / `@core` / `@harness`（不改逻辑）  
+- [ ] 本地确认：`yarn test:e2e:gate` 绿（含 write-to-changes + harness）  
+- [x] CI 草稿：门禁 = `@smoke|@core|@harness`（见 `e2e/README.md` + `test:e2e:gate`）  
 
 ### Phase 1 — 公开前门禁补齐（2–4 天）**优先**
 
 | 顺序 | 交付 | 验收 |
 |------|------|------|
-| 1.1 | H2 cancel 可感（注入 + Stop） | 聊天非空白 / stopped UI |
-| 1.2 | H4 复制调试信息 | 错误态按钮；bundle 无 key |
-| 1.3 | H8 Timeline revert smoke（可选若组件测已够） | confirm 关闭路径 1 条 e2e **或** 明确「仅 L1」 |
-| 1.4 | H6 Agents 卡片注入 | code 面板 Agents 可见 agent-card |
-| 1.5 | S3 surface 切换独立 it | chat↔code 稳定 |
+| 1.1 | H2 cancel 可感（注入 + Stop） | **已实现** `harness-cancel.spec.ts` |
+| 1.2 | H4 复制调试信息 | **已实现** `harness-copy-debug.spec.ts` |
+| 1.3 | H8 Timeline revert smoke（可选若组件测已够） | **仅 L1**（`TimelineView.test`；e2e 后置） |
+| 1.4 | H6 Agents 卡片注入 | **已实现** `harness-agents.spec.ts` |
+| 1.5 | S3 surface 切换独立 it | **已实现** `surface-switch.spec.ts` |
 
 **公开前 e2e 门禁定义（建议）：**
 

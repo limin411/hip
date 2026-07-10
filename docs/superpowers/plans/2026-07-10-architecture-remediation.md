@@ -192,6 +192,13 @@ Required fields (`llmProvider`, `model`, `tools`) are left as provided; do not i
 2. [x] `lib.rs` modularized: `logging.rs`, `hip_config.rs`, `path_tools.rs` (~1.9k → ~1.3k).
 3. [x] DAG path: `workflow-runner` uses `DurableExecutor` when SQLite store is present (checkpoint + resume by runId); `orchMode === 'dag' && pendingWorkflowDef` remains the main-loop entry.
 
+### Phase 3b — completed 2026-07-10
+
+1. [x] Extract turn engine: `session-turn-runner.ts` (`processInput` / `runTurn` / `runManagedAgentTurn` via `SessionTurnHost`).
+2. [x] Extract turn ops: `session-turn-ops.ts` (resume / regenerate / plan / retry / resumeSubagent).
+3. [x] Extract background: `session-background.ts`.
+4. [x] `session.ts` façade **~741 lines** (target ≤800 met).
+
 ### Phase 4
 
 1. Verification / reviewer gates on main path.

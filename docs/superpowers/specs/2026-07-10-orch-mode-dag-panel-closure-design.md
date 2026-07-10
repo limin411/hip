@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | Grok (design pass) |
 | 日期 | 2026-07-10 |
-| 状态 | **待评审**（先方案、后实现） |
+| 状态 | **已实现** |
 | 相关代码 | `packages/protocol`（orch/workflow messages）、`packages/sidecar/src/session/{session,session-turn-runner,workflow-runner,handlers}`、`packages/sidecar/src/orchestrator/*`、`packages/sidecar/src/persistence/{schema,workflow-store}`、`src/components/chat/ModelPicker.tsx`、`src/components/workflow/*`、`src/store/workflowStore.ts`、`src/components/artifact/ArtifactPanel.tsx`、`src/domain/*` |
 | 前置文档 | `docs/agent-orchestration-plan.md`、`docs/superpowers/plans/2026-07-10-architecture-remediation.md` |
 | 外部实践参考 | Temporal durable execution + event history；Temporal Flow / React Flow 只读可视化；AWS Step Functions 状态机可视化 |

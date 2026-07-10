@@ -144,6 +144,8 @@ Phase 4 (持续): 生态与记忆
 
 **目标**：让 DAG 编排器成为主循环的一等公民，所有状态转换可恢复。
 
+**状态（2026-07-10）**：主循环集群模式（`orchMode: 'dag'`）+ 只读 DAG 面板产品闭环已完成——模式切换走默认/显式工作流、耐久落盘、实时/恢复可视化。详见设计 `docs/superpowers/specs/2026-07-10-orch-mode-dag-panel-closure-design.md` 与实施计划 `docs/superpowers/plans/2026-07-10-orch-mode-dag-panel-closure.md`。
+
 **交付物**：
 - `OrchestrationMode` — fast / dag 模式切换
 - `WorkflowNode` 类型扩展（agent / tool / parallel / gate / human）

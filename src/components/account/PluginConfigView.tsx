@@ -79,13 +79,13 @@ export function PluginConfigView({
           <h2 className="text-title font-semibold text-ink">{t('settings.plugins.title')}</h2>
           <p className="mt-1 text-body text-ink-secondary">{t('settings.plugins.intro')}</p>
         </div>
-        <Button size="sm" onClick={onShowForm}>
+        <Button size="sm" onClick={onShowForm} data-testid="plugin-install-open">
           <Plus size={15} /> {t('settings.plugins.install')}
         </Button>
       </div>
 
       {showForm && (
-        <div className="mt-4 rounded-lg border border-border bg-surface p-4">
+        <div className="mt-4 rounded-lg border border-border bg-surface p-4" data-testid="plugin-install-form">
           <label className="mb-1.5 block text-meta text-ink-tertiary">{t('settings.plugins.urlLabel')}</label>
           <input
             className={inputCls}
@@ -93,12 +93,18 @@ export function PluginConfigView({
             onChange={(e) => onUrlChange(e.target.value)}
             placeholder={t('settings.plugins.urlPlaceholder')}
             disabled={submitted}
+            data-testid="plugin-install-url"
           />
           <div className="mt-3 flex justify-end gap-2">
             <Button variant="outline" size="sm" disabled={submitted} onClick={onHideForm}>
               {t('settings.plugins.cancel')}
             </Button>
-            <Button size="sm" disabled={submitted || !url.trim()} onClick={() => void onSubmit()}>
+            <Button
+              size="sm"
+              disabled={submitted || !url.trim()}
+              onClick={() => void onSubmit()}
+              data-testid="plugin-install-submit"
+            >
               {t('settings.plugins.install')}
             </Button>
           </div>
@@ -119,7 +125,10 @@ export function PluginConfigView({
       )}
 
       {error && (
-        <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
+        <div
+          className="mt-4 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger"
+          data-testid="plugin-install-error"
+        >
           <AlertCircle size={14} className="mr-1.5 inline" />
           {error}
           <button

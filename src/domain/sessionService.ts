@@ -1,5 +1,13 @@
 // src/domain/sessionService.ts
-import type { ServerMessage, SessionConfig, DiffBase, CheckpointMode, PermissionMode, OrchestrationMode } from '@hip/protocol'
+import type {
+  ServerMessage,
+  SessionConfig,
+  DiffBase,
+  CheckpointMode,
+  PermissionMode,
+  OrchestrationMode,
+  Checkpoint,
+} from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
 import type { Transport } from './transport'
@@ -19,6 +27,7 @@ import { surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { applyServerMessageEffects } from './serverMessageEffects'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -30,6 +39,12 @@ export class SessionService {
   private readonly transport: Transport
   private readonly unsubscribe: () => void
   private readonly unsubStatus: () => void
+  /** E2E: when set, checkpoint list requests/results for this session re-apply the seed. */
+  private e2eCheckpointSeed: {
+    sessionId: string
+    checkpoints: Checkpoint[]
+    branch: string
+  } | null = null
 
   constructor(transport: Transport) {
     this.transport = transport
@@ -69,6 +84,15 @@ export class SessionService {
       requestCommitLog: (sessionId) => this.requestCommitLog(sessionId),
       resyncActiveIfRunning: () => this.resyncActiveIfRunning(),
     })
+    // E2E seed wins over empty/real sidecar list:result for the seeded session.
+    if (
+      msg.type === 'git:checkpoint:list:result' &&
+      this.e2eCheckpointSeed &&
+      msg.sessionId === this.e2eCheckpointSeed.sessionId
+    ) {
+      const seed = this.e2eCheckpointSeed
+      useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
+    }
   }
 
   /**
@@ -246,6 +270,76 @@ export class SessionService {
         ? [{ code: session.error.code, message: session.error.message, at: Date.now() }]
         : undefined,
     })
+  }
+
+  /** E2E H5: surface HITL permission modal. */
+  simulatePermissionRequest(sessionId: string): { turnId: string; requestId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const requestId = `e2e-perm-${nanoid(8)}`
+    this.receive({
+      type: 'permission:request',
+      sessionId,
+      turnId,
+      requestId,
+      tool: { title: 'e2e-run-script', kind: 'execute', content: 'echo e2e' },
+      options: [
+        { optionId: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+        { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
+      ],
+    })
+    return { turnId, requestId }
+  }
+
+  /**
+   * E2E P4: seed checkpoint list + isGitRepo so Timeline tab is gated open
+   * without a real git repo on disk.
+   *
+   * Pins seed on this service so TimelineView's requestCheckpoints + late
+   * `git:checkpoint:list:result` cannot wipe rows with an empty sidecar list.
+   */
+  seedCheckpoints(sessionId: string): { count: number } {
+    const now = Date.now()
+    const checkpoints = [
+      {
+        id: `${sessionId}:t1`,
+        sessionId,
+        turnId: 't1',
+        kind: 'turn' as const,
+        label: 'e2e turn',
+        treeSha: 'tree1',
+        commitSha: 'commit1',
+        branch: 'main',
+        createdAt: now,
+      },
+      {
+        id: `${sessionId}:start`,
+        sessionId,
+        turnId: null,
+        kind: 'start' as const,
+        label: null,
+        treeSha: 'tree0',
+        commitSha: 'commit0',
+        branch: 'main',
+        createdAt: now - 1000,
+      },
+    ]
+    this.e2eCheckpointSeed = { sessionId, checkpoints, branch: 'main' }
+    useDiffStore.getState().setCheckpoints(sessionId, checkpoints, true, 'main')
+    return { count: checkpoints.length }
+  }
+
+  /** E2E S5: open global command palette (⌘K) without OS key routing. */
+  openCommandPaletteForE2e(): void {
+    useCommandPaletteStore.getState().setOpen(true)
+  }
+
+  closeCommandPaletteForE2e(): void {
+    useCommandPaletteStore.getState().close()
+  }
+
+  /** E2E T2: install failure payload (UI must have submitted form to show error). */
+  simulatePluginInstallError(error = 'e2e package structure invalid'): void {
+    this.receive({ type: 'plugin:install:result', ok: false, error })
   }
 
   createSession(config: SessionConfig = DEFAULT_CONFIG): string {
@@ -456,6 +550,11 @@ export class SessionService {
 
   /** Pull the checkpoint list (+ isGitRepo / current branch) for the timeline tab + tab gating. */
   requestCheckpoints(sessionId: string): void {
+    if (this.e2eCheckpointSeed?.sessionId === sessionId) {
+      const seed = this.e2eCheckpointSeed
+      useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
+      return
+    }
     this.transport.send({ type: 'git:checkpoint:list', sessionId })
   }
 
@@ -638,6 +737,11 @@ export type HipE2EHooks = {
   simulateSessionError: (sessionId: string, code?: string, message?: string) => void
   seedAgentCollaboration: (sessionId: string) => { turnId: string; callId: string }
   getSessionDebugBundleJson: () => string | null
+  simulatePermissionRequest: (sessionId: string) => { turnId: string; requestId: string }
+  seedCheckpoints: (sessionId: string) => { count: number }
+  openCommandPaletteForE2e: () => void
+  closeCommandPaletteForE2e: () => void
+  simulatePluginInstallError: (error?: string) => void
 }
 
 declare global {
@@ -661,6 +765,11 @@ function installE2eHooks(svc: SessionService): void {
     simulateSessionError: (sessionId, code, message) => svc.simulateSessionError(sessionId, code, message),
     seedAgentCollaboration: (sessionId) => svc.seedAgentCollaboration(sessionId),
     getSessionDebugBundleJson: () => svc.getSessionDebugBundleJson(),
+    simulatePermissionRequest: (sessionId) => svc.simulatePermissionRequest(sessionId),
+    seedCheckpoints: (sessionId) => svc.seedCheckpoints(sessionId),
+    openCommandPaletteForE2e: () => svc.openCommandPaletteForE2e(),
+    closeCommandPaletteForE2e: () => svc.closeCommandPaletteForE2e(),
+    simulatePluginInstallError: (error) => svc.simulatePluginInstallError(error),
   }
 }
 

@@ -22,53 +22,58 @@ type HipE2E = {
   simulateSessionError: (s: string, code?: string, message?: string) => void
   seedAgentCollaboration: (s: string) => { turnId: string; callId: string }
   getSessionDebugBundleJson: () => string | null
+  simulatePermissionRequest: (s: string) => { turnId: string; requestId: string }
+  seedCheckpoints: (s: string) => { count: number }
+  openCommandPaletteForE2e: () => void
+  closeCommandPaletteForE2e: () => void
+  simulatePluginInstallError: (error?: string) => void
 }
 
 export async function getActiveSessionId(): Promise<string | null> {
   return browser.execute(() => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    return e2e?.getActiveSessionId() ?? null
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    return hooks?.getActiveSessionId() ?? null
   })
 }
 
 /** Simulate agent write_file finish so diff refresh runs (file must already exist on disk). */
 export async function simulateAgentWriteFinished(sessionId: string): Promise<{ turnId: string; callId: string }> {
   return browser.execute((id: string) => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    return e2e.simulateAgentWriteFinished(id)
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.simulateAgentWriteFinished(id)
   }, sessionId)
 }
 
 export async function createChatSessionForE2e(): Promise<string> {
   return browser.execute(() => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    return e2e.createChatSessionForE2e()
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.createChatSessionForE2e()
   })
 }
 
 export async function createCodeSessionForE2e(cwd: string): Promise<string> {
   return browser.execute((dir: string) => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    return e2e.createCodeSessionForE2e(dir)
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.createCodeSessionForE2e(dir)
   }, cwd)
 }
 
 export async function simulateTurnRunning(sessionId: string): Promise<{ turnId: string; callId: string }> {
   return browser.execute((id: string) => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    return e2e.simulateTurnRunning(id)
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.simulateTurnRunning(id)
   }, sessionId)
 }
 
 export async function simulateTurnCancelled(sessionId: string): Promise<void> {
   await browser.execute((id: string) => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    e2e.simulateTurnCancelled(id)
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    hooks.simulateTurnCancelled(id)
   }, sessionId)
 }
 
@@ -79,9 +84,9 @@ export async function simulateSessionError(
 ): Promise<void> {
   await browser.execute(
     (id: string, c: string, m: string) => {
-      const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-      if (!e2e) throw new Error('__hipE2E missing')
-      e2e.simulateSessionError(id, c, m)
+      const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+      if (!hooks) throw new Error('__hipE2E missing')
+      hooks.simulateSessionError(id, c, m)
     },
     sessionId,
     code,
@@ -91,15 +96,55 @@ export async function simulateSessionError(
 
 export async function seedAgentCollaboration(sessionId: string): Promise<{ turnId: string; callId: string }> {
   return browser.execute((id: string) => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    if (!e2e) throw new Error('__hipE2E missing')
-    return e2e.seedAgentCollaboration(id)
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.seedAgentCollaboration(id)
   }, sessionId)
 }
 
 export async function getSessionDebugBundleJson(): Promise<string | null> {
   return browser.execute(() => {
-    const e2e = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
-    return e2e?.getSessionDebugBundleJson() ?? null
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    return hooks?.getSessionDebugBundleJson() ?? null
   })
+}
+
+export async function simulatePermissionRequest(sessionId: string): Promise<{ turnId: string; requestId: string }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.simulatePermissionRequest(id)
+  }, sessionId)
+}
+
+export async function seedCheckpoints(sessionId: string): Promise<{ count: number }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    return hooks.seedCheckpoints(id)
+  }, sessionId)
+}
+
+export async function openCommandPaletteForE2e(): Promise<void> {
+  await browser.execute(() => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    hooks.openCommandPaletteForE2e()
+  })
+}
+
+export async function closeCommandPaletteForE2e(): Promise<void> {
+  await browser.execute(() => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    hooks.closeCommandPaletteForE2e()
+  })
+}
+
+export async function simulatePluginInstallError(error = 'e2e package structure invalid'): Promise<void> {
+  await browser.execute((msg: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks) throw new Error('__hipE2E missing')
+    hooks.simulatePluginInstallError(msg)
+  }, error)
 }

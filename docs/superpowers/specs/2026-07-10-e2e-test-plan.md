@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **计划中 · Phase 0–1 落地中** |
+| 状态 | **计划中 · Phase 0–2 已落地（待全量 gate 绿）** |
 | 前提 | A/B/C 主干 + polish P1–P3 已落地；栈为 WDIO + `@wdio/tauri-service` + Mocha |
 | 入口 | `yarn test:e2e` → `wdio.conf.ts`；过滤：`E2E_GREP` / `E2E_INVERT` / `--spec` |
 | 相关 | [`pre-public-roadmap-index`](./2026-07-10-pre-public-roadmap-index.md)、[`polish-e2e-write-to-changes`](./2026-07-10-polish-e2e-write-to-changes-design.md)、Sprint A/B |
@@ -205,11 +205,11 @@ e2e/
 | ID | 用例 | 状态 | 步骤概要 | 期望 |
 |----|------|------|----------|------|
 | H1 | write → Changes auto | ✅ | 落盘 + `simulateAgentWriteFinished` | `diff-file` 含 path |
-| H2 | cancel 运行中 turn | ⬜ | 注入 streaming/running + 点 `composer-stop` 或 inject cancel 结果 | 有 assistant/`stopped` 痕迹；非空白 |
-| H3 | cancel 后已写文件仍在 Changes | ⬜ | H1 + stop | path 仍在 |
-| H4 | 复制调试信息 | ⬜ | 注入 error 条或菜单 | `chat-copy-debug` 可用；payload 无 apiKey |
-| H5 | Permission modal | ⬜ | inject permission request | modal + option 可点；关闭 |
-| H6 | Agents 面板有卡片 | ⬜ | inject agent run/structure | `agent-card` 或结构条可见 |
+| H2 | cancel 运行中 turn | ✅ | `harness-cancel` | 有 assistant/`stopped` 痕迹；非空白 |
+| H3 | cancel 后已写文件仍在 Changes | ✅ | `harness-cancel-keeps-diff` | path 仍在 |
+| H4 | 复制调试信息 | ✅ | `harness-copy-debug` | `chat-copy-debug` 可用；payload 无 apiKey |
+| H5 | Permission modal | ✅ | `harness-permission` | modal + option 可点；关闭 |
+| H6 | Agents 面板有卡片 | ✅ | `harness-agents` | `agent-card` 或结构条可见 |
 | H7 | 委派行 / jump to turn | ⬜ | 注入 multi-agent turn | `delegation-row` / `agent-jump-turn` |
 | H8 | 检查点 revert 确认流 | ⬜ | mock checkpoints + 点 revert | modal 确认/取消；成功关闭（可弱于组件测） |
 
@@ -222,7 +222,7 @@ e2e/
 | P1 | Terminal 菜单与 host | ✅ | `code-terminal` |
 | P2 | Terminal keep-alive 切 tab | ✅ | 同上 |
 | P3 | Chat 无 Terminal | ✅ | 同上 |
-| P4 | Timeline 列表渲染 | ⬜ | 有 checkpoint 数据时 `timeline-row` |
+| P4 | Timeline 列表渲染 | ✅ | `timeline-panel` + `seedCheckpoints` |
 | P5 | Agents 入口在 code 菜单 | 🟡 | terminal 测间接断言 menu 含 agents；缺交互 |
 
 ### 4.5 Settings / 插件 `@settings`
@@ -230,7 +230,7 @@ e2e/
 | ID | 用例 | 状态 | 说明 |
 |----|------|------|------|
 | T1 | 设置 tab smoke | ✅ | |
-| T2 | 坏插件 / 安装错误可读 | ⬜ | fixture + settings skills |
+| T2 | 坏插件 / 安装错误可读 | ✅ | `plugin-install-error`（submit + inject result） |
 | T3 | token chip 无数据不显示 | ✅ | |
 | T4 | token chip 有数据 | 🟡 | 存在性 gate；真数据靠 live 或 inject usage |
 
@@ -337,11 +337,19 @@ Helpers 同步扩：`e2e/helpers/e2e-hooks.ts`。
 
 ### Phase 2 — 深度与面板（1–2 周，可穿插）
 
-- H3 cancel 保 diff、H5 permission modal  
-- C7 多文件 jump、C11 history  
-- P4 Timeline 列表、T2 坏插件  
-- 全局命令面板 S5  
-- helpers：`git-workspace.ts` 抽出 `initGitAndOpenChanges` 去重  
+- [x] H3 cancel 保 diff — `harness-cancel-keeps-diff.spec.ts`  
+- [x] H5 permission modal — `harness-permission.spec.ts`  
+- [x] C7 多文件 jump — `diff-workspace` 末项  
+- [x] C11 history — `session-history.spec.ts`  
+- [x] P4 Timeline 列表 — `timeline-panel.spec.ts`  
+- [x] T2 坏插件 — `plugin-install-error.spec.ts`  
+- [x] 全局命令面板 S5 — `command-palette.spec.ts`  
+- [x] helpers：`e2e/helpers/git-workspace.ts` + write-to-changes 改 `createCodeSessionForE2e`  
+
+### Phase 2 补充（可选后续）
+
+- H7 委派行 jump-to-turn  
+- H8 Timeline revert e2e（现 L1 足够）
 
 ### Phase 3 — 可选与硬化
 

@@ -66,15 +66,18 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 
 Non-production frontend installs `window.__hipE2E` (see `sessionService.installE2eHooks`):
 
-- `getActiveSessionId`
-- `injectServerMessage`
+- `getActiveSessionId` / `injectServerMessage`
 - `simulateAgentWriteFinished` — write → Changes (H1)
-- `createChatSession` / helpers below as added in Phase 1
-- `simulateTurnRunning` / `simulateTurnCancelled` — cancel UI (H2)
+- `createChatSessionForE2e` / `createCodeSessionForE2e` — session without LLM
+- `simulateTurnRunning` / `simulateTurnCancelled` — cancel UI (H2/H3)
 - `simulateSessionError` / `getSessionDebugBundleJson` — copy-debug (H4)
+- `simulatePermissionRequest` — HITL modal (H5)
 - `seedAgentCollaboration` — Agents panel (H6)
+- `seedCheckpoints` — Timeline rows (P4)
+- `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
+- `simulatePluginInstallError` — T2 (after Settings form submit)
 
-Helpers: `e2e/helpers/e2e-hooks.ts`.
+Helpers: `e2e/helpers/e2e-hooks.ts`, `git-workspace.ts`, `history.ts`.
 
 ## CI suggestion
 

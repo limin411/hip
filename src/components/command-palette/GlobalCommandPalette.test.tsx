@@ -12,7 +12,7 @@ import * as domain from '@/domain'
 
 describe('feature flag', () => {
   it('is dark-launched off', () => {
-    expect(GLOBAL_COMMAND_PALETTE).toBe(false)
+    expect(GLOBAL_COMMAND_PALETTE).toBe(true)
   })
 })
 

@@ -614,6 +614,65 @@ describe('workspace diff', () => {
     expect(turn.toolCalls?.[0]).toMatchObject({ callId, name: 'read_file', status: 'running' })
   })
 
+  it('simulatePermissionRequest sets pendingPermission', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { requestId } = svc.simulatePermissionRequest('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.pendingPermission?.requestId).toBe(requestId)
+    expect(sess.pendingPermission?.tool.title).toBe('e2e-run-script')
+    expect(sess.pendingPermission?.options).toHaveLength(2)
+  })
+
+  it('seedCheckpoints folds isGitRepo and rows into diffStore', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { count } = svc.seedCheckpoints('s1')
+    expect(count).toBe(2)
+    const slice = useDiffStore.getState().bySession['s1']
+    expect(slice.isGitRepo).toBe(true)
+    expect(slice.checkpoints).toHaveLength(2)
+    expect(slice.currentBranch).toBe('main')
+  })
+
+  it('seedCheckpoints survives requestCheckpoints and empty list:result', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedCheckpoints('s1')
+    svc.requestCheckpoints('s1')
+    expect(t.sent.filter((m) => m.type === 'git:checkpoint:list')).toHaveLength(0)
+    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(2)
+    t.push({
+      type: 'git:checkpoint:list:result',
+      sessionId: 's1',
+      checkpoints: [],
+      isGitRepo: true,
+      currentBranch: 'main',
+    })
+    expect(useDiffStore.getState().bySession['s1'].checkpoints).toHaveLength(2)
+  })
+
+  it('openCommandPaletteForE2e toggles command palette store', async () => {
+    const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
+    useCommandPaletteStore.setState({ open: false, page: null })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.openCommandPaletteForE2e()
+    expect(useCommandPaletteStore.getState().open).toBe(true)
+    svc.closeCommandPaletteForE2e()
+    expect(useCommandPaletteStore.getState().open).toBe(false)
+  })
+
+  it('simulatePluginInstallError sets pluginInstall result failure', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.simulatePluginInstallError('structure bad')
+    expect(useDomainStore.getState().pluginInstall).toMatchObject({
+      status: 'error',
+      result: { ok: false, error: 'structure bad' },
+    })
+  })
+
   it('ready resets a wedged loading state so requestDiff works again', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

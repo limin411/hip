@@ -5,6 +5,12 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
+import {
+  commitCodeSessionWithDir,
+  diffFileTexts,
+  initGitAndOpenChanges,
+  reopenChangesTab,
+} from '../helpers/git-workspace.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -12,17 +18,6 @@ import { CodePage } from '../page-objects/CodePage.js'
 // Created in before() (not at module load) so an E2E_GREP-filtered run never leaks it.
 let dir: string
 const codePage = new CodePage()
-
-async function initGitAndOpenChanges(): Promise<void> {
-  const init = await codePage.gitInitButton
-  await init.waitForExist({ timeout: 30000 })
-  await init.click()
-  // The Changes tab is git-gated and only appears once init makes this a repo.
-  const changesTab = await browser.$('[data-testid="tab-changes"]')
-  await changesTab.waitForExist({ timeout: 30000 })
-  await changesTab.click()
-  await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 30000 })
-}
 
 describe('workspace git diff @core', () => {
   before(async () => {
@@ -34,19 +29,12 @@ describe('workspace git diff @core', () => {
     await switchToCodeSurface()
   })
 
-  after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }) })
+  after(() => {
+    if (dir) fs.rmSync(dir, { recursive: true, force: true })
+  })
 
   it('commits a session bound to the temp folder', async () => {
-    await codePage.newConversation.waitForExist({ timeout: 120000 })
-    await codePage.pickDirectory(dir)
-    await (await codePage.entry('/hello.txt')).waitForExist({ timeout: 60000 })
-    const ta = await browser.$('[data-testid="new-conversation"] textarea')
-    await ta.click()
-    await browser.keys('diff e2e')
-    const send = await browser.$('[data-testid="new-conversation"] [data-testid="composer-send"]')
-    await send.waitForEnabled({ timeout: 10000 })
-    await send.click()
-    await codePage.newConversation.waitForExist({ reverse: true, timeout: 30000 })
+    await commitCodeSessionWithDir(dir, 'diff e2e', '/hello.txt')
   })
 
   it('shows the not-a-repo state with an init button on the Files tab', async () => {
@@ -71,20 +59,15 @@ describe('workspace git diff @core', () => {
   it('an out-of-band file change appears in the changes view', async () => {
     // The sidecar has no live fs watcher, so re-activate the Changes tab to
     // trigger a fresh diff pull after the external edit.
-    const filesTab = await browser.$('[data-testid="tab-files"]')
-    await filesTab.waitForExist({ timeout: 10000 })
-    await filesTab.click()
-
     fs.writeFileSync(path.join(dir, 'hello.txt'), 'changed\n')
-
-    const changesTab = await browser.$('[data-testid="tab-changes"]')
-    await changesTab.waitForExist({ timeout: 10000 })
-    await changesTab.click()
-    await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 10000 })
+    await reopenChangesTab()
 
     const file = await browser.$('[data-testid="diff-file"]')
     await file.waitForExist({ timeout: 30000 })
-    await browser.waitUntil(async () => (await file.getText()).includes('hello.txt'), { timeout: 10000, interval: 500 })
+    await browser.waitUntil(async () => (await file.getText()).includes('hello.txt'), {
+      timeout: 10000,
+      interval: 500,
+    })
   })
 
   it('split view toggle is present and switches to two-column layout', async () => {
@@ -119,5 +102,24 @@ describe('workspace git diff @core', () => {
   it('changed-files jump list is absent for a single-file diff', async () => {
     const jumpList = await browser.$('[data-testid="diff-file-list"]')
     expect(await jumpList.isExisting()).toBe(false)
+  })
+
+  // C7: multi-file jump list
+  it('shows jump list when two files are changed', async () => {
+    fs.writeFileSync(path.join(dir, 'second.txt'), 'second file\n')
+    await reopenChangesTab()
+
+    await browser.waitUntil(
+      async () => {
+        const joined = await diffFileTexts()
+        return joined.includes('hello.txt') && joined.includes('second.txt')
+      },
+      { timeout: 30000, interval: 500, timeoutMsg: 'expected two diff files' },
+    )
+
+    const jumpList = await browser.$('[data-testid="diff-file-list"]')
+    await jumpList.waitForExist({ timeout: 15000 })
+    const jumps = await browser.$$('[data-testid="diff-file-jump"]')
+    expect(jumps.length).toBeGreaterThanOrEqual(2)
   })
 })

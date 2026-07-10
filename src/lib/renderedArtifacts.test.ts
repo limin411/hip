@@ -98,6 +98,24 @@ describe('extractRenderedArtifacts', () => {
     expect(extractRenderedArtifacts(calls)).toEqual([])
   })
 
+  it('recovers path from write_file confirmation when clipped input is content-first', () => {
+    // content-first + clip chops `"path"` off; output still carries `wrote /p/late.html (N bytes)`.
+    const full = JSON.stringify({ content: 'z'.repeat(8000), path: '/p/late.html' })
+    const clipped = full.slice(0, 4096)
+    const calls: ToolCall[] = [
+      tc({
+        callId: 'c1',
+        seq: 1,
+        input: clipped,
+        truncated: true,
+        output: 'wrote /p/late.html (8000 bytes)',
+      }),
+    ]
+    expect(extractRenderedArtifacts(calls)).toEqual<RenderedArtifact[]>([
+      { path: '/p/late.html', name: 'late.html', kind: 'html' },
+    ])
+  })
+
   it('returns [] for undefined or empty input', () => {
     expect(extractRenderedArtifacts(undefined)).toEqual([])
     expect(extractRenderedArtifacts([])).toEqual([])

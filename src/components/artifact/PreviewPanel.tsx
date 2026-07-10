@@ -115,9 +115,10 @@ export function PreviewPanel() {
                   )
                 })}
               </ul>
-              <div className="min-w-0 flex-1">
+              {/* Column flex so FilePreview (h-full iframe/img) gets a definite remaining height. */}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 {ready && (
-                  <div className="flex items-center gap-1 border-b border-border px-2 py-1">
+                  <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1">
                     <Button variant="ghost" size="icon" onClick={copy} title={t('artifact.copyArtifact')} disabled={!ready || preview?.encoding === 'base64'}>
                       <Copy size={15} />
                     </Button>
@@ -126,7 +127,9 @@ export function PreviewPanel() {
                     </Button>
                   </div>
                 )}
-                <FilePreview />
+                <div className="min-h-0 flex-1">
+                  <FilePreview />
+                </div>
               </div>
             </div>
           )

@@ -42,6 +42,8 @@ export function ArtifactCard({ toolCalls }: { toolCalls?: ToolCall[] }) {
         ui.setTab('files')
       }
     } else {
+      // Chat: force the files/artifacts tab (not agents) so the preview actually mounts.
+      ui.setChatActiveTab('files')
       ui.setSelectedArtifactPath(path)
       setSessionChatPanelOpen(activeSessionId, true)
     }

@@ -205,8 +205,11 @@ export interface SystemPromptInput {
 
 const BASE_CHAT =
   'You are a helpful desktop assistant. Prefer short answers. ' +
-  'You may use read-only tools when the workspace allows. ' +
+  'You have a private sandbox workspace with file tools (when available). ' +
   'For simple greetings or short questions, answer directly without tools or sub-agents. ' +
+  'When the user asks for a previewable deliverable — HTML page, image, PDF, Markdown doc, or similar — ' +
+  'write it with write_file to a root-relative path (e.g. `/page.html`, `/notes.md`, `/chart.svg`) so it ' +
+  'appears in the artifacts preview. Do not only paste large HTML/source into the chat. ' +
   'Do not invent shell tool names; use run_script only if it is available.'
 
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions, MCP catalog). */

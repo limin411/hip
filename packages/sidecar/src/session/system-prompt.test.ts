@@ -31,6 +31,12 @@ describe('buildSystemPrompt', () => {
     expect(chat.length).toBeLessThan(code.length)
   })
 
+  it('chat surface steers previewable deliverables to write_file artifacts', () => {
+    const chat = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'chat' })
+    expect(chat).toMatch(/write_file/)
+    expect(chat).toMatch(/page\.html|artifacts preview|previewable/i)
+  })
+
   it('gives the agent the hip identity and forbids impersonating other assistants', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
     expect(s).toMatch(/you are hip/i)

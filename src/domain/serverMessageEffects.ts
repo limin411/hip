@@ -6,6 +6,8 @@ import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
+import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
+import { surfaceOf } from '@/lib/sessions'
 
 /** Dependencies the side-effect router needs from SessionService (avoid circular imports). */
 export interface ServerMessageEffectDeps {
@@ -214,6 +216,23 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       if (tab === 'changes' || view === 'code') {
         deps.requestDiff(msg.sessionId)
         if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
+      }
+      // Chat surface: auto-open PreviewPanel on the latest renderable write so HTML/images/docs
+      // actually appear without requiring a manual card click (Claude Artifacts-style).
+      const domain = useDomainStore.getState()
+      const sess = domain.sessions.find((s) => s.id === msg.sessionId)
+      if (sess && surfaceOf(sess.config) === 'chat' && domain.activeSessionId === msg.sessionId) {
+        const arts = extractRenderedArtifacts(msg.message.toolCalls)
+        if (arts.length > 0) {
+          const last = arts[arts.length - 1]
+          useFsStore.getState().setActive(msg.sessionId, last.path)
+          useFsStore.getState().setPreview(msg.sessionId, { status: 'loading', path: last.path })
+          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path: last.path })
+          const ui = useUiStore.getState()
+          ui.setChatActiveTab('files')
+          ui.setSelectedArtifactPath(last.path)
+          domain.setSessionChatPanelOpen(msg.sessionId, true)
+        }
       }
       return
     }

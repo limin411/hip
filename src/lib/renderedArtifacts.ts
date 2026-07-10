@@ -26,19 +26,35 @@ function recoverPath(input: string): string | null {
   }
 }
 
+/**
+ * Recover path from write_file's success confirmation (`wrote /path (N bytes)`). Used when the
+ * clipped input is content-first and the `"path"` key was chopped off entirely — the short
+ * confirmation string still carries the path reliably.
+ */
+function pathFromWriteOutput(output?: string): string | null {
+  if (!output) return null
+  const m = /^wrote (.+) \(\d+ bytes\)$/.exec(output.trim())
+  return m ? m[1] : null
+}
+
 /** Parse a write_file ToolCall.input (JSON) and return its `.path`, or null; never throws. When the
  *  input was clipped (`truncated`) or JSON.parse fails, fall back to a leading-`path` regex so the
- *  large HTML/MD/SVG/PDF artifacts the card targets aren't silently dropped. */
-function pathOf(input: string, truncated?: boolean): string | null {
+ *  large HTML/MD/SVG/PDF artifacts the card targets aren't silently dropped. When input still has
+ *  no path, fall back to the write confirmation in `output`. */
+function pathOf(input: string, truncated?: boolean, output?: string): string | null {
   if (!truncated) {
     try {
       const p = (JSON.parse(input) as { path?: unknown }).path
-      return typeof p === 'string' ? p : null
+      if (typeof p === 'string') return p
     } catch {
-      return recoverPath(input)
+      const recovered = recoverPath(input)
+      if (recovered) return recovered
     }
+  } else {
+    const recovered = recoverPath(input)
+    if (recovered) return recovered
   }
-  return recoverPath(input)
+  return pathFromWriteOutput(output)
 }
 
 function basename(p: string): string {
@@ -62,7 +78,7 @@ export function extractRenderedArtifacts(toolCalls?: ToolCall[]): RenderedArtifa
   const sorted = [...toolCalls].sort((a, b) => a.seq - b.seq)
   for (const tc of sorted) {
     if (tc.name !== 'write_file' || tc.status !== 'finished') continue
-    const path = pathOf(tc.input, tc.truncated)
+    const path = pathOf(tc.input, tc.truncated, tc.output)
     if (!path) continue
     const kind = previewKind(path)
     if (!RENDERABLE.has(kind)) continue

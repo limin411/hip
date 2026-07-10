@@ -182,10 +182,12 @@ export class SessionStore {
       const base: Message = { id: r.id, role: r.role, content: r.content, agentId: r.agent_id ?? undefined, timestamp: r.timestamp, ...(r.stopped ? { stopped: true } : {}), ...(attachments?.length ? { attachments } : {}) }
       if (r.timeline != null) {
         base.timeline = JSON.parse(r.timeline) as TimelineStep[]
-        const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
-          .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
-        if (tools.length) base.toolCalls = tools
       }
+      // toolCalls are keyed by agent_runs.message_id — load them even when timeline is null
+      // (e.g. tool-only artifact turns that still produced write_file rows).
+      const tools = (toolStmt.all(r.id) as { call_id: string; agent_id: string; name: string; input: string; output: string | null; status: ToolStatus; error: string | null; seq: number; truncated: number }[])
+        .map((t): ToolCall => ({ callId: t.call_id, agentId: t.agent_id, name: t.name, input: t.input, status: t.status, seq: t.seq, ...(t.output != null ? { output: t.output } : {}), ...(t.error != null ? { error: t.error } : {}), ...(t.truncated ? { truncated: true } : {}) }))
+      if (tools.length) base.toolCalls = tools
       return base
     })
   }

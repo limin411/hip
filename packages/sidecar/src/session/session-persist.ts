@@ -102,13 +102,18 @@ export function finalizeAndPersistTurn(
   const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
   if (deps.store) {
     emitSessionEvent(deps, { type: 'text_ended', sessionId: deps.id, messageId: turnId, content: finalText, timestamp: ts })
+    // Always persist an assistant row when the turn produced text OR tool/timeline work.
+    // Previously empty finalText (tool-only artifact turns) passed assistant:null, so
+    // agent_runs.message_id stayed NULL and loadMessages dropped toolCalls on reload —
+    // Chat ArtifactCards vanished after reopening the session.
+    const hasWork = !!finalText || runs.length > 0 || timeline.length > 0
     emitSessionEvent(
       deps,
       { type: 'step_ended', sessionId: deps.id, turnId, agentId: 'supervisor', timestamp: ts },
       {
         usage: turnUsage,
         runs,
-        assistant: finalText
+        assistant: hasWork
           ? { id: turnId, sessionId: deps.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline }
           : null,
       },

@@ -228,4 +228,66 @@ describe('applyServerMessageEffects', () => {
       expect(useWorkflowStore.getState().bySession['s1']).toBeUndefined()
     })
   })
+
+  describe('chat artifact auto-open', () => {
+    it('message:complete on chat surface opens PreviewPanel and loads the latest renderable write', () => {
+      seedSession('chat')
+      useUiStore.setState({
+        activeView: 'chat',
+        chatActiveTab: 'agents',
+        selectedArtifactPath: null,
+      })
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'done',
+            timestamp: 1,
+            toolCalls: [
+              {
+                callId: 'c1',
+                agentId: 'supervisor',
+                name: 'write_file',
+                input: JSON.stringify({ path: '/page.html', content: '<h1>hi</h1>' }),
+                status: 'finished',
+                seq: 0,
+                output: 'wrote /page.html (11 bytes)',
+              },
+            ],
+          },
+        },
+        deps,
+      )
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+      expect(sess.chatPanelOpen).toBe(true)
+      expect(useUiStore.getState().chatActiveTab).toBe('files')
+      expect(useUiStore.getState().selectedArtifactPath).toBe('/page.html')
+      expect(deps.sent.some((m) => m.type === 'fs:read' && (m as { path?: string }).path === '/page.html')).toBe(true)
+    })
+
+    it('message:complete on chat surface does not open panel when no renderable writes', () => {
+      seedSession('chat')
+      useUiStore.setState({ activeView: 'chat', selectedArtifactPath: null })
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'message:complete',
+          sessionId: 's1',
+          message: {
+            id: 't1',
+            role: 'assistant',
+            content: 'hello',
+            timestamp: 1,
+            toolCalls: [],
+          },
+        },
+        deps,
+      )
+      expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+    })
+  })
 })

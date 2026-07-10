@@ -499,10 +499,14 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   // Persist with agentId='supervisor' so insertTurnBody is invoked and the legacy messages table
   // stores timeline + agentRuns. Without this, a later session:load (common in Code sessions with
   // cwd/project state) returns a stripped message and the sub-agent activity vanishes.
+  // Persist assistant even when agentText is empty so tool-only turns keep message_id linkage.
+  const hasWork = !!agentText || runs.length > 0 || timeline.length > 0
   host.emit({ type: 'step_ended', sessionId: host.id, turnId, agentId: 'supervisor', timestamp: Date.now() }, {
     usage: turnUsage,
     runs,
-    assistant: agentText ? { id: turnId, sessionId: host.id, agentId: agent.id, content: agentText, timestamp: Date.now(), timeline } : null,
+    assistant: hasWork
+      ? { id: turnId, sessionId: host.id, agentId: agent.id, content: agentText, timestamp: Date.now(), timeline }
+      : null,
   })
   _send({ type: 'message:complete', sessionId: host.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now(), timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}) } })
 

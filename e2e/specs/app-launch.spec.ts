@@ -6,7 +6,7 @@ import { skipLoginIfPresent } from '../helpers/auth.js'
 // the historical variant list in `chat.greeting`.
 const CHAT_GREETING = '我们来做点什么？'
 
-describe('hip desktop app', () => {
+describe('hip desktop app @smoke', () => {
   it('should launch and show the login screen', async () => {
     await waitForAppReady()
 

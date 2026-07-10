@@ -24,7 +24,7 @@ async function initGitAndOpenChanges(): Promise<void> {
   await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 30000 })
 }
 
-describe('write tool → Changes auto-refresh', () => {
+describe('write tool → Changes auto-refresh @core @harness', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

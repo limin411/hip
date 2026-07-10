@@ -9,7 +9,7 @@ const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const codePage = new CodePage()
 const sessionItems = () => browser.$$('[data-testid="session-tab"]')
 
-describe('new conversation', () => {
+describe('new conversation @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

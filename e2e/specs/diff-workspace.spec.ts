@@ -24,7 +24,7 @@ async function initGitAndOpenChanges(): Promise<void> {
   await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 30000 })
 }
 
-describe('workspace git diff', () => {
+describe('workspace git diff @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

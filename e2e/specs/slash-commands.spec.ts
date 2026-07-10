@@ -22,7 +22,7 @@ async function typeInComposer(text: string): Promise<void> {
   await browser.keys(text)
 }
 
-describe('slash commands', () => {
+describe('slash commands @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

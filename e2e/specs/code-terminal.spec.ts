@@ -49,7 +49,7 @@ async function commitCodeSession(message: string): Promise<void> {
   await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
 }
 
-describe('code terminal panel', () => {
+describe('code terminal panel @panel', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

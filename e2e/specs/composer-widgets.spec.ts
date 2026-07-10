@@ -23,7 +23,7 @@ async function openChipMenu(chip: ChainablePromiseElement): Promise<ChainablePro
   return menu
 }
 
-describe('composer widgets', () => {
+describe('composer widgets @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

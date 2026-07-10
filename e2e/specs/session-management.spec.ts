@@ -17,7 +17,7 @@ async function ensureNewConversationDraft(): Promise<void> {
   }
 }
 
-describe('session management', () => {
+describe('session management @smoke @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

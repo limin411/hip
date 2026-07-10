@@ -15,7 +15,7 @@ const PAGES = [
   { id: 'plugins', label: '插件' },
 ] as const
 
-describe('settings smoke', () => {
+describe('settings smoke @settings @smoke', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

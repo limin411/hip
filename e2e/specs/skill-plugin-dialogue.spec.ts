@@ -37,7 +37,7 @@ async function selectSkill(name: string): Promise<void> {
   await browser.pause(300)
 }
 
-describe('skill-plugin-dialogue', () => {
+describe('skill-plugin-dialogue @core', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()

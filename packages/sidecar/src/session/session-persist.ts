@@ -1,0 +1,144 @@
+/** Dual-write session event persistence + turn finalize helpers. */
+import type { ServerMessage, SessionConfig, AgentRun, SessionEvent, TimelineStep, TurnUsage } from '@hip/protocol'
+import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
+import { trajectoryToRuns, trajectoryToTimeline, type TraceRun } from './tool-trace.js'
+import { verifyWrites } from './verify.js'
+import { sumUsage } from './usage.js'
+import type { SessionStore } from '../persistence/store.js'
+import type { EventStore, SnapshotStore } from '../persistence/event-store.js'
+import { saveSessionSnapshot } from '../persistence/event-store.js'
+import { projectEvent } from '../persistence/message-projector.js'
+import { sessionEventToEventData } from './session-message-codec.js'
+import { logInfo } from '../debug-logger.js'
+
+type SendFn = (msg: ServerMessage) => void
+
+export interface PersistDeps {
+  id: string
+  store?: SessionStore
+  eventStore?: EventStore
+  snapshotStore?: SnapshotStore
+  config: SessionConfig
+  messages: BaseMessage[]
+}
+
+export function emitSessionEvent(
+  deps: PersistDeps,
+  event: SessionEvent,
+  context?: {
+    stepId?: string
+    usage?: TurnUsage
+    runs?: AgentRun[]
+    assistant?: {
+      id: string
+      sessionId: string
+      agentId: string
+      content: string
+      timestamp: number
+      stopped?: boolean
+      timeline?: TimelineStep[]
+    } | null
+  },
+): void {
+  if (!deps.store || !deps.eventStore) return
+  const db = deps.store.getDb()
+  db.exec('BEGIN')
+  try {
+    switch (event.type) {
+      case 'user_message':
+        deps.store.insertMessage({
+          id: event.messageId,
+          sessionId: event.sessionId,
+          role: 'user',
+          agentId: null,
+          content: event.content,
+          timestamp: event.timestamp,
+          attachments: event.attachments,
+        })
+        deps.store.touchSession(event.sessionId, event.timestamp)
+        break
+      case 'step_ended':
+        if (event.agentId === 'supervisor' && context?.assistant !== undefined) {
+          deps.store.insertTurnBody(context.assistant, event.sessionId, context.runs ?? [])
+        }
+        break
+    }
+
+    const data = sessionEventToEventData(event, context)
+    const published = deps.eventStore.append(event.sessionId, event.type, data)
+    projectEvent(db, published)
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+export function finalizeAndPersistTurn(
+  deps: PersistDeps,
+  send: SendFn,
+  turnId: string,
+  supervisorText: string,
+  trajectory: Map<string, TraceRun>,
+  stopped: boolean,
+  usageByAgent?: Map<string, TurnUsage>,
+  targetMessages: BaseMessage[] = deps.messages,
+): string {
+  const { correction } = verifyWrites(trajectory, supervisorText, deps.config.language ?? 'en')
+  const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
+  const last = targetMessages[targetMessages.length - 1]
+  if ((last instanceof AIMessage || last instanceof AIMessageChunk) && typeof last.content === 'string' && last.content === supervisorText && finalText) {
+    targetMessages[targetMessages.length - 1] = new AIMessage(finalText)
+  } else if (finalText) {
+    targetMessages.push(new AIMessage(finalText))
+  }
+  const ts = Date.now()
+  const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => {
+    const u = usageByAgent?.get(r.agentId)
+    return { ...r, messageId: turnId, ...(u ? { usage: u } : {}) }
+  })
+  const turnUsage = sumUsage(runs.map((r) => r.usage))
+  const timeline = trajectoryToTimeline(trajectory)
+  const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
+  if (deps.store) {
+    emitSessionEvent(deps, { type: 'text_ended', sessionId: deps.id, messageId: turnId, content: finalText, timestamp: ts })
+    emitSessionEvent(
+      deps,
+      { type: 'step_ended', sessionId: deps.id, turnId, agentId: 'supervisor', timestamp: ts },
+      {
+        usage: turnUsage,
+        runs,
+        assistant: finalText
+          ? { id: turnId, sessionId: deps.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline }
+          : null,
+      },
+    )
+    deps.store.touchSession(deps.id, ts)
+    if (deps.snapshotStore) {
+      const latestSeq = deps.eventStore?.latestSeq(deps.id) ?? 0
+      saveSessionSnapshot(deps.snapshotStore, deps.id, latestSeq, {
+        messages: targetMessages,
+        config: deps.config,
+        usageByAgent: usageByAgent ? Object.fromEntries(usageByAgent) : undefined,
+      })
+    }
+  }
+  logInfo('session', 'message:complete', { sessionId: deps.id, turnId, textLen: finalText.length, stopped })
+  send({
+    type: 'message:complete',
+    sessionId: deps.id,
+    message: {
+      id: turnId,
+      role: 'assistant',
+      content: finalText,
+      agentId: 'supervisor',
+      timestamp: ts,
+      timeline,
+      toolCalls,
+      agentRuns: runs,
+      ...(turnUsage ? { usage: turnUsage } : {}),
+      ...(stopped ? { stopped: true } : {}),
+    },
+  })
+  return finalText
+}

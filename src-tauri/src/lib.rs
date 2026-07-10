@@ -4,9 +4,21 @@ mod auth;
 mod skills;
 mod plugins;
 mod path_env;
+mod logging;
+mod hip_config;
+mod path_tools;
+
+// Re-export so command handlers and unit tests can use `super::HipConfig` etc.
+use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
+#[cfg(test)]
+use hip_config::{
+    ActiveModel, AgentEntry, BoundModel, McpServerEntry, PermissionEntry, ProviderEntry,
+    SkillEntry, ToolPermissionConfig, TomlActiveModel, TomlAgentEntry, TomlBoundModel,
+    TomlMcpServerEntry, TomlPermissionEntry, TomlProviderEntry, TomlSkillEntry,
+    TomlToolPermissionConfig,
+};
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::sync::OnceLock;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
@@ -14,68 +26,6 @@ use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
-
-const LOG_MAX_SIZE: u64 = 5 * 1024 * 1024; // 5 MB
-const LOG_MAX_FILES: u32 = 5;
-
-fn log_is_debug() -> bool {
-    static V: OnceLock<bool> = OnceLock::new();
-    *V.get_or_init(|| std::env::var("HIP_DEBUG").as_deref() == Ok("1"))
-}
-
-fn log_base_name() -> &'static str {
-    if log_is_debug() { "tauri-debug" } else { "tauri" }
-}
-
-fn log_dir() -> &'static std::path::PathBuf {
-    static V: OnceLock<std::path::PathBuf> = OnceLock::new();
-    V.get_or_init(|| {
-        let dir = dirs::home_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join(".hip").join("logs");
-        let _ = std::fs::create_dir_all(&dir);
-        dir
-    })
-}
-
-fn log_file_path(suffix: &str) -> std::path::PathBuf {
-    log_dir().join(format!("{}{}.log", log_base_name(), suffix))
-}
-
-fn log_rotate() {
-    for i in (0..LOG_MAX_FILES).rev() {
-        let suffix = if i == 0 { String::new() } else { format!(".{i}") };
-        let src = log_file_path(&suffix);
-        if !src.exists() { continue }
-        if i >= LOG_MAX_FILES - 1 { let _ = std::fs::remove_file(&src); continue }
-        let dst = log_file_path(&format!(".{}", i + 1));
-        let _ = std::fs::rename(&src, &dst);
-    }
-}
-
-fn log_write(level: &str, tag: &str, msg: &str) {
-    let ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let line = format!("[{ms}] [{level}] [{tag}] {msg}\n");
-    let p = log_file_path("");
-    if let Ok(meta) = std::fs::metadata(&p) {
-        if meta.len() >= LOG_MAX_SIZE { log_rotate() }
-    }
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&p) {
-        let _ = f.write_all(line.as_bytes());
-    }
-}
-
-#[macro_export]
-macro_rules! tauri_info {
-    ($tag:expr, $msg:expr) => { $crate::log_write("INFO", $tag, $msg) };
-}
-#[macro_export]
-macro_rules! tauri_debug {
-    ($tag:expr, $msg:expr) => { if $crate::log_is_debug() { $crate::log_write("DEBUG", $tag, $msg) } };
-}
 
 pub struct SidecarState {
     pub port: Mutex<Option<u16>>,
@@ -92,511 +42,6 @@ impl SidecarState {
             token: Mutex::new(None),
             child: Mutex::new(None),
             generation: AtomicU64::new(0),
-        }
-    }
-}
-
-// ── Unified TOML config types (wave 1) ──
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct BoundModel {
-    // Protocol (packages/protocol) uses capital-ID keys, not plain camelCase.
-    #[serde(rename = "providerID")]
-    provider_id: String,
-    #[serde(rename = "modelID")]
-    model_id: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct ActiveModel {
-    // Protocol (packages/protocol) uses capital-ID/URL keys, not plain camelCase.
-    #[serde(rename = "providerID")]
-    provider_id: String,
-    #[serde(rename = "modelID")]
-    model_id: String,
-    #[serde(rename = "baseURL")]
-    base_url: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ProviderEntry {
-    id: String,
-    name: String,
-    base_url: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    api_key: Option<String>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct McpServerEntry {
-    id: String,
-    name: String,
-    transport: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    command: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    args: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    headers: Option<HashMap<String, String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    enabled_tools: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    disabled_tools: Option<Vec<String>>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct AgentEntry {
-    id: String,
-    name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    kind: String,
-    command: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    args: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    bound_model: Option<BoundModel>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    quirks: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    prompt: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    allowed_tools: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    allowed_skills: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    allowed_mcp_servers: Option<Vec<String>>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct SkillEntry {
-    id: String,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ToolPermissionConfig {
-    default_mode: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    overrides: Option<HashMap<String, String>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct PermissionEntry {
-    coarse_mode: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tool_permissions: Option<ToolPermissionConfig>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct HipConfig {
-    version: u32,
-    #[serde(default)]
-    providers: Vec<ProviderEntry>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    active_model: Option<ActiveModel>,
-    #[serde(default)]
-    mcp_servers: Vec<McpServerEntry>,
-    #[serde(default)]
-    skills: Vec<SkillEntry>,
-    #[serde(default)]
-    agents: Vec<AgentEntry>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    fixed_agents: Option<HashMap<String, bool>>,
-    #[serde(default)]
-    permissions: Option<PermissionEntry>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct NetworkPolicyConfig {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    allowlist: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    denylist: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_requests_per_minute: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_response_bytes: Option<u64>,
-}
-
-// ── TOML mirror structs (snake_case with camelCase aliases for backward compat) ──
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlBoundModel {
-    #[serde(alias = "providerId")]
-    provider_id: String,
-    #[serde(alias = "modelId")]
-    model_id: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlActiveModel {
-    #[serde(alias = "providerId")]
-    provider_id: String,
-    #[serde(alias = "modelId")]
-    model_id: String,
-    #[serde(alias = "baseUrl")]
-    base_url: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlProviderEntry {
-    id: String,
-    name: String,
-    #[serde(alias = "baseUrl")]
-    base_url: String,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "apiKey")]
-    api_key: Option<String>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlMcpServerEntry {
-    id: String,
-    name: String,
-    transport: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    command: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    args: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    url: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    headers: Option<HashMap<String, String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "enabledTools")]
-    enabled_tools: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "disabledTools")]
-    disabled_tools: Option<Vec<String>>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlAgentEntry {
-    id: String,
-    name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
-    kind: String,
-    command: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    args: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "boundModel")]
-    bound_model: Option<TomlBoundModel>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    quirks: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    env: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    prompt: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedTools")]
-    allowed_tools: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedSkills")]
-    allowed_skills: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "allowedMcpServers")]
-    allowed_mcp_servers: Option<Vec<String>>,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlSkillEntry {
-    id: String,
-    enabled: bool,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlToolPermissionConfig {
-    #[serde(alias = "defaultMode")]
-    default_mode: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    overrides: Option<HashMap<String, String>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlPermissionEntry {
-    #[serde(alias = "coarseMode")]
-    coarse_mode: String,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "toolPermissions")]
-    tool_permissions: Option<TomlToolPermissionConfig>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(dead_code)]
-struct TomlHipConfig {
-    version: u32,
-    #[serde(default)]
-    providers: Vec<TomlProviderEntry>,
-    #[serde(skip_serializing_if = "Option::is_none", alias = "activeModel")]
-    active_model: Option<TomlActiveModel>,
-    #[serde(default, alias = "mcpServers")]
-    mcp_servers: Vec<TomlMcpServerEntry>,
-    #[serde(default)]
-    skills: Vec<TomlSkillEntry>,
-    #[serde(default)]
-    agents: Vec<TomlAgentEntry>,
-    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fixedAgents")]
-    fixed_agents: Option<HashMap<String, bool>>,
-    #[serde(default)]
-    permissions: Option<TomlPermissionEntry>,
-}
-
-// ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
-
-impl From<BoundModel> for TomlBoundModel {
-    fn from(b: BoundModel) -> Self {
-        TomlBoundModel {
-            provider_id: b.provider_id,
-            model_id: b.model_id,
-        }
-    }
-}
-
-impl From<TomlBoundModel> for BoundModel {
-    fn from(b: TomlBoundModel) -> Self {
-        BoundModel {
-            provider_id: b.provider_id,
-            model_id: b.model_id,
-        }
-    }
-}
-
-impl From<ActiveModel> for TomlActiveModel {
-    fn from(m: ActiveModel) -> Self {
-        TomlActiveModel {
-            provider_id: m.provider_id,
-            model_id: m.model_id,
-            base_url: m.base_url,
-        }
-    }
-}
-
-impl From<TomlActiveModel> for ActiveModel {
-    fn from(m: TomlActiveModel) -> Self {
-        ActiveModel {
-            provider_id: m.provider_id,
-            model_id: m.model_id,
-            base_url: m.base_url,
-        }
-    }
-}
-
-impl From<ProviderEntry> for TomlProviderEntry {
-    fn from(p: ProviderEntry) -> Self {
-        TomlProviderEntry {
-            id: p.id,
-            name: p.name,
-            base_url: p.base_url,
-            api_key: p.api_key,
-            enabled: p.enabled,
-        }
-    }
-}
-
-impl From<TomlProviderEntry> for ProviderEntry {
-    fn from(p: TomlProviderEntry) -> Self {
-        ProviderEntry {
-            id: p.id,
-            name: p.name,
-            base_url: p.base_url,
-            api_key: p.api_key,
-            enabled: p.enabled,
-        }
-    }
-}
-
-impl From<McpServerEntry> for TomlMcpServerEntry {
-    fn from(s: McpServerEntry) -> Self {
-        TomlMcpServerEntry {
-            id: s.id,
-            name: s.name,
-            transport: s.transport,
-            command: s.command,
-            args: s.args,
-            env: s.env,
-            url: s.url,
-            headers: s.headers,
-            enabled_tools: s.enabled_tools,
-            disabled_tools: s.disabled_tools,
-            enabled: s.enabled,
-        }
-    }
-}
-
-impl From<TomlMcpServerEntry> for McpServerEntry {
-    fn from(s: TomlMcpServerEntry) -> Self {
-        McpServerEntry {
-            id: s.id,
-            name: s.name,
-            transport: s.transport,
-            command: s.command,
-            args: s.args,
-            env: s.env,
-            url: s.url,
-            headers: s.headers,
-            enabled_tools: s.enabled_tools,
-            disabled_tools: s.disabled_tools,
-            enabled: s.enabled,
-        }
-    }
-}
-
-impl From<AgentEntry> for TomlAgentEntry {
-    fn from(a: AgentEntry) -> Self {
-        TomlAgentEntry {
-            id: a.id,
-            name: a.name,
-            description: a.description,
-            kind: a.kind,
-            command: a.command,
-            args: a.args,
-            bound_model: a.bound_model.map(|x| x.into()),
-            quirks: a.quirks,
-            env: a.env,
-            prompt: a.prompt,
-            allowed_tools: a.allowed_tools,
-            allowed_skills: a.allowed_skills,
-            allowed_mcp_servers: a.allowed_mcp_servers,
-            enabled: a.enabled,
-        }
-    }
-}
-
-impl From<TomlAgentEntry> for AgentEntry {
-    fn from(a: TomlAgentEntry) -> Self {
-        AgentEntry {
-            id: a.id,
-            name: a.name,
-            description: a.description,
-            kind: a.kind,
-            command: a.command,
-            args: a.args,
-            bound_model: a.bound_model.map(|x| x.into()),
-            quirks: a.quirks,
-            env: a.env,
-            prompt: a.prompt,
-            allowed_tools: a.allowed_tools,
-            allowed_skills: a.allowed_skills,
-            allowed_mcp_servers: a.allowed_mcp_servers,
-            enabled: a.enabled,
-        }
-    }
-}
-
-impl From<SkillEntry> for TomlSkillEntry {
-    fn from(s: SkillEntry) -> Self {
-        TomlSkillEntry {
-            id: s.id,
-            enabled: s.enabled,
-        }
-    }
-}
-
-impl From<TomlSkillEntry> for SkillEntry {
-    fn from(s: TomlSkillEntry) -> Self {
-        SkillEntry {
-            id: s.id,
-            enabled: s.enabled,
-        }
-    }
-}
-
-impl From<ToolPermissionConfig> for TomlToolPermissionConfig {
-    fn from(t: ToolPermissionConfig) -> Self {
-        TomlToolPermissionConfig {
-            default_mode: t.default_mode,
-            overrides: t.overrides,
-        }
-    }
-}
-
-impl From<TomlToolPermissionConfig> for ToolPermissionConfig {
-    fn from(t: TomlToolPermissionConfig) -> Self {
-        ToolPermissionConfig {
-            default_mode: t.default_mode,
-            overrides: t.overrides,
-        }
-    }
-}
-
-impl From<PermissionEntry> for TomlPermissionEntry {
-    fn from(p: PermissionEntry) -> Self {
-        TomlPermissionEntry {
-            coarse_mode: p.coarse_mode,
-            tool_permissions: p.tool_permissions.map(|x| x.into()),
-        }
-    }
-}
-
-impl From<TomlPermissionEntry> for PermissionEntry {
-    fn from(p: TomlPermissionEntry) -> Self {
-        PermissionEntry {
-            coarse_mode: p.coarse_mode,
-            tool_permissions: p.tool_permissions.map(|x| x.into()),
-        }
-    }
-}
-
-impl From<HipConfig> for TomlHipConfig {
-    fn from(cfg: HipConfig) -> Self {
-        TomlHipConfig {
-            version: cfg.version,
-            providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
-            active_model: cfg.active_model.map(|x| x.into()),
-            mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
-            skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
-            agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
-            fixed_agents: cfg.fixed_agents,
-            permissions: cfg.permissions.map(|x| x.into()),
-        }
-    }
-}
-
-impl From<TomlHipConfig> for HipConfig {
-    fn from(cfg: TomlHipConfig) -> Self {
-        HipConfig {
-            version: cfg.version,
-            providers: cfg.providers.into_iter().map(|x| x.into()).collect(),
-            active_model: cfg.active_model.map(|x| x.into()),
-            mcp_servers: cfg.mcp_servers.into_iter().map(|x| x.into()).collect(),
-            skills: cfg.skills.into_iter().map(|x| x.into()).collect(),
-            agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
-            fixed_agents: cfg.fixed_agents,
-            permissions: cfg.permissions.map(|x| x.into()),
         }
     }
 }
@@ -732,49 +177,6 @@ const MODELS_URL: &str = "https://models.dev/api.json";
 const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
-/// True if `p` is a file and (on unix) has any execute bit set.
-fn is_executable(p: &std::path::Path) -> bool {
-    if !p.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        match std::fs::metadata(p) {
-            Ok(m) => m.permissions().mode() & 0o111 != 0,
-            Err(_) => false,
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        true
-    }
-}
-
-/// For each name, true iff an executable of that name exists in any of `dirs`.
-/// `names` are expected to be bare binary names (from the app's ACP preset list),
-/// not paths — they are joined onto each PATH dir as-is.
-fn find_on_path(
-    names: &[String],
-    dirs: &[std::path::PathBuf],
-) -> std::collections::HashMap<String, bool> {
-    names
-        .iter()
-        .map(|n| (n.clone(), dirs.iter().any(|d| is_executable(&d.join(n)))))
-        .collect()
-}
-
-/// Probe PATH for each requested executable. Uses this process's inherited PATH —
-/// the SAME env the sidecar (and thus spawned ACP agents) inherits — so a `true`
-/// here honestly predicts the agent will be spawnable.
-#[tauri::command]
-fn which_binaries(names: Vec<String>) -> Result<std::collections::HashMap<String, bool>, String> {
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    let dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path)
-        .filter(|d| !d.as_os_str().is_empty())
-        .collect();
-    Ok(find_on_path(&names, &dirs))
-}
 
 #[tauri::command]
 fn get_plugins_config(app: tauri::AppHandle) -> Result<String, String> {
@@ -1034,7 +436,7 @@ fn fallback_catalog(cache: Option<&std::path::Path>) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // A GUI/IDE-launched macOS app inherits a stripped PATH; resolve the user's real
-    // global PATH first so detection (which_binaries), the sidecar, and every spawned
+    // global PATH first so detection (path_tools::which_binaries), the sidecar, and every spawned
     // ACP/CLI agent can find globally-installed tools.
     path_env::ensure_user_path();
 
@@ -1083,7 +485,7 @@ pub fn run() {
             install_plugin,
             delete_plugin,
             list_worktrees,
-            which_binaries
+            path_tools::which_binaries
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -1127,7 +529,7 @@ mod tests {
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
         let names = vec!["opencode".to_string(), "nope".to_string()];
-        let got = super::find_on_path(&names, &[PathBuf::from(&dir)]);
+        let got = super::path_tools::find_on_path(&names, &[PathBuf::from(&dir)]);
         assert_eq!(got.get("opencode"), Some(&true));
         assert_eq!(got.get("nope"), Some(&false));
         let _ = std::fs::remove_dir_all(&dir);
@@ -1142,7 +544,7 @@ mod tests {
         let f = dir.join("opencode");
         std::fs::write(&f, "not executable\n").unwrap();
         std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
-        let got = super::find_on_path(&["opencode".to_string()], &[std::path::PathBuf::from(&dir)]);
+        let got = super::path_tools::find_on_path(&["opencode".to_string()], &[std::path::PathBuf::from(&dir)]);
         assert_eq!(got.get("opencode"), Some(&false));
         let _ = std::fs::remove_dir_all(&dir);
     }

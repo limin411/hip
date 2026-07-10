@@ -71,82 +71,36 @@ import { safeErrorMessage } from './error.js'
 import { BackgroundManager, BackgroundTaskPersistence, type BackgroundTaskMeta } from './background-manager.js'
 import { CronManager } from './cron.js'
 import { logInfo, logDebug, logDebugEveryN } from '../debug-logger.js'
+import {
+  resolveModel,
+  resolveModelChoice,
+  buildModel,
+  SAFE_KINDS,
+  tryAutoResolvePermission,
+  logNonCritical,
+  lastUserText,
+  stripImageContentParts,
+  isImageAttachment,
+  parseToolInput,
+} from './session-helpers.js'
+import { rowToBaseMessage, sessionEventToEventData, isRichContentParts } from './session-message-codec.js'
+import { emitSessionEvent, finalizeAndPersistTurn } from './session-persist.js'
 
 export { sanitizeTitle } from './title-generator.js'
 export type { TitleGenerator } from './title-generator.js'
 export type { SessionInput } from './session-input.js'
+export {
+  resolveModel,
+  resolveModelChoice,
+  SAFE_KINDS,
+  tryAutoResolvePermission,
+  stripImageContentParts,
+} from './session-helpers.js'
 
 type SendFn = (msg: ServerMessage) => void
 export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
 
-export function resolveModel(config: SessionConfig): string {
-  return config.model || (config.thinking === false ? 'deepseek-chat' : 'deepseek-reasoner')
-}
-
-function lastUserText(messages: BaseMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i]
-    if (m.getType() !== 'human') continue
-    if (typeof m.content === 'string') return m.content
-    // ContentPart[] — return only the user-typed text (first text part),
-    // not attachment content that inflates plan-detection length.
-    const firstText = m.content.find((b): b is { type: 'text'; text: string } => b.type === 'text')
-    return firstText?.text ?? ''
-  }
-  return ''
-}
-
-function logNonCritical(label: string, err: unknown): void {
-  console.warn(`[session:${label}]`, err instanceof Error ? err.message : String(err))
-}
-
-export function resolveModelChoice(
-  config: Pick<SessionConfig, 'llmProvider' | 'model' | 'baseURL'>,
-  fallback: { providerID: string; modelID: string; baseURL: string },
-  profileBinding?: { providerID: string; modelID: string },
-): { providerID: string; modelID: string; baseURL: string } {
-  if (profileBinding) {
-    return { providerID: profileBinding.providerID, modelID: profileBinding.modelID, baseURL: config.baseURL || fallback.baseURL }
-  }
-  if (config.model) {
-    return { providerID: config.llmProvider || fallback.providerID, modelID: config.model, baseURL: config.baseURL || fallback.baseURL }
-  }
-  return fallback
-}
-
-function buildModel(config: SessionConfig, profileBinding?: { providerID: string; modelID: string }): BaseChatModel {
-  return buildChatModel(resolveModelChoice(config, getActiveModel(), profileBinding))
-}
-
 const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
-
-/** Permission kinds that are considered safe (non-destructive) and auto-resolve
- *  in chat mode without emitting a `permission:request` to the user. */
-export const SAFE_KINDS = new Set(['read', 'fetch', 'other'])
-
-/**
- * Auto-resolve safe (non-file-modifying) permission requests without user prompting.
- * Returns a {@link PermissionChoice} if the request should be auto-resolved, or
- * `null` if it should go through the normal HITL prompt flow.
- *
- * Auto-resolve rules:
- * - In full mode, permissions are already auto-allowed upstream — skip.
- * - In chat and edit modes, auto-resolve for safe kinds (non-file-modifying ops).
- * - Only for kinds in {@link SAFE_KINDS} (`read`/`fetch`/`other`).
- * - Resolves to the first `allow_*` option, or the first option overall, or `{ cancelled: true }` if no options exist.
- */
-export function tryAutoResolvePermission(
-  mode: PermissionMode,
-  kind: string,
-  options: Array<{ optionId: string; kind: string }>,
-): PermissionChoice | null {
-  if (mode === 'full') return null
-  if (!SAFE_KINDS.has(kind)) return null
-  const allowOpt = options.find((o) => o.kind.startsWith('allow'))
-  if (allowOpt) return { optionId: allowOpt.optionId }
-  if (options.length > 0) return { optionId: options[0].optionId }
-  return { cancelled: true }
-}
 
 export class Session {
   private app!: ReturnType<typeof buildGraph>
@@ -1127,9 +1081,11 @@ export class Session {
     planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
     plan?: PlanItem[]
   }): Promise<string> {
-    // ── DAG mode branch ──
-    // When orchMode is 'dag' and a workflow def is pending, delegate directly
-    // to the workflow runner instead of the existing StateGraph loop.
+    // ── DAG orchestration branch ──
+    // orchMode === 'dag' + pending WorkflowDef (from workflow:run / set pending) uses
+    // the orchestrator. Persistence goes through DurableExecutor when SQLite is available
+    // (see workflow-runner). Without a pending def, fall through to the StateGraph loop
+    // so ordinary chat still works while a DAG is not queued.
     if (this.orchMode === 'dag' && this.pendingWorkflowDef) {
       const def = this.pendingWorkflowDef
       this.pendingWorkflowDef = null
@@ -1555,69 +1511,24 @@ export class Session {
   }
 
   /** Dual-write helper: persists the legacy representation AND publishes a durable
-   *  event (plus its session_message projection) inside a single SQLite transaction.
-   *  On error, ROLLBACK leaves both stores consistent. */
+   *  event (plus its session_message projection) inside a single SQLite transaction. */
   private emit(event: SessionEvent, context?: { stepId?: string; usage?: TurnUsage; runs?: AgentRun[]; assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null }): void {
-    if (!this.store || !this.eventStore) return
-    const db = this.store.getDb()
-    db.exec('BEGIN')
-    try {
-      switch (event.type) {
-        case 'user_message':
-          this.store.insertMessage({ id: event.messageId, sessionId: event.sessionId, role: 'user', agentId: null, content: event.content, timestamp: event.timestamp, attachments: event.attachments })
-          this.store.touchSession(event.sessionId, event.timestamp)
-          break
-        case 'step_ended':
-          if (event.agentId === 'supervisor' && context?.assistant !== undefined) {
-            this.store.insertTurnBody(context.assistant, event.sessionId, context.runs ?? [])
-          }
-          break
-      }
+    emitSessionEvent(this.persistDeps(), event, context)
+  }
 
-      const data = sessionEventToEventData(event, context)
-      const published = this.eventStore.append(event.sessionId, event.type, data)
-      projectEvent(db, published)
-      db.exec('COMMIT')
-    } catch (e) {
-      db.exec('ROLLBACK')
-      throw e
+  private persistDeps() {
+    return {
+      id: this.id,
+      store: this.store,
+      eventStore: this.eventStore,
+      snapshotStore: this.snapshotStore,
+      config: this._config,
+      messages: this.messages,
     }
   }
 
   private finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>, targetMessages: BaseMessage[] = this.messages): string {
-    const { correction } = verifyWrites(trajectory, supervisorText, this._config.language ?? 'en')
-    const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
-    const last = targetMessages[targetMessages.length - 1]
-    if ((last instanceof AIMessage || last instanceof AIMessageChunk) && typeof last.content === 'string' && last.content === supervisorText && finalText) {
-      targetMessages[targetMessages.length - 1] = new AIMessage(finalText)
-    } else if (finalText) {
-      targetMessages.push(new AIMessage(finalText))
-    }
-    const ts = Date.now()
-    const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => { const u = usageByAgent?.get(r.agentId); return { ...r, messageId: turnId, ...(u ? { usage: u } : {}) } })
-    const turnUsage = sumUsage(runs.map((r) => r.usage))
-    const timeline = trajectoryToTimeline(trajectory)
-    const toolCalls = runs.flatMap((r) => r.toolCalls ?? []).sort((a, b) => a.seq - b.seq)
-    if (this.store) {
-      this.emit({ type: 'text_ended', sessionId: this.id, messageId: turnId, content: finalText, timestamp: ts })
-      this.emit({ type: 'step_ended', sessionId: this.id, turnId, agentId: 'supervisor', timestamp: ts }, {
-        usage: turnUsage,
-        runs,
-        assistant: finalText ? { id: turnId, sessionId: this.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline } : null,
-      })
-      this.store.touchSession(this.id, ts)
-      if (this.snapshotStore) {
-        const latestSeq = this.eventStore?.latestSeq(this.id) ?? 0
-        saveSessionSnapshot(this.snapshotStore, this.id, latestSeq, {
-          messages: targetMessages,
-          config: this._config,
-          usageByAgent: usageByAgent ? Object.fromEntries(usageByAgent) : undefined,
-        })
-      }
-    }
-    logInfo('session', 'message:complete', { sessionId: this.id, turnId, textLen: finalText.length, stopped })
-    send({ type: 'message:complete', sessionId: this.id, message: { id: turnId, role: 'assistant', content: finalText, agentId: 'supervisor', timestamp: ts, timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}), ...(stopped ? { stopped: true } : {}) } })
-    return finalText
+    return finalizeAndPersistTurn(this.persistDeps(), send, turnId, supervisorText, trajectory, stopped, usageByAgent, targetMessages)
   }
 
   async regenerate(send: SendFn): Promise<void> {
@@ -1882,110 +1793,3 @@ export class Session {
   }
 }
 
-function isRichContentParts(parts: ContentPart[] | undefined): boolean {
-  return !!parts && parts.length > 0 && !(parts.length === 1 && parts[0].type === 'text')
-}
-
-function rowToBaseMessage(d: SessionMessageData): BaseMessage[] {
-  if (d.role === 'user') {
-    const validParts = d.contentParts?.filter((p): p is ContentPart => isContentPart(p as Record<string, unknown>))
-    if (isRichContentParts(validParts)) {
-      return [new HumanMessage({ content: validParts })]
-    }
-    return [new HumanMessage(d.content)]
-  }
-  if (d.role === 'assistant' && 'kind' in d) return [new SystemMessage(d.summary)]
-  const toolCalls = d.toolCalls.length > 0 ? d.toolCalls.map(projectedToolCallToToolCall) : undefined
-  const messages: BaseMessage[] = [
-    new AIMessage({ content: d.content, ...(toolCalls ? { tool_calls: toolCalls } : {}) }),
-  ]
-  if (toolCalls) {
-    for (const tc of d.toolCalls) {
-      const content = tc.status === 'error' ? `Error: ${tc.error ?? 'tool failed'}` : (tc.output ?? '')
-      messages.push(new ToolMessage({ content, tool_call_id: tc.callId, name: tc.name }))
-    }
-  }
-  return messages
-}
-
-function projectedToolCallToToolCall(t: ProjectedToolCall) {
-  return { name: t.name, args: parseToolInput(t.input), id: t.callId, type: 'tool_call' as const }
-}
-
-function isImageAttachment(a: { mimeType: string }): boolean {
-  return a.mimeType.startsWith('image/')
-}
-
-/** Remove image_url content parts from HumanMessages so a text-only main model never
- *  receives them. Call this at invocation time; durable storage keeps the full parts. */
-export function stripImageContentParts(messages: BaseMessage[]): BaseMessage[] {
-  return messages.map((m) => {
-    if (!(m instanceof HumanMessage)) return m
-    const content = m.content
-    if (!Array.isArray(content)) return m
-    const filtered = content.filter((p) => {
-      if (p != null && typeof p === 'object' && 'type' in p) {
-        return (p as { type: string }).type !== 'image_url'
-      }
-      return true
-    })
-    if (filtered.length === content.length) return m
-    if (filtered.length === 0) return new HumanMessage('')
-    if (filtered.length === 1 && (filtered[0] as { type: string }).type === 'text') {
-      return new HumanMessage((filtered[0] as { text: string }).text)
-    }
-    return new HumanMessage({ content: filtered })
-  })
-}
-
-function parseToolInput(input: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(input)
-    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
-  } catch (err) { logNonCritical('parseToolInput', err) }
-  return {}
-}
-
-/** Map a protocol SessionEvent into the internal event payload that the
- *  message projector expects. Protocol identifiers (`turnId`, `messageId`)
- *  map to the projector's `stepId`; tool events use the caller-supplied stepId. */
-function sessionEventToEventData(
-  event: SessionEvent,
-  context?: {
-    stepId?: string
-    usage?: TurnUsage
-    runs?: AgentRun[]
-    assistant?: {
-      id: string
-      sessionId: string
-      agentId: string
-      content: string
-      timestamp: number
-      stopped?: boolean
-      timeline?: TimelineStep[]
-    } | null
-  },
-): Record<string, unknown> {
-  switch (event.type) {
-    case 'user_message':
-      return { messageId: event.messageId, content: event.content, timestamp: event.timestamp, ...(event.attachments?.length ? { attachments: event.attachments } : {}), ...(event.contentParts?.length ? { contentParts: event.contentParts } : {}) }
-    case 'step_started':
-      return { stepId: event.turnId, agentId: event.agentId, startedAt: event.timestamp }
-    case 'step_ended':
-      return { stepId: event.turnId, agentId: event.agentId, finishedAt: event.timestamp, ...(context?.usage ? { usage: context.usage } : {}) }
-    case 'step_failed':
-      return { stepId: event.turnId, agentId: event.agentId, error: event.error, finishedAt: event.timestamp }
-    case 'text_started':
-      return { stepId: event.messageId }
-    case 'text_ended':
-      return { stepId: event.messageId, content: event.content }
-    case 'tool_called':
-      return { callId: event.callId, stepId: context?.stepId, name: event.name, input: event.input, seq: event.timestamp }
-    case 'tool_success':
-      return { callId: event.callId, stepId: context?.stepId, output: event.output }
-    case 'tool_failed':
-      return { callId: event.callId, stepId: context?.stepId, error: event.error }
-    case 'compaction_ended':
-      return { summary: event.summary, timestamp: event.timestamp }
-  }
-}

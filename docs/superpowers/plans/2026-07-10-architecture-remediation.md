@@ -186,11 +186,11 @@ Required fields (`llmProvider`, `model`, `tools`) are left as provided; do not i
 2. [x] Finish SessionManager routing for session / plugin / workflow / plan / replay (void|Promise pattern for sync create).
 3. [x] Document single-client WS close → `cancelAllRunning` assumption (ws-server + SessionManager).
 
-### Phase 3
+### Phase 3 — progressed 2026-07-10
 
-1. `session.ts` ≤ ~800 lines façade; extract TurnRunner / AgentRuntime / ContextPipeline.
-2. `lib.rs` → `commands/*.rs` + `logging.rs`.
-3. Orchestration: `orchMode: dag` on main path with durable resume (see `docs/agent-orchestration-plan.md` Phase 1).
+1. [x] `session.ts` split started: `session-helpers.ts`, `session-message-codec.ts`, `session-persist.ts` (façade still ~1.8k; further TurnRunner extract is Phase 3b).
+2. [x] `lib.rs` modularized: `logging.rs`, `hip_config.rs`, `path_tools.rs` (~1.9k → ~1.3k).
+3. [x] DAG path: `workflow-runner` uses `DurableExecutor` when SQLite store is present (checkpoint + resume by runId); `orchMode === 'dag' && pendingWorkflowDef` remains the main-loop entry.
 
 ### Phase 4
 

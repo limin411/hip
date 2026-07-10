@@ -5,6 +5,7 @@ import { IdleWatchdog } from './idle-watchdog.js'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import { runWorkflow } from '../orchestrator/executor.js'
+import { DurableExecutor } from '../orchestrator/durable-executor.js'
 import { createSessionAgentRunner } from './orchestrator-adapter.js'
 import { runSubagent } from './subagent.js'
 import { CHILD_MAX_STEPS } from './loop-control.js'
@@ -176,7 +177,20 @@ export async function runWorkflowTurn(
   const workflowStore = deps.store ? new SqliteWorkflowStore(deps.store.getDb()) : undefined
 
   try {
-    const runState = await runWorkflow(def, { agentRunner: runner, eventSink, store: workflowStore }, { runId: turnId, signal: abortController.signal })
+    // Prefer DurableExecutor when SQLite is available so each reduce() checkpoints
+    // RunState and a crash can resume the same runId. Without a store, fall back to
+    // the in-memory runWorkflow path (tests / ephemeral sidecar).
+    const runState = workflowStore
+      ? await new DurableExecutor(workflowStore).runWorkflow(
+          def,
+          { agentRunner: runner, eventSink },
+          { runId: turnId, signal: abortController.signal },
+        )
+      : await runWorkflow(
+          def,
+          { agentRunner: runner, eventSink },
+          { runId: turnId, signal: abortController.signal },
+        )
     finishRemaining()
 
     const outputs = Object.values(runState.nodes)

@@ -551,6 +551,24 @@ describe('workspace diff', () => {
     expect(useDiffStore.getState().bySession['s1'].status).toBe('idle')
   })
 
+  it('deleteSession clears terminal ring for that session', async () => {
+    const { useTerminalStore } = await import('@/store/terminalStore')
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+    useTerminalStore.getState().appendRing('s1', 'out')
+    const t = new FakeTransport()
+    new SessionService(t).deleteSession('s1')
+    expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
+  })
+
+  it('setProjectDir clears terminal ring for that session', async () => {
+    const { useTerminalStore } = await import('@/store/terminalStore')
+    useTerminalStore.setState({ bySession: {}, attachedSessionId: null })
+    useTerminalStore.getState().appendRing('s1', 'out')
+    const t = new FakeTransport()
+    new SessionService(t).setProjectDir('s1', '/tmp/other')
+    expect(useTerminalStore.getState().bySession.s1).toBeUndefined()
+  })
+
   it('routes fs:diffSummary:result into the diff store summary', () => {
     const t = new FakeTransport(); new SessionService(t)
     t.push({ type: 'fs:diffSummary:result', sessionId: 's1', state: 'ok', base: 'head', hasSessionStart: false, summary: { totalFiles: 2, totalAdditions: 5, totalDeletions: 1 } })

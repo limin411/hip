@@ -10,6 +10,8 @@ import { useDraftStore } from '@/store/draftStore'
 import type { Draft } from '@/store/draftStore'
 import { useUiStore, type Surface } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
+import { useTerminalStore } from '@/store/terminalStore'
+import { ptyKill } from '@/ipc/pty'
 import i18n from '@/i18n'
 import { resolveModelConfig } from '@/lib/modelKey'
 import { useProvidersStore } from '@/store/providersStore'
@@ -157,6 +159,9 @@ export class SessionService {
   deleteSession(id: string): void {
     useUiStore.getState().removeOpenSession(id)
     useDomainStore.getState().deleteSession(id)
+    // Terminal: single kill hook (closeSession → deleteSession; do not also kill in close).
+    void ptyKill(id).catch(() => {})
+    useTerminalStore.getState().clearSession(id)
     if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
     if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
     // The domain delete-fallback may auto-select sessions[0] from the GLOBAL list, which can belong
@@ -184,6 +189,9 @@ export class SessionService {
     useDomainStore.getState().apply({ type: 'session:cwd', sessionId: id, cwd }) // optimistic
     useFsStore.getState().clearSession(id)
     useDiffStore.getState().clearSession(id)
+    // Terminal: kill old shell + clear ring; TerminalView re-opens on cwd change if tab visible.
+    void ptyKill(id).catch(() => {})
+    useTerminalStore.getState().clearSession(id)
     this.transport.send({ type: 'session:setCwd', sessionId: id, cwd })
   }
 

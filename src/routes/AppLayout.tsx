@@ -19,6 +19,8 @@ import {
   GlobalCommandPalette,
   GlobalHotkeysBinder,
 } from '@/components/command-palette'
+import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
+import { startPtyBridge } from '@/ipc/pty'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
@@ -37,6 +39,25 @@ export function AppLayout() {
     }
     sessionService.connect()
     return () => sessionService.disconnect()
+  }, [])
+
+  // App-lifetime PTY event bridge → terminalStore only (D6a). Never writes xterm.
+  useEffect(() => {
+    if (!CODE_TERMINAL) return
+    let stop: (() => void) | undefined
+    let cancelled = false
+    void startPtyBridge()
+      .then((unlisten) => {
+        if (cancelled) unlisten()
+        else stop = unlisten
+      })
+      .catch((err) => {
+        console.error('[hip] pty bridge failed:', err)
+      })
+    return () => {
+      cancelled = true
+      stop?.()
+    }
   }, [])
 
   const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true

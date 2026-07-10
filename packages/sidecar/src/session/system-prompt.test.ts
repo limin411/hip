@@ -23,6 +23,14 @@ describe('buildSystemPrompt', () => {
     expect(s).toMatch(/\.git\/objects/i)
   })
 
+  it('chat surface omits git commit guidance and is shorter than code', () => {
+    const chat = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'chat' })
+    const code = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code' })
+    expect(chat).not.toMatch(/git_commit/)
+    expect(code).toMatch(/git_commit/)
+    expect(chat.length).toBeLessThan(code.length)
+  })
+
   it('gives the agent the hip identity and forbids impersonating other assistants', () => {
     const s = buildSystemPrompt({ cwd: '/tmp/proj' })
     expect(s).toMatch(/you are hip/i)

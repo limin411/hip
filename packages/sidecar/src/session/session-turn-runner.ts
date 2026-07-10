@@ -738,6 +738,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       permissionMode: mode,
       mcpCatalog: mcpManager.toolCatalog() || undefined,
       tokenBudgetPercent,
+      surface: host._config.surface === 'chat' ? 'chat' : 'code',
       pendingSubagents: host.backgroundManager.runningCount > 0
         ? host.backgroundManager.runningEntries()
         : undefined,

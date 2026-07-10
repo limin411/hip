@@ -5,6 +5,7 @@ import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
+import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
 
 /** Dependencies the side-effect router needs from SessionService (avoid circular imports). */
 export interface ServerMessageEffectDeps {
@@ -15,12 +16,30 @@ export interface ServerMessageEffectDeps {
   resyncActiveIfRunning(): void
 }
 
+/** Per-session debounced full diff refresh after write tools (Sprint B). */
+const debouncedRequestDiff = createDebouncedFn((sessionId: string) => {
+  // Lazy import path: deps is closed over when the callback fires — we store latest deps.
+  const d = lastDiffDeps
+  if (!d) return
+  const base = useDiffStore.getState().bySession[sessionId]?.base ?? 'session-start'
+  d.send({ type: 'fs:diffSummary', sessionId, base })
+  // Always refresh summary; also full diff when Changes tab is open or code surface is active.
+  const tab = useUiStore.getState().activeTab
+  const view = useUiStore.getState().activeView
+  if (tab === 'changes' || view === 'code') {
+    d.requestDiff(sessionId)
+  }
+}, 300)
+
+let lastDiffDeps: ServerMessageEffectDeps | null = null
+
 /**
  * Non-domain-store side effects for inbound ServerMessage traffic.
  * Domain projection stays in useDomainStore.apply; this module owns fs/diff refresh
  * and follow-up client requests so SessionService.receive stays a thin pipeline.
  */
 export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessageEffectDeps): void {
+  lastDiffDeps = deps
   switch (msg.type) {
     case 'ready':
       useDiffStore.getState().resetTransient()
@@ -158,6 +177,17 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
     }
 
+    case 'tool:finished': {
+      // tool:finished has no name — resolve from in-flight toolCalls on the turn message.
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === msg.sessionId)
+      const turn = sess?.messages.find((m) => m.id === msg.turnId || m.toolCalls?.some((tc) => tc.callId === msg.callId))
+      const name = turn?.toolCalls?.find((tc) => tc.callId === msg.callId)?.name ?? ''
+      if (shouldRefreshDiffOnToolFinish(name, msg.status)) {
+        debouncedRequestDiff(msg.sessionId)
+      }
+      return
+    }
+
     case 'message:complete': {
       const fsState = useFsStore.getState().bySession[msg.sessionId]
       if (fsState) {
@@ -173,9 +203,11 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       deps.send({ type: 'fs:diffSummary', sessionId: msg.sessionId, base })
       deps.send({ type: 'git:checkpoint:list', sessionId: msg.sessionId })
       const tab = useUiStore.getState().activeTab
-      if (tab === 'changes') {
+      const view = useUiStore.getState().activeView
+      // Code surface: always refresh full diff after a turn so Changes stays honest after cancel/complete.
+      if (tab === 'changes' || view === 'code') {
         deps.requestDiff(msg.sessionId)
-        deps.requestCommitLog(msg.sessionId)
+        if (tab === 'changes') deps.requestCommitLog(msg.sessionId)
       }
       return
     }

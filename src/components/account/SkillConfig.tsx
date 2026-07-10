@@ -103,8 +103,12 @@ export function SkillConfig() {
     if (!zip) return
     try {
       await install(zip)
-    } catch {
-      setError(t('settings.skill.installError'))
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err ?? '')
+      const { classifyInstallError, installErrorI18nKey } = await import('@/lib/installErrorMessage')
+      const kind = classifyInstallError(raw)
+      const human = t(installErrorI18nKey(kind))
+      setError(raw ? `${human} (${raw.slice(0, 200)})` : human)
     }
   }
 

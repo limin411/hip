@@ -13,11 +13,34 @@ export interface TurnAgent {
   role: AgentRole
   reasoning: string
   tools: ToolCall[]
-  status: 'running' | 'done'
+  /** running while live; error when tools failed or empty-error output; else done */
+  status: 'running' | 'done' | 'error'
   output: string
   elapsedMs: number
   taskInput?: string
   parentAgentId?: string
+  /** Total tokens for this agent run when provider reported usage */
+  totalTokens?: number
+  /** Owning assistant message id (for scroll-to-turn) */
+  messageId?: string
+}
+
+function deriveAgentStatus(
+  live: boolean,
+  run: { finishedAt: number | null; output?: string } | undefined,
+  tools: ToolCall[],
+  messageStopped?: boolean,
+): TurnAgent['status'] {
+  if (live && run != null && run.finishedAt == null) return 'running'
+  const toolFailed = tools.some((tc) => tc.status === 'error')
+  const out = run?.output ?? ''
+  const emptyOrError =
+    (messageStopped && !out.trim()) ||
+    out.trimStart().startsWith('Error:') ||
+    out.includes('Error: sub-agent produced empty') ||
+    out.includes('Error: dispatched agent produced empty')
+  if (toolFailed || emptyOrError) return 'error'
+  return 'done'
 }
 
 /**
@@ -49,8 +72,9 @@ export function groupByAgent(message: Message | null, live: boolean): TurnAgent[
   return order.map((agentId) => {
     const b = buckets.get(agentId)!
     const run = runByAgent.get(agentId)
-    const status: 'running' | 'done' = live && run != null && run.finishedAt == null ? 'running' : 'done'
+    const status = deriveAgentStatus(live, run, b.tools, message.stopped)
     const elapsedMs = run && run.finishedAt != null ? run.finishedAt - run.startedAt : 0
+    const totalTokens = run?.usage?.totalTokens
     return {
       agentId,
       role: b.role,
@@ -59,8 +83,10 @@ export function groupByAgent(message: Message | null, live: boolean): TurnAgent[
       status,
       output: run?.output ?? '',
       elapsedMs,
+      messageId: message.id,
       ...(run?.taskInput ? { taskInput: run.taskInput } : {}),
       ...(run?.parentAgentId ? { parentAgentId: run.parentAgentId } : {}),
+      ...(typeof totalTokens === 'number' ? { totalTokens } : {}),
     }
   })
 }

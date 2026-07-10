@@ -8,6 +8,8 @@ export interface InjectorState {
   permissionMode: PermissionMode
   skills: SkillMeta[]
   tokenBudgetPercent: number
+  /** When 'chat', system prompt omits heavy code/git guidance. */
+  surface?: 'chat' | 'code'
   pendingSubagents?: { id: string; description: string; status: string }[]
   completedSubagents?: { id: string; description: string; status: string }[]
 }
@@ -55,6 +57,7 @@ export class SystemPromptInjector implements ContextInjector {
       cwd: state.cwd,
       skills: state.skills,
       permissionMode: state.permissionMode,
+      surface: state.surface,
     })
     return { systemMessages: [prompt] }
   }

@@ -77,6 +77,56 @@ describe('applyServerMessageEffects', () => {
   })
 
   describe('workflow messages', () => {
+    it('tool:finished write_file schedules debounced diff refresh', () => {
+      vi.useFakeTimers()
+      useUiStore.setState({ activeView: 'code', activeTab: 'files' })
+      const deps = makeDeps()
+      useDomainStore.setState((st) => ({
+        ...st,
+        sessions: st.sessions.map((s) =>
+          s.id === 's1'
+            ? {
+                ...s,
+                messages: [
+                  {
+                    id: 'turn-1',
+                    role: 'assistant' as const,
+                    content: '',
+                    timestamp: 1,
+                    toolCalls: [
+                      {
+                        callId: 'c1',
+                        agentId: 'supervisor',
+                        name: 'write_file',
+                        input: '{}',
+                        status: 'running' as const,
+                        seq: 0,
+                      },
+                    ],
+                  },
+                ],
+              }
+            : s,
+        ),
+      }))
+      applyServerMessageEffects(
+        {
+          type: 'tool:finished',
+          sessionId: 's1',
+          turnId: 'turn-1',
+          agentId: 'supervisor',
+          callId: 'c1',
+          status: 'finished',
+          output: 'ok',
+        },
+        deps,
+      )
+      expect(deps.requestDiff).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(300)
+      expect(deps.requestDiff).toHaveBeenCalledWith('s1')
+      vi.useRealTimers()
+    })
+
     it('workflow:started projects into store and focuses Agents tab for code surface', () => {
       const deps = makeDeps()
       applyServerMessageEffects({

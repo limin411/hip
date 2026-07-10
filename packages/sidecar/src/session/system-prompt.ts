@@ -199,16 +199,29 @@ export interface SystemPromptInput {
   skills?: SkillMeta[]
   permissionMode?: PermissionMode
   mcpCatalog?: string
+  /** Chat surface omits long git guidance to save tokens (Sprint B). */
+  surface?: 'chat' | 'code'
 }
 
+const BASE_CHAT =
+  'You are a helpful desktop assistant. Prefer short answers. ' +
+  'You may use read-only tools when the workspace allows. ' +
+  'For simple greetings or short questions, answer directly without tools or sub-agents. ' +
+  'Do not invent shell tool names; use run_script only if it is available.'
+
 /** Assemble the single-agent system prompt: base + cwd convention + anti-phantom (+ optional skills, user instructions, MCP catalog). */
-export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog }: SystemPromptInput): string {
-  let base = `${IDENTITY}\n\n${BASE}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
+export function buildSystemPrompt({ cwd, userInstructions, skills, permissionMode, mcpCatalog, surface }: SystemPromptInput): string {
+  const isChat = surface === 'chat' || permissionMode === 'chat'
+  const body = isChat ? BASE_CHAT : BASE
+  let base = isChat
+    ? `${IDENTITY}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${ANTI_PHANTOM}`
+    : `${IDENTITY}\n\n${body}\n\n${cwdBlock(cwd, permissionMode)}\n\n${GIT_GUIDANCE}\n\n${ANTI_PHANTOM}`
   if (skills && skills.length > 0) {
-    const block = skillsBlock(skills, cwd)
+    // Tighter skill budget on chat to save context (Sprint B).
+    const block = skillsBlock(skills, cwd, isChat ? { budget: 1500 } : undefined)
     if (block) base = `${base}\n\n${block}`
   }
-  if (mcpCatalog) {
+  if (mcpCatalog && !isChat) {
     base = `${base}\n\n## MCP Tools\n${mcpCatalog}\nUse \`mcp_search\` to find tools by keyword, then call them by their namespaced name (\`mcp__<server>__<tool>\`).`
   }
   const extra = userInstructions?.trim()

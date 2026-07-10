@@ -18,6 +18,8 @@ export interface SessionContextState {
   permissionMode: PermissionMode
   mcpCatalog?: string
   tokenBudgetPercent: number
+  /** Session surface — chat prompts are shorter (Sprint B). */
+  surface?: 'chat' | 'code'
   pendingSubagents?: Array<{
     id: string
     description: string
@@ -93,6 +95,7 @@ async function assembleFromInjectors(
     permissionMode: state.permissionMode,
     skills: state.skills,
     tokenBudgetPercent: state.tokenBudgetPercent,
+    surface: state.surface,
     pendingSubagents: state.pendingSubagents?.map((s) => ({
       id: s.id,
       description: s.description,
@@ -152,6 +155,7 @@ function buildFragmentInput(state: SessionContextState): FragmentSourcesInput {
       skills: state.skills,
       permissionMode: state.permissionMode,
       mcpCatalog: state.mcpCatalog,
+      surface: state.surface,
     },
     skills: { skills: state.skills, cwd: state.cwd },
     time: {},

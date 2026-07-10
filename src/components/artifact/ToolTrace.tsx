@@ -3,7 +3,14 @@ import type { ToolCall } from '@hip/protocol'
 import { ToolCallRow } from './ToolCallRow'
 
 /** Ordered list of an agent's tool calls (seq is the ordering authority). */
-export function ToolTrace({ tools }: { tools: ToolCall[] }) {
+export function ToolTrace({
+  tools,
+  onToolClick,
+}: {
+  tools: ToolCall[]
+  /** Sprint B: jump to owning chat turn when a tool row is activated. */
+  onToolClick?: () => void
+}) {
   const { t } = useTranslation()
   if (tools.length === 0) {
     return <div className="text-caption text-ink-tertiary">{t('artifact.noTools')}</div>
@@ -12,7 +19,25 @@ export function ToolTrace({ tools }: { tools: ToolCall[] }) {
   return (
     <div className="flex flex-col gap-1" data-testid="tool-trace">
       {ordered.map((tc) => (
-        <ToolCallRow key={tc.callId} tool={tc} />
+        <div
+          key={tc.callId}
+          className={onToolClick ? 'cursor-pointer rounded-md hover:bg-surface-muted/80' : undefined}
+          onClick={onToolClick}
+          onKeyDown={
+            onToolClick
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onToolClick()
+                  }
+                }
+              : undefined
+          }
+          role={onToolClick ? 'button' : undefined}
+          tabIndex={onToolClick ? 0 : undefined}
+        >
+          <ToolCallRow tool={tc} />
+        </div>
       ))}
     </div>
   )

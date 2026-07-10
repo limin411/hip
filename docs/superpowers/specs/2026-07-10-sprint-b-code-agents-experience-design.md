@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **草案 / 待实现**（**依赖 Sprint A Done**） |
+| 状态 | **主干已落地**（diff 刷新、Agents v2、prompt 裁剪、AGENTS chip、安装错误人话；检查点确认 UI 可后续补） |
 | 路线图 | [`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md) |
 | 前置 | A 的投影正确性、cancel、调试导出可用 |
 | 相关 | `2026-07-10-code-panel-terminal-design.md`、Agents `CollaborationStructure`、architecture-remediation 中 AGENTS.md 注入 |

@@ -16,6 +16,7 @@ export class SystemPromptFragment implements ContextFragment {
       skills: state.skills,
       permissionMode: state.permissionMode,
       mcpCatalog: state.mcpCatalog,
+      surface: state.surface,
     })
   }
 

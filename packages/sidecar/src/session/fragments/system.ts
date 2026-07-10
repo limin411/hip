@@ -17,6 +17,7 @@ export interface SystemSourceInput {
   readonly skills?: SkillMeta[]
   readonly permissionMode?: PermissionMode
   readonly mcpCatalog?: string
+  readonly surface?: 'chat' | 'code'
 }
 
 // ── Codec ─────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ export function createSystemSource(input: SystemSourceInput): Source<SystemSourc
         skills: input.skills,
         permissionMode: input.permissionMode,
         mcpCatalog: input.mcpCatalog,
+        surface: input.surface,
       })
       return { text: systemPrompt, systemPrompt }
     },

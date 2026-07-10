@@ -21,6 +21,8 @@ export interface FragmentState {
   permissionMode?: 'chat' | 'edit' | 'full'
   /** Per-conversation user instructions injected into the system message. */
   customSystemPrompt?: string
+  /** Session surface for prompt sizing. */
+  surface?: 'chat' | 'code'
 }
 
 // ── Fragment ─────────────────────────────────────────────────────────────────

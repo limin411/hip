@@ -328,15 +328,18 @@ describe('Session orchMode', () => {
     expect(session.config.orchMode).toBe('dag')
   })
 
-  it('falls through to graph loop when orchMode is "dag" but no pendingWorkflowDef', async () => {
-    // When orchMode is 'dag' but pendingWorkflowDef is null/undefined,
-    // the session should behave like fast mode (fall through to the graph loop).
-    const fakeModel = new FakeListChatModel({ responses: ['Hello! I received your message.'] })
-    const events: Array<{ type: string; [k: string]: unknown }> = []
-    const session = new Session('test-om-fallthrough', { ...testConfig, orchMode: 'dag' }, fakeModel)
-    await session.sendMessage('say hello', (msg) => events.push(msg))
-    // The session should still process messages normally (no crash, no error)
-    expect(events.some((e) => e.type === 'message:complete')).toBe(true)
-    expect(events.some((e) => e.type === 'error')).toBe(false)
+  it('setPendingWorkflowDef stores and clears the pending def', () => {
+    const session = new Session('test-om-pending', { ...testConfig, orchMode: 'dag' })
+    const def = {
+      id: 'test-wf',
+      name: 'Test',
+      entry: ['a'],
+      nodes: [{ type: 'agent' as const, id: 'a', agentId: 'worker' }],
+      edges: [],
+    }
+    session.setPendingWorkflowDef(def)
+    expect((session as any).pendingWorkflowDef).toEqual(def)
+    session.setPendingWorkflowDef(null)
+    expect((session as any).pendingWorkflowDef).toBeNull()
   })
 })

@@ -408,6 +408,10 @@ export class Session {
     this.orchMode = orchMode
     return changed
   }
+
+  setPendingWorkflowDef(def: WorkflowDef | null): void {
+    this.pendingWorkflowDef = def
+  }
   applyActiveModel(): boolean { return this.configMgr.applyActiveModel() }
   reloadPlugins(): void { this.configMgr.reloadPlugins() }
 

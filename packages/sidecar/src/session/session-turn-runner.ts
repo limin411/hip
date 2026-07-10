@@ -17,6 +17,7 @@ import type {
   ContentPart,
   AgentConfig,
   Hook,
+  OrchestrationMode,
 } from '@hip/protocol'
 import { FIXED_AGENTS } from '@hip/protocol'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
@@ -48,6 +49,7 @@ import type { EventStore } from '../persistence/event-store.js'
 import type { SkillMeta } from '@hip/protocol'
 import { deriveTitle } from './title-generator.js'
 import { runWorkflowTurn as runWorkflowTurnFn, type WorkflowRunDeps } from './workflow-runner.js'
+import { buildClusterDefaultWorkflow } from './builtin-workflows.js'
 import { shouldPlan } from './plan.js'
 import type { AgentProfile } from './agent-profile.js'
 import type { PlanMode } from './plan-mode.js'
@@ -92,6 +94,34 @@ export type TurnBase = {
   planningMode?: 'fast' | 'plan'
   planStatus?: 'none' | 'generating' | 'ready' | 'approved' | 'rejected'
   plan?: PlanItem[]
+}
+
+/** When orchMode is dag, always resolve a workflow (pending or builtin cluster-default). */
+export function resolveWorkflowDefForTurn(host: {
+  orchMode: OrchestrationMode
+  pendingWorkflowDef: WorkflowDef | null
+}): WorkflowDef | null {
+  if (host.orchMode !== 'dag') return null
+  return host.pendingWorkflowDef ?? buildClusterDefaultWorkflow()
+}
+
+/** Last HumanMessage text content (string or first text part in array content). */
+export function extractLastUserText(messages: BaseMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.getType() !== 'human') continue
+    if (typeof m.content === 'string') return m.content
+    if (Array.isArray(m.content)) {
+      const texts = m.content
+        .filter((b): b is { type: 'text'; text: string } =>
+          b != null && typeof b === 'object' && 'type' in b && (b as { type: string }).type === 'text' && typeof (b as { text?: unknown }).text === 'string',
+        )
+        .map((b) => b.text)
+      if (texts.length > 0) return texts.join('')
+    }
+    return ''
+  }
+  return ''
 }
 
 /**
@@ -486,18 +516,19 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   plan?: PlanItem[]
 }): Promise<string> {
   // ── DAG orchestration branch ──
-  // orchMode === 'dag' + pending WorkflowDef (from workflow:run / set pending) uses
-  // the orchestrator. Persistence goes through DurableExecutor when SQLite is available
-  // (see workflow-runner). Without a pending def, fall through to the StateGraph loop
-  // so ordinary chat still works while a DAG is not queued.
-  if (host.orchMode === 'dag' && host.pendingWorkflowDef) {
-    const def = host.pendingWorkflowDef
+  // orchMode === 'dag' always runs a workflow: pending def (workflow:run) or the
+  // builtin cluster-default template. Persistence goes through DurableExecutor when
+  // SQLite is available (see workflow-runner). User text is injected as runInputs.
+  const dagDef = resolveWorkflowDefForTurn(host)
+  if (dagDef) {
     host.pendingWorkflowDef = null
+    const userText = extractLastUserText(host.messages)
     return runWorkflowTurnFn(
       host.workflowDeps,
-      def,
+      dagDef,
       rawSend,
       (s, turnId, text, traj, stopped) => host.finalizeAndPersist(s, turnId, text, traj, stopped),
+      { runInputs: { text: userText } },
     )
   }
 

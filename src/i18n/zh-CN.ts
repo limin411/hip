@@ -149,13 +149,6 @@ export const zhCN = {
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
       },
-      orchMode: {
-        label: '编排模式',
-        fast: '单实例模式',
-        fastDesc: '单 Agent 循环，最大 25 步',
-        dag: '集群模式',
-        dagDesc: 'DAG 工作流；下一条消息将执行默认 planner→coder 图',
-      },
       activity: {
         completed: '已完成',
         toolCount: '{{finished}}/{{total}} 个工具',

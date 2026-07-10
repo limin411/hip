@@ -149,13 +149,6 @@ export const zhTW = {
         percentage: '{{percent}}%',
         percentageTooltip: '{{used}} / {{total}} tokens（{{percent}}%）',
       },
-      orchMode: {
-        label: '編排模式',
-        fast: '單實例模式',
-        fastDesc: '單 Agent 迴圈，最大 25 步',
-        dag: '集群模式',
-        dagDesc: 'DAG 工作流；下一則訊息將執行預設 planner→coder 圖',
-      },
       activity: {
         completed: '已完成',
         toolCount: '{{finished}}/{{total}} 個工具',
@@ -264,6 +257,8 @@ export const zhTW = {
       failed: '失敗',
       truncated: '已截斷',
       noTools: '暫無工具調用',
+      tokens: '{{count}} tok',
+      jumpToTurn: '跳轉到訊息',
       selectFolder: '選擇專案資料夾',
       selectFolderDesc: '選擇一個資料夾，供智能體讀寫，並在此瀏覽',
       terminalView: {
@@ -421,6 +416,14 @@ export const zhTW = {
         toolSingular: '個工具',
         toolPlural: '個工具',
         manageTools: '管理工具',
+      },
+      installErrors: {
+        allowlist:
+          '該命令不在 MCP 允許清單中。請將二進位檔複製到 ~/.hip/bin（或使用 /usr/bin、/usr/local/bin、/opt）後重試。',
+        permission: '權限被拒絕。請檢查二進位檔是否可執行以及是否有存取權限。',
+        structure: '套件結構無效（例如缺少 SKILL.md）。請修正 zip 版面後重新上傳。',
+        network: '網路錯誤。請檢查連線、URL 與 TLS 設定。',
+        generic: '安裝失敗。詳見錯誤訊息。',
       },
       agentsLabel: '智能體管理',
       skillLabel: '技能',

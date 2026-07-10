@@ -12,11 +12,6 @@ vi.mock('react-i18next', () => ({
       const map: Record<string, string> = {
         'chat.modelHint': 'Choose a model',
         'chat.noModelSelected': 'No model',
-        'chat.orchMode.label': 'Orchestration mode',
-        'chat.orchMode.fast': 'Fast',
-        'chat.orchMode.fastDesc': 'Fast mode runs agents sequentially',
-        'chat.orchMode.dag': 'DAG',
-        'chat.orchMode.dagDesc': 'DAG mode uses a directed acyclic graph',
       }
       return map[key] ?? key
     },
@@ -26,7 +21,6 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Cpu: () => React.createElement('span', { 'data-testid': 'icon-cpu' }),
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
-  GitCompare: () => React.createElement('span', { 'data-testid': 'icon-dag' }),
 }))
 
 // Mock UI components to render their children directly
@@ -72,7 +66,7 @@ vi.mock('@/store/providersStore', () => ({
 
 // Mock domain hooks
 let mockActiveSessionId: string | null = 'sess-1'
-let mockSession: { config: { model?: string; llmProvider?: string; orchMode?: string } } | null = null
+let mockSession: { config: { model?: string; llmProvider?: string } } | null = null
 let mockActiveSessionStatus: 'idle' | 'running' = 'idle'
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
@@ -80,7 +74,6 @@ vi.mock('@/domain', () => ({
   useActiveSessionStatus: () => mockActiveSessionStatus,
   sessionService: {
     setSessionModel: vi.fn(),
-    setOrchMode: vi.fn(),
   },
 }))
 
@@ -113,7 +106,7 @@ describe('ModelPicker', () => {
   beforeEach(() => {
     cleanup()
     mockActiveSessionId = 'sess-1'
-    mockSession = { config: { model: 'deepseek-chat', llmProvider: 'deepseek', orchMode: 'fast' } }
+    mockSession = { config: { model: 'deepseek-chat', llmProvider: 'deepseek' } }
     mockActiveSessionStatus = 'idle'
     mockDraftStore.draft = null
   })
@@ -129,7 +122,7 @@ describe('ModelPicker', () => {
   })
 
   it('shows model label when session has a model', () => {
-    mockSession = { config: { model: 'gpt-4o', llmProvider: 'openai', orchMode: 'fast' } }
+    mockSession = { config: { model: 'gpt-4o', llmProvider: 'openai' } }
     mockActiveSessionId = 'sess-1'
     render(<ModelPicker />)
     // Both the chip label and dropdown item contain 'gpt-4o'
@@ -145,8 +138,9 @@ describe('ModelPicker', () => {
 
   it('does not show orchMode toggle (agent-driven orchestration)', () => {
     render(<ModelPicker />)
-    expect(screen.queryByText('Fast')).toBeNull()
-    expect(screen.queryByText('DAG')).toBeNull()
+    // Product path has no fast/dag switch; only model picker remains.
+    expect(screen.queryByText(/Orchestration|Single Instance|Cluster Mode/i)).toBeNull()
+    expect(screen.queryByTestId('orch-mode-toggle')).toBeNull()
   })
 
   it('has tooltip attributes for accessibility', () => {

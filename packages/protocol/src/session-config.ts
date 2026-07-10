@@ -4,7 +4,10 @@
  */
 export type PermissionMode = 'chat' | 'edit' | 'full'
 
-/** Keep in sync with OrchestrationMode in orchestration-types.ts. */
+/**
+ * Keep in sync with OrchestrationMode in orchestration-types.ts.
+ * @deprecated Ignored for turn routing; retained for config JSON compatibility.
+ */
 export type OrchModeDefault = 'fast' | 'dag'
 
 /**
@@ -27,6 +30,7 @@ export interface SessionConfigLike {
   disablePlan?: boolean
   surface?: 'chat' | 'code'
   useEventSource?: boolean
+  /** @deprecated Ignored for turn routing; retained for config JSON compatibility. */
   orchMode?: OrchModeDefault
 }
 

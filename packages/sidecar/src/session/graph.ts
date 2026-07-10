@@ -14,7 +14,21 @@ import type { ToolCallResult } from './tool-runner/tool-runner.js'
 import { runWithConcurrency } from './run-with-concurrency.js'
 import type { ApprovalFn } from './tools.js'
 import { SELF_GATED_TOOLS } from './tools.js'
-import { sigOf, trailingRepeatCount, DOOM_LOOP_N, SIG_WINDOW, DOOM_LOOP_NUDGE, PAUSE_QUESTION } from './doom-loop.js'
+import {
+  sigOf,
+  trailingRepeatCount,
+  DOOM_LOOP_N,
+  SIG_WINDOW,
+  DOOM_LOOP_NUDGE,
+  PAUSE_QUESTION,
+  pathHitKey,
+  countPathHits,
+  PATH_HIT_LIMIT,
+  PATH_REPEAT_MESSAGE,
+  trailingErrorStreak,
+  ERROR_STREAK_LIMIT,
+  ERROR_STREAK_NUDGE,
+} from './doom-loop.js'
 import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
@@ -95,6 +109,8 @@ const LoopState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({ reducer: messagesStateReducer, default: () => [] }),
   steps: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
   recentSigs: Annotation<string[]>({ reducer: (_prev, next) => next, default: () => [] }),
+  /** History of pathHitKey() values for path-thrash detection (LoopGuard v2). */
+  pathHits: Annotation<string[]>({ reducer: (_prev, next) => next, default: () => [] }),
   nudgedSig: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
   status: Annotation<'running' | 'awaiting_user'>({ reducer: (_prev, next) => next, default: () => 'running' }),
   pendingQuestion: Annotation<string | undefined>({ reducer: (_prev, next) => next, default: () => undefined }),
@@ -400,6 +416,30 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       calls.push(normalized)
     }
 
+    // LoopGuard v2: block path re-reads before invoke once PATH_HIT_LIMIT is reached.
+    const pathHits = [...(state.pathHits ?? [])]
+    const pathBlocked: ToolMessage[] = []
+    const allowedCalls: typeof calls = []
+    for (const call of calls) {
+      const key = pathHitKey(call.name, call.args)
+      if (key && countPathHits(pathHits, key) >= PATH_HIT_LIMIT - 1) {
+        // This call would be the Nth hit — reject and record the hit for counting.
+        pathHits.push(key)
+        pathBlocked.push(new ToolMessage({
+          content: PATH_REPEAT_MESSAGE,
+          tool_call_id: call.id ?? call.name,
+          name: call.name,
+        }))
+        continue
+      }
+      if (key) pathHits.push(key)
+      allowedCalls.push(call)
+    }
+    // Replace calls with non-blocked; keep blocked in blockedCalls for the model.
+    blockedCalls.push(...pathBlocked)
+    calls.length = 0
+    calls.push(...allowedCalls)
+
     const parallelism = ctx.toolParallelism ?? 5
     const parallelIndices: number[] = []
     const sequentialIndices: number[] = []
@@ -463,8 +503,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       ...(planningMode !== undefined ? { planningMode } : {}),
     }
 
+    const pathHitState = { pathHits: pathHits.slice(-50) }
+
     if (allResolved) {
-      return { messages: [...blockedCalls, ...out], recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan, ...planOverride }
+      return {
+        messages: [...blockedCalls, ...out],
+        recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW),
+        plan: updatedPlan,
+        ...pathHitState,
+        ...planOverride,
+      }
     }
     // Some tool calls did not resolve yet: show resolved results in messages,
     // include placeholder entries for all calls in deferredMessages for tracking.
@@ -481,11 +529,27 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           name: c.name,
         })),
     ]
-    return { messages: [...blockedCalls, ...out], deferredMessages: deferredEntries, recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW), plan: updatedPlan, ...planOverride }
+    return {
+      messages: [...blockedCalls, ...out],
+      deferredMessages: deferredEntries,
+      recentSigs: [...state.recentSigs, sig].slice(-SIG_WINDOW),
+      plan: updatedPlan,
+      ...pathHitState,
+      ...planOverride,
+    }
   }
 
-  /** Corrective note after the Nth identical batch; recorded against the offending signature. */
+  /** Corrective note after the Nth identical batch or error streak. */
   function nudge(state: State): Partial<State> {
+    const recentToolContents: string[] = []
+    for (let i = state.messages.length - 1; i >= 0 && recentToolContents.length < ERROR_STREAK_LIMIT; i--) {
+      const m = state.messages[i]
+      if (m instanceof ToolMessage) recentToolContents.unshift(String(m.content))
+      else if (m instanceof AIMessage) break
+    }
+    if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
+      return { messages: [new SystemMessage(ERROR_STREAK_NUDGE)], nudgedSig: 'error-streak' }
+    }
     return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: state.recentSigs[state.recentSigs.length - 1] }
   }
 
@@ -517,6 +581,17 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       if (allCompleted) {
         return END
       }
+    }
+    // LoopGuard v2: consecutive tool errors → nudge (text-only wrap-up).
+    const recentToolContents: string[] = []
+    for (let i = state.messages.length - 1; i >= 0 && recentToolContents.length < ERROR_STREAK_LIMIT; i--) {
+      const m = state.messages[i]
+      if (m instanceof ToolMessage) recentToolContents.unshift(String(m.content))
+      else if (m instanceof AIMessage) break
+    }
+    if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
+      const errSig = 'error-streak'
+      return state.nudgedSig === errSig ? 'pause' : 'nudge'
     }
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     if (lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N) {

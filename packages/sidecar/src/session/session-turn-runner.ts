@@ -883,21 +883,53 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     const isAbort = err instanceof Error && err.name === 'AbortError'; finishRemaining()
     const isSteerAbort = host.steerAbortFlag
     if (isSteerAbort) host.steerAbortFlag = false
+
+    /** Best-effort text: streamed supervisor output, else any trajectory agent output. */
+    const partialFromTraj = (() => {
+      const sup = trajectory.get('supervisor')?.output?.trim()
+      if (sup) return sup
+      const parts = [...trajectory.values()].map((r) => r.output?.trim()).filter(Boolean) as string[]
+      return parts.length ? parts.join('\n\n') : ''
+    })()
+    const body = (supervisorText || partialFromTraj).trim()
+    const stoppedSuffix = timedOut ? '(timed out)' : '(cancelled)'
+    const stoppedBody = body ? `${body}\n\n${stoppedSuffix}` : stoppedSuffix
+
     if (isSteerAbort) {
-      if (supervisorText) {
-        const text = host.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
+      // Steer abort: persist partial if any so the UI is not left blank mid-turn.
+      if (body || trajectory.size > 0) {
+        const text = host.finalizeAndPersist(rawSend, turnId, stoppedBody, trajectory, true, usageByAgent)
         void host.hooks.fire('TurnComplete', { sessionId: host.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
         return text
       }
       return ''
     }
-    if (isAbort && supervisorText) {
-      const text = host.finalizeAndPersist(rawSend, turnId, supervisorText, trajectory, true, usageByAgent)
+    if (isAbort) {
+      // Always project a stopped assistant message (Sprint A — no empty cancel).
+      const text = host.finalizeAndPersist(rawSend, turnId, stoppedBody, trajectory, true, usageByAgent)
       void host.hooks.fire('TurnComplete', { sessionId: host.id, turnId }).catch((err) => logNonCritical('TurnComplete', err))
-      if (timedOut) rawSend({ type: 'error', sessionId: host.id, code: 'TIMEOUT', message: '' })
+      rawSend({
+        type: 'error',
+        sessionId: host.id,
+        code: timedOut ? 'TIMEOUT' : 'CANCELLED',
+        message: timedOut ? '' : 'User cancelled the request',
+      })
       return text
     }
-    rawSend({ type: 'error', sessionId: host.id, code: timedOut ? 'TIMEOUT' : isAbort ? 'CANCELLED' : 'AGENT_ERROR', message: timedOut ? '' : isAbort ? 'User cancelled the request' : safeErrorMessage(err) })
+    rawSend({ type: 'error', sessionId: host.id, code: 'AGENT_ERROR', message: safeErrorMessage(err) })
+    // Unexpected errors: still project trajectory if we have partial work.
+    if (body || trajectory.size > 0) {
+      const text = host.finalizeAndPersist(
+        rawSend,
+        turnId,
+        body ? `${body}\n\n(error)` : `(error: ${safeErrorMessage(err)})`,
+        trajectory,
+        true,
+        usageByAgent,
+      )
+      void host.hooks.fire('TurnComplete', { sessionId: host.id, turnId }).catch((e) => logNonCritical('TurnComplete', e))
+      return text
+    }
     return ''
   } finally {
     tooling?.cleanup()

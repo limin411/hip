@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-10 |
-| 状态 | **草案 / 待实现** |
+| 状态 | **实现中 / 主干已落地**（cancel 投影、LoopGuard v2、黄金委派、权限矩阵、复制调试信息） |
 | 路线图 | [`2026-07-10-pre-public-roadmap-index.md`](./2026-07-10-pre-public-roadmap-index.md) |
 | 前置 | agent-driven orchestration 已落地；workflow cancel partial 已修 |
 | 代码锚点（预期） | `session-turn-runner.ts`、`session-persist.ts`、`graph.ts`、`subagent.ts`、`tool-runner/`、`doom-loop.ts`、`sessionService` / UI 调试导出 |

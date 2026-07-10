@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { sigOf, trailingRepeatCount, DOOM_LOOP_N } from './doom-loop.js'
+import {
+  sigOf,
+  trailingRepeatCount,
+  DOOM_LOOP_N,
+  pathHitKey,
+  countPathHits,
+  normalizeToolPath,
+  trailingErrorStreak,
+  PATH_HIT_LIMIT,
+} from './doom-loop.js'
 
 describe('doom-loop signatures', () => {
   it('identical calls produce identical signatures', () => {
@@ -24,5 +33,25 @@ describe('doom-loop signatures', () => {
 
   it('the threshold constant is 3', () => {
     expect(DOOM_LOOP_N).toBe(3)
+  })
+
+  it('pathHitKey normalizes slashes and only applies to path tools', () => {
+    expect(pathHitKey('read_file', { path: '/proj//a' })).toBe('read_file:/proj/a')
+    expect(pathHitKey('ls', { path: 'foo\\bar' })).toBe('ls:foo/bar')
+    expect(pathHitKey('glob', { pattern: '**/*.ts' })).toBe('glob:**/*.ts')
+    expect(pathHitKey('write_file', { path: '/x' })).toBeNull()
+    expect(normalizeToolPath('/a//b/')).toBe('/a/b')
+  })
+
+  it('countPathHits counts occurrences of a key', () => {
+    const hits = ['read_file:/a', 'ls:/b', 'read_file:/a']
+    expect(countPathHits(hits, 'read_file:/a')).toBe(2)
+    expect(PATH_HIT_LIMIT).toBe(3)
+  })
+
+  it('trailingErrorStreak counts only consecutive Error* tails', () => {
+    expect(trailingErrorStreak(['ok', 'Error: a', 'Error: b'])).toBe(2)
+    expect(trailingErrorStreak(['Error: a', 'ok', 'Error: b'])).toBe(1)
+    expect(trailingErrorStreak(['Error: a', 'Error: b', 'Error: c'])).toBe(3)
   })
 })

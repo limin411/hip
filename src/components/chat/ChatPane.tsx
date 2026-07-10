@@ -5,6 +5,7 @@ import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
@@ -97,6 +98,30 @@ export function ChatPane() {
 
   const showThinking = status === 'running' && last?.role === 'user'
 
+  const copyDebugInfo = async () => {
+    if (!session || !activeSessionId) return
+    const text = sessionDebugBundleJson({
+      sessionId: activeSessionId,
+      title: session.title,
+      config: session.config,
+      messages,
+      recentErrors: error
+        ? [{ code: error.code, message: error.message, at: Date.now() }]
+        : undefined,
+    })
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Fallback for environments without clipboard permission.
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+  }
+
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
@@ -162,26 +187,35 @@ export function ChatPane() {
                       ? t('chat.errorTimeout')
                       : t('chat.errorGeneric', { message: error.message })}
               </p>
-              {error.code === 'NO_API_KEY' ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {error.code === 'NO_API_KEY' ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setActiveView('settings')}
+                  >
+                    {t('chat.openSettings')}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => sessionService.regenerate()}
+                    data-testid="chat-error-retry"
+                  >
+                    {t('chat.retry')}
+                  </Button>
+                )}
                 <Button
-                  variant="primary"
+                  variant="secondary"
                   size="sm"
-                  onClick={() => setActiveView('settings')}
-                  className="mt-2"
+                  onClick={() => void copyDebugInfo()}
+                  data-testid="chat-copy-debug"
+                  title={t('chat.copyDebugHint')}
                 >
-                  {t('chat.openSettings')}
+                  {t('chat.copyDebug')}
                 </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => sessionService.regenerate()}
-                  data-testid="chat-error-retry"
-                  className="mt-2"
-                >
-                  {t('chat.retry')}
-                </Button>
-              )}
+              </div>
             </div>
           )}
           <div ref={bottomRef} />

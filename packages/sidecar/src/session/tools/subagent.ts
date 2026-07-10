@@ -22,14 +22,24 @@ export function buildSubagentTools(
   }
 
   const task = tool(
-    async ({ description, mode }) => spawnSubagent(description, mode),
+    async ({ description, mode }) => {
+      const result = await spawnSubagent(description, mode)
+      if (!result?.trim()) {
+        return (
+          'Error: sub-agent produced empty output. ' +
+          'Do not treat this as success — retry with a clearer task description, or complete the work yourself.'
+        )
+      }
+      return result
+    },
     {
       name: 'task',
       description:
         'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
         'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
         'The sub-agent cannot itself delegate. Set mode to "background" to run the sub-agent ' +
-        'without blocking the current turn (max 10 concurrent background tasks).',
+        'without blocking the current turn (max 10 concurrent background tasks). ' +
+        'Do not use for simple single-step requests (greetings, list one directory, read one file).',
       schema: z.object({
         description: z.string(),
         mode: z.enum(['foreground', 'background']).optional(),
@@ -95,7 +105,16 @@ export function buildSubagentTools(
   const ids = dispatch.agents.map((a) => a.id) as [string, ...string[]]
 
   const dispatchAgent = tool(
-    async ({ agent, task: t }) => dispatch.run(agent, t, dispatch.signal),
+    async ({ agent, task: t }) => {
+      const result = await dispatch.run(agent, t, dispatch.signal)
+      if (!result?.trim()) {
+        return (
+          'Error: dispatched agent produced empty output. ' +
+          'Do not treat this as success — retry with a clearer task, pick another agent, or do the work yourself.'
+        )
+      }
+      return result
+    },
     {
       name: 'dispatch_agent',
       description:

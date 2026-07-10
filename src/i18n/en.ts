@@ -25,6 +25,8 @@ export const en = {
       errorNoApiKey: 'DeepSeek API key not configured. Set it in Settings to continue.',
       errorGeneric: 'Something went wrong: {{message}}',
       openSettings: 'Open Settings',
+      copyDebug: 'Copy debug info',
+      copyDebugHint: 'Copy a redacted session snapshot for troubleshooting (no API keys)',
       newConversationGreeting: 'What are we building?',
       codeGreeting: 'What should we build?',
       codeNeedFolder: 'Choose a project folder to start coding',

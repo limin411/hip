@@ -25,6 +25,8 @@ export const zhCN = {
       errorNoApiKey: '未配置 DeepSeek API Key，请在「设置」中配置后重试。',
       errorGeneric: '出错了：{{message}}',
       openSettings: '前往设置',
+      copyDebug: '复制调试信息',
+      copyDebugHint: '复制脱敏会话快照用于排查（不含 API 密钥）',
       newConversationGreeting: '我们来做点什么？',
       codeGreeting: '我们来写点什么？',
       codeNeedFolder: '选择一个项目文件夹以开始编码',

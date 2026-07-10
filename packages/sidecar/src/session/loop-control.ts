@@ -1,5 +1,5 @@
 /** Max model turns per user turn before the loop is forced to finish (OpenCode's value). */
-export const MAX_STEPS = 25
+export const MAX_STEPS = 800
 
 /** A sub-agent's own loop cap (P3-J4), independent of the parent MAX_STEPS. Each `task` call is
  *  one parent step, so the parent cap bounds spawns; this bounds each child. */

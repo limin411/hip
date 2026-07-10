@@ -4,7 +4,7 @@
 |------|-----|
 | 作者 | TBD |
 | 日期 | 2026-07-10 |
-| 状态 | PR-1–4 已实现；PR-5（`CODE_TERMINAL=true`）未做；暗发 flag 仍为 false |
+| 状态 | **已发布**：PR-1–5 完成；`CODE_TERMINAL=true`（回滚改 false） |
 | 相关代码 | `src/routes/AppLayout.tsx`, `src/components/artifact/ArtifactPanel.tsx`, `src/components/layout/PanelToggle.tsx`, `src/store/uiStore.ts`, `src/store/useFsScope.ts`, `src/ipc/dialog.ts`, `src/components/theme/ThemeProvider.tsx`, `src-tauri/src/path_env.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json` |
 | 竞品参考 | `docs/research/2026-07-05-claude-desktop.md`, `docs/research/2026-07-05-codex-desktop.md`, `docs/research/2026-07-05-competitive-feature-gap-analysis.md` |
 | 前置能力 | 无 xterm / node-pty / 交互式 PTY；`tauri-plugin-shell` 仅用于 sidecar 与 `open()` URL；`src/` 内尚无 `@tauri-apps/api/event` 用法 |
@@ -128,7 +128,7 @@ export function fsScopeOf(active: SessionVM | null, draft: Draft | null): FsScop
 | D6a | Detach 输出 | **进程级 `pty:data` 订阅 + per-session 内存 ring buffer（对齐 D15 行预算），reattach 时 rehydrate xterm** | 避免「进程活着但输出全丢」；见下节 |
 | D7 | 无 cwd | **不 spawn**；empty + `pickDirectory` → `setProjectDir` | 对齐 FileTree；避免落到 `$HOME` |
 | D8 | cwd 变更 | **自动 kill 旧 PTY + 清 ring + 可见时 reopen**；**无确认对话框** | 产品拍板；与 `setProjectDir` 清 fs/diff 一致 |
-| D9 | Feature flag | **`CODE_TERMINAL = false` 模块常量暗发** | 对齐 `GLOBAL_COMMAND_PALETTE`；不改 hipConfig |
+| D9 | Feature flag | **`CODE_TERMINAL = true`（PR-5 已开）**；回滚改 `false` | 对齐 `GLOBAL_COMMAND_PALETTE` 式模块常量；不改 hipConfig |
 | D10 | 安全姿态 v1 | **无沙箱；用户责任；无 agent 自动执行**；**无**强制 first-run 信任文案 | 与 Terminal.app 同级信任；产品不要额外说明（D20） |
 | D11 | Shell | **Login 交互 shell：`$SHELL -il`**（平台等价）；fallback `/bin/zsh -il` → `/bin/bash -il` | 产品拍板：贴近 Terminal.app；PATH 仍继承 `path_env`；接受 rc 可能重复 source |
 | D12 | `activeTab` 全局 | **v1 保持全局**；切 session 停在 terminal 且新 session 无 cwd → empty | 避免 per-session tab 大 refactor |

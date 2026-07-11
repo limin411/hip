@@ -98,4 +98,38 @@ describe('ModelConfig layout', () => {
       expect(screen.getByTestId('model-purpose-embedding')).toBeInTheDocument()
     })
   })
+
+  it('sets embedding model via setMemoryConfig when choosing a model on embedding tab', async () => {
+    render(<ModelConfig />)
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.modelConfig.tabs.embedding' }))
+    const row = await screen.findByText('text-embedding-3-small')
+    fireEvent.click(row.closest('button') ?? row)
+    await waitFor(() => {
+      expect(setMemoryConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          embeddingModel: expect.objectContaining({
+            providerID: 'openai',
+            modelID: 'text-embedding-3-small',
+          }),
+        }),
+      )
+    })
+  })
+
+  it('sets rerank model via setMemoryConfig when choosing a model on rerank tab', async () => {
+    render(<ModelConfig />)
+    fireEvent.click(screen.getByRole('tab', { name: 'settings.modelConfig.tabs.rerank' }))
+    const row = await screen.findByText('gpt-4o')
+    fireEvent.click(row.closest('button') ?? row)
+    await waitFor(() => {
+      expect(setMemoryConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rerankModel: expect.objectContaining({
+            providerID: 'openai',
+            modelID: 'gpt-4o',
+          }),
+        }),
+      )
+    })
+  })
 })

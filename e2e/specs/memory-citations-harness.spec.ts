@@ -1,0 +1,56 @@
+// Citations chip via inject harness (no LLM).
+import { expect } from 'expect-webdriverio'
+import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { skipLoginIfPresent } from '../helpers/auth.js'
+import {
+  createChatSessionForE2e,
+  injectServerMessage,
+  waitForHipE2E,
+} from '../helpers/e2e-hooks.js'
+import { switchToChatSurface } from '../helpers/surface.js'
+
+describe('memory citations harness @memory @harness', () => {
+  before(async () => {
+    await waitForAppReady()
+    await skipLoginIfPresent()
+    await waitForMainApp()
+    await waitForHipE2E()
+    await switchToChatSurface()
+  })
+
+  it('M2.14 shows citations chip when assistant message has memoryCitations', async () => {
+    const sessionId = await createChatSessionForE2e()
+    expect(sessionId).toBeTruthy()
+
+    await browser.waitUntil(
+      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      { timeout: 20000, interval: 300 },
+    )
+
+    const msgId = `e2e-mem-cite-${Date.now()}`
+    await injectServerMessage({
+      type: 'message:complete',
+      sessionId,
+      message: {
+        id: msgId,
+        role: 'assistant',
+        content: 'We should use yarn for installs.',
+        agentId: 'supervisor',
+        timestamp: Date.now(),
+        memoryCitations: [
+          { memoryId: 'mem-e2e-1', title: 'Yarn preference' },
+        ],
+      },
+    })
+
+    const chip = await browser.$('[data-testid="memory-citations-chip"]')
+    await chip.waitForExist({ timeout: 15000 })
+    await expect(chip).toBeDisplayed()
+
+    await chip.click()
+    const list = await browser.$('[data-testid="memory-citations-list"]')
+    await list.waitForExist({ timeout: 10000 })
+    const text = await list.getText()
+    expect(text.toLowerCase()).toMatch(/yarn|mem-e2e|preference/i)
+  })
+})

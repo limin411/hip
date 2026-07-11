@@ -1003,6 +1003,29 @@ export type HipE2EHooks = {
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
   simulatePluginInstallError: (error?: string) => void
+  /** Cross-session memory (WS via SessionService). */
+  getMemoryConfig: () => Promise<MemoryFileConfig>
+  setMemoryConfig: (partial: Partial<MemoryFileConfig>) => Promise<MemoryFileConfig>
+  seedMemoryItem: (
+    item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>,
+  ) => Promise<MemoryItem>
+  listMemories: (filter?: {
+    scope?: MemoryScope
+    projectKeyHash?: string
+    sessionId?: string
+    query?: string
+    limit?: number
+    status?: MemoryStatus
+  }) => Promise<MemoryItem[]>
+  deleteMemory: (id: string, hard?: boolean) => Promise<boolean>
+  restoreMemory: (id: string) => Promise<MemoryItem>
+  emptyMemoryTrash: () => Promise<number>
+  triggerMemoryConsolidate: (projectKeyHash?: string) => void
+  getActiveSessionMemoryFlags: () => {
+    useMemories?: boolean
+    generateMemories?: boolean
+    incognito?: boolean
+  } | null
 }
 
 declare global {
@@ -1031,6 +1054,25 @@ function installE2eHooks(svc: SessionService): void {
     openCommandPaletteForE2e: () => svc.openCommandPaletteForE2e(),
     closeCommandPaletteForE2e: () => svc.closeCommandPaletteForE2e(),
     simulatePluginInstallError: (error) => svc.simulatePluginInstallError(error),
+    getMemoryConfig: () => svc.getMemoryConfig(),
+    setMemoryConfig: (partial) => svc.setMemoryConfig(partial),
+    seedMemoryItem: (item) => svc.upsertMemory(item),
+    listMemories: (filter) => svc.listMemories(filter),
+    deleteMemory: (id, hard) => svc.deleteMemory(id, hard),
+    restoreMemory: (id) => svc.restoreMemory(id),
+    emptyMemoryTrash: () => svc.emptyMemoryTrash(),
+    triggerMemoryConsolidate: (projectKeyHash) => svc.consolidateMemories(projectKeyHash),
+    getActiveSessionMemoryFlags: () => {
+      const id = useDomainStore.getState().activeSessionId
+      if (!id) return null
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === id)
+      if (!sess) return null
+      return {
+        useMemories: sess.config?.useMemories,
+        generateMemories: sess.config?.generateMemories,
+        incognito: sess.config?.incognito,
+      }
+    },
   }
 }
 

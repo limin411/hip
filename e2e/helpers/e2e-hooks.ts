@@ -28,6 +28,19 @@ type HipE2E = {
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
   simulatePluginInstallError: (error?: string) => void
+  getMemoryConfig?: () => Promise<Record<string, unknown>>
+  setMemoryConfig?: (partial: Record<string, unknown>) => Promise<Record<string, unknown>>
+  seedMemoryItem?: (item: Record<string, unknown>) => Promise<Record<string, unknown>>
+  listMemories?: (filter?: Record<string, unknown>) => Promise<unknown[]>
+  deleteMemory?: (id: string, hard?: boolean) => Promise<boolean>
+  restoreMemory?: (id: string) => Promise<Record<string, unknown>>
+  emptyMemoryTrash?: () => Promise<number>
+  triggerMemoryConsolidate?: (projectKeyHash?: string) => void
+  getActiveSessionMemoryFlags?: () => {
+    useMemories?: boolean
+    generateMemories?: boolean
+    incognito?: boolean
+  } | null
 }
 
 export async function getActiveSessionId(): Promise<string | null> {

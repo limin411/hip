@@ -12,15 +12,27 @@ import {
 
 describe('memoryConfigPath', () => {
   const prev = process.env.HIP_MEMORY_CONFIG_PATH
+  const prevDataDir = process.env.HIP_DATA_DIR
 
   afterEach(() => {
     if (prev === undefined) delete process.env.HIP_MEMORY_CONFIG_PATH
     else process.env.HIP_MEMORY_CONFIG_PATH = prev
+    if (prevDataDir === undefined) delete process.env.HIP_DATA_DIR
+    else process.env.HIP_DATA_DIR = prevDataDir
   })
 
   it('honors HIP_MEMORY_CONFIG_PATH', () => {
     process.env.HIP_MEMORY_CONFIG_PATH = '/tmp/custom-memory.json'
     expect(memoryConfigPath()).toBe('/tmp/custom-memory.json')
+  })
+
+  it('honors HIP_DATA_DIR when HIP_MEMORY_CONFIG_PATH unset', () => {
+    delete process.env.HIP_MEMORY_CONFIG_PATH
+    const prevData = process.env.HIP_DATA_DIR
+    process.env.HIP_DATA_DIR = '/tmp/hip-e2e-data'
+    expect(memoryConfigPath()).toBe('/tmp/hip-e2e-data/config/memory.json')
+    if (prevData === undefined) delete process.env.HIP_DATA_DIR
+    else process.env.HIP_DATA_DIR = prevData
   })
 
   it('explicit override beats env', () => {

@@ -78,6 +78,30 @@ function stageE2eData(e2eDataDir: string): void {
   )
 
   process.env.HIP_PLUGINS_PATH = pluginsConfigPath
+
+  // Isolate memory.json under the e2e data dir (sidecar honors HIP_DATA_DIR / this env).
+  const memoryPath = path.join(configDir, 'memory.json')
+  process.env.HIP_MEMORY_CONFIG_PATH = memoryPath
+
+  // Live LLM memory suite: accelerate Phase1 idle debounce (opt-in only).
+  if (process.env.E2E_LIVE_LLM === '1') {
+    fs.writeFileSync(
+      memoryPath,
+      JSON.stringify(
+        {
+          version: 1,
+          useMemories: true,
+          generateMemories: true,
+          idleMinutes: 0,
+          minExtractIntervalHours: 0,
+          maxExtractsPerDay: 50,
+          hybridSearchEnabled: false,
+        },
+        null,
+        2,
+      ),
+    )
+  }
 }
 
 function readUserPluginPaths(userConfigDir: string): string[] {

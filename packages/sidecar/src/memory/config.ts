@@ -3,11 +3,17 @@ import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 import { MEMORY_FILE_CONFIG_DEFAULTS, type MemoryFileConfig } from '@hip/protocol'
 
-/** Path to `memory.json`. Override with `HIP_MEMORY_CONFIG_PATH` (tests). */
+/**
+ * Path to `memory.json`.
+ * Precedence: explicit override → `HIP_MEMORY_CONFIG_PATH` →
+ * `$HIP_DATA_DIR/config/memory.json` (E2E isolation) → `~/.hip/config/memory.json`.
+ */
 export function memoryConfigPath(override?: string): string {
   if (override?.trim()) return override.trim()
   const fromEnv = process.env.HIP_MEMORY_CONFIG_PATH?.trim()
   if (fromEnv) return fromEnv
+  const dataDir = process.env.HIP_DATA_DIR?.trim()
+  if (dataDir) return join(dataDir, 'config', 'memory.json')
   return join(homedir(), '.hip', 'config', 'memory.json')
 }
 

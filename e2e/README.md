@@ -41,6 +41,12 @@ yarn test:e2e:gate
 # Live LLM (opt-in; needs ~/.hip/config/auth.json staged by wdio)
 yarn test:e2e:live
 
+# Memory UI (unpaid; Settings / slash / citations harness)
+E2E_GREP=@memory yarn test:e2e
+
+# Live memory cross-session (opt-in; paid; needs auth.json)
+E2E_LIVE_LLM=1 E2E_GREP=@live.*memory yarn test:e2e --spec e2e/specs/live-memory.spec.ts
+
 # Single file
 yarn test:e2e --spec e2e/specs/write-to-changes.spec.ts
 
@@ -67,6 +73,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@harness` | Inject bridge (write/cancel/debug/agents) | yes |
 | `@panel` | Terminal / Agents panels | optional / nightly |
 | `@settings` | Settings smoke, usage chip | optional |
+| `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
 
 ## Isolation notes
@@ -90,8 +97,11 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 - `seedCheckpoints` — Timeline rows (P4); also makes `revertCheckpoint` auto-succeed (H8)
 - `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
 - `simulatePluginInstallError` — T2 (after Settings form submit)
+- Memory: `getMemoryConfig` / `setMemoryConfig` / `seedMemoryItem` / `listMemories` /
+  `deleteMemory` / `restoreMemory` / `emptyMemoryTrash` / `triggerMemoryConsolidate` /
+  `getActiveSessionMemoryFlags`
 
-Helpers: `e2e/helpers/e2e-hooks.ts`, `git-workspace.ts`, `history.ts`.
+Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`, `history.ts`.
 
 ## CI suggestion
 
@@ -100,6 +110,7 @@ Helpers: `e2e/helpers/e2e-hooks.ts`, `git-workspace.ts`, `history.ts`.
 | Gate | `@smoke\|@core\|@harness` | PR / main |
 | Nightly | (full, exclude `@live`) | schedule |
 | Live | `@live` | manual / secret present |
+| Live memory | `@live` + `@memory` | manual; stages accelerated `memory.json` (`idleMinutes: 0`) |
 
 ## Flakes
 

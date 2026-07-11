@@ -38,6 +38,13 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     if let Some(p) = crate::paths::hip_config_path(app) {
         cmd = cmd.env("HIP_CONFIG_PATH", p.to_string_lossy().into_owned());
     }
+    // Cross-session memory flags/config (memory.json under the same config root).
+    if let Some(dir) = crate::paths::config_dir(app) {
+        cmd = cmd.env(
+            "HIP_MEMORY_CONFIG_PATH",
+            dir.join("memory.json").to_string_lossy().into_owned(),
+        );
+    }
     // Providers are read from hip.toml via HIP_CONFIG_PATH; no separate env var needed.
     // Point the sidecar at the plugin registry (installed plugin manifests).
     if let Some(p) = crate::paths::plugins_config_path(app) {

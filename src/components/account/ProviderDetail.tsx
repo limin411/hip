@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Check, Eye, EyeOff } from 'lucide-react'
 import type { CatalogProvider, CatalogModel } from '@/ipc/catalog'
@@ -37,6 +37,9 @@ export function ProviderDetail({
   onSaveBaseURL,
   onSetEnabled,
   onSetCurrent,
+  setCurrentLabel,
+  currentLabel,
+  roleActions,
 }: {
   provider: CatalogProvider
   configured: boolean
@@ -48,6 +51,12 @@ export function ProviderDetail({
   onSaveBaseURL: (value: string) => Promise<void>
   onSetEnabled: (value: boolean) => Promise<void>
   onSetCurrent: (modelID: string) => Promise<void>
+  /** Button label when a model is not current (e.g. "Set as embedding"). */
+  setCurrentLabel?: string
+  /** Button label when a model is current (e.g. "Current embedding"). */
+  currentLabel?: string
+  /** Optional role-specific actions rendered above the model list (Clear/Recommend). */
+  roleActions?: ReactNode
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
@@ -273,12 +282,16 @@ export function ProviderDetail({
           </div>
         )}
 
+        {roleActions && <div className="mb-3">{roleActions}</div>}
+
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
           {current && (
             <ModelCard
               model={current}
               isCurrent
               disabled={busy || !enabled}
+              setCurrentLabel={setCurrentLabel}
+              currentLabel={currentLabel}
               onClick={() => void run(() => onSetCurrent(current.id))}
             />
           )}
@@ -291,6 +304,8 @@ export function ProviderDetail({
                   model={m}
                   isCurrent={false}
                   disabled={busy || !enabled}
+                  setCurrentLabel={setCurrentLabel}
+                  currentLabel={currentLabel}
                   onClick={() => void run(() => onSetCurrent(m.id))}
                 />
               ))
@@ -310,11 +325,15 @@ function ModelCard({
   model,
   isCurrent,
   disabled,
+  setCurrentLabel,
+  currentLabel,
   onClick,
 }: {
   model: CatalogModel
   isCurrent: boolean
   disabled: boolean
+  setCurrentLabel?: string
+  currentLabel?: string
   onClick: () => void
 }) {
   const { t } = useTranslation()
@@ -340,7 +359,9 @@ function ModelCard({
         )}
       </div>
       <span className="shrink-0 text-caption text-accent-strong">
-        {isCurrent ? t('settings.modelConfig.current') : t('settings.modelConfig.setCurrent')}
+        {isCurrent
+          ? (currentLabel ?? t('settings.modelConfig.current'))
+          : (setCurrentLabel ?? t('settings.modelConfig.setCurrent'))}
       </span>
     </button>
   )

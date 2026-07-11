@@ -297,6 +297,89 @@ describe('memory handlers', () => {
     expect(store.getItem(item.id)?.status).toBe('deleted')
   })
 
+  it('soft delete then restore returns to active list', () => {
+    const item = svc.upsert({
+      title: 'restore me',
+      content: 'body',
+      kind: 'preference',
+      scope: 'global',
+    })
+    handleMemoryMessage(ctx, { type: 'memory:delete', id: item.id }, send)
+    expect(store.getItem(item.id)?.status).toBe('deleted')
+
+    sent = []
+    handleMemoryMessage(ctx, { type: 'memory:list', status: 'deleted' }, send)
+    expect(sent[0].type).toBe('memory:list:result')
+    if (sent[0].type !== 'memory:list:result') throw new Error('expected list result')
+    expect(sent[0].items.map((i) => i.id)).toContain(item.id)
+
+    sent = []
+    handleMemoryMessage(ctx, { type: 'memory:restore', id: item.id }, send)
+    expect(sent[0].type).toBe('memory:restore:result')
+    if (sent[0].type !== 'memory:restore:result') throw new Error('expected restore result')
+    expect(sent[0].item?.id).toBe(item.id)
+    expect(sent[0].item?.status).toBe('active')
+    expect(store.getItem(item.id)?.status).toBe('active')
+
+    sent = []
+    handleMemoryMessage(ctx, { type: 'memory:list', scope: 'global' }, send)
+    expect(sent[0].type).toBe('memory:list:result')
+    if (sent[0].type !== 'memory:list:result') throw new Error('expected list result')
+    expect(sent[0].items.map((i) => i.id)).toContain(item.id)
+  })
+
+  it('memory:emptyTrash hard-deletes all deleted items', () => {
+    const a = svc.upsert({
+      title: 'a',
+      content: 'a',
+      kind: 'preference',
+      scope: 'global',
+    })
+    const b = svc.upsert({
+      title: 'b',
+      content: 'b',
+      kind: 'preference',
+      scope: 'global',
+    })
+    const keep = svc.upsert({
+      title: 'keep',
+      content: 'keep',
+      kind: 'preference',
+      scope: 'global',
+    })
+    svc.softDelete(a.id)
+    svc.softDelete(b.id)
+
+    handleMemoryMessage(ctx, { type: 'memory:emptyTrash' }, send)
+    expect(sent[0]).toEqual({ type: 'memory:emptyTrash:result', deleted: 2 })
+    expect(store.getItem(a.id)).toBeUndefined()
+    expect(store.getItem(b.id)).toBeUndefined()
+    expect(store.getItem(keep.id)?.status).toBe('active')
+  })
+
+  it('deleteBySourceSession still hard-deletes derived items by default', () => {
+    const derived = svc.upsert({
+      title: 'derived',
+      content: 'from session',
+      kind: 'lesson',
+      scope: 'project',
+      source: 'extract',
+      sourceSessionId: 'sess-hard',
+      projectKeyHash: 'pk',
+    })
+    handleMemoryMessage(
+      ctx,
+      { type: 'memory:deleteBySourceSession', sessionId: 'sess-hard' },
+      send,
+    )
+    expect(sent[0]).toMatchObject({
+      type: 'memory:deleteBySourceSession:result',
+      sessionId: 'sess-hard',
+      deleted: 1,
+    })
+    expect(store.getItem(derived.id)).toBeUndefined()
+  })
+
   it('memory:consolidate emits started then noop when no stage1', async () => {
     handleMemoryMessage(ctx, { type: 'memory:consolidate' }, send)
     expect(sent[0]).toEqual({

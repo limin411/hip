@@ -85,6 +85,7 @@ export {
   itemUnusedAgeMs,
   type DecayJobResult,
 } from './pipeline/evolution.js'
+export { runTrashRetentionJob } from './trash.js'
 export {
   writeMemoryMirror,
   atomicWriteFile,

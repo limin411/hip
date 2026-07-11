@@ -212,6 +212,32 @@ describe('MemoryService', () => {
     expect(svc.search('UniqueTokenAlpha').map((x) => x.id)).toEqual(['s1'])
   })
 
+  it('soft delete then restore returns item to active', () => {
+    const item = svc.upsert({
+      title: 'trash then restore',
+      content: 'body',
+      kind: 'preference',
+      scope: 'global',
+    })
+    expect(svc.softDelete(item.id)).toBe(true)
+    expect(svc.getItem(item.id)?.status).toBe('deleted')
+
+    const restored = svc.restore(item.id)
+    expect(restored?.status).toBe('active')
+    expect(svc.getItem(item.id)?.status).toBe('active')
+    expect(svc.store.listItems({ status: 'active' }).map((i) => i.id)).toContain(item.id)
+  })
+
+  it('emptyTrash hard-deletes deleted only; restore of missing returns undefined', () => {
+    const a = svc.upsert({ title: 'a', content: 'a', kind: 'lesson', scope: 'global' })
+    const b = svc.upsert({ title: 'b', content: 'b', kind: 'lesson', scope: 'global' })
+    svc.softDelete(a.id)
+    expect(svc.emptyTrash()).toBe(1)
+    expect(svc.getItem(a.id)).toBeUndefined()
+    expect(svc.getItem(b.id)).toBeDefined()
+    expect(svc.restore(a.id)).toBeUndefined()
+  })
+
   it('exportJsonl / importJsonl keep|overwrite|merge', () => {
     const a = svc.upsert({
       id: 'e1',

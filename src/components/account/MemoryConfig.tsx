@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Brain, Download, Pencil, Pin, Trash2, Upload } from 'lucide-react'
+import { Brain, Download, Pencil, Pin, RotateCcw, Trash2, Upload } from 'lucide-react'
 import type { MemoryFileConfig, MemoryItem, MemoryStatus } from '@hip/protocol'
 import { sessionService } from '@/domain'
 import { useProvidersStore } from '@/store/providersStore'
@@ -35,14 +35,16 @@ export function MemoryConfig() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** List filter; Task 4 will add trash/archived. */
-  const [listStatus] = useState<MemoryStatus>('active')
+  /** List filter: Active | Trash. */
+  const [listStatus, setListStatus] = useState<MemoryStatus>('active')
   const [editing, setEditing] = useState<MemoryItem | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [deleting, setDeleting] = useState<MemoryItem | null>(null)
+  const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig)
+  const isTrash = listStatus === 'deleted'
 
   const loadItems = useCallback(async (status: MemoryStatus) => {
     return sessionService.listMemories({ limit: 200, status })
@@ -65,6 +67,21 @@ export function MemoryConfig() {
       setLoading(false)
     }
   }, [listStatus, loadItems])
+
+  const switchListStatus = async (status: MemoryStatus) => {
+    if (status === listStatus) return
+    setListStatus(status)
+    setBusy(true)
+    setError(null)
+    try {
+      const list = await loadItems(status)
+      setItems(list)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   useEffect(() => {
     void refresh()
@@ -150,6 +167,33 @@ export function MemoryConfig() {
       await sessionService.deleteMemory(deleting.id)
       setItems((prev) => prev.filter((it) => it.id !== deleting.id))
       setDeleting(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onRestore = async (item: MemoryItem) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await sessionService.restoreMemory(item.id)
+      setItems((prev) => prev.filter((it) => it.id !== item.id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onConfirmEmptyTrash = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await sessionService.emptyMemoryTrash()
+      setItems([])
+      setConfirmEmptyTrash(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -367,25 +411,55 @@ export function MemoryConfig() {
       <div className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-prose font-medium text-ink">{t('settings.memory.listTitle')}</h3>
-          <div className="flex flex-wrap gap-1.5" data-testid="memory-list-filters" role="group" aria-label={t('settings.memory.listFilters')}>
-            <button
-              type="button"
-              data-testid="memory-filter-active"
-              className={cn(
-                'rounded-full border px-2.5 py-0.5 text-caption font-medium transition-colors',
-                listStatus === 'active'
-                  ? 'border-accent/40 bg-accent/10 text-accent'
-                  : 'border-border bg-surface text-ink-secondary hover:bg-surface-muted',
-              )}
-              aria-pressed={listStatus === 'active'}
-            >
-              {t('settings.memory.filterActive')}
-            </button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap gap-1.5" data-testid="memory-list-filters" role="group" aria-label={t('settings.memory.listFilters')}>
+              <button
+                type="button"
+                data-testid="memory-filter-active"
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-caption font-medium transition-colors',
+                  listStatus === 'active'
+                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    : 'border-border bg-surface text-ink-secondary hover:bg-surface-muted',
+                )}
+                aria-pressed={listStatus === 'active'}
+                disabled={busy}
+                onClick={() => void switchListStatus('active')}
+              >
+                {t('settings.memory.filterActive')}
+              </button>
+              <button
+                type="button"
+                data-testid="memory-filter-trash"
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-caption font-medium transition-colors',
+                  isTrash
+                    ? 'border-accent/40 bg-accent/10 text-accent'
+                    : 'border-border bg-surface text-ink-secondary hover:bg-surface-muted',
+                )}
+                aria-pressed={isTrash}
+                disabled={busy}
+                onClick={() => void switchListStatus('deleted')}
+              >
+                {t('settings.memory.filterTrash')}
+              </button>
+            </div>
+            {isTrash && items.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy}
+                data-testid="memory-empty-trash"
+                onClick={() => setConfirmEmptyTrash(true)}
+              >
+                {t('settings.memory.emptyTrash')}
+              </Button>
+            )}
           </div>
         </div>
         {items.length === 0 ? (
           <p className="mt-3 text-body text-ink-tertiary" data-testid="memory-list-empty">
-            {t('settings.memory.listEmpty')}
+            {isTrash ? t('settings.memory.listEmptyTrash') : t('settings.memory.listEmpty')}
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-border rounded-lg border border-border" data-testid="memory-list">
@@ -393,7 +467,7 @@ export function MemoryConfig() {
               <li key={item.id} className="flex items-start gap-2 px-3 py-3" data-testid={`memory-item-${item.id}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    {item.pinned && (
+                    {item.pinned && !isTrash && (
                       <Pin
                         size={12}
                         className="shrink-0 text-accent"
@@ -416,40 +490,56 @@ export function MemoryConfig() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn('shrink-0', item.pinned ? 'text-accent' : 'text-ink-secondary')}
-                    disabled={busy}
-                    aria-label={item.pinned ? t('settings.memory.unpin') : t('settings.memory.pin')}
-                    aria-pressed={item.pinned}
-                    data-testid={`memory-pin-${item.id}`}
-                    onClick={() => void onTogglePin(item)}
-                  >
-                    <Pin size={15} fill={item.pinned ? 'currentColor' : 'none'} />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 text-ink-secondary"
-                    disabled={busy}
-                    aria-label={t('settings.memory.edit')}
-                    data-testid={`memory-edit-${item.id}`}
-                    onClick={() => openEdit(item)}
-                  >
-                    <Pencil size={15} />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="shrink-0 text-ink-secondary hover:text-danger"
-                    disabled={busy}
-                    aria-label={t('settings.memory.delete')}
-                    data-testid={`memory-delete-${item.id}`}
-                    onClick={() => setDeleting(item)}
-                  >
-                    <Trash2 size={15} />
-                  </Button>
+                  {isTrash ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0 text-ink-secondary"
+                      disabled={busy}
+                      aria-label={t('settings.memory.restore')}
+                      data-testid={`memory-restore-${item.id}`}
+                      onClick={() => void onRestore(item)}
+                    >
+                      <RotateCcw size={15} />
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={cn('shrink-0', item.pinned ? 'text-accent' : 'text-ink-secondary')}
+                        disabled={busy}
+                        aria-label={item.pinned ? t('settings.memory.unpin') : t('settings.memory.pin')}
+                        aria-pressed={item.pinned}
+                        data-testid={`memory-pin-${item.id}`}
+                        onClick={() => void onTogglePin(item)}
+                      >
+                        <Pin size={15} fill={item.pinned ? 'currentColor' : 'none'} />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 text-ink-secondary"
+                        disabled={busy}
+                        aria-label={t('settings.memory.edit')}
+                        data-testid={`memory-edit-${item.id}`}
+                        onClick={() => openEdit(item)}
+                      >
+                        <Pencil size={15} />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="shrink-0 text-ink-secondary hover:text-danger"
+                        disabled={busy}
+                        aria-label={t('settings.memory.delete')}
+                        data-testid={`memory-delete-${item.id}`}
+                        onClick={() => setDeleting(item)}
+                      >
+                        <Trash2 size={15} />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}
@@ -533,6 +623,35 @@ export function MemoryConfig() {
                 onClick={() => void onConfirmDelete()}
               >
                 {t('settings.memory.delete')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {confirmEmptyTrash && (
+        <Modal
+          open
+          onOpenChange={(o) => {
+            if (!o) setConfirmEmptyTrash(false)
+          }}
+          title={t('settings.memory.emptyTrashConfirmTitle')}
+          className="max-w-sm"
+        >
+          <div className="p-5">
+            <p className="text-body text-ink-secondary">{t('settings.memory.emptyTrashConfirmBody')}</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmEmptyTrash(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={busy}
+                data-testid="memory-empty-trash-confirm"
+                onClick={() => void onConfirmEmptyTrash()}
+              >
+                {t('settings.memory.emptyTrash')}
               </Button>
             </div>
           </div>

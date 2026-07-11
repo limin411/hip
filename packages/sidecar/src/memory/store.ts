@@ -236,9 +236,31 @@ export class MemoryStore {
     return (r.changes ?? 0) > 0
   }
 
+  /** Restore a soft-deleted item to active. Returns false if not found or not deleted. */
+  restoreItem(id: string): boolean {
+    const r = this.db.prepare(
+      `UPDATE memory_items SET status='active', updated_at=? WHERE id=? AND status='deleted'`,
+    ).run(Date.now(), id)
+    return (r.changes ?? 0) > 0
+  }
+
   hardDelete(id: string): boolean {
     const r = this.db.prepare(`DELETE FROM memory_items WHERE id=?`).run(id)
     return (r.changes ?? 0) > 0
+  }
+
+  /** Hard-delete soft-deleted items older than cutoff (updated_at < cutoffMs). */
+  purgeDeletedOlderThan(cutoffMs: number): number {
+    const r = this.db.prepare(
+      `DELETE FROM memory_items WHERE status='deleted' AND updated_at < ?`,
+    ).run(cutoffMs)
+    return r.changes ?? 0
+  }
+
+  /** Hard-delete all soft-deleted items (empty trash). */
+  emptyTrash(): number {
+    const r = this.db.prepare(`DELETE FROM memory_items WHERE status='deleted'`).run()
+    return r.changes ?? 0
   }
 
   /**

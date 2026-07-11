@@ -5,6 +5,7 @@ import type { MemoryService } from './service.js'
 import { createDefaultMemoryLlmClient } from './llm-client.js'
 import { runPhase2Consolidate } from './pipeline/phase2-consolidate.js'
 import { runDecayJob } from './pipeline/evolution.js'
+import { runTrashRetentionJob } from './trash.js'
 
 export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:list',
@@ -12,6 +13,8 @@ export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:upsert',
   'memory:delete',
   'memory:deleteBySourceSession',
+  'memory:restore',
+  'memory:emptyTrash',
   'memory:export',
   'memory:import',
   'memory:getConfig',
@@ -115,6 +118,7 @@ export function handleMemoryMessage(
     }
     case 'memory:deleteBySourceSession': {
       try {
+        // Default remains hard delete (privacy for session-derived items).
         const deleted = ctx
           .getMemoryService()
           .store.deleteBySourceSession(msg.sessionId, { soft: msg.soft })
@@ -130,6 +134,28 @@ export function handleMemoryMessage(
           deleted: 0,
           error: String(e),
         })
+      }
+      return
+    }
+    case 'memory:restore': {
+      try {
+        const item = ctx.getMemoryService().restore(msg.id)
+        if (!item) {
+          send({ type: 'memory:restore:result', error: `not found or not deleted: ${msg.id}` })
+        } else {
+          send({ type: 'memory:restore:result', item })
+        }
+      } catch (e) {
+        send({ type: 'memory:restore:result', error: String(e) })
+      }
+      return
+    }
+    case 'memory:emptyTrash': {
+      try {
+        const deleted = ctx.getMemoryService().emptyTrash()
+        send({ type: 'memory:emptyTrash:result', deleted })
+      } catch (e) {
+        send({ type: 'memory:emptyTrash:result', deleted: 0, error: String(e) })
       }
       return
     }
@@ -233,12 +259,20 @@ export function handleMemoryMessage(
             })
             return
           }
-          // Best-effort decay after successful Phase2.
+          // Best-effort decay + trash retention after successful Phase2.
           try {
             runDecayJob(svc.store, config)
           } catch (err) {
             console.warn(
               '[memory] decay after consolidate failed',
+              err instanceof Error ? err.message : String(err),
+            )
+          }
+          try {
+            runTrashRetentionJob(svc.store, config)
+          } catch (err) {
+            console.warn(
+              '[memory] trash retention after consolidate failed',
               err instanceof Error ? err.message : String(err),
             )
           }

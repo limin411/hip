@@ -562,6 +562,22 @@ export class SessionService {
     return msg.deleted
   }
 
+  async restoreMemory(id: string): Promise<MemoryItem> {
+    const wait = this.waitForServerMessage('memory:restore:result')
+    this.transport.send({ type: 'memory:restore', id })
+    const msg = await wait
+    if (msg.error || !msg.item) throw new Error(msg.error ?? 'restore failed')
+    return msg.item
+  }
+
+  async emptyMemoryTrash(): Promise<number> {
+    const wait = this.waitForServerMessage('memory:emptyTrash:result')
+    this.transport.send({ type: 'memory:emptyTrash' })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.deleted
+  }
+
   async exportMemories(format: 'jsonl' | 'markdown' = 'jsonl'): Promise<string> {
     const wait = this.waitForServerMessage('memory:export:result')
     this.transport.send({ type: 'memory:export', format })

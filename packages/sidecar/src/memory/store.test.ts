@@ -197,6 +197,66 @@ describe('MemoryStore', () => {
     expect(store.getItem('s1')?.status).toBe('deleted')
   })
 
+  it('soft delete then restore returns to active list', () => {
+    store.upsertItem(item({ id: 'r1', title: 'restore me', content: 'unique-restore-token-abc' }))
+    expect(store.softDelete('r1')).toBe(true)
+    expect(store.getItem('r1')?.status).toBe('deleted')
+    expect(store.listItems({ status: 'active' }).map((i) => i.id)).not.toContain('r1')
+    expect(store.listItems({ status: 'deleted' }).map((i) => i.id)).toContain('r1')
+
+    expect(store.restoreItem('r1')).toBe(true)
+    expect(store.getItem('r1')?.status).toBe('active')
+    expect(store.listItems({ status: 'active' }).map((i) => i.id)).toContain('r1')
+    expect(store.search('unique-restore-token-abc').map((i) => i.id)).toEqual(['r1'])
+  })
+
+  it('restoreItem is no-op for active or missing ids', () => {
+    store.upsertItem(item({ id: 'active', title: 'a', content: 'c' }))
+    expect(store.restoreItem('active')).toBe(false)
+    expect(store.restoreItem('missing')).toBe(false)
+  })
+
+  it('purgeDeletedOlderThan removes only old trash', () => {
+    const now = 1_000_000
+    store.upsertItem(item({
+      id: 'old-trash',
+      title: 'old',
+      content: 'old',
+      status: 'deleted',
+      updatedAt: now - 1000,
+    }))
+    store.upsertItem(item({
+      id: 'new-trash',
+      title: 'new',
+      content: 'new',
+      status: 'deleted',
+      updatedAt: now - 10,
+    }))
+    store.upsertItem(item({
+      id: 'still-active',
+      title: 'active',
+      content: 'active',
+      status: 'active',
+      updatedAt: now - 10_000,
+    }))
+
+    const n = store.purgeDeletedOlderThan(now - 100)
+    expect(n).toBe(1)
+    expect(store.getItem('old-trash')).toBeUndefined()
+    expect(store.getItem('new-trash')?.status).toBe('deleted')
+    expect(store.getItem('still-active')?.status).toBe('active')
+  })
+
+  it('emptyTrash hard-deletes all deleted items only', () => {
+    store.upsertItem(item({ id: 't1', title: 't1', content: 'c', status: 'deleted' }))
+    store.upsertItem(item({ id: 't2', title: 't2', content: 'c', status: 'deleted' }))
+    store.upsertItem(item({ id: 'a1', title: 'a1', content: 'c', status: 'active' }))
+    expect(store.emptyTrash()).toBe(2)
+    expect(store.getItem('t1')).toBeUndefined()
+    expect(store.getItem('t2')).toBeUndefined()
+    expect(store.getItem('a1')).toBeDefined()
+  })
+
   it('hardDelete removes the row', () => {
     store.upsertItem(item({ id: 'h1', title: 'gone', content: 'hard-delete-token' }))
     expect(store.hardDelete('h1')).toBe(true)

@@ -225,6 +225,65 @@ describe('MemoryConfig', () => {
     expect(deleteSpy.mock.calls[0]).toHaveLength(1)
   })
 
+  it('trash tab lists deleted items and restore / empty trash', async () => {
+    const deletedItem: MemoryItem = { ...sampleItem, id: 'd1', title: 'Trashed', status: 'deleted' }
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
+    const listSpy = vi
+      .spyOn(sessionService, 'listMemories')
+      .mockImplementation(async (filter) => {
+        if (filter?.status === 'deleted') return [deletedItem]
+        return [sampleItem]
+      })
+    const restoreSpy = vi.spyOn(sessionService, 'restoreMemory').mockResolvedValue({
+      ...deletedItem,
+      status: 'active',
+    })
+    const emptySpy = vi.spyOn(sessionService, 'emptyMemoryTrash').mockResolvedValue(1)
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-filter-trash')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-filter-trash'))
+
+    await waitFor(() => {
+      expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'deleted' })
+      expect(screen.getByTestId('memory-item-d1')).toBeInTheDocument()
+      expect(screen.getByTestId('memory-restore-d1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-restore-d1'))
+
+    await waitFor(() => {
+      expect(restoreSpy).toHaveBeenCalledWith('d1')
+    })
+
+    // Re-enter trash with an item so Empty trash is available again.
+    listSpy.mockImplementation(async (filter) => {
+      if (filter?.status === 'deleted') return [deletedItem]
+      return []
+    })
+    fireEvent.click(screen.getByTestId('memory-filter-active'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
+    })
+    fireEvent.click(screen.getByTestId('memory-filter-trash'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-empty-trash')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-empty-trash'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-empty-trash-confirm')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-empty-trash-confirm'))
+    await waitFor(() => {
+      expect(emptySpy).toHaveBeenCalled()
+    })
+  })
+
   it('extract model catalog picker persists MemoryModelRef and clears with empty', async () => {
     vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
     vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])

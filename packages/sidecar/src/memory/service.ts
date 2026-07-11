@@ -12,6 +12,7 @@ import { redactSecrets } from './redact.js'
 import { scanMemoryContent } from './threat-scan.js'
 import { resolveProjectKey } from './project-key.js'
 import { runDecayJob } from './pipeline/evolution.js'
+import { runTrashRetentionJob } from './trash.js'
 import type {
   MemoryListFilter,
   MemorySearchOpts,
@@ -52,17 +53,27 @@ export class MemoryService {
   }
 
   /**
-   * Best-effort decay once per service instance (call from getMemoryService / process startup).
-   * Safe to invoke repeatedly; only the first call runs the job.
+   * Best-effort decay + trash retention once per service instance
+   * (call from getMemoryService / process startup).
+   * Safe to invoke repeatedly; only the first call runs the jobs.
    */
   runStartupDecayOnce(): void {
     if (this.startupDecayRan) return
     this.startupDecayRan = true
+    const config = this.getConfig()
     try {
-      runDecayJob(this.store, this.getConfig())
+      runDecayJob(this.store, config)
     } catch (err) {
       console.warn(
         '[memory] startup decay failed',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+    try {
+      runTrashRetentionJob(this.store, config)
+    } catch (err) {
+      console.warn(
+        '[memory] startup trash retention failed',
         err instanceof Error ? err.message : String(err),
       )
     }
@@ -210,6 +221,21 @@ export class MemoryService {
 
   hardDelete(id: string): boolean {
     return this.store.hardDelete(id)
+  }
+
+  /**
+   * Restore a soft-deleted memory to active.
+   * Hybrid re-embed (if enabled) is a no-op until Task 6.
+   */
+  restore(id: string): MemoryItem | undefined {
+    const ok = this.store.restoreItem(id)
+    if (!ok) return undefined
+    return this.store.getItem(id)
+  }
+
+  /** Hard-delete all soft-deleted memories. */
+  emptyTrash(): number {
+    return this.store.emptyTrash()
   }
 
   exportJsonl(filter: MemoryListFilter = {}): string {

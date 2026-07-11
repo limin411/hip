@@ -98,6 +98,8 @@ export type ClientMessage =
   | { type: 'memory:upsert'; item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'> }
   | { type: 'memory:delete'; id: string; hard?: boolean }
   | { type: 'memory:deleteBySourceSession'; sessionId: string; soft?: boolean }
+  | { type: 'memory:restore'; id: string }
+  | { type: 'memory:emptyTrash' }
   | { type: 'memory:export'; format: 'jsonl' | 'markdown'; scope?: MemoryScope; projectKeyHash?: string }
   | { type: 'memory:import'; format: 'jsonl'; data: string; conflict?: 'keep' | 'overwrite' | 'merge' }
   | { type: 'memory:getConfig' }
@@ -177,6 +179,8 @@ export type ServerMessage =
   | { type: 'memory:upsert:result'; item?: MemoryItem; error?: string }
   | { type: 'memory:delete:result'; id: string; ok: boolean; error?: string }
   | { type: 'memory:deleteBySourceSession:result'; sessionId: string; deleted: number; error?: string }
+  | { type: 'memory:restore:result'; item?: MemoryItem; error?: string }
+  | { type: 'memory:emptyTrash:result'; deleted: number; error?: string }
   | { type: 'memory:export:result'; format: string; data: string; error?: string }
   | { type: 'memory:import:result'; ok: boolean; imported: number; error?: string }
   | { type: 'memory:config'; config: MemoryFileConfig }

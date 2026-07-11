@@ -63,6 +63,8 @@ export const CLIENT_MESSAGE_TYPES = [
   'memory:upsert',
   'memory:delete',
   'memory:deleteBySourceSession',
+  'memory:restore',
+  'memory:emptyTrash',
   'memory:export',
   'memory:import',
   'memory:getConfig',

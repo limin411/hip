@@ -2,6 +2,8 @@ import type { ClientMessage, MemoryItem, SessionConfig } from '@hip/protocol'
 import type { Session } from '../session/session.js'
 import type { SendFn } from '../session/handlers/types.js'
 import type { MemoryService } from './service.js'
+import { createDefaultMemoryLlmClient } from './llm-client.js'
+import { runPhase2Consolidate } from './pipeline/phase2-consolidate.js'
 
 export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:list',
@@ -199,13 +201,50 @@ export function handleMemoryMessage(
       return
     }
     case 'memory:consolidate': {
-      // Phase2 pipeline lands later — acknowledge as noop for V1.
-      send({
-        type: 'memory:pipeline',
-        phase: 2,
-        status: 'noop',
-        detail: 'not_implemented_until_phase2',
+      const svc = ctx.getMemoryService()
+      const config = svc.getConfig()
+      const llm = createDefaultMemoryLlmClient({ extractModel: config.extractModel })
+      send({ type: 'memory:pipeline', phase: 2, status: 'started' })
+      void runPhase2Consolidate({
+        store: svc.store,
+        llm,
+        config,
+        projectKeyHash: msg.projectKeyHash,
       })
+        .then((res) => {
+          if (res.status === 'skipped') {
+            send({
+              type: 'memory:pipeline',
+              phase: 2,
+              status: 'noop',
+              detail: res.reason ?? 'skipped',
+            })
+            return
+          }
+          if (res.status === 'failed') {
+            send({
+              type: 'memory:pipeline',
+              phase: 2,
+              status: 'failed',
+              detail: res.reason,
+            })
+            return
+          }
+          send({
+            type: 'memory:pipeline',
+            phase: 2,
+            status: 'succeeded',
+            detail: `upserted=${res.upserted ?? 0};archived=${res.archived ?? 0}`,
+          })
+        })
+        .catch((err) => {
+          send({
+            type: 'memory:pipeline',
+            phase: 2,
+            status: 'failed',
+            detail: err instanceof Error ? err.message : String(err),
+          })
+        })
       return
     }
     case 'session:setMemoryFlags': {

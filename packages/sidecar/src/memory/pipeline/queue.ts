@@ -4,6 +4,8 @@ import type { MemoryLlmClient } from '../llm-client.js'
 import { createDefaultMemoryLlmClient } from '../llm-client.js'
 import { resolveSessionMemoryFlags } from '../config.js'
 import { runPhase1Extract } from './phase1-extract.js'
+import { runPhase2Consolidate } from './phase2-consolidate.js'
+import { resolveProjectKey } from '../project-key.js'
 import type { MemoryStore } from '../store.js'
 
 export type Phase1QueueJob = {
@@ -69,7 +71,7 @@ export async function processQueue(): Promise<void> {
       active += 1
       // Sequential await when concurrency=1; keeps process simple and testable.
       try {
-        await runPhase1Extract({
+        const phase1 = await runPhase1Extract({
           store: job.store,
           sessionStore: job.sessionStore,
           sessionId: job.sessionId,
@@ -77,6 +79,36 @@ export async function processQueue(): Promise<void> {
           config: job.config,
           sessionConfig: job.sessionConfig,
         })
+        // After successful Phase1, enqueue Phase2 for same project (or global).
+        if (phase1.status === 'succeeded' || phase1.status === 'succeeded_no_output') {
+          let projectKeyHash: string | undefined
+          let projectKey: string | undefined
+          const cwd = job.sessionConfig?.cwd
+          if (cwd) {
+            try {
+              const pk = resolveProjectKey(cwd)
+              projectKeyHash = pk.projectKeyHash
+              projectKey = pk.projectKey
+            } catch {
+              // best-effort
+            }
+          }
+          try {
+            await runPhase2Consolidate({
+              store: job.store,
+              llm: job.llm,
+              config: job.config,
+              projectKeyHash,
+              projectKey,
+            })
+          } catch (err) {
+            console.warn(
+              '[memory-queue] phase2 failed',
+              job.sessionId,
+              err instanceof Error ? err.message : String(err),
+            )
+          }
+        }
       } catch (err) {
         console.warn(
           '[memory-queue] phase1 failed',

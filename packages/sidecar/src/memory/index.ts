@@ -29,6 +29,8 @@ export {
   type MemorySearchOpts,
   type MemorySearchInScopesOpts,
   type MemoryStage1Row,
+  type MemoryStage1ListFilter,
+  type MemorySummaryRow,
 } from './store.js'
 export {
   createDefaultMemoryLlmClient,
@@ -39,8 +41,13 @@ export {
 } from './llm-client.js'
 export {
   PHASE1_SYSTEM_PROMPT,
+  PHASE2_SYSTEM_PROMPT,
   buildPhase1UserPrompt,
+  buildPhase2UserPrompt,
   type Stage1LlmOutput,
+  type Phase2LlmItem,
+  type Phase2LlmOutput,
+  type Phase2PromptInput,
 } from './pipeline/prompts.js'
 export {
   buildPhase1Transcript,
@@ -56,6 +63,36 @@ export {
   type RunPhase1ExtractOpts,
   type SessionMessagesLoader,
 } from './pipeline/phase1-extract.js'
+export {
+  runPhase2Consolidate,
+  applyPhase2PostPass,
+  parsePhase2LlmOutput,
+  normalizeSummaryMd,
+  simpleExtractFromStage1,
+  PHASE2_MAX_STAGE1_DEFAULT,
+  PHASE2_NEW_EXTRACT_CONFIDENCE_CAP,
+  type Phase2ConsolidateResult,
+  type Phase2ConsolidateStatus,
+  type RunPhase2ConsolidateOpts,
+  type Phase2PostPassItem,
+  type Phase2PostPassResult,
+} from './pipeline/phase2-consolidate.js'
+export {
+  runDecayJob,
+  applyDecayStep,
+  isDecayCandidate,
+  itemUnusedAgeMs,
+  type DecayJobResult,
+} from './pipeline/evolution.js'
+export {
+  writeMemoryMirror,
+  atomicWriteFile,
+  formatMemoryMirrorMarkdown,
+  memoriesRootDir,
+  globalMemoryMirrorPath,
+  projectMemoryMirrorPath,
+  type WriteMemoryMirrorOpts,
+} from './mirror.js'
 export {
   enqueuePhase1,
   processQueue,

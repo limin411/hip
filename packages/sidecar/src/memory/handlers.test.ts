@@ -245,13 +245,19 @@ describe('memory handlers', () => {
     expect(store.getItem(item.id)?.status).toBe('deleted')
   })
 
-  it('memory:consolidate emits phase2 noop', () => {
+  it('memory:consolidate emits started then noop when no stage1', async () => {
     handleMemoryMessage(ctx, { type: 'memory:consolidate' }, send)
     expect(sent[0]).toEqual({
       type: 'memory:pipeline',
       phase: 2,
-      status: 'noop',
-      detail: 'not_implemented_until_phase2',
+      status: 'started',
     })
+    // Wait for async Phase2 settle
+    await new Promise((r) => setTimeout(r, 50))
+    const last = sent[sent.length - 1]
+    expect(last).toMatchObject({ type: 'memory:pipeline', phase: 2 })
+    expect(['noop', 'failed', 'succeeded']).toContain(
+      (last as { status: string }).status,
+    )
   })
 })

@@ -107,10 +107,20 @@ export function AppLayout() {
             {renderMainContent()}
           </Panel>
 
-          <PanelResizeHandle className="group relative z-10 w-2 bg-transparent">
-            {/* Soft edge cue only when the floating card is open — no hard splitter line. */}
+          <PanelResizeHandle className="group relative z-10 flex w-3 items-center justify-center bg-transparent">
+            {/* Restrained drag affordance: short center grip, soft full-height cue only on hover/drag. */}
             {rightOpen ? (
-              <div className="mx-auto h-full w-px bg-transparent transition-colors group-hover:bg-accent/40 group-data-[resize-handle-state=drag]:bg-accent" />
+              <>
+                <div
+                  className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-accent/30 group-data-[resize-handle-state=drag]:bg-accent/50"
+                  aria-hidden
+                />
+                <div
+                  className="relative h-7 w-[3px] rounded-full bg-border transition-colors group-hover:bg-accent/70 group-data-[resize-handle-state=drag]:bg-accent"
+                  aria-hidden
+                  data-testid="right-panel-resize-grip"
+                />
+              </>
             ) : null}
           </PanelResizeHandle>
 

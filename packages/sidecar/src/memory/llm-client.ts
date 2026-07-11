@@ -1,12 +1,14 @@
 import { SystemMessage, HumanMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { MemoryModelRef } from '@hip/protocol'
+import { normalizeExtractModel } from '@hip/protocol'
 import { getActiveModel, cheapModelFor, resolveProviderBaseURL } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { buildChatModel } from '../session/model-factory.js'
 import { loadMemoryConfig } from './config.js'
 
 export interface MemoryLlmCompleteOpts {
-  model?: string
+  model?: string | MemoryModelRef
   maxTokens?: number
   temperature?: number
   signal?: AbortSignal
@@ -21,37 +23,30 @@ const DEFAULT_TIMEOUT_MS = 120_000
 const DEFAULT_MAX_TOKENS = 4096
 const DEFAULT_TEMPERATURE = 0
 
-/** Resolve provider/model/baseURL from an override (`provider/model` or bare model id) or active + cheap default. */
-export function resolveMemoryExtractModel(override?: string): {
+/**
+ * Resolve provider/model/baseURL for memory extract.
+ * Accepts MemoryModelRef, legacy `provider/model` string, bare model id, or falls back to
+ * memory.json extractModel then active provider's cheap model.
+ */
+export function resolveMemoryExtractModel(override?: string | MemoryModelRef): {
   providerID: string
   modelID: string
   baseURL: string
 } {
+  const ref =
+    normalizeExtractModel(override) ?? normalizeExtractModel(loadMemoryConfig().extractModel)
   const active = getActiveModel()
-  if (!override?.trim()) {
+  if (!ref) {
     return {
       providerID: active.providerID,
       modelID: cheapModelFor(active.providerID, active.modelID),
-      baseURL: active.baseURL,
-    }
-  }
-  const raw = override.trim()
-  const slash = raw.indexOf('/')
-  if (slash > 0) {
-    const providerID = raw.slice(0, slash)
-    const modelID = raw.slice(slash + 1)
-    if (providerID && modelID) {
-      return {
-        providerID,
-        modelID,
-        baseURL: providerID === active.providerID ? active.baseURL : resolveProviderBaseURL(providerID),
-      }
+      baseURL: active.baseURL || resolveProviderBaseURL(active.providerID),
     }
   }
   return {
-    providerID: active.providerID,
-    modelID: raw,
-    baseURL: active.baseURL,
+    providerID: ref.providerID,
+    modelID: ref.modelID,
+    baseURL: ref.baseURL || resolveProviderBaseURL(ref.providerID),
   }
 }
 
@@ -98,10 +93,9 @@ function contentToText(content: unknown): string {
  * Uses buildChatModel + invoke — never RealModelRunner / session tool loops.
  */
 export function createDefaultMemoryLlmClient(opts?: {
-  extractModel?: string
+  extractModel?: string | MemoryModelRef
 }): MemoryLlmClient | null {
-  const extractModel = opts?.extractModel ?? loadMemoryConfig().extractModel
-  const defaultChoice = resolveMemoryExtractModel(extractModel)
+  const defaultChoice = resolveMemoryExtractModel(opts?.extractModel)
   if (!resolveApiKey(defaultChoice.providerID)) return null
 
   return {

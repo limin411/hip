@@ -21,6 +21,8 @@ export function mergeMemoryConfig(partial: Partial<MemoryFileConfig> | Record<st
   const out: MemoryFileConfig = { ...MEMORY_FILE_CONFIG_DEFAULTS }
   for (const [k, v] of Object.entries(partial)) {
     if (k === 'version' || v === undefined) continue
+    // Explicit clear of optional fields (null / empty string) → leave defaults / absent.
+    if (v === null || v === '') continue
     if (k in MEMORY_FILE_CONFIG_DEFAULTS || isOptionalMemoryKey(k)) {
       ;(out as Record<string, unknown>)[k] = v
     }
@@ -40,6 +42,11 @@ function isOptionalMemoryKey(k: string): boolean {
     'extractMaxTokens',
     'onboardingTipDismissed',
     'simpleExtract',
+    'embeddingModel',
+    'rerankModel',
+    'hybridSearchEnabled',
+    'maxExtractsPerDay',
+    'trashRetentionDays',
   ].includes(k)
 }
 

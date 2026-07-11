@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Brain, Download, Pencil, Pin, Trash2, Upload } from 'lucide-react'
 import type { MemoryFileConfig, MemoryItem, MemoryStatus } from '@hip/protocol'
 import { sessionService } from '@/domain'
+import { useProvidersStore } from '@/store/providersStore'
+import { groupModelOptions } from '@/lib/agentModelOptions'
+import { memoryModelKey, memoryModelRefFromKey } from '@/lib/memoryModelRef'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Switch } from '@/components/ui/Switch'
@@ -26,12 +29,12 @@ function downloadText(filename: string, data: string, mime = 'application/x-ndjs
 
 export function MemoryConfig() {
   const { t } = useTranslation()
+  const { catalog, config: providersConfig, load: loadProviders } = useProvidersStore()
   const [config, setConfig] = useState<MemoryFileConfig | null>(null)
   const [items, setItems] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [extractModelDraft, setExtractModelDraft] = useState('')
   /** List filter; Task 4 will add trash/archived. */
   const [listStatus] = useState<MemoryStatus>('active')
   const [editing, setEditing] = useState<MemoryItem | null>(null)
@@ -39,6 +42,7 @@ export function MemoryConfig() {
   const [editContent, setEditContent] = useState('')
   const [deleting, setDeleting] = useState<MemoryItem | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const modelGroups = groupModelOptions(catalog, providersConfig)
 
   const loadItems = useCallback(async (status: MemoryStatus) => {
     return sessionService.listMemories({ limit: 200, status })
@@ -49,7 +53,6 @@ export function MemoryConfig() {
     try {
       const cfg = await sessionService.getMemoryConfig()
       setConfig(cfg)
-      setExtractModelDraft(cfg.extractModel ?? '')
       if (cfg.useMemories || cfg.generateMemories) {
         const list = await loadItems(listStatus)
         setItems(list)
@@ -65,7 +68,8 @@ export function MemoryConfig() {
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void loadProviders()
+  }, [refresh, loadProviders])
 
   const applyConfig = async (partial: Partial<MemoryFileConfig>) => {
     setBusy(true)
@@ -73,7 +77,6 @@ export function MemoryConfig() {
     try {
       const cfg = await sessionService.setMemoryConfig(partial)
       setConfig(cfg)
-      setExtractModelDraft(cfg.extractModel ?? '')
       if (cfg.useMemories || cfg.generateMemories) {
         const list = await loadItems(listStatus)
         setItems(list)
@@ -185,9 +188,20 @@ export function MemoryConfig() {
     sessionService.consolidateMemories()
   }
 
-  const onSaveExtractModel = async () => {
-    const next = extractModelDraft.trim()
-    await applyConfig({ extractModel: next || undefined })
+  const onExtractModelChange = async (key: string) => {
+    if (!key) {
+      // Clear override → cheap fallback for active provider.
+      await applyConfig({ extractModel: null } as unknown as Partial<MemoryFileConfig>)
+      return
+    }
+    const slash = key.indexOf('/')
+    const providerID = slash > 0 ? key.slice(0, slash) : ''
+    const baseURL =
+      (providerID && providersConfig.providers[providerID]?.baseURL) ||
+      (providerID && catalog[providerID]?.api) ||
+      undefined
+    const ref = memoryModelRefFromKey(key, baseURL)
+    if (ref) await applyConfig({ extractModel: ref })
   }
 
   if (loading && !config) {
@@ -289,19 +303,33 @@ export function MemoryConfig() {
           {t('settings.memory.extractModel')}
         </label>
         <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.extractModelDesc')}</p>
-        <div className="mt-2 flex gap-2">
-          <input
-            id="memory-extract-model"
-            className={cn(inputCls, 'flex-1')}
-            value={extractModelDraft}
-            placeholder={t('settings.memory.extractModelPlaceholder')}
-            data-testid="memory-extract-model"
-            onChange={(e) => setExtractModelDraft(e.target.value)}
-          />
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void onSaveExtractModel()}>
-            {t('settings.memory.save')}
-          </Button>
-        </div>
+        <select
+          id="memory-extract-model"
+          className={cn(inputCls, 'mt-2')}
+          value={memoryModelKey(config?.extractModel)}
+          disabled={busy || !config}
+          data-testid="memory-extract-model"
+          onChange={(e) => void onExtractModelChange(e.target.value)}
+        >
+          <option value="">{t('settings.memory.extractModelDefault')}</option>
+          {modelGroups.map((g) => (
+            <optgroup key={g.providerID} label={g.providerName}>
+              {g.models.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.modelID}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          {/* Legacy free-text / missing catalog entry still displayable */}
+          {config?.extractModel &&
+            !modelGroups.some((g) => g.models.some((m) => m.key === memoryModelKey(config.extractModel))) &&
+            memoryModelKey(config.extractModel).includes('/') && (
+              <option value={memoryModelKey(config.extractModel)}>
+                {memoryModelKey(config.extractModel)}
+              </option>
+            )}
+        </select>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">

@@ -22,6 +22,21 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
   } as any
 })
 
+vi.mock('@/store/providersStore', () => ({
+  useProvidersStore: () => ({
+    catalog: {
+      openai: {
+        id: 'openai',
+        name: 'OpenAI',
+        env: [],
+        models: { 'gpt-4o-mini': { id: 'gpt-4o-mini', name: 'gpt-4o-mini' } },
+      },
+    },
+    config: { providers: { openai: { enabled: true } } },
+    load: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
 const offConfig: MemoryFileConfig = {
   ...MEMORY_FILE_CONFIG_DEFAULTS,
   useMemories: false,
@@ -208,5 +223,42 @@ describe('MemoryConfig', () => {
       expect(deleteSpy).toHaveBeenCalledWith('m1')
     })
     expect(deleteSpy.mock.calls[0]).toHaveLength(1)
+  })
+
+  it('extract model catalog picker persists MemoryModelRef and clears with empty', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])
+    const setSpy = vi.spyOn(sessionService, 'setMemoryConfig').mockImplementation(async (partial) => ({
+      ...onConfig,
+      ...partial,
+      extractModel: (partial as { extractModel?: unknown }).extractModel === null
+        ? undefined
+        : ((partial as { extractModel?: MemoryFileConfig['extractModel'] }).extractModel ??
+          onConfig.extractModel),
+    }))
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-extract-model')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByTestId('memory-extract-model'), {
+      target: { value: 'openai/gpt-4o-mini' },
+    })
+
+    await waitFor(() => {
+      expect(setSpy).toHaveBeenCalledWith({
+        extractModel: { providerID: 'openai', modelID: 'gpt-4o-mini' },
+      })
+    })
+
+    fireEvent.change(screen.getByTestId('memory-extract-model'), {
+      target: { value: '' },
+    })
+
+    await waitFor(() => {
+      expect(setSpy).toHaveBeenCalledWith({ extractModel: null })
+    })
   })
 })

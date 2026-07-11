@@ -97,6 +97,53 @@ describe('loadMemoryConfig / saveMemoryConfig', () => {
     saveMemoryConfig({ minExtractIntervalHours: 12 })
     expect(loadMemoryConfig().minExtractIntervalHours).toBe(12)
   })
+
+  it('role-model / hybrid / trash defaults and merges', () => {
+    const cfg = loadMemoryConfig()
+    expect(cfg.hybridSearchEnabled).toBe(false)
+    expect(cfg.maxExtractsPerDay).toBe(20)
+    expect(cfg.trashRetentionDays).toBe(30)
+    expect(cfg.embeddingModel).toBeUndefined()
+    expect(cfg.rerankModel).toBeUndefined()
+
+    saveMemoryConfig({
+      hybridSearchEnabled: true,
+      maxExtractsPerDay: 5,
+      trashRetentionDays: 14,
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+      rerankModel: { providerID: 'openai', modelID: 'gpt-4o-mini' },
+      extractModel: { providerID: 'deepseek', modelID: 'deepseek-chat' },
+    })
+    const loaded = loadMemoryConfig()
+    expect(loaded.hybridSearchEnabled).toBe(true)
+    expect(loaded.maxExtractsPerDay).toBe(5)
+    expect(loaded.trashRetentionDays).toBe(14)
+    expect(loaded.embeddingModel).toEqual({
+      providerID: 'openai',
+      modelID: 'text-embedding-3-small',
+    })
+    expect(loaded.rerankModel).toEqual({ providerID: 'openai', modelID: 'gpt-4o-mini' })
+    expect(loaded.extractModel).toEqual({ providerID: 'deepseek', modelID: 'deepseek-chat' })
+  })
+
+  it('clears optional role models with null', () => {
+    saveMemoryConfig({
+      extractModel: { providerID: 'openai', modelID: 'gpt-4o-mini' },
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+    })
+    saveMemoryConfig({
+      extractModel: null as unknown as undefined,
+      embeddingModel: null as unknown as undefined,
+    })
+    const cfg = loadMemoryConfig()
+    expect(cfg.extractModel).toBeUndefined()
+    expect(cfg.embeddingModel).toBeUndefined()
+  })
+
+  it('still accepts legacy string extractModel', () => {
+    saveMemoryConfig({ extractModel: 'openai/gpt-4o-mini' })
+    expect(loadMemoryConfig().extractModel).toBe('openai/gpt-4o-mini')
+  })
 })
 
 describe('resolveSessionMemoryFlags', () => {

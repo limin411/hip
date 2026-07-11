@@ -30,6 +30,13 @@ export interface MemoryCitation {
   note?: string
 }
 
+/** Provider/model reference for memory role models (extract / embed / rerank). */
+export interface MemoryModelRef {
+  providerID: string
+  modelID: string
+  baseURL?: string
+}
+
 /** Writable global memory flags (memory.json). */
 export interface MemoryFileConfig {
   version: 1
@@ -47,10 +54,24 @@ export interface MemoryFileConfig {
   minExtractIntervalHours?: number
   decayFactor?: number
   forgetConfidence?: number
-  extractModel?: string
+  /**
+   * Chat model used for background extract/consolidate.
+   * @deprecated string form still accepted on load; prefer MemoryModelRef.
+   */
+  extractModel?: string | MemoryModelRef
   extractMaxTokens?: number
   onboardingTipDismissed?: boolean
   simpleExtract?: boolean
+  /** OpenAI-compatible embedding model for hybrid search. */
+  embeddingModel?: MemoryModelRef
+  /** Optional rerank model; unset skips rerank. */
+  rerankModel?: MemoryModelRef
+  /** Hybrid (vector + FTS) search. Default false. Requires embeddingModel when enabled. */
+  hybridSearchEnabled?: boolean
+  /** Max Phase1 extract LLM calls per UTC day. Default 20. */
+  maxExtractsPerDay?: number
+  /** Soft-deleted memories hard-purged after this many days. Default 30. */
+  trashRetentionDays?: number
 }
 
 export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
@@ -69,4 +90,37 @@ export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
   decayFactor: 0.92,
   forgetConfidence: 0.15,
   simpleExtract: false,
+  hybridSearchEnabled: false,
+  maxExtractsPerDay: 20,
+  trashRetentionDays: 30,
+}
+
+/**
+ * Normalize extract model override from legacy `provider/model` string or MemoryModelRef.
+ * Bare model ids fall back to provider `openai` as a last resort.
+ */
+export function normalizeExtractModel(
+  v: string | MemoryModelRef | undefined | null,
+): MemoryModelRef | undefined {
+  if (v == null || v === '') return undefined
+  if (typeof v === 'string') {
+    const raw = v.trim()
+    if (!raw) return undefined
+    const i = raw.indexOf('/')
+    if (i > 0) {
+      const providerID = raw.slice(0, i)
+      const modelID = raw.slice(i + 1)
+      if (providerID && modelID) return { providerID, modelID }
+    }
+    return { providerID: 'openai', modelID: raw }
+  }
+  if (typeof v === 'object' && typeof v.providerID === 'string' && typeof v.modelID === 'string') {
+    if (!v.providerID.trim() || !v.modelID.trim()) return undefined
+    return {
+      providerID: v.providerID,
+      modelID: v.modelID,
+      ...(v.baseURL ? { baseURL: v.baseURL } : {}),
+    }
+  }
+  return undefined
 }

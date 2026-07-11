@@ -40,6 +40,101 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
 END;
 `
 
+// Cross-session memory tables (v16). FTS is probe-created separately.
+const MEMORY_DDL = `
+CREATE TABLE IF NOT EXISTS memory_items (
+  id              TEXT PRIMARY KEY,
+  scope           TEXT NOT NULL CHECK(scope IN ('global','project','session')),
+  project_key     TEXT,
+  project_key_hash TEXT,
+  session_id      TEXT,
+  kind            TEXT NOT NULL,
+  title           TEXT NOT NULL,
+  content         TEXT NOT NULL,
+  confidence      REAL NOT NULL DEFAULT 0.5,
+  status          TEXT NOT NULL DEFAULT 'active'
+                    CHECK(status IN ('active','archived','deleted')),
+  source          TEXT NOT NULL DEFAULT 'extract'
+                    CHECK(source IN ('extract','user','import','tool','consolidate')),
+  source_session_id TEXT,
+  tags_json       TEXT NOT NULL DEFAULT '[]',
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL,
+  last_used_at    INTEGER,
+  use_count       INTEGER NOT NULL DEFAULT 0,
+  pinned          INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_memory_items_scope_project
+  ON memory_items(scope, project_key_hash, status);
+CREATE INDEX IF NOT EXISTS idx_memory_items_session
+  ON memory_items(session_id) WHERE session_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_memory_items_source_session
+  ON memory_items(source_session_id) WHERE source_session_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS memory_summaries (
+  id              TEXT PRIMARY KEY,
+  scope           TEXT NOT NULL,
+  project_key     TEXT,
+  project_key_hash TEXT,
+  summary_md      TEXT NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memory_stage1 (
+  id              TEXT PRIMARY KEY,
+  session_id      TEXT NOT NULL,
+  project_key     TEXT,
+  project_key_hash TEXT,
+  cwd             TEXT,
+  raw_memory      TEXT NOT NULL,
+  rollout_summary TEXT NOT NULL,
+  rollout_slug    TEXT,
+  status          TEXT NOT NULL,
+  selected_for_phase2 INTEGER NOT NULL DEFAULT 0,
+  lease_owner     TEXT,
+  lease_until     INTEGER,
+  retry_after     INTEGER,
+  source_updated_at INTEGER NOT NULL,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memory_stage1_claim
+  ON memory_stage1(status, retry_after, source_updated_at);
+CREATE INDEX IF NOT EXISTS idx_memory_stage1_session
+  ON memory_stage1(session_id);
+
+CREATE TABLE IF NOT EXISTS memory_jobs (
+  id              TEXT PRIMARY KEY,
+  kind            TEXT NOT NULL,
+  watermark       INTEGER NOT NULL DEFAULT 0,
+  lease_owner     TEXT,
+  lease_until     INTEGER,
+  last_error      TEXT,
+  updated_at      INTEGER NOT NULL
+);
+`
+
+const MEMORIES_FTS_DDL = `
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+  title, content, content='memory_items', content_rowid='rowid', tokenize='trigram'
+);
+
+CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memory_items BEGIN
+  INSERT INTO memories_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memory_items BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, title, content)
+    VALUES('delete', old.rowid, old.title, old.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memory_items BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, title, content)
+    VALUES('delete', old.rowid, old.title, old.content);
+  INSERT INTO memories_fts(rowid, title, content)
+    VALUES (new.rowid, new.title, new.content);
+END;
+`
+
 /** Create core tables (v1) and apply incremental migrations. Idempotent. */
 export function migrate(db: DatabaseSync): void {
   const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
@@ -355,6 +450,17 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 16) {
+    db.exec('BEGIN')
+    try {
+      db.exec(MEMORY_DDL)
+      db.exec('PRAGMA user_version = 16')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */
@@ -364,6 +470,17 @@ export function tryEnableFts(db: DatabaseSync): boolean {
     return true
   } catch (e) {
     console.warn('[persistence] FTS5/trigram unavailable; search will use LIKE.', e)
+    return false
+  }
+}
+
+/** Try to create memories FTS5 objects. Returns true if FTS is available. */
+export function tryEnableMemoriesFts(db: DatabaseSync): boolean {
+  try {
+    db.exec(MEMORIES_FTS_DDL)
+    return true
+  } catch (e) {
+    console.warn('[persistence] memories FTS5/trigram unavailable; memory search will use LIKE.', e)
     return false
   }
 }

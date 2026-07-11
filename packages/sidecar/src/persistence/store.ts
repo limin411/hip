@@ -289,8 +289,13 @@ export class SessionStore {
    * FK cascades cover messages/agent_runs/tool_calls/checkpoints when present.
    * Event log / session_message / snapshots have no FK to sessions — purge explicitly.
    * Tables that only exist after newer migrations are best-effort (ignore missing).
+   *
+   * Memory cleanup (v16):
+   * - always hard-delete session-scoped memory_items and memory_stage1 for this session
+   * - by default null `source_session_id` on retained project/global items
+   * - if `deleteDerivedMemories`, hard-delete all memory_items with that source session instead
    */
-  deleteSession(id: string): void {
+  deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
     const runIgnoreMissing = (sql: string, ...params: unknown[]) => {
       try {
         this.db.prepare(sql).run(...params)
@@ -314,6 +319,14 @@ export class SessionStore {
       runIgnoreMissing(`DELETE FROM session_input WHERE session_id=?`, id)
       runIgnoreMissing(`DELETE FROM session_context_epoch WHERE session_id=?`, id)
       runIgnoreMissing(`DELETE FROM cron_tasks WHERE session_id=?`, id)
+      // Memory tables (v16): may be missing on older fixtures / partial schemas.
+      runIgnoreMissing(`DELETE FROM memory_items WHERE scope='session' AND session_id=?`, id)
+      runIgnoreMissing(`DELETE FROM memory_stage1 WHERE session_id=?`, id)
+      if (opts?.deleteDerivedMemories) {
+        runIgnoreMissing(`DELETE FROM memory_items WHERE source_session_id=?`, id)
+      } else {
+        runIgnoreMissing(`UPDATE memory_items SET source_session_id=NULL WHERE source_session_id=?`, id)
+      }
       this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
       this.db.exec('COMMIT')
     } catch (e) {

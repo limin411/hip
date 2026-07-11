@@ -181,6 +181,60 @@ describe('SessionStore', () => {
     expect(db.prepare(`SELECT COUNT(*) AS n FROM snapshots WHERE session_id=?`).get('s1') as { n: number }).toEqual({ n: 0 })
   })
 
+  it('deleteSession keeps project-scoped memory, clears session-scoped, nulls source_session_id', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    const now = 1
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('sess-m', 'session', 's1', 'preference', 'session mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, session_id, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('proj-m', 'project', null, 'preference', 'project mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_stage1(
+        id, session_id, raw_memory, rollout_summary, status, selected_for_phase2,
+        source_updated_at, created_at
+      ) VALUES (?,?,?,?,?,?,?,?)
+    `).run('st1', 's1', 'raw', 'sum', 'pending', 0, now, now)
+
+    store.deleteSession('s1')
+
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='sess-m'`).get() as { n: number }).toEqual({ n: 0 })
+    const proj = db.prepare(`SELECT source_session_id AS src FROM memory_items WHERE id='proj-m'`).get() as { src: string | null }
+    expect(proj.src).toBeNull()
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_stage1 WHERE session_id='s1'`).get() as { n: number }).toEqual({ n: 0 })
+  })
+
+  it('deleteSession with deleteDerivedMemories hard-deletes project items from that session', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    const db = store.getDb()
+    const now = 1
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('proj-m', 'project', 'preference', 'project mem', 'c', 0.5, 'active', 'extract', 's1', '[]', now, now, 0, 0)
+    db.prepare(`
+      INSERT INTO memory_items(
+        id, scope, kind, title, content, confidence, status, source,
+        source_session_id, tags_json, created_at, updated_at, use_count, pinned
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run('other-m', 'project', 'preference', 'other', 'c', 0.5, 'active', 'extract', 's2', '[]', now, now, 0, 0)
+
+    store.deleteSession('s1', { deleteDerivedMemories: true })
+
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='proj-m'`).get() as { n: number }).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM memory_items WHERE id='other-m'`).get() as { n: number }).toEqual({ n: 1 })
+  })
+
   it('round-trips tool calls + delegation through insertTurn/loadAgentRuns', () => {
     store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })

@@ -47,6 +47,8 @@ const labels: GlobalCommandLabels = {
     memoryIncognito: 'Incognito memory',
     memoryIncognitoOff: 'Exit incognito',
     memoryStatus: 'Memory status',
+    needSession: 'Open a conversation…',
+    needSessionHint: 'Session actions need an active session',
   },
 }
 
@@ -139,5 +141,19 @@ describe('registry', () => {
     const ids = groups[0]?.items.map((i) => i.id) ?? []
     expect(ids).toContain('skill-pdf')
     expect(ids).not.toContain('skill-off')
+  })
+
+  it('runSkillHandoff selects session when composer is missing then inserts', async () => {
+    const { runSkillHandoff } = await import('./registry')
+    const selectSession = vi.fn()
+    // No inserter initially
+    registerComposerInserter(null)
+    const p = runSkillHandoff('pdf', { sessionId: 's1', selectSession })
+    // After selectSession, register inserter (simulates InputBar mount)
+    expect(selectSession).toHaveBeenCalledWith('s1')
+    const insert = vi.fn()
+    registerComposerInserter(insert)
+    await p
+    expect(insert).toHaveBeenCalledWith('/pdf ')
   })
 })

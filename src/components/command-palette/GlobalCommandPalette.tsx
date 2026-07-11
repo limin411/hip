@@ -102,6 +102,8 @@ export function GlobalCommandPalette() {
         memoryIncognito: t('commandPalette.context.memoryIncognito'),
         memoryIncognitoOff: t('commandPalette.context.memoryIncognitoOff'),
         memoryStatus: t('commandPalette.context.memoryStatus'),
+        needSession: t('commandPalette.context.needSession'),
+        needSessionHint: t('commandPalette.context.needSessionHint'),
       },
     }),
     [t, i18n.language],

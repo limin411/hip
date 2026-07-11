@@ -29,6 +29,8 @@ export const zhCN = {
       },
       diff: {
         loading: '工作区变更正在加载…',
+        empty: '工作区没有变更',
+        failed: '无法加载变更：{{error}}',
       },
       memory: {
         enabled: '已为本会话启用记忆注入',
@@ -804,6 +806,8 @@ export const zhCN = {
         memoryIncognito: '此会话隐身（不注入/抽取记忆）',
         memoryIncognitoOff: '退出隐身记忆',
         memoryStatus: '查看记忆状态',
+        needSession: '打开会话以使用会话相关操作…',
+        needSessionHint: '压缩、变更、记忆开关需要已打开的会话',
       },
       skills: {
         needComposer: '请先打开会话再将技能插入输入框。历史或设置页无法单独运行技能。',

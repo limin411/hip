@@ -31,6 +31,8 @@ export const en = {
       },
       diff: {
         loading: 'Workspace changes are already loading…',
+        empty: 'No workspace changes',
+        failed: 'Could not load changes: {{error}}',
       },
       memory: {
         enabled: 'Memory injection enabled for this session',
@@ -810,6 +812,8 @@ export const en = {
         memoryIncognito: 'Incognito memory for this session',
         memoryIncognitoOff: 'Exit incognito memory',
         memoryStatus: 'Show memory status',
+        needSession: 'Open a conversation for session actions…',
+        needSessionHint: 'Compact, diff, memory flags need an active session',
       },
       skills: {
         needComposer:

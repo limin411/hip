@@ -56,6 +56,9 @@ export type GlobalCommandLabels = {
     memoryIncognito: string
     memoryIncognitoOff: string
     memoryStatus: string
+    /** Shown when no session is available for session-gated actions. */
+    needSession: string
+    needSessionHint: string
   }
 }
 
@@ -419,6 +422,22 @@ export function buildGlobalCommandGroups(
   ]
 
   const context = contextCandidates.filter((c) => matchesWhen(c.when, ctx))
+
+  // When no session is bound, still surface a hint so Suggested is not only "Settings: Memory".
+  if (!ctx.sessionId) {
+    context.unshift({
+      id: 'ctx-need-session',
+      label: labels.context.needSession,
+      icon: 'message-square',
+      keywords: ['session', 'conversation', '会话', '對話', 'open'],
+      group: 'context',
+      description: labels.context.needSessionHint,
+      run: () => {
+        // Prefer starting a conversation on the current surface.
+        ctx.newConversation(ctx.activeView === 'code' ? 'code' : 'chat')
+      },
+    })
+  }
 
   const workspace = buildSettingsCommands(
     ctx,

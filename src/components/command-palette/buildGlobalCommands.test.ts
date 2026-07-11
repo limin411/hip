@@ -47,6 +47,8 @@ const labels: GlobalCommandLabels = {
     memoryIncognito: 'Incognito memory',
     memoryIncognitoOff: 'Exit incognito',
     memoryStatus: 'Memory status',
+    needSession: 'Open a conversation…',
+    needSessionHint: 'Session actions need an active session',
   },
 }
 
@@ -112,6 +114,22 @@ describe('buildGlobalCommandGroups', () => {
     expect(ids).toContain('action-new-conversation')
     expect(ids).toContain('settings-model')
     expect(ids).toContain('nav-settings')
+  })
+
+  it('shows need-session hint when sessionId is null', () => {
+    const ctx = makeCtx({ sessionId: null })
+    const groups = buildGlobalCommandGroups(ctx)
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id))
+    expect(ids).toContain('ctx-need-session')
+    const hint = groups.flatMap((g) => g.items).find((i) => i.id === 'ctx-need-session')!
+    hint.run?.()
+    expect(ctx.newConversation).toHaveBeenCalled()
+  })
+
+  it('hides need-session hint when session is bound', () => {
+    const groups = buildGlobalCommandGroups(makeCtx({ sessionId: 's1' }))
+    const ids = groups.flatMap((g) => g.items.map((i) => i.id))
+    expect(ids).not.toContain('ctx-need-session')
   })
 
   it('includes sessions when search is non-empty', () => {

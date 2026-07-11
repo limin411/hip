@@ -69,11 +69,21 @@ unregister()
 
 ### Skills handoff
 
-Selecting a skill tries `insertComposerText('/{name} ')`. Register an inserter from the composer (`InputBar` already does). If no composer is mounted (History / Settings / New Conversation), a toast explains that a conversation must be open — **does not** silently open Skills settings. Disabled skills (`skillsEnabled[id] === false`) are omitted.
+Selecting a skill tries `insertComposerText('/{name} ')`. Register an inserter from the composer (`InputBar` already does).
+
+1. If inserter is live → insert and done.  
+2. Else if a palette session id is known → `selectSession` then retry insert briefly (`insertComposerTextWhenReady`).  
+3. Else toast `commandPalette.skills.needComposer` — **never** silently open Skills settings.
+
+Disabled skills (`skillsEnabled[id] === false`) are omitted.
 
 ### ⌘1–⌘9
 
 Hotkey numbers use `flattenHotkeyItems` (skips nested `to` rows). Display badges and keydown share the same list so indices never desync.
+
+### No-session context
+
+When no session is bound, Suggested includes **Open a conversation…** (`ctx-need-session`) so users know why compact/diff/memory are hidden.
 
 ### Favorites
 

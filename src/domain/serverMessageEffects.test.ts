@@ -134,6 +134,25 @@ describe('applyServerMessageEffects', () => {
     expect(toastError).toHaveBeenCalled()
   })
 
+  it('fs:diff:result toasts empty when user-triggered and no files', async () => {
+    toastMessage.mockClear()
+    const { markUserDiffRequest } = await import('@/domain/commands/diffFeedback')
+    markUserDiffRequest('s1')
+    const deps = makeDeps()
+    applyServerMessageEffects(
+      {
+        type: 'fs:diff:result',
+        sessionId: 's1',
+        state: 'ok',
+        files: [],
+        base: 'head',
+        hasSessionStart: false,
+      },
+      deps,
+    )
+    expect(toastMessage).toHaveBeenCalled()
+  })
+
   describe('workflow messages', () => {
     it('tool:finished write_file schedules debounced diff refresh', () => {
       vi.useFakeTimers()

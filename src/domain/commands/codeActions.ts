@@ -2,6 +2,9 @@ import { toast } from 'sonner'
 import i18n from '@/i18n'
 import { sessionService } from '../sessionService'
 import { useUiStore } from '@/store/uiStore'
+import { markUserDiffRequest } from './diffFeedback'
+
+export { markUserDiffRequest, consumeUserDiffRequest } from './diffFeedback'
 
 /** Always navigate to Changes; requestDiff may dedupe while loading. */
 export function runDiff(sessionId: string): void {
@@ -10,7 +13,9 @@ export function runDiff(sessionId: string): void {
   const result = sessionService.requestDiff(sessionId)
   if (result === 'deduped') {
     toast.message(i18n.t('chat.diff.loading'))
+    return
   }
+  markUserDiffRequest(sessionId)
 }
 
 export function runCompact(sessionId: string, focus?: string): void {

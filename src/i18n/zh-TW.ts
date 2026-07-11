@@ -29,6 +29,8 @@ export const zhTW = {
       },
       diff: {
         loading: '工作區變更正在載入…',
+        empty: '工作區沒有變更',
+        failed: '無法載入變更：{{error}}',
       },
       memory: {
         enabled: '已為此對話啟用記憶注入',
@@ -804,6 +806,8 @@ export const zhTW = {
         memoryIncognito: '此對話隱身（不注入／抽取記憶）',
         memoryIncognitoOff: '退出隱身記憶',
         memoryStatus: '檢視記憶狀態',
+        needSession: '開啟對話以使用對話相關操作…',
+        needSessionHint: '壓縮、變更、記憶開關需要已開啟的對話',
       },
       skills: {
         needComposer: '請先開啟對話再將技能插入輸入框。歷史或設定頁無法單獨執行技能。',

@@ -10,6 +10,7 @@ import { useWorkflowStore } from '@/store/workflowStore'
 import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
 import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
 import { surfaceOf } from '@/lib/sessions'
+import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -113,7 +114,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       })
       return
 
-    case 'fs:diff:result':
+    case 'fs:diff:result': {
       useDiffStore.getState().setResult(msg.sessionId, {
         state: msg.state,
         files: msg.files,
@@ -122,7 +123,16 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
         hasSessionStart: msg.hasSessionStart,
         error: msg.error,
       })
+      // User-triggered /diff or palette "Show changes": toast when workspace is clean / failed.
+      if (consumeUserDiffRequest(msg.sessionId)) {
+        if (msg.state === 'ok' && (!msg.files || msg.files.length === 0)) {
+          toast.message(i18n.t('chat.diff.empty'))
+        } else if (msg.state !== 'ok' && msg.error) {
+          toast.error(i18n.t('chat.diff.failed', { error: msg.error }))
+        }
+      }
       return
+    }
 
     case 'fs:diffSummary:result':
       if (msg.summary) useDiffStore.getState().setSummary(msg.sessionId, msg.summary, msg.base, msg.hasSessionStart)

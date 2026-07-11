@@ -2,7 +2,7 @@ import type { GlobalCommandContext, PaletteGroup } from './buildGlobalCommands'
 import { buildGlobalCommandGroups } from './buildGlobalCommands'
 import type { GlobalCommand } from './types'
 import type { SkillMeta } from '@hip/protocol'
-import { insertComposerText } from './composerBridge'
+import { insertComposerText, insertComposerTextWhenReady } from './composerBridge'
 import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
 import i18n from '@/i18n'
 import { toast } from 'sonner'
@@ -58,6 +58,25 @@ export function isSkillEnabled(id: string, enabled?: Record<string, boolean>): b
 }
 
 /**
+ * Insert skill slash token into the composer.
+ * If the composer is not mounted but a session is known, switch to it and retry.
+ * Never silently opens Settings.
+ */
+export async function runSkillHandoff(
+  skillName: string,
+  ctx: Pick<GlobalCommandContext, 'sessionId' | 'selectSession'>,
+): Promise<void> {
+  const text = `/${skillName} `
+  if (insertComposerText(text)) return
+  if (ctx.sessionId) {
+    ctx.selectSession(ctx.sessionId)
+    const ok = await insertComposerTextWhenReady(text)
+    if (ok) return
+  }
+  toast.message(i18n.t('commandPalette.skills.needComposer'))
+}
+
+/**
  * Skills appear when searching or when mode is `@` (skills-only).
  * Prefer composer insert; if no inserter, toast — never silent-open Settings.
  */
@@ -78,9 +97,7 @@ export function skillsCommandProvider(
     keywords: [s.name, s.description ?? '', 'skill', '技能', s.id].filter(Boolean),
     group: 'skills' as const,
     run: () => {
-      const text = `/${s.name} `
-      if (insertComposerText(text)) return
-      toast.message(i18n.t('commandPalette.skills.needComposer'))
+      void runSkillHandoff(s.name, ctx)
     },
   }))
 

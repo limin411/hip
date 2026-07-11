@@ -4,6 +4,7 @@ import type { SendFn } from '../session/handlers/types.js'
 import type { MemoryService } from './service.js'
 import { createDefaultMemoryLlmClient } from './llm-client.js'
 import { runPhase2Consolidate } from './pipeline/phase2-consolidate.js'
+import { runDecayJob } from './pipeline/evolution.js'
 
 export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:list',
@@ -75,6 +76,8 @@ export function handleMemoryMessage(
               projectKeyHash: msg.projectKeyHash,
               sessionId: msg.sessionId,
               limit: msg.limit,
+              // Default: active only (archived/deleted stay out of the browser).
+              status: 'active',
             })
         send({ type: 'memory:list:result', items })
       } catch (e) {
@@ -229,6 +232,15 @@ export function handleMemoryMessage(
               detail: res.reason,
             })
             return
+          }
+          // Best-effort decay after successful Phase2.
+          try {
+            runDecayJob(svc.store, config)
+          } catch (err) {
+            console.warn(
+              '[memory] decay after consolidate failed',
+              err instanceof Error ? err.message : String(err),
+            )
           }
           send({
             type: 'memory:pipeline',

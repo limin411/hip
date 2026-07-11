@@ -151,6 +151,35 @@ describe('memory handlers', () => {
     })
   })
 
+  it('memory:list defaults to status=active (hides archived/deleted)', () => {
+    const active = svc.upsert({
+      title: 'Active tip',
+      content: 'visible',
+      kind: 'preference',
+      scope: 'global',
+    })
+    const archived = svc.upsert({
+      title: 'Archived tip',
+      content: 'hidden',
+      kind: 'preference',
+      scope: 'global',
+    })
+    store.upsertItem({ ...store.getItem(archived.id)!, status: 'archived', updatedAt: Date.now() })
+    const deleted = svc.upsert({
+      title: 'Deleted tip',
+      content: 'gone',
+      kind: 'preference',
+      scope: 'global',
+    })
+    store.upsertItem({ ...store.getItem(deleted.id)!, status: 'deleted', updatedAt: Date.now() })
+
+    handleMemoryMessage(ctx, { type: 'memory:list', scope: 'global' }, send)
+    expect(sent[0].type).toBe('memory:list:result')
+    if (sent[0].type !== 'memory:list:result') throw new Error('expected list result')
+    expect(sent[0].items.map((i) => i.id)).toEqual([active.id])
+    expect(sent[0].items.every((i) => i.status === 'active')).toBe(true)
+  })
+
   it('deleteBySourceSession hard deletes derived items', () => {
     const a = svc.upsert({
       title: 'from s1',

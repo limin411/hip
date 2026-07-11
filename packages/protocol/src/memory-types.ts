@@ -43,6 +43,8 @@ export interface MemoryFileConfig {
   maxUnusedDays: number
   minUserTurns?: number
   minUserChars?: number
+  /** Skip Phase1 if a successful extract for this session ran within this many hours. Default 6. */
+  minExtractIntervalHours?: number
   decayFactor?: number
   forgetConfidence?: number
   extractModel?: string
@@ -63,6 +65,7 @@ export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
   maxUnusedDays: 90,
   minUserTurns: 2,
   minUserChars: 80,
+  minExtractIntervalHours: 6,
   decayFactor: 0.92,
   forgetConfidence: 0.15,
   simpleExtract: false,

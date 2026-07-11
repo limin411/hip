@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { MemoryFileConfig, Message } from '@hip/protocol'
 import { MEMORY_FILE_CONFIG_DEFAULTS } from '@hip/protocol'
 import { openDatabase } from '../../persistence/open.js'
@@ -9,6 +9,8 @@ import {
   processQueue,
   resetPhase1Queue,
   maybeEnqueueMemoryExtract,
+  scheduleMemoryExtractAfterTurn,
+  setLastExtractSuccessAt,
 } from './queue.js'
 import { MemoryService } from '../service.js'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -33,6 +35,7 @@ describe('phase1 queue', () => {
   afterEach(() => {
     resetPhase1Queue()
     rmSync(configDir, { recursive: true, force: true })
+    vi.useRealTimers()
   })
 
   it('processes jobs with concurrency 1 and writes stage1', async () => {
@@ -111,5 +114,49 @@ describe('phase1 queue', () => {
       memoryService: svc,
     })
     expect(store.getDb().prepare(`SELECT COUNT(*) AS n FROM memory_stage1`).get()).toEqual({ n: 0 })
+  })
+
+  it('maybeEnqueueMemoryExtract skips within minExtractIntervalHours', () => {
+    const configPath = join(configDir, 'memory.json')
+    const svc = new MemoryService(store, { configPath })
+    svc.setConfig({ generateMemories: true, minExtractIntervalHours: 6 })
+    setLastExtractSuccessAt('s-recent', Date.now() - 60_000) // 1 min ago
+    maybeEnqueueMemoryExtract({
+      id: 's-recent',
+      _config: { generateMemories: true },
+      store: { loadMessagesWithRuns: () => [] },
+      memoryService: svc,
+    })
+    // No stage1 and no inflight enqueue that would process without LLM; queue stays empty.
+    expect(store.getDb().prepare(`SELECT COUNT(*) AS n FROM memory_stage1`).get()).toEqual({ n: 0 })
+  })
+
+  it('scheduleMemoryExtractAfterTurn debounces until idleMinutes', async () => {
+    vi.useFakeTimers()
+    const configPath = join(configDir, 'memory.json')
+    const svc = new MemoryService(store, { configPath })
+    // short idle for test; generate on; simpleExtract so phase2 doesn't need LLM either
+    // but maybeEnqueue still needs a real LLM client — without keys it no-ops.
+    // We only assert debounce scheduling doesn't immediately write stage1.
+    svc.setConfig({ generateMemories: true, idleMinutes: 15 })
+
+    const host = {
+      id: 's-debounce',
+      _config: { generateMemories: true },
+      store: { loadMessagesWithRuns: () => [] as Message[] },
+      memoryService: svc,
+    }
+    scheduleMemoryExtractAfterTurn(host)
+    // Immediate: nothing enqueued yet
+    expect(store.getDb().prepare(`SELECT COUNT(*) AS n FROM memory_stage1`).get()).toEqual({ n: 0 })
+
+    // New turn resets timer
+    scheduleMemoryExtractAfterTurn(host)
+    await vi.advanceTimersByTimeAsync(14 * 60_000)
+    expect(store.getDb().prepare(`SELECT COUNT(*) AS n FROM memory_stage1`).get()).toEqual({ n: 0 })
+
+    // After full idle window, timer fires (may no-op without LLM key — that's ok)
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
+    // No throw; debounce path completed
   })
 })

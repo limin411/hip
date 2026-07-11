@@ -791,6 +791,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       const db = host.store.getDb()
       const memoriesFts = tryEnableMemoriesFts(db)
       host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
+      host.memoryService.runStartupDecayOnce()
     }
     const flags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
     const useMemories = flags.use

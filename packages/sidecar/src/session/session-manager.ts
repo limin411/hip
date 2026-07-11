@@ -91,6 +91,8 @@ export class SessionManager {
       const db = this.store.getDb()
       const memoriesFts = tryEnableMemoriesFts(db)
       this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
+      // Best-effort decay once when memory first becomes available.
+      this.memoryService.runStartupDecayOnce()
     }
     return this.memoryService
   }

@@ -11,6 +11,7 @@ import { getMemoryCoreBudget, getMemoryPrefetchBudget } from './budget.js'
 import { redactSecrets } from './redact.js'
 import { scanMemoryContent } from './threat-scan.js'
 import { resolveProjectKey } from './project-key.js'
+import { runDecayJob } from './pipeline/evolution.js'
 import type {
   MemoryListFilter,
   MemorySearchOpts,
@@ -41,12 +42,30 @@ function truncateToBudget(text: string, budget: number): string {
 /** Facade over store + config: read snapshots, upsert with redact/scan, import/export. */
 export class MemoryService {
   private readonly configPath?: string
+  private startupDecayRan = false
 
   constructor(
     readonly store: MemoryStore,
     opts?: { configPath?: string },
   ) {
     this.configPath = opts?.configPath
+  }
+
+  /**
+   * Best-effort decay once per service instance (call from getMemoryService / process startup).
+   * Safe to invoke repeatedly; only the first call runs the job.
+   */
+  runStartupDecayOnce(): void {
+    if (this.startupDecayRan) return
+    this.startupDecayRan = true
+    try {
+      runDecayJob(this.store, this.getConfig())
+    } catch (err) {
+      console.warn(
+        '[memory] startup decay failed',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
   }
 
   getConfig(): MemoryFileConfig {

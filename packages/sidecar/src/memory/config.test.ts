@@ -90,6 +90,13 @@ describe('loadMemoryConfig / saveMemoryConfig', () => {
     expect(cfg.idleMinutes).toBe(30)
     expect(cfg.extractModel).toBe('openai/gpt-4o')
   })
+
+  it('minExtractIntervalHours defaults to 6 and merges from partial', () => {
+    expect(MEMORY_FILE_CONFIG_DEFAULTS.minExtractIntervalHours).toBe(6)
+    expect(loadMemoryConfig().minExtractIntervalHours).toBe(6)
+    saveMemoryConfig({ minExtractIntervalHours: 12 })
+    expect(loadMemoryConfig().minExtractIntervalHours).toBe(12)
+  })
 })
 
 describe('resolveSessionMemoryFlags', () => {

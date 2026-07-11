@@ -33,6 +33,7 @@ function isOptionalMemoryKey(k: string): boolean {
   return [
     'minUserTurns',
     'minUserChars',
+    'minExtractIntervalHours',
     'decayFactor',
     'forgetConfidence',
     'extractModel',

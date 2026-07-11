@@ -228,12 +228,49 @@ describe('runPhase2Consolidate', () => {
     expect(items).toHaveLength(1)
     expect(items[0].source).toBe('consolidate')
     expect(items[0].title).toBe('Package manager')
+    // Provenance from primary (most recent) stage1 session_id in the batch.
+    expect(items[0].sourceSessionId).toBe('sess-1')
 
     const sum = store.getSummary('summary:project:pkh1')
     expect(sum?.summaryMd.startsWith('v1')).toBe(true)
 
     const stage1 = store.listStage1({ projectKeyHash: 'pkh1', limit: 10 })
     expect(stage1[0]?.selectedForPhase2).toBe(true)
+  })
+
+  it('Phase2 item sourceSessionId enables deleteBySourceSession hard-delete', async () => {
+    seedStage1(store, { id: 'st-prov', projectKeyHash: 'pkh1' })
+    const llm: MemoryLlmClient = {
+      completeJson: async () => ({
+        items: [
+          {
+            action: 'upsert',
+            title: 'Derived tip',
+            content: 'Comes from stage1 session',
+            kind: 'lesson',
+            scope: 'project',
+            confidence: 0.6,
+          },
+        ],
+        summary_md: 'v1\nderived',
+      }),
+    }
+    const res = await runPhase2Consolidate({
+      store,
+      llm,
+      config: cfg(),
+      projectKeyHash: 'pkh1',
+      projectKey: '/proj',
+    })
+    expect(res.status).toBe('succeeded')
+    const items = store.listItems({ projectKeyHash: 'pkh1', status: 'active' })
+    expect(items).toHaveLength(1)
+    expect(items[0].sourceSessionId).toBe('sess-1')
+    const id = items[0].id
+
+    const deleted = store.deleteBySourceSession('sess-1')
+    expect(deleted).toBe(1)
+    expect(store.getItem(id)).toBeUndefined()
   })
 
   it('simpleExtract skips LLM', async () => {

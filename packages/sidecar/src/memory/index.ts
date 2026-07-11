@@ -101,5 +101,6 @@ export {
   maybeEnqueueMemoryExtract,
   resetPhase1Queue,
   setPhase1QueueConcurrency,
+  setLastExtractSuccessAt,
   type Phase1QueueJob,
 } from './pipeline/queue.js'

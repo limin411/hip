@@ -5,6 +5,7 @@ import { createDefaultMemoryLlmClient } from '../llm-client.js'
 import { resolveSessionMemoryFlags } from '../config.js'
 import { runPhase1Extract } from './phase1-extract.js'
 import { runPhase2Consolidate } from './phase2-consolidate.js'
+import { runDecayJob } from './evolution.js'
 import { resolveProjectKey } from '../project-key.js'
 import type { MemoryStore } from '../store.js'
 
@@ -31,6 +32,10 @@ type SessionHostLike = {
 const queue: Phase1QueueJob[] = []
 /** Sessions currently queued or running — prevents duplicate Phase1 for the same session. */
 const inflight = new Set<string>()
+/** Idle debounce timers: reset on each turn for the session. */
+const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
+/** Last successful Phase1 extract time per session (in-memory; V1). */
+const lastExtractSuccessAt = new Map<string, number>()
 let processing = false
 let concurrency = 1
 let active = 0
@@ -40,12 +45,20 @@ export function setPhase1QueueConcurrency(n: number): void {
   concurrency = Math.max(1, Math.floor(n))
 }
 
-/** Test hook: clear queue state. */
+/** Test hook: clear queue state (including idle timers + extract timestamps). */
 export function resetPhase1Queue(): void {
+  for (const t of idleTimers.values()) clearTimeout(t)
+  idleTimers.clear()
+  lastExtractSuccessAt.clear()
   queue.length = 0
   inflight.clear()
   processing = false
   active = 0
+}
+
+/** Test hook: record a prior extract success (for minExtractIntervalHours tests). */
+export function setLastExtractSuccessAt(sessionId: string, atMs: number): void {
+  lastExtractSuccessAt.set(sessionId, atMs)
 }
 
 /**
@@ -81,6 +94,7 @@ export async function processQueue(): Promise<void> {
         })
         // After successful Phase1, enqueue Phase2 for same project (or global).
         if (phase1.status === 'succeeded' || phase1.status === 'succeeded_no_output') {
+          lastExtractSuccessAt.set(job.sessionId, Date.now())
           let projectKeyHash: string | undefined
           let projectKey: string | undefined
           const cwd = job.sessionConfig?.cwd
@@ -94,13 +108,24 @@ export async function processQueue(): Promise<void> {
             }
           }
           try {
-            await runPhase2Consolidate({
+            const phase2 = await runPhase2Consolidate({
               store: job.store,
               llm: job.llm,
               config: job.config,
               projectKeyHash,
               projectKey,
             })
+            // Best-effort decay after a successful Phase2 run.
+            if (phase2.status === 'succeeded' || phase2.status === 'succeeded_no_output') {
+              try {
+                runDecayJob(job.store, job.config)
+              } catch (err) {
+                console.warn(
+                  '[memory-queue] decay failed',
+                  err instanceof Error ? err.message : String(err),
+                )
+              }
+            }
           } catch (err) {
             console.warn(
               '[memory-queue] phase2 failed',
@@ -128,14 +153,44 @@ export async function processQueue(): Promise<void> {
 }
 
 /**
- * Fire-and-forget schedule after a successful turn.
- * Checks generate/incognito flags; builds a default LLM client; enqueues Phase1.
+ * After a successful turn: debounce Phase1 extract until the session has been
+ * idle for `idleMinutes` (default 15). New turns cancel/reset the timer.
  */
 export function scheduleMemoryExtractAfterTurn(host: SessionHostLike): void {
-  void maybeEnqueueMemoryExtract(host)
+  try {
+    const svc = host.memoryService
+    if (!svc || !host.store) return
+
+    const config = svc.getConfig()
+    const flags = resolveSessionMemoryFlags(config, host._config)
+    if (!flags.generate || flags.incognito) return
+
+    const sessionId = host.id
+    const prev = idleTimers.get(sessionId)
+    if (prev) clearTimeout(prev)
+
+    const idleMs = (config.idleMinutes ?? 15) * 60_000
+    const timer = setTimeout(() => {
+      idleTimers.delete(sessionId)
+      maybeEnqueueMemoryExtract(host)
+    }, idleMs)
+    // Don't keep the process alive solely for extract debounce.
+    if (typeof (timer as NodeJS.Timeout).unref === 'function') {
+      ;(timer as NodeJS.Timeout).unref()
+    }
+    idleTimers.set(sessionId, timer)
+  } catch (err) {
+    console.warn(
+      '[memory] scheduleMemoryExtractAfterTurn failed',
+      err instanceof Error ? err.message : String(err),
+    )
+  }
 }
 
-/** Checks flags and enqueues; no-op when generate is off / incognito / missing deps. */
+/**
+ * Checks flags / min interval and enqueues; no-op when generate is off / incognito /
+ * missing deps / still within minExtractIntervalHours of last success.
+ */
 export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
   try {
     const svc = host.memoryService
@@ -145,6 +200,12 @@ export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
     const config = svc.getConfig()
     const flags = resolveSessionMemoryFlags(config, host._config)
     if (!flags.generate || flags.incognito) return
+
+    const intervalHours = config.minExtractIntervalHours ?? 6
+    const last = lastExtractSuccessAt.get(host.id)
+    if (last !== undefined && Date.now() - last < intervalHours * 3_600_000) {
+      return
+    }
 
     const llm = createDefaultMemoryLlmClient({ extractModel: config.extractModel })
     if (!llm) return

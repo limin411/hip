@@ -502,6 +502,11 @@ export async function runPhase2Consolidate(
     now,
   )
 
+  // Provenance for delete-by-session: use primary stage1 session_id of this batch.
+  // listStage1 is ORDER BY created_at DESC, so stage1[0] is the most recent row.
+  // Multi-session batches still pin all new/updated items to this primary session for V1.
+  const primarySourceSessionId = stage1[0]?.sessionId
+
   let upserted = 0
   let archived = 0
 
@@ -534,7 +539,7 @@ export async function runPhase2Consolidate(
       confidence: it.confidence,
       status: 'active',
       source: 'consolidate',
-      sourceSessionId: prev?.sourceSessionId,
+      sourceSessionId: prev?.sourceSessionId ?? primarySourceSessionId,
       tags: prev?.tags ?? [],
       createdAt: prev?.createdAt ?? now,
       updatedAt: now,

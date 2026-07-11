@@ -87,20 +87,25 @@ describe('MemoryInjector', () => {
   })
 
   it('includes prefetch block when formatPrefetch returns content', async () => {
-    const formatPrefetch = vi.spyOn(svc, 'formatPrefetch').mockReturnValue(
-      '## Memory (prefetch)\n- **hit**: body',
-    )
+    const formatPrefetch = vi.spyOn(svc, 'formatPrefetch').mockReturnValue({
+      text: '## Memory (prefetch)\n- **hit**: body',
+      ids: ['hit-id'],
+    })
     const injector = new MemoryInjector(svc)
+    const injected = new Set<string>()
     const result = await injector.inject({
       ...baseState,
       useMemories: true,
       sessionId: 's1',
       prefetchQuery: 'package management',
+      memoryCoreIds: ['core-id'],
+      memoryIdsInjected: injected,
     })
     expect(formatPrefetch).toHaveBeenCalledWith('package management', '/tmp/project', 's1')
     expect(result.systemMessages).toHaveLength(1)
     expect(result.systemMessages[0]).toContain('## Memory (prefetch)')
     expect(result.systemMessages[0]).toContain('hit')
+    expect([...injected].sort()).toEqual(['core-id', 'hit-id'])
   })
 
   it('two injects with frozen snapshot yield identical core text', async () => {
@@ -122,21 +127,27 @@ describe('refreshMemoryCoreSnapshot', () => {
   const resolveKey = (cwd: string) => ({ projectKeyHash: `hash:${cwd}` })
 
   it('use=false clears snapshot and project key', () => {
-    const load = vi.fn(() => 'should-not-load')
+    const load = vi.fn(() => ({ text: 'should-not-load', ids: ['x'] }))
     const result = refreshMemoryCoreSnapshot({
       useMemories: false,
       cwd: '/proj',
       hostSnapshot: '## Memory (core)\nold',
+      hostCoreIds: ['old'],
       hostProjectKey: 'hash:/proj',
       load,
       resolveKey,
     })
-    expect(result).toEqual({ snapshot: undefined, projectKey: undefined, cleared: true })
+    expect(result).toEqual({
+      snapshot: undefined,
+      coreIds: undefined,
+      projectKey: undefined,
+      cleared: true,
+    })
     expect(load).not.toHaveBeenCalled()
   })
 
   it('empty load freezes: second call with same key skips load', () => {
-    const load = vi.fn(() => '')
+    const load = vi.fn(() => ({ text: '', ids: [] as string[] }))
     const first = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/proj',
@@ -145,23 +156,28 @@ describe('refreshMemoryCoreSnapshot', () => {
       load,
       resolveKey,
     })
-    expect(first).toEqual({ snapshot: '', projectKey: 'hash:/proj' })
+    expect(first).toEqual({ snapshot: '', coreIds: [], projectKey: 'hash:/proj' })
     expect(load).toHaveBeenCalledTimes(1)
 
     const second = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/proj',
       hostSnapshot: first.snapshot,
+      hostCoreIds: first.coreIds,
       hostProjectKey: first.projectKey,
       load,
       resolveKey,
     })
-    expect(second).toEqual({ snapshot: '', projectKey: 'hash:/proj' })
+    expect(second).toEqual({ snapshot: '', coreIds: [], projectKey: 'hash:/proj' })
     expect(load).toHaveBeenCalledTimes(1)
   })
 
   it('key change reloads even when previous snapshot was empty', () => {
-    const load = vi.fn((pk: string) => (pk === 'hash:/other' ? '## Memory (core)\nnew' : ''))
+    const load = vi.fn((pk: string) =>
+      pk === 'hash:/other'
+        ? { text: '## Memory (core)\nnew', ids: ['n1'] }
+        : { text: '', ids: [] as string[] },
+    )
     const afterEmpty = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/proj',
@@ -169,49 +185,62 @@ describe('refreshMemoryCoreSnapshot', () => {
       resolveKey,
     })
     expect(afterEmpty.snapshot).toBe('')
+    expect(afterEmpty.coreIds).toEqual([])
     expect(load).toHaveBeenCalledTimes(1)
 
     const afterMove = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/other',
       hostSnapshot: afterEmpty.snapshot,
+      hostCoreIds: afterEmpty.coreIds,
       hostProjectKey: afterEmpty.projectKey,
       load,
       resolveKey,
     })
-    expect(afterMove).toEqual({ snapshot: '## Memory (core)\nnew', projectKey: 'hash:/other' })
+    expect(afterMove).toEqual({
+      snapshot: '## Memory (core)\nnew',
+      coreIds: ['n1'],
+      projectKey: 'hash:/other',
+    })
     expect(load).toHaveBeenCalledTimes(2)
     expect(load).toHaveBeenLastCalledWith('hash:/other')
   })
 
   it('does not reload solely because hostSnapshot is empty string', () => {
-    const load = vi.fn(() => 'reloaded-leak')
+    const load = vi.fn(() => ({ text: 'reloaded-leak', ids: ['leak'] }))
     const result = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/proj',
       hostSnapshot: '',
+      hostCoreIds: [],
       hostProjectKey: 'hash:/proj',
       load,
       resolveKey,
     })
     expect(result.snapshot).toBe('')
+    expect(result.coreIds).toEqual([])
     expect(result.projectKey).toBe('hash:/proj')
     expect(load).not.toHaveBeenCalled()
   })
 
   it('resolveKey failure keeps host cache', () => {
-    const load = vi.fn(() => 'x')
+    const load = vi.fn(() => ({ text: 'x', ids: ['x'] }))
     const result = refreshMemoryCoreSnapshot({
       useMemories: true,
       cwd: '/bad',
       hostSnapshot: 'kept',
+      hostCoreIds: ['kept-id'],
       hostProjectKey: 'old-key',
       load,
       resolveKey: () => {
         throw new Error('bad cwd')
       },
     })
-    expect(result).toEqual({ snapshot: 'kept', projectKey: 'old-key' })
+    expect(result).toEqual({
+      snapshot: 'kept',
+      coreIds: ['kept-id'],
+      projectKey: 'old-key',
+    })
     expect(load).not.toHaveBeenCalled()
   })
 })

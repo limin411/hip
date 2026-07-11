@@ -36,20 +36,42 @@ const inflight = new Set<string>()
 const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 /** Last successful Phase1 extract time per session (in-memory; V1). */
 const lastExtractSuccessAt = new Map<string, number>()
+/** Successful Phase1 extracts per UTC day (in-memory; V1). */
+let extractCountByDay = { day: '', count: 0 }
 let processing = false
 let concurrency = 1
 let active = 0
+
+function todayKey(now = Date.now()): string {
+  return new Date(now).toISOString().slice(0, 10)
+}
+
+/** True when more Phase1 extracts are allowed today under maxExtractsPerDay. */
+export function assertUnderDailyExtractLimit(config: MemoryFileConfig, now = Date.now()): boolean {
+  const max = config.maxExtractsPerDay ?? 20
+  const day = todayKey(now)
+  if (extractCountByDay.day !== day) extractCountByDay = { day, count: 0 }
+  return extractCountByDay.count < max
+}
+
+/** Count a Phase1 success toward the daily extract limit (UTC day). */
+export function recordExtractSuccess(now = Date.now()): void {
+  const day = todayKey(now)
+  if (extractCountByDay.day !== day) extractCountByDay = { day, count: 0 }
+  extractCountByDay.count += 1
+}
 
 /** Test hook: set concurrency (default 1). */
 export function setPhase1QueueConcurrency(n: number): void {
   concurrency = Math.max(1, Math.floor(n))
 }
 
-/** Test hook: clear queue state (including idle timers + extract timestamps). */
+/** Test hook: clear queue state (including idle timers + extract timestamps + daily counter). */
 export function resetPhase1Queue(): void {
   for (const t of idleTimers.values()) clearTimeout(t)
   idleTimers.clear()
   lastExtractSuccessAt.clear()
+  extractCountByDay = { day: '', count: 0 }
   queue.length = 0
   inflight.clear()
   processing = false
@@ -84,54 +106,59 @@ export async function processQueue(): Promise<void> {
       active += 1
       // Sequential await when concurrency=1; keeps process simple and testable.
       try {
-        const phase1 = await runPhase1Extract({
-          store: job.store,
-          sessionStore: job.sessionStore,
-          sessionId: job.sessionId,
-          llm: job.llm,
-          config: job.config,
-          sessionConfig: job.sessionConfig,
-        })
-        // After successful Phase1, enqueue Phase2 for same project (or global).
-        if (phase1.status === 'succeeded' || phase1.status === 'succeeded_no_output') {
-          lastExtractSuccessAt.set(job.sessionId, Date.now())
-          let projectKeyHash: string | undefined
-          let projectKey: string | undefined
-          const cwd = job.sessionConfig?.cwd
-          if (cwd) {
-            try {
-              const pk = resolveProjectKey(cwd)
-              projectKeyHash = pk.projectKeyHash
-              projectKey = pk.projectKey
-            } catch {
-              // best-effort
-            }
-          }
-          try {
-            const phase2 = await runPhase2Consolidate({
-              store: job.store,
-              llm: job.llm,
-              config: job.config,
-              projectKeyHash,
-              projectKey,
-            })
-            // Best-effort decay after a successful Phase2 run.
-            if (phase2.status === 'succeeded' || phase2.status === 'succeeded_no_output') {
+        if (!assertUnderDailyExtractLimit(job.config)) {
+          console.warn('[memory-queue] phase1 skipped rate_limited', job.sessionId)
+        } else {
+          const phase1 = await runPhase1Extract({
+            store: job.store,
+            sessionStore: job.sessionStore,
+            sessionId: job.sessionId,
+            llm: job.llm,
+            config: job.config,
+            sessionConfig: job.sessionConfig,
+          })
+          // After successful Phase1, count toward daily limit and enqueue Phase2.
+          if (phase1.status === 'succeeded' || phase1.status === 'succeeded_no_output') {
+            recordExtractSuccess()
+            lastExtractSuccessAt.set(job.sessionId, Date.now())
+            let projectKeyHash: string | undefined
+            let projectKey: string | undefined
+            const cwd = job.sessionConfig?.cwd
+            if (cwd) {
               try {
-                runDecayJob(job.store, job.config)
-              } catch (err) {
-                console.warn(
-                  '[memory-queue] decay failed',
-                  err instanceof Error ? err.message : String(err),
-                )
+                const pk = resolveProjectKey(cwd)
+                projectKeyHash = pk.projectKeyHash
+                projectKey = pk.projectKey
+              } catch {
+                // best-effort
               }
             }
-          } catch (err) {
-            console.warn(
-              '[memory-queue] phase2 failed',
-              job.sessionId,
-              err instanceof Error ? err.message : String(err),
-            )
+            try {
+              const phase2 = await runPhase2Consolidate({
+                store: job.store,
+                llm: job.llm,
+                config: job.config,
+                projectKeyHash,
+                projectKey,
+              })
+              // Best-effort decay after a successful Phase2 run.
+              if (phase2.status === 'succeeded' || phase2.status === 'succeeded_no_output') {
+                try {
+                  runDecayJob(job.store, job.config)
+                } catch (err) {
+                  console.warn(
+                    '[memory-queue] decay failed',
+                    err instanceof Error ? err.message : String(err),
+                  )
+                }
+              }
+            } catch (err) {
+              console.warn(
+                '[memory-queue] phase2 failed',
+                job.sessionId,
+                err instanceof Error ? err.message : String(err),
+              )
+            }
           }
         }
       } catch (err) {
@@ -204,6 +231,11 @@ export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
     const intervalHours = config.minExtractIntervalHours ?? 6
     const last = lastExtractSuccessAt.get(host.id)
     if (last !== undefined && Date.now() - last < intervalHours * 3_600_000) {
+      return
+    }
+
+    if (!assertUnderDailyExtractLimit(config)) {
+      console.warn('[memory] phase1 skipped rate_limited', host.id)
       return
     }
 

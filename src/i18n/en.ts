@@ -460,6 +460,8 @@ export const en = {
         useMemoriesDesc: 'Inject relevant memories into the agent context for each turn.',
         generateMemories: 'Generate memories',
         generateMemoriesDesc: 'Extract and consolidate long-term memories after conversations.',
+        generateMemoriesCostHint:
+          'Background extraction uses your API key. Limited to {{max}} successful runs per UTC day (default 20) to control cost.',
         extractModel: 'Extraction model',
         extractModelDesc: 'Optional chat model for background extraction/consolidation. Clear to use the cheap model for the active provider.',
         extractModelDefault: 'Default (cheap model for active provider)',

@@ -460,6 +460,8 @@ export const zhTW = {
         useMemoriesDesc: '在每輪對話中將相關記憶注入智能體上下文。',
         generateMemories: '產生記憶',
         generateMemoriesDesc: '在對話結束後抽取並鞏固長期記憶。',
+        generateMemoriesCostHint:
+          '後台抽取會使用你的 API 金鑰。每個 UTC 日最多 {{max}} 次成功抽取（預設 20），用於控制費用。',
         extractModel: '抽取模型',
         extractModelDesc: '可選的後台抽取/鞏固對話模型；清空則回退到目前活動提供商的廉價模型。',
         extractModelDefault: '預設（目前活動提供商的廉價模型）',

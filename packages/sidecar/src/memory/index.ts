@@ -15,6 +15,7 @@ export {
   MemoryService,
   type MemoryUpsertInput,
   type MemoryImportConflict,
+  type MemoryInjectBlock,
 } from './service.js'
 export { buildMemoryTools } from './tools.js'
 export {
@@ -103,5 +104,7 @@ export {
   resetPhase1Queue,
   setPhase1QueueConcurrency,
   setLastExtractSuccessAt,
+  assertUnderDailyExtractLimit,
+  recordExtractSuccess,
   type Phase1QueueJob,
 } from './pipeline/queue.js'

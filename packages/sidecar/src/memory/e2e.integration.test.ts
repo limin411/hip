@@ -38,7 +38,8 @@ describe('memory e2e integration (light)', () => {
     })
 
     const snap = svc.loadCoreSnapshot(undefined)
-    expect(snap).toContain('Prefer yarn over npm')
-    expect(snap).toMatch(/Memory \(core\)/i)
+    expect(snap.text).toContain('Prefer yarn over npm')
+    expect(snap.text).toMatch(/Memory \(core\)/i)
+    expect(snap.ids.length).toBeGreaterThan(0)
   })
 })

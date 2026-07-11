@@ -24,6 +24,8 @@ export interface PersistDeps {
   messages: BaseMessage[]
   /** Optional; used to bump memory use_count on citation parse at finalize. */
   memoryService?: MemoryService
+  /** Memory ids injected this turn — gate for inline [mem:id] citations. */
+  memoryIdsInjectedThisTurn?: Set<string>
 }
 
 export function emitSessionEvent(
@@ -89,7 +91,10 @@ export function finalizeAndPersistTurn(
   usageByAgent?: Map<string, TurnUsage>,
   targetMessages: BaseMessage[] = deps.messages,
 ): string {
-  const { citations, strippedContent } = parseMemoryCitations(supervisorText)
+  const { citations, strippedContent } = parseMemoryCitations(
+    supervisorText,
+    deps.memoryIdsInjectedThisTurn,
+  )
   const memoryCitations = citations.length ? citations : undefined
   if (memoryCitations && deps.memoryService) {
     bumpMemoryUseCounts(deps.memoryService.store, memoryCitations.map((c) => c.memoryId))

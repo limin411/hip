@@ -37,6 +37,10 @@ export interface SessionContextState {
   useMemories?: boolean
   /** Frozen core memory block for this project (host-cached). */
   memoryCoreSnapshot?: string
+  /** Pinned/core item ids paired with memoryCoreSnapshot. */
+  memoryCoreIds?: string[]
+  /** Mutable accumulator of memory ids injected this turn (core + prefetch). */
+  memoryIdsInjected?: Set<string>
   /** Last user text used as memory prefetch query. */
   prefetchQuery?: string
 }
@@ -118,6 +122,8 @@ export async function assembleFromInjectors(
     sessionId: state.sessionId,
     useMemories: state.useMemories,
     memoryCoreSnapshot: state.memoryCoreSnapshot,
+    memoryCoreIds: state.memoryCoreIds,
+    memoryIdsInjected: state.memoryIdsInjected,
     prefetchQuery: state.prefetchQuery,
   }
   const results = await injectorRegistry.injectAll(injectorState)

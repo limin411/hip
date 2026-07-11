@@ -460,6 +460,8 @@ export const zhCN = {
         useMemoriesDesc: '在每轮对话中将相关记忆注入智能体上下文。',
         generateMemories: '生成记忆',
         generateMemoriesDesc: '在对话结束后抽取并巩固长期记忆。',
+        generateMemoriesCostHint:
+          '后台抽取会使用你的 API 密钥。每个 UTC 日最多 {{max}} 次成功抽取（默认 20），用于控制费用。',
         extractModel: '抽取模型',
         extractModelDesc: '可选的后台抽取/巩固对话模型；清空则回退到当前活动提供商的廉价模型。',
         extractModelDefault: '默认（当前活动提供商的廉价模型）',

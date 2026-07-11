@@ -331,6 +331,11 @@ export function MemoryConfig() {
           <div className="min-w-0 flex-1">
             <div className="text-prose font-medium text-ink">{t('settings.memory.generateMemories')}</div>
             <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.generateMemoriesDesc')}</div>
+            <div className="mt-1 text-caption text-ink-tertiary" data-testid="memory-generate-cost-hint">
+              {t('settings.memory.generateMemoriesCostHint', {
+                max: config?.maxExtractsPerDay ?? 20,
+              })}
+            </div>
           </div>
           <Switch
             checked={!!config?.generateMemories}

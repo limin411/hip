@@ -3,6 +3,11 @@ import { useTranslation } from 'react-i18next'
 import type { Message } from '@hip/protocol'
 import { formatClockTime, formatAbsolute } from '@/lib/datetime'
 import { Avatar } from '@/components/ui/Avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
@@ -97,13 +102,30 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           <div className="mt-1 flex items-center gap-2">
             <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
             {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (
-              <span
-                data-testid="memory-citations-chip"
-                title={message.memoryCitations.map((c) => c.title || c.memoryId).join(', ')}
-                className="rounded-full bg-accent/10 px-2 py-0.5 text-caption text-accent"
-              >
-                {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
-              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="memory-citations-chip"
+                    className="rounded-full bg-accent/10 px-2 py-0.5 text-caption text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-accent"
+                  >
+                    {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-[12rem] max-w-[20rem] p-2">
+                  <ul data-testid="memory-citations-list" className="space-y-1">
+                    {message.memoryCitations.map((c) => (
+                      <li
+                        key={c.memoryId}
+                        className="truncate px-1 py-0.5 text-meta text-ink"
+                        title={c.title || c.memoryId}
+                      >
+                        {c.title || c.memoryId}
+                      </li>
+                    ))}
+                  </ul>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {message.role === 'assistant' && message.usage && (
               <span

@@ -218,8 +218,12 @@ export interface SessionTurnHost {
   rebuildPartsForImageAgent(userData: Extract<import('../persistence/message-types.js').SessionMessageData, { role: 'user' }>): Promise<ContentPart[]>
   /** Frozen core memory block; refreshed when project key changes. */
   memoryCoreSnapshot?: string
+  /** Pinned/core item ids paired with memoryCoreSnapshot. */
+  memoryCoreIds?: string[]
   /** projectKeyHash used when memoryCoreSnapshot was loaded. */
   memorySnapshotProjectKey?: string
+  /** Memory item ids injected into context this turn (core + prefetch). */
+  memoryIdsInjectedThisTurn?: Set<string>
   /** Lazy MemoryService shared across turns on this host. */
   memoryService?: MemoryService
 }
@@ -397,6 +401,8 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   logInfo('session', 'turn:start', { sessionId: host.id, turnId, agentId: agent.id })
   host.abortController = new AbortController()
   host.running = true
+  // Managed path does not inject cross-session memory; clear stale allowedIds.
+  host.memoryIdsInjectedThisTurn = new Set()
 
   const cwd = host._config.cwd ?? process.cwd()
   const mode = host.resolvePermissionMode()
@@ -509,7 +515,10 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   const run = trajectory.get(agent.id); if (run) run.finishedAt = Date.now()
   _send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: agent.id })
 
-  const { citations, strippedContent } = parseMemoryCitations(agentText)
+  const { citations, strippedContent } = parseMemoryCitations(
+    agentText,
+    host.memoryIdsInjectedThisTurn,
+  )
   const memoryCitations = citations.length ? citations : undefined
   if (memoryCitations && host.memoryService) {
     bumpMemoryUseCounts(host.memoryService.store, memoryCitations.map((c) => c.memoryId))
@@ -799,13 +808,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       useMemories: useMemories && !!host.memoryService,
       cwd,
       hostSnapshot: host.memoryCoreSnapshot,
+      hostCoreIds: host.memoryCoreIds,
       hostProjectKey: host.memorySnapshotProjectKey,
       load: (projectKeyHash) => host.memoryService!.loadCoreSnapshot(projectKeyHash),
       resolveKey: resolveProjectKey,
     })
     host.memoryCoreSnapshot = snapshotResult.snapshot
+    host.memoryCoreIds = snapshotResult.coreIds
     host.memorySnapshotProjectKey = snapshotResult.projectKey
     const memoryCoreSnapshot = snapshotResult.snapshot
+    const memoryIdsInjectedThisTurn = new Set<string>()
+    host.memoryIdsInjectedThisTurn = memoryIdsInjectedThisTurn
 
     const prefetchQuery = extractLastUserText(
       base?.messages !== undefined ? modelReady(base.messages) : visibleMessages,
@@ -829,6 +842,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       sessionId: host.id,
       useMemories,
       memoryCoreSnapshot,
+      memoryCoreIds: snapshotResult.coreIds,
+      memoryIdsInjected: memoryIdsInjectedThisTurn,
       prefetchQuery: prefetchQuery || undefined,
     }
 

@@ -25,6 +25,9 @@ export type MemoryUpsertInput = Partial<MemoryItem> &
 
 export type MemoryImportConflict = 'keep' | 'overwrite' | 'merge'
 
+/** Injected memory block plus item ids available for citation allowedIds. */
+export type MemoryInjectBlock = { text: string; ids: string[] }
+
 interface SummaryRow {
   id: string
   scope: string
@@ -93,9 +96,13 @@ export class MemoryService {
 
   /**
    * Frozen core block: global + project summaries and pinned item titles.
-   * Empty string when nothing to inject. Truncated to core budget.
+   * Empty text when nothing to inject. Truncated to core budget.
+   * `ids` lists pinned memory item ids included (for citation allowedIds).
    */
-  loadCoreSnapshot(projectKeyHash: string | undefined, contextWindowTokens?: number): string {
+  loadCoreSnapshot(
+    projectKeyHash: string | undefined,
+    contextWindowTokens?: number,
+  ): MemoryInjectBlock {
     const cfg = this.getConfig()
     const budget = getMemoryCoreBudget(cfg.maxCoreSummaryChars, contextWindowTokens)
     const parts: string[] = []
@@ -108,29 +115,33 @@ export class MemoryService {
       parts.push(`### ${label}\n${body}`)
     }
 
-    const pinnedTitles = this.loadPinnedTitles(projectKeyHash)
-    if (pinnedTitles.length > 0) {
-      parts.push(`### Pinned\n${pinnedTitles.map((t) => `- ${t}`).join('\n')}`)
+    const pinned = this.loadPinnedItems(projectKeyHash)
+    if (pinned.length > 0) {
+      parts.push(`### Pinned\n${pinned.map((p) => `- ${p.title}`).join('\n')}`)
     }
 
-    if (parts.length === 0) return ''
+    if (parts.length === 0) return { text: '', ids: [] }
     const body = parts.join('\n\n')
     const header = '## Memory (core)'
-    return truncateToBudget(`${header}\n${body}`, budget)
+    return {
+      text: truncateToBudget(`${header}\n${body}`, budget),
+      ids: pinned.map((p) => p.id),
+    }
   }
 
   /**
    * Dynamic prefetch block: FTS/LIKE top hits for query, scoped to
    * global ∪ project(cwd) ∪ session, truncated to prefetch budget.
+   * `ids` lists hit item ids considered for injection (citation allowedIds).
    */
   formatPrefetch(
     query: string,
     cwd: string | undefined,
     sessionId: string | undefined,
     contextWindowTokens?: number,
-  ): string {
+  ): MemoryInjectBlock {
     const q = query.trim()
-    if (!q) return ''
+    if (!q) return { text: '', ids: [] }
     const cfg = this.getConfig()
     const budget = getMemoryPrefetchBudget(cfg.maxPrefetchChars, contextWindowTokens)
 
@@ -149,15 +160,20 @@ export class MemoryService {
       sessionId: sessionId ?? undefined,
       limit: 30,
     })
-    if (hits.length === 0) return ''
+    if (hits.length === 0) return { text: '', ids: [] }
 
     const lines: string[] = ['## Memory (prefetch)']
+    const ids: string[] = []
     for (const h of hits) {
       const snippet = h.content.replace(/\s+/g, ' ').trim()
       const line = `- **${h.title}**: ${snippet}`
       lines.push(line)
+      ids.push(h.id)
     }
-    return truncateToBudget(lines.join('\n'), budget)
+    return {
+      text: truncateToBudget(lines.join('\n'), budget),
+      ids,
+    }
   }
 
   /**
@@ -312,11 +328,13 @@ export class MemoryService {
     `).all() as SummaryRow[]
   }
 
-  private loadPinnedTitles(projectKeyHash: string | undefined): string[] {
+  private loadPinnedItems(
+    projectKeyHash: string | undefined,
+  ): Array<{ id: string; title: string }> {
     const db = this.store.getDb()
     if (projectKeyHash) {
-      const rows = db.prepare(`
-        SELECT title FROM memory_items
+      return db.prepare(`
+        SELECT id, title FROM memory_items
         WHERE status = 'active' AND pinned = 1
           AND (
             scope = 'global'
@@ -324,16 +342,14 @@ export class MemoryService {
           )
         ORDER BY updated_at DESC
         LIMIT 50
-      `).all(projectKeyHash) as { title: string }[]
-      return rows.map((r) => r.title)
+      `).all(projectKeyHash) as Array<{ id: string; title: string }>
     }
-    const rows = db.prepare(`
-      SELECT title FROM memory_items
+    return db.prepare(`
+      SELECT id, title FROM memory_items
       WHERE status = 'active' AND pinned = 1 AND scope = 'global'
       ORDER BY updated_at DESC
       LIMIT 50
-    `).all() as { title: string }[]
-    return rows.map((r) => r.title)
+    `).all() as Array<{ id: string; title: string }>
   }
 
 }

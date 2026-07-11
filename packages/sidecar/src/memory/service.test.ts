@@ -120,14 +120,15 @@ describe('MemoryService', () => {
     })
 
     const snap = svc.loadCoreSnapshot('pkh1')
-    expect(snap).toContain('## Memory (core)')
-    expect(snap).toContain('User prefers TypeScript')
-    expect(snap).toContain('Project uses yarn')
-    expect(snap).toContain('Pinned tip')
+    expect(snap.text).toContain('## Memory (core)')
+    expect(snap.text).toContain('User prefers TypeScript')
+    expect(snap.text).toContain('Project uses yarn')
+    expect(snap.text).toContain('Pinned tip')
+    expect(snap.ids).toContain('pin1')
   })
 
   it('loadCoreSnapshot empty when nothing', () => {
-    expect(svc.loadCoreSnapshot(undefined)).toBe('')
+    expect(svc.loadCoreSnapshot(undefined)).toEqual({ text: '', ids: [] })
   })
 
   it('formatPrefetch returns top hits under budget', () => {
@@ -147,8 +148,9 @@ describe('MemoryService', () => {
       pinned: false,
     })
     const block = svc.formatPrefetch('package management', undefined, undefined)
-    expect(block).toContain('## Memory (prefetch)')
-    expect(block).toContain('Yarn tip')
+    expect(block.text).toContain('## Memory (prefetch)')
+    expect(block.text).toContain('Yarn tip')
+    expect(block.ids).toContain('m1')
   })
 
   it('formatPrefetch still surfaces in-scope hit when many out-of-scope matches rank higher', () => {
@@ -188,9 +190,10 @@ describe('MemoryService', () => {
     })
 
     const block = svc.formatPrefetch('prefetch-scope-token', undefined, undefined)
-    expect(block).toContain('## Memory (prefetch)')
-    expect(block).toContain('InScope Prefetch Hit')
-    expect(block).not.toContain('Foreign Prefetch')
+    expect(block.text).toContain('## Memory (prefetch)')
+    expect(block.text).toContain('InScope Prefetch Hit')
+    expect(block.text).not.toContain('Foreign Prefetch')
+    expect(block.ids).toContain('in-scope-global')
   })
 
   it('search delegates to store', () => {

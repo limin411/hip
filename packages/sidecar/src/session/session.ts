@@ -716,6 +716,7 @@ export class Session {
   }
 
   private persistDeps() {
+    const host = this as unknown as SessionTurnHost
     return {
       id: this.id,
       store: this.store,
@@ -723,7 +724,8 @@ export class Session {
       snapshotStore: this.snapshotStore,
       config: this._config,
       messages: this.messages,
-      memoryService: (this as unknown as SessionTurnHost).memoryService,
+      memoryService: host.memoryService,
+      memoryIdsInjectedThisTurn: host.memoryIdsInjectedThisTurn,
     }
   }
 

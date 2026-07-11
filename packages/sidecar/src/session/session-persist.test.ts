@@ -107,4 +107,52 @@ describe('Session persistence', () => {
     st.loadMessagesWithRuns('s1')
     expect(memStore.getItem('mem-yarn')!.useCount).toBe(1)
   })
+
+  it('finalize collects inline [mem:id] only when allowedIds includes them', () => {
+    const db = st.getDb()
+    const memStore = new MemoryStore(db, false)
+    const memSvc = new MemoryService(memStore)
+    for (const id of ['mem-a', 'mem-b']) {
+      memStore.upsertItem({
+        id,
+        scope: 'global',
+        kind: 'preference',
+        title: id,
+        content: 'c',
+        confidence: 0.9,
+        status: 'active',
+        source: 'user',
+        tags: [],
+        createdAt: 1,
+        updatedAt: 1,
+        useCount: 0,
+        pinned: false,
+      })
+    }
+
+    const body = 'See [mem:mem-a] and [mem:mem-b].'
+    const events: ServerMessage[] = []
+    const messages: BaseMessage[] = [new AIMessage(body)]
+    finalizeAndPersistTurn(
+      {
+        id: 's1',
+        store: st,
+        eventStore: new EventStore(db),
+        config: cfg,
+        messages,
+        memoryService: memSvc,
+        memoryIdsInjectedThisTurn: new Set(['mem-a']),
+      },
+      (m) => events.push(m),
+      'turn-inline',
+      body,
+      new Map(),
+      false,
+    )
+
+    const complete = events.find((e) => e.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(complete.message.memoryCitations).toEqual([{ memoryId: 'mem-a' }])
+    expect(memStore.getItem('mem-a')!.useCount).toBe(1)
+    expect(memStore.getItem('mem-b')!.useCount).toBe(0)
+  })
 })

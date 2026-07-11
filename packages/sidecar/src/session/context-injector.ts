@@ -18,6 +18,10 @@ export interface InjectorState {
   useMemories?: boolean
   /** Frozen core memory block for this project (host-cached). */
   memoryCoreSnapshot?: string
+  /** Pinned/core item ids paired with memoryCoreSnapshot. */
+  memoryCoreIds?: string[]
+  /** Mutable accumulator of memory ids injected this turn (core + prefetch). */
+  memoryIdsInjected?: Set<string>
   /** Last user text used as memory prefetch query. */
   prefetchQuery?: string
 }

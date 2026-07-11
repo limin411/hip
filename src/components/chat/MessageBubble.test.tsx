@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import i18n from '@/i18n'
 import { MessageBubble } from './MessageBubble'
 
@@ -109,7 +109,13 @@ describe('MessageBubble', () => {
         } as any}
       />,
     )
-    expect(screen.getByTestId('memory-citations-chip')).toBeInTheDocument()
+    const chip = screen.getByTestId('memory-citations-chip')
+    expect(chip).toBeInTheDocument()
+    fireEvent.pointerDown(chip)
+    fireEvent.click(chip)
+    const list = screen.getByTestId('memory-citations-list')
+    expect(list).toHaveTextContent('A')
+    expect(list).toHaveTextContent('B')
   })
 
   it('hides memory citations chip when empty or missing', () => {

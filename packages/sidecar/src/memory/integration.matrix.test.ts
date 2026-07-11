@@ -102,9 +102,10 @@ describe('V1 integration matrix A1.1–A1.6', () => {
     })
 
     const snap = svc.loadCoreSnapshot('pkh-matrix-1')
-    expect(snap).toContain(title)
-    expect(snap).toMatch(/Memory \(core\)/i)
-    expect(snap).toContain('### Pinned')
+    expect(snap.text).toContain(title)
+    expect(snap.text).toMatch(/Memory \(core\)/i)
+    expect(snap.text).toContain('### Pinned')
+    expect(snap.ids.length).toBeGreaterThan(0)
   })
 
   it('A1.2: incognito skips Phase1 / enqueue and inject is empty when use forced false', async () => {
@@ -215,7 +216,7 @@ describe('V1 integration matrix A1.1–A1.6', () => {
       pinned: true,
     })
     const snap = svc.loadCoreSnapshot(undefined)
-    expect(snap).toContain('Pinned yarn preference')
+    expect(snap.text).toContain('Pinned yarn preference')
 
     const registry = new ContextInjectorRegistry()
     registry.register(new ProjectAgentsMdInjector())
@@ -227,7 +228,8 @@ describe('V1 integration matrix A1.1–A1.6', () => {
       skills: [],
       tokenBudgetPercent: 100,
       useMemories: true,
-      memoryCoreSnapshot: snap,
+      memoryCoreSnapshot: snap.text,
+      memoryCoreIds: snap.ids,
     })
     const system = results.flatMap((r) => r.systemMessages).join('\n\n')
 

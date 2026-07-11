@@ -182,6 +182,9 @@ export async function processQueue(): Promise<void> {
 /**
  * After a successful turn: debounce Phase1 extract until the session has been
  * idle for `idleMinutes` (default 15). New turns cancel/reset the timer.
+ *
+ * `idleMinutes: 0` is intentional (E2E / accelerated configs): uses `??` not `||`
+ * so zero schedules via `setTimeout(0)` on the next macrotask, still debounced.
  */
 export function scheduleMemoryExtractAfterTurn(host: SessionHostLike): void {
   try {
@@ -196,6 +199,7 @@ export function scheduleMemoryExtractAfterTurn(host: SessionHostLike): void {
     const prev = idleTimers.get(sessionId)
     if (prev) clearTimeout(prev)
 
+    // Use nullish coalescing so idleMinutes: 0 is not replaced by 15.
     const idleMs = (config.idleMinutes ?? 15) * 60_000
     const timer = setTimeout(() => {
       idleTimers.delete(sessionId)

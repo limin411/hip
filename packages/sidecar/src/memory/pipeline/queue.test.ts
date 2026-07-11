@@ -39,6 +39,7 @@ describe('phase1 queue', () => {
     resetPhase1Queue()
     rmSync(configDir, { recursive: true, force: true })
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('processes jobs with concurrency 1 and writes stage1', async () => {
@@ -161,6 +162,131 @@ describe('phase1 queue', () => {
     // After full idle window, timer fires (may no-op without LLM key — that's ok)
     await vi.advanceTimersByTimeAsync(2 * 60_000)
     // No throw; debounce path completed
+  })
+
+  it('idleMinutes 0 schedules extract on next timer turn (not coerced to 15)', async () => {
+    vi.useFakeTimers()
+    const configPath = join(configDir, 'memory.json')
+    const svc = new MemoryService(store, { configPath })
+    svc.setConfig({
+      generateMemories: true,
+      idleMinutes: 0,
+      minExtractIntervalHours: 0,
+    })
+    expect(svc.getConfig().idleMinutes).toBe(0)
+
+    const messages: Message[] = [
+      { id: 'u1', role: 'user', content: 'Prefer strict TypeScript always for this monorepo.', timestamp: 1 },
+      { id: 'a1', role: 'assistant', content: 'Understood.', agentId: 'supervisor', timestamp: 2 },
+      { id: 'u2', role: 'user', content: 'Also always use yarn, never npm.', timestamp: 3 },
+    ]
+    let createClientCalls = 0
+    const completeJson = vi.fn(async () => ({
+      raw_memory: '- Prefer yarn and strict TS',
+      rollout_summary: 'prefs',
+    }))
+    vi.spyOn(llmClient, 'createDefaultMemoryLlmClient').mockImplementation(() => {
+      createClientCalls += 1
+      return { completeJson }
+    })
+
+    const host = {
+      id: 's-idle-zero',
+      _config: { generateMemories: true },
+      store: { loadMessagesWithRuns: () => messages },
+      memoryService: svc,
+    }
+
+    scheduleMemoryExtractAfterTurn(host)
+    expect(createClientCalls).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(0)
+    await processQueue()
+    await Promise.resolve()
+
+    expect(createClientCalls).toBe(1)
+    expect(completeJson).toHaveBeenCalled()
+  })
+
+  it('idleMinutes 0 still debounces two schedules into one extract', async () => {
+    vi.useFakeTimers()
+    const configPath = join(configDir, 'memory.json')
+    const svc = new MemoryService(store, { configPath })
+    svc.setConfig({
+      generateMemories: true,
+      idleMinutes: 0,
+      minExtractIntervalHours: 0,
+    })
+
+    const messages: Message[] = [
+      { id: 'u1', role: 'user', content: 'Prefer strict TypeScript always for this monorepo.', timestamp: 1 },
+      { id: 'a1', role: 'assistant', content: 'Understood.', agentId: 'supervisor', timestamp: 2 },
+      { id: 'u2', role: 'user', content: 'Also always use yarn, never npm.', timestamp: 3 },
+    ]
+    let createClientCalls = 0
+    vi.spyOn(llmClient, 'createDefaultMemoryLlmClient').mockImplementation(() => {
+      createClientCalls += 1
+      return {
+        completeJson: async () => ({
+          raw_memory: '- Prefer yarn',
+          rollout_summary: 'prefs',
+        }),
+      }
+    })
+
+    const host = {
+      id: 's-idle-zero-debounce',
+      _config: { generateMemories: true },
+      store: { loadMessagesWithRuns: () => messages },
+      memoryService: svc,
+    }
+
+    scheduleMemoryExtractAfterTurn(host)
+    scheduleMemoryExtractAfterTurn(host)
+    expect(createClientCalls).toBe(0)
+
+    await vi.advanceTimersByTimeAsync(0)
+    await processQueue()
+    await Promise.resolve()
+
+    expect(createClientCalls).toBe(1)
+  })
+
+  it('minExtractIntervalHours 0 does not block immediate re-enqueue after success', async () => {
+    const configPath = join(configDir, 'memory.json')
+    const svc = new MemoryService(store, { configPath })
+    svc.setConfig({
+      generateMemories: true,
+      minExtractIntervalHours: 0,
+      maxExtractsPerDay: 20,
+    })
+
+    setLastExtractSuccessAt('s-interval-zero', Date.now() - 1)
+
+    const llmSpy = vi.spyOn(llmClient, 'createDefaultMemoryLlmClient').mockReturnValue({
+      completeJson: async () => ({ raw_memory: '- x', rollout_summary: 'y' }),
+    })
+
+    maybeEnqueueMemoryExtract({
+      id: 's-interval-zero',
+      _config: { generateMemories: true },
+      store: {
+        loadMessagesWithRuns: () => [
+          { id: 'u1', role: 'user', content: 'Prefer strict TypeScript always for this monorepo.', timestamp: 1 },
+          { id: 'a1', role: 'assistant', content: 'ok', agentId: 'supervisor', timestamp: 2 },
+          { id: 'u2', role: 'user', content: 'Use yarn always.', timestamp: 3 },
+        ],
+      },
+      memoryService: svc,
+    })
+
+    expect(llmSpy).toHaveBeenCalled()
+    llmSpy.mockRestore()
+  })
+
+  it('MEMORY_FILE_CONFIG_DEFAULTS keep production idle 15 and interval 6', () => {
+    expect(MEMORY_FILE_CONFIG_DEFAULTS.idleMinutes).toBe(15)
+    expect(MEMORY_FILE_CONFIG_DEFAULTS.minExtractIntervalHours).toBe(6)
   })
 
   it('assertUnderDailyExtractLimit / recordExtractSuccess track UTC day', () => {

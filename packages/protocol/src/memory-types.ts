@@ -43,6 +43,11 @@ export interface MemoryFileConfig {
   useMemories: boolean
   generateMemories: boolean
   defaultScope: 'project' | 'global'
+  /**
+   * Minutes of session idle before Phase1 extract is scheduled after a turn.
+   * Default 15. **0 is valid** and means schedule on the next timer turn (immediate
+   * debounce expiry) — used by E2E / advanced configs; do not coerce 0 to default.
+   */
   idleMinutes: number
   maxCoreSummaryChars: number
   maxPrefetchChars: number
@@ -50,7 +55,10 @@ export interface MemoryFileConfig {
   maxUnusedDays: number
   minUserTurns?: number
   minUserChars?: number
-  /** Skip Phase1 if a successful extract for this session ran within this many hours. Default 6. */
+  /**
+   * Skip Phase1 if a successful extract for this session ran within this many hours. Default 6.
+   * **0 is valid** and disables the interval throttle (still subject to maxExtractsPerDay).
+   */
   minExtractIntervalHours?: number
   decayFactor?: number
   forgetConfidence?: number

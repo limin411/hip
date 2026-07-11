@@ -2,20 +2,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runDiff, runCompact, runInit } from './codeActions'
 import { sessionService } from '../sessionService'
+import { useDomainStore } from '../sessionStore'
 import { useUiStore } from '@/store/uiStore'
 
 describe('codeActions', () => {
   beforeEach(() => {
     useUiStore.setState({ activeView: 'chat', activeTab: 'files' })
+    useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
     vi.restoreAllMocks()
   })
 
-  it('runDiff requests diff, opens changes tab, switches to code', () => {
+  it('runDiff requests diff, opens changes tab, switches to code, opens panel', () => {
     const spy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue('sent')
     runDiff('s1')
     expect(spy).toHaveBeenCalledWith('s1')
     expect(useUiStore.getState().activeTab).toBe('changes')
     expect(useUiStore.getState().activeView).toBe('code')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
   })
 
   it('runDiff navigates even when request is deduped', () => {
@@ -23,6 +27,7 @@ describe('codeActions', () => {
     runDiff('s1')
     expect(useUiStore.getState().activeTab).toBe('changes')
     expect(useUiStore.getState().activeView).toBe('code')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
   })
 
   it('runCompact calls compactSession', () => {
@@ -43,5 +48,6 @@ describe('codeActions', () => {
     expect(spy).toHaveBeenCalledWith('s1')
     expect(useUiStore.getState().activeTab).toBe('changes')
     expect(useUiStore.getState().activeView).toBe('code')
+    expect(useDomainStore.getState().sessions[0].codePanelOpen).toBe(true)
   })
 })

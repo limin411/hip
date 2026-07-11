@@ -22,7 +22,8 @@ export type RankOptions = {
 }
 
 function normalize(s: string): string {
-  return s.trim().toLowerCase()
+  // Leading `/` is common when users type slash-style names (e.g. `/diff`).
+  return s.trim().toLowerCase().replace(/^\/+/, '')
 }
 
 /** Score one item: 0 = no match; higher is better. */
@@ -30,6 +31,7 @@ export function scoreItem(item: RankableItem, needle: string): number {
   const label = item.label.toLowerCase()
   const keys = (item.keywords ?? []).join(' ').toLowerCase()
   const desc = (item.description ?? '').toLowerCase()
+  needle = normalize(needle)
   const terms = needle.split(/\s+/).filter(Boolean)
 
   const termMissesAll = terms.some(

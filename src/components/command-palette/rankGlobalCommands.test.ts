@@ -33,6 +33,16 @@ describe('scoreItem', () => {
     expect(score).toBeGreaterThan(0)
     expect(score).toBeLessThanOrEqual(0.65)
   })
+
+  it('matches slash-style queries like /diff against keywords', () => {
+    const item: RankableItem = {
+      id: 'ctx-diff',
+      label: 'Show workspace changes',
+      keywords: ['diff', 'changes'],
+    }
+    expect(scoreItem(item, '/diff')).toBe(scoreItem(item, 'diff'))
+    expect(scoreItem(item, '/diff')).toBeGreaterThan(0)
+  })
 })
 
 describe('rankGroups with usage', () => {

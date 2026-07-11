@@ -20,6 +20,7 @@ import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
+import { registerComposerInserter } from '@/components/command-palette/composerBridge'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -49,6 +50,15 @@ export function InputBar() {
 
   const [skillBody, setSkillBody] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Allow ⌘K skill handoff to fill the composer (Handoff A).
+  useEffect(() => {
+    registerComposerInserter((text) => {
+      setValue(text)
+      setTimeout(() => inputRef.current?.focus(), 0)
+    })
+    return () => registerComposerInserter(null)
+  }, [])
 
   useEffect(() => {
     if (!selectedSkill) {

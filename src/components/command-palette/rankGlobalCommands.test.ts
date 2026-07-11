@@ -27,6 +27,29 @@ describe('scoreItem', () => {
     )
     expect(score).toBe(0.35)
   })
+
+  it('fuzzy-matches non-contiguous label chars', () => {
+    const score = scoreItem({ id: '1', label: 'Set Syntax Markdown' }, 'ssmd')
+    expect(score).toBeGreaterThan(0)
+    expect(score).toBeLessThanOrEqual(0.65)
+  })
+})
+
+describe('rankGroups with usage', () => {
+  it('boosts frequently used matches', () => {
+    const groups = [
+      {
+        items: [
+          { id: 'a', label: 'Alpha tools' },
+          { id: 'b', label: 'Beta tools' },
+        ],
+      },
+    ]
+    const ranked = rankGroups(groups, 'tools', {
+      usage: { b: { count: 20, lastUsedAtMs: Date.now() } },
+    })
+    expect(ranked[0]?.items[0]?.id).toBe('b')
+  })
 })
 
 describe('rankGroups', () => {

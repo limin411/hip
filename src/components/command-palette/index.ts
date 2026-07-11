@@ -15,3 +15,5 @@ export type {
 } from './buildGlobalCommands'
 export type { PaletteIconName, CommandGroupId, CommandWhen } from './types'
 export { rankGroups, scoreItem } from './rankGlobalCommands'
+export { buildAllGroups, registerCommandProvider } from './registry'
+export { registerComposerInserter, insertComposerText } from './composerBridge'

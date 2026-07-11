@@ -1202,10 +1202,10 @@ P0
 - [x] T9 e2e gate (unit green; e2e needs app run)
 
 P1
-- [ ] T10 fuzzy
-- [ ] T11 usage
-- [ ] T12 registry + skills
-- [ ] T13 footer / highlight / theme search
+- [x] T10 fuzzy
+- [x] T11 usage
+- [x] T12 registry + skills
+- [x] T13 footer / highlight / theme search
 
 P2
 - [ ] T14 backlog items as prioritized

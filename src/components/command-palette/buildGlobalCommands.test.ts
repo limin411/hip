@@ -16,6 +16,7 @@ const labels: GlobalCommandLabels = {
   groupContext: 'Suggested',
   groupWorkspace: 'Workspace',
   groupAppearance: 'Appearance',
+  groupSkills: 'Skills',
   navChat: 'Work',
   navCode: 'Coding',
   navHistory: 'History',

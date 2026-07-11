@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { GlobalCommand, PaletteIconName } from '../types'
+import { matchHighlightIndices } from '../fuzzyScore'
 
 const ICONS: Record<PaletteIconName, LucideIcon> = {
   'message-square': MessageSquare,
@@ -44,7 +45,38 @@ const ICONS: Record<PaletteIconName, LucideIcon> = {
   puzzle: Puzzle,
 }
 
-export function CommandRow({ item }: { item: GlobalCommand }) {
+function HighlightLabel({ label, search }: { label: string; search?: string }) {
+  const indices = search ? matchHighlightIndices(label, search) : []
+  if (indices.length === 0) {
+    return <span className="min-w-0 flex-1 truncate">{label}</span>
+  }
+  const set = new Set(indices)
+  return (
+    <span className="min-w-0 flex-1 truncate">
+      {Array.from(label).map((ch, i) =>
+        set.has(i) ? (
+          <mark
+            key={i}
+            className="bg-transparent font-medium text-accent"
+            data-testid="cmd-match-mark"
+          >
+            {ch}
+          </mark>
+        ) : (
+          <span key={i}>{ch}</span>
+        ),
+      )}
+    </span>
+  )
+}
+
+export function CommandRow({
+  item,
+  search,
+}: {
+  item: GlobalCommand
+  search?: string
+}) {
   const Icon = item.icon ? ICONS[item.icon] : null
   const showShortcut = Boolean(item.shortcut) && !item.to
   const showChevron = Boolean(item.to)
@@ -52,7 +84,7 @@ export function CommandRow({ item }: { item: GlobalCommand }) {
   return (
     <>
       {Icon ? <Icon className="size-3.5 shrink-0 text-ink-tertiary" size={14} /> : null}
-      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      <HighlightLabel label={item.label} search={search} />
       {item.active ? (
         <Check className="size-3.5 shrink-0 text-accent" data-testid="global-cmd-active" />
       ) : null}

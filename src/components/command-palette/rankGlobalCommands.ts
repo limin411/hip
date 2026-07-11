@@ -1,5 +1,8 @@
 /** Shared ranking helpers for the global command palette. */
 
+import { fuzzyMatch } from './fuzzyScore'
+import { usageBoost, type CommandUsageMap } from './usageStore'
+
 export type RankableItem = {
   id: string
   label: string
@@ -11,6 +14,11 @@ export type RankableGroup<T extends RankableItem = RankableItem> = {
   heading?: string
   id?: string
   items: T[]
+}
+
+export type RankOptions = {
+  usage?: CommandUsageMap
+  now?: number
 }
 
 function normalize(s: string): string {
@@ -27,35 +35,54 @@ export function scoreItem(item: RankableItem, needle: string): number {
   const termMissesAll = terms.some(
     (term) => !label.includes(term) && !keys.includes(term) && !desc.includes(term),
   )
-  if (termMissesAll) return 0
 
-  if (label === needle) return 1
-  if (label.startsWith(needle)) return 0.9
-  const words = label.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-  if (words.includes(needle)) return 0.85
-  if (words.some((w) => w.startsWith(needle))) return 0.8
-  if (label.includes(needle)) return 0.7
-  if (terms.every((term) => label.includes(term))) return 0.6
-  if (terms.every((term) => label.includes(term) || keys.includes(term))) return 0.4
-  // Description-only (or description completing AND) — weakest positive signal.
-  if (terms.every((term) => label.includes(term) || keys.includes(term) || desc.includes(term))) {
-    return 0.35
+  let base = 0
+  if (!termMissesAll) {
+    if (label === needle) base = 1
+    else if (label.startsWith(needle)) base = 0.9
+    else {
+      const words = label.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+      if (words.includes(needle)) base = 0.85
+      else if (words.some((w) => w.startsWith(needle))) base = 0.8
+      else if (label.includes(needle)) base = 0.7
+      else if (terms.every((term) => label.includes(term))) base = 0.6
+      else if (terms.every((term) => label.includes(term) || keys.includes(term))) base = 0.4
+      else if (
+        terms.every((term) => label.includes(term) || keys.includes(term) || desc.includes(term))
+      ) {
+        base = 0.35
+      } else {
+        base = 0.4
+      }
+    }
   }
-  return 0.4
+
+  // Fuzzy subsequence on label (e.g. ssmd → Set Syntax Markdown). Never above 0.65.
+  const fuzzy = fuzzyMatch(item.label, needle).score
+  return Math.max(base, fuzzy)
 }
 
 /** Order items within groups by score; drop non-matches; order groups by best item. */
 export function rankGroups<T extends RankableItem>(
   groups: RankableGroup<T>[],
   search: string,
+  options?: RankOptions,
 ): RankableGroup<T>[] {
   const needle = normalize(search)
   if (!needle) return groups
 
+  const usage = options?.usage
+  const now = options?.now ?? Date.now()
+
   return groups
     .map((group) => {
       const scored = group.items
-        .map((item) => ({ item, score: scoreItem(item, needle) }))
+        .map((item) => {
+          const base = scoreItem(item, needle)
+          if (base <= 0) return { item, score: 0 }
+          const boost = usage ? usageBoost(usage[item.id], now) : 0
+          return { item, score: base + boost }
+        })
         .filter((e) => e.score > 0)
         .sort((a, b) => b.score - a.score)
       return {

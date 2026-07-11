@@ -1,4 +1,5 @@
 import type { SessionVM } from '@/domain'
+import type { SkillMeta } from '@hip/protocol'
 import type { ActiveView, SettingsPageId, Theme } from '@/store/uiStore'
 import {
   goSettingsPage,
@@ -23,6 +24,7 @@ export type GlobalCommandLabels = {
   groupContext: string
   groupWorkspace: string
   groupAppearance: string
+  groupSkills: string
   navChat: string
   navCode: string
   navHistory: string
@@ -73,6 +75,10 @@ export type GlobalCommandContext = {
     body: string
   }
   isMac?: boolean
+  /** Current search (providers use for search-only long tails). */
+  search?: string
+  /** Installed skills for search-time provider. */
+  skills?: SkillMeta[]
 }
 
 /** Source cap for search-time session list. */

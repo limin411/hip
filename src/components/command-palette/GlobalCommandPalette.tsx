@@ -5,22 +5,25 @@ import { ChevronLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { sessionService, useSessions } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
+import { useSkillsStore } from '@/store/skillsStore'
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import {
-  buildGlobalCommandGroups,
   buildThemePageGroups,
   type GlobalCommandLabels,
 } from './buildGlobalCommands'
 import { CommandRow } from './components/CommandRow'
+import { PaletteFooter } from './components/PaletteFooter'
 import { detectIsMac } from './keys'
 import { rankGroups } from './rankGlobalCommands'
+import { buildAllGroups } from './registry'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
 import type { GlobalCommand } from './types'
+import { loadCommandUsage, recordCommandUsage } from './usageStore'
 
 /**
  * Global ⌘K command palette.
- * Navigation, workspace settings, theme subpage, context actions, and search-time sessions.
+ * Navigation, workspace settings, theme subpage, context actions, and search-time sessions/skills.
  */
 export function GlobalCommandPalette() {
   const { t, i18n } = useTranslation()
@@ -29,6 +32,7 @@ export function GlobalCommandPalette() {
   const page = useCommandPaletteStore((s) => s.page)
   const setPage = useCommandPaletteStore((s) => s.setPage)
   const sessions = useSessions()
+  const skills = useSkillsStore((s) => s.skills)
   const activeView = useUiStore((s) => s.activeView)
   const theme = useUiStore((s) => s.theme)
   const chatSessionId = useUiStore((s) => s.chatSessionId)
@@ -38,6 +42,7 @@ export function GlobalCommandPalette() {
   const setSettingsPage = useUiStore((s) => s.setSettingsPage)
   const [search, setSearch] = useState('')
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [usageTick, setUsageTick] = useState(0)
   const isMac = useMemo(() => detectIsMac(), [])
 
   const sessionId =
@@ -46,7 +51,6 @@ export function GlobalCommandPalette() {
   useEffect(() => {
     if (!open) {
       setSearch('')
-      // page cleared by store on close
     }
   }, [open])
 
@@ -59,6 +63,7 @@ export function GlobalCommandPalette() {
       groupContext: t('commandPalette.groups.context'),
       groupWorkspace: t('commandPalette.groups.workspace'),
       groupAppearance: t('commandPalette.groups.appearance'),
+      groupSkills: t('commandPalette.groups.skills'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
@@ -113,6 +118,8 @@ export function GlobalCommandPalette() {
         body: t('chat.slash.memoryStatusBody', flags),
       }),
       isMac,
+      search,
+      skills,
     }),
     [
       sessions,
@@ -125,15 +132,25 @@ export function GlobalCommandPalette() {
       setSettingsPage,
       t,
       isMac,
+      search,
+      skills,
     ],
   )
 
   const groups = useMemo(() => {
     if (page === 'theme') return buildThemePageGroups(ctx)
-    return buildGlobalCommandGroups(ctx, { search })
+    return buildAllGroups(ctx, { search })
   }, [ctx, page, search])
 
-  const visible = useMemo(() => rankGroups(groups, search), [groups, search])
+  const usage = useMemo(() => {
+    void usageTick
+    return loadCommandUsage()
+  }, [usageTick, open])
+
+  const visible = useMemo(
+    () => rankGroups(groups, search, { usage }),
+    [groups, search, usage],
+  )
   const hasItems = visible.some((g) => g.items.length > 0)
 
   const goBack = () => {
@@ -148,6 +165,13 @@ export function GlobalCommandPalette() {
       return
     }
     item.run?.()
+    if (!item.keepOpen && !item.to) {
+      recordCommandUsage(item.id)
+      setUsageTick((n) => n + 1)
+    } else if (item.keepOpen) {
+      recordCommandUsage(item.id)
+      setUsageTick((n) => n + 1)
+    }
     if (!item.keepOpen) {
       useCommandPaletteStore.getState().close()
     }
@@ -235,12 +259,13 @@ export function GlobalCommandPalette() {
                         )}
                         data-testid={`global-cmd-${item.id}`}
                       >
-                        <CommandRow item={item} />
+                        <CommandRow item={item} search={search} />
                       </Command.Item>
                     ))}
                   </Command.Group>
                 ))}
               </Command.List>
+              <PaletteFooter showBack={Boolean(page)} />
             </Command>
           </Dialog.Content>
         </Dialog.Portal>

@@ -81,10 +81,14 @@ def draw_mascot(
     rot: float = 0,
     scale: float = 1.0,
     eye_open: float = 1.0,
+    eye_open_l: float | None = None,
+    eye_open_r: float | None = None,
     pupil_dx: float = 0,
     pupil_dy: float = 0,
     brow_dy: float = 0,
     brow_curve: float = 0,
+    brow_dy_l: float | None = None,
+    brow_dy_r: float | None = None,
     mouth: str = "smile",
     mouth_open: float = 0.0,
     ant_l: float = 0,
@@ -94,9 +98,14 @@ def draw_mascot(
     """Draw one mascot frame (RGBA), supersampled then downscaled for smooth edges.
 
     ox/oy are in output-pixel units (authored against 320px, auto-scaled).
+    eye_open_l / eye_open_r override eye_open per side when set (for wink).
     """
     ox_d = ox * _MOTION * SS
     oy_d = oy * _MOTION * SS
+    open_l = eye_open if eye_open_l is None else eye_open_l
+    open_r = eye_open if eye_open_r is None else eye_open_r
+    brow_l = brow_dy if brow_dy_l is None else brow_dy_l
+    brow_r = brow_dy if brow_dy_r is None else brow_dy_r
 
     layer = Image.new("RGBA", (DRAW_SIZE, DRAW_SIZE), BG)
     draw = ImageDraw.Draw(layer)
@@ -164,21 +173,24 @@ def draw_mascot(
     # --- eyes ---
     eye_ry_base = 72
     eye_rx = 109
-    for cx, cy in ((454, 632), (818, 632)):
+    for (cx, cy), open_amt in (
+        ((454, 632), open_l),
+        ((818, 632), open_r),
+    ):
         px, py = P(cx, cy)
         rx = R(eye_rx)
-        if eye_open < 0.18:
+        if open_amt < 0.18:
             p0 = (px - rx * 0.85, py)
             p1 = (px, py + R(12))
             p2 = (px + rx * 0.85, py)
             pts = bezier_quad(p0, p1, p2, n=48)
             draw_thick_polyline(draw, pts, DARK, R(28))
         else:
-            ry = max(R(8), R(eye_ry_base) * eye_open)
+            ry = max(R(8), R(eye_ry_base) * open_amt)
             draw.ellipse((px - rx, py - ry, px + rx, py + ry), fill=WHITE)
 
-            if eye_open > 0.28:
-                pr = R(35) * min(1.0, 0.5 + eye_open * 0.5)
+            if open_amt > 0.28:
+                pr = R(35) * min(1.0, 0.5 + open_amt * 0.5)
                 ppx = px + s(pupil_dx) * scale
                 ppy = py + s(pupil_dy) * scale
                 max_off_x = rx * 0.35
@@ -198,13 +210,13 @@ def draw_mascot(
                 )
 
     # --- eyebrows ---
-    for left, mid, right in (
-        ((332, 470), (454, 430), (576, 470)),
-        ((697, 470), (818, 430), (940, 470)),
+    for (left, mid, right), bdy in (
+        (((332, 470), (454, 430), (576, 470)), brow_l),
+        (((697, 470), (818, 430), (940, 470)), brow_r),
     ):
-        p0 = P(left[0], left[1] + brow_dy)
-        p1 = P(mid[0], mid[1] + brow_dy + brow_curve)
-        p2 = P(right[0], right[1] + brow_dy)
+        p0 = P(left[0], left[1] + bdy)
+        p1 = P(mid[0], mid[1] + bdy + brow_curve)
+        p2 = P(right[0], right[1] + bdy)
         pts = bezier_quad(p0, p1, p2, n=48)
         draw_thick_polyline(draw, pts, DARK, R(55))
 
@@ -571,6 +583,301 @@ def gif_sleep() -> None:
     save_gif(frames, "sleep", duration=70)
 
 
+def gif_wink() -> None:
+    frames = []
+    frames += [draw_mascot()] * 8
+    # close right eye
+    for open_amt in (0.7, 0.35, 0.1, 0.05, 0.05, 0.05, 0.05, 0.15, 0.4, 0.75, 1.0):
+        frames.append(
+            draw_mascot(
+                eye_open_l=1.0,
+                eye_open_r=open_amt,
+                brow_dy_r=8 if open_amt < 0.3 else 0,
+                mouth="smile",
+                mouth_open=0.25 if open_amt < 0.3 else 0.0,
+                blush=0.55 if open_amt < 0.4 else 0.15,
+                ant_l=6,
+                ant_r=-10,
+            )
+        )
+    frames += [draw_mascot(blush=0.2)] * 10
+    save_gif(frames, "wink", duration=50)
+
+
+def gif_nod() -> None:
+    frames = []
+    n = 28
+    for i in range(n):
+        t = i / n
+        # two friendly nods
+        phase = math.sin(t * math.pi * 4)
+        # bias downward on the first half of each nod
+        dip = max(0.0, -phase) * 18
+        frames.append(
+            draw_mascot(
+                oy=dip,
+                rot=phase * 3,
+                pupil_dy=dip * 0.6,
+                brow_dy=4 * max(0.0, -phase),
+                mouth="smile",
+                mouth_open=0.1 * abs(phase),
+                ant_l=8 * phase,
+                ant_r=-8 * phase,
+            )
+        )
+    save_gif(frames, "nod", duration=45)
+
+
+def gif_shake() -> None:
+    frames = []
+    n = 30
+    for i in range(n):
+        t = i / n
+        wiggle = math.sin(t * math.pi * 5) * 12
+        frames.append(
+            draw_mascot(
+                rot=wiggle,
+                pupil_dx=wiggle * 2.2,
+                mouth="flat",
+                brow_dy=-6,
+                brow_curve=8,
+                ant_l=-wiggle * 0.6,
+                ant_r=-wiggle * 0.6,
+            )
+        )
+    save_gif(frames, "shake", duration=40)
+
+
+def gif_surprise() -> None:
+    frames = []
+    # settle
+    frames += [draw_mascot()] * 4
+    # pop open
+    for i in range(6):
+        t = ease_in_out(i / 5)
+        frames.append(
+            draw_mascot(
+                scale=1.0 + 0.08 * t,
+                oy=-10 * t,
+                eye_open=1.0 + 0.15 * t,
+                mouth="ooo",
+                mouth_open=0.8 * t,
+                brow_dy=-28 * t,
+                brow_curve=-18 * t,
+                ant_l=18 * t,
+                ant_r=-18 * t,
+            )
+        )
+    # hold with tiny quiver
+    for i in range(12):
+        q = math.sin(i * 0.9) * 2
+        frames.append(
+            draw_mascot(
+                scale=1.08,
+                oy=-10 + q,
+                eye_open=1.12,
+                mouth="ooo",
+                mouth_open=0.85,
+                brow_dy=-28,
+                brow_curve=-18,
+                ant_l=18 + q,
+                ant_r=-18 - q,
+            )
+        )
+    # relax
+    for i in range(8):
+        t = ease_in_out(i / 7)
+        frames.append(
+            draw_mascot(
+                scale=1.08 - 0.08 * t,
+                oy=-10 * (1 - t),
+                mouth="ooo" if t < 0.5 else "smile",
+                mouth_open=0.85 * (1 - t),
+                brow_dy=-28 * (1 - t),
+                brow_curve=-18 * (1 - t),
+                ant_l=18 * (1 - t),
+                ant_r=-18 * (1 - t),
+            )
+        )
+    save_gif(frames, "surprise", duration=50)
+
+
+def gif_float() -> None:
+    """Gentle idle bob — good ambient loop for empty states."""
+    frames = []
+    n = 36
+    for i in range(n):
+        t = i / n
+        y = math.sin(t * math.pi * 2) * 10
+        breath = 1.0 + 0.025 * math.sin(t * math.pi * 2)
+        frames.append(
+            draw_mascot(
+                oy=y,
+                scale=breath,
+                pupil_dy=-4 + y * 0.2,
+                mouth="smile",
+                ant_l=6 * math.sin(t * math.pi * 2 + 0.4),
+                ant_r=-6 * math.sin(t * math.pi * 2 + 0.4),
+            )
+        )
+    save_gif(frames, "float", duration=55)
+
+
+def gif_dance() -> None:
+    frames = []
+    n = 32
+    for i in range(n):
+        t = i / n
+        side = math.sin(t * math.pi * 4)
+        hop = -abs(math.sin(t * math.pi * 4)) * 16
+        frames.append(
+            draw_mascot(
+                ox=side * 14,
+                oy=hop,
+                rot=side * 10,
+                scale=1.0 + 0.04 * abs(math.sin(t * math.pi * 4)),
+                mouth="grin",
+                mouth_open=0.35 + 0.25 * abs(side),
+                blush=0.45,
+                brow_dy=-12,
+                brow_curve=-10,
+                ant_l=30 * side,
+                ant_r=-30 * side,
+                pupil_dx=side * 12,
+            )
+        )
+    save_gif(frames, "dance", duration=40)
+
+
+def gif_curious() -> None:
+    frames = []
+    # lean in and look
+    for i in range(10):
+        t = ease_in_out(i / 9)
+        frames.append(
+            draw_mascot(
+                scale=1.0 + 0.06 * t,
+                oy=8 * t,
+                rot=6 * t,
+                pupil_dx=28 * t,
+                pupil_dy=10 * t,
+                brow_dy=-12 * t,
+                brow_curve=-8 * t,
+                mouth="ooo" if t > 0.55 else "smile",
+                mouth_open=0.35 * t,
+                ant_l=10 * t,
+                ant_r=5 * t,
+            )
+        )
+    # hold, blink once
+    for i in range(14):
+        open_amt = 1.0
+        if i in (6, 7):
+            open_amt = 0.08
+        if i == 8:
+            open_amt = 0.55
+        frames.append(
+            draw_mascot(
+                scale=1.06,
+                oy=8,
+                rot=6,
+                pupil_dx=28,
+                pupil_dy=10,
+                brow_dy=-12,
+                brow_curve=-8,
+                mouth="ooo",
+                mouth_open=0.35,
+                eye_open=open_amt,
+                ant_l=10 + 2 * math.sin(i * 0.5),
+                ant_r=5,
+            )
+        )
+    # ease out
+    for i in range(8):
+        t = ease_in_out(i / 7)
+        frames.append(
+            draw_mascot(
+                scale=1.06 - 0.06 * t,
+                oy=8 * (1 - t),
+                rot=6 * (1 - t),
+                pupil_dx=28 * (1 - t),
+                pupil_dy=10 * (1 - t),
+                brow_dy=-12 * (1 - t),
+                brow_curve=-8 * (1 - t),
+                mouth="smile",
+            )
+        )
+    save_gif(frames, "curious", duration=50)
+
+
+def gif_yawn() -> None:
+    frames = []
+    for i in range(8):
+        t = ease_in_out(i / 7)
+        frames.append(
+            draw_mascot(
+                eye_open=1.0 - 0.35 * t,
+                brow_dy=8 * t,
+                mouth="ooo",
+                mouth_open=0.3 * t,
+            )
+        )
+    for i in range(14):
+        t = i / 13
+        open_amt = 0.65 + 0.35 * math.sin(t * math.pi)
+        frames.append(
+            draw_mascot(
+                eye_open=0.35 - 0.2 * math.sin(t * math.pi),
+                brow_dy=10,
+                brow_curve=6,
+                mouth="ooo",
+                mouth_open=open_amt,
+                scale=1.0 + 0.02 * math.sin(t * math.pi),
+                ant_l=-6,
+                ant_r=6,
+            )
+        )
+    for i in range(8):
+        t = ease_in_out(i / 7)
+        frames.append(
+            draw_mascot(
+                eye_open=0.35 + 0.65 * t,
+                brow_dy=10 * (1 - t),
+                mouth="ooo" if t < 0.4 else "smile",
+                mouth_open=0.65 * (1 - t),
+            )
+        )
+    # little blink after yawn
+    for open_amt in (0.4, 0.08, 0.5, 1.0):
+        frames.append(draw_mascot(eye_open=open_amt, mouth="smile"))
+    save_gif(frames, "yawn", duration=55)
+
+
+def gif_heartbeat() -> None:
+    """Soft scale pulse — calm presence idle."""
+    frames = []
+    n = 28
+    for i in range(n):
+        t = i / n
+        # lub-dub: two quick peaks then rest
+        lub = max(0.0, math.sin(t * math.pi * 2))
+        dub = max(0.0, math.sin((t - 0.18) * math.pi * 2)) * 0.55
+        beat = lub + dub
+        if t > 0.45:
+            beat *= max(0.0, 1.0 - (t - 0.45) / 0.55)
+        frames.append(
+            draw_mascot(
+                scale=1.0 + 0.05 * beat,
+                oy=-4 * beat,
+                mouth="smile",
+                blush=0.15 + 0.35 * beat,
+                ant_l=4 * beat,
+                ant_r=-4 * beat,
+            )
+        )
+    save_gif(frames, "heartbeat", duration=50)
+
+
 def main() -> None:
     print(f"render {OUT_SIZE}px @ {SS}x supersample ({DRAW_SIZE}px draw) → gif")
     gif_blink()
@@ -581,6 +888,15 @@ def main() -> None:
     gif_think()
     gif_spin()
     gif_sleep()
+    gif_wink()
+    gif_nod()
+    gif_shake()
+    gif_surprise()
+    gif_float()
+    gif_dance()
+    gif_curious()
+    gif_yawn()
+    gif_heartbeat()
     print("done")
 
 

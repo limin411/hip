@@ -70,4 +70,14 @@ describe('MascotActor', () => {
       'happy',
     )
   })
+
+  it('honors initialAction for the first clip', () => {
+    const { container } = render(<MascotActor initialAction="curious" />)
+    expect(container.querySelector('[data-mascot-action]')).toHaveAttribute(
+      'data-mascot-action',
+      'curious',
+    )
+    const img = container.querySelector('img')
+    expect(img?.getAttribute('src')).toMatch(/gif\/curious\.gif/)
+  })
 })

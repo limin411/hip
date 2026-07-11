@@ -4,35 +4,65 @@ import { HipLogo } from '@/components/login/HipLogo'
 export type MascotAction =
   | 'blink'
   | 'bounce'
+  | 'curious'
+  | 'dance'
+  | 'float'
   | 'happy'
+  | 'heartbeat'
   | 'look-around'
+  | 'nod'
+  | 'shake'
   | 'sleep'
+  | 'surprise'
   | 'think'
   | 'tilt'
   | 'wave'
+  | 'wink'
+  | 'yawn'
 
 /** Approximate clip lengths from public/gif (ms). */
 const ACTION_MS: Record<MascotAction, number> = {
   blink: 2400,
   bounce: 1000,
+  curious: 1600,
+  dance: 1300,
+  float: 2000,
   happy: 1300,
+  heartbeat: 1400,
   'look-around': 3400,
+  nod: 1300,
+  shake: 1200,
   sleep: 2900,
+  surprise: 1500,
   think: 1900,
   tilt: 1000,
   wave: 1200,
+  wink: 1450,
+  yawn: 1900,
 }
 
+/** Weighted idle pool — calm motions more often than big reactions. */
 const IDLE_POOL: MascotAction[] = [
   'blink',
   'blink',
+  'blink',
+  'float',
+  'float',
+  'look-around',
   'look-around',
   'tilt',
   'think',
-  'blink',
+  'wink',
+  'nod',
+  'curious',
+  'heartbeat',
+  'bounce',
+  'yawn',
+  'dance',
+  'sleep',
 ]
 
-const GAP_MS = [1800, 2800, 3500] as const
+const GAP_MS = [1600, 2400, 3200, 4000] as const
 
 function gifUrl(action: MascotAction, bust = false): string {
   const base = import.meta.env.BASE_URL ?? '/'
@@ -57,20 +87,28 @@ function pickGap(): number {
 interface MascotActorProps {
   size?: number
   className?: string
-  /** When true, play `happy` once then return to idle. */
+  /** When true, play a cheer clip once then return to idle. */
   cheer?: boolean
+  /** First clip before the idle loop (default: wave). */
+  initialAction?: MascotAction
 }
 
 /**
  * Cycles mascot action GIFs from `public/gif`. Falls back to static HipLogo
  * when the user prefers reduced motion.
  */
-export function MascotActor({ size = 280, className, cheer }: MascotActorProps) {
+export function MascotActor({
+  size = 280,
+  className,
+  cheer,
+  initialAction = 'wave',
+}: MascotActorProps) {
   const [reduced, setReduced] = useState(prefersReducedMotion)
-  const [src, setSrc] = useState(() => gifUrl('wave'))
-  const [action, setAction] = useState<MascotAction>('wave')
+  const [src, setSrc] = useState(() => gifUrl(initialAction))
+  const [action, setAction] = useState<MascotAction>(initialAction)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const modeRef = useRef<'auto' | 'oneshot'>('auto')
+  const initialRef = useRef(initialAction)
 
   const clearTimer = useCallback(() => {
     if (timerRef.current != null) {
@@ -98,7 +136,7 @@ export function MascotActor({ size = 280, className, cheer }: MascotActorProps) 
     [clearTimer, play],
   )
 
-  // Initial wave → idle loop
+  // Initial greeting → idle loop
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
     const onChange = () => setReduced(Boolean(mq?.matches))
@@ -109,9 +147,10 @@ export function MascotActor({ size = 280, className, cheer }: MascotActorProps) 
       return () => mq?.removeEventListener?.('change', onChange)
     }
 
+    const start = initialRef.current
     modeRef.current = 'auto'
-    play('wave')
-    scheduleIdle(ACTION_MS.wave + 600)
+    play(start)
+    scheduleIdle(ACTION_MS[start] + 600)
 
     return () => {
       clearTimer()

@@ -11,7 +11,12 @@ import { getMemoryCoreBudget, getMemoryPrefetchBudget } from './budget.js'
 import { redactSecrets } from './redact.js'
 import { scanMemoryContent } from './threat-scan.js'
 import { resolveProjectKey } from './project-key.js'
-import type { MemoryListFilter, MemorySearchOpts, MemoryStore } from './store.js'
+import type {
+  MemoryListFilter,
+  MemorySearchOpts,
+  MemorySearchInScopesOpts,
+  MemoryStore,
+} from './store.js'
 
 export type MemoryUpsertInput = Partial<MemoryItem> &
   Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>
@@ -168,8 +173,24 @@ export class MemoryService {
     return item
   }
 
+  getItem(id: string): MemoryItem | undefined {
+    return this.store.getItem(id)
+  }
+
   search(query: string, opts?: MemorySearchOpts): MemoryItem[] {
     return this.store.search(query, opts)
+  }
+
+  searchInScopes(query: string, opts?: MemorySearchInScopesOpts): MemoryItem[] {
+    return this.store.searchInScopes(query, opts)
+  }
+
+  softDelete(id: string): boolean {
+    return this.store.softDelete(id)
+  }
+
+  hardDelete(id: string): boolean {
+    return this.store.hardDelete(id)
   }
 
   exportJsonl(filter: MemoryListFilter = {}): string {

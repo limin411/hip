@@ -16,6 +16,7 @@ export {
   type MemoryUpsertInput,
   type MemoryImportConflict,
 } from './service.js'
+export { buildMemoryTools } from './tools.js'
 export {
   MemoryInjector,
   refreshMemoryCoreSnapshot,

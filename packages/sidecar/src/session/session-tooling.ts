@@ -16,6 +16,8 @@ import { buildGoalTools } from './tools/goal.js'
 import type { CronManager } from './cron.js'
 import { buildCronTools } from './cron.js'
 import type { PlanMode } from './plan-mode.js'
+import type { MemoryService } from '../memory/service.js'
+import { buildMemoryTools } from '../memory/tools.js'
 export interface SessionTooling {
   tools: StructuredToolInterface[]
   toolRunner: ToolRunner
@@ -50,6 +52,8 @@ export interface BuildSessionToolingInput {
   goalManager?: GoalManager
   cronManager?: CronManager
   planMode?: PlanMode
+  memoryService?: MemoryService
+  useMemories?: boolean
 }
 
 export async function buildSessionTooling(input: BuildSessionToolingInput): Promise<SessionTooling> {
@@ -91,6 +95,16 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
   if (input.cronManager) {
     const cronTools = buildCronTools(input.cronManager)
     for (const t of cronTools) {
+      registry.register(t)
+    }
+  }
+  if (input.useMemories && input.memoryService) {
+    const memoryTools = buildMemoryTools(input.memoryService, {
+      sessionId: input.sessionId,
+      cwd: input.cwd,
+      defaultScope: input.memoryService.getConfig().defaultScope,
+    })
+    for (const t of memoryTools) {
       registry.register(t)
     }
   }

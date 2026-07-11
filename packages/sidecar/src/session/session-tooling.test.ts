@@ -6,6 +6,10 @@ import { SessionApprovalCache } from './tool-runner/approval-cache.js'
 import { HookRegistry } from './hooks/registry.js'
 import { buildSessionTooling } from './session-tooling.js'
 import { NetworkPolicy } from './network-policy.js'
+import { openDatabase } from '../persistence/open.js'
+import { MemoryStore } from '../memory/store.js'
+import { MemoryService } from '../memory/service.js'
+import { buildTools } from './tools.js'
 
 const reconciledConfigs: McpServerConfig[] = []
 const deregisteredScopes: unknown[] = []
@@ -124,5 +128,38 @@ describe('buildSessionTooling', () => {
     expect(deregisteredScopes).toHaveLength(0)
     tooling.cleanup()
     expect(deregisteredScopes).toHaveLength(1)
+  })
+
+  it('omits memory_* tools when useMemories is false', async () => {
+    const { db, memoriesFtsEnabled } = openDatabase(':memory:')
+    const memoryService = new MemoryService(new MemoryStore(db, memoriesFtsEnabled))
+    const tooling = await buildSessionTooling({
+      ...baseInput(),
+      memoryService,
+      useMemories: false,
+    })
+    const names = tooling.tools.map((t) => t.name)
+    expect(names.filter((n) => n.startsWith('memory_'))).toEqual([])
+  })
+
+  it('registers memory_* tools when useMemories and memoryService are set', async () => {
+    const { db, memoriesFtsEnabled } = openDatabase(':memory:')
+    const memoryService = new MemoryService(new MemoryStore(db, memoriesFtsEnabled))
+    const tooling = await buildSessionTooling({
+      ...baseInput(),
+      memoryService,
+      useMemories: true,
+    })
+    const names = tooling.tools.map((t) => t.name)
+    expect(names).toContain('memory_search')
+    expect(names).toContain('memory_add')
+    expect(names).toContain('memory_replace')
+    expect(names).toContain('memory_remove')
+  })
+
+  it('subagent buildTools path does not include memory_* tools', () => {
+    // Subagents call buildTools(...) and never go through buildSessionTooling.
+    const names = buildTools('/tmp/project').map((t) => t.name)
+    expect(names.filter((n) => n.startsWith('memory_'))).toEqual([])
   })
 })

@@ -843,6 +843,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       goalManager: host.goalManager,
       cronManager: host.cronManager,
       planMode,
+      memoryService: host.memoryService,
+      useMemories,
     })
     logDebug('session', 'phase:toolingDone', { sessionId: host.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
     // After reconcile: status reflects actual connection state

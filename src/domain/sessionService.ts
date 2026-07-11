@@ -844,13 +844,17 @@ export class SessionService {
     })
   }
 
-  /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */
-  requestDiff(sessionId: string, base?: DiffBase): void {
+  /**
+   * Pull the workspace diff.
+   * In-flight dedupe: a second request while loading is dropped (`'deduped'`).
+   */
+  requestDiff(sessionId: string, base?: DiffBase): 'sent' | 'deduped' {
     const cur = useDiffStore.getState().bySession[sessionId]
-    if (cur?.status === 'loading') return
+    if (cur?.status === 'loading') return 'deduped'
     const b = base ?? cur?.base ?? 'session-start'
     useDiffStore.getState().setLoading(sessionId)
     this.transport.send({ type: 'fs:diff', sessionId, base: b })
+    return 'sent'
   }
 
   /** Request a single file's full diff (for on-demand show-full). */

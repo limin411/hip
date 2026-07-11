@@ -60,10 +60,21 @@ export function filterCommands(
     .map((s) => s.cmd)
 }
 
+/** Missing map entry → enabled (align with command-palette registry). */
+export function isSkillListed(id: string, enabled?: Record<string, boolean>): boolean {
+  if (!enabled) return true
+  return enabled[id] !== false
+}
+
 /** Pure: build the full command list from skills, etc. */
 export function buildCommandList(
   skills?: SkillMeta[],
-  opts?: { surface?: ComposerSurface; sessionId?: string | null },
+  opts?: {
+    surface?: ComposerSurface
+    sessionId?: string | null
+    /** Skill id → enabled; missing key means enabled. */
+    skillsEnabled?: Record<string, boolean>
+  },
 ): SlashCommand[] {
   const surface = opts?.surface ?? 'chat'
   const sessionId = opts?.sessionId ?? null
@@ -74,6 +85,7 @@ export function buildCommandList(
   })
   if (skills) {
     for (const s of skills) {
+      if (!isSkillListed(s.id, opts?.skillsEnabled)) continue
       out.push({
         id: s.id,
         name: s.name,
@@ -98,6 +110,7 @@ interface SlashCommandPaletteProps {
   surface: ComposerSurface
   sessionId?: string | null
   skills?: SkillMeta[]
+  skillsEnabled?: Record<string, boolean>
   onSelect: (command: SlashCommand) => void
   onDismiss?: () => void
 }
@@ -107,10 +120,21 @@ interface SlashCommandPaletteProps {
  * Shows built-in commands, skill names, and (future) MCP prompts.
  * Filterable as the user types; Enter/click selects a command.
  */
-export function SlashCommandPalette({ value, surface, sessionId, skills, onSelect, onDismiss }: SlashCommandPaletteProps) {
+export function SlashCommandPalette({
+  value,
+  surface,
+  sessionId,
+  skills,
+  skillsEnabled,
+  onSelect,
+  onDismiss,
+}: SlashCommandPaletteProps) {
   const { t } = useTranslation()
   const query = useMemo(() => extractSlashQuery(value), [value])
-  const commands = useMemo(() => buildCommandList(skills, { surface, sessionId }), [skills, surface, sessionId])
+  const commands = useMemo(
+    () => buildCommandList(skills, { surface, sessionId, skillsEnabled }),
+    [skills, skillsEnabled, surface, sessionId],
+  )
   const filtered = useMemo(
     () => (query !== null ? filterCommands(commands, query) : []),
     [commands, query],

@@ -6,10 +6,12 @@ import {
   setIncognito,
   showMemoryStatus,
   formatMemoryStatusBody,
+  toastMemoryFlagChange,
 } from './memoryActions'
 import { sessionService } from '../sessionService'
 import { useDomainStore } from '../sessionStore'
 import { useUiStore } from '@/store/uiStore'
+import '@/i18n'
 
 const toastMessage = vi.fn()
 vi.mock('sonner', () => ({
@@ -41,6 +43,18 @@ describe('memoryActions', () => {
     setIncognito('s1')
     expect(spy).toHaveBeenCalledWith('s1', { incognito: true })
     spy.mockRestore()
+  })
+
+  it('setIncognito(false) exits incognito', () => {
+    const spy = vi.spyOn(sessionService, 'setMemoryFlags').mockReturnValue(undefined)
+    setIncognito('s1', false)
+    expect(spy).toHaveBeenCalledWith('s1', { incognito: false })
+    spy.mockRestore()
+  })
+
+  it('toastMemoryFlagChange shows a message', () => {
+    toastMemoryFlagChange('useOn')
+    expect(toastMessage).toHaveBeenCalled()
   })
 
   it('formatMemoryStatusBody reads session flags', () => {

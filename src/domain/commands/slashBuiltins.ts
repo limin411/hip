@@ -63,7 +63,7 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
   {
     id: 'memory-on',
     name: 'memory-on',
-    description: 'Enable memories for this session',
+    description: 'Enable memory injection for this session',
     kind: 'builtin',
     availableIn: ['chat', 'code'],
     requiresSession: true,
@@ -71,7 +71,7 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
   {
     id: 'memory-off',
     name: 'memory-off',
-    description: 'Disable memories for this session',
+    description: 'Disable memory injection for this session',
     kind: 'builtin',
     availableIn: ['chat', 'code'],
     requiresSession: true,
@@ -80,6 +80,14 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
     id: 'memory-incognito',
     name: 'memory-incognito',
     description: 'Incognito: no memory inject/extract this session',
+    kind: 'builtin',
+    availableIn: ['chat', 'code'],
+    requiresSession: true,
+  },
+  {
+    id: 'memory-incognito-off',
+    name: 'memory-incognito-off',
+    description: 'Exit incognito memory for this session',
     kind: 'builtin',
     availableIn: ['chat', 'code'],
     requiresSession: true,

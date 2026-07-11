@@ -11,6 +11,7 @@ import {
   runInit,
   setIncognito,
   setUseMemories,
+  toastMemoryFlagChange,
   formatMemoryStatusBody,
   showMemoryStatus,
 } from '@/domain/commands'
@@ -25,6 +26,8 @@ import {
 export interface UseSlashCommandHandlerOptions {
   sessionId: string | null
   skills: SkillMeta[]
+  /** Skill id → enabled; missing key means enabled. */
+  skillsEnabled?: Record<string, boolean>
   value: string
   setText: (value: string) => void
   inputRef: React.RefObject<HTMLTextAreaElement | null>
@@ -63,11 +66,11 @@ export function useSlashCommandHandler(
   options: UseSlashCommandHandlerOptions,
 ) {
   const { t } = useTranslation()
-  const { sessionId, skills, value, setText, inputRef, onDismiss } = options
+  const { sessionId, skills, skillsEnabled, value, setText, inputRef, onDismiss } = options
 
   const availableCommands = useMemo(
-    () => buildCommandList(skills, { surface, sessionId }),
-    [skills, surface, sessionId],
+    () => buildCommandList(skills, { surface, sessionId, skillsEnabled }),
+    [skills, skillsEnabled, surface, sessionId],
   )
 
   const focusInput = useCallback(() => {
@@ -137,19 +140,37 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'memory-on') {
-          if (sessionId) setUseMemories(sessionId, true)
+          if (sessionId) {
+            setUseMemories(sessionId, true)
+            toastMemoryFlagChange('useOn')
+          }
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-off') {
-          if (sessionId) setUseMemories(sessionId, false)
+          if (sessionId) {
+            setUseMemories(sessionId, false)
+            toastMemoryFlagChange('useOff')
+          }
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-incognito') {
-          if (sessionId) setIncognito(sessionId, true)
+          if (sessionId) {
+            setIncognito(sessionId, true)
+            toastMemoryFlagChange('incognitoOn')
+          }
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'memory-incognito-off') {
+          if (sessionId) {
+            setIncognito(sessionId, false)
+            toastMemoryFlagChange('incognitoOff')
+          }
           setText('')
           focusInput()
           return

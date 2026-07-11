@@ -617,8 +617,21 @@ describe('buildCommandList surface filtering', () => {
       'memory-on',
       'memory-off',
       'memory-incognito',
+      'memory-incognito-off',
       'memory-status',
     ])
+  })
+
+  it('excludes disabled skills from the list', () => {
+    const list = buildCommandList(
+      [
+        { id: 'on', name: 'on', description: 'on', dir: '/t', hasScripts: false },
+        { id: 'off', name: 'off', description: 'off', dir: '/t', hasScripts: false },
+      ],
+      { surface: 'chat', sessionId: 's1', skillsEnabled: { off: false } },
+    )
+    expect(list.map((c) => c.name)).toContain('on')
+    expect(list.map((c) => c.name)).not.toContain('off')
   })
 
   it('includes all builtins in code surface with a session', () => {

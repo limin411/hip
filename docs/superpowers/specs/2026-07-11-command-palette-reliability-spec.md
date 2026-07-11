@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-11 |
-| 状态 | **Draft — 待评审** |
+| 状态 | **Implemented** |
 | 范围 | ⌘K `GlobalCommandPalette` + 共享 `domain/commands` 路径；slash 与 palette 对齐处一并修 |
 | 前置 | P0–P2 命令面板能力已合入；`/compact` 完整修复已合入（`ee0ae8a`） |
 | 现状代码 | `src/components/command-palette/*`、`src/domain/commands/*`、`src/routes/AppLayout.tsx`、`src/components/chat/InputBar.tsx` |

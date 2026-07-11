@@ -16,10 +16,12 @@ import { CommandRow } from './components/CommandRow'
 import { PaletteFooter } from './components/PaletteFooter'
 import { buildFavoritesGroup, flattenVisibleItems } from './favorites'
 import { loadFavorites, toggleFavorite } from './favoritesStore'
+import { flattenHotkeyItems, hotkeyIndexForId } from './hotkeyItems'
 import { detectIsMac } from './keys'
 import { filterGroupsByMode, parsePaletteQuery } from './queryPrefix'
 import { rankGroups } from './rankGlobalCommands'
 import { buildAllGroups } from './registry'
+import { resolvePaletteSessionId } from './sessionResolve'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
 import type { GlobalCommand } from './types'
 import { loadCommandUsage, recordCommandUsage } from './usageStore'
@@ -36,6 +38,7 @@ export function GlobalCommandPalette() {
   const setPage = useCommandPaletteStore((s) => s.setPage)
   const sessions = useSessions()
   const skills = useSkillsStore((s) => s.skills)
+  const skillsEnabled = useSkillsStore((s) => s.enabled)
   const activeView = useUiStore((s) => s.activeView)
   const theme = useUiStore((s) => s.theme)
   const chatSessionId = useUiStore((s) => s.chatSessionId)
@@ -49,8 +52,7 @@ export function GlobalCommandPalette() {
   const [favTick, setFavTick] = useState(0)
   const isMac = useMemo(() => detectIsMac(), [])
 
-  const sessionId =
-    activeView === 'code' ? codeSessionId : activeView === 'chat' ? chatSessionId : null
+  const sessionId = resolvePaletteSessionId(activeView, chatSessionId, codeSessionId)
 
   const parsed = useMemo(() => parsePaletteQuery(search), [search])
 
@@ -98,6 +100,7 @@ export function GlobalCommandPalette() {
         memoryOn: t('commandPalette.context.memoryOn'),
         memoryOff: t('commandPalette.context.memoryOff'),
         memoryIncognito: t('commandPalette.context.memoryIncognito'),
+        memoryIncognitoOff: t('commandPalette.context.memoryIncognitoOff'),
         memoryStatus: t('commandPalette.context.memoryStatus'),
       },
     }),
@@ -127,6 +130,7 @@ export function GlobalCommandPalette() {
       isMac,
       search: parsed.needle,
       skills,
+      skillsEnabled,
     }),
     [
       sessions,
@@ -141,6 +145,7 @@ export function GlobalCommandPalette() {
       isMac,
       parsed.needle,
       skills,
+      skillsEnabled,
     ],
   )
 
@@ -176,6 +181,8 @@ export function GlobalCommandPalette() {
   )
 
   const flatItems = useMemo(() => flattenVisibleItems(visible), [visible])
+  /** Runnable rows for ⌘1–9 (excludes nested `to`) — same list for display and keydown. */
+  const hotkeyItems = useMemo(() => flattenHotkeyItems(visible), [visible])
   const hasItems = flatItems.length > 0
 
   const goBack = () => {
@@ -197,7 +204,7 @@ export function GlobalCommandPalette() {
     }
   }
 
-  // ⌘1–⌘9 run first nine visible rows while palette is open.
+  // ⌘1–⌘9 run first nine hotkey-eligible rows (same order as displayed ⌘n badges).
   useEffect(() => {
     if (!open || page) return
     const onKey = (e: KeyboardEvent) => {
@@ -206,7 +213,7 @@ export function GlobalCommandPalette() {
       if (!mod || e.shiftKey || e.altKey) return
       const n = Number(e.key)
       if (!Number.isInteger(n) || n < 1 || n > 9) return
-      const item = flatItems[n - 1]
+      const item = hotkeyItems[n - 1]
       if (!item) return
       e.preventDefault()
       e.stopPropagation()
@@ -214,17 +221,15 @@ export function GlobalCommandPalette() {
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-    // handleSelect closes over latest flatItems via effect deps
+    // handleSelect closes over latest hotkeyItems via effect deps
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebind when list changes
-  }, [open, page, flatItems])
+  }, [open, page, hotkeyItems])
 
   const pageTitle =
     page === 'theme' ? t('commandPalette.groups.theme') : page ?? ''
 
   const highlightNeedle = parsed.needle
   const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds])
-
-  let hotkeyCounter = 0
 
   return (
     <>
@@ -304,10 +309,7 @@ export function GlobalCommandPalette() {
                     className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-tertiary"
                   >
                     {group.items.map((item) => {
-                      const idx =
-                        !page && !item.to && hotkeyCounter < 9
-                          ? ++hotkeyCounter
-                          : undefined
+                      const idx = !page ? hotkeyIndexForId(hotkeyItems, item.id) : undefined
                       return (
                         <Command.Item
                           key={item.id}

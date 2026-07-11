@@ -36,7 +36,10 @@ export function buildFavoritesGroup(
   return { id: 'favorites', heading, items }
 }
 
-/** Flat list of runnable visible items (for ⌘1–9). */
+/**
+ * Flat list of every visible row (including nested `to` entries).
+ * For ⌘1–⌘9 use `flattenHotkeyItems` instead — it skips `to` so indices match the UI.
+ */
 export function flattenVisibleItems(groups: PaletteGroup[]): GlobalCommand[] {
   const out: GlobalCommand[] = []
   for (const g of groups) {

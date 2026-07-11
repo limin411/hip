@@ -45,6 +45,7 @@ const labels: GlobalCommandLabels = {
     memoryOn: 'Enable memories',
     memoryOff: 'Disable memories',
     memoryIncognito: 'Incognito memory',
+    memoryIncognitoOff: 'Exit incognito',
     memoryStatus: 'Memory status',
   },
 }

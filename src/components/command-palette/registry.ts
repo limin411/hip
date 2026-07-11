@@ -2,9 +2,10 @@ import type { GlobalCommandContext, PaletteGroup } from './buildGlobalCommands'
 import { buildGlobalCommandGroups } from './buildGlobalCommands'
 import type { GlobalCommand } from './types'
 import type { SkillMeta } from '@hip/protocol'
-import { goSettingsPage } from '@/domain/commands'
 import { insertComposerText } from './composerBridge'
 import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
+import i18n from '@/i18n'
+import { toast } from 'sonner'
 
 export type CommandProvider = (ctx: GlobalCommandContext) => PaletteGroup[]
 
@@ -50,9 +51,15 @@ function mergeGroups(base: PaletteGroup[], extra: PaletteGroup[]): PaletteGroup[
   return order.map((k) => byKey.get(k)!).filter(Boolean)
 }
 
+/** Missing map entry → enabled (same default as settings UI). */
+export function isSkillEnabled(id: string, enabled?: Record<string, boolean>): boolean {
+  if (!enabled) return true
+  return enabled[id] !== false
+}
+
 /**
  * Skills appear when searching or when mode is `@` (skills-only).
- * Prefer composer insert; fall back to Skills settings.
+ * Prefer composer insert; if no inserter, toast — never silent-open Settings.
  */
 export function skillsCommandProvider(
   ctx: GlobalCommandContext,
@@ -60,7 +67,7 @@ export function skillsCommandProvider(
 ): PaletteGroup[] {
   const search = (ctx.search ?? '').trim()
   if (!search && !opts?.force) return []
-  const skills = ctx.skills ?? []
+  const skills = (ctx.skills ?? []).filter((s) => isSkillEnabled(s.id, ctx.skillsEnabled))
   if (skills.length === 0) return []
 
   const items: GlobalCommand[] = skills.map((s) => ({
@@ -72,9 +79,8 @@ export function skillsCommandProvider(
     group: 'skills' as const,
     run: () => {
       const text = `/${s.name} `
-      if (!insertComposerText(text)) {
-        goSettingsPage('skill')
-      }
+      if (insertComposerText(text)) return
+      toast.message(i18n.t('commandPalette.skills.needComposer'))
     },
   }))
 

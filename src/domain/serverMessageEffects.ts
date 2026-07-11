@@ -137,6 +137,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       if (msg.ok) {
         deps.requestDiff(msg.sessionId)
         deps.requestCheckpoints(msg.sessionId)
+        toast.success(i18n.t('chat.init.success'))
       } else {
         useDiffStore.getState().setResult(msg.sessionId, {
           state: 'not_a_repo',
@@ -144,6 +145,12 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           hasSessionStart: false,
           error: msg.error,
         })
+        const err = msg.error ?? 'unknown'
+        if (err === 'no_workspace') {
+          toast.error(i18n.t('chat.init.noWorkspace'))
+        } else {
+          toast.error(i18n.t('chat.init.failed', { error: err }))
+        }
       }
       return
 

@@ -40,7 +40,14 @@ export function InputBar() {
   const reconnecting = status === 'running' && connection !== 'connected'
 
   const allSkills = useSkillsStore((s) => s.skills)
-  const skills = useMemo(() => allSkills.filter((sk) => sk.userInvocable !== false), [allSkills])
+  const skillsEnabled = useSkillsStore((s) => s.enabled) ?? {}
+  const skills = useMemo(
+    () =>
+      allSkills.filter(
+        (sk) => sk.userInvocable !== false && skillsEnabled[sk.id] !== false,
+      ),
+    [allSkills, skillsEnabled],
+  )
   const query = useMemo(() => extractSlashQuery(value), [value])
   const invocation = useMemo(() => extractSkillInvocation(value), [value])
   const selectedSkill = useMemo(() => {
@@ -80,6 +87,7 @@ export function InputBar() {
   const { handleCommandSelect, handleDismiss } = useSlashCommandHandler(surface, {
     sessionId: activeId,
     skills,
+    skillsEnabled,
     value,
     setText: setValue,
     inputRef,
@@ -125,7 +133,15 @@ export function InputBar() {
         ) : (
             <div className="relative">
               {query !== null && (
-                <SlashCommandPalette value={value} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
+                <SlashCommandPalette
+                  value={value}
+                  surface={surface}
+                  sessionId={activeId}
+                  skills={skills}
+                  skillsEnabled={skillsEnabled}
+                  onSelect={handleCommandSelect}
+                  onDismiss={handleDismiss}
+                />
               )}
               <Composer
                 value={value}

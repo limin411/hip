@@ -11,6 +11,7 @@ import {
   setIncognito,
   setUseMemories,
   showMemoryStatus,
+  toastMemoryFlagChange,
 } from '@/domain/commands'
 import type { CommandWhen, GlobalCommand, PaletteGroup } from './types'
 
@@ -53,6 +54,7 @@ export type GlobalCommandLabels = {
     memoryOn: string
     memoryOff: string
     memoryIncognito: string
+    memoryIncognitoOff: string
     memoryStatus: string
   }
 }
@@ -80,6 +82,8 @@ export type GlobalCommandContext = {
   search?: string
   /** Installed skills for search-time provider. */
   skills?: SkillMeta[]
+  /** Skill id → enabled; missing key means enabled. */
+  skillsEnabled?: Record<string, boolean>
 }
 
 /** Source cap for search-time session list. */
@@ -309,7 +313,7 @@ export function buildGlobalCommandGroups(
       icon: 'git-branch',
       keywords: ['diff', 'changes', '变更', '變更'],
       group: 'context',
-      when: { views: ['code'], requiresSession: true },
+      when: { requiresSession: true },
       contextBoost: 0.1,
       run: () => {
         if (ctx.sessionId) runDiff(ctx.sessionId)
@@ -321,7 +325,7 @@ export function buildGlobalCommandGroups(
       icon: 'package',
       keywords: ['compact', 'summarize', '压缩', '壓縮'],
       group: 'context',
-      when: { views: ['chat', 'code'], requiresSession: true },
+      when: { requiresSession: true },
       contextBoost: 0.1,
       run: () => {
         if (ctx.sessionId) runCompact(ctx.sessionId)
@@ -333,7 +337,7 @@ export function buildGlobalCommandGroups(
       icon: 'sparkles',
       keywords: ['init', 'initialize', 'project', '初始化'],
       group: 'context',
-      when: { views: ['code'], requiresSession: true },
+      when: { requiresSession: true },
       contextBoost: 0.1,
       run: () => {
         if (ctx.sessionId) runInit(ctx.sessionId)
@@ -351,11 +355,13 @@ export function buildGlobalCommandGroups(
       id: 'ctx-memory-on',
       label: labels.context.memoryOn,
       icon: 'brain',
-      keywords: ['memory', 'enable', 'on', '记忆', '記憶'],
+      keywords: ['memory', 'enable', 'on', 'inject', '记忆', '記憶'],
       group: 'context',
       when: { requiresSession: true },
       run: () => {
-        if (ctx.sessionId) setUseMemories(ctx.sessionId, true)
+        if (!ctx.sessionId) return
+        setUseMemories(ctx.sessionId, true)
+        toastMemoryFlagChange('useOn')
       },
     },
     {
@@ -366,7 +372,9 @@ export function buildGlobalCommandGroups(
       group: 'context',
       when: { requiresSession: true },
       run: () => {
-        if (ctx.sessionId) setUseMemories(ctx.sessionId, false)
+        if (!ctx.sessionId) return
+        setUseMemories(ctx.sessionId, false)
+        toastMemoryFlagChange('useOff')
       },
     },
     {
@@ -377,7 +385,22 @@ export function buildGlobalCommandGroups(
       group: 'context',
       when: { requiresSession: true },
       run: () => {
-        if (ctx.sessionId) setIncognito(ctx.sessionId, true)
+        if (!ctx.sessionId) return
+        setIncognito(ctx.sessionId, true)
+        toastMemoryFlagChange('incognitoOn')
+      },
+    },
+    {
+      id: 'ctx-memory-incognito-off',
+      label: labels.context.memoryIncognitoOff,
+      icon: 'brain',
+      keywords: ['memory', 'incognito', 'exit', '退出隐身', '退出隱身'],
+      group: 'context',
+      when: { requiresSession: true },
+      run: () => {
+        if (!ctx.sessionId) return
+        setIncognito(ctx.sessionId, false)
+        toastMemoryFlagChange('incognitoOff')
       },
     },
     {

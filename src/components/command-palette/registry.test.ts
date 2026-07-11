@@ -45,6 +45,7 @@ const labels: GlobalCommandLabels = {
     memoryOn: 'Enable memories',
     memoryOff: 'Disable memories',
     memoryIncognito: 'Incognito memory',
+    memoryIncognitoOff: 'Exit incognito',
     memoryStatus: 'Memory status',
   },
 }
@@ -122,5 +123,21 @@ describe('registry', () => {
     expect(groups[0]?.items[0]?.id).toBe('skill-pdf')
     groups[0]?.items[0]?.run?.()
     expect(insert).toHaveBeenCalledWith('/pdf ')
+  })
+
+  it('skills provider excludes disabled skills', () => {
+    const groups = skillsCommandProvider(
+      makeCtx({
+        search: 'pdf',
+        skills: [
+          { id: 'pdf', name: 'pdf', description: 'PDF', dir: '/tmp/pdf', hasScripts: false },
+          { id: 'off', name: 'off', description: 'Off', dir: '/tmp/off', hasScripts: false },
+        ],
+        skillsEnabled: { off: false },
+      }),
+    )
+    const ids = groups[0]?.items.map((i) => i.id) ?? []
+    expect(ids).toContain('skill-pdf')
+    expect(ids).not.toContain('skill-off')
   })
 })

@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import i18n from '@/i18n'
 import { sessionService } from '../sessionService'
 import { useDomainStore } from '../sessionStore'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
@@ -19,6 +20,21 @@ export function setUseMemories(sessionId: string, on: boolean): void {
 
 export function setIncognito(sessionId: string, on = true): void {
   sessionService.setMemoryFlags(sessionId, { incognito: on })
+}
+
+export type MemoryFlagToastKind = 'useOn' | 'useOff' | 'incognitoOn' | 'incognitoOff'
+
+/** Short confirmation after a memory flag change (palette / slash). */
+export function toastMemoryFlagChange(kind: MemoryFlagToastKind): void {
+  const key =
+    kind === 'useOn'
+      ? 'chat.memory.enabled'
+      : kind === 'useOff'
+        ? 'chat.memory.disabled'
+        : kind === 'incognitoOn'
+          ? 'chat.memory.incognitoOn'
+          : 'chat.memory.incognitoOff'
+  toast.message(i18n.t(key))
 }
 
 export function formatMemoryStatusBody(sessionId: string): {

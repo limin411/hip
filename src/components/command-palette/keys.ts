@@ -1,6 +1,12 @@
 export type KeybindHelpLabelKey =
   | 'commandPalette.shortcuts.openPalette'
   | 'commandPalette.shortcuts.slash'
+  | 'commandPalette.shortcuts.hotkeys'
+  | 'commandPalette.shortcuts.prefixCmd'
+  | 'commandPalette.shortcuts.prefixSess'
+  | 'commandPalette.shortcuts.prefixSkill'
+  | 'commandPalette.shortcuts.favorite'
+  | 'commandPalette.shortcuts.nestEsc'
 
 export type KeybindHelpEntry = {
   id: string
@@ -20,6 +26,36 @@ export function getKeybindHelp(isMac: boolean): KeybindHelpEntry[] {
       id: 'slash',
       combo: '/',
       labelKey: 'commandPalette.shortcuts.slash',
+    },
+    {
+      id: 'hotkeys',
+      combo: `${mod}1–${mod}9`,
+      labelKey: 'commandPalette.shortcuts.hotkeys',
+    },
+    {
+      id: 'prefix-cmd',
+      combo: '>',
+      labelKey: 'commandPalette.shortcuts.prefixCmd',
+    },
+    {
+      id: 'prefix-sess',
+      combo: '#',
+      labelKey: 'commandPalette.shortcuts.prefixSess',
+    },
+    {
+      id: 'prefix-skill',
+      combo: '@',
+      labelKey: 'commandPalette.shortcuts.prefixSkill',
+    },
+    {
+      id: 'favorite',
+      combo: '☆',
+      labelKey: 'commandPalette.shortcuts.favorite',
+    },
+    {
+      id: 'nest-esc',
+      combo: 'Esc',
+      labelKey: 'commandPalette.shortcuts.nestEsc',
     },
   ]
 }

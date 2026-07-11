@@ -7,8 +7,15 @@ import { useUiStore } from '@/store/uiStore'
 import type { WorkflowDef } from '@hip/protocol'
 import '@/i18n'
 
+const toastSuccess = vi.fn()
+const toastError = vi.fn()
+const toastMessage = vi.fn()
 vi.mock('sonner', () => ({
-  toast: { message: vi.fn(), error: vi.fn() },
+  toast: {
+    message: (...a: unknown[]) => toastMessage(...a),
+    error: (...a: unknown[]) => toastError(...a),
+    success: (...a: unknown[]) => toastSuccess(...a),
+  },
   Toaster: () => null,
 }))
 
@@ -103,6 +110,28 @@ describe('applyServerMessageEffects', () => {
     expect(msgs).toHaveLength(1)
     expect(msgs[0].content.toLowerCase()).toContain('nothing to compact')
     expect(msgs[0].content).not.toMatch(/compacted:\s*7/i)
+  })
+
+  it('fs:gitInit:result ok toasts success and refreshes diff', () => {
+    toastSuccess.mockClear()
+    const deps = makeDeps()
+    applyServerMessageEffects(
+      { type: 'fs:gitInit:result', sessionId: 's1', ok: true },
+      deps,
+    )
+    expect(toastSuccess).toHaveBeenCalled()
+    expect(deps.requestDiff).toHaveBeenCalledWith('s1')
+    expect(deps.requestCheckpoints).toHaveBeenCalledWith('s1')
+  })
+
+  it('fs:gitInit:result failure toasts error', () => {
+    toastError.mockClear()
+    const deps = makeDeps()
+    applyServerMessageEffects(
+      { type: 'fs:gitInit:result', sessionId: 's1', ok: false, error: 'no_workspace' },
+      deps,
+    )
+    expect(toastError).toHaveBeenCalled()
   })
 
   describe('workflow messages', () => {

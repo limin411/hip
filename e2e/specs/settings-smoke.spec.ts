@@ -49,6 +49,44 @@ describe('settings smoke @settings @smoke', () => {
     })
   }
 
+  it('model config exposes key verify with local precheck (no paid network)', async () => {
+    const nav = await settings.nav('model')
+    await nav.waitForClickable({ timeout: 10000 })
+    await nav.click()
+    await browser.waitUntil(
+      async () => (await nav.getAttribute('aria-selected')) === 'true',
+      { timeout: 10000, interval: 200 },
+    )
+
+    const cards = await browser.$('[data-testid="model-config-cards"]')
+    await cards.waitForExist({ timeout: 10000 })
+
+    const editBase = await browser.$('[data-testid="model-card-base-edit"]')
+    await editBase.waitForClickable({ timeout: 10000 })
+    await editBase.click()
+
+    const dialog = await browser.$('[data-testid="base-model-dialog"]')
+    await dialog.waitForExist({ timeout: 10000 })
+
+    const verify = await browser.$('[data-testid="provider-verify-config"]')
+    await verify.waitForExist({ timeout: 10000 })
+    expect(await verify.isExisting()).toBe(true)
+
+    // Local precheck only when the control is enabled (provider on + sidecar connected).
+    // Do not assert a live upstream probe (would require paid keys).
+    const disabled = await verify.getAttribute('disabled')
+    if (disabled === null || disabled === 'false') {
+      await verify.click()
+      const result = await browser.$('[data-testid="provider-verify-result"]')
+      await result.waitForExist({ timeout: 15000 })
+      const text = await result.getText()
+      expect(text.length).toBeGreaterThan(0)
+      // Checked-at caption is dialog-local polish
+      const checked = await browser.$('[data-testid="provider-verify-checked-at"]')
+      await checked.waitForExist({ timeout: 5000 })
+    }
+  })
+
   it('closes settings with the back button', async () => {
     await closeSettings()
     expect(await settings.backButton.isExisting()).toBe(false)

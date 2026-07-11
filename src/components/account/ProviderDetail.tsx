@@ -21,7 +21,10 @@ type KeyProbeStatus =
       code: KeyProbeCode
       message: string
       cached?: boolean
+      checkedAt: number
     }
+
+
 
 /** The capability toggles shown above the model list; each maps to a ModelCaps key + an i18n label. */
 const CAP_FILTERS = [
@@ -160,6 +163,7 @@ export function ProviderDetail({
         ok: false,
         code: 'PROVIDER_DISABLED',
         message: t('settings.modelConfig.testDisabled'),
+        checkedAt: Date.now(),
       })
       return
     }
@@ -170,6 +174,7 @@ export function ProviderDetail({
         ok: false,
         code: 'MISSING_KEY',
         message: t('settings.modelConfig.testNoKey'),
+        checkedAt: Date.now(),
       })
       return
     }
@@ -180,6 +185,7 @@ export function ProviderDetail({
         ok: false,
         code: 'MISSING_BASE_URL',
         message: t('settings.modelConfig.testNoBaseURL'),
+        checkedAt: Date.now(),
       })
       return
     }
@@ -189,6 +195,7 @@ export function ProviderDetail({
         ok: false,
         code: 'NETWORK',
         message: t('settings.modelConfig.testError.NETWORK'),
+        checkedAt: Date.now(),
       })
       return
     }
@@ -210,6 +217,7 @@ export function ProviderDetail({
         code: result.code,
         message: probeMessage(result.code, result.message, result.cached),
         cached: result.cached,
+        checkedAt: result.checkedAt || Date.now(),
       })
     } catch (e) {
       console.error('[modelConfig] testProvider', e)
@@ -218,12 +226,26 @@ export function ProviderDetail({
         ok: false,
         code: 'INTERNAL',
         message: t('settings.modelConfig.testError.INTERNAL'),
+        checkedAt: Date.now(),
       })
     }
   }
 
   const testRunning = testStatus.state === 'running'
   const lastProbeFailed = testStatus.state === 'done' && !testStatus.ok
+
+  let checkedWhen = ''
+  if (testStatus.state === 'done') {
+    const sec = Math.max(0, Math.floor((Date.now() - testStatus.checkedAt) / 1000))
+    if (sec < 45) checkedWhen = t('settings.modelConfig.testCheckedJustNow')
+    else {
+      const min = Math.floor(sec / 60)
+      checkedWhen =
+        min < 60
+          ? t('settings.modelConfig.testCheckedMinutesAgo', { count: min })
+          : t('settings.modelConfig.testCheckedHoursAgo', { count: Math.floor(min / 60) })
+    }
+  }
 
   const allModels = Object.values(provider.models)
   const current = allModels.find((m) => isActive(m.id))
@@ -316,6 +338,7 @@ export function ProviderDetail({
               <Button
                 variant="outline"
                 size="sm"
+                data-testid="provider-verify-config"
                 disabled={!enabled || testRunning || connection !== 'connected'}
                 onClick={() => void handleTest()}
               >
@@ -323,6 +346,7 @@ export function ProviderDetail({
               </Button>
               {testStatus.state === 'done' && (
                 <span
+                  data-testid="provider-verify-result"
                   className={cn(
                     'text-caption',
                     testStatus.ok ? 'text-success' : 'text-danger',
@@ -332,8 +356,16 @@ export function ProviderDetail({
                 </span>
               )}
             </div>
+            {testStatus.state === 'done' && checkedWhen && (
+              <div
+                className="text-caption text-ink-tertiary"
+                data-testid="provider-verify-checked-at"
+              >
+                {t('settings.modelConfig.testCheckedCaption', { when: checkedWhen })}
+              </div>
+            )}
             {lastProbeFailed && (
-              <div className="text-caption text-warning" role="status">
+              <div className="text-caption text-warning" role="status" data-testid="provider-verify-fail-hint">
                 {t('settings.modelConfig.testProbeFailedHint')}
               </div>
             )}

@@ -360,6 +360,10 @@ export const zhTW = {
         testDisabled: '提供商未啟用',
         testEndpoint: '驗證金鑰',
         testProbeFailedHint: '上次檢測失敗 — 金鑰可能不可用。仍可設為目前模型。',
+        testCheckedCaption: '檢測時間 · {{when}}',
+        testCheckedJustNow: '剛剛',
+        testCheckedMinutesAgo: '{{count}} 分鐘前',
+        testCheckedHoursAgo: '{{count}} 小時前',
         testError: {
           OK: '金鑰可用',
           MISSING_KEY: '未設定 API Key',

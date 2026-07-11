@@ -43,7 +43,11 @@ export function EndpointModelDialog({
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [testRunning, setTestRunning] = useState(false)
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [testResult, setTestResult] = useState<{
+    ok: boolean
+    message: string
+    checkedAt: number
+  } | null>(null)
 
   // Reuse stored key only if already on the independent virtual slot; legacy chat keys cannot transfer.
   const canReuseStoredKey = virtualKeyConfigured
@@ -90,19 +94,35 @@ export function EndpointModelDialog({
     const model = modelID.trim()
     const draftKey = apiKey.trim()
     if (!base) {
-      setTestResult({ ok: false, message: t('settings.modelConfig.testNoBaseURL') })
+      setTestResult({
+        ok: false,
+        message: t('settings.modelConfig.testNoBaseURL'),
+        checkedAt: Date.now(),
+      })
       return
     }
     if (!model) {
-      setTestResult({ ok: false, message: t('settings.modelConfig.testError.MISSING_MODEL') })
+      setTestResult({
+        ok: false,
+        message: t('settings.modelConfig.testError.MISSING_MODEL'),
+        checkedAt: Date.now(),
+      })
       return
     }
     if (!draftKey && !canReuseStoredKey) {
-      setTestResult({ ok: false, message: t('settings.modelConfig.testNoKey') })
+      setTestResult({
+        ok: false,
+        message: t('settings.modelConfig.testNoKey'),
+        checkedAt: Date.now(),
+      })
       return
     }
     if (connection !== 'connected') {
-      setTestResult({ ok: false, message: t('settings.modelConfig.testError.NETWORK') })
+      setTestResult({
+        ok: false,
+        message: t('settings.modelConfig.testError.NETWORK'),
+        checkedAt: Date.now(),
+      })
       return
     }
     setTestRunning(true)
@@ -118,10 +138,15 @@ export function EndpointModelDialog({
       setTestResult({
         ok: result.ok,
         message: probeMessage(result.code, result.message, result.cached),
+        checkedAt: result.checkedAt || Date.now(),
       })
     } catch (e) {
       console.error('[endpointDialog] testProvider', e)
-      setTestResult({ ok: false, message: t('settings.modelConfig.testError.INTERNAL') })
+      setTestResult({
+        ok: false,
+        message: t('settings.modelConfig.testError.INTERNAL'),
+        checkedAt: Date.now(),
+      })
     } finally {
       setTestRunning(false)
     }

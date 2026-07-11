@@ -360,6 +360,10 @@ export const en = {
         testDisabled: 'Provider is disabled',
         testEndpoint: 'Verify key',
         testProbeFailedHint: 'Last check failed — key may not work. You can still set a model as current.',
+        testCheckedCaption: 'Checked · {{when}}',
+        testCheckedJustNow: 'just now',
+        testCheckedMinutesAgo: '{{count}}m ago',
+        testCheckedHoursAgo: '{{count}}h ago',
         testError: {
           OK: 'Key works',
           MISSING_KEY: 'API key is missing',

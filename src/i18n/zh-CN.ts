@@ -360,6 +360,10 @@ export const zhCN = {
         testDisabled: '提供商未启用',
         testEndpoint: '验证密钥',
         testProbeFailedHint: '上次检测失败 — 密钥可能不可用。仍可设为当前模型。',
+        testCheckedCaption: '检测时间 · {{when}}',
+        testCheckedJustNow: '刚刚',
+        testCheckedMinutesAgo: '{{count}} 分钟前',
+        testCheckedHoursAgo: '{{count}} 小时前',
         testError: {
           OK: '密钥可用',
           MISSING_KEY: '未配置 API Key',

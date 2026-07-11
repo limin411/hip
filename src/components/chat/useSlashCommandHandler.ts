@@ -4,7 +4,16 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { SkillMeta } from '@hip/protocol'
 import { sessionService, useDomainStore } from '@/domain'
-import { useUiStore } from '@/store/uiStore'
+import {
+  openMemorySettings,
+  runCompact,
+  runDiff,
+  runInit,
+  setIncognito,
+  setUseMemories,
+  formatMemoryStatusBody,
+  showMemoryStatus,
+} from '@/domain/commands'
 import {
   applyCommand,
   buildCommandList,
@@ -77,22 +86,19 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'init') {
-          if (sessionId) sessionService.gitInitWorkspace(sessionId)
+          if (sessionId) runInit(sessionId)
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'diff') {
-          if (sessionId) {
-            sessionService.requestDiff(sessionId)
-            useUiStore.getState().setTab('changes')
-          }
+          if (sessionId) runDiff(sessionId)
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'compact') {
-          if (sessionId) sessionService.compactSession(sessionId)
+          if (sessionId) runCompact(sessionId)
           setText('')
           focusInput()
           return
@@ -115,41 +121,38 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'memory') {
-          useUiStore.getState().setSettingsPage('memory')
-          useUiStore.getState().setActiveView('settings')
+          openMemorySettings()
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-on') {
-          if (sessionId) sessionService.setMemoryFlags(sessionId, { useMemories: true })
+          if (sessionId) setUseMemories(sessionId, true)
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-off') {
-          if (sessionId) sessionService.setMemoryFlags(sessionId, { useMemories: false })
+          if (sessionId) setUseMemories(sessionId, false)
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-incognito') {
-          if (sessionId) sessionService.setMemoryFlags(sessionId, { incognito: true })
+          if (sessionId) setIncognito(sessionId, true)
           setText('')
           focusInput()
           return
         }
         if (cmd.id === 'memory-status') {
           if (sessionId) {
-            const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
-            const cfg = sess?.config
-            toast.message(t('chat.slash.memoryStatusTitle'), {
-              description: t('chat.slash.memoryStatusBody', {
-                use: cfg?.useMemories === undefined ? 'inherit' : String(cfg.useMemories),
-                generate: cfg?.generateMemories === undefined ? 'inherit' : String(cfg.generateMemories),
-                incognito: String(!!cfg?.incognito),
-              }),
-            })
+            const flags = formatMemoryStatusBody(sessionId)
+            if (flags) {
+              showMemoryStatus(sessionId, {
+                title: t('chat.slash.memoryStatusTitle'),
+                body: t('chat.slash.memoryStatusBody', flags),
+              })
+            }
           }
           setText('')
           focusInput()

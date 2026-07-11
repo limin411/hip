@@ -46,4 +46,13 @@ describe('commandPaletteStore', () => {
     expect(useCommandPaletteStore.getState().open).toBe(false)
     expect(useCommandPaletteStore.getState().page).toBeNull()
   })
+
+  it('setPage updates nested page without toggling open', () => {
+    useCommandPaletteStore.getState().setOpen(true)
+    useCommandPaletteStore.getState().setPage('theme')
+    expect(useCommandPaletteStore.getState().open).toBe(true)
+    expect(useCommandPaletteStore.getState().page).toBe('theme')
+    useCommandPaletteStore.getState().setPage(null)
+    expect(useCommandPaletteStore.getState().page).toBeNull()
+  })
 })

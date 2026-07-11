@@ -1,25 +1,57 @@
 import type { SessionVM } from '@/domain'
-import type { ActiveView, Theme } from '@/store/uiStore'
-import type { RankableItem } from './rankGlobalCommands'
+import type { ActiveView, SettingsPageId, Theme } from '@/store/uiStore'
+import {
+  goSettingsPage,
+  formatMemoryStatusBody,
+  openMemorySettings,
+  runCompact,
+  runDiff,
+  runInit,
+  setIncognito,
+  setUseMemories,
+  showMemoryStatus,
+} from '@/domain/commands'
+import type { CommandWhen, GlobalCommand, PaletteGroup } from './types'
 
-export type GlobalCommand = RankableItem & {
-  group: 'navigation' | 'sessions' | 'theme' | 'actions'
-  run: () => void
-}
+export type { GlobalCommand, PaletteGroup } from './types'
 
 export type GlobalCommandLabels = {
   groupNavigation: string
   groupActions: string
   groupTheme: string
   groupSessions: string
+  groupContext: string
+  groupWorkspace: string
+  groupAppearance: string
   navChat: string
   navCode: string
   navHistory: string
   navSettings: string
   actionNewConversation: string
+  actionKeyboardShortcuts: string
+  actionChangeTheme: string
   themeLight: string
   themeDark: string
   themeSystem: string
+  current: string
+  settings: {
+    general: string
+    model: string
+    agents: string
+    mcp: string
+    skill: string
+    plugins: string
+    memory: string
+  }
+  context: {
+    diff: string
+    compact: string
+    init: string
+    memoryOn: string
+    memoryOff: string
+    memoryIncognito: string
+    memoryStatus: string
+  }
 }
 
 export type GlobalCommandContext = {
@@ -27,22 +59,58 @@ export type GlobalCommandContext = {
   activeView: ActiveView
   theme: Theme
   labels: GlobalCommandLabels
+  sessionId: string | null
   setActiveView: (v: ActiveView) => void
   setTheme: (t: Theme) => void
+  setSettingsPage: (p: SettingsPageId) => void
   /** Optional surface: chat | code. When omitted, handler may default. */
   newConversation: (surface?: 'chat' | 'code') => void
   selectSession: (id: string) => void
+  openShortcutsHelp: () => void
+  /** Localized memory status toast copy */
+  memoryStatusCopy: (flags: { use: string; generate: string; incognito: string }) => {
+    title: string
+    body: string
+  }
+  isMac?: boolean
 }
 
-export type PaletteGroup = {
-  heading?: string
-  items: GlobalCommand[]
-}
+/** Source cap for search-time session list. */
+export const RECENT_SESSION_LIMIT = 50
 
-export const RECENT_SESSION_LIMIT = 10
+const ALL_SETTINGS_PAGES: SettingsPageId[] = [
+  'general',
+  'model',
+  'agents',
+  'mcp',
+  'skill',
+  'plugins',
+  'memory',
+]
+
+/** Shown on empty query (curated). */
+const CURATED_SETTINGS: SettingsPageId[] = ['model', 'memory', 'skill', 'mcp']
+
+const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
+  general: 'settings',
+  model: 'cpu',
+  agents: 'bot',
+  mcp: 'wrench',
+  skill: 'sparkles',
+  plugins: 'puzzle',
+  memory: 'brain',
+}
 
 function surfaceForNewConversation(activeView: ActiveView): 'chat' | 'code' {
   return activeView === 'code' ? 'code' : 'chat'
+}
+
+function matchesWhen(when: CommandWhen | undefined, ctx: GlobalCommandContext): boolean {
+  if (!when) return true
+  if (when.enabled === false) return false
+  if (when.views && !when.views.includes(ctx.activeView)) return false
+  if (when.requiresSession && !ctx.sessionId) return false
+  return true
 }
 
 /** Pure: most recently updated sessions, capped. */
@@ -63,39 +131,131 @@ function sessionLabel(s: SessionVM): string {
   return s.id
 }
 
+function settingsLabel(labels: GlobalCommandLabels, page: SettingsPageId): string {
+  return labels.settings[page]
+}
+
+function buildSettingsCommands(
+  ctx: GlobalCommandContext,
+  pages: SettingsPageId[],
+): GlobalCommand[] {
+  return pages.map((page) => ({
+    id: `settings-${page}`,
+    label: settingsLabel(ctx.labels, page),
+    icon: SETTINGS_ICON[page],
+    keywords: [
+      'settings',
+      'prefs',
+      'config',
+      '设置',
+      '設定',
+      page,
+      settingsLabel(ctx.labels, page),
+    ],
+    group: 'workspace' as const,
+    run: () => {
+      ctx.setSettingsPage(page)
+      ctx.setActiveView('settings')
+    },
+  }))
+}
+
+function buildThemeModeItems(ctx: GlobalCommandContext, keepOpen: boolean): GlobalCommand[] {
+  const { labels, theme } = ctx
+  return [
+    {
+      id: 'theme-light',
+      label: labels.themeLight,
+      icon: 'sun' as const,
+      keywords: ['light', 'day', '浅色', '淺色', 'theme', '主题', '主題'],
+      group: 'theme' as const,
+      keepOpen,
+      active: theme === 'light',
+      description: theme === 'light' ? labels.current : undefined,
+      run: () => ctx.setTheme('light'),
+    },
+    {
+      id: 'theme-dark',
+      label: labels.themeDark,
+      icon: 'moon' as const,
+      keywords: ['dark', 'night', '深色', 'theme', '主题', '主題'],
+      group: 'theme' as const,
+      keepOpen,
+      active: theme === 'dark',
+      description: theme === 'dark' ? labels.current : undefined,
+      run: () => ctx.setTheme('dark'),
+    },
+    {
+      id: 'theme-system',
+      label: labels.themeSystem,
+      icon: 'monitor' as const,
+      keywords: ['system', 'auto', '跟随', '跟隨', 'theme', '主题', '主題'],
+      group: 'theme' as const,
+      keepOpen,
+      active: theme === 'system',
+      description: theme === 'system' ? labels.current : undefined,
+      run: () => ctx.setTheme('system'),
+    },
+  ]
+}
+
+/**
+ * Theme subpage groups (page === 'theme').
+ */
+export function buildThemePageGroups(ctx: GlobalCommandContext): PaletteGroup[] {
+  return [
+    {
+      id: 'theme',
+      heading: ctx.labels.groupTheme,
+      items: buildThemeModeItems(ctx, true),
+    },
+  ]
+}
+
 /**
  * Build command groups for the global palette.
- * Navigation, actions, theme, and recent sessions (by updatedAtMs).
+ * Empty search: curated navigation/actions/workspace/appearance (no sessions).
+ * Non-empty search: + all settings pages, theme modes, recent sessions.
  */
-export function buildGlobalCommandGroups(ctx: GlobalCommandContext): PaletteGroup[] {
+export function buildGlobalCommandGroups(
+  ctx: GlobalCommandContext,
+  opts?: { search?: string },
+): PaletteGroup[] {
   const { labels } = ctx
+  const search = (opts?.search ?? '').trim()
+  const searching = search.length > 0
+  const mod = ctx.isMac ? '⌘' : 'Ctrl+'
 
   const navigation: GlobalCommand[] = [
     {
       id: 'nav-chat',
       label: labels.navChat,
-      keywords: ['work', 'office', 'chat', '办公'],
+      icon: 'message-square',
+      keywords: ['work', 'office', 'chat', '办公', '辦公'],
       group: 'navigation',
       run: () => ctx.setActiveView('chat'),
     },
     {
       id: 'nav-code',
       label: labels.navCode,
-      keywords: ['coding', 'code', 'project', '编码'],
+      icon: 'code',
+      keywords: ['coding', 'code', 'project', '编码', '編碼'],
       group: 'navigation',
       run: () => ctx.setActiveView('code'),
     },
     {
       id: 'nav-history',
       label: labels.navHistory,
-      keywords: ['sessions', 'past', '历史'],
+      icon: 'history',
+      keywords: ['sessions', 'past', '历史', '歷史'],
       group: 'navigation',
       run: () => ctx.setActiveView('history'),
     },
     {
       id: 'nav-settings',
       label: labels.navSettings,
-      keywords: ['prefs', 'preferences', 'config', '设置'],
+      icon: 'settings',
+      keywords: ['prefs', 'preferences', 'config', '设置', '設定'],
       group: 'navigation',
       run: () => ctx.setActiveView('settings'),
     },
@@ -105,55 +265,177 @@ export function buildGlobalCommandGroups(ctx: GlobalCommandContext): PaletteGrou
     {
       id: 'action-new-conversation',
       label: labels.actionNewConversation,
-      keywords: ['new', 'chat', 'clear', 'start', '新建'],
+      icon: 'plus',
+      keywords: ['new', 'chat', 'clear', 'start', '新建', '新增'],
       group: 'actions',
       run: () => ctx.newConversation(surfaceForNewConversation(ctx.activeView)),
     },
-  ]
-
-  const theme: GlobalCommand[] = [
     {
-      id: 'theme-light',
-      label: labels.themeLight,
-      keywords: ['light', 'day', '浅色'],
-      group: 'theme',
-      run: () => ctx.setTheme('light'),
-    },
-    {
-      id: 'theme-dark',
-      label: labels.themeDark,
-      keywords: ['dark', 'night', '深色'],
-      group: 'theme',
-      run: () => ctx.setTheme('dark'),
-    },
-    {
-      id: 'theme-system',
-      label: labels.themeSystem,
-      keywords: ['system', 'auto', '跟随'],
-      group: 'theme',
-      run: () => ctx.setTheme('system'),
+      id: 'action-keyboard-shortcuts',
+      label: labels.actionKeyboardShortcuts,
+      icon: 'keyboard',
+      shortcut: `${mod}/`,
+      keywords: ['keyboard', 'shortcuts', 'hotkeys', '快捷键', '快捷鍵'],
+      group: 'actions',
+      run: () => ctx.openShortcutsHelp(),
     },
   ]
 
-  const recent = pickRecentSessions(ctx.sessions)
-  const sessions: GlobalCommand[] = recent.map((s) => {
-    const label = sessionLabel(s)
-    return {
-      id: `session-${s.id}`,
-      label,
-      keywords: [s.id, s.preview, s.title, 'session', '会话'].filter(Boolean),
-      group: 'sessions' as const,
-      run: () => ctx.selectSession(s.id),
-    }
-  })
-
-  const groups: PaletteGroup[] = [
-    { heading: labels.groupNavigation, items: navigation },
-    { heading: labels.groupActions, items: actions },
-    { heading: labels.groupTheme, items: theme },
+  const appearance: GlobalCommand[] = [
+    {
+      id: 'appearance-theme',
+      label: labels.actionChangeTheme,
+      icon: 'palette',
+      keywords: ['theme', 'appearance', 'color', 'dark', 'light', '主题', '主題', '外观', '外觀'],
+      group: 'appearance',
+      to: 'theme',
+    },
   ]
-  if (sessions.length > 0) {
-    groups.push({ heading: labels.groupSessions, items: sessions })
+
+  const contextCandidates: GlobalCommand[] = [
+    {
+      id: 'ctx-diff',
+      label: labels.context.diff,
+      icon: 'git-branch',
+      keywords: ['diff', 'changes', '变更', '變更'],
+      group: 'context',
+      when: { views: ['code'], requiresSession: true },
+      contextBoost: 0.1,
+      run: () => {
+        if (ctx.sessionId) runDiff(ctx.sessionId)
+      },
+    },
+    {
+      id: 'ctx-compact',
+      label: labels.context.compact,
+      icon: 'package',
+      keywords: ['compact', 'summarize', '压缩', '壓縮'],
+      group: 'context',
+      when: { views: ['code'], requiresSession: true },
+      contextBoost: 0.1,
+      run: () => {
+        if (ctx.sessionId) runCompact(ctx.sessionId)
+      },
+    },
+    {
+      id: 'ctx-init',
+      label: labels.context.init,
+      icon: 'sparkles',
+      keywords: ['init', 'initialize', 'project', '初始化'],
+      group: 'context',
+      when: { views: ['code'], requiresSession: true },
+      contextBoost: 0.1,
+      run: () => {
+        if (ctx.sessionId) runInit(ctx.sessionId)
+      },
+    },
+    {
+      id: 'ctx-memory-settings',
+      label: labels.settings.memory,
+      icon: 'brain',
+      keywords: ['memory', 'memories', '记忆', '記憶'],
+      group: 'context',
+      run: () => openMemorySettings(),
+    },
+    {
+      id: 'ctx-memory-on',
+      label: labels.context.memoryOn,
+      icon: 'brain',
+      keywords: ['memory', 'enable', 'on', '记忆', '記憶'],
+      group: 'context',
+      when: { requiresSession: true },
+      run: () => {
+        if (ctx.sessionId) setUseMemories(ctx.sessionId, true)
+      },
+    },
+    {
+      id: 'ctx-memory-off',
+      label: labels.context.memoryOff,
+      icon: 'brain',
+      keywords: ['memory', 'disable', 'off', '记忆', '記憶'],
+      group: 'context',
+      when: { requiresSession: true },
+      run: () => {
+        if (ctx.sessionId) setUseMemories(ctx.sessionId, false)
+      },
+    },
+    {
+      id: 'ctx-memory-incognito',
+      label: labels.context.memoryIncognito,
+      icon: 'brain',
+      keywords: ['memory', 'incognito', 'private', '隐身', '隱身'],
+      group: 'context',
+      when: { requiresSession: true },
+      run: () => {
+        if (ctx.sessionId) setIncognito(ctx.sessionId, true)
+      },
+    },
+    {
+      id: 'ctx-memory-status',
+      label: labels.context.memoryStatus,
+      icon: 'brain',
+      keywords: ['memory', 'status', 'flags', '状态', '狀態'],
+      group: 'context',
+      when: { requiresSession: true },
+      run: () => {
+        if (!ctx.sessionId) return
+        const flags = formatMemoryStatusBody(ctx.sessionId)
+        if (flags) showMemoryStatus(ctx.sessionId, ctx.memoryStatusCopy(flags))
+      },
+    },
+  ]
+
+  const context = contextCandidates.filter((c) => matchesWhen(c.when, ctx))
+
+  const workspace = buildSettingsCommands(
+    ctx,
+    searching ? ALL_SETTINGS_PAGES : CURATED_SETTINGS,
+  )
+
+  // Avoid duplicate "Settings: Memory" when context already has memory settings entry on empty query.
+  const workspaceFiltered =
+    !searching && context.some((c) => c.id === 'ctx-memory-settings')
+      ? workspace.filter((w) => w.id !== 'settings-memory')
+      : workspace
+
+  const groups: PaletteGroup[] = []
+
+  if (context.length > 0) {
+    groups.push({ id: 'context', heading: labels.groupContext, items: context })
   }
+  groups.push(
+    { id: 'navigation', heading: labels.groupNavigation, items: navigation },
+    { id: 'actions', heading: labels.groupActions, items: actions },
+    { id: 'workspace', heading: labels.groupWorkspace, items: workspaceFiltered },
+    { id: 'appearance', heading: labels.groupAppearance, items: appearance },
+  )
+
+  if (searching) {
+    groups.push({
+      id: 'theme',
+      heading: labels.groupTheme,
+      items: buildThemeModeItems(ctx, true),
+    })
+
+    const recent = pickRecentSessions(ctx.sessions)
+    if (recent.length > 0) {
+      const sessions: GlobalCommand[] = recent.map((s) => {
+        const label = sessionLabel(s)
+        return {
+          id: `session-${s.id}`,
+          label,
+          icon: 'message-square' as const,
+          keywords: [s.id, s.preview, s.title, 'session', '会话', '對話'].filter(Boolean),
+          group: 'sessions' as const,
+          run: () => ctx.selectSession(s.id),
+        }
+      })
+      groups.push({ id: 'sessions', heading: labels.groupSessions, items: sessions })
+    }
+  }
+
   return groups
 }
+
+/** Re-export for callers that deep-link into settings without palette. */
+export { goSettingsPage }

@@ -12,12 +12,20 @@ describe('scoreItem', () => {
     expect(scoreItem(items[1], 'tools')).toBe(1)
   })
 
-  it('returns 0 when a term matches neither label nor keywords', () => {
+  it('returns 0 when a term matches neither label nor keywords nor description', () => {
     expect(scoreItem(items[0], 'zzz')).toBe(0)
   })
 
   it('matches keywords alone at lower score', () => {
     expect(scoreItem(items[0], 'config')).toBe(0.4)
+  })
+
+  it('matches description at weak score', () => {
+    const score = scoreItem(
+      { id: 'x', label: 'Foo', description: 'Open memory settings' },
+      'memory',
+    )
+    expect(score).toBe(0.35)
   })
 })
 

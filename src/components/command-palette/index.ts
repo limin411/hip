@@ -3,6 +3,7 @@ export { GlobalCommandPalette } from './GlobalCommandPalette'
 export { GlobalHotkeysBinder } from './GlobalHotkeysBinder'
 export {
   buildGlobalCommandGroups,
+  buildThemePageGroups,
   pickRecentSessions,
   RECENT_SESSION_LIMIT,
 } from './buildGlobalCommands'
@@ -12,4 +13,5 @@ export type {
   GlobalCommandLabels,
   PaletteGroup,
 } from './buildGlobalCommands'
+export type { PaletteIconName, CommandGroupId, CommandWhen } from './types'
 export { rankGroups, scoreItem } from './rankGlobalCommands'

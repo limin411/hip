@@ -4,9 +4,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { TitleBar } from './TitleBar'
 import { useUiStore } from '@/store/uiStore'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 
 beforeEach(() => {
   useUiStore.setState({ activeView: 'chat', previousView: null })
+  useCommandPaletteStore.setState({ open: false, page: null })
 })
 
 afterEach(cleanup)
@@ -67,5 +69,11 @@ describe('TitleBar', () => {
     render(<TitleBar />)
     expect(screen.getByTestId('titlebar')).toHaveAttribute('data-tauri-drag-region')
     expect(screen.getByTestId('titlebar-back')).toHaveAttribute('data-tauri-drag-region', 'false')
+  })
+
+  it('opens command palette from titlebar button', () => {
+    render(<TitleBar />)
+    screen.getByTestId('titlebar-command-palette').click()
+    expect(useCommandPaletteStore.getState().open).toBe(true)
   })
 })

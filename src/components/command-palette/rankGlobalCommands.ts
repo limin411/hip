@@ -1,13 +1,15 @@
-/** Shared ranking helpers for Phase B global palette (PR-6 expands usage). */
+/** Shared ranking helpers for the global command palette. */
 
 export type RankableItem = {
   id: string
   label: string
   keywords?: string[]
+  description?: string
 }
 
 export type RankableGroup<T extends RankableItem = RankableItem> = {
   heading?: string
+  id?: string
   items: T[]
 }
 
@@ -19,11 +21,14 @@ function normalize(s: string): string {
 export function scoreItem(item: RankableItem, needle: string): number {
   const label = item.label.toLowerCase()
   const keys = (item.keywords ?? []).join(' ').toLowerCase()
+  const desc = (item.description ?? '').toLowerCase()
   const terms = needle.split(/\s+/).filter(Boolean)
 
-  if (terms.some((term) => !label.includes(term) && !keys.includes(term))) {
-    return 0
-  }
+  const termMissesAll = terms.some(
+    (term) => !label.includes(term) && !keys.includes(term) && !desc.includes(term),
+  )
+  if (termMissesAll) return 0
+
   if (label === needle) return 1
   if (label.startsWith(needle)) return 0.9
   const words = label.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
@@ -31,6 +36,11 @@ export function scoreItem(item: RankableItem, needle: string): number {
   if (words.some((w) => w.startsWith(needle))) return 0.8
   if (label.includes(needle)) return 0.7
   if (terms.every((term) => label.includes(term))) return 0.6
+  if (terms.every((term) => label.includes(term) || keys.includes(term))) return 0.4
+  // Description-only (or description completing AND) — weakest positive signal.
+  if (terms.every((term) => label.includes(term) || keys.includes(term) || desc.includes(term))) {
+    return 0.35
+  }
   return 0.4
 }
 

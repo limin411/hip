@@ -6,6 +6,7 @@ interface CommandPaletteState {
   setOpen: (open: boolean) => void
   toggle: () => void
   openPage: (page: string) => void
+  setPage: (page: string | null) => void
   close: () => void
 }
 
@@ -16,5 +17,6 @@ export const useCommandPaletteStore = create<CommandPaletteState>((set) => ({
   toggle: () =>
     set((s) => (s.open ? { open: false, page: null } : { open: true })),
   openPage: (page) => set({ open: true, page }),
+  setPage: (page) => set({ page }),
   close: () => set({ open: false, page: null }),
 }))

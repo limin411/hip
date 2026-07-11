@@ -1,4 +1,4 @@
-// Phase 2 S5: global command palette open / filter / navigate.
+// Phase 2 S5 + P0 launcher: open / filter / theme page / empty IA.
 import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
@@ -35,6 +35,13 @@ describe('global command palette @smoke @core', () => {
     expect(await (await browser.$('[data-testid="global-cmd-nav-settings"]')).isExisting()).toBe(true)
   })
 
+  it('empty open does not list session rows', async () => {
+    await openCommandPaletteForE2e()
+    await (await browser.$('[data-testid="global-command-palette"]')).waitForExist({ timeout: 10000 })
+    const sessions = await browser.$$('[data-testid^="global-cmd-session-"]')
+    expect(sessions.length).toBe(0)
+  })
+
   it('filters by search and runs nav-history', async () => {
     await openCommandPaletteForE2e()
     const input = await browser.$('[data-testid="global-command-palette-input"]')
@@ -53,6 +60,28 @@ describe('global command palette @smoke @core', () => {
     const back = await browser.$('[data-testid="titlebar-back"]')
     if (await back.isExisting()) {
       await browser.execute((el: HTMLElement) => el.click(), back)
+    }
+  })
+
+  it('opens theme subpage via appearance-theme', async () => {
+    await openCommandPaletteForE2e()
+    const themeEntry = await browser.$('[data-testid="global-cmd-appearance-theme"]')
+    await themeEntry.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), themeEntry)
+
+    const dark = await browser.$('[data-testid="global-cmd-theme-dark"]')
+    await dark.waitForExist({ timeout: 5000 })
+    await browser.execute((el: HTMLElement) => el.click(), dark)
+
+    // keepOpen: palette still visible
+    expect(await (await browser.$('[data-testid="global-command-palette"]')).isExisting()).toBe(true)
+  })
+
+  it('titlebar button opens palette when present', async () => {
+    const btn = await browser.$('[data-testid="titlebar-command-palette"]')
+    if (await btn.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), btn)
+      await (await browser.$('[data-testid="global-command-palette"]')).waitForExist({ timeout: 5000 })
     }
   })
 })

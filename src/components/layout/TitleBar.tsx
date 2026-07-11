@@ -1,8 +1,9 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Command } from 'lucide-react'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
+import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { SessionTabBar } from '@/components/tabs/SessionTabBar'
 import { ConnectionStatus } from './ConnectionStatus'
@@ -54,12 +55,38 @@ export function TitleBar() {
           <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 truncate text-body font-medium text-ink">
             {t(titleKey)}
           </span>
-          <div className="ml-auto shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
+          <div className="ml-auto flex shrink-0 items-center gap-1 pr-3">
+            <button
+              type="button"
+              data-testid="titlebar-command-palette"
+              data-tauri-drag-region="false"
+              data-no-drag
+              aria-label={t('commandPalette.openTriggerAria')}
+              title={t('commandPalette.openTrigger')}
+              onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+              className="flex size-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+            >
+              <Command size={16} />
+            </button>
+            <div className="shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />
+          </div>
         </>
       ) : (
         <>
           <SessionTabBar onNewSession={onNewSession} />
           <div className="flex shrink-0 items-center gap-2 pr-3">
+            <button
+              type="button"
+              data-testid="titlebar-command-palette"
+              data-tauri-drag-region="false"
+              data-no-drag
+              aria-label={t('commandPalette.openTriggerAria')}
+              title={t('commandPalette.openTrigger')}
+              onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+              className="flex size-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
+            >
+              <Command size={16} />
+            </button>
             <ConnectionStatus />
             <PanelToggle />
           </div>

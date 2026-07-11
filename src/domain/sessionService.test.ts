@@ -896,4 +896,63 @@ describe('branches + revert', () => {
     // no refresh requests fire on a failed revert
     expect(t.sent.some((m) => m.type === 'git:checkpoint:list' && m.sessionId === 's1')).toBe(false)
   })
+
+  describe('testProvider', () => {
+    it('sends config:testProvider and resolves matching requestId', async () => {
+      const t = new FakeTransport()
+      const svc = new SessionService(t)
+      const p = svc.testProvider({
+        purpose: 'chat',
+        providerID: 'deepseek',
+        baseURL: 'https://api.deepseek.com/v1',
+      })
+      const sent = t.sent.at(-1) as {
+        type: string
+        requestId: string
+        purpose: string
+        providerID: string
+      }
+      expect(sent.type).toBe('config:testProvider')
+      expect(sent.purpose).toBe('chat')
+      expect(sent.providerID).toBe('deepseek')
+      t.push({
+        type: 'config:testProvider:result',
+        requestId: sent.requestId,
+        ok: true,
+        code: 'OK',
+        message: 'Key works',
+        checkedAt: 1,
+        latencyMs: 12,
+      })
+      await expect(p).resolves.toMatchObject({ ok: true, code: 'OK', latencyMs: 12 })
+    })
+
+    it('correlates concurrent probes by requestId (out of order)', async () => {
+      const t = new FakeTransport()
+      const svc = new SessionService(t)
+      const p1 = svc.testProvider({ purpose: 'chat', providerID: 'a', baseURL: 'https://a' })
+      const p2 = svc.testProvider({ purpose: 'chat', providerID: 'b', baseURL: 'https://b' })
+      const id1 = (t.sent[t.sent.length - 2] as { requestId: string }).requestId
+      const id2 = (t.sent[t.sent.length - 1] as { requestId: string }).requestId
+      // Resolve second first
+      t.push({
+        type: 'config:testProvider:result',
+        requestId: id2,
+        ok: false,
+        code: 'AUTH_FAILED',
+        message: 'no',
+        checkedAt: 2,
+      })
+      t.push({
+        type: 'config:testProvider:result',
+        requestId: id1,
+        ok: true,
+        code: 'OK',
+        message: 'yes',
+        checkedAt: 1,
+      })
+      await expect(p1).resolves.toMatchObject({ ok: true, code: 'OK' })
+      await expect(p2).resolves.toMatchObject({ ok: false, code: 'AUTH_FAILED' })
+    })
+  })
 })

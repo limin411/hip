@@ -22,6 +22,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'session:setPermissionMode',
   'session:setModel',
   'config:setActiveModel',
+  'config:testProvider',
   'fs:ls',
   'fs:read',
   'fs:lsCwd',

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { MemoryModelRef } from '@hip/protocol'
+import type { KeyProbeCode, MemoryModelRef } from '@hip/protocol'
 import type { MemoryEndpointPurpose } from '@/lib/memoryEndpoint'
+import { memoryEndpointProviderId } from '@/lib/memoryEndpoint'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { sessionService } from '@/domain/sessionService'
+import { useDomainStore } from '@/domain/sessionStore'
 
 const inputCls =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -34,10 +37,16 @@ export function EndpointModelDialog({
   onClose: () => void
 }) {
   const { t } = useTranslation()
+  const connection = useDomainStore((s) => s.connection)
   const [baseURL, setBaseURL] = useState('')
   const [modelID, setModelID] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [testRunning, setTestRunning] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  // Reuse stored key only if already on the independent virtual slot; legacy chat keys cannot transfer.
+  const canReuseStoredKey = virtualKeyConfigured
 
   useEffect(() => {
     if (!open) return
@@ -45,15 +54,84 @@ export function EndpointModelDialog({
     setModelID(existing?.modelID ?? '')
     setApiKey('')
     setError(null)
+    setTestRunning(false)
+    setTestResult(null)
   }, [open, existing?.baseURL, existing?.modelID, existing?.providerID])
+
+  function probeMessage(code: KeyProbeCode, fallback: string, cached?: boolean): string {
+    if (code === 'OK') {
+      return cached
+        ? t('settings.modelConfig.testSuccessCached')
+        : t('settings.modelConfig.testSuccess')
+    }
+    const byCode: Record<Exclude<KeyProbeCode, 'OK'>, string> = {
+      MISSING_KEY: t('settings.modelConfig.testError.MISSING_KEY'),
+      MISSING_BASE_URL: t('settings.modelConfig.testError.MISSING_BASE_URL'),
+      MISSING_MODEL: t('settings.modelConfig.testError.MISSING_MODEL'),
+      PROVIDER_DISABLED: t('settings.modelConfig.testError.PROVIDER_DISABLED'),
+      INCOMPATIBLE_PROVIDER: t('settings.modelConfig.testError.INCOMPATIBLE_PROVIDER'),
+      AUTH_FAILED: t('settings.modelConfig.testError.AUTH_FAILED'),
+      MODEL_NOT_FOUND: t('settings.modelConfig.testError.MODEL_NOT_FOUND'),
+      RATE_LIMITED: t('settings.modelConfig.testError.RATE_LIMITED'),
+      NETWORK: t('settings.modelConfig.testError.NETWORK'),
+      PROVIDER_ERROR: t('settings.modelConfig.testError.PROVIDER_ERROR'),
+      PROBE_RATE_LIMITED: t('settings.modelConfig.testError.PROBE_RATE_LIMITED'),
+      PROBE_BUSY: t('settings.modelConfig.testError.PROBE_BUSY'),
+      PROBE_UNSUPPORTED: t('settings.modelConfig.testError.PROBE_UNSUPPORTED'),
+      PROBE_DISABLED: t('settings.modelConfig.testError.PROBE_DISABLED'),
+      INVALID_RESPONSE: t('settings.modelConfig.testError.INVALID_RESPONSE'),
+      INTERNAL: t('settings.modelConfig.testError.INTERNAL'),
+    }
+    return byCode[code] || fallback || t('settings.modelConfig.error')
+  }
+
+  async function handleVerify() {
+    const base = baseURL.trim()
+    const model = modelID.trim()
+    const draftKey = apiKey.trim()
+    if (!base) {
+      setTestResult({ ok: false, message: t('settings.modelConfig.testNoBaseURL') })
+      return
+    }
+    if (!model) {
+      setTestResult({ ok: false, message: t('settings.modelConfig.testError.MISSING_MODEL') })
+      return
+    }
+    if (!draftKey && !canReuseStoredKey) {
+      setTestResult({ ok: false, message: t('settings.modelConfig.testNoKey') })
+      return
+    }
+    if (connection !== 'connected') {
+      setTestResult({ ok: false, message: t('settings.modelConfig.testError.NETWORK') })
+      return
+    }
+    setTestRunning(true)
+    setTestResult(null)
+    try {
+      const result = await sessionService.testProvider({
+        purpose,
+        providerID: memoryEndpointProviderId(purpose),
+        baseURL: base,
+        modelID: model,
+        ...(draftKey ? { apiKey: draftKey } : {}),
+      })
+      setTestResult({
+        ok: result.ok,
+        message: probeMessage(result.code, result.message, result.cached),
+      })
+    } catch (e) {
+      console.error('[endpointDialog] testProvider', e)
+      setTestResult({ ok: false, message: t('settings.modelConfig.testError.INTERNAL') })
+    } finally {
+      setTestRunning(false)
+    }
+  }
 
   const title =
     purpose === 'embedding'
       ? t('settings.modelConfig.endpointDialog.embeddingTitle')
       : t('settings.modelConfig.endpointDialog.rerankTitle')
 
-  // Reuse stored key only if already on the independent virtual slot; legacy chat keys cannot transfer.
-  const canReuseStoredKey = virtualKeyConfigured
   const canSave =
     baseURL.trim().length > 0 && modelID.trim().length > 0 && (!!apiKey.trim() || canReuseStoredKey)
 
@@ -123,20 +201,40 @@ export function EndpointModelDialog({
               {error}
             </div>
           )}
+          {testResult && (
+            <div
+              className={cn('text-meta', testResult.ok ? 'text-success' : 'text-danger')}
+              role="status"
+              data-testid={`endpoint-${purpose}-test-result`}
+            >
+              {testResult.message}
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-          <div>
+          <div className="flex items-center gap-2">
             {existing && (
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={busy}
+                disabled={busy || testRunning}
                 data-testid={`endpoint-${purpose}-clear`}
                 onClick={() => void clear()}
               >
                 {t(`settings.modelConfig.purpose.${purpose}.clear`)}
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || testRunning || connection !== 'connected'}
+              data-testid={`endpoint-${purpose}-verify`}
+              onClick={() => void handleVerify()}
+            >
+              {testRunning
+                ? t('settings.modelConfig.testRunning')
+                : t('settings.modelConfig.testEndpoint')}
+            </Button>
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>
@@ -145,7 +243,7 @@ export function EndpointModelDialog({
             <Button
               variant="primary"
               size="sm"
-              disabled={busy || !canSave}
+              disabled={busy || testRunning || !canSave}
               data-testid={`endpoint-${purpose}-save`}
               onClick={() => void submit()}
             >

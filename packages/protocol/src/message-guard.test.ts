@@ -78,4 +78,16 @@ describe('message-guard', () => {
     expect(msg?.type).toBe('session:delete')
     expect(msg!.deleteDerivedMemories).toBe(true)
   })
+
+  it('accepts config:testProvider', () => {
+    const msg = parseClientMessage({
+      type: 'config:testProvider',
+      requestId: 'r1',
+      purpose: 'chat',
+      providerID: 'deepseek',
+      baseURL: 'https://api.deepseek.com/v1',
+    })
+    expect(msg?.type).toBe('config:testProvider')
+    expect(msg!.requestId).toBe('r1')
+  })
 })

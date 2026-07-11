@@ -57,6 +57,16 @@ export type ClientMessage =
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:setModel'; sessionId: string; llmProvider: string; model: string; baseURL?: string }
   | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
+  | {
+      type: 'config:testProvider'
+      requestId: string
+      purpose: 'chat' | 'embedding' | 'rerank'
+      providerID: string
+      baseURL?: string
+      modelID?: string
+      /** Optional unsaved key; never persisted by the probe handler. */
+      apiKey?: string
+    }
   | { type: 'fs:ls'; sessionId: string; path: string }
   | { type: 'fs:read'; sessionId: string; path: string }
   | { type: 'fs:lsCwd'; cwd: string; path: string }
@@ -125,6 +135,17 @@ export type ServerMessage =
   | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
   | { type: 'session:orchMode'; sessionId: string; orchMode: OrchestrationMode }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
+  | {
+      type: 'config:testProvider:result'
+      requestId: string
+      ok: boolean
+      code: KeyProbeCode
+      /** English detail from sidecar; UI maps `code` → i18n primarily. */
+      message: string
+      latencyMs?: number
+      checkedAt: number
+      cached?: boolean
+    }
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }
   | { type: 'error'; sessionId?: string; code: string; message: string }
@@ -204,4 +225,24 @@ export type ServerMessage =
       error?: string
     }
   | { type: 'session:memoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
+
+/** Taxonomy for provider key usability probes (config:testProvider). */
+export type KeyProbeCode =
+  | 'OK'
+  | 'MISSING_KEY'
+  | 'MISSING_BASE_URL'
+  | 'MISSING_MODEL'
+  | 'PROVIDER_DISABLED'
+  | 'INCOMPATIBLE_PROVIDER'
+  | 'AUTH_FAILED'
+  | 'MODEL_NOT_FOUND'
+  | 'RATE_LIMITED'
+  | 'NETWORK'
+  | 'PROVIDER_ERROR'
+  | 'PROBE_RATE_LIMITED'
+  | 'PROBE_BUSY'
+  | 'PROBE_UNSUPPORTED'
+  | 'PROBE_DISABLED'
+  | 'INVALID_RESPONSE'
+  | 'INTERNAL'
 

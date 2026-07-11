@@ -1,5 +1,7 @@
 import type { ClientMessage } from '@hip/protocol'
 import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
+import { runProviderProbe } from '../../config/provider-probe.js'
+import { safeErrorMessage } from '../error.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
 
 export const SESSION_MESSAGE_TYPES = new Set([
@@ -30,6 +32,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setPermissionMode',
   'session:setModel',
   'config:setActiveModel',
+  'config:testProvider',
   'workflow:run',
   'workflow:getActive',
 ])
@@ -228,6 +231,43 @@ export function handleSessionMessage(
         hasApiKey: ctx.hasApiKey(msg.providerID),
       })
       return
+    }
+    case 'config:testProvider': {
+      const { requestId } = msg
+      // Always-reply: every request must produce config:testProvider:result
+      // (outer SessionManager only emits generic `error` on throw).
+      return (async () => {
+        try {
+          if (process.env.HIP_KEY_PROBE === '0') {
+            send({
+              type: 'config:testProvider:result',
+              requestId,
+              ok: false,
+              code: 'PROBE_DISABLED',
+              message: 'Key probe disabled (HIP_KEY_PROBE=0)',
+              checkedAt: Date.now(),
+            })
+            return
+          }
+          const result = await runProviderProbe({
+            purpose: msg.purpose,
+            providerID: msg.providerID,
+            baseURL: msg.baseURL,
+            modelID: msg.modelID,
+            draftApiKey: msg.apiKey,
+          })
+          send({ type: 'config:testProvider:result', requestId, ...result })
+        } catch (err) {
+          send({
+            type: 'config:testProvider:result',
+            requestId,
+            ok: false,
+            code: 'INTERNAL',
+            message: safeErrorMessage(err),
+            checkedAt: Date.now(),
+          })
+        }
+      })()
     }
     case 'workflow:run': {
       const s = ctx.ensureSession(msg.sessionId, send)

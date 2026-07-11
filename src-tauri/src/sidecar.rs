@@ -156,7 +156,13 @@ pub fn read_provider_key(app: &AppHandle, provider_id: &str) -> Option<String> {
 }
 
 fn configured_provider_ids(app: &AppHandle) -> Vec<String> {
-    let mut ids = vec!["deepseek".to_string()];
+    // Always seed deepseek + virtual memory endpoint slots so stored keys are
+    // injected as env on spawn (matches chat providers; needed for key probe).
+    let mut ids = vec![
+        "deepseek".to_string(),
+        "hip-memory-embedding".to_string(),
+        "hip-memory-rerank".to_string(),
+    ];
     if let Some(path) = crate::paths::hip_config_path(app) {
         if let Ok(body) = std::fs::read_to_string(&path) {
             if let Ok(v) = toml::from_str::<toml::Value>(&body) {

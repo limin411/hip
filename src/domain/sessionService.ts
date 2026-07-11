@@ -11,6 +11,7 @@ import type {
   MemoryItem,
   MemoryScope,
   MemoryStatus,
+  KeyProbeCode,
 } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
@@ -41,9 +42,28 @@ function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
 
 type ServerMessageWaiter = {
   type: ServerMessage['type']
+  /** When set, only messages matching both type and predicate fulfill this waiter. */
+  predicate?: (msg: ServerMessage) => boolean
   resolve: (msg: ServerMessage) => void
   reject: (err: Error) => void
   timer: ReturnType<typeof setTimeout>
+}
+
+export type TestProviderRequest = {
+  purpose: 'chat' | 'embedding' | 'rerank'
+  providerID: string
+  baseURL?: string
+  modelID?: string
+  apiKey?: string
+}
+
+export type TestProviderResult = {
+  ok: boolean
+  code: KeyProbeCode
+  message: string
+  latencyMs?: number
+  checkedAt: number
+  cached?: boolean
 }
 
 export class SessionService {
@@ -79,9 +99,25 @@ export class SessionService {
     type: T,
     timeoutMs = 5000,
   ): Promise<Extract<ServerMessage, { type: T }>> {
+    return this.waitForServerMessageWhere(type, undefined, timeoutMs)
+  }
+
+  /**
+   * One-shot wait for the next inbound ServerMessage of `type` that also matches
+   * `predicate` (if provided). Non-matching messages of the same type leave this
+   * waiter intact so concurrent requestId RPCs do not cross-resolve.
+   */
+  private waitForServerMessageWhere<T extends ServerMessage['type']>(
+    type: T,
+    predicate: ((msg: Extract<ServerMessage, { type: T }>) => boolean) | undefined,
+    timeoutMs = 5000,
+  ): Promise<Extract<ServerMessage, { type: T }>> {
     return new Promise((resolve, reject) => {
       const entry: ServerMessageWaiter = {
         type,
+        predicate: predicate
+          ? (msg) => msg.type === type && predicate(msg as Extract<ServerMessage, { type: T }>)
+          : undefined,
         resolve: (msg) => resolve(msg as Extract<ServerMessage, { type: T }>),
         reject,
         timer: setTimeout(() => {
@@ -137,7 +173,9 @@ export class SessionService {
   }
 
   private fulfillWaiters(msg: ServerMessage): void {
-    const idx = this.waiters.findIndex((w) => w.type === msg.type)
+    const idx = this.waiters.findIndex(
+      (w) => w.type === msg.type && (!w.predicate || w.predicate(msg)),
+    )
     if (idx < 0) return
     const [w] = this.waiters.splice(idx, 1)
     clearTimeout(w.timer)
@@ -545,6 +583,37 @@ export class SessionService {
   }
 
   // ── Cross-session memory ──────────────────────────────────────────────────
+
+  /**
+   * Probe whether a provider (or memory endpoint) API key works.
+   * Product A: provider-key usability, not per-model entitlement.
+   */
+  async testProvider(req: TestProviderRequest, timeoutMs = 20_000): Promise<TestProviderResult> {
+    const requestId = nanoid()
+    const wait = this.waitForServerMessageWhere(
+      'config:testProvider:result',
+      (m) => m.requestId === requestId,
+      timeoutMs,
+    )
+    this.transport.send({
+      type: 'config:testProvider',
+      requestId,
+      purpose: req.purpose,
+      providerID: req.providerID,
+      ...(req.baseURL !== undefined ? { baseURL: req.baseURL } : {}),
+      ...(req.modelID !== undefined ? { modelID: req.modelID } : {}),
+      ...(req.apiKey !== undefined ? { apiKey: req.apiKey } : {}),
+    })
+    const msg = await wait
+    return {
+      ok: msg.ok,
+      code: msg.code,
+      message: msg.message,
+      latencyMs: msg.latencyMs,
+      checkedAt: msg.checkedAt,
+      cached: msg.cached,
+    }
+  }
 
   async getMemoryConfig(): Promise<MemoryFileConfig> {
     const wait = this.waitForServerMessage('memory:config')

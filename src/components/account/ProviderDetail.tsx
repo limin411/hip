@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Check, Eye, EyeOff } from 'lucide-react'
+import type { KeyProbeCode } from '@hip/protocol'
 import type { CatalogProvider, CatalogModel } from '@/ipc/catalog'
 import { filterModels, NO_CAPS, type ModelCaps } from '@/lib/modelFilter'
 import { modelBadges, type ModelCapKey } from '@/lib/modelBadges'
@@ -8,6 +9,19 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/utils'
+import { sessionService } from '@/domain/sessionService'
+import { useDomainStore } from '@/domain/sessionStore'
+
+type KeyProbeStatus =
+  | { state: 'idle' }
+  | { state: 'running' }
+  | {
+      state: 'done'
+      ok: boolean
+      code: KeyProbeCode
+      message: string
+      cached?: boolean
+    }
 
 /** The capability toggles shown above the model list; each maps to a ModelCaps key + an i18n label. */
 const CAP_FILTERS = [
@@ -59,6 +73,7 @@ export function ProviderDetail({
   roleActions?: ReactNode
 }) {
   const { t } = useTranslation()
+  const connection = useDomainStore((s) => s.connection)
   const [value, setValue] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [baseURLValue, setBaseURLValue] = useState(baseURL)
@@ -66,12 +81,38 @@ export function ProviderDetail({
   const [error, setError] = useState<string | null>(null)
   const [modelQuery, setModelQuery] = useState('')
   const [caps, setCaps] = useState<ModelCaps>(NO_CAPS)
-  const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null)
+  const [testStatus, setTestStatus] = useState<KeyProbeStatus>({ state: 'idle' })
+
+  function probeMessage(code: KeyProbeCode, fallback: string, cached?: boolean): string {
+    if (code === 'OK') {
+      return cached
+        ? t('settings.modelConfig.testSuccessCached')
+        : t('settings.modelConfig.testSuccess')
+    }
+    const byCode: Record<Exclude<KeyProbeCode, 'OK'>, string> = {
+      MISSING_KEY: t('settings.modelConfig.testError.MISSING_KEY'),
+      MISSING_BASE_URL: t('settings.modelConfig.testError.MISSING_BASE_URL'),
+      MISSING_MODEL: t('settings.modelConfig.testError.MISSING_MODEL'),
+      PROVIDER_DISABLED: t('settings.modelConfig.testError.PROVIDER_DISABLED'),
+      INCOMPATIBLE_PROVIDER: t('settings.modelConfig.testError.INCOMPATIBLE_PROVIDER'),
+      AUTH_FAILED: t('settings.modelConfig.testError.AUTH_FAILED'),
+      MODEL_NOT_FOUND: t('settings.modelConfig.testError.MODEL_NOT_FOUND'),
+      RATE_LIMITED: t('settings.modelConfig.testError.RATE_LIMITED'),
+      NETWORK: t('settings.modelConfig.testError.NETWORK'),
+      PROVIDER_ERROR: t('settings.modelConfig.testError.PROVIDER_ERROR'),
+      PROBE_RATE_LIMITED: t('settings.modelConfig.testError.PROBE_RATE_LIMITED'),
+      PROBE_BUSY: t('settings.modelConfig.testError.PROBE_BUSY'),
+      PROBE_UNSUPPORTED: t('settings.modelConfig.testError.PROBE_UNSUPPORTED'),
+      PROBE_DISABLED: t('settings.modelConfig.testError.PROBE_DISABLED'),
+      INVALID_RESPONSE: t('settings.modelConfig.testError.INVALID_RESPONSE'),
+      INTERNAL: t('settings.modelConfig.testError.INTERNAL'),
+    }
+    return byCode[code] || fallback || t('settings.modelConfig.error')
+  }
 
   async function run(fn: () => Promise<void>) {
     setBusy(true)
     setError(null)
-    setTest(null)
     try {
       await fn()
       setValue('')
@@ -87,7 +128,6 @@ export function ProviderDetail({
   async function saveBaseURL() {
     setBusy(true)
     setError(null)
-    setTest(null)
     try {
       await onSaveBaseURL(baseURLValue.trim())
     } catch (e) {
@@ -102,7 +142,6 @@ export function ProviderDetail({
   async function setProviderEnabled(next: boolean) {
     setBusy(true)
     setError(null)
-    setTest(null)
     try {
       await onSetEnabled(next)
     } catch (e) {
@@ -114,25 +153,77 @@ export function ProviderDetail({
   }
 
   async function handleTest() {
-    setBusy(true)
+    // Local fast-path: disabled providers must not probe (product rule).
+    if (!enabled) {
+      setTestStatus({
+        state: 'done',
+        ok: false,
+        code: 'PROVIDER_DISABLED',
+        message: t('settings.modelConfig.testDisabled'),
+      })
+      return
+    }
+    const draftKey = value.trim()
+    if (!configured && !draftKey) {
+      setTestStatus({
+        state: 'done',
+        ok: false,
+        code: 'MISSING_KEY',
+        message: t('settings.modelConfig.testNoKey'),
+      })
+      return
+    }
+    const base = baseURLValue.trim()
+    if (!base && provider.id !== 'anthropic') {
+      setTestStatus({
+        state: 'done',
+        ok: false,
+        code: 'MISSING_BASE_URL',
+        message: t('settings.modelConfig.testNoBaseURL'),
+      })
+      return
+    }
+    if (connection !== 'connected') {
+      setTestStatus({
+        state: 'done',
+        ok: false,
+        code: 'NETWORK',
+        message: t('settings.modelConfig.testError.NETWORK'),
+      })
+      return
+    }
+
     setError(null)
-    setTest(null)
-    // Simulate a brief validation beat so the button feels like it did something.
-    await new Promise((r) => setTimeout(r, 350))
+    setTestStatus({ state: 'running' })
     try {
-      if (!enabled) {
-        setTest({ ok: false, message: t('settings.modelConfig.testDisabled') })
-      } else if (!configured) {
-        setTest({ ok: false, message: t('settings.modelConfig.testNoKey') })
-      } else if (!baseURLValue.trim()) {
-        setTest({ ok: false, message: t('settings.modelConfig.testNoBaseURL') })
-      } else {
-        setTest({ ok: true, message: t('settings.modelConfig.testSuccess') })
-      }
-    } finally {
-      setBusy(false)
+      const activeModel = Object.values(provider.models).find((m) => isActive(m.id))
+      const result = await sessionService.testProvider({
+        purpose: 'chat',
+        providerID: provider.id,
+        baseURL: base,
+        ...(activeModel ? { modelID: activeModel.id } : {}),
+        ...(draftKey ? { apiKey: draftKey } : {}),
+      })
+      setTestStatus({
+        state: 'done',
+        ok: result.ok,
+        code: result.code,
+        message: probeMessage(result.code, result.message, result.cached),
+        cached: result.cached,
+      })
+    } catch (e) {
+      console.error('[modelConfig] testProvider', e)
+      setTestStatus({
+        state: 'done',
+        ok: false,
+        code: 'INTERNAL',
+        message: t('settings.modelConfig.testError.INTERNAL'),
+      })
     }
   }
+
+  const testRunning = testStatus.state === 'running'
+  const lastProbeFailed = testStatus.state === 'done' && !testStatus.ok
 
   const allModels = Object.values(provider.models)
   const current = allModels.find((m) => isActive(m.id))
@@ -220,19 +311,31 @@ export function ProviderDetail({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => void handleTest()}>
-              {t('settings.modelConfig.test')}
-            </Button>
-            {test && (
-              <span
-                className={cn(
-                  'text-caption',
-                  test.ok ? 'text-success' : 'text-danger',
-                )}
+          <div className="flex flex-col gap-1.5 pt-1">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!enabled || testRunning || connection !== 'connected'}
+                onClick={() => void handleTest()}
               >
-                {test.message}
-              </span>
+                {testRunning ? t('settings.modelConfig.testRunning') : t('settings.modelConfig.test')}
+              </Button>
+              {testStatus.state === 'done' && (
+                <span
+                  className={cn(
+                    'text-caption',
+                    testStatus.ok ? 'text-success' : 'text-danger',
+                  )}
+                >
+                  {testStatus.message}
+                </span>
+              )}
+            </div>
+            {lastProbeFailed && (
+              <div className="text-caption text-warning" role="status">
+                {t('settings.modelConfig.testProbeFailedHint')}
+              </div>
             )}
           </div>
 

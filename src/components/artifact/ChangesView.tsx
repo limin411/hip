@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, GitCommit, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
@@ -9,6 +8,7 @@ import { useUiStore } from '@/store/uiStore'
 import { formatRelativeTime } from '@/lib/datetime'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { Button } from '@/components/ui/Button'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 
 export function ChangesView() {
   const { t, i18n } = useTranslation()
@@ -49,14 +49,17 @@ export function ChangesView() {
       <div className="flex min-h-0 flex-[3] flex-col border-b border-border">
         <div className="flex h-8 shrink-0 items-center justify-between px-3 text-meta text-ink-secondary">
           <span>{t('artifact.changesView.uncommitted')}</span>
-          <div className="inline-flex overflow-hidden rounded border border-border text-caption" data-testid="diff-view-toggle">
-            {(['unified', 'split'] as const).map((m) => (
-              <button key={m} onClick={() => setDiffViewMode(m)}
-                className={cn('px-2 py-0.5', diffViewMode === m ? 'bg-accent/15 text-accent' : 'text-ink-tertiary hover:text-ink')}>
-                {t(m === 'unified' ? 'artifact.diffView.viewUnified' : 'artifact.diffView.viewSplit')}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            data-testid="diff-view-toggle"
+            aria-label={t('artifact.diffView.viewUnified')}
+            size="sm"
+            value={diffViewMode}
+            onChange={setDiffViewMode}
+            options={[
+              { value: 'unified', label: t('artifact.diffView.viewUnified') },
+              { value: 'split', label: t('artifact.diffView.viewSplit') },
+            ]}
+          />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {diff.status !== 'ready' && !diff.state ? (

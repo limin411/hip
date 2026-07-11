@@ -673,7 +673,7 @@ function McpServerEditor({
         <Switch checked={form.enabled} onCheckedChange={(v) => patch({ enabled: v })} ariaLabel={t('settings.mcp.enableThis')} />
         <span className="text-body text-ink-secondary">{t('settings.mcp.enableThis')}</span>
       </div>
-      <Button variant="outline" size="sm" onClick={onCancel}>
+      <Button variant="ghost" size="sm" onClick={onCancel}>
         {t('settings.mcp.cancel')}
       </Button>
       <Button variant="primary" size="sm" disabled={busy || !isMcpDraftValid(form)} onClick={() => void submit()}>
@@ -816,7 +816,7 @@ function DeleteServerDialog({
         <p className="text-body text-ink-secondary">{t('settings.mcp.deleteConfirmBody')}</p>
         {error && <p className="mt-3 text-meta text-danger">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel} disabled={busy}>
+          <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
             {t('settings.mcp.cancel')}
           </Button>
           <Button variant="danger" size="sm" onClick={() => void handleConfirm()} disabled={busy}>

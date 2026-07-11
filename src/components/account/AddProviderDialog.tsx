@@ -56,7 +56,7 @@ export function AddProviderDialog({ onDone, onCancel }: { onDone: (id: string) =
           {error && <div className="text-meta text-danger">{error}</div>}
         </div>
         <div className="flex justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-          <Button variant="outline" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
           <Button variant="primary" size="sm" disabled={busy || !name.trim() || !baseURL.trim()} onClick={() => void submit()}>

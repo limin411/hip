@@ -25,7 +25,7 @@ export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessio
           {t('history.deleteSessionConfirmBody')}
         </DialogPrimitive.Description>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             {t('common.cancel')}
           </Button>
           <Button variant="danger" size="sm" onClick={onConfirm}>

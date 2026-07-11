@@ -101,7 +101,7 @@ export function PluginConfig() {
           <div className="p-5">
             <p className="text-body text-ink-secondary">{t('settings.plugins.deleteConfirmBody')}</p>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>
+              <Button variant="ghost" size="sm" onClick={() => setDeleting(null)}>
                 {t('settings.plugins.cancel')}
               </Button>
               <Button

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>hip · Button states (Cursor-inspired)</title>
+  <style>
+    :root {
+      --bg-app: #ffffff;
+      --bg-subtle: #f5f5f5;
+      --bg-muted: #efefef;
+      --border: #e4e4e4;
+      --ink: #111111;
+      --ink-2: #666666;
+      --ink-3: #757575;
+      --surface: #ffffff;
+      --surface-subtle: #f5f5f5;
+      --surface-muted: #efefef;
+      --state-hover: #efefef;
+      --danger: #c63b3b;
+      --on-accent: #ffffff;
+    }
+    html.dark {
+      --bg-app: #0f0f0f;
+      --bg-subtle: #1a1a1a;
+      --bg-muted: #262626;
+      --border: #333333;
+      --ink: #f0f0f0;
+      --ink-2: #a0a0a0;
+      --ink-3: #808080;
+      --surface: #0f0f0f;
+      --surface-subtle: #1a1a1a;
+      --surface-muted: #262626;
+      --state-hover: #262626;
+      --danger: #ff5252;
+      --on-accent: #111111;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: var(--bg-app);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+    .page { max-width: 1040px; margin: 0 auto; padding: 28px 22px 64px; }
+    header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+      margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.02em; }
+    .sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-2); max-width: 560px; }
+    .toggle {
+      border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+      border-radius: 8px; padding: 8px 12px; font-size: 12px; cursor: pointer;
+    }
+    section { margin-bottom: 28px; }
+    section > h2 {
+      margin: 0 0 8px; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3);
+    }
+    .card {
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+      background: var(--surface);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+    th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); background: var(--surface-subtle); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    .name { font-weight: 600; width: 96px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 14px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border: 1px solid transparent; font-weight: 500; font-size: 13px; font-family: inherit;
+      cursor: pointer; transition: 0.1s; line-height: 1.3;
+    }
+    .btn:active:not(:disabled) { transform: scale(0.985); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg-app), 0 0 0 3.5px color-mix(in srgb, var(--ink) 28%, transparent); }
+
+    .sm { height: 28px; padding: 0 10px; border-radius: 6px; }
+    .md { height: 32px; padding: 0 12px; border-radius: 8px; }
+    .lg { height: 36px; padding: 0 14px; border-radius: 8px; }
+    .icon { height: 28px; width: 28px; padding: 0; border-radius: 8px; }
+
+    .primary { background: var(--ink); color: var(--surface); }
+    .primary:hover:not(:disabled) { opacity: 0.9; }
+    .secondary { background: var(--surface-subtle); color: var(--ink); }
+    .secondary:hover:not(:disabled) { background: var(--surface-muted); }
+    .outline { border-color: var(--border); background: transparent; color: var(--ink); }
+    .outline:hover:not(:disabled) { background: var(--state-hover); }
+    .ghost { background: transparent; color: var(--ink-2); }
+    .ghost:hover:not(:disabled) { background: var(--state-hover); color: var(--ink); }
+    .danger { background: var(--danger); color: var(--on-accent); }
+    .dangerSoft { border-color: color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger); background: transparent; }
+    .dangerSoft:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+    .send {
+      width: 28px; height: 28px; border-radius: 999px; border: none;
+      background: var(--ink); color: var(--surface); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .send:disabled { opacity: 0.4; }
+    .composer {
+      display: flex; align-items: flex-end; gap: 8px;
+      border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px;
+      background: var(--surface);
+    }
+    .composer .field { flex: 1; color: var(--ink-2); padding: 6px 0; }
+
+    .seg {
+      display: inline-flex; gap: 2px; padding: 2px;
+      border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted);
+    }
+    .seg button {
+      border: none; background: transparent; color: var(--ink-3);
+      font-size: 11px; font-weight: 500; height: 24px; padding: 0 8px; border-radius: 6px;
+      cursor: pointer; font-family: inherit;
+    }
+    .seg button[aria-selected="true"] {
+      background: var(--surface); color: var(--ink);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06); outline: 1px solid var(--border);
+    }
+
+    .note { margin-top: 8px; font-size: 11px; color: var(--ink-3); padding: 0 2px; }
+    a { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>Button states · Cursor-inspired <span style="font-weight:500;color:var(--ink-3);font-size:12px;">implemented</span></h1>
+        <p class="sub">对齐 <code>buttonVariants</code>：solid inverse primary · denser sizes · dangerSoft · Segmented。对照提案见 <a href="./cursor-inspired.html">cursor-inspired.html</a>。</p>
+      </div>
+      <button type="button" class="toggle" id="themeToggle">切换 Dark</button>
+    </header>
+
+    <section>
+      <h2>Variants × states</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>Variant</th><th>Default</th><th>Disabled</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="name">primary</td>
+              <td><button type="button" class="btn md primary">Save</button></td>
+              <td><button type="button" class="btn md primary" disabled>Save</button></td>
+            </tr>
+            <tr>
+              <td class="name">secondary</td>
+              <td><button type="button" class="btn md secondary">Secondary</button></td>
+              <td><button type="button" class="btn md secondary" disabled>Secondary</button></td>
+            </tr>
+            <tr>
+              <td class="name">outline</td>
+              <td><button type="button" class="btn md outline">Outline</button></td>
+              <td><button type="button" class="btn md outline" disabled>Outline</button></td>
+            </tr>
+            <tr>
+              <td class="name">ghost</td>
+              <td><button type="button" class="btn md ghost">Cancel</button></td>
+              <td><button type="button" class="btn md ghost" disabled>Cancel</button></td>
+            </tr>
+            <tr>
+              <td class="name">danger</td>
+              <td><button type="button" class="btn md danger">Delete</button></td>
+              <td><button type="button" class="btn md danger" disabled>Delete</button></td>
+            </tr>
+            <tr>
+              <td class="name">dangerSoft</td>
+              <td><button type="button" class="btn md dangerSoft">Remove</button></td>
+              <td><button type="button" class="btn md dangerSoft" disabled>Remove</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Sizes</h2>
+      <div class="card row">
+        <button type="button" class="btn sm primary">sm 28</button>
+        <button type="button" class="btn md primary">md 32</button>
+        <button type="button" class="btn lg primary">lg 36</button>
+        <button type="button" class="btn icon primary">＋</button>
+        <button type="button" class="send" aria-label="Send">↑</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Composer + dialog footer</h2>
+      <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:14px;">
+        <div class="composer">
+          <div class="field">Ask hip to do something…</div>
+          <button type="button" class="send" aria-label="Send">↑</button>
+        </div>
+        <div class="row" style="padding:0;justify-content:flex-end;">
+          <button type="button" class="btn sm ghost">Cancel</button>
+          <button type="button" class="btn sm primary">Save</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>SegmentedControl</h2>
+      <div class="card row">
+        <div class="seg" role="tablist">
+          <button type="button" aria-selected="true">Unified</button>
+          <button type="button" aria-selected="false">Split</button>
+        </div>
+        <div class="seg" role="tablist">
+          <button type="button" aria-selected="false">This turn</button>
+          <button type="button" aria-selected="true">Since then</button>
+          <button type="button" aria-selected="false">Since start</button>
+        </div>
+      </div>
+      <p class="note">接入：ChangesView diff 模式 · TimelineView checkpoint 模式</p>
+    </section>
+  </div>
+  <script>
+    const root = document.documentElement;
+    const btn = document.getElementById('themeToggle');
+    function sync() { btn.textContent = root.classList.contains('dark') ? '切换 Light' : '切换 Dark'; }
+    btn.addEventListener('click', () => { root.classList.toggle('dark'); sync(); });
+    document.querySelectorAll('.seg').forEach((seg) => {
+      seg.querySelectorAll('button').forEach((b) => {
+        b.addEventListener('click', () => {
+          seg.querySelectorAll('button').forEach((x) => x.setAttribute('aria-selected', 'false'));
+          b.setAttribute('aria-selected', 'true');
+        });
+      });
+    });
+    sync();
+  </script>
+</body>
+</html>

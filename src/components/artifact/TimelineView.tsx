@@ -12,6 +12,7 @@ import { checkpointModeOptions } from '@/lib/checkpointMode'
 import { DiffDisplay, Empty } from './DiffDisplay'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 
 const MODE_KEY = { 'this-turn': 'artifact.timelineView.modeThisTurn', 'since-then': 'artifact.timelineView.modeSinceThen', 'since-start': 'artifact.timelineView.modeSinceStart' } as const
 
@@ -122,16 +123,18 @@ export function TimelineView() {
         })}
       </div>
       {/* mode toggle */}
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
-        <div className="inline-flex overflow-hidden rounded border border-border text-caption" data-testid="timeline-mode-toggle">
-          {options.map((m) => (
-            <button key={m} onClick={() => setMode(m)}
-              className={cn('px-2 py-0.5', m === effectiveMode ? 'bg-accent/15 text-accent' : 'text-ink-tertiary hover:text-ink')}>
-              {t(MODE_KEY[m])}
-            </button>
-          ))}
+      {options.length > 0 && effectiveMode && (
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2">
+          <SegmentedControl
+            data-testid="timeline-mode-toggle"
+            aria-label={t('artifact.timelineView.modeThisTurn')}
+            size="sm"
+            value={effectiveMode}
+            onChange={setMode}
+            options={options.map((m) => ({ value: m, label: t(MODE_KEY[m]) }))}
+          />
         </div>
-      </div>
+      )}
       {/* diff */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {!cur || cur.status === 'loading' ? (
@@ -170,7 +173,7 @@ export function TimelineView() {
               )}
               <div className="flex justify-end gap-2">
                 {/* Cancel is ALWAYS enabled so a failed/hung revert can be backed out of. */}
-                <Button variant="secondary" size="sm" data-testid="timeline-revert-cancel" onClick={closeRevert}>{t('common.cancel')}</Button>
+                <Button variant="ghost" size="sm" data-testid="timeline-revert-cancel" onClick={closeRevert}>{t('common.cancel')}</Button>
                 <Button
                   size="sm"
                   disabled={reverting || sessionStatus === 'running'}

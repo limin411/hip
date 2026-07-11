@@ -115,7 +115,7 @@ export function AgentEditor({
             <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-            <Button variant="outline" size="sm" onClick={onCancel}>
+            <Button variant="ghost" size="sm" onClick={onCancel}>
               {t('settings.agents.cancel')}
             </Button>
           </div>
@@ -271,7 +271,7 @@ export function AgentEditor({
               />
               <span className="text-body text-ink-secondary">{t('settings.agents.enableThis')}</span>
             </div>
-            <Button variant="outline" size="sm" onClick={onCancel}>
+            <Button variant="ghost" size="sm" onClick={onCancel}>
               {t('settings.agents.cancel')}
             </Button>
             <Button variant="primary" size="sm" disabled={busy || !isAgentDraftValid(form)} onClick={() => void submit()}>

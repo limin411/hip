@@ -20,13 +20,13 @@ describe('AuthButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1)
   })
 
-  it('uses elevated primary styles for solid (not brand sage fill)', () => {
+  it('uses solid inverse primary for solid (not sage fill)', () => {
     const { getByRole } = render(
       <AuthButton icon={Mail} label="Email" onClick={() => {}} variant="solid" />,
     )
     const btn = getByRole('button', { name: 'Email' })
-    expect(btn.className).toMatch(/border-ink/)
-    expect(btn.className).toMatch(/bg-surface/)
+    expect(btn.className).toMatch(/\bbg-ink\b/)
+    expect(btn.className).toMatch(/\btext-surface\b/)
     expect(btn.className).not.toMatch(/\bbg-accent\b/)
     expect(btn.className).not.toMatch(/text-on-accent/)
   })

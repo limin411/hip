@@ -3,27 +3,29 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 rounded-md font-medium transition active:scale-[0.97] duration-100 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:pointer-events-none',
+  'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition active:scale-[0.985] duration-100 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        // Neutral elevated CTA (login design D) — no sage fill + light text
+        // Cursor-inspired solid inverse — monochrome fill, never sage paint
         primary:
-          'border border-ink bg-surface text-ink font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)] hover:bg-surface-subtle focus-visible:ring-ink/25',
+          'bg-ink text-surface hover:opacity-90 focus-visible:ring-ink/30',
         secondary:
-          'border border-border bg-surface-subtle text-ink hover:bg-surface-muted focus-visible:ring-ink/20',
+          'bg-surface-subtle text-ink hover:bg-surface-muted focus-visible:ring-ink/20',
         ghost:
           'text-ink-secondary hover:bg-state-hover hover:text-ink focus-visible:ring-ink/20',
         outline:
-          'border border-border bg-surface text-ink hover:bg-surface-muted focus-visible:ring-ink/20',
+          'border-border bg-transparent text-ink hover:bg-state-hover focus-visible:ring-ink/20',
         danger:
           'bg-danger text-on-accent hover:bg-danger/90 focus-visible:ring-danger/40',
+        dangerSoft:
+          'border-danger/30 text-danger hover:bg-danger/10 focus-visible:ring-danger/30',
       },
       size: {
-        sm: 'h-8 px-3 text-body',
-        md: 'h-9 px-4 text-body',
-        lg: 'h-10 px-5 text-body',
-        icon: 'h-8 w-8 p-0 text-body',
+        sm: 'h-7 rounded-md px-2.5 text-body',
+        md: 'h-8 rounded-lg px-3 text-body',
+        lg: 'h-9 rounded-lg px-3.5 text-body',
+        icon: 'h-7 w-7 rounded-lg p-0 text-body',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

@@ -82,24 +82,26 @@ export function Composer({
               type="button"
               variant="primary"
               size="icon"
+              className="h-7 w-7 shrink-0 rounded-full"
               onClick={onStop}
               disabled={reconnecting}
               data-testid="composer-stop"
               title={t('chat.stop')}
             >
-              <Square size={15} />
+              <Square size={14} />
             </Button>
           </div>
         ) : (
           <Button
             variant="primary"
             size="icon"
+            className="h-7 w-7 shrink-0 rounded-full"
             onClick={onSubmit}
             disabled={(!value.trim() && attachments.length === 0) || submitDisabled}
             data-testid="composer-send"
             title={t('chat.send')}
           >
-            <ArrowUp size={17} />
+            <ArrowUp size={15} />
           </Button>
         )}
       </div>

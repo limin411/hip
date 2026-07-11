@@ -25,7 +25,7 @@ export function DeleteAgentDialog({
       <div className="p-5">
         <p className="text-body text-ink-secondary">{t('settings.agents.deleteConfirmBody')}</p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             {t('settings.agents.cancel')}
           </Button>
           <Button variant="danger" size="sm" onClick={onConfirm}>

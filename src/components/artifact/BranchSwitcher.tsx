@@ -85,7 +85,7 @@ export function BranchSwitcher() {
           )}
           <div className="flex justify-end gap-2">
             {/* Cancel is ALWAYS enabled so a failed/hung switch can be backed out of. */}
-            <Button variant="secondary" size="sm" onClick={closeConfirm}>{t('common.cancel')}</Button>
+            <Button variant="ghost" size="sm" onClick={closeConfirm}>{t('common.cancel')}</Button>
             <Button
               size="sm"
               disabled={switching}

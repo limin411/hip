@@ -96,7 +96,7 @@ export function PluginConfigView({
             data-testid="plugin-install-url"
           />
           <div className="mt-3 flex justify-end gap-2">
-            <Button variant="outline" size="sm" disabled={submitted} onClick={onHideForm}>
+            <Button variant="ghost" size="sm" disabled={submitted} onClick={onHideForm}>
               {t('settings.plugins.cancel')}
             </Button>
             <Button

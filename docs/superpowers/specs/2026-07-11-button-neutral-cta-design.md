@@ -4,6 +4,7 @@
 |------|-----|
 | 日期 | 2026-07-11 |
 | 状态 | **已实现**（P0–P1；MessageBubble/ThinkingBubble 身份 chip 仍用 accent 填充，见 Non-Goals / follow-up） |
+| 后续 | primary 形态被 **Cursor 化升级** 覆盖：见 [`2026-07-11-button-cursor-inspired-design.md`](./2026-07-11-button-cursor-inspired-design.md)（solid inverse；仍禁止绿底 CTA） |
 | 类型 | 设计系统原语变更 + 全页扫尾（不扩产品面） |
 | 参照 | 登录页右侧 **方案 D**（`AuthButton` elevated stack） |
 | 前置 | `2026-07-11-visual-design-style-architecture` 已落地；`Button` + `buttonVariants` 为唯一按钮真相源 |

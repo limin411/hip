@@ -115,7 +115,7 @@ export class MemoryStore {
         source=excluded.source,
         source_session_id=excluded.source_session_id,
         tags_json=excluded.tags_json,
-        created_at=excluded.created_at,
+        created_at=memory_items.created_at,
         updated_at=excluded.updated_at,
         last_used_at=excluded.last_used_at,
         use_count=excluded.use_count,
@@ -282,7 +282,7 @@ export class MemoryStore {
         lease_until=excluded.lease_until,
         retry_after=excluded.retry_after,
         source_updated_at=excluded.source_updated_at,
-        created_at=excluded.created_at
+        created_at=memory_stage1.created_at
     `).run(
       row.id,
       row.sessionId,

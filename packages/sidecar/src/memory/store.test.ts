@@ -57,6 +57,28 @@ describe('MemoryStore', () => {
     expect(store.listItems({ projectKeyHash: 'other' })).toHaveLength(0)
   })
 
+  it('upsert twice preserves original createdAt', () => {
+    store.upsertItem(item({
+      id: 'm-created',
+      title: 'first',
+      content: 'v1',
+      createdAt: 100,
+      updatedAt: 100,
+    }))
+    store.upsertItem(item({
+      id: 'm-created',
+      title: 'second',
+      content: 'v2',
+      createdAt: 999,
+      updatedAt: 200,
+    }))
+    const got = store.getItem('m-created')
+    expect(got?.createdAt).toBe(100)
+    expect(got?.updatedAt).toBe(200)
+    expect(got?.title).toBe('second')
+    expect(got?.content).toBe('v2')
+  })
+
   it('search finds content; excludes non-active status', () => {
     store.upsertItem(item({ id: 'a', title: 'Active tip', content: '配置密钥请在设置中配置' }))
     store.upsertItem(item({

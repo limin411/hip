@@ -74,6 +74,7 @@ import {
   loadMemoryConfig,
   resolveSessionMemoryFlags,
   refreshMemoryCoreSnapshot,
+  scheduleMemoryExtractAfterTurn,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
 import { tryEnableMemoriesFts } from '../persistence/schema.js'
@@ -529,6 +530,9 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   if (isFirstTurn) {
     await host.generateFirstTurnTitle(input, agentText, _send)
   }
+
+  // Background Phase1 memory extract (fire-and-forget; gated by generate/incognito flags).
+  scheduleMemoryExtractAfterTurn(host)
 
   return agentText
 }
@@ -1038,5 +1042,9 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
 
   const ckptLabel = (finalText || '').replace(/\s+/g, ' ').trim().slice(0, 72) || null
   void host.captureCheckpoint(turnId, ckptLabel, send).catch((err) => logNonCritical('captureCheckpoint', err))
+
+  // Background Phase1 memory extract (fire-and-forget; gated by generate/incognito flags).
+  scheduleMemoryExtractAfterTurn(host)
+
   return finalText
 }

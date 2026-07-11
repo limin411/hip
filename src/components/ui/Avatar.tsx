@@ -26,7 +26,7 @@ export function Avatar({ name, src, size = 32, shape = 'circle', gradient, ring,
         'inline-flex shrink-0 items-center justify-center overflow-hidden font-semibold',
         shape === 'circle' ? 'rounded-full' : 'rounded-lg',
         !hasGradient && 'bg-accent-subtle text-meta text-accent-strong',
-        hasGradient && 'text-meta text-white',
+        hasGradient && 'text-meta text-on-accent',
         ring && 'ring-1 ring-transparent hover:ring-border',
         className,
       )}

@@ -26,8 +26,8 @@ export function LoginScreen() {
       {/* 右侧登录方式 */}
       <div className="flex flex-1 items-center justify-center px-8">
         <div className="w-full max-w-sm" data-tauri-drag-region="false" data-no-drag>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{t('login.title')}</h1>
-          <p className="mt-1.5 text-sm text-ink-secondary">{t('login.subtitle')}</p>
+          <h1 className="text-display font-bold tracking-tight text-ink">{t('login.title')}</h1>
+          <p className="mt-1.5 text-meta text-ink-secondary">{t('login.subtitle')}</p>
 
           <div className="mt-8 flex flex-col gap-3">
             <AuthButton icon={Mail} label={t('login.email')} onClick={enter} variant="solid" />
@@ -37,7 +37,7 @@ export function LoginScreen() {
 
           <button
             onClick={enter}
-            className="mt-6 flex w-full items-center justify-center gap-1.5 text-sm text-ink-tertiary transition-colors hover:text-ink-secondary"
+            className="mt-6 flex w-full items-center justify-center gap-1.5 text-meta text-ink-tertiary transition-colors hover:text-ink-secondary"
           >
             {t('login.skip')}
             <ArrowRight size={15} />

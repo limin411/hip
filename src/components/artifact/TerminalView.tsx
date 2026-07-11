@@ -9,6 +9,7 @@ import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
 import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
 import { useUiStore } from '@/store/uiStore'
 import { buildXtermTheme, isDarkDom } from './terminalTheme'
+import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 /**
@@ -251,14 +252,15 @@ export function TerminalView() {
           {t('artifact.terminalView.noCwd')}
         </div>
         <div className="max-w-[240px] text-meta">{t('artifact.terminalView.noCwdDesc')}</div>
-        <button
+        <Button
           type="button"
           data-testid="terminal-select-folder"
           onClick={() => void chooseFolder()}
-          className="rounded-md bg-accent px-3 py-1.5 text-body font-medium text-white transition-colors hover:bg-accent-hover"
+          variant="primary"
+          size="sm"
         >
           {t('artifact.terminalView.selectFolder')}
-        </button>
+        </Button>
       </div>
     )
   }

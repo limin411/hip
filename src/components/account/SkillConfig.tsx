@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import { Sparkles, Upload, FileText, Eye, Trash2, MoreVertical, TerminalSquare, Zap, GitFork, Wrench, BookOpen } from 'lucide-react'
+import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import type { PluginMeta, SkillMeta } from '@hip/protocol'
 import { useSkillsStore } from '@/store/skillsStore'
 import { usePluginsStore } from '@/store/pluginsStore'
@@ -382,9 +382,7 @@ function SkillViewModal({ skill, onClose }: { skill: SkillMeta; onClose: () => v
         ) : body === null ? (
           <div className="text-body text-ink-tertiary">…</div>
         ) : (
-          <div className="max-w-none text-prose leading-relaxed text-ink">
-            <ReactMarkdown components={markdownComponents}>{body}</ReactMarkdown>
-          </div>
+          <MarkdownBody content={body} components={markdownComponents} />
         )}
       </div>
     </Modal>

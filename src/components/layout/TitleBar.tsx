@@ -46,7 +46,7 @@ export function TitleBar() {
             data-tauri-drag-region="false"
             data-no-drag
             onClick={handleBack}
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-body text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
           >
             <ChevronLeft size={16} />
             {t('common.back')}

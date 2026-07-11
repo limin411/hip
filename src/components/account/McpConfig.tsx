@@ -903,7 +903,7 @@ function ChoiceCard({
       <span
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-          selected ? 'border-accent bg-accent text-white' : 'border-border',
+          selected ? 'border-accent bg-accent text-on-accent' : 'border-border',
         )}
       >
         {selected && <Check size={11} />}

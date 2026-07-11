@@ -52,7 +52,7 @@ export function SessionTabBar({ onNewSession }: SessionTabBarProps) {
             data-testid="new-session-button"
             data-tauri-drag-region="false"
             data-no-drag
-            className="ml-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="ml-0.5 flex h-[26px] w-[26px] items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
           >
             <Plus size={14} />
           </button>

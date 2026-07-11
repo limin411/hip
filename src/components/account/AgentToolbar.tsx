@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Plus, Search, X } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
+import { Button } from '@/components/ui/Button'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/DropdownMenu'
@@ -40,13 +41,10 @@ export function AgentToolbar({
       {/* modal={false}: the menu opens a Modal; stacking two pointer-events locks freezes the app. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="flex h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-body font-medium text-white transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          <Button type="button" variant="primary" size="md" className="gap-1.5 rounded-lg">
             <Plus size={16} />
             {t('settings.agents.addAgent')}
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => onAdd('internal')}>

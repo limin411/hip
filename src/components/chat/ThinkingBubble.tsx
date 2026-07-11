@@ -10,7 +10,7 @@ interface ThinkingBubbleProps {
 export function ThinkingBubble({ steps, toolCalls, agentRuns }: ThinkingBubbleProps) {
   return (
     <div className="flex gap-3" data-testid="thinking-bubble">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-caption font-semibold text-white">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-caption font-semibold text-on-accent">
         AI
       </span>
       <div className="min-w-0 flex-1">

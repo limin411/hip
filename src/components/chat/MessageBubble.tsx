@@ -1,21 +1,17 @@
 import { useMemo } from 'react'
-import ReactMarkdown from 'react-markdown'
-import type { Components } from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useTranslation } from 'react-i18next'
-import { open } from '@tauri-apps/plugin-shell'
 import type { Message } from '@hip/protocol'
 import { formatClockTime, formatAbsolute } from '@/lib/datetime'
 import { Avatar } from '@/components/ui/Avatar'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
-import { CodeBlock } from './CodeBlock'
 import { ActivityBar } from './ActivityBar'
 import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
 import { cn } from '@/lib/utils'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
+import { MarkdownBody } from './MarkdownBody'
 
 function formatBytes(bytes?: number): string {
   if (bytes === undefined || bytes === null) return ''
@@ -23,28 +19,6 @@ function formatBytes(bytes?: number): string {
   const units = ['B', 'KB', 'MB', 'GB']
   const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
-}
-
-const REMARK_PLUGINS = [remarkGfm]
-const MD_COMPONENTS: Components = {
-  pre: CodeBlock,
-  a: ({ href, children, ...props }) => {
-    const handleClick = async (e: React.MouseEvent) => {
-      e.preventDefault()
-      if (!href) return
-      try {
-        await open(href)
-      } catch {
-        // Fallback: open in a new window if Tauri shell fails
-        window.open(href, '_blank', 'noopener,noreferrer')
-      }
-    }
-    return (
-      <a href={href} onClick={handleClick} {...props} className="underline hover:opacity-80 cursor-pointer">
-        {children}
-      </a>
-    )
-  },
 }
 
 interface MessageBubbleProps {
@@ -73,7 +47,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
       {isUser ? (
         <Avatar name={t('chat.user')} size={28} />
       ) : (
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-caption font-semibold text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-caption font-semibold text-on-accent">
           AI
         </span>
       )}
@@ -88,12 +62,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
         </div>
         <div
           className={cn(
-            'max-w-none text-prose leading-relaxed text-ink',
             !isUser && 'bg-gradient-to-br from-accent/[0.02] to-accent/[0.04] rounded-lg -mx-2 px-2',
-            '[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-meta',
-            '[&_code]:font-mono [&_code]:text-meta',
-            '[&_table]:my-2 [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1',
-            '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5',
           )}
         >
           {message.role === 'assistant' && (
@@ -102,7 +71,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
               {nested.map((a) => <SubAgentCard key={a.agentId} agent={a} />)}
             </>
           )}
-          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>{displayContent}</ReactMarkdown>
+          <MarkdownBody content={displayContent} />
           {isUser && message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {message.attachments.map((a) => (

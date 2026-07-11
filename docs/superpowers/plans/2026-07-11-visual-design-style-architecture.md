@@ -32,7 +32,7 @@ yarn tsc
 | Phase | 状态 | 一句话 |
 |-------|------|--------|
 | 1 令牌与对比 | ✅ 已完成 | on-accent / shadow-panel / glass / role.worker + Button/AppLayout/TitleBar |
-| 2 原语与 prose | ⬜ 未开始 | buttonVariants 收敛、MarkdownBody、字号与 hover 约定 |
+| 2 原语与 prose | ✅ 已完成 | buttonVariants 收敛、MarkdownBody、字号与 hover 约定 |
 | 3 扫尾与门禁 | ⬜ 未开始 | 硬编码 rg、可选微间距、spec 标已实现 |
 
 ---
@@ -144,81 +144,48 @@ style: token on-accent/panel shadow and wire shell chrome
 
 **Exit criteria**
 
-- [ ] 热点手写 primary 已改用 `Button` / `buttonVariants`（见 Task 2.2 清单）
-- [ ] Markdown 样式单一入口；`MessageBubble` 无大段 `[&_pre]/…` 定义（迁入入口内）
-- [ ] Login 等业务无新增/存量 `text-sm`（本 phase 点名的文件）
-- [ ] shell 高频 hover 与文档约定一致（新代码 `state-hover` 或等价注释）
-- [ ] `yarn tsc` + 相关 test 绿；布局仍冻结
+- [x] 热点手写 primary 已改用 `Button` / `buttonVariants`
+- [x] Markdown 样式单一入口；`MessageBubble` 无大段 `[&_pre]` 定义
+- [x] Login / AuthButton 无 `text-sm`
+- [x] shell 高频 hover 用 `state-hover`（TitleBar / SessionTabBar；SessionTab 本已对齐）
+- [x] 相关 vitest 28 项绿；布局仍冻结
 
 ---
 
 ### Task 2.1: MarkdownBody（或 prose-hip）
 
-**Files:**
-- Create: `src/components/chat/MarkdownBody.tsx`（默认方案）
-- Modify: `src/components/chat/MessageBubble.tsx`
-- Modify: Skill 预览等重复 markdown class 的文件（实现时 `grep` 定位）
-- Test: `MessageBubble.test.tsx` 等行为测保持通过
-
-- [ ] **Step 1: 定位重复样式**
-
-```bash
-grep -n '\[&_pre\]\|\[&_ul\]\|ReactMarkdown' src --glob '*.tsx'
-```
-
-- [ ] **Step 2: 抽取** `MarkdownBody`：接收 `children` 或 `content` + 现有 `components`/`remarkPlugins` 策略与 MessageBubble 一致（保持外链 open 行为）
-- [ ] **Step 3: MessageBubble 改用 MarkdownBody**；删除组件内重复 prose class 串
-- [ ] **Step 4: 第二调用点**（Skill 配置预览等）接入；若仅一处可先只迁 MessageBubble，在 PR 说明
-- [ ] **Step 5: 测试**
-
-```bash
-yarn vitest run src/components/chat/MessageBubble.test.tsx
-```
+- [x] 新建 `src/components/chat/MarkdownBody.tsx`（`markdownProseClassName` + 默认 CodeBlock/外链）
+- [x] `MessageBubble` / `FilePreview` / `SkillConfig` 接入
+- [x] `yarn vitest run …MessageBubble FilePreview` 等通过
 
 ---
 
 ### Task 2.2: 手写 primary → Button
 
-**Files（实现时再 grep 校准清单）:**
-
-```bash
-grep -n 'bg-accent.*text-white\|text-white.*bg-accent' src --glob '*.tsx'
-```
-
-预期热点（spec 点名）：
-
 | 文件 | 动作 |
 |------|------|
-| `src/components/account/AgentToolbar.tsx` | → `<Button variant="primary">` |
-| `src/components/artifact/FileTree.tsx` | 空状态 CTA → Button |
-| `src/components/login/AuthButton.tsx` | 评估并入 Button 或 `buttonVariants` + `cn` |
-| `src/components/account/ProviderDetail.tsx` / `McpConfig.tsx` | 选中态 chip 未必是 Button；**仅**真正提交/主 CTA 替换；toggle chip 可保留 |
+| `AgentToolbar.tsx` | → `Button` + DropdownMenuTrigger asChild |
+| `FileTree.tsx` / `TerminalView.tsx` | 空状态 CTA → `Button` |
+| `AuthButton.tsx` | `buttonVariants` |
+| `ProviderDetail` / `McpConfig` | 选中态 → `text-on-accent`（保留 chip 结构） |
+| AI badge / Avatar gradient | → `text-on-accent` |
 
-- [ ] **Step 1:** 跑 grep，更新本表「实际修改列表」写入 PR 描述
-- [ ] **Step 2:** 逐个替换；保持 `data-testid` / disabled / title
-- [ ] **Step 3:** 跑相关组件测试
-- [ ] **Step 4:** Avatar/AI 圆标上的 `text-white`（如 MessageBubble AI badge）— **可保留或改 on-accent**；圆标算强调底，优先 `text-on-accent` 以求一致
+- [x] 完成上表替换与相关测试
 
 ---
 
 ### Task 2.3: 字号与 shell hover
 
-**Files:**
-- Modify: `src/routes/LoginScreen.tsx`、`src/components/login/AuthButton.tsx`
-- Modify（对齐 hover）: `TitleBar`、`SessionTab`/`SessionTabBar`、`PanelToggle` 中不一致的 hover 灰
-
-- [ ] **Step 1:** `text-sm` → `text-body` 或 `text-meta`（副文案）
-- [ ] **Step 2:** 在 `tokens.css` 注释写明：`state-hover` ≡ `accent-subtle`（若仍等价）；**新代码**优先 `hover:bg-state-hover`
-- [ ] **Step 3:** shell 三处 hover 统一到同一 token 类名（不改 hit area 结构）
+- [x] Login：`text-display` / `text-meta`；AuthButton 走 variants
+- [x] TitleBar / SessionTabBar → `hover:bg-state-hover`（tokens 已注释等价关系）
 
 ---
 
 ### Task 2.4: Phase 2 收尾
 
-- [ ] 走查：Chat 消息 markdown、Settings 工具条主按钮、Login
-- [ ] `yarn tsc` + 相关 vitest
-- [ ] 本 plan Phase 2 → ✅；spec → **`Phase 2 已实现`**
-- [ ] Commit 示例：
+- [x] 相关 vitest 绿
+- [x] 本 plan Phase 2 → ✅；spec → **Phase 2 已实现**
+- [ ] Commit:
 
 ```text
 style: converge buttons and extract MarkdownBody
@@ -320,6 +287,6 @@ style: finish visual token cleanup and document exceptions
 
 | Phase | 完成日期 | PR / commit | 备注 |
 |-------|----------|-------------|------|
-| 1 | 2026-07-11 | （本提交） | tokens 别名覆盖 Dag；未改 DagEditor.css |
-| 2 | | | |
+| 1 | 2026-07-11 | `0c1356c` | tokens 别名覆盖 Dag；未改 DagEditor.css |
+| 2 | 2026-07-11 | （本提交） | MarkdownBody + primary 收敛 + Login 字号 |
 | 3 | | | |

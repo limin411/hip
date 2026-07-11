@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { buttonVariants } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 interface AuthButtonProps {
@@ -13,10 +14,11 @@ export function AuthButton({ icon: Icon, label, onClick, variant = 'outline' }: 
     <button
       onClick={onClick}
       className={cn(
-        'flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border text-sm font-medium transition-colors',
-        variant === 'solid'
-          ? 'border-accent bg-accent text-white hover:bg-accent-hover'
-          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+        buttonVariants({
+          variant: variant === 'solid' ? 'primary' : 'outline',
+          size: 'lg',
+        }),
+        'h-11 w-full gap-2.5 rounded-lg',
       )}
     >
       <Icon size={18} strokeWidth={2} />

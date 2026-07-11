@@ -1,23 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
 import { useFsScope } from '@/store/useFsScope'
 import { useFsStore } from '@/store/fsStore'
-import { cn } from '@/lib/utils'
+import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { previewKind } from './previewKind'
-
-const PROSE = `
-  max-w-none text-prose leading-relaxed text-ink
-  [&_h1]:mb-3 [&_h1]:mt-1 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-tight
-  [&_h2]:mb-2 [&_h2]:mt-6 [&_h2]:text-title [&_h2]:font-bold [&_h2]:tracking-tight
-  [&_p]:my-2.5
-  [&_ul]:my-2.5 [&_ul]:list-disc [&_ul]:pl-5
-  [&_pre]:my-3 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-meta
-  [&_code]:font-mono
-  [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-ink-secondary
-  [&_table]:my-3 [&_table]:w-full [&_table]:border-collapse
-  [&_th]:border [&_th]:border-border [&_th]:bg-surface-muted [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left
-  [&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5
-`
 
 function Centered({ text, testid }: { text: string; testid: string }) {
   return (
@@ -64,9 +49,9 @@ export function FilePreview() {
 
   if (kind === 'markdown') {
     return (
-      <article className={cn('h-full overflow-auto p-4', PROSE)} data-testid="preview-markdown">
+      <article className="h-full overflow-auto p-4" data-testid="preview-markdown">
         {preview.truncated && <TruncBanner text={t('artifact.previewTruncated')} />}
-        <ReactMarkdown>{preview.content}</ReactMarkdown>
+        <MarkdownBody content={preview.content} />
       </article>
     )
   }

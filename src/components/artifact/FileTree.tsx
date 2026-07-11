@@ -7,6 +7,7 @@ import { useFsStore } from '@/store/fsStore'
 import { useFsScope } from '@/store/useFsScope'
 import { useDraftStore } from '@/store/draftStore'
 import { pickDirectory } from '@/ipc/dialog'
+import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 function basename(p: string): string {
@@ -91,13 +92,9 @@ export function FileTree() {
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
         <Folder size={32} className="opacity-40" />
         <div className="max-w-[200px] text-body">{t('artifact.selectFolderDesc')}</div>
-        <button
-          data-testid="select-folder"
-          onClick={choose}
-          className="rounded-md bg-accent px-3 py-1.5 text-body font-medium text-white transition-colors hover:bg-accent-hover"
-        >
+        <Button data-testid="select-folder" onClick={choose} variant="primary" size="sm">
           {t('artifact.selectFolder')}
-        </button>
+        </Button>
       </div>
     )
   }

@@ -257,7 +257,7 @@ export function ProviderDetail({
               onClick={() => setCaps((c) => ({ ...c, [f.key]: !c[f.key] }))}
               className={cn(
                 'h-9 shrink-0 rounded-md px-2.5 text-caption transition-colors',
-                caps[f.key] ? 'bg-accent text-white' : 'border border-border text-ink-secondary hover:bg-surface-muted',
+                caps[f.key] ? 'bg-accent text-on-accent' : 'border border-border text-ink-secondary hover:bg-state-hover',
               )}
             >
               {t(`settings.modelConfig.${f.i18n}`)}

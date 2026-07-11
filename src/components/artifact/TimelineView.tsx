@@ -146,7 +146,8 @@ export function TimelineView() {
             files={cur.files!}
             summary={cur.summary}
             viewMode={diffViewMode}
-            onToggleCollapse={() => {}}
+            collapsed={diff.collapsed}
+            onToggleCollapse={(p) => useDiffStore.getState().toggleCollapsed(sessionId, p)}
           />
         )}
       </div>

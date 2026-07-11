@@ -62,7 +62,31 @@ vi.mock('@/lib/checkpointMode', () => ({
 }))
 
 vi.mock('./DiffDisplay', () => ({
-  DiffDisplay: () => React.createElement('div', { 'data-testid': 'diff-display' }),
+  DiffDisplay: ({
+    files,
+    collapsed,
+    onToggleCollapse,
+  }: {
+    files: { path: string }[]
+    collapsed?: Record<string, boolean>
+    onToggleCollapse: (path: string) => void
+  }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'diff-display' },
+      files.map((f) =>
+        React.createElement(
+          'button',
+          {
+            key: f.path,
+            'data-testid': 'diff-file-collapse-toggle',
+            'data-collapsed': collapsed?.[f.path] ? '1' : '0',
+            onClick: () => onToggleCollapse(f.path),
+          },
+          f.path,
+        ),
+      ),
+    ),
   Empty: ({ title }: { title: string }) => React.createElement('div', { 'data-testid': 'empty' }, title),
 }))
 
@@ -270,5 +294,27 @@ describe('TimelineView revert confirm', () => {
     expect(screen.queryByTestId('revert-modal')).toBeNull()
     expect(revertCheckpoint).not.toHaveBeenCalled()
     expect(toastMessage).toHaveBeenCalledWith('Stop the run first')
+  })
+
+  it('collapses a single-file checkpoint diff via the file toggle', () => {
+    useDiffStore.getState().setCheckpointDiffResult('s1', 's1:t1|this-turn', {
+      state: 'ok',
+      files: [{
+        path: 'only.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 0,
+        binary: false,
+        truncated: false,
+        hunks: [{ oldStart: 1, oldLines: 0, newStart: 1, newLines: 1, lines: [{ type: 'add', content: 'x', oldNo: null, newNo: 1 }] }],
+      }],
+      summary: { totalFiles: 1, totalAdditions: 1, totalDeletions: 0 },
+    })
+    render(<TimelineView />)
+    const toggle = screen.getByTestId('diff-file-collapse-toggle')
+    expect(toggle).toHaveAttribute('data-collapsed', '0')
+    fireEvent.click(toggle)
+    expect(useDiffStore.getState().bySession['s1'].collapsed['only.ts']).toBe(true)
+    expect(screen.getByTestId('diff-file-collapse-toggle')).toHaveAttribute('data-collapsed', '1')
   })
 })

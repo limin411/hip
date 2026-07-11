@@ -85,24 +85,29 @@ function FileDiff({ file, expanded, collapsed, viewMode, onToggleCollapse, onSho
   const isCollapsed = !!collapsed
   return (
     <div id={`diff-file-${file.path}`} className="border-b border-border" data-testid="diff-file">
-      <div className="sticky top-0 z-[1] flex items-center justify-between gap-2 bg-surface-muted px-3 py-2">
-        <span className="flex min-w-0 items-center gap-2">
+      <div className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 bg-surface-muted px-3">
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none">
           <button
             aria-label={isCollapsed ? t('artifact.diffView.expand') : t('artifact.diffView.collapse')}
             onClick={() => onToggleCollapse(file.path)}
-            className="shrink-0 text-ink-tertiary hover:text-ink"
+            className="inline-flex size-[1em] shrink-0 items-center justify-center text-ink-tertiary hover:text-ink"
             data-testid="diff-file-collapse-toggle"
           >
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
           </button>
-          <span className={cn('shrink-0 rounded px-1 font-medium', chip.cls)} data-testid="diff-status">
-            <span className="text-caption">{t(chip.key)}</span>
-          </span>
-          <span className="truncate font-mono text-meta text-ink">
-            {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
+          <span className="min-w-0 truncate">
+            <span
+              className={cn('mr-1.5 rounded px-1 font-medium', chip.cls)}
+              data-testid="diff-status"
+            >
+              {t(chip.key)}
+            </span>
+            <span className="font-mono text-ink">
+              {file.oldPath && <span className="text-ink-tertiary">{file.oldPath} → </span>}{file.path}
+            </span>
           </span>
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-caption">
+        <span className="flex shrink-0 items-center gap-2 font-mono text-meta leading-none tabular-nums">
           {file.truncated && <span className="text-ink-tertiary">{t('artifact.truncated')}</span>}
           <span className="text-success">+{file.additions}</span>
           <span className="text-danger">-{file.deletions}</span>
@@ -162,13 +167,13 @@ export function DiffDisplay({ files, summary, viewMode, expanded, collapsed, onT
               key={file.path}
               data-testid="diff-file-jump"
               onClick={() => document.getElementById(`diff-file-${file.path}`)?.scrollIntoView({ block: 'start' })}
-              className="flex w-full items-center justify-between px-3 py-0.5 text-meta hover:bg-surface-muted"
+              className="flex w-full items-center justify-between px-3 py-0.5 text-meta leading-none hover:bg-surface-muted"
             >
-              <span className="flex min-w-0 items-center gap-2">
-                <span className={cn('shrink-0 rounded px-1 text-caption font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
-                <span className="truncate font-mono text-ink-secondary">{file.path}</span>
+              <span className="min-w-0 flex-1 truncate">
+                <span className={cn('mr-1.5 rounded px-1 font-medium', STATUS_CHIP[file.status].cls)}>{t(STATUS_CHIP[file.status].key)}</span>
+                <span className="font-mono text-ink-secondary">{file.path}</span>
               </span>
-              <span className="shrink-0 font-mono text-caption"><span className="text-success">+{file.additions}</span> <span className="text-danger">-{file.deletions}</span></span>
+              <span className="shrink-0 font-mono tabular-nums"><span className="text-success">+{file.additions}</span> <span className="text-danger">-{file.deletions}</span></span>
             </button>
           ))}
         </div>

@@ -24,6 +24,11 @@ export const BUILTIN_COMMANDS: SlashCommand[] = [
   { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
   { id: 'compact', name: 'compact', description: 'Summarize conversation to save context', kind: 'builtin', availableIn: ['code'], requiresSession: true },
   { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },
+  { id: 'memory', name: 'memory', description: 'Open Memory settings', kind: 'builtin', availableIn: ['chat', 'code'] },
+  { id: 'memory-on', name: 'memory-on', description: 'Enable memories for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
+  { id: 'memory-off', name: 'memory-off', description: 'Disable memories for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
+  { id: 'memory-incognito', name: 'memory-incognito', description: 'Incognito: no memory inject/extract this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
+  { id: 'memory-status', name: 'memory-status', description: 'Show memory flags for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
 ]
 
 /** Pure: extract the slash command text the user is typing. Returns the raw text after `/`. */

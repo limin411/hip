@@ -158,11 +158,13 @@ describe('buildCommandList', () => {
 
   it('defaults to chat surface and excludes code-only builtins', () => {
     const list = buildCommandList()
-    expect(list.map((c) => c.name)).toEqual(['help', 'clear'])
+    expect(list.map((c) => c.name)).toEqual(['help', 'clear', 'memory'])
     expect(list.map((c) => c.name)).not.toContain('diff')
     expect(list.map((c) => c.name)).not.toContain('init')
     expect(list.map((c) => c.name)).not.toContain('compact')
     expect(list.map((c) => c.name)).not.toContain('config')
+    // session-gated memory commands require a sessionId
+    expect(list.map((c) => c.name)).not.toContain('memory-on')
   })
 
   it('ranks builtins before skills', () => {
@@ -607,7 +609,15 @@ describe('SlashCommandPalette keyboard navigation', () => {
 describe('buildCommandList surface filtering', () => {
   it('includes only universal builtins in chat surface', () => {
     const list = buildCommandList([], { surface: 'chat', sessionId: 's1' })
-    expect(list.map((c) => c.name)).toEqual(['help', 'clear'])
+    expect(list.map((c) => c.name)).toEqual([
+      'help',
+      'clear',
+      'memory',
+      'memory-on',
+      'memory-off',
+      'memory-incognito',
+      'memory-status',
+    ])
   })
 
   it('includes all builtins in code surface with a session', () => {

@@ -114,6 +114,47 @@ export function useSlashCommandHandler(
           focusInput()
           return
         }
+        if (cmd.id === 'memory') {
+          useUiStore.getState().setSettingsPage('memory')
+          useUiStore.getState().setActiveView('settings')
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'memory-on') {
+          if (sessionId) sessionService.setMemoryFlags(sessionId, { useMemories: true })
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'memory-off') {
+          if (sessionId) sessionService.setMemoryFlags(sessionId, { useMemories: false })
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'memory-incognito') {
+          if (sessionId) sessionService.setMemoryFlags(sessionId, { incognito: true })
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'memory-status') {
+          if (sessionId) {
+            const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+            const cfg = sess?.config
+            toast.message(t('chat.slash.memoryStatusTitle'), {
+              description: t('chat.slash.memoryStatusBody', {
+                use: cfg?.useMemories === undefined ? 'inherit' : String(cfg.useMemories),
+                generate: cfg?.generateMemories === undefined ? 'inherit' : String(cfg.generateMemories),
+                incognito: String(!!cfg?.incognito),
+              }),
+            })
+          }
+          setText('')
+          focusInput()
+          return
+        }
       }
 
       setText(applyCommand(cmd, value))

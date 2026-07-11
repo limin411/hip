@@ -13,6 +13,7 @@ import '@/i18n'
 
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
+const mockSetSettingsPage = vi.fn()
 const toastMessage = vi.fn()
 
 vi.mock('sonner', () => ({
@@ -22,13 +23,31 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(
-    (selector?: (s: { setActiveView: typeof mockSetActiveView; setTab: typeof mockSetTab }) => unknown) => {
+    (selector?: (s: {
+      setActiveView: typeof mockSetActiveView
+      setTab: typeof mockSetTab
+      setSettingsPage: typeof mockSetSettingsPage
+    }) => unknown) => {
       if (typeof selector === 'function') {
-        return selector({ setActiveView: mockSetActiveView, setTab: mockSetTab })
+        return selector({
+          setActiveView: mockSetActiveView,
+          setTab: mockSetTab,
+          setSettingsPage: mockSetSettingsPage,
+        })
       }
-      return { setActiveView: mockSetActiveView, setTab: mockSetTab }
+      return {
+        setActiveView: mockSetActiveView,
+        setTab: mockSetTab,
+        setSettingsPage: mockSetSettingsPage,
+      }
     },
-    { getState: () => ({ setActiveView: mockSetActiveView, setTab: mockSetTab }) },
+    {
+      getState: () => ({
+        setActiveView: mockSetActiveView,
+        setTab: mockSetTab,
+        setSettingsPage: mockSetSettingsPage,
+      }),
+    },
   ),
 }))
 
@@ -70,6 +89,7 @@ describe('useSlashCommandHandler', () => {
     vi.restoreAllMocks()
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
+    mockSetSettingsPage.mockClear()
     toastMessage.mockClear()
   })
 
@@ -166,6 +186,46 @@ describe('useSlashCommandHandler', () => {
     result.current.handleCommandSelect(compactCmd)
 
     expect(compactSpy).not.toHaveBeenCalled()
+    expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/memory opens settings on the memory page', () => {
+    const { result, setText } = setup('chat', null)
+
+    result.current.handleCommandSelect(builtin('memory'))
+
+    expect(mockSetSettingsPage).toHaveBeenCalledWith('memory')
+    expect(mockSetActiveView).toHaveBeenCalledWith('settings')
+    expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/memory-on sets useMemories true for the session', () => {
+    const spy = vi.spyOn(sessionService, 'setMemoryFlags').mockReturnValue(undefined)
+    const { result, setText } = setup('chat', 's1')
+
+    result.current.handleCommandSelect(builtin('memory-on'))
+
+    expect(spy).toHaveBeenCalledWith('s1', { useMemories: true })
+    expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/memory-off sets useMemories false for the session', () => {
+    const spy = vi.spyOn(sessionService, 'setMemoryFlags').mockReturnValue(undefined)
+    const { result, setText } = setup('chat', 's1')
+
+    result.current.handleCommandSelect(builtin('memory-off'))
+
+    expect(spy).toHaveBeenCalledWith('s1', { useMemories: false })
+    expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/memory-incognito sets incognito true for the session', () => {
+    const spy = vi.spyOn(sessionService, 'setMemoryFlags').mockReturnValue(undefined)
+    const { result, setText } = setup('chat', 's1')
+
+    result.current.handleCommandSelect(builtin('memory-incognito'))
+
+    expect(spy).toHaveBeenCalledWith('s1', { incognito: true })
     expect(setText).toHaveBeenCalledWith('')
   })
 

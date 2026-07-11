@@ -14,6 +14,7 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
     useTranslation: () => ({
       t: (key: string, params?: Record<string, unknown>) => {
         if (params && 'value' in params) return `${key}:${params.value}`
+        if (params && 'title' in params) return `${key}:${params.title}`
         return key
       },
       i18n: { language: 'en', changeLanguage: vi.fn() },
@@ -101,7 +102,7 @@ describe('MemoryConfig', () => {
 
   it('renders switches and list when config is enabled', async () => {
     vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
-    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([sampleItem])
+    const listSpy = vi.spyOn(sessionService, 'listMemories').mockResolvedValue([sampleItem])
 
     render(<MemoryConfig />)
 
@@ -115,5 +116,97 @@ describe('MemoryConfig', () => {
     expect(genSwitch).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('Prefer yarn')).toBeInTheDocument()
     expect(screen.getByTestId('memory-item-m1')).toBeInTheDocument()
+    expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'active' })
+    expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('calls upsert when pin toggled', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([sampleItem])
+    const upsertSpy = vi.spyOn(sessionService, 'upsertMemory').mockResolvedValue({
+      ...sampleItem,
+      pinned: true,
+    })
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-pin-m1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-pin-m1'))
+
+    await waitFor(() => {
+      expect(upsertSpy).toHaveBeenCalledWith({
+        id: 'm1',
+        title: 'Prefer yarn',
+        content: 'use yarn',
+        kind: 'preference',
+        scope: 'global',
+        pinned: true,
+      })
+    })
+  })
+
+  it('calls upsert with title/content when edit is saved', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([sampleItem])
+    const upsertSpy = vi.spyOn(sessionService, 'upsertMemory').mockResolvedValue({
+      ...sampleItem,
+      title: 'Prefer pnpm',
+      content: 'use pnpm',
+    })
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-edit-m1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-edit-m1'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-edit-title')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByTestId('memory-edit-title'), { target: { value: 'Prefer pnpm' } })
+    fireEvent.change(screen.getByTestId('memory-edit-content'), { target: { value: 'use pnpm' } })
+    fireEvent.click(screen.getByTestId('memory-edit-save'))
+
+    await waitFor(() => {
+      expect(upsertSpy).toHaveBeenCalledWith({
+        id: 'm1',
+        title: 'Prefer pnpm',
+        content: 'use pnpm',
+        kind: 'preference',
+        scope: 'global',
+        pinned: false,
+      })
+    })
+  })
+
+  it('calls deleteMemory without hard by default after confirm', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue(onConfig)
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([sampleItem])
+    const deleteSpy = vi.spyOn(sessionService, 'deleteMemory').mockResolvedValue(true)
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-delete-m1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-delete-m1'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-delete-confirm')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('memory-delete-confirm'))
+
+    await waitFor(() => {
+      expect(deleteSpy).toHaveBeenCalledWith('m1')
+    })
+    expect(deleteSpy.mock.calls[0]).toHaveLength(1)
   })
 })

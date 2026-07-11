@@ -180,6 +180,29 @@ describe('memory handlers', () => {
     expect(sent[0].items.every((i) => i.status === 'active')).toBe(true)
   })
 
+  it('memory:list respects optional status override', () => {
+    const active = svc.upsert({
+      title: 'Active tip',
+      content: 'visible',
+      kind: 'preference',
+      scope: 'global',
+    })
+    const deleted = svc.upsert({
+      title: 'Deleted tip',
+      content: 'gone',
+      kind: 'preference',
+      scope: 'global',
+    })
+    store.upsertItem({ ...store.getItem(deleted.id)!, status: 'deleted', updatedAt: Date.now() })
+
+    handleMemoryMessage(ctx, { type: 'memory:list', scope: 'global', status: 'deleted' }, send)
+    expect(sent[0].type).toBe('memory:list:result')
+    if (sent[0].type !== 'memory:list:result') throw new Error('expected list result')
+    expect(sent[0].items.map((i) => i.id)).toEqual([deleted.id])
+    expect(sent[0].items.every((i) => i.status === 'deleted')).toBe(true)
+    expect(sent[0].items.map((i) => i.id)).not.toContain(active.id)
+  })
+
   it('deleteBySourceSession hard deletes derived items', () => {
     const a = svc.upsert({
       title: 'from s1',

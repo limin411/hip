@@ -77,7 +77,7 @@ export function handleMemoryMessage(
               sessionId: msg.sessionId,
               limit: msg.limit,
               // Default: active only (archived/deleted stay out of the browser).
-              status: 'active',
+              status: msg.status ?? 'active',
             })
         send({ type: 'memory:list:result', items })
       } catch (e) {

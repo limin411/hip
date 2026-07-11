@@ -35,7 +35,7 @@ import type { PluginManifest } from './plugins.js'
 import type { WorkflowDef, OrchestratorEvent, RunState } from './workflow-protocol.js'
 import type { OrchestrationMode } from './orchestration-types.js'
 import type { AgentProfileInfo } from './agent-profile.js'
-import type { MemoryItem, MemoryScope, MemoryFileConfig } from './memory-types.js'
+import type { MemoryItem, MemoryScope, MemoryStatus, MemoryFileConfig } from './memory-types.js'
 
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
@@ -93,7 +93,7 @@ export type ClientMessage =
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
   | { type: 'replay:session'; sessionId: string; turnIndex: number }
   | { type: 'message:compact'; sessionId: string }
-  | { type: 'memory:list'; scope?: MemoryScope; projectKeyHash?: string; sessionId?: string; query?: string; limit?: number }
+  | { type: 'memory:list'; scope?: MemoryScope; projectKeyHash?: string; sessionId?: string; query?: string; limit?: number; status?: MemoryStatus }
   | { type: 'memory:get'; id: string }
   | { type: 'memory:upsert'; item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'> }
   | { type: 'memory:delete'; id: string; hard?: boolean }

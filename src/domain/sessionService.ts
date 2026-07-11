@@ -10,6 +10,7 @@ import type {
   MemoryFileConfig,
   MemoryItem,
   MemoryScope,
+  MemoryStatus,
 } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
@@ -522,6 +523,7 @@ export class SessionService {
     sessionId?: string
     query?: string
     limit?: number
+    status?: MemoryStatus
   }): Promise<MemoryItem[]> {
     const wait = this.waitForServerMessage('memory:list:result')
     this.transport.send({ type: 'memory:list', ...filter })

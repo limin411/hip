@@ -23,7 +23,7 @@ import { handleMcpMessage, isMcpMessage } from './handlers/mcp.js'
 import { handleMemoryMessage, isMemoryMessage, type MemoryHandlerContext } from '../memory/handlers.js'
 import { MemoryService } from '../memory/service.js'
 import { MemoryStore } from '../memory/store.js'
-import { tryEnableMemoriesFts } from '../persistence/schema.js'
+import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.js'
 import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
@@ -90,7 +90,8 @@ export class SessionManager {
       }
       const db = this.store.getDb()
       const memoriesFts = tryEnableMemoriesFts(db)
-      this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
+      const memoriesVec = tryEnableSqliteVec(db)
+      this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
       // Best-effort decay once when memory first becomes available.
       this.memoryService.runStartupDecayOnce()
     }

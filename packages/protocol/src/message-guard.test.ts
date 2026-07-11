@@ -53,6 +53,11 @@ describe('message-guard', () => {
     expect(msg?.type).toBe('memory:setConfig')
   })
 
+  it('accepts memory:reindex and memory:indexStatus', () => {
+    expect(parseClientMessage({ type: 'memory:reindex' })?.type).toBe('memory:reindex')
+    expect(parseClientMessage({ type: 'memory:indexStatus' })?.type).toBe('memory:indexStatus')
+  })
+
   it('accepts session:setMemoryFlags', () => {
     const msg = parseClientMessage({
       type: 'session:setMemoryFlags',

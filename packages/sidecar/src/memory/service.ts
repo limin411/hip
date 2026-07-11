@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import type { MemoryFileConfig, MemoryItem, MemorySource } from '@hip/protocol'
+import type { MemoryFileConfig, MemoryItem, MemoryModelRef, MemorySource } from '@hip/protocol'
+import { normalizeExtractModel } from '@hip/protocol'
 import {
   loadMemoryConfig,
   saveMemoryConfig,
@@ -13,12 +14,38 @@ import { scanMemoryContent } from './threat-scan.js'
 import { resolveProjectKey } from './project-key.js'
 import { runDecayJob } from './pipeline/evolution.js'
 import { runTrashRetentionJob } from './trash.js'
+import {
+  createOpenAICompatibleEmbeddingClient,
+  embeddingModelKey,
+  truncateForEmbed,
+  type MemoryEmbeddingClient,
+} from './embedding-client.js'
+import { embeddingIndexStatus, upsertEmbedding } from './vec.js'
 import type {
   MemoryListFilter,
   MemorySearchOpts,
   MemorySearchInScopesOpts,
   MemoryStore,
 } from './store.js'
+
+export type MemoryEmbeddingClientFactory = (
+  ref: MemoryModelRef,
+) => MemoryEmbeddingClient | null
+
+export type MemoryIndexStatus = {
+  embedded: number
+  total: number
+  failed?: number
+  modelKey?: string
+  vecEnabled: boolean
+}
+
+export type MemoryReindexResult = {
+  embedded: number
+  total: number
+  failed: number
+  modelKey?: string
+}
 
 export type MemoryUpsertInput = Partial<MemoryItem> &
   Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>
@@ -46,13 +73,29 @@ function truncateToBudget(text: string, budget: number): string {
 /** Facade over store + config: read snapshots, upsert with redact/scan, import/export. */
 export class MemoryService {
   private readonly configPath?: string
+  private readonly createEmbeddingClient: MemoryEmbeddingClientFactory
   private startupDecayRan = false
+  /** In-flight embed jobs (dedupe concurrent scheduleEmbed for same id). */
+  private readonly embedInFlight = new Map<string, Promise<void>>()
 
   constructor(
     readonly store: MemoryStore,
-    opts?: { configPath?: string },
+    opts?: {
+      configPath?: string
+      /** Inject embed client factory for tests; default is OpenAI-compatible HTTP. */
+      createEmbeddingClient?: MemoryEmbeddingClientFactory
+    },
   ) {
     this.configPath = opts?.configPath
+    this.createEmbeddingClient =
+      opts?.createEmbeddingClient ??
+      ((ref) => {
+        try {
+          return createOpenAICompatibleEmbeddingClient(ref)
+        } catch {
+          return null
+        }
+      })
   }
 
   /**
@@ -216,6 +259,8 @@ export class MemoryService {
     }
 
     this.store.upsertItem(item)
+    // Best-effort async embed when embeddingModel is configured; never throws on upsert.
+    this.queueEmbed(item.id)
     return item
   }
 
@@ -240,18 +285,64 @@ export class MemoryService {
   }
 
   /**
-   * Restore a soft-deleted memory to active.
-   * Hybrid re-embed (if enabled) is a no-op until Task 6.
+   * Restore a soft-deleted memory to active and schedule re-embed when configured.
    */
   restore(id: string): MemoryItem | undefined {
     const ok = this.store.restoreItem(id)
     if (!ok) return undefined
-    return this.store.getItem(id)
+    const item = this.store.getItem(id)
+    if (item) this.queueEmbed(item.id)
+    return item
   }
 
-  /** Hard-delete all soft-deleted memories. */
+  /** Hard-delete all soft-deleted memories (also drops embedding rows via store). */
   emptyTrash(): number {
     return this.store.emptyTrash()
+  }
+
+  /** Index coverage for the configured embedding model (BLOB rows; vec0 optional). */
+  getIndexStatus(): MemoryIndexStatus {
+    const ref = this.resolveEmbeddingModel()
+    const modelKey = ref ? embeddingModelKey(ref) : undefined
+    const base = embeddingIndexStatus(this.store.getDb(), modelKey)
+    return {
+      ...base,
+      vecEnabled: this.store.isVecEnabled(),
+    }
+  }
+
+  /**
+   * Re-embed all active memories with the configured embedding model.
+   * No-op (failed=0, embedded=0) when embeddingModel is unset.
+   */
+  async reindexAll(): Promise<MemoryReindexResult> {
+    const ref = this.resolveEmbeddingModel()
+    if (!ref) {
+      const total = embeddingIndexStatus(this.store.getDb(), undefined).total
+      return { embedded: 0, total, failed: 0 }
+    }
+    const modelKey = embeddingModelKey(ref)
+    const items = this.store.listItems({ status: 'active', limit: 100_000 })
+    let embedded = 0
+    let failed = 0
+    for (const item of items) {
+      try {
+        const ok = await this.embedItem(item, ref)
+        if (ok) embedded += 1
+        else failed += 1
+      } catch {
+        failed += 1
+      }
+    }
+    return { embedded, total: items.length, failed, modelKey }
+  }
+
+  /**
+   * Schedule embed for one memory id (fire-and-forget). Safe when no model / no key.
+   * Exposed for tests that await the returned promise.
+   */
+  scheduleEmbed(memoryId: string): Promise<void> {
+    return this.embedById(memoryId)
   }
 
   exportJsonl(filter: MemoryListFilter = {}): string {
@@ -308,6 +399,56 @@ export class MemoryService {
   }
 
   // ── private helpers ──────────────────────────────────────────────────────
+
+  private resolveEmbeddingModel(): MemoryModelRef | undefined {
+    return normalizeExtractModel(this.getConfig().embeddingModel)
+  }
+
+  private queueEmbed(memoryId: string): void {
+    if (!this.resolveEmbeddingModel()) return
+    void this.embedById(memoryId).catch((e) => {
+      console.warn(
+        '[memory] embed failed',
+        memoryId,
+        e instanceof Error ? e.message : String(e),
+      )
+    })
+  }
+
+  private async embedById(memoryId: string): Promise<void> {
+    const existing = this.embedInFlight.get(memoryId)
+    if (existing) return existing
+    const ref = this.resolveEmbeddingModel()
+    if (!ref) return
+    const item = this.store.getItem(memoryId)
+    if (!item || item.status !== 'active') return
+    const job = (async () => {
+      try {
+        await this.embedItem(item, ref)
+      } finally {
+        this.embedInFlight.delete(memoryId)
+      }
+    })()
+    this.embedInFlight.set(memoryId, job)
+    return job
+  }
+
+  /** Returns true if embedding was written. */
+  private async embedItem(item: MemoryItem, ref: MemoryModelRef): Promise<boolean> {
+    const client = this.createEmbeddingClient(ref)
+    if (!client) return false
+    const text = truncateForEmbed(item.title, item.content)
+    const vectors = await client.embed([text])
+    const vec = vectors[0]
+    if (!vec || vec.length === 0) return false
+    upsertEmbedding(this.store.getDb(), {
+      memoryId: item.id,
+      modelKey: embeddingModelKey(ref),
+      embedding: vec,
+      vecEnabled: this.store.isVecEnabled(),
+    })
+    return true
+  }
 
   private loadSummaries(projectKeyHash: string | undefined): SummaryRow[] {
     const db = this.store.getDb()

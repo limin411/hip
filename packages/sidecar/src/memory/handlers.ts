@@ -20,6 +20,8 @@ export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:getConfig',
   'memory:setConfig',
   'memory:consolidate',
+  'memory:reindex',
+  'memory:indexStatus',
   'session:setMemoryFlags',
 ])
 
@@ -289,6 +291,50 @@ export function handleMemoryMessage(
             phase: 2,
             status: 'failed',
             detail: err instanceof Error ? err.message : String(err),
+          })
+        })
+      return
+    }
+    case 'memory:indexStatus': {
+      try {
+        const status = ctx.getMemoryService().getIndexStatus()
+        send({
+          type: 'memory:indexStatus:result',
+          embedded: status.embedded,
+          total: status.total,
+          modelKey: status.modelKey,
+          vecEnabled: status.vecEnabled,
+        })
+      } catch (e) {
+        send({
+          type: 'memory:indexStatus:result',
+          embedded: 0,
+          total: 0,
+          error: String(e),
+        })
+      }
+      return
+    }
+    case 'memory:reindex': {
+      const svc = ctx.getMemoryService()
+      void svc
+        .reindexAll()
+        .then((res) => {
+          send({
+            type: 'memory:reindex:result',
+            embedded: res.embedded,
+            total: res.total,
+            failed: res.failed,
+            modelKey: res.modelKey,
+          })
+        })
+        .catch((err) => {
+          send({
+            type: 'memory:reindex:result',
+            embedded: 0,
+            total: 0,
+            failed: 0,
+            error: err instanceof Error ? err.message : String(err),
           })
         })
       return

@@ -1,4 +1,7 @@
+import { createRequire } from 'node:module'
 import type { DatabaseSync } from './sqlite.js'
+
+const nodeRequire = createRequire(import.meta.url)
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS sessions (
@@ -473,6 +476,34 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 18) {
+    db.exec('BEGIN')
+    try {
+      // Portable embedding store (Float32 BLOB). Hybrid cosine works without native vec0.
+      // Optional memory_vec_{dim} virtual tables are created at runtime when sqlite-vec loads.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS memory_embedding_meta (
+          model_key TEXT PRIMARY KEY,
+          dim INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS memory_embedding_rows (
+          memory_id TEXT PRIMARY KEY,
+          model_key TEXT NOT NULL,
+          dim INTEGER NOT NULL,
+          embedding BLOB NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_memory_embedding_rows_model
+          ON memory_embedding_rows(model_key);
+      `)
+      db.exec('PRAGMA user_version = 18')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */
@@ -493,6 +524,45 @@ export function tryEnableMemoriesFts(db: DatabaseSync): boolean {
     return true
   } catch (e) {
     console.warn('[persistence] memories FTS5/trigram unavailable; memory search will use LIKE.', e)
+    return false
+  }
+}
+
+/**
+ * Try to load the sqlite-vec extension for optional vec0 KNN.
+ * DB must be opened with `{ allowExtension: true }`.
+ * Failure is non-fatal: BLOB embeddings (memory_embedding_rows) still work for hybrid cosine.
+ */
+export function tryEnableSqliteVec(db: DatabaseSync): boolean {
+  try {
+    if (typeof db.enableLoadExtension === 'function') {
+      db.enableLoadExtension(true)
+    }
+    // Prefer package helper (db.loadExtension(path)); falls back if shape differs.
+    // createRequire so Vite/vitest never tries to bundle the native path.
+    const sqliteVec = nodeRequire('sqlite-vec') as {
+      load?: (db: DatabaseSync) => void
+      getLoadablePath?: () => string
+    }
+    if (typeof sqliteVec.load === 'function') {
+      sqliteVec.load(db)
+    } else if (
+      typeof sqliteVec.getLoadablePath === 'function' &&
+      typeof db.loadExtension === 'function'
+    ) {
+      db.loadExtension(sqliteVec.getLoadablePath())
+    } else {
+      return false
+    }
+    // Probe: extension must expose vec_version.
+    const row = db.prepare('SELECT vec_version() AS v').get() as { v?: string } | undefined
+    if (!row?.v) return false
+    return true
+  } catch (e) {
+    console.warn(
+      '[persistence] sqlite-vec unavailable; vector KNN disabled (BLOB embeddings still work).',
+      e instanceof Error ? e.message : e,
+    )
     return false
   }
 }

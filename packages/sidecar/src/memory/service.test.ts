@@ -5,13 +5,33 @@ import { tmpdir } from 'node:os'
 import type { MemoryItem } from '@hip/protocol'
 import { openDatabase } from '../persistence/open.js'
 import { MemoryStore } from './store.js'
-import { MemoryService } from './service.js'
+import { MemoryService, type MemoryEmbeddingClientFactory } from './service.js'
+import { getEmbedding } from './vec.js'
+import type { MemoryEmbeddingClient } from './embedding-client.js'
 
-function freshService(configPath?: string) {
-  const { db, memoriesFtsEnabled } = openDatabase(':memory:')
-  const store = new MemoryStore(db, memoriesFtsEnabled)
-  const svc = new MemoryService(store, configPath ? { configPath } : undefined)
+function freshService(
+  configPath?: string,
+  opts?: { createEmbeddingClient?: MemoryEmbeddingClientFactory },
+) {
+  const { db, memoriesFtsEnabled, memoriesVecEnabled } = openDatabase(':memory:')
+  const store = new MemoryStore(db, memoriesFtsEnabled, memoriesVecEnabled)
+  const svc = new MemoryService(store, {
+    ...(configPath ? { configPath } : {}),
+    ...opts,
+  })
   return { db, store, svc }
+}
+
+function unitEmbedClient(dim = 3): MemoryEmbeddingClient {
+  return {
+    async embed(texts: string[]) {
+      return texts.map((_, i) => {
+        const v = new Array(dim).fill(0)
+        v[i % dim] = 1
+        return v
+      })
+    },
+  }
 }
 
 describe('MemoryService', () => {
@@ -328,5 +348,92 @@ describe('MemoryService', () => {
     )
     expect(neu.imported).toBe(1)
     expect(store.getItem('e2')?.title).toBe('two')
+  })
+
+  it('upsert schedules embed when embeddingModel configured (mock client)', async () => {
+    const client = unitEmbedClient(4)
+    const embedSpy = {
+      embed: async (texts: string[]) => client.embed(texts),
+    }
+    const { svc: embSvc, db: embDb, store: embStore } = freshService(configPath, {
+      createEmbeddingClient: () => embedSpy,
+    })
+    embSvc.setConfig({
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+    })
+    const item = embSvc.upsert({
+      title: 'embed me',
+      content: 'vector body',
+      kind: 'lesson',
+      scope: 'global',
+    })
+    await embSvc.scheduleEmbed(item.id)
+    const row = getEmbedding(embDb, item.id)
+    expect(row?.dim).toBe(4)
+    expect(row?.modelKey).toBe('openai/text-embedding-3-small')
+    expect(embSvc.getIndexStatus()).toMatchObject({
+      embedded: 1,
+      total: 1,
+      modelKey: 'openai/text-embedding-3-small',
+    })
+    expect(typeof embSvc.getIndexStatus().vecEnabled).toBe('boolean')
+
+    // hard delete drops embedding row
+    embStore.hardDelete(item.id)
+    expect(getEmbedding(embDb, item.id)).toBeUndefined()
+  })
+
+  it('upsert without embeddingModel does not throw; missing client is soft-fail', async () => {
+    const item = svc.upsert({
+      title: 'no embed',
+      content: 'ok',
+      kind: 'lesson',
+      scope: 'global',
+    })
+    await expect(svc.scheduleEmbed(item.id)).resolves.toBeUndefined()
+    expect(getEmbedding(db, item.id)).toBeUndefined()
+
+    const { svc: soft, db: softDb } = freshService(configPath, {
+      createEmbeddingClient: () => null,
+    })
+    soft.setConfig({
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+    })
+    const item2 = soft.upsert({
+      title: 'no client',
+      content: 'ok',
+      kind: 'lesson',
+      scope: 'global',
+    })
+    await soft.scheduleEmbed(item2.id)
+    expect(getEmbedding(softDb, item2.id)).toBeUndefined()
+  })
+
+  it('restore schedules re-embed; reindexAll covers active items', async () => {
+    const { svc: embSvc, db: embDb } = freshService(configPath, {
+      createEmbeddingClient: () => unitEmbedClient(2),
+    })
+    embSvc.setConfig({
+      embeddingModel: { providerID: 'openai', modelID: 'emb' },
+    })
+    const a = embSvc.upsert({ title: 'a', content: 'a', kind: 'lesson', scope: 'global' })
+    const b = embSvc.upsert({ title: 'b', content: 'b', kind: 'lesson', scope: 'global' })
+    await embSvc.scheduleEmbed(a.id)
+    await embSvc.scheduleEmbed(b.id)
+    embSvc.softDelete(a.id)
+    // reindex skips deleted
+    let res = await embSvc.reindexAll()
+    expect(res.total).toBe(1)
+    expect(res.embedded).toBe(1)
+
+    const restored = embSvc.restore(a.id)
+    expect(restored?.status).toBe('active')
+    await embSvc.scheduleEmbed(a.id)
+    expect(getEmbedding(embDb, a.id)?.dim).toBe(2)
+
+    res = await embSvc.reindexAll()
+    expect(res.total).toBe(2)
+    expect(res.embedded).toBe(2)
+    expect(res.failed).toBe(0)
   })
 })

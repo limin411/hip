@@ -6777,6 +6777,42 @@ split2@^4.1.0, split2@^4.2.0:
   resolved "https://registry.npmmirror.com/split2/-/split2-4.2.0.tgz#c9c5920904d148bab0b9f67145f245a86aadbfa4"
   integrity sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==
 
+sqlite-vec-darwin-arm64@0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec-darwin-arm64/-/sqlite-vec-darwin-arm64-0.1.9.tgz#0f73ce38d8127de5a2be9e47a526e13a5816ba63"
+  integrity sha512-jSsZpE42OfBkGL/ItyJTVCUwl6o6Ka3U5rc4j+UBDIQzC1ulSSKMEhQLthsOnF/MdAf1MuAkYhkdKmmcjaIZQg==
+
+sqlite-vec-darwin-x64@0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec-darwin-x64/-/sqlite-vec-darwin-x64-0.1.9.tgz#5c907bff5f1336312d0d77b123c7519d54d98746"
+  integrity sha512-KDlVyqQT7pnOhU1ymB9gs7dMbSoVmKHitT+k1/xkjarcX8bBqPxWrGlK/R+C5WmWkfvWwyq5FfXfiBYCBs6PlA==
+
+sqlite-vec-linux-arm64@0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec-linux-arm64/-/sqlite-vec-linux-arm64-0.1.9.tgz#08e37c1142cf12b75de686419e7db905f1efa07c"
+  integrity sha512-5wXVJ9c9kR4CHm/wVqXb/R+XUHTdpZ4nWbPHlS+gc9qQFVHs92Km4bPnCKX4rtcPMzvNis+SIzMJR1SCEwpuUw==
+
+sqlite-vec-linux-x64@0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec-linux-x64/-/sqlite-vec-linux-x64-0.1.9.tgz#692af0d05a6c37c41049e3b5bdcdf60508dfaf5c"
+  integrity sha512-w3tCH8xK2finW8fQJ/m8uqKodXUZ9KAuAar2UIhz4BHILfpE0WM/MTGCRfa7RjYbrYim5Luk3guvMOGI7T7JQA==
+
+sqlite-vec-windows-x64@0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec-windows-x64/-/sqlite-vec-windows-x64-0.1.9.tgz#5ae39efdcae3e2b9333a3d3ace8b4cdfd35417c0"
+  integrity sha512-y3gEIyy/17bq2QFPQOWLE68TYWcRZkBQVA2XLrTPHNTOp55xJi/BBBmOm40tVMDMjtP+Elpk6UBUXdaq+46b0Q==
+
+sqlite-vec@^0.1.9:
+  version "0.1.9"
+  resolved "https://registry.npmmirror.com/sqlite-vec/-/sqlite-vec-0.1.9.tgz#1634ac7d125c32dd62502591b71f2d961e2a9aa4"
+  integrity sha512-L7XJWRIBNvR9O5+vh1FQ+IGkh/3D2AzVksW5gdtk28m78Hy8skFD0pqReKH1Yp0/BUKRGcffgKvyO/EON5JXpA==
+  optionalDependencies:
+    sqlite-vec-darwin-arm64 "0.1.9"
+    sqlite-vec-darwin-x64 "0.1.9"
+    sqlite-vec-linux-arm64 "0.1.9"
+    sqlite-vec-linux-x64 "0.1.9"
+    sqlite-vec-windows-x64 "0.1.9"
+
 stack-utils@^2.0.6:
   version "2.0.6"
   resolved "https://registry.npmmirror.com/stack-utils/-/stack-utils-2.0.6.tgz#aaf0748169c02fc33c8232abccf933f54a1cc34f"

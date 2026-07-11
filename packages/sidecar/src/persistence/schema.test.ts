@@ -21,7 +21,7 @@ describe('migrate', () => {
     expect(columns(db, 'tool_calls')).toEqual(
       expect.arrayContaining(['agent_run_id', 'call_id', 'agent_id', 'name', 'input', 'output', 'status', 'error', 'seq', 'truncated']),
     )
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
     expect(columns(db, 'messages')).toContain('attachments')
   })
 
@@ -47,7 +47,7 @@ describe('migrate', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'sessions')).toContain('acp_session_id')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 
   it('v10 adds event_sequence + event + snapshots tables and reaches user_version 10', () => {
@@ -62,7 +62,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='event'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_event_aggregate_seq', 'idx_event_aggregate_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 
   it('v10 migration preserves all pre-existing tables (no drop / no rename)', () => {
@@ -80,7 +80,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_message'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_message_session_seq', 'idx_session_message_session_type_seq']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 
   it('v13 adds session_input queue table and reaches user_version 13', () => {
@@ -91,7 +91,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='session_input'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_session_input_session', 'idx_session_input_session_promoted']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 
   it('v14 adds cron_tasks table and reaches user_version 14', () => {
@@ -102,7 +102,7 @@ describe('migrate', () => {
     )
     const indexes = (db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='cron_tasks'`).all() as { name: string }[]).map((r) => r.name)
     expect(indexes).toEqual(expect.arrayContaining(['idx_cron_tasks_session']))
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 
   it('v15 adds messages.attachments column', () => {
@@ -136,10 +136,22 @@ describe('migrate', () => {
     )
   })
 
-  it('v17 adds messages.memory_citations and reaches user_version 17', () => {
+  it('v17 adds messages.memory_citations and reaches user_version 17+', () => {
     const db = new DatabaseSync(':memory:')
     migrate(db)
     expect(columns(db, 'messages')).toContain('memory_citations')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
+  })
+
+  it('v18 adds memory_embedding_meta / memory_embedding_rows', () => {
+    const db = new DatabaseSync(':memory:')
+    migrate(db)
+    expect(columns(db, 'memory_embedding_meta')).toEqual(
+      expect.arrayContaining(['model_key', 'dim', 'updated_at']),
+    )
+    expect(columns(db, 'memory_embedding_rows')).toEqual(
+      expect.arrayContaining(['memory_id', 'model_key', 'dim', 'embedding', 'updated_at']),
+    )
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(18)
   })
 })

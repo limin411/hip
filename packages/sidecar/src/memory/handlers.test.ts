@@ -14,10 +14,16 @@ import {
 } from './handlers.js'
 import type { Session } from '../session/session.js'
 
-function freshService(configPath?: string) {
-  const { db, memoriesFtsEnabled } = openDatabase(':memory:')
-  const store = new MemoryStore(db, memoriesFtsEnabled)
-  const svc = new MemoryService(store, configPath ? { configPath } : undefined)
+function freshService(
+  configPath?: string,
+  opts?: ConstructorParameters<typeof MemoryService>[1],
+) {
+  const { db, memoriesFtsEnabled, memoriesVecEnabled } = openDatabase(':memory:')
+  const store = new MemoryStore(db, memoriesFtsEnabled, memoriesVecEnabled)
+  const svc = new MemoryService(store, {
+    ...(configPath ? { configPath } : {}),
+    ...opts,
+  })
   return { db, store, svc }
 }
 
@@ -394,5 +400,49 @@ describe('memory handlers', () => {
     expect(['noop', 'failed', 'succeeded']).toContain(
       (last as { status: string }).status,
     )
+  })
+
+  it('memory:indexStatus returns coverage; reindex uses mock embed client', async () => {
+    // Rebuild service with mock embed factory
+    const { svc: embSvc } = freshService(configPath, {
+      createEmbeddingClient: () => ({
+        async embed(texts: string[]) {
+          return texts.map(() => [1, 0, 0])
+        },
+      }),
+    })
+    embSvc.setConfig({
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+    })
+    embSvc.upsert({ title: 'i1', content: 'c1', kind: 'lesson', scope: 'global' })
+    embSvc.upsert({ title: 'i2', content: 'c2', kind: 'lesson', scope: 'global' })
+    ctx = { ...ctx, getMemoryService: () => embSvc }
+
+    handleMemoryMessage(ctx, { type: 'memory:indexStatus' }, send)
+    expect(sent[0]).toMatchObject({
+      type: 'memory:indexStatus:result',
+      total: 2,
+      modelKey: 'openai/text-embedding-3-small',
+    })
+    expect(typeof (sent[0] as { vecEnabled?: boolean }).vecEnabled).toBe('boolean')
+
+    sent = []
+    handleMemoryMessage(ctx, { type: 'memory:reindex' }, send)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(sent[0]).toMatchObject({
+      type: 'memory:reindex:result',
+      embedded: 2,
+      total: 2,
+      failed: 0,
+      modelKey: 'openai/text-embedding-3-small',
+    })
+
+    sent = []
+    handleMemoryMessage(ctx, { type: 'memory:indexStatus' }, send)
+    expect(sent[0]).toMatchObject({
+      type: 'memory:indexStatus:result',
+      embedded: 2,
+      total: 2,
+    })
   })
 })

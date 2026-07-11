@@ -105,6 +105,8 @@ export type ClientMessage =
   | { type: 'memory:getConfig' }
   | { type: 'memory:setConfig'; config: Partial<MemoryFileConfig> }
   | { type: 'memory:consolidate'; projectKeyHash?: string }
+  | { type: 'memory:reindex' }
+  | { type: 'memory:indexStatus' }
   | { type: 'session:setMemoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 
 type AttachmentSendPayload = Attachment & { path: string }
@@ -185,5 +187,21 @@ export type ServerMessage =
   | { type: 'memory:import:result'; ok: boolean; imported: number; error?: string }
   | { type: 'memory:config'; config: MemoryFileConfig }
   | { type: 'memory:pipeline'; phase: 1 | 2; status: 'started' | 'succeeded' | 'failed' | 'noop'; detail?: string }
+  | {
+      type: 'memory:reindex:result'
+      embedded: number
+      total: number
+      failed?: number
+      modelKey?: string
+      error?: string
+    }
+  | {
+      type: 'memory:indexStatus:result'
+      embedded: number
+      total: number
+      modelKey?: string
+      vecEnabled?: boolean
+      error?: string
+    }
   | { type: 'session:memoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 

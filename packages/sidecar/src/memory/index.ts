@@ -16,7 +16,27 @@ export {
   type MemoryUpsertInput,
   type MemoryImportConflict,
   type MemoryInjectBlock,
+  type MemoryEmbeddingClientFactory,
+  type MemoryIndexStatus,
+  type MemoryReindexResult,
 } from './service.js'
+export {
+  createOpenAICompatibleEmbeddingClient,
+  embeddingModelKey,
+  truncateForEmbed,
+  type MemoryEmbeddingClient,
+} from './embedding-client.js'
+export {
+  encodeEmbedding,
+  decodeEmbedding,
+  upsertEmbedding,
+  getEmbedding,
+  deleteEmbedding,
+  deleteEmbeddings,
+  embeddingIndexStatus,
+  ensureVec0Table,
+  memoryVecTableName,
+} from './vec.js'
 export { buildMemoryTools } from './tools.js'
 export {
   MemoryInjector,

@@ -70,6 +70,8 @@ export const CLIENT_MESSAGE_TYPES = [
   'memory:getConfig',
   'memory:setConfig',
   'memory:consolidate',
+  'memory:reindex',
+  'memory:indexStatus',
   'session:setMemoryFlags',
 ] as const
 

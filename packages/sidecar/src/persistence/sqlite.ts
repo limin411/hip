@@ -13,14 +13,24 @@ export interface SqliteStatement {
   get(...params: unknown[]): unknown
   all(...params: unknown[]): unknown[]
 }
+export interface SqliteDatabaseOptions {
+  /** Required to load sqlite-vec (or any other extension). Default false. */
+  allowExtension?: boolean
+  readOnly?: boolean
+  timeout?: number
+}
 export interface SqliteDatabase {
   exec(sql: string): void
   prepare(sql: string): SqliteStatement
   close(): void
+  enableLoadExtension?(allow: boolean): void
+  loadExtension?(path: string, entrypoint?: string): void
 }
 
 const nodeRequire = createRequire(import.meta.url)
-const sqlite = nodeRequire('node:sqlite') as { DatabaseSync: new (path: string) => SqliteDatabase }
+const sqlite = nodeRequire('node:sqlite') as {
+  DatabaseSync: new (path: string, options?: SqliteDatabaseOptions) => SqliteDatabase
+}
 
 /** The node:sqlite synchronous database class, loaded natively (Vite-safe). */
 export const DatabaseSync = sqlite.DatabaseSync

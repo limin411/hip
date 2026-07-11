@@ -10,13 +10,22 @@ export interface AgentModelGroup {
   models: Array<{ key: string; modelID: string }>
 }
 
-/** Enabled providers' models, grouped for the agent editor's <optgroup> picker. */
+/**
+ * Enabled providers' models, grouped for <optgroup> pickers (agent editor, memory extract, chat).
+ * When `keyConfigured` is provided, providers without a stored API key are excluded so clearing
+ * a key removes them from pickers (enabled alone is not enough).
+ */
 export function groupModelOptions(
   catalog: Record<string, CatalogProvider>,
   config: ProviderEnablement,
+  keyConfigured?: Record<string, boolean>,
 ): AgentModelGroup[] {
   return Object.entries(catalog)
-    .filter(([id]) => config.providers[id]?.enabled)
+    .filter(([id]) => {
+      if (!config.providers[id]?.enabled) return false
+      if (keyConfigured !== undefined && !keyConfigured[id]) return false
+      return true
+    })
     .map(([id, p]) => ({
       providerID: id,
       providerName: p.name,

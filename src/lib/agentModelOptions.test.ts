@@ -28,4 +28,20 @@ describe('groupModelOptions', () => {
     })
     expect(groups.map((g) => g.providerID)).toEqual(['anthropic'])
   })
+
+  it('when keyConfigured is provided, drops enabled providers without a key', () => {
+    const groups = groupModelOptions(
+      catalog,
+      { providers: { anthropic: { enabled: true }, openai: { enabled: true } } },
+      { anthropic: true, openai: false },
+    )
+    expect(groups.map((g) => g.providerID)).toEqual(['anthropic'])
+  })
+
+  it('without keyConfigured, still includes enabled providers that lack a key', () => {
+    const groups = groupModelOptions(catalog, {
+      providers: { openai: { enabled: true } },
+    })
+    expect(groups.map((g) => g.providerID)).toEqual(['openai'])
+  })
 })

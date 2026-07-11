@@ -29,7 +29,12 @@ function downloadText(filename: string, data: string, mime = 'application/x-ndjs
 
 export function MemoryConfig() {
   const { t } = useTranslation()
-  const { catalog, config: providersConfig, load: loadProviders } = useProvidersStore()
+  const {
+    catalog,
+    config: providersConfig,
+    keyConfigured,
+    load: loadProviders,
+  } = useProvidersStore()
   const [config, setConfig] = useState<MemoryFileConfig | null>(null)
   const [items, setItems] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +55,7 @@ export function MemoryConfig() {
   } | null>(null)
   const [reindexing, setReindexing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const modelGroups = groupModelOptions(catalog, providersConfig)
+  const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
   const hasEmbeddingModel = !!(
     config?.embeddingModel &&

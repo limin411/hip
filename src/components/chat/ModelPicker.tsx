@@ -23,10 +23,11 @@ export function ModelPicker() {
   // Separate selectors (matching AgentPicker) avoid a new object each render / useShallow.
   const catalog = useProvidersStore((s) => s.catalog)
   const config = useProvidersStore((s) => s.config)
+  const keyConfigured = useProvidersStore((s) => s.keyConfigured)
   const activeId = useActiveSessionId()
   const session = useActiveSession()
 
-  const groups = groupModelOptions(catalog, config)
+  const groups = groupModelOptions(catalog, config, keyConfigured)
 
   // Active session: show the session's current model (pinned or global fallback) and allow switching.
   // Draft (no session): show the draft's modelKey (or global fallback).

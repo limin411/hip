@@ -33,7 +33,7 @@ export function AgentEditor({
   onCancel: () => void
 }) {
   const { t } = useTranslation()
-  const { config, catalog } = useProvidersStore()
+  const { config, catalog, keyConfigured } = useProvidersStore()
   const mcpServers = useMcpServers()
   const { skills } = useSkillsStore()
   const agents = useAgentsStore((s) => s.agents)
@@ -83,7 +83,7 @@ export function AgentEditor({
     : isAcp && acpStep === 'pick'
       ? t('settings.agents.acpPickTitle')
       : t(isAcp ? 'settings.agents.addAcp' : 'settings.agents.addInternal')
-  const groups = groupModelOptions(catalog, config)
+  const groups = groupModelOptions(catalog, config, keyConfigured)
   const patch = (p: Partial<AgentForm>) => setForm((f) => ({ ...f, ...p }))
   const toggleSkill = (id: string, on: boolean) =>
     setForm((f) => ({ ...f, allowedSkills: on ? [...f.allowedSkills, id] : f.allowedSkills.filter((x) => x !== id) }))

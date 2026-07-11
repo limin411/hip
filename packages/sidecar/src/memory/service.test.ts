@@ -151,6 +151,48 @@ describe('MemoryService', () => {
     expect(block).toContain('Yarn tip')
   })
 
+  it('formatPrefetch still surfaces in-scope hit when many out-of-scope matches rank higher', () => {
+    // 40 foreign project items that all match the query (would fill LIMIT=30 alone).
+    for (let i = 0; i < 40; i++) {
+      store.upsertItem({
+        id: `foreign-${i}`,
+        scope: 'project',
+        projectKeyHash: 'foreign-pkh',
+        kind: 'lesson',
+        title: `Foreign Prefetch ${i}`,
+        content: 'prefetch-scope-token shared foreign body',
+        confidence: 0.9,
+        status: 'active',
+        source: 'user',
+        tags: [],
+        createdAt: 1,
+        updatedAt: 10_000 + i,
+        useCount: 0,
+        pinned: false,
+      })
+    }
+    store.upsertItem({
+      id: 'in-scope-global',
+      scope: 'global',
+      kind: 'lesson',
+      title: 'InScope Prefetch Hit',
+      content: 'prefetch-scope-token global body',
+      confidence: 0.5,
+      status: 'active',
+      source: 'user',
+      tags: [],
+      createdAt: 1,
+      updatedAt: 1,
+      useCount: 0,
+      pinned: false,
+    })
+
+    const block = svc.formatPrefetch('prefetch-scope-token', undefined, undefined)
+    expect(block).toContain('## Memory (prefetch)')
+    expect(block).toContain('InScope Prefetch Hit')
+    expect(block).not.toContain('Foreign Prefetch')
+  })
+
   it('search delegates to store', () => {
     store.upsertItem({
       id: 's1',

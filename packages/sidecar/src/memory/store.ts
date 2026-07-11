@@ -15,6 +15,13 @@ export interface MemorySearchOpts {
   limit?: number
 }
 
+/** Read-path scopes: global ∪ matching project ∪ matching session. */
+export interface MemorySearchInScopesOpts {
+  projectKeyHash?: string
+  sessionId?: string
+  limit?: number
+}
+
 export interface MemoryStage1Row {
   id: string
   sessionId: string
@@ -210,9 +217,6 @@ export class MemoryStore {
   }
 
   search(query: string, opts: MemorySearchOpts = {}): MemoryItem[] {
-    const q = query.trim()
-    if (!q) return []
-    const limit = opts.limit ?? 50
     const filters: string[] = [`m.status='active'`]
     const params: unknown[] = []
     if (opts.projectKeyHash !== undefined) {
@@ -223,6 +227,37 @@ export class MemoryStore {
       filters.push('m.session_id=?')
       params.push(opts.sessionId)
     }
+    return this.searchWithFilters(query, filters, params, opts.limit ?? 50)
+  }
+
+  /**
+   * Search limited to the normal read path: active items in
+   * global ∪ project(projectKeyHash) ∪ session(sessionId).
+   * Scope OR is applied in SQL so LIMIT cannot drop all in-scope hits.
+   */
+  searchInScopes(query: string, opts: MemorySearchInScopesOpts = {}): MemoryItem[] {
+    const scopeOr: string[] = [`m.scope='global'`]
+    const params: unknown[] = []
+    if (opts.projectKeyHash !== undefined) {
+      scopeOr.push(`(m.scope='project' AND m.project_key_hash=?)`)
+      params.push(opts.projectKeyHash)
+    }
+    if (opts.sessionId !== undefined) {
+      scopeOr.push(`(m.scope='session' AND m.session_id=?)`)
+      params.push(opts.sessionId)
+    }
+    const filters = [`m.status='active'`, `(${scopeOr.join(' OR ')})`]
+    return this.searchWithFilters(query, filters, params, opts.limit ?? 50)
+  }
+
+  private searchWithFilters(
+    query: string,
+    filters: string[],
+    params: unknown[],
+    limit: number,
+  ): MemoryItem[] {
+    const q = query.trim()
+    if (!q) return []
     const whereExtra = filters.length ? `AND ${filters.join(' AND ')}` : ''
 
     // trigram MATCH needs >=3 chars and a quoted literal to avoid FTS syntax errors.

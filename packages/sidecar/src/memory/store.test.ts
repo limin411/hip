@@ -98,6 +98,82 @@ describe('MemoryStore', () => {
     expect(hits.map((h) => h.id)).toEqual(['a'])
   })
 
+  it('searchInScopes keeps global/project/session OR; excludes foreign projects', () => {
+    store.upsertItem(item({
+      id: 'g1',
+      title: 'Global hit',
+      content: 'scope-token-alpha shared',
+      scope: 'global',
+      projectKeyHash: undefined,
+    }))
+    store.upsertItem(item({
+      id: 'p-mine',
+      title: 'My project',
+      content: 'scope-token-alpha mine',
+      scope: 'project',
+      projectKeyHash: 'mine-hash',
+    }))
+    store.upsertItem(item({
+      id: 'p-other',
+      title: 'Other project',
+      content: 'scope-token-alpha other',
+      scope: 'project',
+      projectKeyHash: 'other-hash',
+    }))
+    store.upsertItem(item({
+      id: 's1',
+      title: 'Session hit',
+      content: 'scope-token-alpha sess',
+      scope: 'session',
+      sessionId: 'sess-a',
+      projectKeyHash: undefined,
+    }))
+    store.upsertItem(item({
+      id: 's-other',
+      title: 'Other session',
+      content: 'scope-token-alpha sess-other',
+      scope: 'session',
+      sessionId: 'sess-b',
+      projectKeyHash: undefined,
+    }))
+
+    const hits = store.searchInScopes('scope-token-alpha', {
+      projectKeyHash: 'mine-hash',
+      sessionId: 'sess-a',
+      limit: 10,
+    })
+    const ids = hits.map((h) => h.id).sort()
+    expect(ids).toEqual(['g1', 'p-mine', 's1'])
+  })
+
+  it('searchInScopes LIMIT cannot be exhausted by foreign projects', () => {
+    for (let i = 0; i < 40; i++) {
+      store.upsertItem(item({
+        id: `foreign-${i}`,
+        title: `Foreign ${i}`,
+        content: 'limit-token-beta foreign project',
+        scope: 'project',
+        projectKeyHash: 'foreign-hash',
+        updatedAt: 1000 + i,
+      }))
+    }
+    store.upsertItem(item({
+      id: 'in-scope',
+      title: 'In scope',
+      content: 'limit-token-beta only mine',
+      scope: 'global',
+      projectKeyHash: undefined,
+      updatedAt: 1,
+    }))
+
+    const hits = store.searchInScopes('limit-token-beta', {
+      projectKeyHash: 'mine-hash',
+      limit: 5,
+    })
+    expect(hits.map((h) => h.id)).toContain('in-scope')
+    expect(hits.every((h) => h.scope === 'global' || h.projectKeyHash === 'mine-hash')).toBe(true)
+  })
+
   it('FTS Chinese substring match when trigram available', () => {
     store.upsertItem(item({
       id: 'zh',

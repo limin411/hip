@@ -20,5 +20,6 @@ export {
   MemoryStore,
   type MemoryListFilter,
   type MemorySearchOpts,
+  type MemorySearchInScopesOpts,
   type MemoryStage1Row,
 } from './store.js'

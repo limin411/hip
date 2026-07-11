@@ -108,12 +108,16 @@ export class MemoryService {
       }
     }
 
-    const hits = this.store.search(q, { limit: 30 })
-    const scoped = hits.filter((h) => this.inReadScope(h, projectKeyHash, sessionId))
-    if (scoped.length === 0) return ''
+    // SQL-level scope OR so LIMIT cannot drop all in-scope hits behind foreign projects.
+    const hits = this.store.searchInScopes(q, {
+      projectKeyHash,
+      sessionId: sessionId ?? undefined,
+      limit: 30,
+    })
+    if (hits.length === 0) return ''
 
     const lines: string[] = ['## Memory (prefetch)']
-    for (const h of scoped) {
+    for (const h of hits) {
       const snippet = h.content.replace(/\s+/g, ' ').trim()
       const line = `- **${h.title}**: ${snippet}`
       lines.push(line)
@@ -266,18 +270,4 @@ export class MemoryService {
     return rows.map((r) => r.title)
   }
 
-  private inReadScope(
-    item: MemoryItem,
-    projectKeyHash: string | undefined,
-    sessionId: string | undefined,
-  ): boolean {
-    if (item.scope === 'global') return true
-    if (item.scope === 'project' && projectKeyHash && item.projectKeyHash === projectKeyHash) {
-      return true
-    }
-    if (item.scope === 'session' && sessionId && item.sessionId === sessionId) {
-      return true
-    }
-    return false
-  }
 }

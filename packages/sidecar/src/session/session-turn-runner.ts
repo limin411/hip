@@ -67,6 +67,15 @@ import {
   SubagentStatusInjector,
 } from './context-injector.js'
 import { ProjectAgentsMdInjector } from './project-agents-md.js'
+import {
+  MemoryService,
+  MemoryStore,
+  resolveProjectKey,
+  loadMemoryConfig,
+  resolveSessionMemoryFlags,
+} from '../memory/index.js'
+import { MemoryInjector } from '../memory/inject.js'
+import { tryEnableMemoriesFts } from '../persistence/schema.js'
 import { ContextEpoch } from './context-epoch.js'
 import { buildSessionTooling, type SessionTooling } from './session-tooling.js'
 import { safeErrorMessage } from './error.js'
@@ -203,6 +212,12 @@ export interface SessionTurnHost {
   lastUserMessageRow(): import('../persistence/message-types.js').SessionMessageData & { role: 'user' } | null
   incompleteAssistantStepAfter(userMessageId: string): { stepId: string; agentId: string } | null
   rebuildPartsForImageAgent(userData: Extract<import('../persistence/message-types.js').SessionMessageData, { role: 'user' }>): Promise<ContentPart[]>
+  /** Frozen core memory block; refreshed when project key changes. */
+  memoryCoreSnapshot?: string
+  /** projectKeyHash used when memoryCoreSnapshot was loaded. */
+  memorySnapshotProjectKey?: string
+  /** Lazy MemoryService shared across turns on this host. */
+  memoryService?: MemoryService
 }
 
 
@@ -735,6 +750,39 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const planMode: PlanMode | undefined = host._config.disablePlan ? undefined : host.planMode
 
   if (!host.agentProv.isExternalAgent()) {
+    // Cross-session memory: ensure service, resolve flags, freeze/refresh core snapshot.
+    if (!host.memoryService && host.store) {
+      const db = host.store.getDb()
+      const memoriesFts = tryEnableMemoriesFts(db)
+      host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
+    }
+    const flags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
+    let useMemories = flags.use
+    let memoryCoreSnapshot = host.memoryCoreSnapshot
+    let memorySnapshotProjectKey = host.memorySnapshotProjectKey
+
+    if (useMemories && host.memoryService && cwd) {
+      try {
+        const { projectKeyHash } = resolveProjectKey(cwd)
+        if (!memoryCoreSnapshot || memorySnapshotProjectKey !== projectKeyHash) {
+          memoryCoreSnapshot = host.memoryService.loadCoreSnapshot(projectKeyHash)
+          host.memoryCoreSnapshot = memoryCoreSnapshot
+          host.memorySnapshotProjectKey = projectKeyHash
+        }
+      } catch {
+        // resolveProjectKey can fail on bad cwd; skip core snapshot.
+        memoryCoreSnapshot = host.memoryCoreSnapshot
+      }
+    } else if (!useMemories) {
+      host.memoryCoreSnapshot = undefined
+      host.memorySnapshotProjectKey = undefined
+      memoryCoreSnapshot = undefined
+    }
+
+    const prefetchQuery = extractLastUserText(
+      base?.messages !== undefined ? modelReady(base.messages) : visibleMessages,
+    )
+
     const contextState: SessionContextState = {
       cwd,
       customSystemPrompt: host._config.systemPrompt,
@@ -750,6 +798,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         const entries = host.backgroundManager.completedEntries()
         return entries.length > 0 ? entries : undefined
       })(),
+      sessionId: host.id,
+      useMemories,
+      memoryCoreSnapshot,
+      prefetchQuery: prefetchQuery || undefined,
     }
 
     const injectorRegistry = new ContextInjectorRegistry()
@@ -759,6 +811,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     injectorRegistry.register(new PermissionModeInjector())
     injectorRegistry.register(new TokenBudgetInjector())
     injectorRegistry.register(new SubagentStatusInjector())
+    // Memory last (Option A): AGENTS.md / other injectors take priority ordering-wise.
+    if (host.memoryService) {
+      injectorRegistry.register(new MemoryInjector(host.memoryService))
+    }
 
     logDebug('session', 'phase:prepareContext', { sessionId: host.id, elapsedMs: Date.now() - t0 })
     const prepared = await prepareSessionContext(host.id, 'supervisor', contextState, host.store, false, injectorRegistry)

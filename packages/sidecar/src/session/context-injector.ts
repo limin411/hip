@@ -12,6 +12,14 @@ export interface InjectorState {
   surface?: 'chat' | 'code'
   pendingSubagents?: { id: string; description: string; status: string }[]
   completedSubagents?: { id: string; description: string; status: string }[]
+  /** Session id for memory prefetch scoping. */
+  sessionId?: string
+  /** When true, MemoryInjector may inject core snapshot + prefetch. */
+  useMemories?: boolean
+  /** Frozen core memory block for this project (host-cached). */
+  memoryCoreSnapshot?: string
+  /** Last user text used as memory prefetch query. */
+  prefetchQuery?: string
 }
 
 // ── Result ─────────────────────────────────────────────────────────────────────

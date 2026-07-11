@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
 import { SystemContext } from './system-context.js'
-import { prepareSessionContext } from './session-context.js'
+import { prepareSessionContext, assembleFromInjectors } from './session-context.js'
+import {
+  ContextInjectorRegistry,
+  type ContextInjector,
+  type InjectResult,
+  type InjectorState,
+} from './context-injector.js'
 
 function freshStore(): SessionStore {
   const { db, ftsEnabled } = openDatabase(':memory:')
@@ -101,5 +107,88 @@ describe('prepareSessionContext', () => {
 
     initSpy.mockRestore()
     errorSpy.mockRestore()
+  })
+})
+
+describe('assembleFromInjectors', () => {
+  it('maps memory fields into InjectorState', async () => {
+    let seen: InjectorState | undefined
+    const capture: ContextInjector = {
+      id: 'capture',
+      async inject(state) {
+        seen = state
+        return { systemMessages: [] }
+      },
+    }
+    const registry = new ContextInjectorRegistry()
+    registry.register(capture)
+
+    await assembleFromInjectors(registry, {
+      ...baseState,
+      sessionId: 'sess-1',
+      useMemories: true,
+      memoryCoreSnapshot: '## Memory (core)\ncore-body',
+      prefetchQuery: 'how do I build',
+    })
+
+    expect(seen?.sessionId).toBe('sess-1')
+    expect(seen?.useMemories).toBe(true)
+    expect(seen?.memoryCoreSnapshot).toBe('## Memory (core)\ncore-body')
+    expect(seen?.prefetchQuery).toBe('how do I build')
+  })
+
+  it('ProjectAgents content before Memory; assembled system ends with memory block', async () => {
+    const agents: ContextInjector = {
+      id: 'project-agents-md',
+      async inject(): Promise<InjectResult> {
+        return { systemMessages: ['# Project instructions (AGENTS.md)\n\nUse pnpm.'] }
+      },
+    }
+    const memory: ContextInjector = {
+      id: 'memory',
+      async inject(state): Promise<InjectResult> {
+        if (!state.useMemories || !state.memoryCoreSnapshot) return { systemMessages: [] }
+        return {
+          systemMessages: [
+            `## Cross-session memory (auxiliary recall; project AGENTS.md / user instructions take priority over memory)\n\n${state.memoryCoreSnapshot}`,
+          ],
+        }
+      },
+    }
+    const registry = new ContextInjectorRegistry()
+    registry.register(agents)
+    registry.register(memory)
+
+    const system = await assembleFromInjectors(registry, {
+      ...baseState,
+      useMemories: true,
+      memoryCoreSnapshot: '## Memory (core)\n### Global\nPrefer yarn',
+    })
+
+    const agentsIdx = system.indexOf('Project instructions')
+    const memoryIdx = system.indexOf('Cross-session memory')
+    expect(agentsIdx).toBeGreaterThanOrEqual(0)
+    expect(memoryIdx).toBeGreaterThan(agentsIdx)
+    expect(system.trimEnd().endsWith('Prefer yarn')).toBe(true)
+  })
+
+  it('useMemories=false yields no memory text', async () => {
+    const memory: ContextInjector = {
+      id: 'memory',
+      async inject(state): Promise<InjectResult> {
+        if (!state.useMemories) return { systemMessages: [] }
+        return { systemMessages: ['MEMORY_LEAK'] }
+      },
+    }
+    const registry = new ContextInjectorRegistry()
+    registry.register(memory)
+
+    const system = await assembleFromInjectors(registry, {
+      ...baseState,
+      useMemories: false,
+      memoryCoreSnapshot: 'should-not-appear',
+    })
+    expect(system).not.toContain('MEMORY_LEAK')
+    expect(system).not.toContain('should-not-appear')
   })
 })

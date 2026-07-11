@@ -31,6 +31,14 @@ export interface SessionContextState {
     status: 'running' | 'completed' | 'failed'
   }>
   checkpointId?: string | null
+  /** Session id for memory prefetch scoping. */
+  sessionId?: string
+  /** When true, MemoryInjector may inject core snapshot + prefetch. */
+  useMemories?: boolean
+  /** Frozen core memory block for this project (host-cached). */
+  memoryCoreSnapshot?: string
+  /** Last user text used as memory prefetch query. */
+  prefetchQuery?: string
 }
 
 export interface PreparedContext {
@@ -86,7 +94,8 @@ export async function prepareSessionContext(
   }
 }
 
-async function assembleFromInjectors(
+/** Map SessionContextState → InjectorState and join injector system messages. Exported for tests. */
+export async function assembleFromInjectors(
   injectorRegistry: ContextInjectorRegistry,
   state: SessionContextState,
 ): Promise<string> {
@@ -106,6 +115,10 @@ async function assembleFromInjectors(
       description: s.description,
       status: s.status,
     })),
+    sessionId: state.sessionId,
+    useMemories: state.useMemories,
+    memoryCoreSnapshot: state.memoryCoreSnapshot,
+    prefetchQuery: state.prefetchQuery,
   }
   const results = await injectorRegistry.injectAll(injectorState)
   const messages = results.flatMap((r) => r.systemMessages)

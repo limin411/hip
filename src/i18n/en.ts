@@ -318,7 +318,7 @@ export const en = {
       model: 'Model Configuration',
       modelConfig: {
         currentModel: 'Current model',
-        intro: 'Configure provider API keys and available models, and pick the current model for chat.',
+        intro: 'Configure providers and pick models by purpose: chat, embedding, or rerank.',
         noModel: 'No model selected',
         noModelHint: 'Pick a provider below and set a current model',
         ready: 'Ready',
@@ -358,6 +358,44 @@ export const en = {
         customName: 'Name',
         customModels: 'Model ids (comma-separated)',
         addProvider: 'Add',
+        tabs: {
+          base: 'Base models',
+          embedding: 'Embedding',
+          rerank: 'Rerank',
+          ariaLabel: 'Model purpose',
+        },
+        purpose: {
+          base: {
+            currentModel: 'Current chat model',
+            noModel: 'No chat model selected',
+            noModelHint: 'Pick a provider below and set a current chat model',
+            setCurrent: 'Set as current',
+            current: 'Current',
+          },
+          embedding: {
+            currentModel: 'Current embedding model',
+            noModel: 'No embedding model',
+            noModelHint: 'Required for hybrid search. Pick a provider and set an embedding model.',
+            setCurrent: 'Set as embedding',
+            current: 'Embedding',
+            clear: 'Clear embedding',
+            privacyNote:
+              'Embeddings send memory text to the chosen provider API. Hybrid search stays off until you enable it under Memory.',
+          },
+          rerank: {
+            currentModel: 'Current rerank model',
+            noModel: 'No rerank model (optional)',
+            noModelHint: 'Leave unset to skip rerank. Pick a provider to configure a dedicated rerank endpoint.',
+            setCurrent: 'Set as rerank',
+            current: 'Rerank',
+            clear: 'Clear rerank',
+            privacyNote:
+              'Rerank may send query and memory snippets to the chosen provider API when hybrid search is enabled.',
+          },
+        },
+        useRecommended: 'Use recommended',
+        recommendEmbeddingUnavailable:
+          'Recommended embedding is only available when the active chat provider is OpenAI-compatible. Pick a model manually, or switch the active provider.',
         roleModels: {
           title: 'Role models',
           intro: 'Optional models for background memory extract, embedding, and rerank.',
@@ -469,7 +507,7 @@ export const en = {
         hybridSearch: 'Hybrid search',
         hybridSearchDesc:
           'Combine keyword (FTS) and embedding similarity when ranking memories for prefetch and tools.',
-        hybridSearchNeedsEmbedding: 'Set an embedding model under Models → Role models first.',
+        hybridSearchNeedsEmbedding: 'Set an embedding model under Models → Embedding first.',
         hybridPrivacyNote:
           'Hybrid search sends query text and memory snippets to the configured embedding (and optional rerank) provider. Keep hybrid off to stay fully local (FTS only).',
         indexStatus: 'Embedding index: {{embedded}} / {{total}}',

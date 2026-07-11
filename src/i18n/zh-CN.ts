@@ -318,7 +318,7 @@ export const zhCN = {
       model: '模型配置',
       modelConfig: {
         currentModel: '当前模型',
-        intro: '配置提供商的 API 密钥与可用模型，并选择对话使用的当前模型。',
+        intro: '按用途配置提供商与模型：对话基础模型、嵌入、重排。',
         noModel: '未选择模型',
         noModelHint: '在下方选择一个提供商并设为当前模型',
         ready: '已就绪',
@@ -358,6 +358,44 @@ export const zhCN = {
         customName: '名称',
         customModels: '模型 id（逗号分隔）',
         addProvider: '添加',
+        tabs: {
+          base: '基础模型',
+          embedding: '嵌入',
+          rerank: '重排',
+          ariaLabel: '模型用途',
+        },
+        purpose: {
+          base: {
+            currentModel: '当前对话模型',
+            noModel: '未选择对话模型',
+            noModelHint: '在下方选择一个提供商并设为当前对话模型',
+            setCurrent: '设为当前',
+            current: '当前',
+          },
+          embedding: {
+            currentModel: '当前嵌入模型',
+            noModel: '未配置嵌入模型',
+            noModelHint: '混合检索需要配置嵌入模型。请选择提供商并设为嵌入模型。',
+            setCurrent: '设为嵌入',
+            current: '嵌入',
+            clear: '清除嵌入',
+            privacyNote:
+              '嵌入会将记忆文本发送到所选供应商 API。混合检索默认关闭，可在「记忆」设置中开启。',
+          },
+          rerank: {
+            currentModel: '当前重排模型',
+            noModel: '未配置重排模型（可选）',
+            noModelHint: '可不设置以跳过重排。选择提供商以配置专用重排端点。',
+            setCurrent: '设为重排',
+            current: '重排',
+            clear: '清除重排',
+            privacyNote:
+              '开启混合检索时，重排可能将查询与记忆片段发送到所选供应商 API。',
+          },
+        },
+        useRecommended: '使用推荐',
+        recommendEmbeddingUnavailable:
+          '仅当当前对话提供商为 OpenAI 兼容时可用一键推荐。请手动选择模型，或切换当前活动提供商。',
         roleModels: {
           title: '专用模型',
           intro: '可选：用于后台记忆抽取、向量嵌入与重排序的模型。',
@@ -468,7 +506,7 @@ export const zhCN = {
         extractModelPlaceholder: 'provider/model（可选）',
         hybridSearch: '混合检索',
         hybridSearchDesc: '在预取与工具检索时，将关键词（FTS）与向量相似度结合排序。',
-        hybridSearchNeedsEmbedding: '请先在「模型 → 角色模型」中配置嵌入模型。',
+        hybridSearchNeedsEmbedding: '请先在「模型 → 嵌入」中配置嵌入模型。',
         hybridPrivacyNote:
           '混合检索会将查询与记忆片段发送到已配置的嵌入（及可选重排序）服务商。关闭混合检索可保持纯本地 FTS。',
         indexStatus: '嵌入索引：{{embedded}} / {{total}}',

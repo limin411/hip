@@ -93,6 +93,49 @@ export class SessionService {
     })
   }
 
+  /**
+   * Wait for the first message whose type is in `types`. Cancels sibling waiters
+   * so a validation error does not leave a hung waiter.
+   */
+  private waitForFirstServerMessage<T extends ServerMessage['type']>(
+    types: T[],
+    timeoutMs = 5000,
+  ): Promise<Extract<ServerMessage, { type: T }>> {
+    return new Promise((resolve, reject) => {
+      const entries: ServerMessageWaiter[] = []
+      const cleanup = () => {
+        for (const e of entries) {
+          clearTimeout(e.timer)
+          this.waiters = this.waiters.filter((w) => w !== e)
+        }
+      }
+      const timer = setTimeout(() => {
+        cleanup()
+        reject(new Error(`Timeout waiting for ${types.join('|')}`))
+      }, timeoutMs)
+      for (const type of types) {
+        const entry: ServerMessageWaiter = {
+          type,
+          resolve: (msg) => {
+            cleanup()
+            clearTimeout(timer)
+            resolve(msg as Extract<ServerMessage, { type: T }>)
+          },
+          reject: (err) => {
+            cleanup()
+            clearTimeout(timer)
+            reject(err)
+          },
+          // Individual timers unused; outer timer owns the deadline.
+          timer: setTimeout(() => {}, timeoutMs),
+        }
+        clearTimeout(entry.timer)
+        entries.push(entry)
+        this.waiters.push(entry)
+      }
+    })
+  }
+
   private fulfillWaiters(msg: ServerMessage): void {
     const idx = this.waiters.findIndex((w) => w.type === msg.type)
     if (idx < 0) return
@@ -511,10 +554,50 @@ export class SessionService {
   }
 
   async setMemoryConfig(config: Partial<MemoryFileConfig>): Promise<MemoryFileConfig> {
-    const wait = this.waitForServerMessage('memory:config')
+    // setConfig validation failures arrive as type:error (code MEMORY_CONFIG).
+    const wait = this.waitForFirstServerMessage(['memory:config', 'error'])
     this.transport.send({ type: 'memory:setConfig', config })
     const msg = await wait
+    if (msg.type === 'error') {
+      throw new Error(msg.message)
+    }
     return msg.config
+  }
+
+  async getMemoryIndexStatus(): Promise<{
+    embedded: number
+    total: number
+    modelKey?: string
+    vecEnabled?: boolean
+  }> {
+    const wait = this.waitForServerMessage('memory:indexStatus:result')
+    this.transport.send({ type: 'memory:indexStatus' })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return {
+      embedded: msg.embedded,
+      total: msg.total,
+      modelKey: msg.modelKey,
+      vecEnabled: msg.vecEnabled,
+    }
+  }
+
+  async reindexMemories(): Promise<{
+    embedded: number
+    total: number
+    failed: number
+    modelKey?: string
+  }> {
+    const wait = this.waitForServerMessage('memory:reindex:result')
+    this.transport.send({ type: 'memory:reindex' })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return {
+      embedded: msg.embedded,
+      total: msg.total,
+      failed: msg.failed ?? 0,
+      modelKey: msg.modelKey,
+    }
   }
 
   async listMemories(filter?: {

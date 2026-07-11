@@ -91,7 +91,7 @@ export class MemoryInjector implements ContextInjector {
     if (state.memoryCoreSnapshot) parts.push(state.memoryCoreSnapshot)
 
     if (state.prefetchQuery) {
-      const block = this.svc.formatPrefetch(
+      const block = await this.svc.formatPrefetch(
         state.prefetchQuery,
         state.cwd,
         state.sessionId,

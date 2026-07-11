@@ -151,7 +151,7 @@ describe('MemoryService', () => {
     expect(svc.loadCoreSnapshot(undefined)).toEqual({ text: '', ids: [] })
   })
 
-  it('formatPrefetch returns top hits under budget', () => {
+  it('formatPrefetch returns top hits under budget', async () => {
     store.upsertItem({
       id: 'm1',
       scope: 'global',
@@ -167,13 +167,13 @@ describe('MemoryService', () => {
       useCount: 0,
       pinned: false,
     })
-    const block = svc.formatPrefetch('package management', undefined, undefined)
+    const block = await svc.formatPrefetch('package management', undefined, undefined)
     expect(block.text).toContain('## Memory (prefetch)')
     expect(block.text).toContain('Yarn tip')
     expect(block.ids).toContain('m1')
   })
 
-  it('formatPrefetch still surfaces in-scope hit when many out-of-scope matches rank higher', () => {
+  it('formatPrefetch still surfaces in-scope hit when many out-of-scope matches rank higher', async () => {
     // 40 foreign project items that all match the query (would fill LIMIT=30 alone).
     for (let i = 0; i < 40; i++) {
       store.upsertItem({
@@ -209,7 +209,7 @@ describe('MemoryService', () => {
       pinned: false,
     })
 
-    const block = svc.formatPrefetch('prefetch-scope-token', undefined, undefined)
+    const block = await svc.formatPrefetch('prefetch-scope-token', undefined, undefined)
     expect(block.text).toContain('## Memory (prefetch)')
     expect(block.text).toContain('InScope Prefetch Hit')
     expect(block.text).not.toContain('Foreign Prefetch')

@@ -466,6 +466,16 @@ export const en = {
         extractModelDesc: 'Optional chat model for background extraction/consolidation. Clear to use the cheap model for the active provider.',
         extractModelDefault: 'Default (cheap model for active provider)',
         extractModelPlaceholder: 'provider/model (optional)',
+        hybridSearch: 'Hybrid search',
+        hybridSearchDesc:
+          'Combine keyword (FTS) and embedding similarity when ranking memories for prefetch and tools.',
+        hybridSearchNeedsEmbedding: 'Set an embedding model under Models → Role models first.',
+        hybridPrivacyNote:
+          'Hybrid search sends query text and memory snippets to the configured embedding (and optional rerank) provider. Keep hybrid off to stay fully local (FTS only).',
+        indexStatus: 'Embedding index: {{embedded}} / {{total}}',
+        indexStatusNone: 'Embedding index: no model configured',
+        reindex: 'Reindex embeddings',
+        reindexing: 'Reindexing…',
         save: 'Save',
         exportJsonl: 'Export JSONL',
         importJsonl: 'Import JSONL',

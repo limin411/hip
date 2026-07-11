@@ -20,7 +20,8 @@ import {
   truncateForEmbed,
   type MemoryEmbeddingClient,
 } from './embedding-client.js'
-import { embeddingIndexStatus, upsertEmbedding } from './vec.js'
+import { searchHybrid } from './hybrid-search.js'
+import { embeddingIndexStatus, getEmbedding, upsertEmbedding } from './vec.js'
 import type {
   MemoryListFilter,
   MemorySearchOpts,
@@ -130,6 +131,23 @@ export class MemoryService {
   }
 
   setConfig(partial: Partial<MemoryFileConfig>): MemoryFileConfig {
+    const current = this.getConfig()
+    // Mirror mergeMemoryConfig clear semantics for optional role models.
+    const embedRaw =
+      (partial as { embeddingModel?: MemoryModelRef | null | '' }).embeddingModel !== undefined
+        ? (partial as { embeddingModel?: MemoryModelRef | null | '' }).embeddingModel
+        : current.embeddingModel
+    const effectiveEmbed =
+      embedRaw === null || embedRaw === '' || embedRaw === undefined
+        ? undefined
+        : normalizeExtractModel(embedRaw)
+    const effectiveHybrid =
+      partial.hybridSearchEnabled !== undefined
+        ? !!partial.hybridSearchEnabled
+        : !!current.hybridSearchEnabled
+    if (effectiveHybrid && !effectiveEmbed) {
+      throw new Error('hybridSearchEnabled requires embeddingModel')
+    }
     return saveMemoryConfig(partial, this.configPath)
   }
 
@@ -173,16 +191,16 @@ export class MemoryService {
   }
 
   /**
-   * Dynamic prefetch block: FTS/LIKE top hits for query, scoped to
+   * Dynamic prefetch block: FTS/LIKE (or hybrid) top hits for query, scoped to
    * global ∪ project(cwd) ∪ session, truncated to prefetch budget.
    * `ids` lists hit item ids considered for injection (citation allowedIds).
    */
-  formatPrefetch(
+  async formatPrefetch(
     query: string,
     cwd: string | undefined,
     sessionId: string | undefined,
     contextWindowTokens?: number,
-  ): MemoryInjectBlock {
+  ): Promise<MemoryInjectBlock> {
     const q = query.trim()
     if (!q) return { text: '', ids: [] }
     const cfg = this.getConfig()
@@ -198,7 +216,7 @@ export class MemoryService {
     }
 
     // SQL-level scope OR so LIMIT cannot drop all in-scope hits behind foreign projects.
-    const hits = this.store.searchInScopes(q, {
+    const hits = await this.searchScoped(q, {
       projectKeyHash,
       sessionId: sessionId ?? undefined,
       limit: 30,
@@ -274,6 +292,57 @@ export class MemoryService {
 
   searchInScopes(query: string, opts?: MemorySearchInScopesOpts): MemoryItem[] {
     return this.store.searchInScopes(query, opts)
+  }
+
+  /**
+   * Scoped search: hybrid (FTS candidates + query embed + score) when enabled
+   * and an embedding client is available; otherwise plain FTS `searchInScopes`.
+   */
+  async searchScoped(
+    query: string,
+    opts?: MemorySearchInScopesOpts,
+  ): Promise<MemoryItem[]> {
+    const q = query.trim()
+    if (!q) return []
+    const cfg = this.getConfig()
+    const ref = normalizeExtractModel(cfg.embeddingModel)
+    const limit = opts?.limit ?? 50
+
+    if (cfg.hybridSearchEnabled && ref) {
+      const client = this.createEmbeddingClient(ref)
+      if (client) {
+        const modelKey = embeddingModelKey(ref)
+        const rerankRef = normalizeExtractModel(cfg.rerankModel)
+        return searchHybrid({
+          store: this.store,
+          query: q,
+          projectKeyHash: opts?.projectKeyHash,
+          sessionId: opts?.sessionId,
+          limit,
+          embedQuery: async () => {
+            try {
+              const vecs = await client.embed([q])
+              const v = vecs[0]
+              return v && v.length > 0 ? v : null
+            } catch (e) {
+              console.warn(
+                '[memory] query embed failed; hybrid falls back to FTS order',
+                e instanceof Error ? e.message : String(e),
+              )
+              return null
+            }
+          },
+          getEmbedding: (id) => {
+            const row = getEmbedding(this.store.getDb(), id)
+            if (!row || row.modelKey !== modelKey) return null
+            return row.embedding
+          },
+          rerankModel: rerankRef,
+        })
+      }
+    }
+
+    return this.store.searchInScopes(q, opts)
   }
 
   softDelete(id: string): boolean {

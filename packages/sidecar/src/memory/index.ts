@@ -37,6 +37,15 @@ export {
   ensureVec0Table,
   memoryVecTableName,
 } from './vec.js'
+export {
+  cosine,
+  hybridScore,
+  searchHybrid,
+  maybeRerank,
+  DEFAULT_HYBRID_WEIGHTS,
+  type HybridWeights,
+  type SearchHybridOpts,
+} from './hybrid-search.js'
 export { buildMemoryTools } from './tools.js'
 export {
   MemoryInjector,

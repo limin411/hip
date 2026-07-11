@@ -52,7 +52,7 @@ export function buildMemoryTools(
           } catch {
             projectKeyHash = undefined
           }
-          hits = svc.searchInScopes(q, {
+          hits = await svc.searchScoped(q, {
             projectKeyHash,
             sessionId: ctx.sessionId,
             limit: 20,

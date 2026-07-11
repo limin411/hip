@@ -68,6 +68,15 @@ const sampleItem: MemoryItem = {
 describe('MemoryConfig', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.spyOn(sessionService, 'getMemoryIndexStatus').mockResolvedValue({
+      embedded: 0,
+      total: 0,
+    })
+    vi.spyOn(sessionService, 'reindexMemories').mockResolvedValue({
+      embedded: 0,
+      total: 0,
+      failed: 0,
+    })
   })
 
   afterEach(() => {
@@ -133,6 +142,40 @@ describe('MemoryConfig', () => {
     expect(screen.getByTestId('memory-item-m1')).toBeInTheDocument()
     expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'active' })
     expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
+    // Hybrid disabled until embedding model is set
+    expect(screen.getByTestId('memory-switch-hybrid')).toBeDisabled()
+    expect(screen.getByTestId('memory-reindex')).toBeDisabled()
+    expect(screen.getByTestId('memory-index-status')).toBeInTheDocument()
+  })
+
+  it('enables hybrid toggle when embeddingModel is set', async () => {
+    vi.spyOn(sessionService, 'getMemoryConfig').mockResolvedValue({
+      ...onConfig,
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+      hybridSearchEnabled: false,
+    })
+    vi.spyOn(sessionService, 'listMemories').mockResolvedValue([])
+    vi.spyOn(sessionService, 'getMemoryIndexStatus').mockResolvedValue({
+      embedded: 1,
+      total: 2,
+      modelKey: 'openai/text-embedding-3-small',
+    })
+    const setSpy = vi.spyOn(sessionService, 'setMemoryConfig').mockResolvedValue({
+      ...onConfig,
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+      hybridSearchEnabled: true,
+    })
+
+    render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
+    })
+    expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
+    fireEvent.click(screen.getByTestId('memory-switch-hybrid'))
+    await waitFor(() => {
+      expect(setSpy).toHaveBeenCalledWith({ hybridSearchEnabled: true })
+    })
   })
 
   it('calls upsert when pin toggled', async () => {

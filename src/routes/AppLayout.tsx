@@ -132,7 +132,7 @@ export function AppLayout() {
               // at the bottom / left (especially near the window corner).
               <div className="flex h-full min-h-0 flex-col p-3" data-testid="right-panel-float">
                 {/* Low-offset shadow so it sits inside the p-3 gutter and doesn't clip into a hard line. */}
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_2px_12px_-2px_rgba(17,17,17,0.12),0_1px_3px_rgba(17,17,17,0.06)] animate-panel-in dark:shadow-[0_2px_12px_-2px_rgba(0,0,0,0.45),0_1px_3px_rgba(0,0,0,0.25)]">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-panel animate-panel-in">
                   {codeOpen ? <ArtifactPanel /> : <PreviewPanel />}
                 </div>
               </div>

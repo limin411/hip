@@ -23,6 +23,7 @@ export default {
           subtle: 'var(--accent-subtle)',
           active: 'var(--accent-active)',
         },
+        'on-accent': 'var(--on-accent)',
         success: 'var(--success)',
         danger: 'var(--danger)',
         warning: 'var(--warning)',
@@ -32,11 +33,16 @@ export default {
           disabled: 'var(--state-disabled)',
         },
         'focus-ring': 'var(--focus-ring)',
+        glass: {
+          DEFAULT: 'var(--glass-bg)',
+          border: 'var(--glass-border)',
+        },
         role: {
           supervisor: 'var(--role-supervisor)',
           planner: 'var(--role-planner)',
           coder: 'var(--role-coder)',
           reviewer: 'var(--role-reviewer)',
+          worker: 'var(--role-worker)',
         },
       },
       fontFamily: {
@@ -65,7 +71,8 @@ export default {
         '3xl': '12px',
         full: '9999px',
       },
-      // 扁平化：界面主体不用阴影。唯一例外是真正的浮层（菜单、弹窗）用克制的柔和阴影。
+      // 扁平化：界面主体不用阴影。
+      // 例外三档：panel（右栏浮动卡）、menu（下拉）、overlay（Modal）。
       boxShadow: {
         none: 'none',
         sm: 'none',
@@ -77,6 +84,7 @@ export default {
         inner: 'none',
         pop: 'none',
         float: 'none',
+        panel: 'var(--shadow-panel)',
         menu: '0 6px 20px -6px rgba(17, 17, 17, 0.14), 0 2px 6px -2px rgba(17, 17, 17, 0.08)',
         overlay: '0 16px 48px -12px rgba(17, 17, 17, 0.22), 0 6px 16px -8px rgba(17, 17, 17, 0.12)',
         'card-hover': 'none',

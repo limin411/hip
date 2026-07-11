@@ -96,6 +96,15 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
         {!streaming && (
           <div className="mt-1 flex items-center gap-2">
             <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
+            {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (
+              <span
+                data-testid="memory-citations-chip"
+                title={message.memoryCitations.map((c) => c.title || c.memoryId).join(', ')}
+                className="rounded-full bg-accent/10 px-2 py-0.5 text-caption text-accent"
+              >
+                {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
+              </span>
+            )}
             {message.role === 'assistant' && message.usage && (
               <span
                 data-testid="message-usage"

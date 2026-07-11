@@ -93,4 +93,37 @@ describe('MessageBubble', () => {
     )
     expect(screen.getByTestId('message-time')).toBeInTheDocument()
   })
+
+  it('shows memory citations chip when memoryCitations is non-empty', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm6',
+          role: 'assistant',
+          content: 'ok',
+          timestamp: Date.now(),
+          memoryCitations: [
+            { memoryId: 'a', title: 'A' },
+            { memoryId: 'b', title: 'B' },
+          ],
+        } as any}
+      />,
+    )
+    expect(screen.getByTestId('memory-citations-chip')).toBeInTheDocument()
+  })
+
+  it('hides memory citations chip when empty or missing', () => {
+    render(
+      <MessageBubble
+        message={{
+          id: 'm7',
+          role: 'assistant',
+          content: 'ok',
+          timestamp: Date.now(),
+          memoryCitations: [],
+        } as any}
+      />,
+    )
+    expect(screen.queryByTestId('memory-citations-chip')).not.toBeInTheDocument()
+  })
 })

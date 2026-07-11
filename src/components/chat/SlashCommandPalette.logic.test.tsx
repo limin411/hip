@@ -96,7 +96,7 @@ describe('filterCommands', () => {
     { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin', availableIn: ['chat', 'code'] },
     { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin', availableIn: ['chat', 'code'] },
     { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
-    { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },
+    { id: 'init', name: 'init', description: 'Create or update AGENTS.md with project guidance', kind: 'builtin', availableIn: ['code'], requiresSession: true },
     { id: 'fmt', name: 'fmt', description: 'Format code', kind: 'skill', availableIn: ['chat', 'code'] },
   ]
 
@@ -654,10 +654,11 @@ describe('buildCommandList surface filtering', () => {
     expect(list.map((c) => c.name)).toContain('compact')
   })
 
-  it('excludes compact in code surface when sessionId is null', () => {
+  it('excludes session-required commands in code surface when sessionId is null', () => {
     const list = buildCommandList([], { surface: 'code', sessionId: null })
     expect(list.map((c) => c.name)).toContain('diff')
-    expect(list.map((c) => c.name)).toContain('init')
+    // /init needs a session (sends AGENTS.md generation prompt); /compact same.
+    expect(list.map((c) => c.name)).not.toContain('init')
     expect(list.map((c) => c.name)).not.toContain('compact')
   })
 })

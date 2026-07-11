@@ -41,7 +41,7 @@ const labels: GlobalCommandLabels = {
   context: {
     diff: 'Show workspace changes',
     compact: 'Compact conversation',
-    init: 'Initialize project',
+    init: 'Create or update AGENTS.md',
     memoryOn: 'Enable memories',
     memoryOff: 'Disable memories',
     memoryIncognito: 'Incognito memory',

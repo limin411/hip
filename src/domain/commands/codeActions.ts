@@ -4,8 +4,10 @@ import { sessionService } from '../sessionService'
 import { useDomainStore } from '../sessionStore'
 import { useUiStore } from '@/store/uiStore'
 import { markUserDiffRequest } from './diffFeedback'
+import { buildInitPrompt } from './initPrompt'
 
 export { markUserDiffRequest, consumeUserDiffRequest } from './diffFeedback'
+export { buildInitPrompt, extractInitFocus } from './initPrompt'
 
 /** Switch to Code, open the right panel on Changes, then request the workspace diff. */
 function surfaceChangesPanel(sessionId: string): void {
@@ -30,8 +32,24 @@ export function runCompact(sessionId: string, focus?: string): void {
   sessionService.compactSession(sessionId, focus)
 }
 
-/** Initialize git workspace and surface Changes (aligned with runDiff). */
-export function runInit(sessionId: string): void {
-  sessionService.gitInitWorkspace(sessionId)
-  surfaceChangesPanel(sessionId)
+/**
+ * `/init`: analyze the workspace and create/update AGENTS.md via a guided agent turn.
+ * Git repository init remains on GitInitBanner / ChangesView (`gitInitWorkspace`).
+ */
+export function runInit(sessionId: string, focus?: string): void {
+  const st = useDomainStore.getState()
+  const session = st.sessions.find((s) => s.id === sessionId)
+  if (!session) return
+
+  const cwd = session.config.cwd?.trim()
+  if (!cwd) {
+    toast.error(i18n.t('chat.init.noWorkspace'))
+    return
+  }
+
+  if (st.activeSessionId !== sessionId) {
+    sessionService.selectSession(sessionId)
+  }
+
+  sessionService.sendMessage(buildInitPrompt(focus))
 }

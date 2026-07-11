@@ -9,6 +9,7 @@ import {
   runCompact,
   runDiff,
   runInit,
+  extractInitFocus,
   setIncognito,
   setUseMemories,
   toastMemoryFlagChange,
@@ -113,7 +114,10 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'init') {
-          if (sessionId) runInit(sessionId)
+          if (sessionId) {
+            const focus = extractInitFocus(value)
+            runInit(sessionId, focus)
+          }
           setText('')
           focusInput()
           return

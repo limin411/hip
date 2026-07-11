@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openDatabase } from './open.js'
 import { SessionStore } from './store.js'
-import { EventStore, SnapshotStore, serializeMessages, deserializeMessages } from './event-store.js'
+import {
+  EventStore,
+  SnapshotStore,
+  serializeMessages,
+  deserializeMessages,
+  hasValidToolCallPairing,
+  ensureToolCallResults,
+  saveSessionSnapshot,
+  loadSessionSnapshot,
+} from './event-store.js'
 import type { SessionEvent } from './event-store.js'
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage } from '@langchain/core/messages'
 
 function freshDb() {
   const { db } = openDatabase(':memory:')
@@ -226,6 +235,97 @@ describe('serializeMessages / deserializeMessages', () => {
     const ai = roundTripped[0] as AIMessage
     expect(ai.content).toBe('used a tool')
     expect(ai.tool_calls).toEqual([{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }])
+  })
+
+  it('round-trips ToolMessage after AIMessage tool_calls (INVALID_TOOL_RESULTS fix)', () => {
+    const original = [
+      new HumanMessage('list files'),
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }],
+      }),
+      new ToolMessage({ content: 'a.ts\nb.ts', tool_call_id: 'c1', name: 'ls' }),
+      new AIMessage('done'),
+    ]
+    const roundTripped = deserializeMessages(serializeMessages(original))
+    expect(roundTripped).toHaveLength(4)
+    expect(roundTripped[0]).toBeInstanceOf(HumanMessage)
+    expect(roundTripped[1]).toBeInstanceOf(AIMessage)
+    expect(roundTripped[2]).toBeInstanceOf(ToolMessage)
+    expect(roundTripped[3]).toBeInstanceOf(AIMessage)
+    const tool = roundTripped[2] as ToolMessage
+    expect(tool.tool_call_id).toBe('c1')
+    expect(tool.name).toBe('ls')
+    expect(tool.content).toBe('a.ts\nb.ts')
+    expect(hasValidToolCallPairing(roundTripped)).toBe(true)
+  })
+})
+
+describe('hasValidToolCallPairing / ensureToolCallResults', () => {
+  it('detects unpaired tool_calls (legacy snapshot corruption shape)', () => {
+    const broken = [
+      new HumanMessage('hi'),
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }],
+      }),
+      // Old serializer rewrote ToolMessage as AIMessage — loses tool_call_id.
+      new AIMessage('file list output'),
+      new AIMessage('summary'),
+    ]
+    expect(hasValidToolCallPairing(broken)).toBe(false)
+  })
+
+  it('accepts correctly paired tool results', () => {
+    const ok = [
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { name: 'ls', args: {}, id: 'c1', type: 'tool_call' },
+          { name: 'read_file', args: {}, id: 'c2', type: 'tool_call' },
+        ],
+      }),
+      new ToolMessage({ content: 'a', tool_call_id: 'c1', name: 'ls' }),
+      new ToolMessage({ content: 'b', tool_call_id: 'c2', name: 'read_file' }),
+    ]
+    expect(hasValidToolCallPairing(ok)).toBe(true)
+  })
+
+  it('ensureToolCallResults inserts synthetic tool messages for missing ids', () => {
+    const broken = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'ls', args: {}, id: 'c1', type: 'tool_call' }],
+      }),
+      new HumanMessage('next'),
+    ]
+    const fixed = ensureToolCallResults(broken)
+    expect(hasValidToolCallPairing(fixed)).toBe(true)
+    expect(fixed[1]).toBeInstanceOf(ToolMessage)
+    expect((fixed[1] as ToolMessage).tool_call_id).toBe('c1')
+    expect(fixed[2]).toBeInstanceOf(HumanMessage)
+  })
+
+  it('save/load snapshot preserves ToolMessage pairing', () => {
+    const db = freshDb()
+    const snapshots = new SnapshotStore(db)
+    const messages = [
+      new HumanMessage('hi'),
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }],
+      }),
+      new ToolMessage({ content: 'out', tool_call_id: 'c1', name: 'ls' }),
+      new AIMessage('done'),
+    ]
+    saveSessionSnapshot(snapshots, 's-tool', 1, {
+      messages,
+      config: { llmProvider: 'deepseek', model: 'm', tools: [] },
+    })
+    const loaded = loadSessionSnapshot(snapshots, 's-tool')
+    expect(loaded).not.toBeNull()
+    expect(hasValidToolCallPairing(loaded!.messages)).toBe(true)
+    expect(loaded!.messages[2]).toBeInstanceOf(ToolMessage)
   })
 })
 

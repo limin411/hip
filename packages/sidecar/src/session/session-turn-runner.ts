@@ -40,6 +40,7 @@ import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
+import { ensureToolCallResults, hasValidToolCallPairing } from '../persistence/event-store.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -631,6 +632,14 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       host.messages.length = 0
       host.messages.push(...rebuilt)
     }
+  }
+
+  // Providers reject histories where AIMessage.tool_calls lack following ToolMessages
+  // (INVALID_TOOL_RESULTS). Repair before invoke — covers corrupt snapshots and aborts.
+  if (!hasValidToolCallPairing(host.messages)) {
+    const fixed = ensureToolCallResults(host.messages)
+    host.messages.length = 0
+    host.messages.push(...fixed)
   }
 
   const supportsImages = host.currentModelSupportsImages()

@@ -83,7 +83,14 @@ const codeOnly = (id: string): SlashCommand =>
 
 const diffCmd = codeOnly('diff')
 const compactCmd: SlashCommand = { id: 'compact', name: 'compact', description: 'compact', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true }
-const initCmd = codeOnly('init')
+const initCmd: SlashCommand = {
+  id: 'init',
+  name: 'init',
+  description: 'init',
+  kind: 'builtin',
+  availableIn: ['code'],
+  requiresSession: true,
+}
 
 describe('useSlashCommandHandler', () => {
   beforeEach(async () => {
@@ -92,6 +99,7 @@ describe('useSlashCommandHandler', () => {
     mockSetTab.mockClear()
     mockSetSettingsPage.mockClear()
     toastMessage.mockClear()
+    useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
     await i18n.changeLanguage('en')
   })
 
@@ -129,24 +137,55 @@ describe('useSlashCommandHandler', () => {
     expect(setText).toHaveBeenCalledWith('')
   })
 
-  it('/init calls gitInitWorkspace in code surface when sessionId is present', () => {
-    const initSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
+  it('/init sends AGENTS.md init prompt when sessionId is present', () => {
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+    const gitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
+    useDomainStore.getState().createSession('s1', {
+      llmProvider: 'deepseek',
+      model: 'm',
+      tools: [],
+      cwd: '/tmp/proj',
+    })
+    useDomainStore.setState({ activeSessionId: 's1' })
     const { result, setText } = setup('code', 's1')
 
     result.current.handleCommandSelect(initCmd)
 
-    expect(initSpy).toHaveBeenCalledWith('s1')
+    expect(gitSpy).not.toHaveBeenCalled()
+    expect(sendSpy).toHaveBeenCalled()
+    const prompt = sendSpy.mock.calls[0][0] as string
+    expect(prompt).toContain('AGENTS.md')
     expect(setText).toHaveBeenCalledWith('')
   })
 
   it('/init no-ops when sessionId is null', () => {
-    const initSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+    const gitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
     const { result, setText } = setup('code', null)
 
     result.current.handleCommandSelect(initCmd)
 
-    expect(initSpy).not.toHaveBeenCalled()
+    expect(sendSpy).not.toHaveBeenCalled()
+    expect(gitSpy).not.toHaveBeenCalled()
     expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/init forwards trailing focus text', () => {
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
+    useDomainStore.getState().createSession('s1', {
+      llmProvider: 'deepseek',
+      model: 'm',
+      tools: [],
+      cwd: '/tmp/proj',
+    })
+    useDomainStore.setState({ activeSessionId: 's1' })
+    const { result } = setup('code', 's1', { value: '/init focus on CI' })
+
+    result.current.handleCommandSelect(initCmd)
+
+    expect(sendSpy).toHaveBeenCalled()
+    const prompt = sendSpy.mock.calls[0][0] as string
+    expect(prompt).toContain('focus on CI')
   })
 
   it('/diff in chat surface is not reachable and only clears input', () => {

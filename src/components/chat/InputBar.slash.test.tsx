@@ -88,10 +88,16 @@ function baseMocks() {
   vi.spyOn(domain, 'useConnectionStatus').mockReturnValue('connected')
 }
 
-function stubSession(surface: 'chat' | 'code'): SessionVM {
+function stubSession(surface: 'chat' | 'code', cwd?: string): SessionVM {
   return {
     id: 's1',
-    config: { surface, llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+    config: {
+      surface,
+      llmProvider: 'openai',
+      model: 'gpt-4o',
+      tools: [],
+      ...(cwd ? { cwd } : {}),
+    },
     title: '',
     preview: '',
     updatedAtMs: 0,
@@ -175,9 +181,17 @@ describe('InputBar slash commands', () => {
     expect(mockSetActiveView).not.toHaveBeenCalled()
   })
 
-  it('/init command calls gitInitWorkspace and clears input', async () => {
+  it('/init command sends AGENTS.md init prompt and clears input', async () => {
     baseMocks()
-    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code', '/tmp/proj'))
+    useDomainStore.setState({ sessions: [], activeSessionId: null, connection: 'disconnected' })
+    useDomainStore.getState().createSession('s1', {
+      surface: 'code',
+      llmProvider: 'openai',
+      model: 'gpt-4o',
+      tools: [],
+      cwd: '/tmp/proj',
+    })
     const gitInitSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
@@ -193,9 +207,10 @@ describe('InputBar slash commands', () => {
 
     fireEvent.click(initButton)
 
-    expect(gitInitSpy).toHaveBeenCalledWith('s1')
+    expect(gitInitSpy).not.toHaveBeenCalled()
+    expect(sendSpy).toHaveBeenCalled()
+    expect(sendSpy.mock.calls[0][0]).toContain('AGENTS.md')
     expect(textarea).toHaveValue('')
-    expect(sendSpy).not.toHaveBeenCalled()
   })
 
   it('/diff command calls requestDiff and switches to changes tab', async () => {
@@ -497,7 +512,7 @@ describe('InputBar slash commands', () => {
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
     const cancelSpy = vi.spyOn(sessionService, 'cancel').mockReturnValue(undefined)
     const newConvSpy = vi.spyOn(sessionService, 'newConversation').mockReturnValue(undefined)
-    const initSpy = vi.spyOn(sessionService, 'gitInitWorkspace').mockReturnValue(undefined)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)
 
@@ -514,7 +529,7 @@ describe('InputBar slash commands', () => {
     expect(cancelSpy).toHaveBeenCalledTimes(1)
     expect(newConvSpy).toHaveBeenCalledTimes(1)
     // Must NOT call unrelated handlers
-    expect(initSpy).not.toHaveBeenCalled()
+    expect(sendSpy).not.toHaveBeenCalled()
     // Input must be cleared
     expect(textarea).toHaveValue('')
   })

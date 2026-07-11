@@ -58,9 +58,10 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
   {
     id: 'init',
     name: 'init',
-    description: 'Initialize a new project',
+    description: 'Create or update AGENTS.md with project guidance',
     kind: 'builtin',
     availableIn: ['code'],
+    requiresSession: true,
   },
   {
     id: 'memory',

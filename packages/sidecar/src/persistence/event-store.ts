@@ -1,6 +1,13 @@
 import type { DatabaseSync } from './sqlite.js'
 import type { SessionConfig, TurnUsage } from '@hip/protocol'
-import { HumanMessage, AIMessage, SystemMessage, type BaseMessage, type MessageContent } from '@langchain/core/messages'
+import {
+  HumanMessage,
+  AIMessage,
+  SystemMessage,
+  ToolMessage,
+  type BaseMessage,
+  type MessageContent,
+} from '@langchain/core/messages'
 
 export interface SessionEvent {
   id: string
@@ -45,9 +52,13 @@ interface ToolCallJson {
 
 /** JSON shape of a single message inside a session snapshot. */
 interface MessageJson {
-  readonly type: 'human' | 'ai' | 'system'
+  readonly type: 'human' | 'ai' | 'system' | 'tool'
   readonly content: string
   readonly tool_calls?: readonly ToolCallJson[]
+  /** Present when type === 'tool' (LangChain ToolMessage.tool_call_id). */
+  readonly tool_call_id?: string
+  /** Optional tool name on tool result messages. */
+  readonly name?: string
 }
 
 /** A high-level session snapshot: the data needed to warm-start a Session. */
@@ -75,8 +86,11 @@ function isToolCallJson(value: unknown): value is ToolCallJson {
 function isMessageJson(value: unknown): value is MessageJson {
   if (!isRecord(value)) return false
   const type = value.type
-  if (type !== 'human' && type !== 'ai' && type !== 'system') return false
+  if (type !== 'human' && type !== 'ai' && type !== 'system' && type !== 'tool') return false
   if (typeof value.content !== 'string') return false
+  if (type === 'tool') {
+    return typeof value.tool_call_id === 'string' && value.tool_call_id.length > 0
+  }
   if (value.tool_calls !== undefined) {
     if (!Array.isArray(value.tool_calls) || !value.tool_calls.every(isToolCallJson)) return false
   }
@@ -114,6 +128,15 @@ export function serializeMessages(messages: readonly BaseMessage[]): string {
     const type = m.getType()
     if (type === 'human') return { type: 'human', content }
     if (type === 'system') return { type: 'system', content }
+    if (type === 'tool') {
+      const tool = m as ToolMessage
+      return {
+        type: 'tool',
+        content,
+        tool_call_id: tool.tool_call_id,
+        ...(tool.name ? { name: tool.name } : {}),
+      }
+    }
     const ai = m as AIMessage
     return {
       type: 'ai',
@@ -142,6 +165,12 @@ export function deserializeMessages(json: string): BaseMessage[] {
         return new HumanMessage(parseSnapshotContent(item.content))
       case 'system':
         return new SystemMessage(parseSnapshotContent(item.content))
+      case 'tool':
+        return new ToolMessage({
+          content: parseSnapshotContent(item.content),
+          tool_call_id: item.tool_call_id!,
+          ...(item.name ? { name: item.name } : {}),
+        })
       case 'ai':
         return new AIMessage({
           content: parseSnapshotContent(item.content),
@@ -149,6 +178,71 @@ export function deserializeMessages(json: string): BaseMessage[] {
         })
     }
   })
+}
+
+/**
+ * True when every AIMessage.tool_calls entry has a following ToolMessage with
+ * the matching tool_call_id before the next non-tool turn boundary.
+ * Used to reject snapshots corrupted by older serializers that dropped ToolMessages.
+ */
+export function hasValidToolCallPairing(messages: readonly BaseMessage[]): boolean {
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i]
+    if (!(m instanceof AIMessage) || !m.tool_calls?.length) continue
+    const needed = m.tool_calls
+      .map((tc) => tc.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    if (needed.length === 0) continue
+    const found = new Set<string>()
+    for (let j = i + 1; j < messages.length; j++) {
+      const next = messages[j]
+      if (next instanceof ToolMessage) {
+        found.add(next.tool_call_id)
+        continue
+      }
+      break
+    }
+    for (const id of needed) {
+      if (!found.has(id)) return false
+    }
+  }
+  return true
+}
+
+/**
+ * Ensure each AIMessage.tool_calls id has a following ToolMessage.
+ * Inserts synthetic error results for missing ids so providers accept the history.
+ * Does not rewrite already-valid sequences.
+ */
+export function ensureToolCallResults(messages: readonly BaseMessage[]): BaseMessage[] {
+  if (hasValidToolCallPairing(messages)) return messages as BaseMessage[]
+  const out: BaseMessage[] = []
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i]
+    out.push(m)
+    if (!(m instanceof AIMessage) || !m.tool_calls?.length) continue
+    const needed = m.tool_calls.map((tc) => ({
+      id: (typeof tc.id === 'string' && tc.id.length > 0 ? tc.id : tc.name) as string,
+      name: tc.name,
+    }))
+    const found = new Set<string>()
+    let j = i + 1
+    while (j < messages.length && messages[j] instanceof ToolMessage) {
+      found.add((messages[j] as ToolMessage).tool_call_id)
+      j++
+    }
+    for (const tc of needed) {
+      if (found.has(tc.id)) continue
+      out.push(
+        new ToolMessage({
+          content: 'Error: tool result missing from session history (recovered)',
+          tool_call_id: tc.id,
+          name: tc.name,
+        }),
+      )
+    }
+  }
+  return out
 }
 
 /** Persist a typed session snapshot, replacing any previous snapshot for the session. */

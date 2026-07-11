@@ -19,7 +19,7 @@ export const zhCN = {
           clear: '开始新对话',
           diff: '显示工作区变更',
           compact: '摘要对话以节省上下文（可选：/compact 关注点…）',
-          init: '初始化新项目',
+          init: '分析项目并生成/更新 AGENTS.md',
           memory: '打开记忆设置',
           'memory-on': '为本会话启用记忆注入',
           'memory-off': '为本会话关闭记忆注入',
@@ -814,7 +814,7 @@ export const zhCN = {
       context: {
         diff: '查看工作区变更',
         compact: '压缩对话上下文',
-        init: '初始化项目',
+        init: '生成或更新 AGENTS.md',
         memoryOn: '为此会话启用记忆注入',
         memoryOff: '为此会话关闭记忆注入',
         memoryIncognito: '此会话隐身（不注入/抽取记忆）',

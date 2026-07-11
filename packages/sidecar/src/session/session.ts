@@ -34,7 +34,14 @@ import { HookRegistry } from './hooks/registry.js'
 import type { AgentRunner } from '../orchestrator/ports.js'
 import { createAgentInvoker, type AgentInvoker } from './agents/invoker.js'
 import type { SessionStore } from '../persistence/store.js'
-import { EventStore, SnapshotStore, saveSessionSnapshot, loadSessionSnapshot } from '../persistence/event-store.js'
+import {
+  EventStore,
+  SnapshotStore,
+  saveSessionSnapshot,
+  loadSessionSnapshot,
+  hasValidToolCallPairing,
+  ensureToolCallResults,
+} from '../persistence/event-store.js'
 import { loadProjection, projectEvent } from '../persistence/message-projector.js'
 import type { SessionMessageData, ProjectedToolCall } from '../persistence/message-types.js'
 import { isAssistantStep } from '../persistence/message-types.js'
@@ -548,7 +555,11 @@ export class Session {
     }
 
     const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
-    if (snapshot != null && snapshot.messages.length > 0) {
+    if (
+      snapshot != null &&
+      snapshot.messages.length > 0 &&
+      hasValidToolCallPairing(snapshot.messages)
+    ) {
       this.messages.length = 0
       this.messages.push(...snapshot.messages)
     }
@@ -568,14 +579,19 @@ export class Session {
   }
 
   /** Rebuild the in-memory message list for model context.
-   *  Prefer the latest snapshot when present (authoritative after compaction and
-   *  turn finalize). Otherwise rebuild from the event projection (filtering any
-   *  replacedMessageIds), then legacy message rows. */
+   *  Prefer the latest snapshot when present and tool_call pairing is valid
+   *  (authoritative after compaction and turn finalize). Otherwise rebuild from
+   *  the event projection (filtering any replacedMessageIds), then legacy rows.
+   *  Invalid snapshots (e.g. pre-fix ToolMessage serialization) fall through. */
   hydrate(messages?: Message[]): void {
     this.messages.length = 0
     if (this.snapshotStore) {
       const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
-      if (snapshot != null && snapshot.messages.length > 0) {
+      if (
+        snapshot != null &&
+        snapshot.messages.length > 0 &&
+        hasValidToolCallPairing(snapshot.messages)
+      ) {
         this.messages.push(...snapshot.messages)
         this.reseedLastCheckpoint()
         return
@@ -592,6 +608,12 @@ export class Session {
       for (const m of this.store.loadMessages(this.id)) {
         this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
       }
+    }
+    // Last-resort repair if legacy paths left unpaired tool_calls.
+    if (this.messages.length > 0 && !hasValidToolCallPairing(this.messages)) {
+      const fixed = ensureToolCallResults(this.messages)
+      this.messages.length = 0
+      this.messages.push(...fixed)
     }
     this.reseedLastCheckpoint()
   }

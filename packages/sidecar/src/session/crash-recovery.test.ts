@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { SessionConfig } from '@hip/protocol'
 import { Session } from './session.js'
 import { openDatabase } from '../persistence/open.js'
@@ -134,13 +134,14 @@ describe('Session crash recovery', () => {
       new AIMessage('world'),
       new SystemMessage('context'),
       new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1', type: 'tool_call' }] }),
+      new ToolMessage({ content: 'files', tool_call_id: 'c1', name: 'ls' }),
     ]
     saveSessionSnapshot(snapshotStore, sessionId, 5, { messages, config: { ...baseCfg, cwd: root } })
 
     const session = new Session(sessionId, { ...baseCfg, cwd: root }, undefined, st)
 
     const restored = getMessages(session)
-    expect(restored).toHaveLength(4)
+    expect(restored).toHaveLength(5)
     expect(restored[0]).toBeInstanceOf(HumanMessage)
     expect(contentOf(restored[0])).toBe('hello')
     expect(restored[1]).toBeInstanceOf(AIMessage)
@@ -151,6 +152,39 @@ describe('Session crash recovery', () => {
     const ai = restored[3] as AIMessage
     expect(ai.tool_calls).toHaveLength(1)
     expect(ai.tool_calls?.[0].name).toBe('ls')
+    expect(restored[4]).toBeInstanceOf(ToolMessage)
+    expect((restored[4] as ToolMessage).tool_call_id).toBe('c1')
+  })
+
+  it('skips snapshots with unpaired tool_calls and rebuilds from projection', () => {
+    const sessionId = 's-snapshot-bad-tools'
+    insertSession(st, sessionId)
+    publishEvent(db, eventStore, sessionId, 'user_message', { messageId: 'u-1', content: 'hi', timestamp: 1 })
+    publishEvent(db, eventStore, sessionId, 'step_started', { stepId: 'a-1', agentId: 'supervisor', startedAt: 2 })
+    publishEvent(db, eventStore, sessionId, 'tool_called', { stepId: 'a-1', callId: 'c-1', name: 'ls', input: '{}', seq: 3 })
+    publishEvent(db, eventStore, sessionId, 'tool_success', { callId: 'c-1', stepId: 'a-1', output: 'ok' })
+    publishEvent(db, eventStore, sessionId, 'text_ended', { stepId: 'a-1', content: 'done' })
+    publishEvent(db, eventStore, sessionId, 'step_ended', { stepId: 'a-1', agentId: 'supervisor', finishedAt: 4 })
+
+    // Corrupt snapshot shape: AI tool_calls without ToolMessage (legacy serializer bug).
+    const badMessages: BaseMessage[] = [
+      new HumanMessage('hi'),
+      new AIMessage({
+        content: '',
+        tool_calls: [{ name: 'ls', args: {}, id: 'c-1', type: 'tool_call' }],
+      }),
+      new AIMessage('ok'), // was a ToolMessage
+      new AIMessage('done'),
+    ]
+    saveSessionSnapshot(snapshotStore, sessionId, 99, { messages: badMessages, config: { ...baseCfg, cwd: root } })
+
+    const session = new Session(sessionId, { ...baseCfg, cwd: root }, undefined, st)
+    session.hydrate()
+    const restored = getMessages(session)
+    // Projection rebuild pairs tool_calls with ToolMessages.
+    expect(restored.some((m) => m instanceof ToolMessage)).toBe(true)
+    const tool = restored.find((m) => m instanceof ToolMessage) as ToolMessage
+    expect(tool.tool_call_id).toBe('c-1')
   })
 
   it('round-trips a snapshot through loadSessionSnapshot', () => {

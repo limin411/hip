@@ -19,7 +19,7 @@ export const zhTW = {
           clear: '開始新對話',
           diff: '顯示工作區變更',
           compact: '摘要對話以節省上下文（可選：/compact 關注點…）',
-          init: '初始化新專案',
+          init: '分析專案並產生/更新 AGENTS.md',
           memory: '開啟記憶設定',
           'memory-on': '為此對話啟用記憶注入',
           'memory-off': '為此對話關閉記憶注入',
@@ -814,7 +814,7 @@ export const zhTW = {
       context: {
         diff: '檢視工作區變更',
         compact: '壓縮對話上下文',
-        init: '初始化專案',
+        init: '產生或更新 AGENTS.md',
         memoryOn: '為此對話啟用記憶注入',
         memoryOff: '為此對話關閉記憶注入',
         memoryIncognito: '此對話隱身（不注入／抽取記憶）',

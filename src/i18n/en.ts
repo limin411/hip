@@ -19,7 +19,7 @@ export const en = {
           clear: 'Start a new conversation',
           diff: 'Show workspace changes',
           compact: 'Summarize conversation to save context (optional: /compact focus…)',
-          init: 'Initialize a new project',
+          init: 'Create or update AGENTS.md with project guidance',
           memory: 'Open Memory settings',
           'memory-on': 'Enable memory injection for this session',
           'memory-off': 'Disable memory injection for this session',
@@ -820,7 +820,7 @@ export const en = {
       context: {
         diff: 'Show workspace changes',
         compact: 'Compact conversation',
-        init: 'Initialize project',
+        init: 'Create or update AGENTS.md',
         memoryOn: 'Enable memory injection for this session',
         memoryOff: 'Disable memory injection for this session',
         memoryIncognito: 'Incognito memory for this session',

@@ -20,6 +20,10 @@ import { EventStore } from '../persistence/event-store.js'
 import { AttachmentError } from './attachments.js'
 import { handleWorkspaceMessage, isWorkspaceMessage } from './handlers/workspace.js'
 import { handleMcpMessage, isMcpMessage } from './handlers/mcp.js'
+import { handleMemoryMessage, isMemoryMessage, type MemoryHandlerContext } from '../memory/handlers.js'
+import { MemoryService } from '../memory/service.js'
+import { MemoryStore } from '../memory/store.js'
+import { tryEnableMemoriesFts } from '../persistence/schema.js'
 import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
@@ -33,6 +37,7 @@ function sanitizeRename(raw: string): string {
 
 export class SessionManager {
   private readonly sessions = new Map<string, Session>()
+  private memoryService?: MemoryService
 
   // modelFactory defaults to undefined → Session builds the real env-keyed model.
   constructor(
@@ -58,10 +63,14 @@ export class SessionManager {
 
     // Sync type-gates first — never await an async handler for non-matching types
     // (session:create must complete before fire-and-forget set* messages).
+    // Order: workspace, mcp, memory, session, plugin — memory before session so
+    // session:setMemoryFlags is handled here (not in SESSION_MESSAGE_TYPES).
     if (isWorkspaceMessage(msg)) {
       await handleWorkspaceMessage(this.handlerCtx(), msg, send)
     } else if (isMcpMessage(msg)) {
       await handleMcpMessage(msg, send)
+    } else if (isMemoryMessage(msg)) {
+      handleMemoryMessage(this.memoryCtx(), msg, send)
     } else if (isSessionMessage(msg)) {
       const r = handleSessionMessage(this.lifecycleCtx(), msg, send)
       if (r) await r
@@ -71,6 +80,28 @@ export class SessionManager {
     }
 
     logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
+  }
+
+  /** Lazy singleton MemoryService bound to the manager's SQLite store. */
+  private getMemoryService(): MemoryService {
+    if (!this.memoryService) {
+      if (!this.store) {
+        throw new Error('No persistence store available for memory')
+      }
+      const db = this.store.getDb()
+      const memoriesFts = tryEnableMemoriesFts(db)
+      this.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
+    }
+    return this.memoryService
+  }
+
+  private memoryCtx(): MemoryHandlerContext {
+    return {
+      getMemoryService: () => this.getMemoryService(),
+      ensureSession: (id, send) => this.ensureSession(id, send),
+      getSession: (id) => this.sessions.get(id),
+      store: this.store,
+    }
   }
 
   private handlerCtx() {
@@ -89,7 +120,7 @@ export class SessionManager {
       createSession: (id, config, send) => this.createSession(id, config, send),
       destroySession: (id) => this.destroySession(id),
       getSession: (id) => this.sessions.get(id),
-      deleteSessionSync: (id, send) => this.deleteSessionSync(id, send),
+      deleteSessionSync: (id, send, opts) => this.deleteSessionSync(id, send, opts),
       listSessions: () => this.store?.listSessions() ?? [],
       loadSession: (id) => {
         const config = this.store
@@ -180,12 +211,16 @@ export class SessionManager {
     try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
   }
 
-  private deleteSessionSync(id: string, send: SendFn): void {
+  private deleteSessionSync(
+    id: string,
+    send: SendFn,
+    opts?: { deleteDerivedMemories?: boolean },
+  ): void {
     // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
     // store delete + session:deleted being immediate — no await before them). The shadow-ref
     // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
     const delCwd = this.resolveSessionCwd(id)
-    this.store?.deleteSession(id)
+    this.store?.deleteSession(id, opts)
     this.sessions.delete(id)
     removeScratchDir(id, this.scratchRoot)
     if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})

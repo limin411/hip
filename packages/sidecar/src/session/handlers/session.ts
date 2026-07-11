@@ -147,7 +147,9 @@ export function handleSessionMessage(
       send({ type: 'session:search:result', query: msg.query, hits: ctx.searchSessions(msg.query) })
       return
     case 'session:delete':
-      ctx.deleteSessionSync(msg.sessionId, send)
+      ctx.deleteSessionSync(msg.sessionId, send, {
+        deleteDerivedMemories: msg.deleteDerivedMemories,
+      })
       return
     case 'session:rename': {
       const title = ctx.setCustomTitle(msg.sessionId, msg.title)

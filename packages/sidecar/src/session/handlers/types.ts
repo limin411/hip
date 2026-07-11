@@ -26,7 +26,7 @@ export interface SessionManagerContext {
     getSession?(id: string): { config: string } | undefined
     loadMessagesWithRuns?(id: string): Message[]
     search?(query: string): SearchHit[]
-    deleteSession?(id: string): void
+    deleteSession?(id: string, opts?: { deleteDerivedMemories?: boolean }): void
     setCustomTitle?(id: string, title: string): void
   } | null
 }
@@ -37,7 +37,7 @@ export interface SessionLifecycleContext extends SessionManagerContext {
   destroySession(id: string): Promise<void>
   getSession(id: string): Session | undefined
   /** Synchronous delete: store + memory + scratch (+ best-effort checkpoint cleanup). */
-  deleteSessionSync(id: string, send: SendFn): void
+  deleteSessionSync(id: string, send: SendFn, opts?: { deleteDerivedMemories?: boolean }): void
   listSessions(): SessionSummary[]
   loadSession(id: string): { messages: Message[]; config?: SessionConfig }
   searchSessions(query: string): SearchHit[]

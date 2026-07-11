@@ -43,7 +43,7 @@ export class MemoryService {
   private readonly configPath?: string
 
   constructor(
-    private readonly store: MemoryStore,
+    readonly store: MemoryStore,
     opts?: { configPath?: string },
   ) {
     this.configPath = opts?.configPath

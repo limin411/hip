@@ -1,5 +1,5 @@
 /**
- * V1 integration matrix A1.1–A1.6
+ * Integration matrix A1.1–A1.9
  * Cross-module paths only — unit details live in sibling *.test.ts files.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -25,12 +25,15 @@ import {
   processQueue,
 } from './pipeline/queue.js'
 
-function openMemDb() {
+function openMemDb(opts?: { vecEnabled?: boolean }) {
   const opened = openDatabase(':memory:')
+  const vec =
+    opts?.vecEnabled !== undefined ? opts.vecEnabled : opened.memoriesVecEnabled
   return {
     db: opened.db,
-    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled),
+    store: new MemoryStore(opened.db, opened.memoriesFtsEnabled, vec),
     fts: opened.memoriesFtsEnabled,
+    vec,
   }
 }
 
@@ -67,7 +70,7 @@ function longTranscript(): Message[] {
   ]
 }
 
-describe('V1 integration matrix A1.1–A1.6', () => {
+describe('integration matrix A1.1–A1.9', () => {
   let configDir: string
   let configPath: string
   let store: MemoryStore
@@ -301,5 +304,111 @@ describe('V1 integration matrix A1.1–A1.6', () => {
     await Promise.resolve()
 
     expect(createClientCalls).toBe(1)
+  })
+
+  it('A1.7: soft delete → restore → active list', () => {
+    const item = svc.upsert({
+      id: 'trash-me',
+      title: 'Soft-delete restore path',
+      content: 'unique-matrix-trash-token-a17',
+      kind: 'lesson',
+      scope: 'global',
+    })
+
+    expect(svc.softDelete(item.id)).toBe(true)
+    expect(svc.getItem(item.id)?.status).toBe('deleted')
+    expect(store.listItems({ status: 'active' }).map((i) => i.id)).not.toContain(item.id)
+    expect(store.listItems({ status: 'deleted' }).map((i) => i.id)).toContain(item.id)
+    expect(svc.search('unique-matrix-trash-token-a17')).toHaveLength(0)
+
+    const restored = svc.restore(item.id)
+    expect(restored?.status).toBe('active')
+    expect(store.listItems({ status: 'active' }).map((i) => i.id)).toContain(item.id)
+    expect(svc.search('unique-matrix-trash-token-a17').map((i) => i.id)).toEqual([item.id])
+  })
+
+  it('A1.8: hybrid mock semantic query returns expected id', async () => {
+    // Dedicated service with deterministic mock embeddings (no network).
+    const opened = openMemDb()
+    const hybridSvc = new MemoryService(opened.store, {
+      configPath: join(configDir, 'memory-hybrid.json'),
+      createEmbeddingClient: () => ({
+        async embed(texts: string[]) {
+          return texts.map((t) => {
+            const s = t.trim()
+            if (s === 'package management' || s.startsWith('package management')) {
+              return [1, 0, 0]
+            }
+            if (s.includes('Yarn') || s.includes('yarn')) return [0.99, 0.01, 0]
+            return [0, 1, 0]
+          })
+        },
+      }),
+    })
+    hybridSvc.setConfig({
+      embeddingModel: { providerID: 'openai', modelID: 'text-embedding-3-small' },
+      hybridSearchEnabled: true,
+    })
+
+    const noise = hybridSvc.upsert({
+      id: 'noise-a18',
+      title: 'package package package noise',
+      content: 'package management package package filler',
+      kind: 'lesson',
+      scope: 'global',
+      confidence: 0.95,
+    })
+    const neighbor = hybridSvc.upsert({
+      id: 'neighbor-a18',
+      title: 'Yarn tip',
+      content: 'package management prefers yarn',
+      kind: 'lesson',
+      scope: 'global',
+      confidence: 0.4,
+    })
+    await hybridSvc.scheduleEmbed(noise.id)
+    await hybridSvc.scheduleEmbed(neighbor.id)
+
+    const hits = await hybridSvc.searchScoped('package management', { limit: 10 })
+    expect(hits[0]?.id).toBe('neighbor-a18')
+
+    const block = await hybridSvc.formatPrefetch('package management', undefined, undefined)
+    expect(block.ids[0]).toBe('neighbor-a18')
+    expect(block.text).toContain('Yarn tip')
+  })
+
+  it('A1.9: hybrid disabled / no embed / vec probe false → FTS still works', async () => {
+    // Force vec disabled (as if sqlite-vec probe failed); BLOB path unused here.
+    const opened = openMemDb({ vecEnabled: false })
+    expect(opened.store.isVecEnabled()).toBe(false)
+    const ftsSvc = new MemoryService(opened.store, {
+      configPath: join(configDir, 'memory-fts-only.json'),
+    })
+    ftsSvc.setConfig({
+      hybridSearchEnabled: false,
+      // No embeddingModel — hybrid cannot engage.
+    })
+    expect(ftsSvc.getConfig().hybridSearchEnabled).toBe(false)
+    expect(ftsSvc.getConfig().embeddingModel).toBeUndefined()
+    expect(ftsSvc.getIndexStatus().vecEnabled).toBe(false)
+
+    const item = ftsSvc.upsert({
+      id: 'fts-a19',
+      title: 'Yarn workspaces tip',
+      content: 'Always use yarn for package management in monorepos',
+      kind: 'preference',
+      scope: 'global',
+    })
+
+    const fts = opened.store.searchInScopes('package management', { limit: 30 })
+    expect(fts.map((x) => x.id)).toContain(item.id)
+
+    const scoped = await ftsSvc.searchScoped('package management', { limit: 30 })
+    expect(scoped.map((x) => x.id)).toEqual(fts.map((x) => x.id))
+    expect(scoped.map((x) => x.id)).toContain(item.id)
+
+    const block = await ftsSvc.formatPrefetch('package management', undefined, undefined)
+    expect(block.text).toMatch(/Yarn workspaces tip|package management/i)
+    expect(block.ids).toContain(item.id)
   })
 })

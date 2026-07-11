@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-11 |
-| 状态 | **Approved — plan ready**（rev 2） |
+| 状态 | **Implemented (partial) — branch `memory-phase-next`**（A+B+C 实现进行中/本分支已落地；合入 `dev` 前以集成矩阵 + 测试绿为准） |
 | 前置 | V1 已合入 `dev`（`feat/cross-session-memory` → fast-forward） |
 | 权威 V1 设计 | [`2026-07-11-cross-session-memory-system-design.md`](./2026-07-11-cross-session-memory-system-design.md) rev 3 |
 | 实现计划（V1） | [`../plans/2026-07-11-cross-session-memory-system.md`](../plans/2026-07-11-cross-session-memory-system.md) |

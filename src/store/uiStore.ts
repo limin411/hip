@@ -9,10 +9,17 @@ export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 
+/** Settings panel left-nav page ids (see SettingsPanel PAGES). */
+export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'memory'
+
 interface UiState {
   settingsNavCollapsed: boolean
   setSettingsNavCollapsed: (v: boolean) => void
   toggleSettingsNav: () => void
+
+  /** Which settings category is selected (also used by /memory slash command). */
+  settingsPage: SettingsPageId
+  setSettingsPage: (page: SettingsPageId) => void
 
   scrollTargetMessageId: string | null
   setScrollTarget: (id: string | null) => void
@@ -76,6 +83,10 @@ export const useUiStore = create<UiState>()(
       setSettingsNavCollapsed: (v) =>
         set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
       toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
+
+      settingsPage: 'general',
+      setSettingsPage: (page) =>
+        set((s) => (s.settingsPage === page ? s : { settingsPage: page })),
 
       scrollTargetMessageId: null,
       setScrollTarget: (id) => set((s) => (s.scrollTargetMessageId === id ? s : { scrollTargetMessageId: id })),

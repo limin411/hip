@@ -8,10 +8,20 @@ interface SwitchProps {
   id?: string
   ariaLabel?: string
   className?: string
+  'data-testid'?: string
 }
 
 /** Controlled on/off toggle. Native <button role="switch"> → Space/Enter toggle for free. */
-export function Switch({ checked, onCheckedChange, disabled, ariaDisabled, id, ariaLabel, className }: SwitchProps) {
+export function Switch({
+  checked,
+  onCheckedChange,
+  disabled,
+  ariaDisabled,
+  id,
+  ariaLabel,
+  className,
+  'data-testid': dataTestId,
+}: SwitchProps) {
   return (
     <button
       type="button"
@@ -21,6 +31,7 @@ export function Switch({ checked, onCheckedChange, disabled, ariaDisabled, id, a
       aria-label={ariaLabel}
       aria-disabled={ariaDisabled}
       disabled={disabled}
+      data-testid={dataTestId}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors',

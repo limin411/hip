@@ -29,6 +29,15 @@ describe('DeleteSessionDialog', () => {
     render(<DeleteSessionDialog title="Session A" onConfirm={onConfirm} onCancel={vi.fn()} />)
     fireEvent.click(screen.getByText('history.delete'))
     expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onConfirm).toHaveBeenCalledWith(undefined)
+  })
+
+  it('passes deleteDerivedMemories when checkbox is checked', () => {
+    const onConfirm = vi.fn()
+    render(<DeleteSessionDialog title="Session A" onConfirm={onConfirm} onCancel={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('delete-derived-memories'))
+    fireEvent.click(screen.getByText('history.delete'))
+    expect(onConfirm).toHaveBeenCalledWith({ deleteDerivedMemories: true })
   })
 
   it('calls onCancel when cancel button is clicked', () => {

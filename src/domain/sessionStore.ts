@@ -292,6 +292,17 @@ export function applyServerMessage(
     case 'session:orchMode':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, orchMode: msg.orchMode } }))
 
+    case 'session:memoryFlags':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        config: {
+          ...s.config,
+          ...(msg.useMemories !== undefined ? { useMemories: msg.useMemories } : {}),
+          ...(msg.generateMemories !== undefined ? { generateMemories: msg.generateMemories } : {}),
+          ...(msg.incognito !== undefined ? { incognito: msg.incognito } : {}),
+        },
+      }))
+
     case 'error':
       // A cancel is intentional, not a failure: return to idle and surface nothing.
       if (!msg.sessionId) return state

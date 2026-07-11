@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useUiStore } from '@/store/uiStore'
+import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 
 import { GeneralSettings } from './GeneralSettings'
 import { ModelConfig } from './ModelConfig'
@@ -12,21 +12,25 @@ import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
 import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
+import { MemoryConfig } from './MemoryConfig'
 
 const PAGES = [
-  { id: 'general', icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
-  { id: 'model', icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
-  { id: 'agents', icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
-  { id: 'mcp', icon: Plug, labelKey: 'settings.mcpLabel', Component: McpConfig },
-  { id: 'skill', icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
-  { id: 'plugins', icon: Package, labelKey: 'settings.pluginsLabel', Component: PluginConfig },
-] as const
+  { id: 'general' as const, icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
+  { id: 'model' as const, icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
+  { id: 'agents' as const, icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
+  { id: 'mcp' as const, icon: Plug, labelKey: 'settings.mcpLabel', Component: McpConfig },
+  { id: 'skill' as const, icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
+  { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel', Component: PluginConfig },
+  { id: 'memory' as const, icon: Brain, labelKey: 'settings.memoryLabel', Component: MemoryConfig },
+]
 
 export function SettingsPanel() {
   const { t } = useTranslation()
   const navRef = useRef<ImperativePanelHandle>(null)
   const navCollapsed = useUiStore((s) => s.settingsNavCollapsed)
   const setNavCollapsed = useUiStore((s) => s.setSettingsNavCollapsed)
+  const settingsPage = useUiStore((s) => s.settingsPage)
+  const setSettingsPage = useUiStore((s) => s.setSettingsPage)
 
   // 折叠态由 store 驱动（标题栏统一按钮 → settingsNavCollapsed），命令式同步到 Panel，
   // 与对话侧栏（AppLayout 同款 effect）完全一致。
@@ -43,7 +47,12 @@ export function SettingsPanel() {
   // 左侧分类栏完全参照「对话列表」侧栏：同色（bg-surface）、可拖拽缩放（同款 PanelResizeHandle）、
   // 且可最小化（折叠到 0，由标题栏的统一折叠按钮控制）。
   return (
-    <TabsPrimitive.Root orientation="vertical" defaultValue="general" className="h-full">
+    <TabsPrimitive.Root
+      orientation="vertical"
+      value={settingsPage}
+      onValueChange={(v) => setSettingsPage(v as SettingsPageId)}
+      className="h-full"
+    >
       <PanelGroup direction="horizontal" className="h-full w-full">
         <Panel
           ref={navRef}

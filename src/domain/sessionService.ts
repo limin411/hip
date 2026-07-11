@@ -7,6 +7,9 @@ import type {
   PermissionMode,
   OrchestrationMode,
   Checkpoint,
+  MemoryFileConfig,
+  MemoryItem,
+  MemoryScope,
 } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
@@ -35,10 +38,18 @@ function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
   return l === 'zh-CN' || l === 'zh-TW' ? l : 'en'
 }
 
+type ServerMessageWaiter = {
+  type: ServerMessage['type']
+  resolve: (msg: ServerMessage) => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
 export class SessionService {
   private readonly transport: Transport
   private readonly unsubscribe: () => void
   private readonly unsubStatus: () => void
+  private waiters: ServerMessageWaiter[] = []
   /** E2E: when set, checkpoint list requests/results for this session re-apply the seed. */
   private e2eCheckpointSeed: {
     sessionId: string
@@ -55,6 +66,38 @@ export class SessionService {
   dispose(): void {
     this.unsubscribe()
     this.unsubStatus()
+    for (const w of this.waiters) {
+      clearTimeout(w.timer)
+      w.reject(new Error('SessionService disposed'))
+    }
+    this.waiters = []
+  }
+
+  /** One-shot wait for the next inbound ServerMessage of a given type. */
+  private waitForServerMessage<T extends ServerMessage['type']>(
+    type: T,
+    timeoutMs = 5000,
+  ): Promise<Extract<ServerMessage, { type: T }>> {
+    return new Promise((resolve, reject) => {
+      const entry: ServerMessageWaiter = {
+        type,
+        resolve: (msg) => resolve(msg as Extract<ServerMessage, { type: T }>),
+        reject,
+        timer: setTimeout(() => {
+          this.waiters = this.waiters.filter((w) => w !== entry)
+          reject(new Error(`Timeout waiting for ${type}`))
+        }, timeoutMs),
+      }
+      this.waiters.push(entry)
+    })
+  }
+
+  private fulfillWaiters(msg: ServerMessage): void {
+    const idx = this.waiters.findIndex((w) => w.type === msg.type)
+    if (idx < 0) return
+    const [w] = this.waiters.splice(idx, 1)
+    clearTimeout(w.timer)
+    w.resolve(msg)
   }
 
   async connect(): Promise<void> {
@@ -93,6 +136,7 @@ export class SessionService {
       const seed = this.e2eCheckpointSeed
       useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
     }
+    this.fulfillWaiters(msg)
   }
 
   /**
@@ -428,7 +472,7 @@ export class SessionService {
     }
   }
 
-  deleteSession(id: string): void {
+  deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
     useUiStore.getState().removeOpenSession(id)
     useDomainStore.getState().deleteSession(id)
     // Terminal: single kill hook (closeSession → deleteSession; do not also kill in close).
@@ -449,7 +493,107 @@ export class SessionService {
         else { useDomainStore.getState().deselect(); this.rememberActiveForSurface(null) }
       }
     }
-    this.transport.send({ type: 'session:delete', sessionId: id })
+    this.transport.send({
+      type: 'session:delete',
+      sessionId: id,
+      ...(opts?.deleteDerivedMemories ? { deleteDerivedMemories: true } : {}),
+    })
+  }
+
+  // ── Cross-session memory ──────────────────────────────────────────────────
+
+  async getMemoryConfig(): Promise<MemoryFileConfig> {
+    const wait = this.waitForServerMessage('memory:config')
+    this.transport.send({ type: 'memory:getConfig' })
+    const msg = await wait
+    return msg.config
+  }
+
+  async setMemoryConfig(config: Partial<MemoryFileConfig>): Promise<MemoryFileConfig> {
+    const wait = this.waitForServerMessage('memory:config')
+    this.transport.send({ type: 'memory:setConfig', config })
+    const msg = await wait
+    return msg.config
+  }
+
+  async listMemories(filter?: {
+    scope?: MemoryScope
+    projectKeyHash?: string
+    sessionId?: string
+    query?: string
+    limit?: number
+  }): Promise<MemoryItem[]> {
+    const wait = this.waitForServerMessage('memory:list:result')
+    this.transport.send({ type: 'memory:list', ...filter })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.items
+  }
+
+  async upsertMemory(
+    item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>,
+  ): Promise<MemoryItem> {
+    const wait = this.waitForServerMessage('memory:upsert:result')
+    this.transport.send({ type: 'memory:upsert', item })
+    const msg = await wait
+    if (msg.error || !msg.item) throw new Error(msg.error ?? 'upsert failed')
+    return msg.item
+  }
+
+  async deleteMemory(id: string, hard?: boolean): Promise<boolean> {
+    const wait = this.waitForServerMessage('memory:delete:result')
+    this.transport.send({ type: 'memory:delete', id, ...(hard !== undefined ? { hard } : {}) })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.ok
+  }
+
+  async deleteMemoriesBySourceSession(sessionId: string, soft?: boolean): Promise<number> {
+    const wait = this.waitForServerMessage('memory:deleteBySourceSession:result')
+    this.transport.send({
+      type: 'memory:deleteBySourceSession',
+      sessionId,
+      ...(soft !== undefined ? { soft } : {}),
+    })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.deleted
+  }
+
+  async exportMemories(format: 'jsonl' | 'markdown' = 'jsonl'): Promise<string> {
+    const wait = this.waitForServerMessage('memory:export:result')
+    this.transport.send({ type: 'memory:export', format })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.data
+  }
+
+  async importMemories(data: string): Promise<number> {
+    const wait = this.waitForServerMessage('memory:import:result')
+    this.transport.send({ type: 'memory:import', format: 'jsonl', data })
+    const msg = await wait
+    if (msg.error || !msg.ok) throw new Error(msg.error ?? 'import failed')
+    return msg.imported
+  }
+
+  consolidateMemories(projectKeyHash?: string): void {
+    this.transport.send({
+      type: 'memory:consolidate',
+      ...(projectKeyHash ? { projectKeyHash } : {}),
+    })
+  }
+
+  setMemoryFlags(
+    sessionId: string,
+    flags: { useMemories?: boolean; generateMemories?: boolean; incognito?: boolean },
+  ): void {
+    // Optimistic local merge; server echoes session:memoryFlags.
+    useDomainStore.getState().apply({
+      type: 'session:memoryFlags',
+      sessionId,
+      ...flags,
+    })
+    this.transport.send({ type: 'session:setMemoryFlags', sessionId, ...flags })
   }
 
   renameSession(id: string, title: string): void {

@@ -179,8 +179,8 @@ export function SessionHistory() {
       {deletingSession && (
         <DeleteSessionDialog
           title={deletingSession.title}
-          onConfirm={() => {
-            sessionService.deleteSession(deletingSession.id)
+          onConfirm={(opts) => {
+            sessionService.deleteSession(deletingSession.id, opts)
             setDeletingSessionId(null)
           }}
           onCancel={() => setDeletingSessionId(null)}

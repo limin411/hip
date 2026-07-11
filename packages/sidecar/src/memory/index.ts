@@ -32,6 +32,7 @@ export {
   type MemoryStage1ListFilter,
   type MemorySummaryRow,
 } from './store.js'
+export { parseMemoryCitations, bumpMemoryUseCounts } from './citations.js'
 export {
   createDefaultMemoryLlmClient,
   parseJsonFromLlmText,

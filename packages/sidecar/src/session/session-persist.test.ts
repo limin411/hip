@@ -4,6 +4,11 @@ import { Session } from './session.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import { openDatabase } from '../persistence/open.js'
 import { SessionStore } from '../persistence/store.js'
+import { EventStore } from '../persistence/event-store.js'
+import { MemoryStore } from '../memory/store.js'
+import { MemoryService } from '../memory/service.js'
+import { finalizeAndPersistTurn } from './session-persist.js'
+import type { ServerMessage } from '@hip/protocol'
 
 const cfg = { llmProvider: 'deepseek' as const, model: 'deepseek-chat', tools: [] }
 function store() { const { db, ftsEnabled } = openDatabase(':memory:'); return new SessionStore(db, ftsEnabled) }
@@ -37,5 +42,69 @@ describe('Session persistence', () => {
     await session.sendMessage('我叫什么', (m) => events.push(m), 'u1')
     expect(events.some((e) => e.type === 'message:complete')).toBe(true)
     expect(st.loadMessages('s1').map((m) => m.id)).toContain('u0')
+  })
+
+  it('finalize strips citation fence, persists memoryCitations, bumps use_count once (not on load)', () => {
+    const db = st.getDb()
+    const memStore = new MemoryStore(db, false)
+    const memSvc = new MemoryService(memStore)
+    memStore.upsertItem({
+      id: 'mem-yarn',
+      scope: 'project',
+      kind: 'preference',
+      title: 'Prefer yarn',
+      content: 'use yarn',
+      confidence: 0.9,
+      status: 'active',
+      source: 'user',
+      tags: [],
+      createdAt: 1,
+      updatedAt: 1,
+      useCount: 0,
+      pinned: false,
+      projectKeyHash: 'pkh',
+    })
+
+    const body = [
+      'Use yarn for package installs.',
+      '```hip-memory-citations',
+      '[{"memoryId":"mem-yarn","title":"Prefer yarn"}]',
+      '```',
+    ].join('\n')
+
+    const events: ServerMessage[] = []
+    const messages: BaseMessage[] = [new AIMessage(body)]
+    const finalText = finalizeAndPersistTurn(
+      {
+        id: 's1',
+        store: st,
+        eventStore: new EventStore(db),
+        config: cfg,
+        messages,
+        memoryService: memSvc,
+      },
+      (m) => events.push(m),
+      'turn-cite',
+      body,
+      new Map(),
+      false,
+    )
+
+    expect(finalText).toBe('Use yarn for package installs.')
+    expect(finalText).not.toContain('hip-memory-citations')
+
+    const complete = events.find((e) => e.type === 'message:complete') as Extract<ServerMessage, { type: 'message:complete' }>
+    expect(complete.message.content).toBe('Use yarn for package installs.')
+    expect(complete.message.memoryCitations).toEqual([{ memoryId: 'mem-yarn', title: 'Prefer yarn' }])
+
+    const loaded = st.loadMessages('s1').find((m) => m.id === 'turn-cite')!
+    expect(loaded.content).toBe('Use yarn for package installs.')
+    expect(loaded.memoryCitations).toEqual([{ memoryId: 'mem-yarn', title: 'Prefer yarn' }])
+
+    expect(memStore.getItem('mem-yarn')!.useCount).toBe(1)
+    // Reload must not re-bump.
+    st.loadMessages('s1')
+    st.loadMessagesWithRuns('s1')
+    expect(memStore.getItem('mem-yarn')!.useCount).toBe(1)
   })
 })

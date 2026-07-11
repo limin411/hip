@@ -1,5 +1,5 @@
 /** Dual-write session event persistence + turn finalize helpers. */
-import type { ServerMessage, SessionConfig, AgentRun, SessionEvent, TimelineStep, TurnUsage } from '@hip/protocol'
+import type { ServerMessage, SessionConfig, AgentRun, SessionEvent, TimelineStep, TurnUsage, MemoryCitation } from '@hip/protocol'
 import { AIMessage, AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
 import { trajectoryToRuns, trajectoryToTimeline, type TraceRun } from './tool-trace.js'
 import { verifyWrites } from './verify.js'
@@ -10,6 +10,8 @@ import { saveSessionSnapshot } from '../persistence/event-store.js'
 import { projectEvent } from '../persistence/message-projector.js'
 import { sessionEventToEventData } from './session-message-codec.js'
 import { logInfo } from '../debug-logger.js'
+import { parseMemoryCitations, bumpMemoryUseCounts } from '../memory/citations.js'
+import type { MemoryService } from '../memory/service.js'
 
 type SendFn = (msg: ServerMessage) => void
 
@@ -20,6 +22,8 @@ export interface PersistDeps {
   snapshotStore?: SnapshotStore
   config: SessionConfig
   messages: BaseMessage[]
+  /** Optional; used to bump memory use_count on citation parse at finalize. */
+  memoryService?: MemoryService
 }
 
 export function emitSessionEvent(
@@ -37,6 +41,7 @@ export function emitSessionEvent(
       timestamp: number
       stopped?: boolean
       timeline?: TimelineStep[]
+      memoryCitations?: MemoryCitation[]
     } | null
   },
 ): void {
@@ -84,10 +89,21 @@ export function finalizeAndPersistTurn(
   usageByAgent?: Map<string, TurnUsage>,
   targetMessages: BaseMessage[] = deps.messages,
 ): string {
-  const { correction } = verifyWrites(trajectory, supervisorText, deps.config.language ?? 'en')
-  const finalText = correction ? `${supervisorText}\n\n${correction}` : supervisorText
+  const { citations, strippedContent } = parseMemoryCitations(supervisorText)
+  const memoryCitations = citations.length ? citations : undefined
+  if (memoryCitations && deps.memoryService) {
+    bumpMemoryUseCounts(deps.memoryService.store, memoryCitations.map((c) => c.memoryId))
+  }
+  const { correction } = verifyWrites(trajectory, strippedContent, deps.config.language ?? 'en')
+  const finalText = correction ? `${strippedContent}\n\n${correction}` : strippedContent
   const last = targetMessages[targetMessages.length - 1]
-  if ((last instanceof AIMessage || last instanceof AIMessageChunk) && typeof last.content === 'string' && last.content === supervisorText && finalText) {
+  // Replace the last AI message when it matches either the raw (pre-strip) or stripped body.
+  if (
+    (last instanceof AIMessage || last instanceof AIMessageChunk) &&
+    typeof last.content === 'string' &&
+    (last.content === supervisorText || last.content === strippedContent) &&
+    finalText
+  ) {
     targetMessages[targetMessages.length - 1] = new AIMessage(finalText)
   } else if (finalText) {
     targetMessages.push(new AIMessage(finalText))
@@ -114,7 +130,16 @@ export function finalizeAndPersistTurn(
         usage: turnUsage,
         runs,
         assistant: hasWork
-          ? { id: turnId, sessionId: deps.id, agentId: 'supervisor', content: finalText, timestamp: ts, stopped, timeline }
+          ? {
+              id: turnId,
+              sessionId: deps.id,
+              agentId: 'supervisor',
+              content: finalText,
+              timestamp: ts,
+              stopped,
+              timeline,
+              ...(memoryCitations ? { memoryCitations } : {}),
+            }
           : null,
       },
     )
@@ -143,6 +168,7 @@ export function finalizeAndPersistTurn(
       agentRuns: runs,
       ...(turnUsage ? { usage: turnUsage } : {}),
       ...(stopped ? { stopped: true } : {}),
+      ...(memoryCitations ? { memoryCitations } : {}),
     },
   })
   return finalText

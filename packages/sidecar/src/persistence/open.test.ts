@@ -10,7 +10,7 @@ describe('openDatabase', () => {
     expect(names).toEqual(expect.arrayContaining(['sessions', 'messages', 'agent_runs']))
     const cols = (db.prepare(`PRAGMA table_info(messages)`).all() as { name: string }[]).map((c) => c.name)
     expect(cols).toContain('timeline')
-    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(16)
+    expect((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(17)
     expect(ftsEnabled).toBe(true)
     db.close()
   })

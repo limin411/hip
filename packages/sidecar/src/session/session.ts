@@ -711,7 +711,7 @@ export class Session {
 
   /** Dual-write helper: persists the legacy representation AND publishes a durable
    *  event (plus its session_message projection) inside a single SQLite transaction. */
-  private emit(event: SessionEvent, context?: { stepId?: string; usage?: TurnUsage; runs?: AgentRun[]; assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null }): void {
+  private emit(event: SessionEvent, context?: { stepId?: string; usage?: TurnUsage; runs?: AgentRun[]; assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[]; memoryCitations?: import('@hip/protocol').MemoryCitation[] } | null }): void {
     emitSessionEvent(this.persistDeps(), event, context)
   }
 
@@ -723,6 +723,7 @@ export class Session {
       snapshotStore: this.snapshotStore,
       config: this._config,
       messages: this.messages,
+      memoryService: (this as unknown as SessionTurnHost).memoryService,
     }
   }
 

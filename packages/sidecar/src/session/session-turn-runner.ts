@@ -75,6 +75,8 @@ import {
   resolveSessionMemoryFlags,
   refreshMemoryCoreSnapshot,
   scheduleMemoryExtractAfterTurn,
+  parseMemoryCitations,
+  bumpMemoryUseCounts,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
 import { tryEnableMemoriesFts } from '../persistence/schema.js'
@@ -196,7 +198,7 @@ export interface SessionTurnHost {
     stepId?: string
     usage?: TurnUsage
     runs?: AgentRun[]
-    assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[] } | null
+    assistant?: { id: string; sessionId: string; agentId: string; content: string; timestamp: number; stopped?: boolean; timeline?: TimelineStep[]; memoryCitations?: import('@hip/protocol').MemoryCitation[] } | null
   }): void
   finalizeAndPersist(send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean, usageByAgent?: Map<string, TurnUsage>, targetMessages?: BaseMessage[]): string
   startActivity(description: string, totalSteps?: number): Activity
@@ -507,8 +509,14 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   const run = trajectory.get(agent.id); if (run) run.finishedAt = Date.now()
   _send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: agent.id })
 
-  host.messages.push(new AIMessage(agentText))
-  host.emit({ type: 'text_ended', sessionId: host.id, messageId: turnId, content: agentText, timestamp: Date.now() })
+  const { citations, strippedContent } = parseMemoryCitations(agentText)
+  const memoryCitations = citations.length ? citations : undefined
+  if (memoryCitations && host.memoryService) {
+    bumpMemoryUseCounts(host.memoryService.store, memoryCitations.map((c) => c.memoryId))
+  }
+  const finalAgentText = strippedContent
+  host.messages.push(new AIMessage(finalAgentText))
+  host.emit({ type: 'text_ended', sessionId: host.id, messageId: turnId, content: finalAgentText, timestamp: Date.now() })
   const runs: AgentRun[] = trajectoryToRuns(trajectory).map((r) => ({ ...r, messageId: turnId, parentAgentId: 'supervisor', ...(usageByAgent.get(r.agentId) ? { usage: usageByAgent.get(r.agentId) } : {}) }))
   const turnUsage = sumUsage(runs.map((r) => r.usage))
   const timeline = trajectoryToTimeline(trajectory)
@@ -517,24 +525,47 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
   // stores timeline + agentRuns. Without this, a later session:load (common in Code sessions with
   // cwd/project state) returns a stripped message and the sub-agent activity vanishes.
   // Persist assistant even when agentText is empty so tool-only turns keep message_id linkage.
-  const hasWork = !!agentText || runs.length > 0 || timeline.length > 0
+  const hasWork = !!finalAgentText || runs.length > 0 || timeline.length > 0
   host.emit({ type: 'step_ended', sessionId: host.id, turnId, agentId: 'supervisor', timestamp: Date.now() }, {
     usage: turnUsage,
     runs,
     assistant: hasWork
-      ? { id: turnId, sessionId: host.id, agentId: agent.id, content: agentText, timestamp: Date.now(), timeline }
+      ? {
+          id: turnId,
+          sessionId: host.id,
+          agentId: agent.id,
+          content: finalAgentText,
+          timestamp: Date.now(),
+          timeline,
+          ...(memoryCitations ? { memoryCitations } : {}),
+        }
       : null,
   })
-  _send({ type: 'message:complete', sessionId: host.id, message: { id: turnId, role: 'assistant', content: agentText, agentId: agent.id, timestamp: Date.now(), timeline, toolCalls, agentRuns: runs, ...(turnUsage ? { usage: turnUsage } : {}) } })
+  _send({
+    type: 'message:complete',
+    sessionId: host.id,
+    message: {
+      id: turnId,
+      role: 'assistant',
+      content: finalAgentText,
+      agentId: agent.id,
+      timestamp: Date.now(),
+      timeline,
+      toolCalls,
+      agentRuns: runs,
+      ...(turnUsage ? { usage: turnUsage } : {}),
+      ...(memoryCitations ? { memoryCitations } : {}),
+    },
+  })
 
   if (isFirstTurn) {
-    await host.generateFirstTurnTitle(input, agentText, _send)
+    await host.generateFirstTurnTitle(input, finalAgentText, _send)
   }
 
   // Background Phase1 memory extract (fire-and-forget; gated by generate/incognito flags).
   scheduleMemoryExtractAfterTurn(host)
 
-  return agentText
+  return finalAgentText
 }
 
 export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {

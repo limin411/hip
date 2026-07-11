@@ -221,6 +221,14 @@ export class MemoryStore {
     return rows.map(rowToItem)
   }
 
+  /** Bump use_count and last_used_at for a cited memory (finalize only; not on reload). */
+  incrementUse(id: string): boolean {
+    const r = this.db.prepare(
+      `UPDATE memory_items SET use_count = use_count + 1, last_used_at = ? WHERE id = ?`,
+    ).run(Date.now(), id)
+    return (r.changes ?? 0) > 0
+  }
+
   softDelete(id: string): boolean {
     const r = this.db.prepare(
       `UPDATE memory_items SET status='deleted', updated_at=? WHERE id=? AND status!='deleted'`,

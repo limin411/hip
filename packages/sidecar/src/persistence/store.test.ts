@@ -57,6 +57,30 @@ describe('SessionStore', () => {
     expect(store.loadMessages('s1')[0]).toEqual({ id: 'u1', role: 'user', content: 'hi', agentId: undefined, timestamp: 7, attachments })
   })
 
+  it('insertTurn persists memoryCitations and loadMessages restores them (no use_count side effects)', () => {
+    store.insertSession({ id: 's1', title: 't', config: cfg, createdAt: 1, updatedAt: 1 })
+    store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: 'hi', timestamp: 1 })
+    const cites = [{ memoryId: 'mem-1', title: 'Prefer yarn' }, { memoryId: 'mem-2' }]
+    store.insertTurn(
+      {
+        id: 'a1',
+        sessionId: 's1',
+        agentId: 'supervisor',
+        content: 'Use yarn for installs.',
+        timestamp: 2,
+        memoryCitations: cites,
+      },
+      's1',
+      [],
+    )
+    const msg = store.loadMessages('s1').find((m) => m.id === 'a1')!
+    expect(msg.content).toBe('Use yarn for installs.')
+    expect(msg.memoryCitations).toEqual(cites)
+    // Reload again — still present, still no side effects on memory tables.
+    expect(store.loadMessages('s1').find((m) => m.id === 'a1')!.memoryCitations).toEqual(cites)
+    expect(store.loadMessagesWithRuns('s1').find((m) => m.id === 'a1')!.memoryCitations).toEqual(cites)
+  })
+
   it('search finds a Chinese substring via FTS and returns a snippet', () => {
     store.insertSession({ id: 's1', title: '关于配置', config: cfg, createdAt: 1, updatedAt: 1 })
     store.insertMessage({ id: 'u1', sessionId: 's1', role: 'user', agentId: null, content: '未配置密钥请在设置中配置', timestamp: 1 })

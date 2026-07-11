@@ -1,29 +1,32 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Pencil, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import type { MemoryFileConfig, MemoryModelRef, ProvidersConfig } from '@hip/protocol'
+import type { MemoryFileConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
-import type { Catalog } from '@/ipc/catalog'
 import { groupProviders } from '@/lib/providerGroups'
 import {
-  canRecommendEmbedding,
-  RECOMMENDED_EMBEDDING_MODEL_ID,
-} from '@/lib/memoryModelRef'
+  buildMemoryEndpointRef,
+  memoryEndpointKeyProviderId,
+  memoryEndpointProviderId,
+  type MemoryEndpointPurpose,
+} from '@/lib/memoryEndpoint'
+import {
+  isProviderKeyConfigured,
+  saveProviderKey,
+  clearProviderKey,
+  restartSidecar,
+} from '@/ipc/secrets'
 import { sessionService } from '@/domain'
 import { Button } from '@/components/ui/Button'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { CurrentModelHero, type ModelPurpose } from './CurrentModelHero'
+import { Badge } from '@/components/ui/Badge'
+import { Modal } from '@/components/ui/Modal'
 import { ProviderList } from './ProviderList'
 import { ProviderDetail } from './ProviderDetail'
 import { AddProviderDialog } from './AddProviderDialog'
+import { EndpointModelDialog } from './EndpointModelDialog'
 
-function resolveBaseURL(
-  providerID: string,
-  catalog: Catalog,
-  config: ProvidersConfig,
-): string | undefined {
-  return config.providers[providerID]?.baseURL ?? catalog[providerID]?.api ?? undefined
-}
+type DialogKind = 'base' | MemoryEndpointPurpose | null
 
 export function ModelConfig() {
   const { t } = useTranslation()
@@ -43,9 +46,20 @@ export function ModelConfig() {
   const [filter, setFilter] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [showIncompatible, setShowIncompatible] = useState(false)
-  const [purpose, setPurpose] = useState<ModelPurpose>('base')
+  const [dialog, setDialog] = useState<DialogKind>(null)
   const [memoryCfg, setMemoryCfg] = useState<MemoryFileConfig | null>(null)
   const [memoryBusy, setMemoryBusy] = useState(false)
+  const [endpointKeyOk, setEndpointKeyOk] = useState<{
+    embedding: boolean
+    rerank: boolean
+    embeddingVirtual: boolean
+    rerankVirtual: boolean
+  }>({
+    embedding: false,
+    rerank: false,
+    embeddingVirtual: false,
+    rerankVirtual: false,
+  })
 
   useEffect(() => {
     void load()
@@ -55,8 +69,24 @@ export function ModelConfig() {
     try {
       const cfg = await sessionService.getMemoryConfig()
       setMemoryCfg(cfg)
+      const embId = memoryEndpointKeyProviderId('embedding', cfg.embeddingModel)
+      const rrId = memoryEndpointKeyProviderId('rerank', cfg.rerankModel)
+      const embSlot = memoryEndpointProviderId('embedding')
+      const rrSlot = memoryEndpointProviderId('rerank')
+      const [embOk, rrOk, embVirtual, rrVirtual] = await Promise.all([
+        isProviderKeyConfigured(embId),
+        isProviderKeyConfigured(rrId),
+        isProviderKeyConfigured(embSlot),
+        isProviderKeyConfigured(rrSlot),
+      ])
+      setEndpointKeyOk({
+        embedding: embOk,
+        rerank: rrOk,
+        embeddingVirtual: embVirtual,
+        rerankVirtual: rrVirtual,
+      })
     } catch {
-      // Memory role models are optional UI; leave unset on failure.
+      // optional UI
     }
   }, [])
 
@@ -69,202 +99,191 @@ export function ModelConfig() {
     try {
       const cfg = await sessionService.setMemoryConfig(partial)
       setMemoryCfg(cfg)
+      return cfg
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('settings.modelConfig.error'))
+      throw e
     } finally {
       setMemoryBusy(false)
     }
   }
 
   const groups = groupProviders(catalog, filter, keyConfigured)
-  const activeId =
-    selected ?? config.activeModel?.providerID ?? groups.configured[0]?.id ?? groups.available[0]?.id ?? null
-  const active = activeId ? catalog[activeId] : undefined
   const am = config.activeModel
   const emb = memoryCfg?.embeddingModel
   const rr = memoryCfg?.rerankModel
+  const activeId =
+    selected ?? am?.providerID ?? groups.configured[0]?.id ?? groups.available[0]?.id ?? null
+  const active = activeId ? catalog[activeId] : undefined
 
-  const hero =
-    purpose === 'base'
-      ? {
-          providerName: am ? (catalog[am.providerID]?.name ?? am.providerID) : null,
-          modelID: am?.modelID ?? null,
-          model: am ? catalog[am.providerID]?.models[am.modelID] : undefined,
-          keyConfigured: am ? !!keyConfigured[am.providerID] : false,
-          locateId: am?.providerID,
-        }
-      : purpose === 'embedding'
-        ? {
-            providerName: emb ? (catalog[emb.providerID]?.name ?? emb.providerID) : null,
-            modelID: emb?.modelID ?? null,
-            model: emb ? catalog[emb.providerID]?.models[emb.modelID] : undefined,
-            keyConfigured: emb ? !!keyConfigured[emb.providerID] : false,
-            locateId: emb?.providerID,
-          }
-        : {
-            providerName: rr ? (catalog[rr.providerID]?.name ?? rr.providerID) : null,
-            modelID: rr?.modelID ?? null,
-            model: rr ? catalog[rr.providerID]?.models[rr.modelID] : undefined,
-            keyConfigured: rr ? !!keyConfigured[rr.providerID] : false,
-            locateId: rr?.providerID,
-          }
-
-  const onSetCurrent = async (modelID: string) => {
-    if (!activeId) return
-    if (purpose === 'base') {
-      await setActiveModel(activeId, modelID)
-      return
+  const saveEndpoint = async (
+    purpose: MemoryEndpointPurpose,
+    draft: { baseURL: string; modelID: string; apiKey: string },
+  ) => {
+    const slot = memoryEndpointProviderId(purpose)
+    const ref = buildMemoryEndpointRef(purpose, draft.baseURL, draft.modelID)
+    if (!ref) throw new Error(t('settings.modelConfig.error'))
+    if (draft.apiKey) {
+      await saveProviderKey(slot, draft.apiKey)
+      await restartSidecar()
+    } else {
+      const ok = await isProviderKeyConfigured(slot)
+      if (!ok) throw new Error(t('settings.modelConfig.testNoKey'))
     }
-    const baseURL = resolveBaseURL(activeId, catalog, config)
-    const ref: MemoryModelRef = {
-      providerID: activeId,
-      modelID,
-      ...(baseURL ? { baseURL } : {}),
-    }
-    if (purpose === 'embedding') await applyMemory({ embeddingModel: ref })
-    else await applyMemory({ rerankModel: ref })
+    const field = purpose === 'embedding' ? 'embeddingModel' : 'rerankModel'
+    await applyMemory({ [field]: ref })
+    await refreshMemory()
   }
 
-  const isActive = (modelID: string) => {
-    if (purpose === 'base') return am?.providerID === activeId && am?.modelID === modelID
-    if (purpose === 'embedding') return emb?.providerID === activeId && emb?.modelID === modelID
-    return rr?.providerID === activeId && rr?.modelID === modelID
-  }
-
-  const onRecommendEmbedding = async () => {
-    if (!am || !canRecommendEmbedding(am.providerID, catalog)) {
-      toast.message(t('settings.modelConfig.recommendEmbeddingUnavailable'))
-      return
+  const clearEndpoint = async (purpose: MemoryEndpointPurpose) => {
+    const slot = memoryEndpointProviderId(purpose)
+    try {
+      await clearProviderKey(slot)
+      await restartSidecar()
+    } catch {
+      // ignore missing key
     }
-    const baseURL = resolveBaseURL(am.providerID, catalog, config)
-    const ref: MemoryModelRef = {
-      providerID: am.providerID,
-      modelID: RECOMMENDED_EMBEDDING_MODEL_ID,
-      ...(baseURL ? { baseURL } : {}),
-    }
-    await applyMemory({ embeddingModel: ref })
+    const field = purpose === 'embedding' ? 'embeddingModel' : 'rerankModel'
+    await applyMemory({ [field]: null } as unknown as Partial<MemoryFileConfig>)
+    await refreshMemory()
   }
-
-  const roleActions =
-    purpose === 'embedding' ? (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={memoryBusy || !memoryCfg}
-          data-testid="role-embedding-recommend"
-          onClick={() => void onRecommendEmbedding()}
-        >
-          {t('settings.modelConfig.useRecommended')}
-        </Button>
-        {emb && (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={memoryBusy || !memoryCfg}
-            data-testid="role-embedding-clear"
-            onClick={() =>
-              void applyMemory({ embeddingModel: null } as unknown as Partial<MemoryFileConfig>)
-            }
-          >
-            {t('settings.modelConfig.purpose.embedding.clear')}
-          </Button>
-        )}
-      </div>
-    ) : purpose === 'rerank' && rr ? (
-      <Button
-        size="sm"
-        variant="secondary"
-        disabled={memoryBusy || !memoryCfg}
-        data-testid="role-rerank-clear"
-        onClick={() =>
-          void applyMemory({ rerankModel: null } as unknown as Partial<MemoryFileConfig>)
-        }
-      >
-        {t('settings.modelConfig.purpose.rerank.clear')}
-      </Button>
-    ) : null
 
   if (!loaded) return <div className="p-6 text-meta text-ink-tertiary">…</div>
 
+  const baseReady = !!(am && keyConfigured[am.providerID])
+  const embReady = !!(emb?.modelID && emb?.baseURL && endpointKeyOk.embedding)
+  const rrReady = !!(rr?.modelID && (rr.baseURL || rr.providerID) && endpointKeyOk.rerank)
+
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full flex-col p-6" data-testid="model-config-cards">
       <h2 className="text-title font-semibold text-ink">{t('settings.model')}</h2>
       <p className="mt-1 text-body text-ink-secondary">{t('settings.modelConfig.intro')}</p>
 
-      <div className="mt-4">
-        <SegmentedControl
-          data-testid="model-purpose-tabs"
-          aria-label={t('settings.modelConfig.tabs.ariaLabel')}
-          size="md"
-          value={purpose}
-          onChange={setPurpose}
-          options={[
-            { value: 'base', label: t('settings.modelConfig.tabs.base') },
-            { value: 'embedding', label: t('settings.modelConfig.tabs.embedding') },
-            { value: 'rerank', label: t('settings.modelConfig.tabs.rerank') },
-          ]}
+      <div className="mt-5 flex flex-col gap-3">
+        <ModelPurposeCard
+          testId="model-card-base"
+          label={t('settings.modelConfig.tabs.base')}
+          title={am?.modelID ?? t('settings.modelConfig.purpose.base.noModel')}
+          subtitle={
+            am
+              ? `${catalog[am.providerID]?.name ?? am.providerID} · ${t('settings.modelConfig.purpose.base.currentModel')}`
+              : t('settings.modelConfig.purpose.base.noModelHint')
+          }
+          ready={baseReady}
+          configured={!!am}
+          onEdit={() => setDialog('base')}
+          editLabel={am ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
+        />
+        <ModelPurposeCard
+          testId="model-card-embedding"
+          label={t('settings.modelConfig.tabs.embedding')}
+          title={emb?.modelID ?? t('settings.modelConfig.purpose.embedding.noModel')}
+          subtitle={
+            emb
+              ? emb.baseURL ?? emb.providerID
+              : t('settings.modelConfig.purpose.embedding.noModelHint')
+          }
+          ready={embReady}
+          configured={!!emb}
+          privacy={t('settings.modelConfig.purpose.embedding.privacyNote')}
+          onEdit={() => setDialog('embedding')}
+          editLabel={emb ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
+        />
+        <ModelPurposeCard
+          testId="model-card-rerank"
+          label={`${t('settings.modelConfig.tabs.rerank')} · ${t('settings.modelConfig.optional')}`}
+          title={rr?.modelID ?? t('settings.modelConfig.purpose.rerank.noModel')}
+          subtitle={
+            rr
+              ? rr.baseURL ?? rr.providerID
+              : t('settings.modelConfig.purpose.rerank.noModelHint')
+          }
+          ready={rrReady}
+          configured={!!rr}
+          optional
+          privacy={t('settings.modelConfig.purpose.rerank.privacyNote')}
+          onEdit={() => setDialog('rerank')}
+          editLabel={rr ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
         />
       </div>
 
-      <div
-        className="mt-5 flex min-h-0 flex-1 flex-col gap-5"
-        data-testid={`model-purpose-${purpose}`}
-      >
-        <CurrentModelHero
-          purpose={purpose}
-          providerName={hero.providerName}
-          modelID={hero.modelID}
-          model={hero.model}
-          keyConfigured={hero.keyConfigured}
-          onLocate={hero.locateId ? () => setSelected(hero.locateId!) : undefined}
-        />
-
-        {(purpose === 'embedding' || purpose === 'rerank') && (
-          <p className="text-meta text-ink-tertiary">
-            {t(`settings.modelConfig.purpose.${purpose}.privacyNote`)}
-          </p>
-        )}
-
-        <div className="flex min-h-0 flex-1 gap-5">
-          <div className="flex w-[280px] min-w-[240px] max-w-[360px] shrink-0 flex-col">
-            <ProviderList
-              groups={groups}
-              activeId={activeId}
-              keyConfigured={keyConfigured}
-              filter={filter}
-              onFilter={setFilter}
-              showIncompatible={showIncompatible}
-              onToggleIncompatible={() => setShowIncompatible((v) => !v)}
-              onSelect={setSelected}
-              onAddCustom={() => setAddOpen(true)}
-            />
-          </div>
-
-          {active ? (
-            <ProviderDetail
-              key={active.id}
-              provider={active}
-              configured={!!keyConfigured[active.id]}
-              enabled={config.providers[active.id]?.enabled ?? false}
-              baseURL={config.providers[active.id]?.baseURL ?? active.api ?? ''}
-              isActive={isActive}
-              onSaveKey={(v) => saveKey(active.id, v)}
-              onClearKey={() => clearKey(active.id)}
-              onSaveBaseURL={(v) => setBaseURL(active.id, v)}
-              onSetEnabled={(v) => setEnabled(active.id, v)}
-              onSetCurrent={onSetCurrent}
-              setCurrentLabel={t(`settings.modelConfig.purpose.${purpose}.setCurrent`)}
-              currentLabel={t(`settings.modelConfig.purpose.${purpose}.current`)}
-              roleActions={roleActions}
-            />
-          ) : (
-            <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border text-meta text-ink-tertiary">
-              {t('settings.modelConfig.noMatches')}
+      {dialog === 'base' && (
+        <Modal
+          open
+          onOpenChange={(o) => { if (!o) setDialog(null) }}
+          title={t('settings.modelConfig.baseDialogTitle')}
+          resizable
+          defaultSize={{ width: 960, height: 640 }}
+          minSize={{ width: 720, height: 480 }}
+          storageKey="model-config-base-dialog"
+        >
+          <div className="flex h-full min-h-[420px] flex-col gap-3 p-4" data-testid="base-model-dialog">
+            <p className="text-meta text-ink-tertiary">{t('settings.modelConfig.baseDialogIntro')}</p>
+            <div className="flex min-h-0 flex-1 gap-4">
+              <div className="flex w-[260px] shrink-0 flex-col">
+                <ProviderList
+                  groups={groups}
+                  activeId={activeId}
+                  keyConfigured={keyConfigured}
+                  filter={filter}
+                  onFilter={setFilter}
+                  showIncompatible={showIncompatible}
+                  onToggleIncompatible={() => setShowIncompatible((v) => !v)}
+                  onSelect={setSelected}
+                  onAddCustom={() => setAddOpen(true)}
+                />
+              </div>
+              {active ? (
+                <ProviderDetail
+                  key={active.id}
+                  provider={active}
+                  configured={!!keyConfigured[active.id]}
+                  enabled={config.providers[active.id]?.enabled ?? false}
+                  baseURL={config.providers[active.id]?.baseURL ?? active.api ?? ''}
+                  isActive={(modelID) => am?.providerID === active.id && am?.modelID === modelID}
+                  onSaveKey={(v) => saveKey(active.id, v)}
+                  onClearKey={() => clearKey(active.id)}
+                  onSaveBaseURL={(v) => setBaseURL(active.id, v)}
+                  onSetEnabled={(v) => setEnabled(active.id, v)}
+                  onSetCurrent={(modelID) => setActiveModel(active.id, modelID)}
+                  setCurrentLabel={t('settings.modelConfig.purpose.base.setCurrent')}
+                  currentLabel={t('settings.modelConfig.purpose.base.current')}
+                />
+              ) : (
+                <div className="flex min-w-0 flex-1 items-center justify-center rounded-lg border border-dashed border-border text-meta text-ink-tertiary">
+                  {t('settings.modelConfig.noMatches')}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </Modal>
+      )}
+
+      {dialog === 'embedding' && (
+        <EndpointModelDialog
+          purpose="embedding"
+          open
+          existing={emb}
+          virtualKeyConfigured={endpointKeyOk.embeddingVirtual}
+          busy={memoryBusy}
+          onSave={(d) => saveEndpoint('embedding', d)}
+          onClear={() => clearEndpoint('embedding')}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog === 'rerank' && (
+        <EndpointModelDialog
+          purpose="rerank"
+          open
+          existing={rr}
+          virtualKeyConfigured={endpointKeyOk.rerankVirtual}
+          busy={memoryBusy}
+          onSave={(d) => saveEndpoint('rerank', d)}
+          onClear={() => clearEndpoint('rerank')}
+          onClose={() => setDialog(null)}
+        />
+      )}
 
       {addOpen && (
         <AddProviderDialog
@@ -275,6 +294,70 @@ export function ModelConfig() {
           onCancel={() => setAddOpen(false)}
         />
       )}
+    </div>
+  )
+}
+
+function ModelPurposeCard({
+  testId,
+  label,
+  title,
+  subtitle,
+  ready,
+  configured,
+  optional,
+  privacy,
+  onEdit,
+  editLabel,
+}: {
+  testId: string
+  label: string
+  title: string
+  subtitle: string
+  ready: boolean
+  configured: boolean
+  optional?: boolean
+  privacy?: string
+  onEdit: () => void
+  editLabel: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <div
+      className="rounded-lg border border-border bg-surface px-4 py-3.5"
+      data-testid={testId}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+            {label}
+          </div>
+          <div className="mt-1 truncate text-prose font-medium text-ink">{title}</div>
+          <div className="mt-0.5 truncate text-meta text-ink-tertiary">{subtitle}</div>
+          {privacy && <p className="mt-2 text-caption text-ink-tertiary">{privacy}</p>}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {configured ? (
+            ready ? (
+              <Badge variant="success" size="sm">
+                {t('settings.modelConfig.ready')}
+              </Badge>
+            ) : (
+              <Badge variant="warning" size="sm">
+                {t('settings.modelConfig.keyMissing')}
+              </Badge>
+            )
+          ) : optional ? (
+            <Badge size="sm">{t('settings.modelConfig.optional')}</Badge>
+          ) : (
+            <Badge size="sm">{t('settings.modelConfig.notConfigured')}</Badge>
+          )}
+          <Button size="sm" variant="secondary" onClick={onEdit} data-testid={`${testId}-edit`}>
+            {configured ? <Pencil size={14} /> : <Plus size={14} />}
+            <span className="ml-1">{editLabel}</span>
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

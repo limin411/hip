@@ -318,7 +318,8 @@ export const en = {
       model: 'Model Configuration',
       modelConfig: {
         currentModel: 'Current model',
-        intro: 'Configure providers and pick models by purpose: chat, embedding, or rerank.',
+        intro:
+          'Configure chat, embedding, and rerank separately. Embedding and rerank use their own endpoint and API key — independent of chat providers.',
         noModel: 'No model selected',
         noModelHint: 'Pick a provider below and set a current model',
         ready: 'Ready',
@@ -375,27 +376,39 @@ export const en = {
           embedding: {
             currentModel: 'Current embedding model',
             noModel: 'No embedding model',
-            noModelHint: 'Required for hybrid search. Pick a provider and set an embedding model.',
+            noModelHint: 'Required for hybrid search. Open the form to enter endpoint, API key, and model id.',
             setCurrent: 'Set as embedding',
             current: 'Embedding',
             clear: 'Clear embedding',
             privacyNote:
-              'Embeddings send memory text to the chosen provider API. Hybrid search stays off until you enable it under Memory.',
+              'Embeddings send memory text to the configured endpoint. Hybrid search stays off until you enable it under Memory.',
           },
           rerank: {
             currentModel: 'Current rerank model',
             noModel: 'No rerank model (optional)',
-            noModelHint: 'Leave unset to skip rerank. Pick a provider to configure a dedicated rerank endpoint.',
+            noModelHint: 'Leave unset to skip rerank. Enter a dedicated rerank endpoint if needed.',
             setCurrent: 'Set as rerank',
             current: 'Rerank',
             clear: 'Clear rerank',
             privacyNote:
-              'Rerank may send query and memory snippets to the chosen provider API when hybrid search is enabled.',
+              'Rerank may send query and memory snippets to the configured endpoint when hybrid search is enabled.',
           },
         },
-        useRecommended: 'Use recommended',
-        recommendEmbeddingUnavailable:
-          'Recommended embedding is only available when the active chat provider is OpenAI-compatible. Pick a model manually, or switch the active provider.',
+        edit: 'Edit',
+        configure: 'Configure',
+        optional: 'Optional',
+        baseDialogTitle: 'Edit base models',
+        baseDialogIntro:
+          'Chat providers and models used for conversation and agents. Not shared with embedding or rerank credentials.',
+        endpointDialog: {
+          embeddingTitle: 'Configure embedding model',
+          rerankTitle: 'Configure rerank model',
+          embeddingIntro:
+            'Independent of chat providers. Enter an OpenAI-compatible embeddings endpoint, its API key, and model id.',
+          rerankIntro:
+            'Independent of chat providers. Enter the rerank service endpoint, API key, and model id. Leave unset to skip rerank.',
+          modelId: 'Model ID',
+        },
       },
       mcpLabel: 'External Tool Services',
       mcp: {

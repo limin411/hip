@@ -318,7 +318,8 @@ export const zhTW = {
       model: '模型配置',
       modelConfig: {
         currentModel: '當前模型',
-        intro: '按用途設定提供商與模型：對話基礎模型、嵌入、重排。',
+        intro:
+          '分別設定對話、嵌入與重排。嵌入與重排使用各自的端點與 API Key，與對話提供商完全獨立。',
         noModel: '未選擇模型',
         noModelHint: '在下方選擇一個提供商並設為當前模型',
         ready: '已就緒',
@@ -375,27 +376,38 @@ export const zhTW = {
           embedding: {
             currentModel: '當前嵌入模型',
             noModel: '未設定嵌入模型',
-            noModelHint: '混合檢索需要設定嵌入模型。請選擇提供商並設為嵌入模型。',
+            noModelHint: '混合檢索需要設定。開啟表單填寫端點、API Key 與模型 id。',
             setCurrent: '設為嵌入',
             current: '嵌入',
             clear: '清除嵌入',
             privacyNote:
-              '嵌入會將記憶文字傳送到所選供應商 API。混合檢索預設關閉，可在「記憶」設定中開啟。',
+              '嵌入會將記憶文字傳送到所設定的端點。混合檢索預設關閉，可在「記憶」設定中開啟。',
           },
           rerank: {
             currentModel: '當前重排模型',
             noModel: '未設定重排模型（可選）',
-            noModelHint: '可不設定以跳過重排。選擇提供商以設定專用重排端點。',
+            noModelHint: '可不設定以跳過重排。需要時填寫獨立重排端點。',
             setCurrent: '設為重排',
             current: '重排',
             clear: '清除重排',
             privacyNote:
-              '開啟混合檢索時，重排可能將查詢與記憶片段傳送到所選供應商 API。',
+              '開啟混合檢索時，重排可能將查詢與記憶片段傳送到所設定的端點。',
           },
         },
-        useRecommended: '使用推薦',
-        recommendEmbeddingUnavailable:
-          '僅當目前對話提供商為 OpenAI 相容時可用一鍵推薦。請手動選擇模型，或切換目前活動提供商。',
+        edit: '編輯',
+        configure: '設定',
+        optional: '可選',
+        baseDialogTitle: '編輯基礎模型',
+        baseDialogIntro: '用於對話與智能體的 chat 提供商與模型。金鑰不與嵌入/重排共用。',
+        endpointDialog: {
+          embeddingTitle: '設定嵌入模型',
+          rerankTitle: '設定重排模型',
+          embeddingIntro:
+            '與對話提供商完全獨立。填寫 OpenAI 相容的 embedding 端點、API Key 與模型 id。',
+          rerankIntro:
+            '與對話提供商完全獨立。填寫重排服務端點、API Key 與模型 id。不設定則跳過重排。',
+          modelId: '模型 ID',
+        },
       },
       mcpLabel: '外部工具服務',
       mcp: {

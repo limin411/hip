@@ -3,8 +3,9 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ModelConfig } from './ModelConfig'
+import { MEMORY_EMBEDDING_PROVIDER_ID } from '@/lib/memoryEndpoint'
 
-const { setMemoryConfig } = vi.hoisted(() => {
+const { setMemoryConfig, saveProviderKey, isProviderKeyConfigured } = vi.hoisted(() => {
   const setMemoryConfig = vi.fn(async (partial: Record<string, unknown>) => ({
     version: 1 as const,
     useMemories: false,
@@ -18,7 +19,9 @@ const { setMemoryConfig } = vi.hoisted(() => {
     hybridSearchEnabled: false,
     ...partial,
   }))
-  return { setMemoryConfig }
+  const saveProviderKey = vi.fn(async () => undefined)
+  const isProviderKeyConfigured = vi.fn(async () => false)
+  return { setMemoryConfig, saveProviderKey, isProviderKeyConfigured }
 })
 
 vi.mock('react-i18next', () => ({
@@ -45,6 +48,13 @@ vi.mock('@/domain', () => ({
   },
 }))
 
+vi.mock('@/ipc/secrets', () => ({
+  isProviderKeyConfigured,
+  saveProviderKey,
+  clearProviderKey: vi.fn(async () => undefined),
+  restartSidecar: vi.fn(async () => 0),
+}))
+
 vi.mock('@/store/providersStore', () => ({
   useProvidersStore: () => ({
     catalog: {
@@ -55,10 +65,6 @@ vi.mock('@/store/providersStore', () => ({
         npm: '@ai-sdk/openai',
         models: {
           'gpt-4o': { id: 'gpt-4o', name: 'gpt-4o' },
-          'text-embedding-3-small': {
-            id: 'text-embedding-3-small',
-            name: 'text-embedding-3-small',
-          },
         },
         api: 'https://api.openai.com/v1',
       },
@@ -81,52 +87,55 @@ vi.mock('@/store/providersStore', () => ({
 afterEach(() => {
   cleanup()
   setMemoryConfig.mockClear()
+  saveProviderKey.mockClear()
+  isProviderKeyConfigured.mockClear()
+  isProviderKeyConfigured.mockResolvedValue(false)
 })
 
-describe('ModelConfig layout', () => {
-  it('renders purpose tabs and does not render role-models section', async () => {
+describe('ModelConfig cards + dialogs', () => {
+  it('renders three purpose cards and no purpose tabs', async () => {
     render(<ModelConfig />)
-    expect(screen.getByTestId('model-purpose-tabs')).toBeInTheDocument()
+    expect(screen.getByTestId('model-config-cards')).toBeInTheDocument()
+    expect(screen.getByTestId('model-card-base')).toBeInTheDocument()
+    expect(screen.getByTestId('model-card-embedding')).toBeInTheDocument()
+    expect(screen.getByTestId('model-card-rerank')).toBeInTheDocument()
+    expect(screen.queryByTestId('model-purpose-tabs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('role-models-section')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('role-extract-model')).not.toBeInTheDocument()
   })
 
-  it('switches to embedding tab', async () => {
+  it('opens base model dialog with provider workspace', async () => {
     render(<ModelConfig />)
-    fireEvent.click(screen.getByRole('tab', { name: 'settings.modelConfig.tabs.embedding' }))
+    fireEvent.click(screen.getByTestId('model-card-base-edit'))
     await waitFor(() => {
-      expect(screen.getByTestId('model-purpose-embedding')).toBeInTheDocument()
+      expect(screen.getByTestId('base-model-dialog')).toBeInTheDocument()
     })
+    expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
   })
 
-  it('sets embedding model via setMemoryConfig when choosing a model on embedding tab', async () => {
+  it('saves embedding endpoint to virtual provider with independent key', async () => {
     render(<ModelConfig />)
-    fireEvent.click(screen.getByRole('tab', { name: 'settings.modelConfig.tabs.embedding' }))
-    const row = await screen.findByText('text-embedding-3-small')
-    fireEvent.click(row.closest('button') ?? row)
+    fireEvent.click(screen.getByTestId('model-card-embedding-edit'))
     await waitFor(() => {
+      expect(screen.getByTestId('endpoint-dialog-embedding')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByTestId('endpoint-embedding-base-url'), {
+      target: { value: 'https://api.openai.com/v1' },
+    })
+    fireEvent.change(screen.getByTestId('endpoint-embedding-model-id'), {
+      target: { value: 'text-embedding-3-small' },
+    })
+    fireEvent.change(screen.getByTestId('endpoint-embedding-api-key'), {
+      target: { value: 'sk-embed-only' },
+    })
+    fireEvent.click(screen.getByTestId('endpoint-embedding-save'))
+    await waitFor(() => {
+      expect(saveProviderKey).toHaveBeenCalledWith(MEMORY_EMBEDDING_PROVIDER_ID, 'sk-embed-only')
       expect(setMemoryConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           embeddingModel: expect.objectContaining({
-            providerID: 'openai',
+            providerID: MEMORY_EMBEDDING_PROVIDER_ID,
             modelID: 'text-embedding-3-small',
-          }),
-        }),
-      )
-    })
-  })
-
-  it('sets rerank model via setMemoryConfig when choosing a model on rerank tab', async () => {
-    render(<ModelConfig />)
-    fireEvent.click(screen.getByRole('tab', { name: 'settings.modelConfig.tabs.rerank' }))
-    const row = await screen.findByText('gpt-4o')
-    fireEvent.click(row.closest('button') ?? row)
-    await waitFor(() => {
-      expect(setMemoryConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          rerankModel: expect.objectContaining({
-            providerID: 'openai',
-            modelID: 'gpt-4o',
+            baseURL: 'https://api.openai.com/v1',
           }),
         }),
       )

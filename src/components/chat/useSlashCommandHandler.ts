@@ -51,6 +51,13 @@ export function formatHelpMessageBody(commands: SlashCommand[]): string {
   return lines.join('\n')
 }
 
+/** Trailing text after `/compact` becomes summarizer focus, e.g. `/compact auth next`. */
+export function extractCompactFocus(value: string): string | undefined {
+  const m = value.match(/(?:^|\s)\/compact(?:\s+(.*))?$/i)
+  const rest = m?.[1]?.trim()
+  return rest || undefined
+}
+
 export function useSlashCommandHandler(
   surface: ComposerSurface,
   options: UseSlashCommandHandlerOptions,
@@ -98,7 +105,10 @@ export function useSlashCommandHandler(
           return
         }
         if (cmd.id === 'compact') {
-          if (sessionId) runCompact(sessionId)
+          if (sessionId) {
+            const focus = extractCompactFocus(value)
+            runCompact(sessionId, focus)
+          }
           setText('')
           focusInput()
           return

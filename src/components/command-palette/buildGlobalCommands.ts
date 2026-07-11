@@ -321,7 +321,7 @@ export function buildGlobalCommandGroups(
       icon: 'package',
       keywords: ['compact', 'summarize', '压缩', '壓縮'],
       group: 'context',
-      when: { views: ['code'], requiresSession: true },
+      when: { views: ['chat', 'code'], requiresSession: true },
       contextBoost: 0.1,
       run: () => {
         if (ctx.sessionId) runCompact(ctx.sessionId)

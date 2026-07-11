@@ -223,10 +223,12 @@ describe('protocol: SessionEvent', () => {
       sessionId: 's1',
       summary: 'summary text',
       timestamp: 1,
+      replacedMessageIds: ['a1', 'u2'],
     }
     const rt = JSON.parse(JSON.stringify(e)) as Extract<SessionEvent, { type: 'compaction_ended' }>
     expect(rt.type).toBe('compaction_ended')
     expect(rt.summary).toBe('summary text')
+    expect(rt.replacedMessageIds).toEqual(['a1', 'u2'])
   })
 })
 

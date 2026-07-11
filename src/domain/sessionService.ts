@@ -834,11 +834,14 @@ export class SessionService {
     this.transport.send({ type: 'permission:respond', sessionId, requestId, ...('optionId' in choice ? { optionId: choice.optionId } : { cancelled: true }) })
   }
 
-  /** Compact the in-memory conversation history (summarize the middle), freeing token budget
-   *  for longer sessions. Fires a message:compact WS message; the backend responds with a
-   *  compact:result that injects an informational message into the session. */
-  compactSession(sessionId: string): void {
-    this.transport.send({ type: 'message:compact', sessionId })
+  /** Compact model context (summarize the middle). Optional focus steers the summary.
+   *  Backend responds with compact:result (applied / noop / error). */
+  compactSession(sessionId: string, focus?: string): void {
+    this.transport.send({
+      type: 'message:compact',
+      sessionId,
+      ...(focus?.trim() ? { focus: focus.trim() } : {}),
+    })
   }
 
   /** Pull the workspace diff. In-flight dedupe: a second request while loading is dropped. */

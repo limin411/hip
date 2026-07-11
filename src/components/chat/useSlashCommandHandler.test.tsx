@@ -81,7 +81,7 @@ const codeOnly = (id: string): SlashCommand =>
   ({ id, name: id, description: id, kind: 'builtin', availableIn: ['code'] } as SlashCommand)
 
 const diffCmd = codeOnly('diff')
-const compactCmd: SlashCommand = { id: 'compact', name: 'compact', description: 'compact', kind: 'builtin', availableIn: ['code'], requiresSession: true }
+const compactCmd: SlashCommand = { id: 'compact', name: 'compact', description: 'compact', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true }
 const initCmd = codeOnly('init')
 
 describe('useSlashCommandHandler', () => {
@@ -175,8 +175,17 @@ describe('useSlashCommandHandler', () => {
 
     result.current.handleCommandSelect(compactCmd)
 
-    expect(compactSpy).toHaveBeenCalledWith('s1')
+    expect(compactSpy).toHaveBeenCalledWith('s1', undefined)
     expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/compact with trailing focus forwards focus string', () => {
+    const compactSpy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
+    const { result } = setup('chat', 's1', { value: '/compact auth middleware' })
+
+    result.current.handleCommandSelect(compactCmd)
+
+    expect(compactSpy).toHaveBeenCalledWith('s1', 'auth middleware')
   })
 
   it('/compact no-ops when sessionId is null', () => {
@@ -242,7 +251,7 @@ describe('useSlashCommandHandler', () => {
     expect(message.content).not.toContain('/config')
     expect(message.content).not.toContain('/diff')
     expect(message.content).not.toContain('/init')
-    expect(message.content).not.toContain('/compact')
+    expect(message.content).toContain('/compact')
     expect(setText).toHaveBeenCalledWith('')
   })
 

@@ -13,22 +13,39 @@ export function rowToBaseMessage(d: SessionMessageData): BaseMessage[] {
   if (d.role === 'user') {
     const validParts = d.contentParts?.filter((p): p is ContentPart => isContentPart(p as Record<string, unknown>))
     if (isRichContentParts(validParts)) {
-      return [new HumanMessage({ content: validParts })]
+      return [new HumanMessage({ id: d.messageId, content: validParts })]
     }
-    return [new HumanMessage(d.content)]
+    return [new HumanMessage({ id: d.messageId, content: d.content })]
   }
-  if (d.role === 'assistant' && 'kind' in d) return [new SystemMessage(d.summary)]
+  if (d.role === 'assistant' && 'kind' in d) {
+    return [new SystemMessage({ content: d.summary })]
+  }
   const toolCalls = d.toolCalls.length > 0 ? d.toolCalls.map(projectedToolCallToToolCall) : undefined
   const messages: BaseMessage[] = [
-    new AIMessage({ content: d.content, ...(toolCalls ? { tool_calls: toolCalls } : {}) }),
+    new AIMessage({
+      id: d.stepId,
+      content: d.content,
+      ...(toolCalls ? { tool_calls: toolCalls } : {}),
+    }),
   ]
   if (toolCalls) {
     for (const tc of d.toolCalls) {
       const content = tc.status === 'error' ? `Error: ${tc.error ?? 'tool failed'}` : (tc.output ?? '')
-      messages.push(new ToolMessage({ content, tool_call_id: tc.callId, name: tc.name }))
+      messages.push(new ToolMessage({ content, tool_call_id: tc.callId, name: tc.name, id: tc.callId }))
     }
   }
   return messages
+}
+
+/** Stable ids associated with a projection row (for compaction filter on rebuild). */
+export function projectionRowIds(d: SessionMessageData): string[] {
+  if (d.role === 'user') return [d.messageId]
+  if (d.role === 'assistant' && 'kind' in d) return []
+  const ids = [d.stepId]
+  for (const tc of d.toolCalls) {
+    if (tc.callId) ids.push(tc.callId)
+  }
+  return ids
 }
 
 export function projectedToolCallToToolCall(t: ProjectedToolCall) {
@@ -74,6 +91,10 @@ export function sessionEventToEventData(
     case 'tool_failed':
       return { callId: event.callId, stepId: context?.stepId, error: event.error }
     case 'compaction_ended':
-      return { summary: event.summary, timestamp: event.timestamp }
+      return {
+        summary: event.summary,
+        timestamp: event.timestamp,
+        ...(event.replacedMessageIds?.length ? { replacedMessageIds: event.replacedMessageIds } : {}),
+      }
   }
 }

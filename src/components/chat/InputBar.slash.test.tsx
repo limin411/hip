@@ -457,7 +457,7 @@ describe('InputBar slash commands', () => {
     fireEvent.keyDown(document, { key: 'Enter' })
 
     // /compact clears input and calls compactSession — does NOT inject text or send to AI
-    expect(compactSpy).toHaveBeenCalledWith('s1')
+    expect(compactSpy).toHaveBeenCalledWith('s1', undefined)
     expect(textarea).toHaveValue('')
     expect(sendSpy).not.toHaveBeenCalled()
 
@@ -485,7 +485,7 @@ describe('InputBar slash commands', () => {
 
     fireEvent.click(compactButton)
 
-    expect(compactSpy).toHaveBeenCalledWith('s1')
+    expect(compactSpy).toHaveBeenCalledWith('s1', undefined)
     expect(textarea).toHaveValue('')
     expect(sendSpy).not.toHaveBeenCalled()
   })
@@ -561,7 +561,7 @@ describe('InputBar slash commands', () => {
     expect(screen.getByText('/compact')).toBeInTheDocument()
   })
 
-  it('hides code-only commands in a chat session surface', async () => {
+  it('hides code-only commands in a chat session surface but shows compact', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('chat'))
 
@@ -575,7 +575,7 @@ describe('InputBar slash commands', () => {
     expect(screen.queryByText('/config')).not.toBeInTheDocument()
     expect(screen.queryByText('/diff')).not.toBeInTheDocument()
     expect(screen.queryByText('/init')).not.toBeInTheDocument()
-    expect(screen.queryByText('/compact')).not.toBeInTheDocument()
+    expect(screen.getByText('/compact')).toBeInTheDocument()
   })
 
   it('regression: selecting fixture skill /sample-greet injects "/sample-greet " into composer', async () => {

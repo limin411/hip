@@ -728,7 +728,15 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: host.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { host.emit({ type: 'tool_success', sessionId: host.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { host.emit({ type: 'tool_failed', sessionId: host.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; host.checkSteerPromotion() },
     usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
     planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: host.id, turnId, itemId, delta }) },
-    compaction: (summary: string) => { host.emit({ type: 'compaction_ended', sessionId: host.id, summary, timestamp: Date.now() }) },
+    compaction: (summary: string, meta?: { replacedMessageIds?: string[] }) => {
+      host.emit({
+        type: 'compaction_ended',
+        sessionId: host.id,
+        summary,
+        timestamp: Date.now(),
+        ...(meta?.replacedMessageIds?.length ? { replacedMessageIds: meta.replacedMessageIds } : {}),
+      })
+    },
   })
   const emit = makeEmit('supervisor', 'supervisor')
   let subagentSeq = 0

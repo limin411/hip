@@ -1,5 +1,7 @@
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { nanoid } from 'nanoid'
+import { toast } from 'sonner'
+import i18n from '@/i18n'
 import { useDomainStore } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useUiStore } from '@/store/uiStore'
@@ -8,6 +10,36 @@ import { useWorkflowStore } from '@/store/workflowStore'
 import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefreshOnWrite'
 import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
 import { surfaceOf } from '@/lib/sessions'
+
+/** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
+const COMPACT_KEEP_RECENT_TURNS = 3
+
+/** Build user-facing compact result body (transcript + toast). */
+export function formatCompactResultMessage(
+  msg: Extract<ServerMessage, { type: 'compact:result' }>,
+): string {
+  if (!msg.ok) {
+    if (msg.reason === 'session_busy') {
+      return i18n.t('chat.compact.busy')
+    }
+    return i18n.t('chat.compact.failed', { error: msg.error ?? msg.reason ?? 'unknown' })
+  }
+  if (!msg.applied) {
+    return i18n.t('chat.compact.noop', { n: COMPACT_KEEP_RECENT_TURNS })
+  }
+  const lines = [
+    i18n.t('chat.compact.applied', {
+      before: msg.messagesBefore,
+      after: msg.messagesAfter,
+      tokensBefore: msg.tokensBefore,
+      tokensAfter: msg.tokensAfter,
+    }),
+  ]
+  if (msg.summary?.trim()) {
+    lines.push('', msg.summary.trim())
+  }
+  return lines.join('\n')
+}
 
 /** Dependencies the side-effect router needs from SessionService (avoid circular imports). */
 export interface ServerMessageEffectDeps {
@@ -237,16 +269,35 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
     }
 
-    case 'compact:result':
-      if (msg.ok) {
+    case 'compact:result': {
+      const content = formatCompactResultMessage(msg)
+      if (msg.ok && msg.applied) {
         useDomainStore.getState().appendMessage(msg.sessionId, {
           id: nanoid(),
           role: 'assistant',
-          content: `Conversation compacted: ${msg.messagesBefore} messages → ${msg.messagesAfter} messages`,
+          content,
+          timestamp: Date.now(),
+        })
+      } else if (msg.ok && !msg.applied) {
+        // No-op: status strip in transcript + toast so short sessions aren't silent.
+        useDomainStore.getState().appendMessage(msg.sessionId, {
+          id: nanoid(),
+          role: 'assistant',
+          content,
+          timestamp: Date.now(),
+        })
+        toast.message(i18n.t('chat.compact.noopTitle'), { description: content })
+      } else {
+        toast.error(i18n.t('chat.compact.failedTitle'), { description: content })
+        useDomainStore.getState().appendMessage(msg.sessionId, {
+          id: nanoid(),
+          role: 'assistant',
+          content,
           timestamp: Date.now(),
         })
       }
       return
+    }
 
     case 'workflow:started': {
       useWorkflowStore.getState().setActiveWorkflow(msg.sessionId, msg.def, msg.runId)

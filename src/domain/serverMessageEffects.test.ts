@@ -5,6 +5,12 @@ import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { useUiStore } from '@/store/uiStore'
 import type { WorkflowDef } from '@hip/protocol'
+import '@/i18n'
+
+vi.mock('sonner', () => ({
+  toast: { message: vi.fn(), error: vi.fn() },
+  Toaster: () => null,
+}))
 
 const mockDef: WorkflowDef = { id: 'w1', name: 'W', nodes: [], edges: [], entry: [] }
 
@@ -60,20 +66,43 @@ describe('applyServerMessageEffects', () => {
     expect(deps.resyncActiveIfRunning).toHaveBeenCalled()
   })
 
-  it('compact:result ok appends a summary assistant message', () => {
+  it('compact:result applied appends counts and optional summary', () => {
     const deps = makeDeps()
     applyServerMessageEffects({
       type: 'compact:result',
       sessionId: 's1',
       ok: true,
-      inputTokens: 1,
-      outputTokens: 2,
+      applied: true,
+      tokensBefore: 100,
+      tokensAfter: 40,
       messagesBefore: 10,
       messagesAfter: 4,
+      summary: '[对话摘要] done',
     }, deps)
     const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
     expect(msgs).toHaveLength(1)
-    expect(msgs[0].content).toContain('10 messages → 4 messages')
+    expect(msgs[0].content).toContain('10')
+    expect(msgs[0].content).toContain('4')
+    expect(msgs[0].content).toContain('[对话摘要] done')
+  })
+
+  it('compact:result noop does not claim success as compacted', () => {
+    const deps = makeDeps()
+    applyServerMessageEffects({
+      type: 'compact:result',
+      sessionId: 's1',
+      ok: true,
+      applied: false,
+      reason: 'nothing_to_compact',
+      tokensBefore: 7,
+      tokensAfter: 7,
+      messagesBefore: 7,
+      messagesAfter: 7,
+    }, deps)
+    const msgs = useDomainStore.getState().sessions.find((s) => s.id === 's1')!.messages
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0].content.toLowerCase()).toContain('nothing to compact')
+    expect(msgs[0].content).not.toMatch(/compacted:\s*7/i)
   })
 
   describe('workflow messages', () => {

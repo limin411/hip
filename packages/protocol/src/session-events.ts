@@ -11,4 +11,4 @@ export type SessionEvent =
   | { type: 'tool_called'; sessionId: string; callId: string; name: string; input: string; timestamp: number }
   | { type: 'tool_success'; sessionId: string; callId: string; output: string; timestamp: number }
   | { type: 'tool_failed'; sessionId: string; callId: string; error: string; timestamp: number }
-  | { type: 'compaction_ended'; sessionId: string; summary: string; timestamp: number }
+  | { type: 'compaction_ended'; sessionId: string; summary: string; timestamp: number; replacedMessageIds?: string[] }

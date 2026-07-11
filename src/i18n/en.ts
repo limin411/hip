@@ -14,6 +14,16 @@ export const en = {
         memoryStatusTitle: 'Memory status',
         memoryStatusBody: 'use={{use}} · generate={{generate}} · incognito={{incognito}}',
       },
+      compact: {
+        applied:
+          'Context compacted: {{before}} → {{after}} messages (~{{tokensBefore}} → ~{{tokensAfter}} tokens)',
+        noop:
+          'Nothing to compact. Need more than {{n}} user turns of history beyond the goal (recent turns are kept verbatim).',
+        noopTitle: 'Nothing to compact',
+        busy: 'Cannot compact while a turn is running. Wait for it to finish, then retry.',
+        failed: 'Compaction failed: {{error}}',
+        failedTitle: 'Compaction failed',
+      },
       send: 'Send',
       user: 'User',
       you: 'You',

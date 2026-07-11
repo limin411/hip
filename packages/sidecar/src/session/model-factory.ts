@@ -132,11 +132,17 @@ export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较�
 
 /** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
 class RealSummarizer implements Summarizer {
-  async summarize(messages: BaseMessage[]): Promise<string> {
+  async summarize(messages: BaseMessage[], opts?: { focus?: string }): Promise<string> {
     const { providerID, modelID, baseURL } = getActiveModel()
     const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
-    const res = await model.invoke([new SystemMessage(SUMMARY_TEMPLATE), new HumanMessage(transcript)])
+    const focusNote = opts?.focus?.trim()
+      ? `\n\nAdditional focus for this summary (prioritize these topics):\n${opts.focus.trim()}`
+      : ''
+    const res = await model.invoke([
+      new SystemMessage(SUMMARY_TEMPLATE + focusNote),
+      new HumanMessage(transcript),
+    ])
     return typeof res.content === 'string' ? res.content : ''
   }
 }

@@ -607,11 +607,12 @@ describe('SlashCommandPalette keyboard navigation', () => {
 })
 
 describe('buildCommandList surface filtering', () => {
-  it('includes only universal builtins in chat surface', () => {
+  it('includes universal builtins and compact in chat surface with a session', () => {
     const list = buildCommandList([], { surface: 'chat', sessionId: 's1' })
     expect(list.map((c) => c.name)).toEqual([
       'help',
       'clear',
+      'compact',
       'memory',
       'memory-on',
       'memory-off',
@@ -640,7 +641,7 @@ describe('SlashCommandPalette surface rendering', () => {
     cleanup()
   })
 
-  it('hides code-only commands in chat surface', () => {
+  it('hides code-only commands in chat surface but shows compact', () => {
     render(
       <SlashCommandPalette
         value="/"
@@ -653,6 +654,7 @@ describe('SlashCommandPalette surface rendering', () => {
     expect(screen.queryByTestId('slash-cmd-diff')).not.toBeInTheDocument()
     expect(screen.queryByTestId('slash-cmd-init')).not.toBeInTheDocument()
     expect(screen.queryByTestId('slash-cmd-help')).toBeInTheDocument()
+    expect(screen.queryByTestId('slash-cmd-compact')).toBeInTheDocument()
   })
 
   it('shows code-only commands in code surface', () => {

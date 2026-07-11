@@ -27,7 +27,7 @@ import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
-import { compactMessages, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
+import { compactMessages, applyCompactResult, estimateTokens, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, type Summarizer } from './compaction.js'
 import { PAUSE_QUESTION } from './doom-loop.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import { HookRegistry } from './hooks/registry.js'
@@ -83,7 +83,7 @@ import {
   isImageAttachment,
   parseToolInput,
 } from './session-helpers.js'
-import { rowToBaseMessage, sessionEventToEventData, isRichContentParts } from './session-message-codec.js'
+import { rowToBaseMessage, projectionRowIds, sessionEventToEventData, isRichContentParts } from './session-message-codec.js'
 import { emitSessionEvent, finalizeAndPersistTurn } from './session-persist.js'
 import { processInput, runTurn, runManagedAgentTurn, type SessionTurnHost } from './session-turn-runner.js'
 import { runBackgroundSubagent, loadSubagentMessages } from './session-background.js'
@@ -353,26 +353,101 @@ export class Session {
     }
   }
 
-  /** Compact the in-memory message history on demand (e.g. from the /compact slash command).
-   *  Returns token counts and message counts before/after for the UI to display. */
-  async compactNow(): Promise<{ inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number }> {
-    const before = this.messages.length
-    const tokensBefore = estimateTokens(this.messages)
-    const result = await compactMessages(this.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: this.summarizer() })
-    if (!result) {
-      return { inputTokens: tokensBefore, outputTokens: 0, messagesBefore: before, messagesAfter: before }
-    }
-    const idsToRemove = new Set([result.summary.id, ...result.removeIds])
-    for (let i = this.messages.length - 1; i >= 0; i--) {
-      const id = this.messages[i].id
-      if (id && idsToRemove.has(id)) {
-        this.messages.splice(i, 1)
+  /**
+   * Compact the in-memory message history on demand (e.g. from `/compact`).
+   * Applies summary in place, persists snapshot + compaction_ended, and returns
+   * honest applied/noop counts for the UI.
+   */
+  async compactNow(opts?: { focus?: string }): Promise<{
+    ok: boolean
+    applied: boolean
+    reason?: string
+    tokensBefore: number
+    tokensAfter: number
+    messagesBefore: number
+    messagesAfter: number
+    summary?: string
+    error?: string
+  }> {
+    if (this.running) {
+      const n = this.messages.length
+      const t = estimateTokens(this.messages)
+      return {
+        ok: false,
+        applied: false,
+        reason: 'session_busy',
+        tokensBefore: t,
+        tokensAfter: t,
+        messagesBefore: n,
+        messagesAfter: n,
+        error: 'Cannot compact while a turn is running',
       }
     }
-    this.messages.push(result.summary)
+    const before = this.messages.length
+    const tokensBefore = estimateTokens(this.messages)
+    let result
+    try {
+      result = await compactMessages(this.messages, {
+        keepRecentTurns: KEEP_RECENT_TURNS,
+        summarizer: this.summarizer(),
+        ...(opts?.focus ? { focus: opts.focus } : {}),
+      })
+    } catch (e) {
+      return {
+        ok: false,
+        applied: false,
+        reason: 'summarizer_failed',
+        tokensBefore,
+        tokensAfter: tokensBefore,
+        messagesBefore: before,
+        messagesAfter: before,
+        error: e instanceof Error ? e.message : String(e),
+      }
+    }
+    if (!result) {
+      return {
+        ok: true,
+        applied: false,
+        reason: 'nothing_to_compact',
+        tokensBefore,
+        tokensAfter: tokensBefore,
+        messagesBefore: before,
+        messagesAfter: before,
+      }
+    }
+    const next = applyCompactResult(this.messages, result)
+    this.messages.length = 0
+    this.messages.push(...next)
+    const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
+    const ts = Date.now()
+    this.emit({
+      type: 'compaction_ended',
+      sessionId: this.id,
+      summary: summaryText,
+      timestamp: ts,
+      replacedMessageIds: result.replacedIds,
+    })
+    if (this.store) {
+      new ContextEpoch(this.store.getDb()).requestReplacement(this.id, 0)
+    }
+    if (this.snapshotStore) {
+      const latestSeq = this.eventStore?.latestSeq(this.id) ?? 0
+      saveSessionSnapshot(this.snapshotStore, this.id, latestSeq, {
+        messages: this.messages,
+        config: this._config,
+      })
+    }
     const after = this.messages.length
     const tokensAfter = estimateTokens(this.messages)
-    return { inputTokens: tokensBefore, outputTokens: tokensAfter, messagesBefore: before, messagesAfter: after }
+    return {
+      ok: true,
+      applied: true,
+      tokensBefore,
+      tokensAfter,
+      messagesBefore: before,
+      messagesAfter: after,
+      summary: summaryText,
+    }
   }
 
   // ── Git delegation ──
@@ -492,13 +567,20 @@ export class Session {
     return running
   }
 
-  /** Rebuild the in-memory message list from the event-sourced projection.
-   *  Falls back to the legacy messages table when the projection is empty.
-   *  The event projection is authoritative when it exists: it contains any
-   *  messages persisted after the last snapshot (e.g. an attachment-bearing
-   *  user message sent just before an interruption). */
+  /** Rebuild the in-memory message list for model context.
+   *  Prefer the latest snapshot when present (authoritative after compaction and
+   *  turn finalize). Otherwise rebuild from the event projection (filtering any
+   *  replacedMessageIds), then legacy message rows. */
   hydrate(messages?: Message[]): void {
     this.messages.length = 0
+    if (this.snapshotStore) {
+      const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
+      if (snapshot != null && snapshot.messages.length > 0) {
+        this.messages.push(...snapshot.messages)
+        this.reseedLastCheckpoint()
+        return
+      }
+    }
     const rebuilt = this.rebuildMessagesFromEvents(this.id)
     if (rebuilt.length > 0) {
       this.messages.push(...rebuilt)
@@ -509,14 +591,6 @@ export class Session {
     } else if (this.store) {
       for (const m of this.store.loadMessages(this.id)) {
         this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
-      }
-    }
-    // If the projection and legacy tables are both empty, fall back to the last
-    // snapshot so a session that lost its event log is not left with no history.
-    if (this.messages.length === 0 && this.snapshotStore) {
-      const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
-      if (snapshot != null && snapshot.messages.length > 0) {
-        this.messages.push(...snapshot.messages)
       }
     }
     this.reseedLastCheckpoint()
@@ -561,11 +635,22 @@ export class Session {
   }
 
   /** Load session_message rows and map them back to LangGraph BaseMessages.
-   *  This is the boundary where events become the source of truth for LoopState. */
+   *  Skips rows whose ids appear in any compaction's replacedMessageIds. */
   rebuildMessagesFromEvents(sessionId: string): BaseMessage[] {
     if (!this.store) return []
     const rows = loadProjection(this.store.getDb(), sessionId)
-    return rows.flatMap((r) => rowToBaseMessage(r.data))
+    const replaced = new Set<string>()
+    for (const r of rows) {
+      const d = r.data
+      if (d.role === 'assistant' && 'kind' in d && d.kind === 'compaction' && d.replacedMessageIds) {
+        for (const id of d.replacedMessageIds) replaced.add(id)
+      }
+    }
+    return rows.flatMap((r) => {
+      const ids = projectionRowIds(r.data)
+      if (ids.some((id) => replaced.has(id))) return []
+      return rowToBaseMessage(r.data)
+    })
   }
 
   private requireCompatibleModel(send: SendFn): boolean {

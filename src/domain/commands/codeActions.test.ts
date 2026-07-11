@@ -21,7 +21,13 @@ describe('codeActions', () => {
   it('runCompact calls compactSession', () => {
     const spy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
     runCompact('s1')
-    expect(spy).toHaveBeenCalledWith('s1')
+    expect(spy).toHaveBeenCalledWith('s1', undefined)
+  })
+
+  it('runCompact forwards optional focus', () => {
+    const spy = vi.spyOn(sessionService, 'compactSession').mockReturnValue(undefined)
+    runCompact('s1', 'auth')
+    expect(spy).toHaveBeenCalledWith('s1', 'auth')
   })
 
   it('runInit calls gitInitWorkspace', () => {

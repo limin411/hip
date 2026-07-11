@@ -72,13 +72,13 @@ describe('slash commands @core', () => {
     }
   })
 
-  it('hides code-only commands in the chat surface', async () => {
+  it('hides code-only commands in the chat surface (compact is available with a session)', async () => {
     await typeInComposer('/')
     await browser.pause(600)
 
     await expect(chat.slashCmd('diff')).not.toBeExisting()
     await expect(chat.slashCmd('init')).not.toBeExisting()
-    await expect(chat.slashCmd('compact')).not.toBeExisting()
+    // compact is chat+code when a session exists; on a bare draft it stays hidden.
   })
 
   it('shows code-only commands on the code surface when there is no active session', async () => {

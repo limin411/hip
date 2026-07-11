@@ -29,7 +29,7 @@ import {
   ERROR_STREAK_LIMIT,
   ERROR_STREAK_NUDGE,
 } from './doom-loop.js'
-import { estimateTokens, compactMessages, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
+import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -75,7 +75,7 @@ export interface GraphEmit {
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
   usage(u: TurnUsage): void
   planDelta(itemId: string, delta: string): void
-  compaction(summary: string): void
+  compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -171,10 +171,7 @@ export function resolveDeferred(state: State): Partial<State> {
 }
 
 function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): BaseMessage[] {
-  const removeSet = new Set(result.removeIds)
-  return stateMessages
-    .filter((m) => !m.id || !removeSet.has(m.id))
-    .map((m) => (m.id === result.summary.id ? result.summary : m))
+  return applyCompactResult(stateMessages, result)
 }
 
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
@@ -222,7 +219,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
     if (!result) return deferredResolved
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
-    ctx.emit.compaction(summaryText)
+    ctx.emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
     return {
       messages: [...(deferredResolved.messages ?? []), result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
       compacted: true,
@@ -333,7 +330,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const result = await compactMessages(messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer, overflowRecovery: true })
       if (!result) throw err
       const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
-      emit.compaction(summaryText)
+      emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
       const compactedMessages = [result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))]
       const compactedState = applyCompaction(state.messages, result)
       const retryMessages = prepareMessages(compactedState)

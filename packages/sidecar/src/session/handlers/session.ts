@@ -65,8 +65,10 @@ export function handleSessionMessage(
           type: 'compact:result',
           sessionId: msg.sessionId,
           ok: false,
-          inputTokens: 0,
-          outputTokens: 0,
+          applied: false,
+          reason: 'session_not_found',
+          tokensBefore: 0,
+          tokensAfter: 0,
           messagesBefore: 0,
           messagesAfter: 0,
           error: 'session not found',
@@ -75,15 +77,17 @@ export function handleSessionMessage(
       }
       return (async () => {
         try {
-          const result = await session.compactNow()
-          send({ type: 'compact:result', sessionId: msg.sessionId, ok: true, ...result })
+          const result = await session.compactNow(msg.focus ? { focus: msg.focus } : undefined)
+          send({ type: 'compact:result', sessionId: msg.sessionId, ...result })
         } catch (e) {
           send({
             type: 'compact:result',
             sessionId: msg.sessionId,
             ok: false,
-            inputTokens: 0,
-            outputTokens: 0,
+            applied: false,
+            reason: 'summarizer_failed',
+            tokensBefore: 0,
+            tokensAfter: 0,
             messagesBefore: 0,
             messagesAfter: 0,
             error: String(e),

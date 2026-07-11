@@ -7,8 +7,8 @@ export function runDiff(sessionId: string): void {
   useUiStore.getState().setActiveView('code')
 }
 
-export function runCompact(sessionId: string): void {
-  sessionService.compactSession(sessionId)
+export function runCompact(sessionId: string, focus?: string): void {
+  sessionService.compactSession(sessionId, focus)
 }
 
 export function runInit(sessionId: string): void {

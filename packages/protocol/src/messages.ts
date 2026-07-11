@@ -102,7 +102,7 @@ export type ClientMessage =
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
   | { type: 'replay:session'; sessionId: string; turnIndex: number }
-  | { type: 'message:compact'; sessionId: string }
+  | { type: 'message:compact'; sessionId: string; focus?: string }
   | { type: 'memory:list'; scope?: MemoryScope; projectKeyHash?: string; sessionId?: string; query?: string; limit?: number; status?: MemoryStatus }
   | { type: 'memory:get'; id: string }
   | { type: 'memory:upsert'; item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'> }
@@ -192,7 +192,22 @@ export type ServerMessage =
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }
   | { type: 'replay:result'; sessionId: string; result: ReplayResult }
-  | { type: 'compact:result'; sessionId: string; ok: boolean; inputTokens: number; outputTokens: number; messagesBefore: number; messagesAfter: number; error?: string }
+  | {
+      type: 'compact:result'
+      sessionId: string
+      /** Transport / unexpected failure. No-op (nothing to compact) is ok:true + applied:false. */
+      ok: boolean
+      /** True only when the model context was actually rewritten. */
+      applied: boolean
+      reason?: 'nothing_to_compact' | 'session_busy' | 'session_not_found' | 'summarizer_failed' | string
+      tokensBefore: number
+      tokensAfter: number
+      messagesBefore: number
+      messagesAfter: number
+      /** Present when applied — for UI status strip. */
+      summary?: string
+      error?: string
+    }
   | { type: 'workflow:started'; sessionId: string; runId: string; def: WorkflowDef }
   | { type: 'workflow:event'; sessionId: string; runId: string; event: OrchestratorEvent }
   | { type: 'workflow:snapshot'; sessionId: string; runId: string; def: WorkflowDef; state: RunState }

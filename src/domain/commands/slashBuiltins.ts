@@ -41,9 +41,9 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
   {
     id: 'compact',
     name: 'compact',
-    description: 'Summarize conversation to save context',
+    description: 'Summarize conversation to save context (optional: /compact focus…)',
     kind: 'builtin',
-    availableIn: ['code'],
+    availableIn: ['chat', 'code'],
     requiresSession: true,
   },
   {

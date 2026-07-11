@@ -27,14 +27,16 @@ describe('AuthButton', () => {
     const btn = getByRole('button', { name: 'Email' })
     expect(btn.className).toMatch(/border-ink/)
     expect(btn.className).toMatch(/bg-surface/)
-    expect(btn.className).not.toMatch(/bg-accent/)
+    expect(btn.className).not.toMatch(/\bbg-accent\b/)
+    expect(btn.className).not.toMatch(/text-on-accent/)
   })
 
-  it('uses soft gray fill for outline', () => {
+  it('uses secondary soft fill for outline', () => {
     const { getByRole } = render(
       <AuthButton icon={Mail} label="GitHub" onClick={() => {}} />,
     )
     const btn = getByRole('button', { name: 'GitHub' })
-    expect(btn.className).toMatch(/bg-\[#fafafa\]|bg-surface-subtle/)
+    expect(btn.className).toMatch(/bg-surface-subtle/)
+    expect(btn.className).not.toMatch(/\bbg-accent\b/)
   })
 })

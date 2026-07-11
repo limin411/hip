@@ -896,21 +896,21 @@ function ChoiceCard({
       aria-checked={selected}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-        selected ? 'border-accent bg-accent-subtle' : 'border-border hover:bg-surface-muted',
+        'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+        selected ? 'border-ink bg-surface-subtle' : 'border-border hover:bg-surface-muted',
       )}
     >
       <span
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
-          selected ? 'border-accent bg-accent text-on-accent' : 'border-border',
+          selected ? 'border-ink bg-ink text-surface' : 'border-border',
         )}
       >
         {selected && <Check size={11} />}
       </span>
       <div>
-        <div className={cn('text-body font-medium', selected ? 'text-accent-strong' : 'text-ink')}>{title}</div>
-        <div className={cn('text-caption', selected ? 'text-accent-strong/80' : 'text-ink-tertiary')}>{desc}</div>
+        <div className="text-body font-medium text-ink">{title}</div>
+        <div className={cn('text-caption', selected ? 'text-ink-secondary' : 'text-ink-tertiary')}>{desc}</div>
       </div>
     </button>
   )

@@ -31,13 +31,12 @@ export function CurrentModelHero({
   purpose?: ModelPurpose
 }) {
   const { t } = useTranslation()
-  const p = `settings.modelConfig.purpose.${purpose}`
 
   if (!modelID || !providerName) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-3.5">
-        <div className="text-body text-ink-secondary">{t(`${p}.noModel`)}</div>
-        <div className="mt-0.5 text-meta text-ink-tertiary">{t(`${p}.noModelHint`)}</div>
+        <div className="text-body text-ink-secondary">{t(`settings.modelConfig.purpose.${purpose}.noModel`)}</div>
+        <div className="mt-0.5 text-meta text-ink-tertiary">{t(`settings.modelConfig.purpose.${purpose}.noModelHint`)}</div>
       </div>
     )
   }
@@ -49,7 +48,7 @@ export function CurrentModelHero({
       <div className="min-w-0 flex-1">
         <div className="truncate text-body font-medium text-ink">{modelID}</div>
         <div className="mt-0.5 text-meta text-ink-tertiary">
-          {providerName} · {t(`${p}.currentModel`)}
+          {providerName} · {t(`settings.modelConfig.purpose.${purpose}.currentModel`)}
         </div>
         {badges && (badges.contextK !== null || badges.caps.length > 0) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

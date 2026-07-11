@@ -396,22 +396,6 @@ export const zhCN = {
         useRecommended: '使用推荐',
         recommendEmbeddingUnavailable:
           '仅当当前对话提供商为 OpenAI 兼容时可用一键推荐。请手动选择模型，或切换当前活动提供商。',
-        roleModels: {
-          title: '专用模型',
-          intro: '可选：用于后台记忆抽取、向量嵌入与重排序的模型。',
-          privacyNote:
-            '嵌入与重排序会将记忆文本发送到所选供应商 API。混合检索默认关闭，可在「记忆」设置中开启。',
-          extract: '记忆抽取',
-          embedding: '嵌入（Embedding）',
-          embeddingHint: '仅在开启混合检索时需要；纯 FTS 可不配置嵌入模型。',
-          rerank: '重排序（可选）',
-          defaultCheap: '默认（当前活动提供商的廉价模型）',
-          none: '未设置',
-          noneOptional: '未设置（跳过重排序）',
-          useRecommended: '使用推荐',
-          recommendEmbeddingUnavailable:
-            '仅当当前对话提供商为 OpenAI 兼容时可用一键推荐。请手动选择模型，或切换当前活动提供商。',
-        },
       },
       mcpLabel: '外部工具服务',
       mcp: {

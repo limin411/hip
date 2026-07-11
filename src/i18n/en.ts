@@ -396,22 +396,6 @@ export const en = {
         useRecommended: 'Use recommended',
         recommendEmbeddingUnavailable:
           'Recommended embedding is only available when the active chat provider is OpenAI-compatible. Pick a model manually, or switch the active provider.',
-        roleModels: {
-          title: 'Role models',
-          intro: 'Optional models for background memory extract, embedding, and rerank.',
-          privacyNote:
-            'Embeddings and rerank send memory text to the chosen provider API. Hybrid search stays off until you enable it under Memory.',
-          extract: 'Memory extract',
-          embedding: 'Embedding',
-          embeddingHint: 'Required only when hybrid search is enabled. FTS works without an embedding model.',
-          rerank: 'Rerank (optional)',
-          defaultCheap: 'Default (cheap model for active provider)',
-          none: 'None',
-          noneOptional: 'None (skip rerank)',
-          useRecommended: 'Use recommended',
-          recommendEmbeddingUnavailable:
-            'Recommended embedding is only available when the active chat provider is OpenAI-compatible. Pick a model manually, or switch the active provider.',
-        },
       },
       mcpLabel: 'External Tool Services',
       mcp: {

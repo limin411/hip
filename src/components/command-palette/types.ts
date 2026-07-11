@@ -11,6 +11,7 @@ export type CommandGroupId =
   | 'settings-pages'
   | 'commands-extra'
   | 'theme'
+  | 'favorites'
   | string
 
 export type PaletteIconName =

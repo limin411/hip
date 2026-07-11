@@ -2,8 +2,12 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { SkillMeta } from '@hip/protocol'
+import {
+  SLASH_BUILTIN_COMMANDS,
+  type ComposerSurface,
+} from '@/domain/commands/slashBuiltins'
 
-export type ComposerSurface = 'chat' | 'code'
+export type { ComposerSurface }
 
 /** One command shown in the palette. */
 export interface SlashCommand {
@@ -16,20 +20,10 @@ export interface SlashCommand {
   onSelect?: () => void
 }
 
-/** Built-in slash commands. */
-export const BUILTIN_COMMANDS: SlashCommand[] = [
-  { id: 'help', name: 'help', description: 'Show available commands', kind: 'builtin', availableIn: ['chat', 'code'] },
-  { id: 'clear', name: 'clear', description: 'Start a new conversation', kind: 'builtin', availableIn: ['chat', 'code'] },
-  // /config removed: open Settings via global command palette (⌘K → Settings).
-  { id: 'diff', name: 'diff', description: 'Show workspace changes', kind: 'builtin', availableIn: ['code'] },
-  { id: 'compact', name: 'compact', description: 'Summarize conversation to save context', kind: 'builtin', availableIn: ['code'], requiresSession: true },
-  { id: 'init', name: 'init', description: 'Initialize a new project', kind: 'builtin', availableIn: ['code'] },
-  { id: 'memory', name: 'memory', description: 'Open Memory settings', kind: 'builtin', availableIn: ['chat', 'code'] },
-  { id: 'memory-on', name: 'memory-on', description: 'Enable memories for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
-  { id: 'memory-off', name: 'memory-off', description: 'Disable memories for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
-  { id: 'memory-incognito', name: 'memory-incognito', description: 'Incognito: no memory inject/extract this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
-  { id: 'memory-status', name: 'memory-status', description: 'Show memory flags for this session', kind: 'builtin', availableIn: ['chat', 'code'], requiresSession: true },
-]
+/** Built-in slash commands — single source: `domain/commands/slashBuiltins`. */
+export const BUILTIN_COMMANDS: SlashCommand[] = SLASH_BUILTIN_COMMANDS.map((c) => ({
+  ...c,
+}))
 
 /** Pure: extract the slash command text the user is typing. Returns the raw text after `/`. */
 export function extractSlashQuery(value: string): string | null {

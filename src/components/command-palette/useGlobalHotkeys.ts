@@ -3,7 +3,6 @@ import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 
 /**
  * Toggle the global command palette with ⌘K / Ctrl+K.
- * Mount only when GLOBAL_COMMAND_PALETTE is enabled (AppLayout gate).
  * Opening the palette leaves slash dismissal to consumers watching `open` (D18).
  */
 export function useGlobalHotkeys(): void {

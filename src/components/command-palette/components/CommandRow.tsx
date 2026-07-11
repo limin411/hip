@@ -19,10 +19,12 @@ import {
   Bot,
   Puzzle,
   GitBranch,
+  Star,
   type LucideIcon,
 } from 'lucide-react'
 import type { GlobalCommand, PaletteIconName } from '../types'
 import { matchHighlightIndices } from '../fuzzyScore'
+import { cn } from '@/lib/utils'
 
 const ICONS: Record<PaletteIconName, LucideIcon> = {
   'message-square': MessageSquare,
@@ -73,13 +75,21 @@ function HighlightLabel({ label, search }: { label: string; search?: string }) {
 export function CommandRow({
   item,
   search,
+  favorited,
+  onToggleFavorite,
+  hotkeyIndex,
 }: {
   item: GlobalCommand
   search?: string
+  favorited?: boolean
+  onToggleFavorite?: (id: string) => void
+  /** 1–9 when shown as quick-run hint */
+  hotkeyIndex?: number
 }) {
   const Icon = item.icon ? ICONS[item.icon] : null
-  const showShortcut = Boolean(item.shortcut) && !item.to
+  const showShortcut = Boolean(item.shortcut) && !item.to && hotkeyIndex == null
   const showChevron = Boolean(item.to)
+  const canFavorite = Boolean(onToggleFavorite) && !item.to
 
   return (
     <>
@@ -93,14 +103,43 @@ export function CommandRow({
           {item.description}
         </span>
       ) : null}
+      {hotkeyIndex != null && hotkeyIndex >= 1 && hotkeyIndex <= 9 ? (
+        <kbd className="ml-auto shrink-0 rounded bg-surface-muted px-1.5 py-0.5 font-mono text-caption text-ink-tertiary">
+          ⌘{hotkeyIndex}
+        </kbd>
+      ) : null}
       {showShortcut ? (
         <kbd className="ml-auto shrink-0 rounded bg-surface-muted px-1.5 py-0.5 font-mono text-caption text-ink-tertiary">
           {item.shortcut}
         </kbd>
       ) : null}
+      {canFavorite ? (
+        <button
+          type="button"
+          data-testid={`global-cmd-fav-${item.id}`}
+          aria-label={favorited ? 'Remove favorite' : 'Add favorite'}
+          aria-pressed={favorited}
+          className={cn(
+            'shrink-0 rounded p-0.5 text-ink-tertiary hover:text-accent',
+            favorited && 'text-accent',
+            !showShortcut && hotkeyIndex == null && !showChevron && 'ml-auto',
+          )}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onToggleFavorite?.(item.id)
+          }}
+        >
+          <Star className="size-3.5" fill={favorited ? 'currentColor' : 'none'} size={14} />
+        </button>
+      ) : null}
       {showChevron ? (
         <ChevronRight
-          className={`size-3.5 shrink-0 text-ink-tertiary ${showShortcut ? '' : 'ml-auto'}`}
+          className={`size-3.5 shrink-0 text-ink-tertiary ${showShortcut || canFavorite || hotkeyIndex != null ? '' : 'ml-auto'}`}
           size={14}
         />
       ) : null}

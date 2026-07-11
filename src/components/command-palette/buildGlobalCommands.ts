@@ -25,6 +25,7 @@ export type GlobalCommandLabels = {
   groupWorkspace: string
   groupAppearance: string
   groupSkills: string
+  groupFavorites: string
   navChat: string
   navCode: string
   navHistory: string
@@ -83,6 +84,8 @@ export type GlobalCommandContext = {
 
 /** Source cap for search-time session list. */
 export const RECENT_SESSION_LIMIT = 50
+/** Max session rows shown after rank (P2-9). */
+export const SESSION_DISPLAY_CAP = 15
 
 const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'general',
@@ -221,15 +224,16 @@ export function buildThemePageGroups(ctx: GlobalCommandContext): PaletteGroup[] 
 /**
  * Build command groups for the global palette.
  * Empty search: curated navigation/actions/workspace/appearance (no sessions).
- * Non-empty search: + all settings pages, theme modes, recent sessions.
+ * Non-empty search (or forceSessions for `#` prefix): + sessions / theme modes.
  */
 export function buildGlobalCommandGroups(
   ctx: GlobalCommandContext,
-  opts?: { search?: string },
+  opts?: { search?: string; forceSessions?: boolean },
 ): PaletteGroup[] {
   const { labels } = ctx
   const search = (opts?.search ?? '').trim()
-  const searching = search.length > 0
+  const includeLongTail = search.length > 0 || Boolean(opts?.forceSessions)
+  const includeThemeSearch = search.length > 0
   const mod = ctx.isMac ? '⌘' : 'Ctrl+'
 
   const navigation: GlobalCommand[] = [
@@ -395,12 +399,12 @@ export function buildGlobalCommandGroups(
 
   const workspace = buildSettingsCommands(
     ctx,
-    searching ? ALL_SETTINGS_PAGES : CURATED_SETTINGS,
+    search.length > 0 ? ALL_SETTINGS_PAGES : CURATED_SETTINGS,
   )
 
   // Avoid duplicate "Settings: Memory" when context already has memory settings entry on empty query.
   const workspaceFiltered =
-    !searching && context.some((c) => c.id === 'ctx-memory-settings')
+    search.length === 0 && context.some((c) => c.id === 'ctx-memory-settings')
       ? workspace.filter((w) => w.id !== 'settings-memory')
       : workspace
 
@@ -416,13 +420,15 @@ export function buildGlobalCommandGroups(
     { id: 'appearance', heading: labels.groupAppearance, items: appearance },
   )
 
-  if (searching) {
+  if (includeThemeSearch) {
     groups.push({
       id: 'theme',
       heading: labels.groupTheme,
       items: buildThemeModeItems(ctx, true),
     })
+  }
 
+  if (includeLongTail) {
     const recent = pickRecentSessions(ctx.sessions)
     if (recent.length > 0) {
       const sessions: GlobalCommand[] = recent.map((s) => {
@@ -436,7 +442,11 @@ export function buildGlobalCommandGroups(
           run: () => ctx.selectSession(s.id),
         }
       })
-      groups.push({ id: 'sessions', heading: labels.groupSessions, items: sessions })
+      groups.push({
+        id: 'sessions',
+        heading: labels.groupSessions,
+        items: sessions.slice(0, SESSION_DISPLAY_CAP),
+      })
     }
   }
 

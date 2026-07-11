@@ -14,7 +14,10 @@ import {
 } from './buildGlobalCommands'
 import { CommandRow } from './components/CommandRow'
 import { PaletteFooter } from './components/PaletteFooter'
+import { buildFavoritesGroup, flattenVisibleItems } from './favorites'
+import { loadFavorites, toggleFavorite } from './favoritesStore'
 import { detectIsMac } from './keys'
+import { filterGroupsByMode, parsePaletteQuery } from './queryPrefix'
 import { rankGroups } from './rankGlobalCommands'
 import { buildAllGroups } from './registry'
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog'
@@ -23,7 +26,7 @@ import { loadCommandUsage, recordCommandUsage } from './usageStore'
 
 /**
  * Global ⌘K command palette.
- * Navigation, workspace settings, theme subpage, context actions, and search-time sessions/skills.
+ * Navigation, workspace, theme subpage, context actions, prefixes, favorites, skills.
  */
 export function GlobalCommandPalette() {
   const { t, i18n } = useTranslation()
@@ -43,10 +46,13 @@ export function GlobalCommandPalette() {
   const [search, setSearch] = useState('')
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [usageTick, setUsageTick] = useState(0)
+  const [favTick, setFavTick] = useState(0)
   const isMac = useMemo(() => detectIsMac(), [])
 
   const sessionId =
     activeView === 'code' ? codeSessionId : activeView === 'chat' ? chatSessionId : null
+
+  const parsed = useMemo(() => parsePaletteQuery(search), [search])
 
   useEffect(() => {
     if (!open) {
@@ -64,6 +70,7 @@ export function GlobalCommandPalette() {
       groupWorkspace: t('commandPalette.groups.workspace'),
       groupAppearance: t('commandPalette.groups.appearance'),
       groupSkills: t('commandPalette.groups.skills'),
+      groupFavorites: t('commandPalette.groups.favorites'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
@@ -118,7 +125,7 @@ export function GlobalCommandPalette() {
         body: t('chat.slash.memoryStatusBody', flags),
       }),
       isMac,
-      search,
+      search: parsed.needle,
       skills,
     }),
     [
@@ -132,26 +139,44 @@ export function GlobalCommandPalette() {
       setSettingsPage,
       t,
       isMac,
-      search,
+      parsed.needle,
       skills,
     ],
   )
 
+  const favoriteIds = useMemo(() => {
+    void favTick
+    return loadFavorites()
+  }, [favTick, open])
+
   const groups = useMemo(() => {
     if (page === 'theme') return buildThemePageGroups(ctx)
-    return buildAllGroups(ctx, { search })
-  }, [ctx, page, search])
+    const built = buildAllGroups(ctx, { search, mode: parsed.mode })
+    const fav = buildFavoritesGroup(built, labels.groupFavorites, favoriteIds)
+    // Favorites only on root empty-all mode (not when filtering with prefix)
+    if (fav && parsed.mode === 'all' && !parsed.needle && !page) {
+      return [fav, ...built]
+    }
+    return built
+  }, [ctx, page, search, parsed.mode, parsed.needle, labels.groupFavorites, favoriteIds])
 
   const usage = useMemo(() => {
     void usageTick
     return loadCommandUsage()
   }, [usageTick, open])
 
-  const visible = useMemo(
-    () => rankGroups(groups, search, { usage }),
-    [groups, search, usage],
+  const ranked = useMemo(
+    () => rankGroups(groups, parsed.needle, { usage }),
+    [groups, parsed.needle, usage],
   )
-  const hasItems = visible.some((g) => g.items.length > 0)
+
+  const visible = useMemo(
+    () => filterGroupsByMode(ranked, parsed.mode),
+    [ranked, parsed.mode],
+  )
+
+  const flatItems = useMemo(() => flattenVisibleItems(visible), [visible])
+  const hasItems = flatItems.length > 0
 
   const goBack = () => {
     setSearch('')
@@ -165,26 +190,47 @@ export function GlobalCommandPalette() {
       return
     }
     item.run?.()
-    if (!item.keepOpen && !item.to) {
-      recordCommandUsage(item.id)
-      setUsageTick((n) => n + 1)
-    } else if (item.keepOpen) {
-      recordCommandUsage(item.id)
-      setUsageTick((n) => n + 1)
-    }
+    recordCommandUsage(item.id)
+    setUsageTick((n) => n + 1)
     if (!item.keepOpen) {
       useCommandPaletteStore.getState().close()
     }
   }
 
+  // ⌘1–⌘9 run first nine visible rows while palette is open.
+  useEffect(() => {
+    if (!open || page) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing) return
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod || e.shiftKey || e.altKey) return
+      const n = Number(e.key)
+      if (!Number.isInteger(n) || n < 1 || n > 9) return
+      const item = flatItems[n - 1]
+      if (!item) return
+      e.preventDefault()
+      e.stopPropagation()
+      handleSelect(item)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+    // handleSelect closes over latest flatItems via effect deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebind when list changes
+  }, [open, page, flatItems])
+
   const pageTitle =
     page === 'theme' ? t('commandPalette.groups.theme') : page ?? ''
+
+  const highlightNeedle = parsed.needle
+  const favSet = useMemo(() => new Set(favoriteIds), [favoriteIds])
+
+  let hotkeyCounter = 0
 
   return (
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[200] bg-ink/20" />
+          <Dialog.Overlay className="fixed inset-0 z-[200] bg-ink/20 motion-reduce:transition-none" />
           <Dialog.Content
             aria-describedby={undefined}
             onEscapeKeyDown={(e) => {
@@ -196,9 +242,12 @@ export function GlobalCommandPalette() {
             className={cn(
               'fixed left-1/2 top-[min(20vh,8rem)] z-[210] w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2',
               'overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none',
-              'animate-menu-in',
+              'animate-menu-in motion-reduce:animate-none',
             )}
             data-testid="global-command-palette"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('commandPalette.title')}
           >
             <Dialog.Title className="sr-only">{t('commandPalette.title')}</Dialog.Title>
             <Command shouldFilter={false} loop className="flex flex-col">
@@ -207,6 +256,7 @@ export function GlobalCommandPalette() {
                   type="button"
                   data-testid="global-command-palette-back"
                   onClick={goBack}
+                  aria-label={t('commandPalette.back')}
                   className="flex w-full items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-caption text-ink-secondary transition-colors hover:text-ink"
                 >
                   <ChevronLeft className="size-3.5" />
@@ -228,13 +278,18 @@ export function GlobalCommandPalette() {
                 }}
                 placeholder={t('commandPalette.searchPlaceholder')}
                 data-testid="global-command-palette-input"
+                aria-label={t('commandPalette.searchPlaceholder')}
                 className="h-11 w-full border-b border-border bg-transparent px-4 text-body text-ink outline-none placeholder:text-ink-tertiary"
               />
-              <Command.List className="max-h-[min(20rem,56vh)] overflow-y-auto p-1">
+              <Command.List
+                className="max-h-[min(20rem,56vh)] overflow-y-auto p-1"
+                aria-label={t('commandPalette.title')}
+              >
                 {!hasItems && (
                   <div
                     className="px-3 py-6 text-center text-meta text-ink-secondary"
                     data-testid="global-command-palette-empty"
+                    role="status"
                   >
                     <div>{t('commandPalette.noResults')}</div>
                     <div className="mt-1 text-caption text-ink-tertiary">
@@ -248,20 +303,35 @@ export function GlobalCommandPalette() {
                     heading={group.heading}
                     className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-tertiary"
                   >
-                    {group.items.map((item) => (
-                      <Command.Item
-                        key={item.id}
-                        value={`${item.label}\u0001${item.id}`}
-                        onSelect={() => handleSelect(item)}
-                        className={cn(
-                          'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-body text-ink',
-                          'data-[selected=true]:bg-accent-subtle',
-                        )}
-                        data-testid={`global-cmd-${item.id}`}
-                      >
-                        <CommandRow item={item} search={search} />
-                      </Command.Item>
-                    ))}
+                    {group.items.map((item) => {
+                      const idx =
+                        !page && !item.to && hotkeyCounter < 9
+                          ? ++hotkeyCounter
+                          : undefined
+                      return (
+                        <Command.Item
+                          key={item.id}
+                          value={`${item.label}\u0001${item.id}`}
+                          onSelect={() => handleSelect(item)}
+                          className={cn(
+                            'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-body text-ink',
+                            'data-[selected=true]:bg-accent-subtle',
+                          )}
+                          data-testid={`global-cmd-${item.id}`}
+                        >
+                          <CommandRow
+                            item={item}
+                            search={highlightNeedle}
+                            favorited={favSet.has(item.id)}
+                            hotkeyIndex={idx}
+                            onToggleFavorite={(id) => {
+                              toggleFavorite(id)
+                              setFavTick((n) => n + 1)
+                            }}
+                          />
+                        </Command.Item>
+                      )
+                    })}
                   </Command.Group>
                 ))}
               </Command.List>

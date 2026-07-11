@@ -741,9 +741,9 @@ export const zhTW = {
     },
     commandPalette: {
       title: '命令面板',
-      searchPlaceholder: '輸入命令…',
+      searchPlaceholder: '輸入命令…  > 指令  # 對話  @ 技能',
       noResults: '無結果',
-      noResultsHint: '試試「主題」、「記憶」或對話名稱',
+      noResultsHint: '試試「主題」、「記憶」、對話名，或前綴 > # @',
       back: '返回',
       current: '目前',
       openTrigger: '命令面板',
@@ -757,6 +757,7 @@ export const zhTW = {
         workspace: '工作區',
         appearance: '外觀',
         skills: '技能',
+        favorites: '收藏',
       },
       actions: {
         newConversation: '新增對話',

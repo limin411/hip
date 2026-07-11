@@ -4,12 +4,13 @@ import type { GlobalCommand } from './types'
 import type { SkillMeta } from '@hip/protocol'
 import { goSettingsPage } from '@/domain/commands'
 import { insertComposerText } from './composerBridge'
+import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
 
 export type CommandProvider = (ctx: GlobalCommandContext) => PaletteGroup[]
 
 const extraProviders: CommandProvider[] = []
 
-/** Register an extra provider; returns unregister. */
+/** Register an extra provider; returns unregister. See README.md. */
 export function registerCommandProvider(provider: CommandProvider): () => void {
   extraProviders.push(provider)
   return () => {
@@ -50,12 +51,15 @@ function mergeGroups(base: PaletteGroup[], extra: PaletteGroup[]): PaletteGroup[
 }
 
 /**
- * Skills appear only when the user is searching (long-tail).
+ * Skills appear when searching or when mode is `@` (skills-only).
  * Prefer composer insert; fall back to Skills settings.
  */
-export function skillsCommandProvider(ctx: GlobalCommandContext): PaletteGroup[] {
+export function skillsCommandProvider(
+  ctx: GlobalCommandContext,
+  opts?: { force?: boolean },
+): PaletteGroup[] {
   const search = (ctx.search ?? '').trim()
-  if (!search) return []
+  if (!search && !opts?.force) return []
   const skills = ctx.skills ?? []
   if (skills.length === 0) return []
 
@@ -83,16 +87,29 @@ export function skillsCommandProvider(ctx: GlobalCommandContext): PaletteGroup[]
   ]
 }
 
+export type BuildAllGroupsOpts = {
+  search?: string
+  /** Pre-parsed mode; if omitted, derived from search. */
+  mode?: PaletteQueryMode
+}
+
 /** Core builder + registered providers. */
 export function buildAllGroups(
   ctx: GlobalCommandContext,
-  opts?: { search?: string },
+  opts?: BuildAllGroupsOpts,
 ): PaletteGroup[] {
-  const search = opts?.search ?? ctx.search ?? ''
-  const ctxWithSearch: GlobalCommandContext = { ...ctx, search }
-  const core = buildGlobalCommandGroups(ctxWithSearch, { search })
+  const rawSearch = opts?.search ?? ctx.search ?? ''
+  const parsed = parsePaletteQuery(rawSearch)
+  const mode = opts?.mode ?? parsed.mode
+  const needle = parsed.needle
+
+  const ctxWithSearch: GlobalCommandContext = { ...ctx, search: needle }
+  const core = buildGlobalCommandGroups(ctxWithSearch, {
+    search: needle,
+    forceSessions: mode === 'sessions',
+  })
   const extras = [
-    skillsCommandProvider(ctxWithSearch),
+    skillsCommandProvider(ctxWithSearch, { force: mode === 'skills' }),
     ...extraProviders.map((p) => p(ctxWithSearch)),
   ].flat()
   return mergeGroups(core, extras)

@@ -745,9 +745,9 @@ export const en = {
     },
     commandPalette: {
       title: 'Command palette',
-      searchPlaceholder: 'Type a command…',
+      searchPlaceholder: 'Type a command…  > cmds  # sessions  @ skills',
       noResults: 'No results',
-      noResultsHint: 'Try “theme”, “memory”, or a session name',
+      noResultsHint: 'Try “theme”, “memory”, a session name, or prefixes > # @',
       back: 'Back',
       current: 'Current',
       openTrigger: 'Command palette',
@@ -761,6 +761,7 @@ export const en = {
         workspace: 'Workspace',
         appearance: 'Appearance',
         skills: 'Skills',
+        favorites: 'Favorites',
       },
       actions: {
         newConversation: 'New conversation',

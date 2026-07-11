@@ -741,9 +741,9 @@ export const zhCN = {
     },
     commandPalette: {
       title: '命令面板',
-      searchPlaceholder: '输入命令…',
+      searchPlaceholder: '输入命令…  > 命令  # 会话  @ 技能',
       noResults: '无结果',
-      noResultsHint: '试试 “主题”、“记忆” 或会话名称',
+      noResultsHint: '试试 “主题”、“记忆”、会话名，或前缀 > # @',
       back: '返回',
       current: '当前',
       openTrigger: '命令面板',
@@ -757,6 +757,7 @@ export const zhCN = {
         workspace: '工作区',
         appearance: '外观',
         skills: '技能',
+        favorites: '收藏',
       },
       actions: {
         newConversation: '新建对话',

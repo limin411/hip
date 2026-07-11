@@ -1208,7 +1208,8 @@ P1
 - [x] T13 footer / highlight / theme search
 
 P2
-- [ ] T14 backlog items as prioritized
+- [x] T14: prefixes, favorites, registry docs, slash catalog, a11y, flag off
+- [ ] Optional remaining: settings field search (P2-2), live keybind store (P2-6)
 ```
 
 ---

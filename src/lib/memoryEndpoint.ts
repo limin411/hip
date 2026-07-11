@@ -1,4 +1,5 @@
-import type { MemoryModelRef } from '@hip/protocol'
+import type { MemoryEndpointApiFormat, MemoryModelRef } from '@hip/protocol'
+import { defaultMemoryApiFormat, resolveMemoryApiFormat } from '@hip/protocol'
 
 /** Virtual provider id for memory embedding credentials (independent of chat providers). */
 export const MEMORY_EMBEDDING_PROVIDER_ID = 'hip-memory-embedding'
@@ -7,6 +8,8 @@ export const MEMORY_EMBEDDING_PROVIDER_ID = 'hip-memory-embedding'
 export const MEMORY_RERANK_PROVIDER_ID = 'hip-memory-rerank'
 
 export type MemoryEndpointPurpose = 'embedding' | 'rerank'
+
+export type RerankApiFormat = Extract<MemoryEndpointApiFormat, 'cohere' | 'jina'>
 
 export function memoryEndpointProviderId(purpose: MemoryEndpointPurpose): string {
   return purpose === 'embedding' ? MEMORY_EMBEDDING_PROVIDER_ID : MEMORY_RERANK_PROVIDER_ID
@@ -17,14 +20,19 @@ export function buildMemoryEndpointRef(
   purpose: MemoryEndpointPurpose,
   baseURL: string,
   modelID: string,
+  apiFormat?: MemoryEndpointApiFormat,
 ): MemoryModelRef | undefined {
   const url = baseURL.trim().replace(/\/$/, '')
   const model = modelID.trim()
   if (!url || !model) return undefined
+  const format = resolveMemoryApiFormat(purpose, {
+    apiFormat: apiFormat ?? defaultMemoryApiFormat(purpose),
+  })
   return {
     providerID: memoryEndpointProviderId(purpose),
     modelID: model,
     baseURL: url,
+    apiFormat: format,
   }
 }
 
@@ -36,3 +44,5 @@ export function memoryEndpointKeyProviderId(
   if (ref?.providerID) return ref.providerID
   return memoryEndpointProviderId(purpose)
 }
+
+export { resolveMemoryApiFormat, defaultMemoryApiFormat }

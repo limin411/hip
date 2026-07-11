@@ -9,8 +9,10 @@ import {
   buildMemoryEndpointRef,
   memoryEndpointKeyProviderId,
   memoryEndpointProviderId,
+  resolveMemoryApiFormat,
   type MemoryEndpointPurpose,
 } from '@/lib/memoryEndpoint'
+import type { EndpointDraft } from './EndpointModelDialog'
 import {
   isProviderKeyConfigured,
   saveProviderKey,
@@ -116,12 +118,9 @@ export function ModelConfig() {
     selected ?? am?.providerID ?? groups.configured[0]?.id ?? groups.available[0]?.id ?? null
   const active = activeId ? catalog[activeId] : undefined
 
-  const saveEndpoint = async (
-    purpose: MemoryEndpointPurpose,
-    draft: { baseURL: string; modelID: string; apiKey: string },
-  ) => {
+  const saveEndpoint = async (purpose: MemoryEndpointPurpose, draft: EndpointDraft) => {
     const slot = memoryEndpointProviderId(purpose)
-    const ref = buildMemoryEndpointRef(purpose, draft.baseURL, draft.modelID)
+    const ref = buildMemoryEndpointRef(purpose, draft.baseURL, draft.modelID, draft.apiFormat)
     if (!ref) throw new Error(t('settings.modelConfig.error'))
     if (draft.apiKey) {
       await saveProviderKey(slot, draft.apiKey)
@@ -133,6 +132,11 @@ export function ModelConfig() {
     const field = purpose === 'embedding' ? 'embeddingModel' : 'rerankModel'
     await applyMemory({ [field]: ref })
     await refreshMemory()
+  }
+
+  const protocolLabel = (purpose: MemoryEndpointPurpose, ref: typeof emb) => {
+    const fmt = resolveMemoryApiFormat(purpose, ref)
+    return t(`settings.modelConfig.apiFormat.${fmt}`)
   }
 
   const clearEndpoint = async (purpose: MemoryEndpointPurpose) => {
@@ -180,12 +184,11 @@ export function ModelConfig() {
           title={emb?.modelID ?? t('settings.modelConfig.purpose.embedding.noModel')}
           subtitle={
             emb
-              ? emb.baseURL ?? emb.providerID
+              ? `${protocolLabel('embedding', emb)} · ${emb.baseURL ?? emb.providerID}`
               : t('settings.modelConfig.purpose.embedding.noModelHint')
           }
           ready={embReady}
           configured={!!emb}
-          privacy={t('settings.modelConfig.purpose.embedding.privacyNote')}
           onEdit={() => setDialog('embedding')}
           editLabel={emb ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
         />
@@ -195,12 +198,11 @@ export function ModelConfig() {
           title={rr?.modelID ?? t('settings.modelConfig.purpose.rerank.noModel')}
           subtitle={
             rr
-              ? rr.baseURL ?? rr.providerID
+              ? `${protocolLabel('rerank', rr)} · ${rr.baseURL ?? rr.providerID}`
               : t('settings.modelConfig.purpose.rerank.noModelHint')
           }
           ready={rrReady}
           configured={!!rr}
-          privacy={t('settings.modelConfig.purpose.rerank.privacyNote')}
           onEdit={() => setDialog('rerank')}
           editLabel={rr ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
         />
@@ -304,7 +306,6 @@ function ModelPurposeCard({
   subtitle,
   ready,
   configured,
-  privacy,
   onEdit,
   editLabel,
 }: {
@@ -314,7 +315,6 @@ function ModelPurposeCard({
   subtitle: string
   ready: boolean
   configured: boolean
-  privacy?: string
   onEdit: () => void
   editLabel: string
 }) {
@@ -331,7 +331,6 @@ function ModelPurposeCard({
           </div>
           <div className="mt-1 truncate text-prose font-medium text-ink">{title}</div>
           <div className="mt-0.5 truncate text-meta text-ink-tertiary">{subtitle}</div>
-          {privacy && <p className="mt-2 text-caption text-ink-tertiary">{privacy}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {configured ? (

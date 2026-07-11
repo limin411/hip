@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { KeyProbeCode, MemoryModelRef } from '@hip/protocol'
-import type { MemoryEndpointPurpose } from '@/lib/memoryEndpoint'
-import { memoryEndpointProviderId } from '@/lib/memoryEndpoint'
+import type { KeyProbeCode, MemoryEndpointApiFormat, MemoryModelRef } from '@hip/protocol'
+import {
+  type MemoryEndpointPurpose,
+  type RerankApiFormat,
+  memoryEndpointProviderId,
+  resolveMemoryApiFormat,
+} from '@/lib/memoryEndpoint'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -12,9 +16,19 @@ import { useDomainStore } from '@/domain/sessionStore'
 const inputCls =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
 
+export type EndpointDraft = {
+  baseURL: string
+  modelID: string
+  apiKey: string
+  apiFormat: MemoryEndpointApiFormat
+}
+
 /**
  * Independent endpoint form for embedding / rerank (base URL + API key + model id).
  * Does not use the chat provider catalog.
+ *
+ * - Embedding: fixed OpenAI Embeddings protocol (industry standard).
+ * - Rerank: Cohere or Jina wire format (no OpenAI standard).
  */
 export function EndpointModelDialog({
   purpose,
@@ -32,7 +46,7 @@ export function EndpointModelDialog({
   existing?: MemoryModelRef | null
   virtualKeyConfigured: boolean
   busy?: boolean
-  onSave: (draft: { baseURL: string; modelID: string; apiKey: string }) => Promise<void>
+  onSave: (draft: EndpointDraft) => Promise<void>
   onClear: () => Promise<void>
   onClose: () => void
 }) {
@@ -41,6 +55,9 @@ export function EndpointModelDialog({
   const [baseURL, setBaseURL] = useState('')
   const [modelID, setModelID] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [apiFormat, setApiFormat] = useState<MemoryEndpointApiFormat>(() =>
+    resolveMemoryApiFormat(purpose, existing),
+  )
   const [error, setError] = useState<string | null>(null)
   const [testRunning, setTestRunning] = useState(false)
   const [testResult, setTestResult] = useState<{
@@ -57,10 +74,11 @@ export function EndpointModelDialog({
     setBaseURL(existing?.baseURL ?? '')
     setModelID(existing?.modelID ?? '')
     setApiKey('')
+    setApiFormat(resolveMemoryApiFormat(purpose, existing))
     setError(null)
     setTestRunning(false)
     setTestResult(null)
-  }, [open, existing?.baseURL, existing?.modelID, existing?.providerID])
+  }, [open, purpose, existing?.baseURL, existing?.modelID, existing?.providerID, existing?.apiFormat])
 
   function probeMessage(code: KeyProbeCode, fallback: string, cached?: boolean): string {
     if (code === 'OK') {
@@ -164,7 +182,12 @@ export function EndpointModelDialog({
     if (!canSave) return
     setError(null)
     try {
-      await onSave({ baseURL: baseURL.trim(), modelID: modelID.trim(), apiKey: apiKey.trim() })
+      await onSave({
+        baseURL: baseURL.trim(),
+        modelID: modelID.trim(),
+        apiKey: apiKey.trim(),
+        apiFormat: purpose === 'embedding' ? 'openai' : apiFormat,
+      })
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : t('settings.modelConfig.error'))
@@ -188,13 +211,51 @@ export function EndpointModelDialog({
           <p className="text-meta text-ink-tertiary">
             {t(`settings.modelConfig.endpointDialog.${purpose}Intro`)}
           </p>
+
+          {purpose === 'embedding' ? (
+            <Field label={t('settings.modelConfig.endpointDialog.apiProtocol')}>
+              <div
+                className="rounded-md border border-border bg-surface-subtle px-2.5 py-2"
+                data-testid="endpoint-embedding-protocol"
+              >
+                <div className="text-body font-medium text-ink">
+                  {t('settings.modelConfig.apiFormat.openai')}
+                </div>
+                <p className="mt-0.5 text-caption text-ink-tertiary">
+                  {t('settings.modelConfig.endpointDialog.embeddingProtocolHint')}
+                </p>
+              </div>
+            </Field>
+          ) : (
+            <Field label={t('settings.modelConfig.endpointDialog.apiProtocol')}>
+              <select
+                className={cn(inputCls, 'cursor-pointer')}
+                data-testid="endpoint-rerank-api-format"
+                value={apiFormat === 'jina' ? 'jina' : 'cohere'}
+                onChange={(e) => setApiFormat(e.target.value as RerankApiFormat)}
+              >
+                <option value="cohere">{t('settings.modelConfig.apiFormat.cohere')}</option>
+                <option value="jina">{t('settings.modelConfig.apiFormat.jina')}</option>
+              </select>
+              <p className="mt-1 text-caption text-ink-tertiary">
+                {t('settings.modelConfig.endpointDialog.rerankProtocolHint')}
+              </p>
+            </Field>
+          )}
+
           <Field label={t('settings.modelConfig.baseUrl')}>
             <input
               className={cn(inputCls, 'font-mono')}
               data-testid={`endpoint-${purpose}-base-url`}
               value={baseURL}
               onChange={(e) => setBaseURL(e.target.value)}
-              placeholder="https://api.openai.com/v1"
+              placeholder={
+                purpose === 'embedding'
+                  ? 'https://api.openai.com/v1'
+                  : apiFormat === 'jina'
+                    ? 'https://api.jina.ai/v1'
+                    : 'https://api.cohere.com/v2'
+              }
               autoComplete="off"
             />
           </Field>
@@ -216,7 +277,11 @@ export function EndpointModelDialog({
               value={modelID}
               onChange={(e) => setModelID(e.target.value)}
               placeholder={
-                purpose === 'embedding' ? 'text-embedding-3-small' : 'rerank-model-id'
+                purpose === 'embedding'
+                  ? 'text-embedding-3-small'
+                  : apiFormat === 'jina'
+                    ? 'jina-reranker-v2-base-multilingual'
+                    : 'rerank-v3.5'
               }
               autoComplete="off"
             />

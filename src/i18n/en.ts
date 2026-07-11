@@ -319,7 +319,7 @@ export const en = {
       modelConfig: {
         currentModel: 'Current model',
         intro:
-          'Configure chat, embedding, and rerank separately. Embedding and rerank use their own endpoint and API key — independent of chat providers.',
+          'Configure chat, embedding, and rerank separately. Embedding and rerank use their own endpoint and API key.',
         noModel: 'No model selected',
         noModelHint: 'Pick a provider below and set a current model',
         ready: 'Ready',
@@ -403,7 +403,7 @@ export const en = {
           embedding: {
             currentModel: 'Current embedding model',
             noModel: 'Not configured',
-            noModelHint: 'Open the form to enter endpoint, API key, and model id.',
+            noModelHint: 'Configure an OpenAI Embeddings endpoint',
             setCurrent: 'Set as embedding',
             current: 'Embedding',
             clear: 'Clear embedding',
@@ -413,13 +413,20 @@ export const en = {
           rerank: {
             currentModel: 'Current rerank model',
             noModel: 'Not configured',
-            noModelHint: 'Open the form to enter endpoint, API key, and model id.',
+            noModelHint: 'Configure a Cohere or Jina rerank endpoint',
             setCurrent: 'Set as rerank',
             current: 'Rerank',
             clear: 'Clear rerank',
             privacyNote:
               'Rerank may send query and memory snippets to the configured endpoint when hybrid search is enabled.',
           },
+        },
+        apiFormat: {
+          openai: 'OpenAI Embeddings',
+          cohere: 'Cohere',
+          jina: 'Jina',
+          openaiHint: 'Industry-standard POST /embeddings protocol',
+          rerankHint: 'No OpenAI standard — pick Cohere or Jina when configuring',
         },
         edit: 'Edit',
         configure: 'Configure',
@@ -430,9 +437,14 @@ export const en = {
           embeddingTitle: 'Configure embedding model',
           rerankTitle: 'Configure rerank model',
           embeddingIntro:
-            'Independent of chat providers. Enter an OpenAI-compatible embeddings endpoint, its API key, and model id.',
+            'Independent of chat providers. Uses the industry-standard OpenAI Embeddings API (POST …/embeddings). Enter base URL, API key, and model id.',
           rerankIntro:
-            'Independent of chat providers. Enter the rerank service endpoint, API key, and model id.',
+            'Independent of chat providers. OpenAI has no public rerank API — choose Cohere or Jina wire format to match your endpoint.',
+          apiProtocol: 'API protocol',
+          embeddingProtocolHint:
+            'Compatible with OpenAI, Azure OpenAI, Ollama, vLLM, LiteLLM, and most “OpenAI-compatible” gateways.',
+          rerankProtocolHint:
+            'Match the format your service documents. vLLM and many self-hosted stacks support both; cloud vendors usually document one.',
           modelId: 'Model ID',
         },
       },

@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   MEMORY_FILE_CONFIG_DEFAULTS,
   normalizeExtractModel,
+  normalizeMemoryApiFormat,
+  resolveMemoryApiFormat,
+  defaultMemoryApiFormat,
   type MemoryItem,
   type MemoryCitation,
   type MemoryModelRef,
@@ -79,8 +82,50 @@ describe('normalizeExtractModel', () => {
     expect(normalizeExtractModel(ref)).toEqual(ref)
   })
 
+  it('preserves known apiFormat on MemoryModelRef', () => {
+    expect(
+      normalizeExtractModel({
+        providerID: 'hip-memory-rerank',
+        modelID: 'rerank-v3.5',
+        baseURL: 'https://api.cohere.com/v2',
+        apiFormat: 'cohere',
+      }),
+    ).toEqual({
+      providerID: 'hip-memory-rerank',
+      modelID: 'rerank-v3.5',
+      baseURL: 'https://api.cohere.com/v2',
+      apiFormat: 'cohere',
+    })
+    expect(
+      normalizeExtractModel({
+        providerID: 'x',
+        modelID: 'm',
+        apiFormat: 'not-a-format' as MemoryModelRef['apiFormat'],
+      }),
+    ).toEqual({ providerID: 'x', modelID: 'm' })
+  })
+
   it('drops invalid MemoryModelRef shapes', () => {
     expect(normalizeExtractModel({ providerID: '', modelID: 'x' } as MemoryModelRef)).toBeUndefined()
     expect(normalizeExtractModel({ providerID: 'openai', modelID: '' } as MemoryModelRef)).toBeUndefined()
+  })
+})
+
+describe('MemoryEndpointApiFormat helpers', () => {
+  it('normalizeMemoryApiFormat keeps known values', () => {
+    expect(normalizeMemoryApiFormat('openai')).toBe('openai')
+    expect(normalizeMemoryApiFormat('COHERE')).toBe('cohere')
+    expect(normalizeMemoryApiFormat('jina')).toBe('jina')
+    expect(normalizeMemoryApiFormat('bedrock')).toBeUndefined()
+    expect(normalizeMemoryApiFormat(undefined)).toBeUndefined()
+  })
+
+  it('defaults and resolves by purpose', () => {
+    expect(defaultMemoryApiFormat('embedding')).toBe('openai')
+    expect(defaultMemoryApiFormat('rerank')).toBe('cohere')
+    expect(resolveMemoryApiFormat('embedding', { apiFormat: 'jina' })).toBe('openai')
+    expect(resolveMemoryApiFormat('rerank', { apiFormat: 'jina' })).toBe('jina')
+    expect(resolveMemoryApiFormat('rerank', { apiFormat: 'openai' })).toBe('cohere')
+    expect(resolveMemoryApiFormat('rerank', null)).toBe('cohere')
   })
 })

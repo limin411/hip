@@ -318,8 +318,7 @@ export const zhCN = {
       model: '模型配置',
       modelConfig: {
         currentModel: '当前模型',
-        intro:
-          '分别配置对话、嵌入与重排。嵌入与重排使用各自的端点与 API Key，与对话提供商完全独立。',
+        intro: '分别配置对话、嵌入与重排。嵌入与重排使用独立端点与 API Key。',
         noModel: '未选择模型',
         noModelHint: '在下方选择一个提供商并设为当前模型',
         ready: '已就绪',
@@ -403,7 +402,7 @@ export const zhCN = {
           embedding: {
             currentModel: '当前嵌入模型',
             noModel: '未配置',
-            noModelHint: '打开表单填写端点、API Key 与模型 id。',
+            noModelHint: '配置 OpenAI Embeddings 端点',
             setCurrent: '设为嵌入',
             current: '嵌入',
             clear: '清除嵌入',
@@ -412,13 +411,20 @@ export const zhCN = {
           rerank: {
             currentModel: '当前重排模型',
             noModel: '未配置',
-            noModelHint: '打开表单填写端点、API Key 与模型 id。',
+            noModelHint: '配置 Cohere 或 Jina 重排端点',
             setCurrent: '设为重排',
             current: '重排',
             clear: '清除重排',
             privacyNote:
               '开启混合检索时，重排可能将查询与记忆片段发送到所配置的端点。',
           },
+        },
+        apiFormat: {
+          openai: 'OpenAI Embeddings',
+          cohere: 'Cohere',
+          jina: 'Jina',
+          openaiHint: '业界主流公共协议：POST /embeddings',
+          rerankHint: '无 OpenAI 标准，配置时选择 Cohere 或 Jina',
         },
         edit: '编辑',
         configure: '配置',
@@ -428,8 +434,14 @@ export const zhCN = {
           embeddingTitle: '配置嵌入模型',
           rerankTitle: '配置重排模型',
           embeddingIntro:
-            '与对话提供商完全独立。填写 OpenAI 兼容的 embedding 端点、API Key 与模型 id。',
-          rerankIntro: '与对话提供商完全独立。填写重排服务端点、API Key 与模型 id。',
+            '与对话提供商完全独立。使用业界主流的 OpenAI Embeddings 协议（POST …/embeddings）。填写 Base URL、API Key 与模型 id。',
+          rerankIntro:
+            '与对话提供商完全独立。OpenAI 没有公开重排 API — 请按端点文档选择 Cohere 或 Jina 协议。',
+          apiProtocol: 'API 协议',
+          embeddingProtocolHint:
+            '兼容 OpenAI、Azure OpenAI、Ollama、vLLM、LiteLLM 以及大多数「OpenAI 兼容」网关。',
+          rerankProtocolHint:
+            '请与服务文档中的协议保持一致。vLLM 等自托管栈常同时兼容两者；云厂商通常只写一种。',
           modelId: '模型 ID',
         },
       },

@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { ModelConfig } from './ModelConfig'
-import { MEMORY_EMBEDDING_PROVIDER_ID } from '@/lib/memoryEndpoint'
+import { MEMORY_EMBEDDING_PROVIDER_ID, MEMORY_RERANK_PROVIDER_ID } from '@/lib/memoryEndpoint'
 
 const { setMemoryConfig, saveProviderKey, isProviderKeyConfigured } = vi.hoisted(() => {
   const setMemoryConfig = vi.fn(async (partial: Record<string, unknown>) => ({
@@ -26,26 +26,53 @@ const { setMemoryConfig, saveProviderKey, isProviderKeyConfigured } = vi.hoisted
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
+  initReactI18next: { type: '3rdParty', init: () => undefined },
 }))
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), message: vi.fn() } }))
 
+const memoryDefaults = {
+  version: 1 as const,
+  useMemories: false,
+  generateMemories: false,
+  defaultScope: 'project' as const,
+  idleMinutes: 15,
+  maxCoreSummaryChars: 1500,
+  maxPrefetchChars: 2500,
+  exportMarkdownMirror: true,
+  maxUnusedDays: 90,
+  hybridSearchEnabled: false,
+}
+
 vi.mock('@/domain', () => ({
   sessionService: {
-    getMemoryConfig: vi.fn(async () => ({
-      version: 1,
-      useMemories: false,
-      generateMemories: false,
-      defaultScope: 'project',
-      idleMinutes: 15,
-      maxCoreSummaryChars: 1500,
-      maxPrefetchChars: 2500,
-      exportMarkdownMirror: true,
-      maxUnusedDays: 90,
-      hybridSearchEnabled: false,
-    })),
+    getMemoryConfig: vi.fn(async () => ({ ...memoryDefaults })),
     setMemoryConfig,
+    testProvider: vi.fn(async () => ({
+      ok: true,
+      code: 'OK',
+      message: 'ok',
+      checkedAt: Date.now(),
+    })),
   },
+}))
+
+vi.mock('@/domain/sessionService', () => ({
+  sessionService: {
+    getMemoryConfig: vi.fn(async () => ({ ...memoryDefaults })),
+    setMemoryConfig,
+    testProvider: vi.fn(async () => ({
+      ok: true,
+      code: 'OK',
+      message: 'ok',
+      checkedAt: Date.now(),
+    })),
+  },
+}))
+
+vi.mock('@/domain/sessionStore', () => ({
+  useDomainStore: (sel: (s: { connection: string }) => unknown) =>
+    sel({ connection: 'connected' }),
 }))
 
 vi.mock('@/ipc/secrets', () => ({
@@ -112,12 +139,14 @@ describe('ModelConfig cards + dialogs', () => {
     expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
   })
 
-  it('saves embedding endpoint to virtual provider with independent key', async () => {
+  it('saves embedding endpoint to virtual provider with OpenAI apiFormat', async () => {
     render(<ModelConfig />)
     fireEvent.click(screen.getByTestId('model-card-embedding-edit'))
     await waitFor(() => {
       expect(screen.getByTestId('endpoint-dialog-embedding')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('endpoint-embedding-protocol')).toBeInTheDocument()
+    expect(screen.queryByTestId('endpoint-rerank-api-format')).not.toBeInTheDocument()
     fireEvent.change(screen.getByTestId('endpoint-embedding-base-url'), {
       target: { value: 'https://api.openai.com/v1' },
     })
@@ -136,6 +165,41 @@ describe('ModelConfig cards + dialogs', () => {
             providerID: MEMORY_EMBEDDING_PROVIDER_ID,
             modelID: 'text-embedding-3-small',
             baseURL: 'https://api.openai.com/v1',
+            apiFormat: 'openai',
+          }),
+        }),
+      )
+    })
+  })
+
+  it('saves rerank endpoint with selectable Cohere/Jina apiFormat', async () => {
+    render(<ModelConfig />)
+    fireEvent.click(screen.getByTestId('model-card-rerank-edit'))
+    await waitFor(() => {
+      expect(screen.getByTestId('endpoint-dialog-rerank')).toBeInTheDocument()
+    })
+    const formatSelect = screen.getByTestId('endpoint-rerank-api-format') as HTMLSelectElement
+    expect(formatSelect.value).toBe('cohere')
+    fireEvent.change(formatSelect, { target: { value: 'jina' } })
+    fireEvent.change(screen.getByTestId('endpoint-rerank-base-url'), {
+      target: { value: 'https://api.jina.ai/v1' },
+    })
+    fireEvent.change(screen.getByTestId('endpoint-rerank-model-id'), {
+      target: { value: 'jina-reranker-v2-base-multilingual' },
+    })
+    fireEvent.change(screen.getByTestId('endpoint-rerank-api-key'), {
+      target: { value: 'jina-key' },
+    })
+    fireEvent.click(screen.getByTestId('endpoint-rerank-save'))
+    await waitFor(() => {
+      expect(saveProviderKey).toHaveBeenCalledWith(MEMORY_RERANK_PROVIDER_ID, 'jina-key')
+      expect(setMemoryConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rerankModel: expect.objectContaining({
+            providerID: MEMORY_RERANK_PROVIDER_ID,
+            modelID: 'jina-reranker-v2-base-multilingual',
+            baseURL: 'https://api.jina.ai/v1',
+            apiFormat: 'jina',
           }),
         }),
       )

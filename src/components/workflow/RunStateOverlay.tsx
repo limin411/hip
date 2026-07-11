@@ -17,13 +17,13 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<NodeStatus, StatusConfig> = {
-  pending:   { dotClass: 'pending',   label: 'Pending',   color: 'bg-[var(--ink-tertiary)]' },
-  ready:     { dotClass: 'pending',   label: 'Ready',     color: 'bg-[var(--ink-tertiary)]' },
-  running:   { dotClass: 'running',   label: 'Running',   color: 'bg-[var(--accent)]' },
-  succeeded: { dotClass: 'succeeded', label: 'Succeeded', color: 'bg-[var(--success)]' },
-  failed:    { dotClass: 'failed',    label: 'Failed',    color: 'bg-[var(--danger)]' },
-  skipped:   { dotClass: 'skipped',   label: 'Skipped',   color: 'bg-[var(--ink-tertiary)]' },
-  cancelled: { dotClass: 'skipped',   label: 'Cancelled', color: 'bg-[var(--ink-tertiary)]' },
+  pending:   { dotClass: 'pending',   label: 'Pending',   color: 'bg-ink-tertiary' },
+  ready:     { dotClass: 'pending',   label: 'Ready',     color: 'bg-ink-tertiary' },
+  running:   { dotClass: 'running',   label: 'Running',   color: 'bg-accent' },
+  succeeded: { dotClass: 'succeeded', label: 'Succeeded', color: 'bg-success' },
+  failed:    { dotClass: 'failed',    label: 'Failed',    color: 'bg-danger' },
+  skipped:   { dotClass: 'skipped',   label: 'Skipped',   color: 'bg-ink-tertiary' },
+  cancelled: { dotClass: 'skipped',   label: 'Cancelled', color: 'bg-ink-tertiary' },
 }
 
 /** Statuses that should appear in the legend, in display order. */

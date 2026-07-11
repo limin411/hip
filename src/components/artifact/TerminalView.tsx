@@ -358,7 +358,7 @@ export function TerminalView() {
 
       <div
         ref={containerRef}
-        className="min-h-0 flex-1 overflow-hidden bg-[var(--bg-app)]"
+        className="min-h-0 flex-1 overflow-hidden bg-surface"
         data-testid="terminal-xterm"
         data-no-drag
         data-tauri-drag-region="false"

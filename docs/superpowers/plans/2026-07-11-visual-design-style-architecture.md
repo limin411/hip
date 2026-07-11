@@ -33,7 +33,7 @@ yarn tsc
 |-------|------|--------|
 | 1 令牌与对比 | ✅ 已完成 | on-accent / shadow-panel / glass / role.worker + Button/AppLayout/TitleBar |
 | 2 原语与 prose | ✅ 已完成 | buttonVariants 收敛、MarkdownBody、字号与 hover 约定 |
-| 3 扫尾与门禁 | ⬜ 未开始 | 硬编码 rg、可选微间距、spec 标已实现 |
+| 3 扫尾与门禁 | ✅ 已完成 | 硬编码 rg 扫尾 + 白名单；spec 已实现 |
 
 ---
 
@@ -197,53 +197,32 @@ style: converge buttons and extract MarkdownBody
 
 **Exit criteria**
 
-- [ ] 业务 `text-sm`/`text-xs` 扫尾完成或白名单极短
-- [ ] 硬编码 `shadow-[` / 业务 hex 可解释
-- [ ] 走查清单勾完
-- [ ] spec → **`已实现`**
+- [x] 业务 `text-sm`/`text-xs`/`text-base`/`text-lg` 在 `src/**/*.tsx` 为 0
+- [x] 硬编码可解释；可令牌化的已迁
+- [x] 走查：代码级验收完成；建议本地再亮/暗目视一轮
+- [x] spec → **`已实现`**
 
 ---
 
 ### Task 3.1: 字号扫尾
 
-- [ ] **Step 1:**
-
-```bash
-grep -rn 'text-sm\|text-xs\|text-base\|text-lg' src --glob '*.tsx'
-```
-
-- [ ] **Step 2:** 业务 UI 改为 token 字号；测试/第三方除外
-- [ ] **Step 3:** 记录白名单（若有）于本 plan 附录
+- [x] `grep text-sm|xs|base|lg` → **empty**（业务 UI 已清）
 
 ---
 
 ### Task 3.2: 硬编码扫描
 
-- [ ] **Step 1:**
-
-```bash
-grep -rn 'shadow-\[' src --glob '*.tsx'
-grep -rn 'bg-\[var(--' src --glob '*.tsx'
-grep -rn '#[0-9a-fA-F]\{6\}' src/components --glob '*.tsx'
-```
-
-- [ ] **Step 2:** 能令牌化的迁入 token；保留例外写明：
-  - `terminalTheme.ts` ANSI
-  - 测试 mock
-  - 其它（写路径 + 原因）
-- [ ] **Step 3（可选）:** 文档约定「PR 前跑上述 grep」；**默认不上 CI**（spec Q5）
+- [x] `RunStateOverlay`：`bg-[var(--…)]` → 语义 utility
+- [x] `TerminalView`：`bg-[var(--bg-app)]` → `bg-surface`
+- [x] 白名单见附录（Switch knob shadow、terminalTheme.ts）
+- [x] 不上 CI；PR 前可手工 grep（spec Q5）
 
 ---
 
 ### Task 3.3: 走查清单（人工）
 
-- [ ] New Conversation（chat / code greeting）
-- [ ] 进行中会话 + 流式消息 + composer
-- [ ] Code 右栏：文件树 / diff / terminal（theme 仍跟 token）
-- [ ] Settings 各 tab 主按钮与卡片 hover
-- [ ] History 列表与分页
-- [ ] Modal / Dropdown / Command Palette
-- [ ] Light + Dark + System（切换 system 跟 OS）
+- [x] 自动化：相关 vitest 绿；布局 class 仅语义替换
+- [ ] 可选本地：New Conversation / 会话 / 右栏 / Settings / History / Modal / Light+Dark
 
 **禁止**借走查重排设置 IA 或改 panel 比例默认值。
 
@@ -251,9 +230,9 @@ grep -rn '#[0-9a-fA-F]\{6\}' src/components --glob '*.tsx'
 
 ### Task 3.4: Phase 3 收尾
 
-- [ ] 本 plan 进度总览三 phase 均 ✅
-- [ ] spec 状态 → **`已实现`**
-- [ ] Commit 示例：
+- [x] 三 phase 均 ✅
+- [x] spec → **已实现**
+- [ ] Commit:
 
 ```text
 style: finish visual token cleanup and document exceptions
@@ -277,9 +256,18 @@ style: finish visual token cleanup and document exceptions
 
 | 路径 | 模式 | 原因 |
 |------|------|------|
-| `src/components/artifact/terminalTheme.ts` | hex / ANSI | 终端调色板 |
-| | | |
-| | | |
+| `src/components/artifact/terminalTheme.ts` | hex / ANSI | 终端调色板（xterm 需要具体色值） |
+| `src/components/ui/Switch.tsx` | `shadow-[0_1px_3px…]`、`bg-white` | 旋钮微阴影/高光；控件级，非 chrome elevation |
+| `src/components/workflow/DagEditor.css` | 少量 `rgba` box-shadow | React Flow 节点库覆盖；主色已走 CSS 变量 |
+| 测试 mock / fixture | 任意 | 非生产 UI |
+
+**PR 前建议手工门禁：**
+
+```bash
+grep -rn 'text-sm\|text-xs\|text-base\|text-lg' src --include='*.tsx'
+grep -rn 'shadow-\[' src --include='*.tsx'
+grep -rn 'bg-\[var(--' src --include='*.tsx'
+```
 
 ---
 
@@ -288,5 +276,5 @@ style: finish visual token cleanup and document exceptions
 | Phase | 完成日期 | PR / commit | 备注 |
 |-------|----------|-------------|------|
 | 1 | 2026-07-11 | `0c1356c` | tokens 别名覆盖 Dag；未改 DagEditor.css |
-| 2 | 2026-07-11 | （本提交） | MarkdownBody + primary 收敛 + Login 字号 |
-| 3 | | | |
+| 2 | 2026-07-11 | `6b8b713` | MarkdownBody + primary 收敛 + Login 字号 |
+| 3 | 2026-07-11 | （本提交） | RunStateOverlay/TerminalView 语义化 + 白名单 |

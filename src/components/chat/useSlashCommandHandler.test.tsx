@@ -3,13 +3,14 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import {
+  formatHelpMessageBody,
   formatHelpToastBody,
   useSlashCommandHandler,
 } from './useSlashCommandHandler'
 import { sessionService, useDomainStore } from '@/domain'
 import type { SkillMeta } from '@hip/protocol'
 import type { SlashCommand } from './SlashCommandPalette'
-import '@/i18n'
+import i18n from '@/i18n'
 
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
@@ -85,12 +86,13 @@ const compactCmd: SlashCommand = { id: 'compact', name: 'compact', description: 
 const initCmd = codeOnly('init')
 
 describe('useSlashCommandHandler', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks()
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
     mockSetSettingsPage.mockClear()
     toastMessage.mockClear()
+    await i18n.changeLanguage('en')
   })
 
   it('/clear cancels and starts a new conversation in chat surface', () => {
@@ -246,13 +248,31 @@ describe('useSlashCommandHandler', () => {
 
     expect(appendSpy).toHaveBeenCalledTimes(1)
     const [, message] = appendSpy.mock.calls[0]
-    expect(message.content).toContain('/help')
-    expect(message.content).toContain('/clear')
+    expect(message.content).toContain('**Available commands**')
+    expect(message.content).toContain('`/help`')
+    expect(message.content).toContain('`/clear`')
+    expect(message.content).toContain('Show available commands')
+    expect(message.content).toContain('Start a new conversation')
+    expect(message.content).toMatch(/^- `\/help` — /m)
     expect(message.content).not.toContain('/config')
     expect(message.content).not.toContain('/diff')
     expect(message.content).not.toContain('/init')
-    expect(message.content).toContain('/compact')
+    expect(message.content).toContain('`/compact`')
     expect(setText).toHaveBeenCalledWith('')
+  })
+
+  it('/help localizes builtin descriptions for zh-CN', async () => {
+    await i18n.changeLanguage('zh-CN')
+    const appendSpy = vi.spyOn(useDomainStore.getState(), 'appendMessage').mockImplementation(vi.fn())
+    const { result } = setup('chat', 's1')
+
+    result.current.handleCommandSelect(builtin('help'))
+
+    const [, message] = appendSpy.mock.calls[0]
+    expect(message.content).toContain('**可用命令**')
+    expect(message.content).toContain('显示可用命令')
+    expect(message.content).toContain('开始新对话')
+    expect(message.content).not.toContain('Show available commands')
   })
 
   it('/help lists all builtins in code surface with a session', () => {
@@ -263,12 +283,13 @@ describe('useSlashCommandHandler', () => {
 
     expect(appendSpy).toHaveBeenCalledTimes(1)
     const [, message] = appendSpy.mock.calls[0]
-    expect(message.content).toContain('/help')
-    expect(message.content).toContain('/clear')
+    expect(message.content).toContain('**Available commands**')
+    expect(message.content).toContain('`/help`')
+    expect(message.content).toContain('`/clear`')
     expect(message.content).not.toContain('/config')
-    expect(message.content).toContain('/diff')
-    expect(message.content).toContain('/init')
-    expect(message.content).toContain('/compact')
+    expect(message.content).toContain('`/diff`')
+    expect(message.content).toContain('`/init`')
+    expect(message.content).toContain('`/compact`')
     expect(setText).toHaveBeenCalledWith('')
   })
 
@@ -304,6 +325,48 @@ describe('useSlashCommandHandler', () => {
     expect(body).not.toContain('/cmd12')
     expect(body).toContain('+3 more')
     expect(body).not.toContain(' — ')
+  })
+
+  it('formatHelpMessageBody emits markdown list with fenced command names', () => {
+    const cmds: SlashCommand[] = [
+      {
+        id: 'help',
+        name: 'help',
+        description: 'Show available commands',
+        kind: 'builtin',
+        availableIn: ['chat', 'code'],
+      },
+      {
+        id: 'clear',
+        name: 'clear',
+        description: 'Start a new conversation',
+        kind: 'builtin',
+        availableIn: ['chat', 'code'],
+      },
+    ]
+    const body = formatHelpMessageBody(cmds, '可用命令')
+    expect(body).toBe(
+      [
+        '**可用命令**',
+        '',
+        '- `/help` — Show available commands',
+        '- `/clear` — Start a new conversation',
+      ].join('\n'),
+    )
+  })
+
+  it('formatHelpMessageBody omits empty descriptions and handles empty list', () => {
+    expect(formatHelpMessageBody([])).toBe('**Available commands**')
+    const body = formatHelpMessageBody([
+      {
+        id: 'x',
+        name: 'x',
+        description: '  ',
+        kind: 'skill',
+        availableIn: ['chat', 'code'],
+      },
+    ])
+    expect(body).toBe('**Available commands**\n\n- `/x`')
   })
 
   it('skill commands apply the command text and refocus', () => {

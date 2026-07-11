@@ -13,6 +13,20 @@ export const en = {
         helpTitle: 'Available commands',
         memoryStatusTitle: 'Memory status',
         memoryStatusBody: 'use={{use}} · generate={{generate}} · incognito={{incognito}}',
+        /** Built-in slash command descriptions (palette + /help). Keys match command ids. */
+        cmd: {
+          help: 'Show available commands',
+          clear: 'Start a new conversation',
+          diff: 'Show workspace changes',
+          compact: 'Summarize conversation to save context (optional: /compact focus…)',
+          init: 'Initialize a new project',
+          memory: 'Open Memory settings',
+          'memory-on': 'Enable memory injection for this session',
+          'memory-off': 'Disable memory injection for this session',
+          'memory-incognito': 'Incognito: no memory inject/extract this session',
+          'memory-incognito-off': 'Exit incognito memory for this session',
+          'memory-status': 'Show memory flags for this session',
+        },
       },
       compact: {
         applied:

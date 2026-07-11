@@ -146,6 +146,19 @@ describe('buildCommandList', () => {
     expect(list.map((c) => c.name)).toContain('clear')
   })
 
+  it('localizes builtin descriptions via translateBuiltin', () => {
+    const list = buildCommandList([], {
+      surface: 'chat',
+      sessionId: 's1',
+      translateBuiltin: (key, fallback) =>
+        key === 'chat.slash.cmd.help' ? '显示可用命令' : fallback,
+    })
+    const help = list.find((c) => c.id === 'help')
+    expect(help?.description).toBe('显示可用命令')
+    const clear = list.find((c) => c.id === 'clear')
+    expect(clear?.description).toBe('Start a new conversation')
+  })
+
   it('includes skills when provided', () => {
     const list = buildCommandList([
       { id: 's1', name: 'my-skill', description: 'My Skill', scope: 'global', autoInvoke: false, dir: '/tmp/s1', hasScripts: false },

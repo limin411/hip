@@ -2,6 +2,9 @@
  * Shared catalog of built-in slash commands.
  * Composer slash palette and docs should import from here (single source of truth).
  * Global ⌘K context actions call the same domain handlers but use palette-specific labels/ids.
+ *
+ * Display copy lives in i18n (`chat.slash.cmd.<id>`). `description` is the English
+ * fallback for pure/unit contexts that do not pass a translator.
  */
 
 export type ComposerSurface = 'chat' | 'code'
@@ -9,10 +12,16 @@ export type ComposerSurface = 'chat' | 'code'
 export interface SlashBuiltinDef {
   id: string
   name: string
+  /** English fallback; UI should prefer `slashCmdDescriptionKey(id)` via i18n. */
   description: string
   kind: 'builtin'
   availableIn: ComposerSurface[]
   requiresSession?: boolean
+}
+
+/** i18n key for a built-in slash command description (`chat.slash.cmd.<id>`). */
+export function slashCmdDescriptionKey(id: string): string {
+  return `chat.slash.cmd.${id}`
 }
 
 /** Built-in slash commands (not skills). */

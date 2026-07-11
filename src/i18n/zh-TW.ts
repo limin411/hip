@@ -13,6 +13,20 @@ export const zhTW = {
         helpTitle: '可用命令',
         memoryStatusTitle: '記憶狀態',
         memoryStatusBody: 'use={{use}} · generate={{generate}} · incognito={{incognito}}',
+        /** 內建斜線指令描述（命令面板 + /help）。鍵與指令 id 一致。 */
+        cmd: {
+          help: '顯示可用命令',
+          clear: '開始新對話',
+          diff: '顯示工作區變更',
+          compact: '摘要對話以節省上下文（可選：/compact 關注點…）',
+          init: '初始化新專案',
+          memory: '開啟記憶設定',
+          'memory-on': '為此對話啟用記憶注入',
+          'memory-off': '為此對話關閉記憶注入',
+          'memory-incognito': '隱身：此對話不注入/抽取記憶',
+          'memory-incognito-off': '退出此對話的隱身記憶',
+          'memory-status': '顯示此對話的記憶標誌',
+        },
       },
       compact: {
         applied: '上下文已壓縮：{{before}} → {{after}} 則訊息（約 {{tokensBefore}} → {{tokensAfter}} tokens）',

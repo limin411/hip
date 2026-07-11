@@ -243,7 +243,7 @@ describe('InputBar slash commands', () => {
     const [sessionId, message] = appendSpy.mock.calls[0]
     expect(sessionId).toBe('s1')
     expect(message.role).toBe('assistant')
-    expect(message.content).toContain('Available commands:')
+    expect(message.content).toContain('**Available commands**')
     expect(message.content).toContain('/help')
     expect(message.content).toContain('/clear')
     expect(message.content).not.toContain('/config')

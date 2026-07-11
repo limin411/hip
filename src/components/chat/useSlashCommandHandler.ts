@@ -45,11 +45,22 @@ export function formatHelpToastBody(commands: SlashCommand[]): string {
   return [...head, `+${rest} more`].join('\n')
 }
 
-/** Session transcript body: full name — description list. */
-export function formatHelpMessageBody(commands: SlashCommand[]): string {
-  const lines = ['Available commands:']
+/**
+ * Session transcript body as Markdown so MarkdownBody renders a real list
+ * (plain newlines collapse into one paragraph under react-markdown).
+ */
+export function formatHelpMessageBody(
+  commands: SlashCommand[],
+  title = 'Available commands',
+): string {
+  if (commands.length === 0) {
+    return `**${title}**`
+  }
+
+  const lines = [`**${title}**`, '']
   for (const c of commands) {
-    lines.push(`/${c.name} — ${c.description}`)
+    const desc = c.description?.trim()
+    lines.push(desc ? `- \`/${c.name}\` — ${desc}` : `- \`/${c.name}\``)
   }
   return lines.join('\n')
 }
@@ -69,8 +80,14 @@ export function useSlashCommandHandler(
   const { sessionId, skills, skillsEnabled, value, setText, inputRef, onDismiss } = options
 
   const availableCommands = useMemo(
-    () => buildCommandList(skills, { surface, sessionId, skillsEnabled }),
-    [skills, skillsEnabled, surface, sessionId],
+    () =>
+      buildCommandList(skills, {
+        surface,
+        sessionId,
+        skillsEnabled,
+        translateBuiltin: (key, fallback) => t(key, { defaultValue: fallback }),
+      }),
+    [skills, skillsEnabled, surface, sessionId, t],
   )
 
   const focusInput = useCallback(() => {
@@ -121,7 +138,10 @@ export function useSlashCommandHandler(
             useDomainStore.getState().appendMessage(sessionId, {
               id: nanoid(),
               role: 'assistant',
-              content: formatHelpMessageBody(availableCommands),
+              content: formatHelpMessageBody(
+                availableCommands,
+                t('chat.slash.helpTitle'),
+              ),
               timestamp: Date.now(),
             })
           } else {

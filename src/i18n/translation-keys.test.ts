@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { en } from './en'
 import { zhCN } from './zh-CN'
 import { zhTW } from './zh-TW'
+import { SLASH_BUILTIN_COMMANDS } from '@/domain/commands/slashBuiltins'
 
 /**
  * Recursively extract all dot-separated key paths from a nested object.
@@ -79,6 +80,15 @@ describe('Translation key consistency', () => {
     for (const l of locales) {
       const topLevelKeys = Object.keys(l.obj)
       expect(topLevelKeys.length).toBeGreaterThanOrEqual(10)
+    }
+  })
+
+  it('every built-in slash command has chat.slash.cmd.<id> in all locales', () => {
+    for (const { name, keys } of keySets) {
+      for (const cmd of SLASH_BUILTIN_COMMANDS) {
+        const key = `chat.slash.cmd.${cmd.id}`
+        expect(keys.has(key), `${name} missing ${key}`).toBe(true)
+      }
     }
   })
 })

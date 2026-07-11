@@ -190,13 +190,14 @@ describe('NewConversation', () => {
     const [sessionId, message] = appendSpy.mock.calls[0]
     expect(sessionId).toBe('s1')
     expect(message.role).toBe('assistant')
-    expect(message.content).toContain('Available commands:')
-    expect(message.content).toContain('/help')
-    expect(message.content).toContain('/clear')
+    expect(message.content).toContain('**Available commands**')
+    expect(message.content).toContain('`/help`')
+    expect(message.content).toContain('`/clear`')
+    expect(message.content).toContain('`/compact`')
+    expect(message.content).toMatch(/^- `\/help` — /m)
     expect(message.content).not.toContain('/config')
-    expect(message.content).not.toContain('/diff')
-    expect(message.content).not.toContain('/init')
-    expect(message.content).not.toContain('/compact')
+    expect(message.content).not.toContain('`/diff`')
+    expect(message.content).not.toContain('`/init`')
     // Draft text should be cleared
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
@@ -258,7 +259,7 @@ describe('NewConversation', () => {
     const [sessionId, message] = appendSpy.mock.calls[0]
     expect(sessionId).toBe('s1')
     expect(message.role).toBe('assistant')
-    expect(message.content).toContain('Available commands:')
+    expect(message.content).toContain('**Available commands**')
     expect(useDraftStore.getState().draft?.text).toBe('')
   })
 
@@ -303,7 +304,7 @@ describe('NewConversation', () => {
     expect(screen.queryByText('/init')).not.toBeInTheDocument()
   })
 
-  it('/compact command is hidden in chat surface', async () => {
+  it('/compact command is available in chat surface when a session is active', async () => {
     vi.spyOn(domain, 'useActiveSessionId').mockReturnValue('s1')
 
     useDraftStore.setState({ draft: { tempId: 'draft-1', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' } })
@@ -311,7 +312,7 @@ describe('NewConversation', () => {
 
     const textarea = screen.getByPlaceholderText('Message hip… (Enter to send, Shift+Enter for newline)')
     fireEvent.change(textarea, { target: { value: '/comp' } })
-    expect(screen.queryByText('/compact')).not.toBeInTheDocument()
+    expect(screen.getByText('/compact')).toBeInTheDocument()
   })
 
   it('does not render surface toggle', () => {

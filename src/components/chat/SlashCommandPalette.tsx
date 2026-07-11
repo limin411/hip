@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import type { SkillMeta } from '@hip/protocol'
 import {
   SLASH_BUILTIN_COMMANDS,
+  slashCmdDescriptionKey,
   type ComposerSurface,
 } from '@/domain/commands/slashBuiltins'
 
@@ -74,15 +75,28 @@ export function buildCommandList(
     sessionId?: string | null
     /** Skill id → enabled; missing key means enabled. */
     skillsEnabled?: Record<string, boolean>
+    /**
+     * Localize a built-in command description.
+     * Receives i18n key + English fallback; omit in pure tests to keep catalog copy.
+     */
+    translateBuiltin?: (key: string, fallback: string) => string
   },
 ): SlashCommand[] {
   const surface = opts?.surface ?? 'chat'
   const sessionId = opts?.sessionId ?? null
+  const translate = opts?.translateBuiltin
   const out = BUILTIN_COMMANDS.filter((cmd) => {
     if (cmd.availableIn && !cmd.availableIn.includes(surface)) return false
     if (cmd.requiresSession && sessionId == null) return false
     return true
-  })
+  }).map((cmd) =>
+    translate
+      ? {
+          ...cmd,
+          description: translate(slashCmdDescriptionKey(cmd.id), cmd.description),
+        }
+      : cmd,
+  )
   if (skills) {
     for (const s of skills) {
       if (!isSkillListed(s.id, opts?.skillsEnabled)) continue
@@ -132,8 +146,14 @@ export function SlashCommandPalette({
   const { t } = useTranslation()
   const query = useMemo(() => extractSlashQuery(value), [value])
   const commands = useMemo(
-    () => buildCommandList(skills, { surface, sessionId, skillsEnabled }),
-    [skills, skillsEnabled, surface, sessionId],
+    () =>
+      buildCommandList(skills, {
+        surface,
+        sessionId,
+        skillsEnabled,
+        translateBuiltin: (key, fallback) => t(key, { defaultValue: fallback }),
+      }),
+    [skills, skillsEnabled, surface, sessionId, t],
   )
   const filtered = useMemo(
     () => (query !== null ? filterCommands(commands, query) : []),

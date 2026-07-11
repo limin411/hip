@@ -13,6 +13,20 @@ export const zhCN = {
         helpTitle: '可用命令',
         memoryStatusTitle: '记忆状态',
         memoryStatusBody: 'use={{use}} · generate={{generate}} · incognito={{incognito}}',
+        /** 内置斜杠命令描述（命令面板 + /help）。键与命令 id 一致。 */
+        cmd: {
+          help: '显示可用命令',
+          clear: '开始新对话',
+          diff: '显示工作区变更',
+          compact: '摘要对话以节省上下文（可选：/compact 关注点…）',
+          init: '初始化新项目',
+          memory: '打开记忆设置',
+          'memory-on': '为本会话启用记忆注入',
+          'memory-off': '为本会话关闭记忆注入',
+          'memory-incognito': '隐身：本会话不注入/抽取记忆',
+          'memory-incognito-off': '退出本会话的隐身记忆',
+          'memory-status': '显示本会话的记忆标志',
+        },
       },
       compact: {
         applied: '上下文已压缩：{{before}} → {{after}} 条消息（约 {{tokensBefore}} → {{tokensAfter}} tokens）',

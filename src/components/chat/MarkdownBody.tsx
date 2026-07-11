@@ -14,6 +14,8 @@ export const markdownProseClassName = [
   '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5',
   '[&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5',
   '[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-surface-muted [&_pre]:p-3 [&_pre]:font-mono [&_pre]:text-meta',
+  // Inline code only — fenced blocks use <pre><code> and already have pre chrome.
+  '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-surface-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-px',
   '[&_code]:font-mono [&_code]:text-meta',
   '[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-ink-secondary',
   '[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse',

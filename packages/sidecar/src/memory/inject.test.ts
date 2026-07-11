@@ -11,7 +11,7 @@ import {
 import { openDatabase } from '../persistence/open.js'
 import { MemoryStore } from './store.js'
 import { MemoryService } from './service.js'
-import { MemoryInjector } from './inject.js'
+import { MemoryInjector, refreshMemoryCoreSnapshot } from './inject.js'
 
 function freshService(configPath?: string) {
   const { db, memoriesFtsEnabled } = openDatabase(':memory:')
@@ -115,6 +115,104 @@ describe('MemoryInjector', () => {
     const b = await injector.inject(state)
     expect(a.systemMessages).toEqual(b.systemMessages)
     expect(a.systemMessages[0]).toContain(snap)
+  })
+})
+
+describe('refreshMemoryCoreSnapshot', () => {
+  const resolveKey = (cwd: string) => ({ projectKeyHash: `hash:${cwd}` })
+
+  it('use=false clears snapshot and project key', () => {
+    const load = vi.fn(() => 'should-not-load')
+    const result = refreshMemoryCoreSnapshot({
+      useMemories: false,
+      cwd: '/proj',
+      hostSnapshot: '## Memory (core)\nold',
+      hostProjectKey: 'hash:/proj',
+      load,
+      resolveKey,
+    })
+    expect(result).toEqual({ snapshot: undefined, projectKey: undefined, cleared: true })
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('empty load freezes: second call with same key skips load', () => {
+    const load = vi.fn(() => '')
+    const first = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/proj',
+      hostSnapshot: undefined,
+      hostProjectKey: undefined,
+      load,
+      resolveKey,
+    })
+    expect(first).toEqual({ snapshot: '', projectKey: 'hash:/proj' })
+    expect(load).toHaveBeenCalledTimes(1)
+
+    const second = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/proj',
+      hostSnapshot: first.snapshot,
+      hostProjectKey: first.projectKey,
+      load,
+      resolveKey,
+    })
+    expect(second).toEqual({ snapshot: '', projectKey: 'hash:/proj' })
+    expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('key change reloads even when previous snapshot was empty', () => {
+    const load = vi.fn((pk: string) => (pk === 'hash:/other' ? '## Memory (core)\nnew' : ''))
+    const afterEmpty = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/proj',
+      load,
+      resolveKey,
+    })
+    expect(afterEmpty.snapshot).toBe('')
+    expect(load).toHaveBeenCalledTimes(1)
+
+    const afterMove = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/other',
+      hostSnapshot: afterEmpty.snapshot,
+      hostProjectKey: afterEmpty.projectKey,
+      load,
+      resolveKey,
+    })
+    expect(afterMove).toEqual({ snapshot: '## Memory (core)\nnew', projectKey: 'hash:/other' })
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(load).toHaveBeenLastCalledWith('hash:/other')
+  })
+
+  it('does not reload solely because hostSnapshot is empty string', () => {
+    const load = vi.fn(() => 'reloaded-leak')
+    const result = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/proj',
+      hostSnapshot: '',
+      hostProjectKey: 'hash:/proj',
+      load,
+      resolveKey,
+    })
+    expect(result.snapshot).toBe('')
+    expect(result.projectKey).toBe('hash:/proj')
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('resolveKey failure keeps host cache', () => {
+    const load = vi.fn(() => 'x')
+    const result = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/bad',
+      hostSnapshot: 'kept',
+      hostProjectKey: 'old-key',
+      load,
+      resolveKey: () => {
+        throw new Error('bad cwd')
+      },
+    })
+    expect(result).toEqual({ snapshot: 'kept', projectKey: 'old-key' })
+    expect(load).not.toHaveBeenCalled()
   })
 })
 

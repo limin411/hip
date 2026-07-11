@@ -16,7 +16,12 @@ export {
   type MemoryUpsertInput,
   type MemoryImportConflict,
 } from './service.js'
-export { MemoryInjector } from './inject.js'
+export {
+  MemoryInjector,
+  refreshMemoryCoreSnapshot,
+  type RefreshMemoryCoreSnapshotArgs,
+  type RefreshMemoryCoreSnapshotResult,
+} from './inject.js'
 export {
   MemoryStore,
   type MemoryListFilter,

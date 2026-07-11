@@ -73,6 +73,7 @@ import {
   resolveProjectKey,
   loadMemoryConfig,
   resolveSessionMemoryFlags,
+  refreshMemoryCoreSnapshot,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
 import { tryEnableMemoriesFts } from '../persistence/schema.js'
@@ -757,27 +758,18 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts))
     }
     const flags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
-    let useMemories = flags.use
-    let memoryCoreSnapshot = host.memoryCoreSnapshot
-    let memorySnapshotProjectKey = host.memorySnapshotProjectKey
-
-    if (useMemories && host.memoryService && cwd) {
-      try {
-        const { projectKeyHash } = resolveProjectKey(cwd)
-        if (!memoryCoreSnapshot || memorySnapshotProjectKey !== projectKeyHash) {
-          memoryCoreSnapshot = host.memoryService.loadCoreSnapshot(projectKeyHash)
-          host.memoryCoreSnapshot = memoryCoreSnapshot
-          host.memorySnapshotProjectKey = projectKeyHash
-        }
-      } catch {
-        // resolveProjectKey can fail on bad cwd; skip core snapshot.
-        memoryCoreSnapshot = host.memoryCoreSnapshot
-      }
-    } else if (!useMemories) {
-      host.memoryCoreSnapshot = undefined
-      host.memorySnapshotProjectKey = undefined
-      memoryCoreSnapshot = undefined
-    }
+    const useMemories = flags.use
+    const snapshotResult = refreshMemoryCoreSnapshot({
+      useMemories: useMemories && !!host.memoryService,
+      cwd,
+      hostSnapshot: host.memoryCoreSnapshot,
+      hostProjectKey: host.memorySnapshotProjectKey,
+      load: (projectKeyHash) => host.memoryService!.loadCoreSnapshot(projectKeyHash),
+      resolveKey: resolveProjectKey,
+    })
+    host.memoryCoreSnapshot = snapshotResult.snapshot
+    host.memorySnapshotProjectKey = snapshotResult.projectKey
+    const memoryCoreSnapshot = snapshotResult.snapshot
 
     const prefetchQuery = extractLastUserText(
       base?.messages !== undefined ? modelReady(base.messages) : visibleMessages,

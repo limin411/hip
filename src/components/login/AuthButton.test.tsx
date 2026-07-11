@@ -25,8 +25,8 @@ describe('AuthButton', () => {
       <AuthButton icon={Mail} label="Email" onClick={() => {}} variant="solid" />,
     )
     const btn = getByRole('button', { name: 'Email' })
-    expect(btn.className).toMatch(/\bbg-ink\b/)
-    expect(btn.className).toMatch(/\btext-surface\b/)
+    expect(btn.className).toMatch(/bg-btn-primary/)
+    expect(btn.className).toMatch(/text-on-btn-primary/)
     expect(btn.className).not.toMatch(/\bbg-accent\b/)
     expect(btn.className).not.toMatch(/text-on-accent/)
   })

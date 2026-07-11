@@ -9,11 +9,11 @@ afterEach(() => {
 })
 
 describe('Button variants', () => {
-  it('primary is solid inverse monochrome, not sage or elevated outline', () => {
+  it('primary is soft solid inverse monochrome, not sage or elevated outline', () => {
     const { getByRole } = render(<Button variant="primary">Save</Button>)
     const cls = getByRole('button', { name: 'Save' }).className
-    expect(cls).toMatch(/\bbg-ink\b/)
-    expect(cls).toMatch(/\btext-surface\b/)
+    expect(cls).toMatch(/bg-btn-primary/)
+    expect(cls).toMatch(/text-on-btn-primary/)
     expect(cls).not.toMatch(/\bbg-accent\b/)
     expect(cls).not.toMatch(/text-on-accent/)
     expect(cls).not.toMatch(/border-ink/)
@@ -22,7 +22,7 @@ describe('Button variants', () => {
   it('default variant matches primary solid inverse', () => {
     const { getByRole } = render(<Button>Default</Button>)
     const cls = getByRole('button', { name: 'Default' }).className
-    expect(cls).toMatch(/\bbg-ink\b/)
+    expect(cls).toMatch(/bg-btn-primary/)
     expect(cls).not.toMatch(/\bbg-accent\b/)
   })
 

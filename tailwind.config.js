@@ -24,6 +24,11 @@ export default {
           active: 'var(--accent-active)',
         },
         'on-accent': 'var(--on-accent)',
+        'btn-primary': {
+          DEFAULT: 'var(--btn-primary)',
+          hover: 'var(--btn-primary-hover)',
+        },
+        'on-btn-primary': 'var(--on-btn-primary)',
         success: 'var(--success)',
         danger: 'var(--danger)',
         warning: 'var(--warning)',

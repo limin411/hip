@@ -7,9 +7,9 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Cursor-inspired solid inverse — monochrome fill, never sage paint
+        // Cursor-inspired solid inverse — soft monochrome (not pure ink-black), never sage paint
         primary:
-          'bg-ink text-surface hover:opacity-90 focus-visible:ring-ink/30',
+          'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover focus-visible:ring-ink/25',
         secondary:
           'bg-surface-subtle text-ink hover:bg-surface-muted focus-visible:ring-ink/20',
         ghost:

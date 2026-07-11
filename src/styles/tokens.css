@@ -56,6 +56,10 @@
   --ink: var(--text-primary);
   --ink-secondary: var(--text-secondary);
   --ink-tertiary: var(--text-tertiary);
+  /* Solid inverse CTA — softer than pure ink (#111) so primary buttons aren't ink-black */
+  --btn-primary: #3a3a3a;
+  --btn-primary-hover: #2e2e2e;
+  --on-btn-primary: #fafafa;
 }
 
 .dark {
@@ -99,6 +103,10 @@
   --ink: var(--text-primary);
   --ink-secondary: var(--text-secondary);
   --ink-tertiary: var(--text-tertiary);
+  /* Dark solid inverse — soft off-white fill (not pure paper white) */
+  --btn-primary: #d4d4d4;
+  --btn-primary-hover: #e0e0e0;
+  --on-btn-primary: #141414;
 }
 
 html {

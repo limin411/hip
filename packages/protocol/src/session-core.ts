@@ -48,5 +48,11 @@ export interface SessionConfig {
    * Kept for old session JSON / WS compatibility only.
    */
   orchMode?: 'fast' | 'dag'
+  /** undefined ⇒ inherit global memory.json useMemories */
+  useMemories?: boolean
+  /** undefined ⇒ inherit global memory.json generateMemories */
+  generateMemories?: boolean
+  /** When true, skip memory inject/extract for this session. */
+  incognito?: boolean
 }
 

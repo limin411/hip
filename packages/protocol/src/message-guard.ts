@@ -58,6 +58,17 @@ export const CLIENT_MESSAGE_TYPES = [
   'subagent:resume',
   'replay:session',
   'message:compact',
+  'memory:list',
+  'memory:get',
+  'memory:upsert',
+  'memory:delete',
+  'memory:deleteBySourceSession',
+  'memory:export',
+  'memory:import',
+  'memory:getConfig',
+  'memory:setConfig',
+  'memory:consolidate',
+  'session:setMemoryFlags',
 ] as const
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number]

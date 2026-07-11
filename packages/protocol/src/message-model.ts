@@ -1,5 +1,6 @@
 /** Chat message, tool-call, timeline, and attachment shapes. */
 import type { AgentRole } from './session-core.js'
+import type { MemoryCitation } from './memory-types.js'
 
 export interface Attachment {
   id: string
@@ -24,6 +25,7 @@ export interface Message {
   agentRuns?: AgentRun[]     // per-agent run metadata for THIS turn (taskInput/output/timing/parent)
   usage?: TurnUsage          // turn total = sum of agentRuns' usage; present once usage was reported
   attachments?: Attachment[]
+  memoryCitations?: MemoryCitation[]
 }
 
 /** Provider-reported token counts for a turn or a single agent's slice of it.

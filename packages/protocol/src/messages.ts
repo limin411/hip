@@ -35,6 +35,7 @@ import type { PluginManifest } from './plugins.js'
 import type { WorkflowDef, OrchestratorEvent, RunState } from './workflow-protocol.js'
 import type { OrchestrationMode } from './orchestration-types.js'
 import type { AgentProfileInfo } from './agent-profile.js'
+import type { MemoryItem, MemoryScope, MemoryFileConfig } from './memory-types.js'
 
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
@@ -48,7 +49,7 @@ export type ClientMessage =
   | { type: 'session:list' }
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }
-  | { type: 'session:delete'; sessionId: string }
+  | { type: 'session:delete'; sessionId: string; deleteDerivedMemories?: boolean }
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
@@ -92,6 +93,17 @@ export type ClientMessage =
   | { type: 'subagent:resume'; sessionId: string; taskId: string; message: string }
   | { type: 'replay:session'; sessionId: string; turnIndex: number }
   | { type: 'message:compact'; sessionId: string }
+  | { type: 'memory:list'; scope?: MemoryScope; projectKeyHash?: string; sessionId?: string; query?: string; limit?: number }
+  | { type: 'memory:get'; id: string }
+  | { type: 'memory:upsert'; item: Partial<MemoryItem> & Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'> }
+  | { type: 'memory:delete'; id: string; hard?: boolean }
+  | { type: 'memory:deleteBySourceSession'; sessionId: string; soft?: boolean }
+  | { type: 'memory:export'; format: 'jsonl' | 'markdown'; scope?: MemoryScope; projectKeyHash?: string }
+  | { type: 'memory:import'; format: 'jsonl'; data: string; conflict?: 'keep' | 'overwrite' | 'merge' }
+  | { type: 'memory:getConfig' }
+  | { type: 'memory:setConfig'; config: Partial<MemoryFileConfig> }
+  | { type: 'memory:consolidate'; projectKeyHash?: string }
+  | { type: 'session:setMemoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 
 type AttachmentSendPayload = Attachment & { path: string }
 
@@ -160,4 +172,14 @@ export type ServerMessage =
   | { type: 'workflow:event'; sessionId: string; runId: string; event: OrchestratorEvent }
   | { type: 'workflow:snapshot'; sessionId: string; runId: string; def: WorkflowDef; state: RunState }
   | { type: 'workflow:cleared'; sessionId: string }
+  | { type: 'memory:list:result'; items: MemoryItem[]; error?: string }
+  | { type: 'memory:get:result'; item?: MemoryItem; error?: string }
+  | { type: 'memory:upsert:result'; item?: MemoryItem; error?: string }
+  | { type: 'memory:delete:result'; id: string; ok: boolean; error?: string }
+  | { type: 'memory:deleteBySourceSession:result'; sessionId: string; deleted: number; error?: string }
+  | { type: 'memory:export:result'; format: string; data: string; error?: string }
+  | { type: 'memory:import:result'; ok: boolean; imported: number; error?: string }
+  | { type: 'memory:config'; config: MemoryFileConfig }
+  | { type: 'memory:pipeline'; phase: 1 | 2; status: 'started' | 'succeeded' | 'failed' | 'noop'; detail?: string }
+  | { type: 'session:memoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 

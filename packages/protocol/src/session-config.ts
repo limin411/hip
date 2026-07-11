@@ -32,6 +32,12 @@ export interface SessionConfigLike {
   useEventSource?: boolean
   /** @deprecated Ignored for turn routing; retained for config JSON compatibility. */
   orchMode?: OrchModeDefault
+  /** undefined ⇒ inherit global memory.json useMemories */
+  useMemories?: boolean
+  /** undefined ⇒ inherit global memory.json generateMemories */
+  generateMemories?: boolean
+  /** When true, skip memory inject/extract for this session. */
+  incognito?: boolean
 }
 
 /** Effective defaults applied when optional SessionConfig fields are undefined. */

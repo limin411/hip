@@ -44,4 +44,33 @@ describe('message-guard', () => {
     const msg = parseClientMessage({ type: 'workflow:getActive', sessionId: 's1' })
     expect(msg?.type).toBe('workflow:getActive')
   })
+
+  it('accepts memory:setConfig', () => {
+    const msg = parseClientMessage({
+      type: 'memory:setConfig',
+      config: { useMemories: true, generateMemories: false },
+    })
+    expect(msg?.type).toBe('memory:setConfig')
+  })
+
+  it('accepts session:setMemoryFlags', () => {
+    const msg = parseClientMessage({
+      type: 'session:setMemoryFlags',
+      sessionId: 's1',
+      useMemories: true,
+      generateMemories: false,
+      incognito: true,
+    })
+    expect(msg?.type).toBe('session:setMemoryFlags')
+  })
+
+  it('accepts session:delete with deleteDerivedMemories', () => {
+    const msg = parseClientMessage({
+      type: 'session:delete',
+      sessionId: 's1',
+      deleteDerivedMemories: true,
+    })
+    expect(msg?.type).toBe('session:delete')
+    expect(msg!.deleteDerivedMemories).toBe(true)
+  })
 })

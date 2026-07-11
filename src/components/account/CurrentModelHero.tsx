@@ -12,6 +12,8 @@ const CAP_I18N = {
   attachment: 'settings.modelConfig.vision',
 } as const satisfies Record<ModelCapKey, string>
 
+export type ModelPurpose = 'base' | 'embedding' | 'rerank'
+
 /** Hero card summarising the current (active) model. Renders an empty state when none is set. */
 export function CurrentModelHero({
   providerName,
@@ -19,20 +21,23 @@ export function CurrentModelHero({
   model,
   keyConfigured,
   onLocate,
+  purpose = 'base',
 }: {
   providerName: string | null
   modelID: string | null
   model: CatalogModel | undefined
   keyConfigured: boolean
   onLocate?: () => void
+  purpose?: ModelPurpose
 }) {
   const { t } = useTranslation()
+  const p = `settings.modelConfig.purpose.${purpose}`
 
   if (!modelID || !providerName) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-3.5">
-        <div className="text-body text-ink-secondary">{t('settings.modelConfig.noModel')}</div>
-        <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.modelConfig.noModelHint')}</div>
+        <div className="text-body text-ink-secondary">{t(`${p}.noModel`)}</div>
+        <div className="mt-0.5 text-meta text-ink-tertiary">{t(`${p}.noModelHint`)}</div>
       </div>
     )
   }
@@ -44,7 +49,7 @@ export function CurrentModelHero({
       <div className="min-w-0 flex-1">
         <div className="truncate text-body font-medium text-ink">{modelID}</div>
         <div className="mt-0.5 text-meta text-ink-tertiary">
-          {providerName} · {t('settings.modelConfig.currentModel')}
+          {providerName} · {t(`${p}.currentModel`)}
         </div>
         {badges && (badges.contextK !== null || badges.caps.length > 0) && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

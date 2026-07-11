@@ -54,6 +54,7 @@ export function MemoryConfig() {
     vecEnabled?: boolean
   } | null>(null)
   const [reindexing, setReindexing] = useState(false)
+  const [needEmbedOpen, setNeedEmbedOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
@@ -261,6 +262,10 @@ export function MemoryConfig() {
   }
 
   const onReindex = async () => {
+    if (!hasEmbeddingModel) {
+      setNeedEmbedOpen(true)
+      return
+    }
     setReindexing(true)
     setError(null)
     try {
@@ -271,6 +276,14 @@ export function MemoryConfig() {
     } finally {
       setReindexing(false)
     }
+  }
+
+  const onHybridChange = (v: boolean) => {
+    if (v && !hasEmbeddingModel) {
+      setNeedEmbedOpen(true)
+      return
+    }
+    void applyConfig({ hybridSearchEnabled: v })
   }
 
   const onExtractModelChange = async (key: string) => {
@@ -427,21 +440,16 @@ export function MemoryConfig() {
           <div className="min-w-0 flex-1">
             <div className="text-prose font-medium text-ink">{t('settings.memory.hybridSearch')}</div>
             <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.hybridSearchDesc')}</div>
-            {!hasEmbeddingModel && (
-              <div className="mt-1 text-caption text-ink-tertiary" data-testid="memory-hybrid-needs-embed">
-                {t('settings.memory.hybridSearchNeedsEmbedding')}
-              </div>
-            )}
             <p className="mt-2 text-caption text-ink-tertiary" data-testid="memory-hybrid-privacy">
               {t('settings.memory.hybridPrivacyNote')}
             </p>
           </div>
           <Switch
             checked={!!config?.hybridSearchEnabled}
-            disabled={busy || !config || !hasEmbeddingModel}
+            disabled={busy || !config}
             ariaLabel={t('settings.memory.hybridSearch')}
             data-testid="memory-switch-hybrid"
-            onCheckedChange={(v) => void applyConfig({ hybridSearchEnabled: v })}
+            onCheckedChange={onHybridChange}
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-0 py-5">
@@ -456,7 +464,7 @@ export function MemoryConfig() {
           <Button
             size="sm"
             variant="secondary"
-            disabled={busy || reindexing || !hasEmbeddingModel}
+            disabled={busy || reindexing}
             data-testid="memory-reindex"
             onClick={() => void onReindex()}
           >
@@ -741,6 +749,26 @@ export function MemoryConfig() {
                 onClick={() => void onConfirmEmptyTrash()}
               >
                 {t('settings.memory.emptyTrash')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {needEmbedOpen && (
+        <Modal
+          open
+          onOpenChange={(o) => {
+            if (!o) setNeedEmbedOpen(false)
+          }}
+          title={t('settings.memory.hybridNeedsEmbeddingTitle')}
+          className="max-w-sm"
+        >
+          <div className="p-5" data-testid="memory-need-embed-modal">
+            <p className="text-body text-ink-secondary">{t('settings.memory.hybridNeedsEmbeddingBody')}</p>
+            <div className="mt-5 flex justify-end">
+              <Button size="sm" data-testid="memory-need-embed-ok" onClick={() => setNeedEmbedOpen(false)}>
+                {t('common.close')}
               </Button>
             </div>
           </div>

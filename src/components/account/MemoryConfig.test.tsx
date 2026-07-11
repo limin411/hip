@@ -142,9 +142,13 @@ describe('MemoryConfig', () => {
     expect(screen.getByTestId('memory-item-m1')).toBeInTheDocument()
     expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'active' })
     expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
-    // Hybrid disabled until embedding model is set
-    expect(screen.getByTestId('memory-switch-hybrid')).toBeDisabled()
-    expect(screen.getByTestId('memory-reindex')).toBeDisabled()
+    // Without embedding: controls stay interactive; enabling hybrid shows a prompt modal
+    expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
+    expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
+    fireEvent.click(screen.getByTestId('memory-switch-hybrid'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-need-embed-modal')).toBeInTheDocument()
+    })
     expect(screen.getByTestId('memory-index-status')).toBeInTheDocument()
   })
 

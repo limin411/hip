@@ -375,18 +375,17 @@ export const zhTW = {
           },
           embedding: {
             currentModel: '當前嵌入模型',
-            noModel: '未設定嵌入模型',
-            noModelHint: '混合檢索需要設定。開啟表單填寫端點、API Key 與模型 id。',
+            noModel: '未設定',
+            noModelHint: '開啟表單填寫端點、API Key 與模型 id。',
             setCurrent: '設為嵌入',
             current: '嵌入',
             clear: '清除嵌入',
-            privacyNote:
-              '嵌入會將記憶文字傳送到所設定的端點。混合檢索預設關閉，可在「記憶」設定中開啟。',
+            privacyNote: '嵌入會將記憶文字傳送到所設定的端點。在「記憶」中開啟混合檢索時使用。',
           },
           rerank: {
             currentModel: '當前重排模型',
-            noModel: '未設定重排模型（可選）',
-            noModelHint: '可不設定以跳過重排。需要時填寫獨立重排端點。',
+            noModel: '未設定',
+            noModelHint: '開啟表單填寫端點、API Key 與模型 id。',
             setCurrent: '設為重排',
             current: '重排',
             clear: '清除重排',
@@ -396,7 +395,6 @@ export const zhTW = {
         },
         edit: '編輯',
         configure: '設定',
-        optional: '可選',
         baseDialogTitle: '編輯基礎模型',
         baseDialogIntro: '用於對話與智能體的 chat 提供商與模型。金鑰不與嵌入/重排共用。',
         endpointDialog: {
@@ -404,8 +402,7 @@ export const zhTW = {
           rerankTitle: '設定重排模型',
           embeddingIntro:
             '與對話提供商完全獨立。填寫 OpenAI 相容的 embedding 端點、API Key 與模型 id。',
-          rerankIntro:
-            '與對話提供商完全獨立。填寫重排服務端點、API Key 與模型 id。不設定則跳過重排。',
+          rerankIntro: '與對話提供商完全獨立。填寫重排服務端點、API Key 與模型 id。',
           modelId: '模型 ID',
         },
       },
@@ -503,8 +500,11 @@ export const zhTW = {
         hybridSearch: '混合檢索',
         hybridSearchDesc: '在預取與工具檢索時，將關鍵詞（FTS）與向量相似度結合排序。',
         hybridSearchNeedsEmbedding: '請先在「模型 → 嵌入」中設定嵌入模型。',
+        hybridNeedsEmbeddingTitle: '需要設定嵌入模型',
+        hybridNeedsEmbeddingBody:
+          '混合檢索需要嵌入模型。請先到「模型配置 → 嵌入」完成設定，然後再開啟。',
         hybridPrivacyNote:
-          '混合檢索會將查詢與記憶片段發送到已設定的嵌入（及可選重排序）服務商。關閉混合檢索可保持純本機 FTS。',
+          '混合檢索會將查詢與記憶片段發送到已設定的嵌入（及已設定的重排序）服務商。關閉混合檢索可保持純本機 FTS。',
         indexStatus: '嵌入索引：{{embedded}} / {{total}}',
         indexStatusNone: '嵌入索引：未設定模型',
         reindex: '重建嵌入索引',

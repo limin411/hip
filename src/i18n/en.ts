@@ -375,18 +375,18 @@ export const en = {
           },
           embedding: {
             currentModel: 'Current embedding model',
-            noModel: 'No embedding model',
-            noModelHint: 'Required for hybrid search. Open the form to enter endpoint, API key, and model id.',
+            noModel: 'Not configured',
+            noModelHint: 'Open the form to enter endpoint, API key, and model id.',
             setCurrent: 'Set as embedding',
             current: 'Embedding',
             clear: 'Clear embedding',
             privacyNote:
-              'Embeddings send memory text to the configured endpoint. Hybrid search stays off until you enable it under Memory.',
+              'Embeddings send memory text to the configured endpoint. Used when hybrid search is on under Memory.',
           },
           rerank: {
             currentModel: 'Current rerank model',
-            noModel: 'No rerank model (optional)',
-            noModelHint: 'Leave unset to skip rerank. Enter a dedicated rerank endpoint if needed.',
+            noModel: 'Not configured',
+            noModelHint: 'Open the form to enter endpoint, API key, and model id.',
             setCurrent: 'Set as rerank',
             current: 'Rerank',
             clear: 'Clear rerank',
@@ -396,7 +396,6 @@ export const en = {
         },
         edit: 'Edit',
         configure: 'Configure',
-        optional: 'Optional',
         baseDialogTitle: 'Edit base models',
         baseDialogIntro:
           'Chat providers and models used for conversation and agents. Not shared with embedding or rerank credentials.',
@@ -406,7 +405,7 @@ export const en = {
           embeddingIntro:
             'Independent of chat providers. Enter an OpenAI-compatible embeddings endpoint, its API key, and model id.',
           rerankIntro:
-            'Independent of chat providers. Enter the rerank service endpoint, API key, and model id. Leave unset to skip rerank.',
+            'Independent of chat providers. Enter the rerank service endpoint, API key, and model id.',
           modelId: 'Model ID',
         },
       },
@@ -505,8 +504,11 @@ export const en = {
         hybridSearchDesc:
           'Combine keyword (FTS) and embedding similarity when ranking memories for prefetch and tools.',
         hybridSearchNeedsEmbedding: 'Set an embedding model under Models → Embedding first.',
+        hybridNeedsEmbeddingTitle: 'Embedding model required',
+        hybridNeedsEmbeddingBody:
+          'Hybrid search needs an embedding model. Configure it under Models → Embedding, then try again.',
         hybridPrivacyNote:
-          'Hybrid search sends query text and memory snippets to the configured embedding (and optional rerank) provider. Keep hybrid off to stay fully local (FTS only).',
+          'Hybrid search sends query text and memory snippets to the configured embedding (and rerank if set) provider. Keep hybrid off to stay fully local (FTS only).',
         indexStatus: 'Embedding index: {{embedded}} / {{total}}',
         indexStatusNone: 'Embedding index: no model configured',
         reindex: 'Reindex embeddings',

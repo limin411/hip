@@ -191,7 +191,7 @@ export function ModelConfig() {
         />
         <ModelPurposeCard
           testId="model-card-rerank"
-          label={`${t('settings.modelConfig.tabs.rerank')} · ${t('settings.modelConfig.optional')}`}
+          label={t('settings.modelConfig.tabs.rerank')}
           title={rr?.modelID ?? t('settings.modelConfig.purpose.rerank.noModel')}
           subtitle={
             rr
@@ -200,7 +200,6 @@ export function ModelConfig() {
           }
           ready={rrReady}
           configured={!!rr}
-          optional
           privacy={t('settings.modelConfig.purpose.rerank.privacyNote')}
           onEdit={() => setDialog('rerank')}
           editLabel={rr ? t('settings.modelConfig.edit') : t('settings.modelConfig.configure')}
@@ -305,7 +304,6 @@ function ModelPurposeCard({
   subtitle,
   ready,
   configured,
-  optional,
   privacy,
   onEdit,
   editLabel,
@@ -316,7 +314,6 @@ function ModelPurposeCard({
   subtitle: string
   ready: boolean
   configured: boolean
-  optional?: boolean
   privacy?: string
   onEdit: () => void
   editLabel: string
@@ -347,8 +344,6 @@ function ModelPurposeCard({
                 {t('settings.modelConfig.keyMissing')}
               </Badge>
             )
-          ) : optional ? (
-            <Badge size="sm">{t('settings.modelConfig.optional')}</Badge>
           ) : (
             <Badge size="sm">{t('settings.modelConfig.notConfigured')}</Badge>
           )}

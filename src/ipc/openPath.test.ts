@@ -13,7 +13,7 @@ vi.mock('@/i18n', () => ({
   default: { t: (key: string) => key },
 }))
 
-import { openContainingFolder, openPathInDefaultApp } from './openPath'
+import { openContainingFolder } from './openPath'
 
 describe('openContainingFolder', () => {
   beforeEach(() => {
@@ -72,23 +72,5 @@ describe('openContainingFolder', () => {
     })
     expect(ok).toBe(false)
     expect(toastError).toHaveBeenCalledWith('contextMenu.file.openContainingFolderFailed')
-  })
-})
-
-describe('openPathInDefaultApp', () => {
-  beforeEach(() => {
-    openPath.mockReset().mockResolvedValue(undefined)
-    toastError.mockReset()
-  })
-
-  it('opens path when under cwd', async () => {
-    await openPathInDefaultApp('/project/README.md', '/project')
-    expect(openPath).toHaveBeenCalledWith('/project/README.md')
-  })
-
-  it('rejects outside cwd', async () => {
-    const ok = await openPathInDefaultApp('/other', '/project')
-    expect(ok).toBe(false)
-    expect(openPath).not.toHaveBeenCalled()
   })
 })

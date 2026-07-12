@@ -67,27 +67,3 @@ export async function openContainingFolder(
     }
   }
 }
-
-/** Open an arbitrary path with the default app (still cwd-scoped). */
-export async function openPathInDefaultApp(
-  path: string,
-  cwd: string | null,
-): Promise<boolean> {
-  if (!cwd || !path || !isPathUnderRoot(path, cwd)) {
-    toast.error(i18n.t('contextMenu.file.pathOutsideCwd'))
-    return false
-  }
-  const target = normalizeFsPath(path)
-  try {
-    await openerOpenPath(target)
-    return true
-  } catch {
-    try {
-      await shellOpen(target)
-      return true
-    } catch {
-      toast.error(i18n.t('contextMenu.file.openContainingFolderFailed'))
-      return false
-    }
-  }
-}

@@ -113,6 +113,19 @@ describe('fileEntryProvider', () => {
       makeCtx(),
     )
     expect(items.find((i) => i.id === 'file.copyRelativePath')?.disabled).toBe(true)
+    expect(items.find((i) => i.id === 'file.openContainingFolder')?.disabled).toBe(true)
+  })
+
+  it('disables relative copy and open folder when cwd is null', () => {
+    const items = fileEntryProvider(
+      {
+        kind: 'fileEntry',
+        payload: payload({ cwd: null }),
+      },
+      makeCtx(),
+    )
+    expect(items.find((i) => i.id === 'file.copyRelativePath')?.disabled).toBe(true)
+    expect(items.find((i) => i.id === 'file.openContainingFolder')?.disabled).toBe(true)
   })
 
   it('openContainingFolder passes cwd + isDir', async () => {

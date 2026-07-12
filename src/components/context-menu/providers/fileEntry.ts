@@ -66,13 +66,16 @@ export const fileEntryProvider: ContextProvider = (req, ctx) => {
     },
   })
 
+  // Same trust gate as relative copy: missing cwd or path outside cwd.
+  const outsideCwd = rel === null
   items.push({
     id: 'file.openContainingFolder',
     label: ctx.t('contextMenu.file.openContainingFolder'),
     group: 'navigation',
-    disabled: !cwd,
-    disabledReason: !cwd ? ctx.t('contextMenu.file.pathOutsideCwd') : undefined,
+    disabled: outsideCwd,
+    disabledReason: outsideCwd ? ctx.t('contextMenu.file.pathOutsideCwd') : undefined,
     run: () => {
+      if (outsideCwd) return
       void openContainingFolder(path, { cwd, isDir })
     },
   })

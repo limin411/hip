@@ -1,11 +1,6 @@
-import type { ContextMenuPrefs } from './types'
+import type { ContextKind, ContextMenuPrefs } from './types'
 
 const KEY = 'hip.contextMenu.prefs.v1'
-
-const DEFAULT_PREFS: ContextMenuPrefs = {
-  version: 1,
-  disabledIds: [],
-}
 
 function canUseStorage(): boolean {
   return typeof localStorage !== 'undefined'
@@ -13,6 +8,21 @@ function canUseStorage(): boolean {
 
 export function defaultContextMenuPrefs(): ContextMenuPrefs {
   return { version: 1, disabledIds: [] }
+}
+
+/** Validate orderByKind: string keys → string[] only; drop corrupt entries. */
+function parseOrderByKind(raw: unknown): ContextMenuPrefs['orderByKind'] | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Partial<Record<ContextKind, string[]>> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k !== 'string' || !k) continue
+    if (!Array.isArray(v)) continue
+    const ids = v.filter((x): x is string => typeof x === 'string')
+    if (ids.length > 0) {
+      out[k as ContextKind] = ids
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 export function loadPrefs(): ContextMenuPrefs {
@@ -30,9 +40,8 @@ export function loadPrefs(): ContextMenuPrefs {
       version: 1,
       disabledIds,
     }
-    if (obj.orderByKind && typeof obj.orderByKind === 'object' && !Array.isArray(obj.orderByKind)) {
-      prefs.orderByKind = obj.orderByKind as ContextMenuPrefs['orderByKind']
-    }
+    const orderByKind = parseOrderByKind(obj.orderByKind)
+    if (orderByKind) prefs.orderByKind = orderByKind
     return prefs
   } catch {
     return defaultContextMenuPrefs()
@@ -48,4 +57,4 @@ export function savePrefs(prefs: ContextMenuPrefs): void {
   }
 }
 
-export { KEY as CONTEXT_MENU_PREFS_KEY, DEFAULT_PREFS }
+export { KEY as CONTEXT_MENU_PREFS_KEY }

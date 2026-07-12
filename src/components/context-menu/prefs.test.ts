@@ -38,4 +38,36 @@ describe('prefs', () => {
     )
     expect(loadPrefs().disabledIds).toEqual(['ok', 'also'])
   })
+
+  it('parses orderByKind only when values are string arrays', () => {
+    localStorage.setItem(
+      CONTEXT_MENU_PREFS_KEY,
+      JSON.stringify({
+        version: 1,
+        disabledIds: [],
+        orderByKind: {
+          message: ['message.copy', 2, 'message.regenerate'],
+          codeBlock: 'not-an-array',
+          '': ['x'],
+          fileEntry: [],
+        },
+      }),
+    )
+    const prefs = loadPrefs()
+    expect(prefs.orderByKind).toEqual({
+      message: ['message.copy', 'message.regenerate'],
+    })
+  })
+
+  it('drops invalid orderByKind entirely when nothing valid remains', () => {
+    localStorage.setItem(
+      CONTEXT_MENU_PREFS_KEY,
+      JSON.stringify({
+        version: 1,
+        disabledIds: [],
+        orderByKind: { codeBlock: null, fileEntry: 1 },
+      }),
+    )
+    expect(loadPrefs().orderByKind).toBeUndefined()
+  })
 })

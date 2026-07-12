@@ -59,6 +59,6 @@ describe('createContextMenuBuildContext', () => {
     const ctx = createContextMenuBuildContext(t, { sessionId: 's2' })
     expect(ctx.activeSessionId).toBe('s1')
     expect(ctx.sessionStatus).toBe('idle')
-    expect(ctx.sessionInterrupt).toBeUndefined()
+    expect(ctx.sessionInterrupt).toBe(false)
   })
 })

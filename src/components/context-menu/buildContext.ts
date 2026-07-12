@@ -19,7 +19,7 @@ export function createContextMenuBuildContext(
   const targetId = opts?.sessionId ?? activeSessionId
   const session = targetId
     ? domain.sessions.find((s) => s.id === targetId)
-    : domain.sessions.find((s) => s.id === activeSessionId)
+    : undefined
 
   const activeView = ui.activeView
   const surface: Surface | null =
@@ -32,7 +32,7 @@ export function createContextMenuBuildContext(
     surface,
     activeSessionId,
     sessionStatus: session?.status ?? 'idle',
-    sessionInterrupt: session?.interrupt != null ? true : undefined,
+    sessionInterrupt: Boolean(session?.interrupt),
     openSessionIds: ui.openSessionIds.slice(),
     copyText,
   }

@@ -88,6 +88,25 @@ export function mergeByGroup(items: ContextMenuItemDef[]): ContextMenuItemDef[] 
   return out
 }
 
+/**
+ * After filtering, fix separators so the menu never starts with a leading separator.
+ * Group boundaries get separatorBefore; within-group provider flags are preserved.
+ */
+export function restampSeparators(items: ContextMenuItemDef[]): ContextMenuItemDef[] {
+  let prevGroup: ContextGroupId | undefined
+  return items.map((item, index) => {
+    const groupBoundary = prevGroup !== undefined && item.group !== prevGroup
+    prevGroup = item.group
+    if (index === 0) {
+      return item.separatorBefore ? { ...item, separatorBefore: false } : item
+    }
+    if (groupBoundary) {
+      return item.separatorBefore ? item : { ...item, separatorBefore: true }
+    }
+    return item
+  })
+}
+
 /** PR-1: filter disabledIds only. orderByKind deferred to PR-7. */
 export function applyPrefs(
   items: ContextMenuItemDef[],
@@ -95,7 +114,7 @@ export function applyPrefs(
 ): ContextMenuItemDef[] {
   if (!prefs.disabledIds.length) return items
   const disabled = new Set(prefs.disabledIds)
-  return items.filter((item) => !disabled.has(item.id))
+  return restampSeparators(items.filter((item) => !disabled.has(item.id)))
 }
 
 export function buildContextMenuItems(

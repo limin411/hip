@@ -19,6 +19,11 @@ export type DeclarativeContextMenuProps<K extends ContextKind> = {
   kind: K
   payload: ContextPayloadMap[K]
   children: ReactNode
+  /**
+   * Classes on the trigger wrapper div (layout-affecting).
+   * Prefer putting flex/grid/size classes here — the host always wraps children in an extra box
+   * for data-context-menu-* attrs and asChild.
+   */
   className?: string
   /** Optional test id on the trigger wrapper */
   'data-testid'?: string
@@ -33,8 +38,14 @@ function payloadSessionId(payload: unknown): string | null | undefined {
 
 /**
  * Registry-driven context menu host.
- * Always modal={false} to avoid stuck body pointer-events when an item opens a Modal.
- * Prevents open when resolved items are empty (no empty chrome).
+ *
+ * - Always `modal={false}` to avoid stuck body pointer-events when an item opens a Modal.
+ * - Prevents open when resolved items are empty (no empty chrome).
+ * - Empty open attempt still consumes the browser `contextmenu` event (Radix Trigger) —
+ *   no OS menu either. Surface PRs must only wrap nodes expected to have items (or always
+ *   provide at least one action); do not wrap broad empty chrome.
+ * - Providers own error UX for `run()`; the host swallows unhandled rejections so a failed
+ *   async action does not become an unhandled promise rejection.
  */
 export function DeclarativeContextMenu<K extends ContextKind>({
   kind,
@@ -60,7 +71,10 @@ export function DeclarativeContextMenu<K extends ContextKind>({
       const ctx = createContextMenuBuildContext(t, {
         sessionId: payloadSessionId(payload),
       })
-      const built = buildContextMenuItems({ kind, payload } as { kind: ContextKind; payload: ContextPayloadMap[ContextKind] }, ctx)
+      const built = buildContextMenuItems(
+        { kind, payload } as { kind: ContextKind; payload: ContextPayloadMap[ContextKind] },
+        ctx,
+      )
       if (built.length === 0) {
         setOpen(false)
         setItems([])
@@ -109,7 +123,8 @@ function ContextMenuItemRow({ item }: { item: ContextMenuItemDef }) {
         title={item.disabledReason}
         className={cn(item.danger && 'text-danger focus:bg-danger/10')}
         onSelect={() => {
-          void item.run()
+          // Providers should toast on failure; catch avoids unhandled rejection noise.
+          void Promise.resolve(item.run()).catch(() => {})
         }}
       >
         {item.icon ? <ContextMenuIcon name={item.icon} /> : null}

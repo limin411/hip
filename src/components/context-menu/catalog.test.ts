@@ -80,4 +80,21 @@ describe('listCatalogItems', () => {
     unreg()
     expect(listCatalogItems()).toHaveLength(0)
   })
+
+  it('clearCatalogMeta only clears extras (static catalog is never wiped)', () => {
+    registerCatalogMeta([
+      {
+        id: 'extra.only',
+        labelKey: 'extra',
+        kind: 'plugin',
+        group: 'extensions',
+      },
+    ])
+    expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(true)
+    clearCatalogMeta()
+    expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(false)
+    // Static list stays empty in PR-1; after surface PRs fill STATIC_CATALOG,
+    // clear must not empty it — structure guarantees extras-only clear.
+    expect(listCatalogItems()).toEqual([])
+  })
 })

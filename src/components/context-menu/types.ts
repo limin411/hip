@@ -126,7 +126,7 @@ export interface ContextMenuBuildContext {
   /** Domain session status for active session (or targeted session when payload has sessionId) */
   sessionStatus: 'idle' | 'running' | 'error' | string
   /** True when active session has interrupt pending (regenerate allowed while running) */
-  sessionInterrupt: boolean | undefined
+  sessionInterrupt: boolean
   openSessionIds: string[]
   /** Convenience: wraps ipc/clipboard.copyText */
   copyText: (text: string) => Promise<boolean>

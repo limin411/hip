@@ -16,7 +16,7 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
     surface: 'chat',
     activeSessionId: null,
     sessionStatus: 'idle',
-    sessionInterrupt: undefined,
+    sessionInterrupt: false,
     openSessionIds: [],
     copyText: vi.fn(async () => true),
     ...overrides,
@@ -78,6 +78,20 @@ describe('applyPrefs', () => {
   it('returns all when disabledIds empty', () => {
     const items = [item({ id: 'a', group: 'primary' })]
     expect(applyPrefs(items, { version: 1, disabledIds: [] })).toEqual(items)
+  })
+
+  it('does not leave a leading separator when the first group is fully disabled', () => {
+    const merged = mergeByGroup([
+      item({ id: 'p1', group: 'primary', label: 'Open' }),
+      item({ id: 'c1', group: 'clipboard', label: 'Copy' }),
+      item({ id: 'd1', group: 'danger', label: 'Delete' }),
+    ])
+    expect(merged.find((i) => i.id === 'c1')?.separatorBefore).toBe(true)
+
+    const filtered = applyPrefs(merged, { version: 1, disabledIds: ['p1'] })
+    expect(filtered.map((i) => i.id)).toEqual(['c1', 'd1'])
+    expect(filtered[0]?.separatorBefore).toBeFalsy()
+    expect(filtered.find((i) => i.id === 'd1')?.separatorBefore).toBe(true)
   })
 })
 

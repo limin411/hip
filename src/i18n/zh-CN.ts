@@ -751,7 +751,7 @@ export const zhCN = {
       hooks: {
         title: '挂钩配置',
         intro: '查看智能体生命周期中已配置与可配置的挂钩。本页只读，修改请编辑本地配置文件。',
-        introShort: '只读概览。点击鱼骨节点查看声明来源；修改请编辑插件 hooks 文件。',
+        introShort: '只读概览。挂钩生效于主循环、task 子智能体与工作流 agent 节点（不含 gate / 外部 ACP）。点击节点查看来源；修改请编辑插件 hooks 文件。',
         editHint:
           '挂钩通过插件清单（plugin.json 的 hooks 字段）声明，handler 写在插件目录下的 CJS 模块中。安装或更新插件后，在此刷新可见。',
         loading: '正在加载…',

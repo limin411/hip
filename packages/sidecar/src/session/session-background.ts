@@ -54,6 +54,9 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
       networkPolicy: new NetworkPolicy(),
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+      hooks: host.hooks,
+      agentId: taskId,
+      parentAgentId: 'supervisor',
     })
   } catch (err) {
     const msg = safeErrorMessage(err)

@@ -17,6 +17,7 @@ import type { SessionStore } from '../persistence/store.js'
 import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
+import type { HookRegistry } from './hooks/registry.js'
 import { safeErrorMessage } from './error.js'
 
 type SendFn = (msg: ServerMessage) => void
@@ -45,6 +46,18 @@ export interface WorkflowRunDeps {
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
+  /** Session plugin hook registry — required for tool + turn lifecycle parity. */
+  hooks: HookRegistry
+}
+
+export type WorkflowTurnOpts = {
+  runInputs?: { text: string; data?: unknown }
+  signal?: AbortSignal
+  /**
+   * When true, skip UserPromptSubmit (already fired by processInput on message:send + dag).
+   * Default false for workflow:run direct entry.
+   */
+  skipUserPromptSubmit?: boolean
 }
 
 export async function runWorkflowTurn(
@@ -52,7 +65,7 @@ export async function runWorkflowTurn(
   def: WorkflowDef,
   send: SendFn,
   finalize: (send: SendFn, turnId: string, supervisorText: string, trajectory: Map<string, TraceRun>, stopped: boolean) => string,
-  opts?: { runInputs?: { text: string; data?: unknown }; signal?: AbortSignal },
+  opts?: WorkflowTurnOpts,
 ): Promise<string> {
   // Local controller for idle watchdog + executor; link Session.cancel via opts.signal.
   const abortController = new AbortController()
@@ -137,6 +150,44 @@ export async function runWorkflowTurn(
     }
   }
 
+  const logNonCritical = (event: string, err: unknown) => {
+    console.warn(`[workflow hooks] ${event}:`, err instanceof Error ? err.message : String(err))
+  }
+
+  // ── Turn lifecycle: UserPromptSubmit (optional) + TurnStart ──────────────
+  if (!opts?.skipUserPromptSubmit) {
+    const userText = opts?.runInputs?.text?.trim()
+    if (userText) {
+      const promptResult = await deps.hooks
+        .fire('UserPromptSubmit', { sessionId: deps.id, turnId, runId: turnId })
+        .catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+      if (promptResult.kind !== 'allow') {
+        send({
+          type: 'error',
+          sessionId: deps.id,
+          code: 'HOOK_DENIED',
+          message: `User prompt rejected: ${promptResult.reason ?? 'blocked by hook'}`,
+        })
+        watchdog.stop()
+        return ''
+      }
+    }
+  }
+
+  const turnStartResult = await deps.hooks
+    .fire('TurnStart', { sessionId: deps.id, turnId, runId: turnId })
+    .catch(() => ({ kind: 'deny' as const, reason: 'Hook error' }))
+  if (turnStartResult.kind !== 'allow') {
+    send({
+      type: 'error',
+      sessionId: deps.id,
+      code: 'HOOK_DENIED',
+      message: `Turn start rejected: ${turnStartResult.reason ?? 'blocked by hook'}`,
+    })
+    watchdog.stop()
+    return ''
+  }
+
   let runner: AgentRunner
   if (deps.orchestratorRunner) {
     runner = deps.orchestratorRunner
@@ -157,13 +208,27 @@ export async function runWorkflowTurn(
           childMaxSteps: CHILD_MAX_STEPS,
           // Inherit session permission mode (never force full — HITL/edit must apply).
           permissionMode: deps.config.permissionMode ?? 'edit',
+          // Policy A: no HITL transport in workflow workers.
           requestApproval: undefined,
           networkPolicy: deps.networkPolicy,
           toolOutputStore: deps.toolOutputStore,
           guardianReviewer: deps.guardianReviewer,
+          hooks: deps.hooks,
+          sessionId: deps.id,
+          turnId,
+          runId: turnId,
+          nodeId: agentId !== 'worker' ? agentId : undefined,
+          agentId,
+          parentAgentId: 'supervisor',
         })
       },
-      { emit: (nodeId) => makeEmit(nodeId, 'subagent') },
+      {
+        emit: (nodeId) => makeEmit(nodeId, 'subagent'),
+        pluginHooks: deps.hooks,
+        sessionId: deps.id,
+        runId: turnId,
+        permissionMode: deps.config.permissionMode ?? 'edit',
+      },
     )
     deps.orchestratorRunner = runner
   }
@@ -244,11 +309,25 @@ export async function runWorkflowTurn(
           networkPolicy: deps.networkPolicy,
           toolOutputStore: deps.toolOutputStore,
           guardianReviewer: deps.guardianReviewer,
+          hooks: deps.hooks,
+          sessionId: deps.id,
+          turnId,
+          runId: turnId,
+          agentId: 'aggregator',
+          parentAgentId: 'supervisor',
         }) || fallback
       } catch {
         finalText = fallback
       }
     }
+
+    // Stop: fire but ignore `continue` (do not inject a second DAG run).
+    await deps.hooks
+      .fire('Stop', { sessionId: deps.id, turnId, runId: turnId })
+      .catch((err) => logNonCritical('Stop', err))
+    void deps.hooks
+      .fire('TurnComplete', { sessionId: deps.id, turnId, runId: turnId })
+      .catch((err) => logNonCritical('TurnComplete', err))
 
     return finalize(send, turnId, finalText, trajectory, false)
   } catch (err) {
@@ -256,6 +335,9 @@ export async function runWorkflowTurn(
     finishRemaining()
     // Always project trajectory so cancel/timeout leaves a partial assistant message.
     const partialText = collectTrajectoryText(trajectory)
+    void deps.hooks
+      .fire('TurnComplete', { sessionId: deps.id, turnId, runId: turnId })
+      .catch((e) => logNonCritical('TurnComplete', e))
     if (isAbort) {
       send({
         type: 'error',

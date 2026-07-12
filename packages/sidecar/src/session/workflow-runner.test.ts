@@ -12,6 +12,7 @@ import { NetworkPolicy } from './network-policy.js'
 import { ToolOutputStore } from './tool-output-store.js'
 import { GuardianReviewer } from './guardian.js'
 import type { WorkflowRunDeps } from './workflow-runner.js'
+import { HookRegistry } from './hooks/registry.js'
 
 const { capturedRunSubagentArgs, runWorkflowMock } = vi.hoisted(() => ({
   capturedRunSubagentArgs: [] as Array<Record<string, unknown>>,
@@ -59,6 +60,7 @@ function makeDeps(overrides?: Partial<WorkflowRunDeps>): WorkflowRunDeps {
     store: undefined,
     idleTimeoutMs: 60_000,
     pendingPermissions: new Map(),
+    hooks: new HookRegistry(),
     ...overrides,
   }
 }
@@ -70,12 +72,13 @@ beforeEach(async () => {
 })
 
 describe('runWorkflowTurn safety-dependency wiring', () => {
-  it('passes networkPolicy, toolOutputStore, and guardianReviewer to worker runSubagent calls', async () => {
+  it('passes networkPolicy, toolOutputStore, guardianReviewer, and hooks to worker runSubagent calls', async () => {
     const policy = new NetworkPolicy()
     const store = new ToolOutputStore({ outputDir: join(tmpdir(), 'hip-tos-wf') })
     const guardian = new GuardianReviewer({ modelRunner: textRunner('safe') })
+    const hooks = new HookRegistry()
 
-    const deps = makeDeps({ networkPolicy: policy, toolOutputStore: store, guardianReviewer: guardian })
+    const deps = makeDeps({ networkPolicy: policy, toolOutputStore: store, guardianReviewer: guardian, hooks })
 
     const def: WorkflowDef = {
       id: 'wf-test',
@@ -104,8 +107,93 @@ describe('runWorkflowTurn safety-dependency wiring', () => {
     expect(args.networkPolicy).toBe(policy)
     expect(args.toolOutputStore).toBe(store)
     expect(args.guardianReviewer).toBe(guardian)
+    expect(args.hooks).toBe(hooks)
+    expect(args.sessionId).toBe('wf-sess-1')
     // Inherits session permissionMode (default edit), never forced full.
     expect(args.permissionMode).toBe('edit')
+  })
+})
+
+describe('runWorkflowTurn lifecycle hooks', () => {
+  it('fires TurnStart and TurnComplete; UserPromptSubmit when runInputs.text present', async () => {
+    const order: string[] = []
+    const hooks = new HookRegistry()
+    for (const event of ['UserPromptSubmit', 'TurnStart', 'Stop', 'TurnComplete'] as const) {
+      hooks.register({
+        event,
+        handler: async () => {
+          order.push(event)
+          return { kind: 'allow' }
+        },
+      })
+    }
+    runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string }) => {
+      return { runId: opts.runId, workflowId: 'wf-lc', status: 'succeeded' as const, nodes: {} }
+    })
+    const deps = makeDeps({ hooks })
+    const def: WorkflowDef = {
+      id: 'wf-lc',
+      name: 'LC',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'x' }],
+      edges: [],
+      entry: ['n1'],
+    }
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    await runWorkflowTurn(deps, def, () => {}, (_s, _t, text) => text, { runInputs: { text: 'hello' } })
+    expect(order).toEqual(['UserPromptSubmit', 'TurnStart', 'Stop', 'TurnComplete'])
+  })
+
+  it('skips UserPromptSubmit when skipUserPromptSubmit is true', async () => {
+    const order: string[] = []
+    const hooks = new HookRegistry()
+    for (const event of ['UserPromptSubmit', 'TurnStart', 'TurnComplete'] as const) {
+      hooks.register({
+        event,
+        handler: async () => {
+          order.push(event)
+          return { kind: 'allow' }
+        },
+      })
+    }
+    runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string }) => {
+      return { runId: opts.runId, workflowId: 'wf-skip', status: 'succeeded' as const, nodes: {} }
+    })
+    const deps = makeDeps({ hooks })
+    const def: WorkflowDef = {
+      id: 'wf-skip',
+      name: 'Skip',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'x' }],
+      edges: [],
+      entry: ['n1'],
+    }
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    await runWorkflowTurn(deps, def, () => {}, (_s, _t, text) => text, {
+      runInputs: { text: 'hello' },
+      skipUserPromptSubmit: true,
+    })
+    expect(order).toEqual(['TurnStart', 'TurnComplete'])
+  })
+
+  it('denies turn when TurnStart returns deny', async () => {
+    const hooks = new HookRegistry()
+    hooks.register({
+      event: 'TurnStart',
+      handler: async () => ({ kind: 'deny', reason: 'nope' }),
+    })
+    const deps = makeDeps({ hooks })
+    const def: WorkflowDef = {
+      id: 'wf-deny',
+      name: 'Deny',
+      nodes: [{ id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'x' }],
+      edges: [],
+      entry: ['n1'],
+    }
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const sent: ServerMessage[] = []
+    const result = await runWorkflowTurn(deps, def, (m) => sent.push(m), (_s, _t, text) => text)
+    expect(result).toBe('')
+    expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'HOOK_DENIED')).toBe(true)
+    expect(runWorkflowMock).not.toHaveBeenCalled()
   })
 })
 

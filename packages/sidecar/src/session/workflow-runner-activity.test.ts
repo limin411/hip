@@ -8,6 +8,7 @@ import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { TraceRun } from './tool-trace.js'
 import { runWorkflowTurn, type WorkflowRunDeps } from './workflow-runner.js'
+import { HookRegistry } from './hooks/registry.js'
 
 function streamingRunner(text: string): ModelRunner {
   return {
@@ -31,6 +32,7 @@ function makeDeps(overrides?: Partial<WorkflowRunDeps>): WorkflowRunDeps {
     store: undefined,
     idleTimeoutMs: 60_000,
     pendingPermissions: new Map(),
+    hooks: new HookRegistry(),
     ...overrides,
   }
 }

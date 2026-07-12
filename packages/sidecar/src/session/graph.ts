@@ -86,6 +86,12 @@ export interface GraphCtx {
   summarizer: Summarizer
   hooks?: HookRegistry
   sessionId: string
+  /** Optional frame fields forwarded into HookContext via ToolRunner. */
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
   toolRunner?: ToolRunner
@@ -351,6 +357,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       permissionMode: ctx.permissionMode ?? 'edit',
       requestApproval: ctx.requestApproval,
       sessionId: ctx.sessionId,
+      turnId: ctx.turnId,
+      runId: ctx.runId,
+      nodeId: ctx.nodeId,
+      agentId: ctx.agentId,
+      parentAgentId: ctx.parentAgentId,
       toolOutputStore: ctx.toolOutputStore,
       guardianReviewer: ctx.guardianReviewer,
       onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),

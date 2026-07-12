@@ -68,8 +68,13 @@ describe('createSessionAgentRunner', () => {
       'solve this',
       expect.any(Object), // emit
       expect.any(AbortSignal),
-      expect.any(Object), // hooks
-      undefined,          // extras (no opts passed)
+      expect.any(Object), // ExternalAgentHooks
+      expect.objectContaining({
+        agentId: 'my-agent',
+        nodeId: 'n1',
+        runId: 'run-1',
+        parentAgentId: 'supervisor',
+      }),
     )
     reset()
   })
@@ -182,7 +187,7 @@ describe('createSessionAgentRunner', () => {
       expect.any(Object),
       ac.signal,
       expect.any(Object),
-      undefined,
+      expect.objectContaining({ agentId: 'agent', runId: 'run-1', nodeId: 'n1' }),
     )
   })
 
@@ -204,8 +209,8 @@ describe('createSessionAgentRunner', () => {
     expect(built).toEqual(['/path/to/project'])
   })
 
-  // ── Edge: empty opts → extras is undefined ──────────────────────
-  it('omits extras when opts is undefined', async () => {
+  // ── Edge: empty opts still passes frame extras (agent/node/run ids) ──
+  it('passes frame extras when opts is undefined', async () => {
     const { invoke } = mockInvoker('ok')
     const adapter = createSessionAgentRunner('/tmp', () => ({ invoke }))
 
@@ -216,7 +221,12 @@ describe('createSessionAgentRunner', () => {
       expect.any(Object),
       expect.any(AbortSignal),
       expect.any(Object),
-      undefined,
+      expect.objectContaining({
+        agentId: 'agent',
+        nodeId: 'n1',
+        runId: 'run-1',
+        parentAgentId: 'supervisor',
+      }),
     )
   })
 })

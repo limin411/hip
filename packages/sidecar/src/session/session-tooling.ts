@@ -54,6 +54,9 @@ export interface BuildSessionToolingInput {
   planMode?: PlanMode
   memoryService?: MemoryService
   useMemories?: boolean
+  /** Optional HookContext frame fields for the supervisor tool loop. */
+  turnId?: string
+  agentId?: string
 }
 
 export async function buildSessionTooling(input: BuildSessionToolingInput): Promise<SessionTooling> {
@@ -123,6 +126,8 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
     permissionMode: input.mode,
     requestApproval: input.requestApproval,
     sessionId: input.sessionId,
+    turnId: input.turnId,
+    agentId: input.agentId ?? 'supervisor',
     toolOutputStore: input.toolOutputStore,
     guardianReviewer: input.guardianReviewer,
     onToolStarted: input.onToolStarted,

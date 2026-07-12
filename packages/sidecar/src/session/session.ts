@@ -357,6 +357,7 @@ export class Session {
       networkPolicy: this.networkPolicy,
       toolOutputStore: this.toolOutputStore,
       guardianReviewer: this.usesEnvModel ? new GuardianReviewer({ modelRunner: this.modelRunner() }) : undefined,
+      hooks: this.hooks,
     }
   }
 

@@ -751,7 +751,7 @@ export const zhTW = {
       hooks: {
         title: '掛鉤設定',
         intro: '檢視智能體生命週期中已設定與可設定的掛鉤。本頁唯讀，修改請編輯本機設定檔。',
-        introShort: '唯讀概覽。點擊魚骨節點查看宣告來源；修改請編輯外掛 hooks 檔案。',
+        introShort: '唯讀概覽。掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點（不含 gate / 外部 ACP）。點擊節點查看來源；修改請編輯外掛 hooks 檔案。',
         editHint:
           '掛鉤由外掛清單（plugin.json 的 hooks 欄位）宣告，handler 寫在外掛目錄下的 CJS 模組。安裝或更新外掛後可在此查看宣告計數。',
         loading: '載入中…',

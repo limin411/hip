@@ -59,6 +59,12 @@ export interface ToolRunnerDeps {
   requestApproval?: ApprovalFn
   /** Session identifier passed to hook contexts. */
   sessionId: string
+  /** Optional turn / workflow / agent frame fields for HookContext. */
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
   /** Optional store that bounds oversized tool outputs before returning them. */
   toolOutputStore?: ToolOutputStore
   /** Optional guardian that reviews medium/high-risk tools before execution. */
@@ -68,6 +74,22 @@ export interface ToolRunnerDeps {
   onToolFinished?: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
   /** Optional emit for guardian risk classification (emitted for medium/high risk tools). */
   emitRisk?: (toolName: string, risk: RiskLevel, approval: string) => void
+}
+
+function frameCtx(deps: ToolRunnerDeps): {
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
+} {
+  return {
+    ...(deps.turnId ? { turnId: deps.turnId } : {}),
+    ...(deps.runId ? { runId: deps.runId } : {}),
+    ...(deps.nodeId ? { nodeId: deps.nodeId } : {}),
+    ...(deps.agentId ? { agentId: deps.agentId } : {}),
+    ...(deps.parentAgentId ? { parentAgentId: deps.parentAgentId } : {}),
+  }
 }
 
 /** Result of a tool execution, feeds exactly one ToolMessage via `content` + metadata. */
@@ -141,6 +163,7 @@ export class ToolRunner {
       try {
         preResult = await hooks.fire('PreToolUse', {
           sessionId,
+          ...frameCtx(this.deps),
           toolName: resolvedName,
           toolInput: call.args,
         })
@@ -248,6 +271,7 @@ export class ToolRunner {
         try {
           postResult = await hooks.fire('PostToolUse', {
             sessionId,
+            ...frameCtx(this.deps),
             toolName: call.name,
             toolInput: call.args,
             toolOutput: result,
@@ -290,6 +314,7 @@ export class ToolRunner {
         try {
           await hooks.fire('PostToolUseFailure', {
             sessionId,
+            ...frameCtx(this.deps),
             toolName: call.name,
             toolInput: call.args,
             toolError: error,

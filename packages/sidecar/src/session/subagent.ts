@@ -7,6 +7,7 @@ import { buildTools, type ApprovalFn } from './tools.js'
 import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
+import type { HookRegistry } from './hooks/registry.js'
 import { recursionLimit, MAX_DEPTH } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
 
@@ -48,6 +49,17 @@ export interface RunSubagentArgs {
   toolOutputStore?: ToolOutputStore
   /** Guardian reviewer for approval escalation; created per-turn with the parent model. */
   guardianReviewer?: GuardianReviewer
+  /**
+   * Session plugin hook registry. When set, tool calls go through ToolRunner Pre/Post hooks.
+   * Recursive child spawns inherit the same registry.
+   */
+  hooks?: HookRegistry
+  /** Optional frame fields for HookContext (workflow / subagent identity). */
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
   /** Current delegation depth. 0 for top-level session, increments with each `task` delegation.
    *  At depth >= MAX_DEPTH, task/task_batch/dispatch_agent tools are filtered. */
   depth?: number
@@ -78,7 +90,12 @@ export function lastAiText(messages: BaseMessage[]): string {
  *   recursive delegation. At depth >= MAX_DEPTH, those tools are filtered out.
  */
 export async function runSubagent(args: RunSubagentArgs): Promise<string> {
-  const { runner, root, summarizer, emit, signal, description, childMaxSteps, permissionMode, requestApproval, existingMessages, mode, sessionId, networkPolicy, toolOutputStore, guardianReviewer } = args
+  const {
+    runner, root, summarizer, emit, signal, description, childMaxSteps,
+    permissionMode, requestApproval, existingMessages, mode, sessionId,
+    networkPolicy, toolOutputStore, guardianReviewer, hooks,
+    turnId, runId, nodeId, agentId, parentAgentId,
+  } = args
   const currentDepth = args.depth ?? 0
 
   // Create a spawn function for recursive delegation that increments depth on each call.
@@ -89,6 +106,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       description: desc,
       mode: submode,
       existingMessages: undefined, // each delegation is a fresh sub-agent
+      // hooks / frame fields stay on ...args so children share the session registry
     })
   }
 
@@ -103,7 +121,23 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     const blocked = new Set(['task', 'task_batch', 'dispatch_agent'])
     tools = tools.filter((t) => !blocked.has(t.name))
   }
-  const ctx: GraphCtx = { runner, tools, emit: mode === 'background' ? NOOP_EMIT : emit, summarizer, sessionId: sessionId ?? 'subagent', toolOutputStore, guardianReviewer }
+  const ctx: GraphCtx = {
+    runner,
+    tools,
+    emit: mode === 'background' ? NOOP_EMIT : emit,
+    summarizer,
+    sessionId: sessionId ?? 'subagent',
+    hooks,
+    turnId,
+    runId,
+    nodeId,
+    agentId: agentId ?? 'worker',
+    parentAgentId,
+    toolOutputStore,
+    guardianReviewer,
+    requestApproval,
+    permissionMode,
+  }
   const app = buildGraph(childMaxSteps)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0
     ? [...existingMessages, new HumanMessage(description)]

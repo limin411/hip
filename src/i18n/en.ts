@@ -757,7 +757,7 @@ export const en = {
       hooks: {
         title: 'Hooks',
         intro: 'See which lifecycle hooks are configured and which events you can attach. This page is read-only — edit local config files to change hooks.',
-        introShort: 'Read-only overview. Click a fishbone node for sources; edit plugin hook files to change config.',
+        introShort: 'Read-only overview. Hooks apply to the main loop, task subagents, and workflow agent nodes (not gates or external ACP). Click a node for sources; edit plugin hook files to change config.',
         editHint:
           'Hooks are declared by plugins via the hooks field in plugin.json, with handlers in a CJS module under the plugin directory. After install or update, they appear here as declared counts.',
         loading: 'Loading…',

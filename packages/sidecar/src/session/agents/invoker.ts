@@ -11,6 +11,7 @@ import { CHILD_MAX_STEPS } from '../loop-control.js'
 import { createAgentProvider } from './index.js'
 import { readAgentsConfig, resolveAgentModel, type ResolvedModel } from './registry.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
+import type { HookRegistry } from '../hooks/registry.js'
 
 /** Run one configured external agent's turn and return its final text.
  *  Shaped like the orchestrator's AgentRunner (agentId + task → text), but it also
@@ -30,6 +31,16 @@ export interface InvokerExtras {
   /** Pre-built content parts for the agent's HumanMessage. When provided, the runner skips
    * re-validating/re-reading raw attachments. */
   attachmentParts?: ContentPart[]
+  /**
+   * Session plugin HookRegistry for internal-loop tool interception.
+   * Distinct from the `hooks?: ExternalAgentHooks` argument on `invoke` (ACP permission bridge).
+   */
+  pluginHooks?: HookRegistry
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
 }
 
 export interface AgentInvoker {
@@ -57,6 +68,11 @@ export interface RunInternalArgs {
   attachments?: AttachmentPayload[]
   /** Pre-built content parts; passed through to runManagedAgent to avoid duplicate file I/O. */
   attachmentParts?: ContentPart[]
+  pluginHooks?: HookRegistry
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  parentAgentId?: string
 }
 
 export interface InvokerDeps {
@@ -97,9 +113,16 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
       attachments: a.attachments,
       attachmentParts: a.attachmentParts,
+      hooks: a.pluginHooks,
+      turnId: a.turnId,
+      runId: a.runId,
+      nodeId: a.nodeId,
+      agentId: a.agentId,
+      parentAgentId: a.parentAgentId,
     }))
   return {
-    async invoke(agentId, task, emit, signal, hooks, extras, attachments) {
+    // `hooks` here is ExternalAgentHooks (ACP permission bridge), not HookRegistry.
+    async invoke(agentId, task, emit, signal, externalHooks, extras, attachments) {
       const agent = readAgents().find((a) => a.id === agentId && a.enabled)
       if (!agent) throw new Error(`unknown or disabled agent: ${agentId}`)
 
@@ -115,7 +138,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         const narrowedSkills = extras?.skills?.filter((s) => allowedSkills.includes(s.id))
         const narrowedMcp = extras?.mcpTools?.filter((t) => serverIds.some((id) => t.name.startsWith(`mcp__${id}__`)))
         return runInternal({
-          agentId, resolved: resolveModel(agent, cwd), cwd, prompt: agent.prompt ?? '',
+          agentId: extras?.agentId ?? agentId,
+          resolved: resolveModel(agent, cwd), cwd, prompt: agent.prompt ?? '',
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,
           requestApproval: extras?.requestApproval, permissionMode: extras?.permissionMode,
@@ -123,6 +147,11 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           toolOutputStore: extras?.toolOutputStore, guardianReviewer: extras?.guardianReviewer,
           attachments,
           attachmentParts: extras?.attachmentParts,
+          pluginHooks: extras?.pluginHooks,
+          turnId: extras?.turnId,
+          runId: extras?.runId,
+          nodeId: extras?.nodeId,
+          parentAgentId: extras?.parentAgentId,
         })
       }
 
@@ -145,7 +174,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         compaction: emit.compaction,
       }
       try {
-        await provider.runTurn(task, teed, signal, hooks)
+        await provider.runTurn(task, teed, signal, externalHooks)
         return text
       } finally {
         provider.dispose()

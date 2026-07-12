@@ -258,6 +258,10 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
       networkPolicy: new NetworkPolicy(),
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+      hooks: host.hooks,
+      turnId,
+      agentId,
+      parentAgentId: 'supervisor',
       ...(priorContext.length > 0 ? { existingMessages: priorContext } : {}),
     })
   } catch (err) {
@@ -310,6 +314,10 @@ export async function resumeSubagent(host: SessionTurnHost, taskId: string, cont
       permissionMode: mode, requestApproval,
       existingMessages: [...existingMessages, new HumanMessage(content)],
       sessionId: host.id,
+      hooks: host.hooks,
+      turnId,
+      agentId: taskId,
+      parentAgentId: 'supervisor',
     })
     send({ type: 'agent:finished', sessionId: host.id, turnId, agentId: taskId })
     const ts = Date.now()

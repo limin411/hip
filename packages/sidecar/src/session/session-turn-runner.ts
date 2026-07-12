@@ -492,6 +492,10 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: host.modelRunner() }) : undefined,
       attachmentParts: agentParts,
+      pluginHooks: host.hooks,
+      turnId,
+      agentId: agent.id,
+      parentAgentId: 'supervisor',
     }, imageAttachments)
     // Prefer the locally-tee'd streamed text; fall back to the invoker's return value when the
     // graph's final AIMessage happens to be empty (e.g. tool-call-only final step).
@@ -605,7 +609,12 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         dagDef,
         rawSend,
         (s, turnId, text, traj, stopped) => host.finalizeAndPersist(s, turnId, text, traj, stopped),
-        { runInputs: { text: userText }, signal: host.abortController.signal },
+        {
+          runInputs: { text: userText },
+          signal: host.abortController.signal,
+          // UserPromptSubmit already fired in processInput.
+          skipUserPromptSubmit: true,
+        },
       )
     } finally {
       host.running = false
@@ -763,7 +772,15 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     if (taskId && host.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
     const existingMessages = taskId ? host.loadSubagentMessages(taskId) : undefined
     ensureStarted(childId, 'worker', 'supervisor', description, taskId)
-    const text = await runSubagent({ runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'), signal: signal ?? host.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS, permissionMode: mode, requestApproval, sessionId: host.id, networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore, guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined, ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}) })
+    const text = await runSubagent({
+      runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
+      signal: signal ?? host.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS,
+      permissionMode: mode, requestApproval, sessionId: host.id,
+      networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore,
+      guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+      hooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
+      ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}),
+    })
     ensureFinished(childId, text)
     return text
   }
@@ -799,7 +816,12 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       configOptions: () => {},
     }
     try {
-      const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? host.abortController!.signal, hooks, { mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: host.id, networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore, guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined })
+      const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? host.abortController!.signal, hooks, {
+        mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: host.id,
+        networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore,
+        guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+        pluginHooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
+      })
       ensureFinished(childId, text); return text || '(sub-agent produced no output)'
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') throw err
@@ -914,6 +936,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       planMode,
       memoryService: host.memoryService,
       useMemories,
+      turnId,
+      agentId: 'supervisor',
     })
     logDebug('session', 'phase:toolingDone', { sessionId: host.id, elapsedMs: Date.now() - t0, toolCount: tooling?.tools.length ?? 0 })
     // After reconcile: status reflects actual connection state
@@ -921,7 +945,14 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   }
 
   const maxSteps = host.activeActivity?.stepsRemaining ?? MAX_STEPS
-  const ctx: GraphCtx = { runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: host.hooks, sessionId: host.id, toolRunner: tooling?.toolRunner, toolPolicy: host.toolPolicy, approvalCache: host.approvalCache, requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools, blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id, maxSteps, planMode }
+  const ctx: GraphCtx = {
+    runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: host.hooks, sessionId: host.id,
+    turnId, agentId: 'supervisor',
+    toolRunner: tooling?.toolRunner, toolPolicy: host.toolPolicy, approvalCache: host.approvalCache,
+    requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools,
+    blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id,
+    maxSteps, planMode,
+  }
 
   let finalState: LoopState | undefined
   try {

@@ -40,6 +40,13 @@ export interface HookContext {
   toolInput?: Record<string, unknown>
   toolOutput?: string
   toolError?: string
+  /** Workflow run id (often equals turnId for workflow turns). */
+  runId?: string
+  /** Workflow node id when the active agent is a DAG node. */
+  nodeId?: string
+  /** Executing agent frame: supervisor | worker | node id | subagent-* */
+  agentId?: string
+  parentAgentId?: string
 }
 
 export interface Hook {

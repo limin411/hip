@@ -19,6 +19,7 @@ import type { ApprovalFn } from './tools.js'
 import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
+import type { HookRegistry } from './hooks/registry.js'
 
 export interface RunManagedAgentArgs {
   resolved: ResolvedModel | null      // the agent's bound model; null ⇒ global active model
@@ -42,6 +43,13 @@ export interface RunManagedAgentArgs {
   networkPolicy?: NetworkPolicy         // parent session's network policy (rate limits, SSRF guard)
   toolOutputStore?: ToolOutputStore     // parent session's tool output store (bound large outputs to files)
   guardianReviewer?: GuardianReviewer   // parent session's guardian reviewer (reads files before write)
+  /** Session plugin hook registry (distinct from ExternalAgentHooks on ACP providers). */
+  hooks?: HookRegistry
+  turnId?: string
+  runId?: string
+  nodeId?: string
+  agentId?: string
+  parentAgentId?: string
 }
 
 /**
@@ -53,14 +61,34 @@ export interface RunManagedAgentArgs {
  * through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
-  const { resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps, mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer } = args
+  const {
+    resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps,
+    mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer,
+    hooks, turnId, runId, nodeId, agentId, parentAgentId,
+  } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
   // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
   const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
   const toolNames = tools.map((t) => t.name)
-  const ctx: GraphCtx = { runner, tools, emit, summarizer, sessionId: args.sessionId ?? 'managed-agent', toolOutputStore, guardianReviewer }
+  const ctx: GraphCtx = {
+    runner,
+    tools,
+    emit,
+    summarizer,
+    sessionId: args.sessionId ?? 'managed-agent',
+    hooks,
+    turnId,
+    runId,
+    nodeId,
+    agentId,
+    parentAgentId,
+    toolOutputStore,
+    guardianReviewer,
+    requestApproval,
+    permissionMode,
+  }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {
     if (task) {

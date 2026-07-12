@@ -6,6 +6,7 @@ import type { GraphEmit } from './graph.js'
 import type { ApprovalFn } from './tools.js'
 import type { AgentInvoker, InvokerExtras } from './agents/invoker.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
+import type { HookRegistry } from './hooks/registry.js'
 
 /** Signature for the worker subagent runner (task-tool depth-1 subagent or workflow node). */
 export type RunSubagentFn = (input: string, signal: AbortSignal, nodeId?: string) => Promise<string>
@@ -17,6 +18,13 @@ export interface SessionAgentRunnerOpts {
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
   emit?: (nodeId: string) => GraphEmit
+  /**
+   * Session plugin HookRegistry for internal-loop tool interception.
+   * Distinct from ExternalAgentHooks used for ACP permission bridges.
+   */
+  pluginHooks?: HookRegistry
+  sessionId?: string
+  runId?: string
 }
 
 /**
@@ -69,7 +77,8 @@ export function createSessionAgentRunner(
       const emit = opts?.emit?.(req.nodeId) ?? noopEmit
 
       // Auto-reject HITL — orchestrator nodes cannot block waiting for user feedback.
-      const hooks: ExternalAgentHooks = {
+      // This is ExternalAgentHooks (ACP), not the plugin HookRegistry.
+      const externalHooks: ExternalAgentHooks = {
         requestPermission: async (_req): Promise<PermissionChoice> => ({ cancelled: true }),
         configOptions: () => {},
       }
@@ -81,11 +90,23 @@ export function createSessionAgentRunner(
               skills: opts.skills,
               requestApproval: opts.requestApproval,
               permissionMode: opts.permissionMode,
+              sessionId: opts.sessionId,
+              pluginHooks: opts.pluginHooks,
+              runId: opts.runId ?? req.runId,
+              nodeId: req.nodeId,
+              agentId: req.agentId,
+              parentAgentId: 'supervisor',
             }
-          : undefined
+          : {
+              pluginHooks: undefined,
+              runId: req.runId,
+              nodeId: req.nodeId,
+              agentId: req.agentId,
+              parentAgentId: 'supervisor',
+            }
 
       // The invoker handles agent lookup and throws for unknown/disabled agents.
-      const text = await invoker.invoke(req.agentId, req.input.text, emit, signal, hooks, extras)
+      const text = await invoker.invoke(req.agentId, req.input.text, emit, signal, externalHooks, extras)
       return { text, data: req.input.data }
     },
   }

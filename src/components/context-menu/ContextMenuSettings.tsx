@@ -169,7 +169,7 @@ export function ContextMenuSettings() {
   return (
     <>
       <div
-        className="flex items-center justify-between border-t border-border px-6 py-5"
+        className="flex items-center justify-between px-6 py-5"
         data-testid="context-menu-settings"
       >
         <div className="min-w-0 flex-1">

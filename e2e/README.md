@@ -5,6 +5,8 @@ WebdriverIO + `@wdio/tauri-service` against a debug Tauri binary and Vite on `:1
 Harness overview lives in this file. Feature plans:
 
 - Business coverage audit: [`docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md`](../docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md)
+- Run results (2026-07-13 unpaid): [`docs/superpowers/specs/2026-07-13-e2e-run-results.md`](../docs/superpowers/specs/2026-07-13-e2e-run-results.md)
+- Fix plan: [`docs/superpowers/specs/2026-07-13-e2e-fix-spec.md`](../docs/superpowers/specs/2026-07-13-e2e-fix-spec.md)
 - Context menu (recent): [`docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md`](../docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md)
 
 ## Prerequisites

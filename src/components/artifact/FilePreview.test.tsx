@@ -67,4 +67,33 @@ describe('FilePreview', () => {
     render(<FilePreview />)
     expect(document.querySelector('[data-context-menu-kind="filePreview"]')).toBeNull()
   })
+
+  it('shows path chrome above HTML iframe for context-menu hit target', () => {
+    setPreview({
+      status: 'ready',
+      path: '/tmp/index.html',
+      content: '<p>hi</p>',
+      mimeType: 'text/html',
+      encoding: 'utf8',
+    })
+    render(<FilePreview />)
+    expect(screen.getByTestId('preview-html-shell')).toBeInTheDocument()
+    const chrome = screen.getByTestId('preview-chrome')
+    expect(chrome).toHaveTextContent('/tmp/index.html')
+    expect(chrome.closest('[data-context-menu-kind="filePreview"]')).toBeTruthy()
+  })
+
+  it('shows path chrome above PDF iframe', () => {
+    setPreview({
+      status: 'ready',
+      path: '/tmp/doc.pdf',
+      content: 'JVBERi0=',
+      mimeType: 'application/pdf',
+      encoding: 'base64',
+    })
+    render(<FilePreview />)
+    expect(screen.getByTestId('preview-pdf-shell')).toBeInTheDocument()
+    expect(screen.getByTestId('preview-chrome')).toHaveTextContent('/tmp/doc.pdf')
+    expect(screen.getByTestId('preview-pdf')).toBeInTheDocument()
+  })
 })

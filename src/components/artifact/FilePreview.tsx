@@ -18,6 +18,33 @@ function TruncBanner({ text }: { text: string }) {
   return <div className="mb-2 rounded bg-surface-muted px-2 py-1 text-meta text-ink-tertiary">{text}</div>
 }
 
+/**
+ * Path chrome above full-bleed iframes so right-click reaches the host ContextMenuTrigger.
+ * iframe documents swallow contextmenu; design: "Menu on chrome".
+ */
+function IframePreviewChrome({
+  path,
+  testid,
+  children,
+}: {
+  path: string
+  testid: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col" data-testid={testid}>
+      <div
+        className="shrink-0 truncate border-b border-border bg-surface-muted px-2 py-1 font-mono text-meta text-ink-tertiary"
+        data-testid="preview-chrome"
+        title={path}
+      >
+        {path}
+      </div>
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
 /** Layout lives on children so CONTEXT_MENUS=false (bare fragment) does not collapse h-full. */
 function withPreviewMenu(
   path: string,
@@ -97,7 +124,9 @@ export function FilePreview() {
       cwd,
       undefined,
       preview.mimeType,
-      <iframe data-testid="preview-pdf" title="preview" className="h-full w-full border-0 bg-white" src={`data:${preview.mimeType};base64,${preview.content}`} />,
+      <IframePreviewChrome path={preview.path} testid="preview-pdf-shell">
+        <iframe data-testid="preview-pdf" title="preview" className="h-full w-full border-0 bg-white" src={`data:${preview.mimeType};base64,${preview.content}`} />
+      </IframePreviewChrome>,
     )
   }
 
@@ -107,7 +136,9 @@ export function FilePreview() {
       cwd,
       textContent,
       preview.mimeType,
-      <iframe data-testid="preview-html" title="preview" sandbox="" className="h-full w-full border-0 bg-white" srcDoc={preview.content} />,
+      <IframePreviewChrome path={preview.path} testid="preview-html-shell">
+        <iframe data-testid="preview-html" title="preview" sandbox="" className="h-full w-full border-0 bg-white" srcDoc={preview.content} />
+      </IframePreviewChrome>,
     )
   }
 

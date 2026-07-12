@@ -36,7 +36,6 @@ describe('LoginBrandPanel', () => {
     )
 
     expect(getByText(i18n.t('login.brandHeadline'))).toBeInTheDocument()
-    expect(getByText(i18n.t('login.feature1'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.liveBadge'))).toBeInTheDocument()
     // public/motion row (3× crossfade stages), not the static logo mark
@@ -46,7 +45,7 @@ describe('LoginBrandPanel', () => {
     expect(container.querySelector('img[src="/logo.svg"]')).toBeNull()
     expect(container.querySelectorAll('[data-dust]').length).toBeGreaterThan(0)
     expect(container.querySelectorAll('[data-parallax]').length).toBeGreaterThan(0)
-    expect(container.querySelectorAll('[data-feature-index]').length).toBe(3)
+    expect(container.querySelectorAll('[data-feature-index]').length).toBe(0)
 
     await waitFor(() => {
       const items = container.querySelectorAll('[data-brand-item]')

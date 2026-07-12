@@ -787,7 +787,7 @@ export const en = {
       brandLine2: 'agents',
       brandLine3: 'that ship.',
       brandHeadline: 'Build with agents that ship',
-      brandDesc: 'Local AI. Real projects. One desktop workbench.',
+      brandDesc: 'Real projects. One desktop workbench.',
       brandFeaturesLabel: 'Highlights',
       feature1: 'Local-first',
       feature2: 'Multi-agent',

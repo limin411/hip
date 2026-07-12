@@ -781,7 +781,7 @@ export const zhTW = {
       brandLine2: '交付',
       brandLine3: '真實工作',
       brandHeadline: '用智能體交付真實工作',
-      brandDesc: '本地 AI · 真實專案 · 桌面工作台',
+      brandDesc: '真實專案 · 桌面工作台',
       brandFeaturesLabel: '產品亮點',
       feature1: '本地優先',
       feature2: '多智能體',

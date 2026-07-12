@@ -781,7 +781,7 @@ export const zhCN = {
       brandLine2: '交付',
       brandLine3: '真实工作',
       brandHeadline: '用智能体交付真实工作',
-      brandDesc: '本地 AI · 真实项目 · 桌面工作台',
+      brandDesc: '真实项目 · 桌面工作台',
       brandFeaturesLabel: '产品亮点',
       feature1: '本地优先',
       feature2: '多智能体',

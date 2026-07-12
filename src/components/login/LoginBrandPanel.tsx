@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import gsap from 'gsap'
 import { MascotActor } from '@/components/login/MascotActor'
 
-const FEATURE_KEYS = ['feature1', 'feature2', 'feature3'] as const
 const TAGLINE_KEYS = ['slogan', 'tagline2', 'tagline3'] as const
 const STICKER_KEYS = ['sticker1', 'sticker2', 'sticker3'] as const
 
@@ -25,8 +24,6 @@ const PLAY_COLORS = {
   pink: '#f72585',
   sage: '#6b7c5c',
 } as const
-
-const FEATURE_COLORS = [PLAY_COLORS.coral, PLAY_COLORS.sky, PLAY_COLORS.violet] as const
 
 const CONFETTI: Array<{
   top: string
@@ -184,8 +181,6 @@ export function LoginBrandPanel() {
       const light = cursorLightRef.current
       if (light) gsap.killTweensOf(light)
       root.querySelectorAll('[data-parallax]').forEach((n) => gsap.killTweensOf(n))
-      root.querySelectorAll('[data-constellation]').forEach((n) => gsap.killTweensOf(n))
-      root.querySelectorAll('[data-feature-link]').forEach((n) => gsap.killTweensOf(n))
     }
 
     const applyReducedMotion = () => {
@@ -272,18 +267,6 @@ export function LoginBrandPanel() {
             duration: 1.6,
             delay: 0.2 + i * 0.12,
             ease: 'power2.inOut',
-          })
-        })
-
-        const linkPaths = root.querySelectorAll<SVGGeometryElement>('[data-feature-link]')
-        linkPaths.forEach((line, i) => {
-          const len = typeof line.getTotalLength === 'function' ? line.getTotalLength() : 200
-          gsap.set(line, { strokeDasharray: len, strokeDashoffset: len, opacity: 0.2 })
-          gsap.to(line, {
-            strokeDashoffset: 0,
-            duration: 1.2,
-            delay: 1.1 + i * 0.18,
-            ease: 'power2.out',
           })
         })
 
@@ -502,52 +485,7 @@ export function LoginBrandPanel() {
         layers.forEach((layer) => {
           gsap.to(layer, { x: 0, y: 0, duration: 1, ease: 'power2.out' })
         })
-        root.querySelectorAll('[data-constellation]').forEach((n) => {
-          gsap.to(n, {
-            opacity: Number((n as HTMLElement).dataset.baseOpacity) || 0.45,
-            duration: 0.3,
-          })
-        })
-        root.querySelectorAll('[data-feature-link]').forEach((n) => {
-          gsap.to(n, { opacity: 0.2, attr: { 'stroke-width': 1 }, duration: 0.3 })
-        })
       }
-
-      const featureItems = content.querySelectorAll<HTMLElement>('[data-feature-index]')
-      const clearFeatureFx = () => {
-        root.querySelectorAll<SVGCircleElement>('[data-constellation]').forEach((n) => {
-          const base = Number(n.dataset.baseOpacity) || 0.45
-          const baseR = Number(n.dataset.baseR) || 1.5
-          gsap.to(n, { opacity: base, attr: { r: baseR }, duration: 0.35 })
-        })
-        root.querySelectorAll<SVGElement>('[data-feature-link]').forEach((n) => {
-          gsap.to(n, { opacity: 0.2, attr: { 'stroke-width': 1 }, duration: 0.35 })
-        })
-      }
-      const onFeatureEnter = (index: number) => {
-        clearFeatureFx()
-        root.querySelectorAll<SVGCircleElement>(`[data-constellation="${index}"]`).forEach((n) => {
-          const baseR = Number(n.dataset.baseR) || 1.5
-          gsap.to(n, { opacity: 1, attr: { r: baseR * 2.4 }, duration: 0.35 })
-        })
-        root.querySelectorAll<SVGElement>(`[data-feature-link="${index}"]`).forEach((n) => {
-          gsap.to(n, { opacity: 0.85, attr: { 'stroke-width': 1.5 }, duration: 0.35 })
-        })
-      }
-
-      const featureHandlers: Array<{
-        el: HTMLElement
-        enter: () => void
-        leave: () => void
-      }> = []
-      featureItems.forEach((el) => {
-        const idx = Number(el.dataset.featureIndex)
-        const enter = () => onFeatureEnter(idx)
-        const leave = clearFeatureFx
-        el.addEventListener('pointerenter', enter)
-        el.addEventListener('pointerleave', leave)
-        featureHandlers.push({ el, enter, leave })
-      })
 
       root.addEventListener('pointermove', onMove)
       root.addEventListener('pointerenter', onEnter)
@@ -557,10 +495,6 @@ export function LoginBrandPanel() {
         root.removeEventListener('pointermove', onMove)
         root.removeEventListener('pointerenter', onEnter)
         root.removeEventListener('pointerleave', onLeave)
-        featureHandlers.forEach(({ el, enter, leave }) => {
-          el.removeEventListener('pointerenter', enter)
-          el.removeEventListener('pointerleave', leave)
-        })
         killInteractiveTweens()
       }
     }
@@ -745,62 +679,10 @@ export function LoginBrandPanel() {
           <path data-geo-line d="M0 640 L320 900" stroke="rgba(17,17,17,0.06)" />
           <path data-geo-line d="M140 160 L420 400" stroke="rgba(17,17,17,0.06)" />
 
-          <circle
-            data-constellation="0"
-            data-base-opacity="0.85"
-            data-base-r="3"
-            cx="180"
-            cy="200"
-            r="3"
-            fill={PLAY_COLORS.coral}
-            stroke="none"
-            opacity={0.85}
-          />
-          <circle
-            data-constellation="1"
-            data-base-opacity="0.8"
-            data-base-r="2.5"
-            cx="210"
-            cy="248"
-            r="2.5"
-            fill={PLAY_COLORS.sky}
-            stroke="none"
-            opacity={0.8}
-          />
-          <circle
-            data-constellation="2"
-            data-base-opacity="0.8"
-            data-base-r="2.5"
-            cx="152"
-            cy="260"
-            r="2.5"
-            fill={PLAY_COLORS.violet}
-            stroke="none"
-            opacity={0.8}
-          />
+          <circle cx="180" cy="200" r="3" fill={PLAY_COLORS.coral} stroke="none" opacity={0.85} />
+          <circle cx="210" cy="248" r="2.5" fill={PLAY_COLORS.sky} stroke="none" opacity={0.8} />
+          <circle cx="152" cy="260" r="2.5" fill={PLAY_COLORS.violet} stroke="none" opacity={0.8} />
           <path data-geo-line d="M180 200 L210 248 L152 260 Z" stroke={PLAY_COLORS.mint} strokeOpacity="0.45" />
-
-          <path
-            data-feature-link="0"
-            d="M524 250 C 420 250, 340 300, 280 360"
-            stroke={PLAY_COLORS.coral}
-            strokeOpacity="0.45"
-            strokeLinecap="round"
-          />
-          <path
-            data-feature-link="1"
-            d="M524 280 C 400 300, 330 360, 280 420"
-            stroke={PLAY_COLORS.sky}
-            strokeOpacity="0.4"
-            strokeLinecap="round"
-          />
-          <path
-            data-feature-link="2"
-            d="M524 310 C 400 340, 330 410, 280 480"
-            stroke={PLAY_COLORS.violet}
-            strokeOpacity="0.35"
-            strokeLinecap="round"
-          />
         </g>
       </svg>
 
@@ -1009,38 +891,6 @@ export function LoginBrandPanel() {
             {t('login.brandDesc')}
           </p>
 
-          {/* Feature strip — colorful keyword cards */}
-          <ul
-            className="mt-10 flex flex-wrap items-stretch gap-3"
-            aria-label={t('login.brandFeaturesLabel')}
-          >
-            {FEATURE_KEYS.map((key, i) => {
-              const c = FEATURE_COLORS[i] ?? PLAY_COLORS.sage
-              return (
-                <li
-                  key={key}
-                  data-brand-item
-                  data-feature-index={i}
-                  className="group flex min-w-[7.5rem] flex-1 cursor-default flex-col gap-2 rounded-2xl border-2 px-4 py-4 transition-transform duration-300 hover:-translate-y-0.5"
-                  style={{
-                    opacity: 0,
-                    borderColor: `${c}55`,
-                    backgroundColor: `${c}12`,
-                  }}
-                >
-                  <span
-                    className="inline-flex h-6 w-fit items-center rounded-full px-2 text-caption font-bold tabular-nums tracking-[0.14em] text-white"
-                    style={{ backgroundColor: c }}
-                  >
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="text-title font-semibold tracking-tight text-ink">
-                    {t(`login.${key}`)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
         </div>
 
         {/* Footer bar */}

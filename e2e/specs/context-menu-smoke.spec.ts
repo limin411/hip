@@ -17,7 +17,7 @@ import {
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
 import { selectPanelTab } from '../helpers/panel.js'
-import { openSettings, closeSettings } from '../helpers/settings.js'
+import { openSettings, closeSettings, openContextMenuSettingsDialog } from '../helpers/settings.js'
 import { switchToChatSurface, switchToCodeSurface } from '../helpers/surface.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
@@ -109,12 +109,14 @@ describe('context menu smoke @context-menu @smoke @core', () => {
     await closeContextMenu()
   })
 
-  it('CM-S4: settings general exposes context-menu prefs panel', async () => {
+  it('CM-S4: settings general exposes context-menu prefs via configure dialog', async () => {
     await openSettings()
     try {
       const panel = await browser.$('[data-testid="context-menu-settings"]')
       await panel.waitForExist({ timeout: 15000 })
       expect(await panel.isExisting()).toBe(true)
+
+      await openContextMenuSettingsDialog()
 
       // At least one catalog row for a known kind.
       const kind = await browser.$('[data-testid="context-menu-settings-kind-message"]')

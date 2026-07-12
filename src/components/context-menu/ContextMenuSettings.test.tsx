@@ -81,11 +81,21 @@ describe('catalogKinds', () => {
   })
 })
 
+function openContextMenuSettingsDialog() {
+  fireEvent.click(screen.getByTestId('context-menu-settings-open'))
+  expect(screen.getByTestId('context-menu-settings-dialog')).toBeInTheDocument()
+}
+
 describe('ContextMenuSettings', () => {
-  it('renders catalog sections and items from listCatalogItems only', () => {
+  it('renders a compact row; catalog items only appear after opening the dialog', () => {
     render(<ContextMenuSettings />)
     expect(screen.getByTestId('context-menu-settings')).toBeInTheDocument()
-    expect(screen.getByText('settings.contextMenu.title')).toBeInTheDocument()
+    expect(screen.getByTestId('context-menu-settings-open')).toBeInTheDocument()
+    expect(screen.getAllByText('settings.contextMenu.title').length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('context-menu-settings-dialog')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('context-menu-settings-item-message.copy')).not.toBeInTheDocument()
+
+    openContextMenuSettingsDialog()
 
     const catalog = listCatalogItems()
     expect(catalog.length).toBeGreaterThan(0)
@@ -96,6 +106,7 @@ describe('ContextMenuSettings', () => {
 
   it('shows message items in mergeByGroup order by default', () => {
     render(<ContextMenuSettings />)
+    openContextMenuSettingsDialog()
     const section = screen.getByTestId('context-menu-settings-kind-message')
     const rows = within(section).getAllByTestId(/context-menu-settings-item-/)
     expect(rows.map((r) => r.getAttribute('data-testid'))).toEqual([
@@ -109,6 +120,7 @@ describe('ContextMenuSettings', () => {
 
   it('hides an item via checkbox and persists disabledIds', () => {
     render(<ContextMenuSettings />)
+    openContextMenuSettingsDialog()
     const id = 'message.copy'
     const checkbox = screen.getByTestId(`context-menu-settings-visible-${id}`)
     expect(checkbox).toBeChecked()
@@ -120,6 +132,7 @@ describe('ContextMenuSettings', () => {
 
   it('sequential hides both land in disabledIds (functional setPrefs)', () => {
     render(<ContextMenuSettings />)
+    openContextMenuSettingsDialog()
     fireEvent.click(screen.getByTestId('context-menu-settings-visible-message.copy'))
     fireEvent.click(screen.getByTestId('context-menu-settings-visible-message.quote'))
     const ids = loadPrefs().disabledIds
@@ -129,6 +142,7 @@ describe('ContextMenuSettings', () => {
 
   it('reorders from group baseline and persists orderByKind as a single adjacent swap', () => {
     render(<ContextMenuSettings />)
+    openContextMenuSettingsDialog()
     const kind = 'message'
     const section = screen.getByTestId(`context-menu-settings-kind-${kind}`)
     const baseline = defaultItemsForKind(kind).map((m) => m.id)
@@ -150,6 +164,7 @@ describe('ContextMenuSettings', () => {
 
   it('reset restores defaults and clears storage', () => {
     render(<ContextMenuSettings />)
+    openContextMenuSettingsDialog()
     fireEvent.click(screen.getByTestId('context-menu-settings-visible-message.copy'))
     expect(loadPrefs().disabledIds).toContain('message.copy')
 

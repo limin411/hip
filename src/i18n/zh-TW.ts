@@ -348,6 +348,7 @@ export const zhTW = {
       contextMenu: {
         title: '右鍵選單',
         description: '選擇要顯示的右鍵操作及其順序。',
+        configure: '設定',
         reset: '恢復預設',
         showItem: '顯示{{label}}',
         moveUp: '將{{label}}上移',

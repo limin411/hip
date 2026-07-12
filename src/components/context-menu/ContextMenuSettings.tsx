@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { listCatalogItems } from './catalog'
 import {
   defaultContextMenuPrefs,
@@ -103,7 +104,13 @@ export function catalogKinds(): ContextKind[] {
 
 export function ContextMenuSettings() {
   const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
   const [prefs, setPrefs] = useState<ContextMenuPrefs>(() => loadPrefs())
+
+  // Refresh from storage when the dialog opens (other tabs / reset outside).
+  useEffect(() => {
+    if (open) setPrefs(loadPrefs())
+  }, [open])
 
   const kinds = useMemo(() => catalogKinds(), [])
 
@@ -160,8 +167,11 @@ export function ContextMenuSettings() {
   const disabled = useMemo(() => new Set(prefs.disabledIds), [prefs.disabledIds])
 
   return (
-    <div className="border-t border-border px-6 py-5" data-testid="context-menu-settings">
-      <div className="flex items-start justify-between gap-4">
+    <>
+      <div
+        className="flex items-center justify-between border-t border-border px-6 py-5"
+        data-testid="context-menu-settings"
+      >
         <div className="min-w-0 flex-1">
           <div className="text-prose font-medium text-ink">{t('settings.contextMenu.title')}</div>
           <div className="mt-0.5 text-meta text-ink-tertiary">
@@ -172,94 +182,117 @@ export function ContextMenuSettings() {
           type="button"
           variant="outline"
           size="sm"
-          onClick={handleReset}
-          data-testid="context-menu-settings-reset"
+          className="ml-4 shrink-0"
+          onClick={() => setOpen(true)}
+          data-testid="context-menu-settings-open"
         >
-          {t('settings.contextMenu.reset')}
+          {t('settings.contextMenu.configure')}
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-5">
-        {kinds.map((kind) => {
-          const items = itemsForKind(kind, prefs.orderByKind?.[kind])
-          if (items.length === 0) return null
-          return (
-            <div key={kind} data-testid={`context-menu-settings-kind-${kind}`}>
-              <div className="mb-2 text-body font-medium text-ink-secondary">
-                {kindLabel(kind)}
-              </div>
-              <ul className="flex flex-col gap-1 rounded-md border border-border bg-surface">
-                {items.map((item, index) => {
-                  const visible = !disabled.has(item.id)
-                  const inputId = `ctx-menu-item-${item.id}`
-                  const label = itemLabel(item.labelKey)
-                  return (
-                    <li
-                      key={item.id}
-                      className={cn(
-                        'flex items-center gap-2 px-2.5 py-1.5',
-                        index > 0 && 'border-t border-border/60',
-                      )}
-                      data-testid={`context-menu-settings-item-${item.id}`}
-                    >
-                      <input
-                        id={inputId}
-                        type="checkbox"
-                        className="h-3.5 w-3.5 shrink-0 rounded border-border text-accent focus:ring-accent/60"
-                        checked={visible}
-                        onChange={(e) => setVisible(item.id, e.target.checked)}
-                        aria-label={t('settings.contextMenu.showItem', { label })}
-                        data-testid={`context-menu-settings-visible-${item.id}`}
-                      />
-                      <label
-                        htmlFor={inputId}
+      <Modal
+        open={open}
+        onOpenChange={setOpen}
+        title={t('settings.contextMenu.title')}
+        className="max-w-md"
+        footer={
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              data-testid="context-menu-settings-reset"
+            >
+              {t('settings.contextMenu.reset')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-5 p-5" data-testid="context-menu-settings-dialog">
+          <p className="text-meta text-ink-tertiary">{t('settings.contextMenu.description')}</p>
+
+          {kinds.map((kind) => {
+            const items = itemsForKind(kind, prefs.orderByKind?.[kind])
+            if (items.length === 0) return null
+            return (
+              <div key={kind} data-testid={`context-menu-settings-kind-${kind}`}>
+                <div className="mb-2 text-body font-medium text-ink-secondary">
+                  {kindLabel(kind)}
+                </div>
+                <ul className="flex flex-col gap-1 rounded-md border border-border bg-surface">
+                  {items.map((item, index) => {
+                    const visible = !disabled.has(item.id)
+                    const inputId = `ctx-menu-item-${item.id}`
+                    const label = itemLabel(item.labelKey)
+                    return (
+                      <li
+                        key={item.id}
                         className={cn(
-                          'min-w-0 flex-1 cursor-pointer truncate text-body text-ink',
-                          !visible && 'text-ink-tertiary line-through',
+                          'flex items-center gap-2 px-2.5 py-1.5',
+                          index > 0 && 'border-t border-border/60',
                         )}
+                        data-testid={`context-menu-settings-item-${item.id}`}
                       >
-                        {label}
-                      </label>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <button
-                          type="button"
+                        <input
+                          id={inputId}
+                          type="checkbox"
+                          className="h-3.5 w-3.5 shrink-0 rounded border-border text-accent focus:ring-accent/60"
+                          checked={visible}
+                          onChange={(e) => setVisible(item.id, e.target.checked)}
+                          aria-label={t('settings.contextMenu.showItem', { label })}
+                          data-testid={`context-menu-settings-visible-${item.id}`}
+                        />
+                        <label
+                          htmlFor={inputId}
                           className={cn(
-                            'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
-                            'hover:bg-surface-muted hover:text-ink',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-                            'disabled:pointer-events-none disabled:opacity-30',
+                            'min-w-0 flex-1 cursor-pointer truncate text-body text-ink',
+                            !visible && 'text-ink-tertiary line-through',
                           )}
-                          disabled={index === 0}
-                          onClick={() => moveItem(kind, item.id, -1)}
-                          aria-label={t('settings.contextMenu.moveUp', { label })}
-                          data-testid={`context-menu-settings-up-${item.id}`}
                         >
-                          <ChevronUp size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
-                            'hover:bg-surface-muted hover:text-ink',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-                            'disabled:pointer-events-none disabled:opacity-30',
-                          )}
-                          disabled={index === items.length - 1}
-                          onClick={() => moveItem(kind, item.id, 1)}
-                          aria-label={t('settings.contextMenu.moveDown', { label })}
-                          data-testid={`context-menu-settings-down-${item.id}`}
-                        >
-                          <ChevronDown size={14} />
-                        </button>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+                          {label}
+                        </label>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <button
+                            type="button"
+                            className={cn(
+                              'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
+                              'hover:bg-surface-muted hover:text-ink',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                              'disabled:pointer-events-none disabled:opacity-30',
+                            )}
+                            disabled={index === 0}
+                            onClick={() => moveItem(kind, item.id, -1)}
+                            aria-label={t('settings.contextMenu.moveUp', { label })}
+                            data-testid={`context-menu-settings-up-${item.id}`}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className={cn(
+                              'inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary',
+                              'hover:bg-surface-muted hover:text-ink',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                              'disabled:pointer-events-none disabled:opacity-30',
+                            )}
+                            disabled={index === items.length - 1}
+                            onClick={() => moveItem(kind, item.id, 1)}
+                            aria-label={t('settings.contextMenu.moveDown', { label })}
+                            data-testid={`context-menu-settings-down-${item.id}`}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      </Modal>
+    </>
   )
 }

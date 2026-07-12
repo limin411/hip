@@ -17,7 +17,11 @@ import {
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
 import { closeHistory, openHistory } from '../helpers/history.js'
-import { openSettings, closeSettings } from '../helpers/settings.js'
+import {
+  openSettings,
+  closeSettings,
+  openContextMenuSettingsDialog,
+} from '../helpers/settings.js'
 import { switchToChatSurface } from '../helpers/surface.js'
 
 const QUOTE_BODY = 'quote me for e2e composer insert'
@@ -36,6 +40,7 @@ async function dismissOpenModals(): Promise<void> {
   for (const sel of [
     '[data-testid="confirm-delete-sessions"]',
     '[data-testid="rename-session-input"]',
+    '[data-testid="context-menu-settings-dialog"]',
   ]) {
     const el = await browser.$(sel)
     if (await el.isExisting()) {
@@ -297,8 +302,7 @@ describe('context menu core @context-menu @core', () => {
 
     await openSettings()
     try {
-      const panel = await browser.$('[data-testid="context-menu-settings"]')
-      await panel.waitForExist({ timeout: 15000 })
+      await openContextMenuSettingsDialog()
 
       const quoteVisible = await browser.$(
         '[data-testid="context-menu-settings-visible-message.quote"]',
@@ -326,6 +330,7 @@ describe('context menu core @context-menu @core', () => {
     // Reset prefs.
     await openSettings()
     try {
+      await openContextMenuSettingsDialog()
       const reset = await browser.$('[data-testid="context-menu-settings-reset"]')
       await reset.waitForExist({ timeout: 10000 })
       await browser.execute((el: HTMLElement) => el.click(), reset)

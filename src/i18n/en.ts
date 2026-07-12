@@ -350,6 +350,7 @@ export const en = {
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',
+        configure: 'Configure',
         reset: 'Reset to defaults',
         showItem: 'Show {{label}}',
         moveUp: 'Move {{label}} up',

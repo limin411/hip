@@ -348,6 +348,7 @@ export const zhCN = {
       contextMenu: {
         title: '右键菜单',
         description: '选择要显示的右键操作及其顺序。',
+        configure: '配置',
         reset: '恢复默认',
         showItem: '显示{{label}}',
         moveUp: '将{{label}}上移',

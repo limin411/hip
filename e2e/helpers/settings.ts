@@ -21,3 +21,14 @@ export async function closeSettings(): Promise<void> {
     { timeout: 10000, interval: 200 },
   )
 }
+
+/** Open General → Context menus configure dialog (item list lives in the modal). */
+export async function openContextMenuSettingsDialog(): Promise<void> {
+  const row = await browser.$('[data-testid="context-menu-settings"]')
+  await row.waitForExist({ timeout: 15000 })
+  const openBtn = await browser.$('[data-testid="context-menu-settings-open"]')
+  await openBtn.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), openBtn)
+  const dialog = await browser.$('[data-testid="context-menu-settings-dialog"]')
+  await dialog.waitForExist({ timeout: 10000 })
+}

@@ -4,7 +4,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import type { PluginMeta } from '@hip/protocol'
 import { HookConfig } from './HookConfig'
-import { HOOK_EVENT_CATALOG, pluginsWithHooks, totalConfiguredHookCount } from './hookCatalog'
+import {
+  HOOK_EVENT_CATALOG,
+  configuredHookEvents,
+  pluginsWithHooks,
+  totalConfiguredHookCount,
+} from './hookCatalog'
 
 const load = vi.fn(async () => {})
 
@@ -29,7 +34,12 @@ vi.mock('@/store/pluginsStore', () => ({
 }))
 
 vi.mock('@/components/ui/Badge', () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  Badge: ({
+    children,
+    ...rest
+  }: { children: React.ReactNode } & Record<string, unknown>) => (
+    <span {...rest}>{children}</span>
+  ),
 }))
 
 let mockPlugins: PluginMeta[] = []
@@ -43,6 +53,7 @@ function plugin(partial: Partial<PluginMeta> & Pick<PluginMeta, 'id' | 'name' | 
     skills: [],
     mcpServers: [],
     agents: [],
+    hookEvents: [],
     ...partial,
   }
 }
@@ -62,6 +73,14 @@ describe('hookCatalog helpers', () => {
     expect(pluginsWithHooks(list).map((p) => p.id)).toEqual(['b'])
     expect(totalConfiguredHookCount(list)).toBe(2)
   })
+
+  it('aggregates unique configured events across plugins', () => {
+    const list = [
+      plugin({ id: 'a', name: 'A', hookCount: 1, hookEvents: ['PreToolUse', 'Stop'] }),
+      plugin({ id: 'b', name: 'B', hookCount: 1, hookEvents: ['PreToolUse', 'SessionStart'] }),
+    ]
+    expect([...configuredHookEvents(list)].sort()).toEqual(['PreToolUse', 'SessionStart', 'Stop'])
+  })
 })
 
 describe('HookConfig', () => {
@@ -78,9 +97,11 @@ describe('HookConfig', () => {
   it('renders catalog of configurable hook events', () => {
     render(<HookConfig />)
     expect(screen.getByTestId('settings-hooks-page')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-lifecycle-diagram')).toBeInTheDocument()
     for (const event of HOOK_EVENT_CATALOG) {
       expect(screen.getByTestId(`hook-event-${event}`)).toBeInTheDocument()
-      expect(screen.getByText(event)).toBeInTheDocument()
+      expect(screen.getByTestId(`hook-diagram-node-${event}`)).toBeInTheDocument()
+      expect(screen.getByTestId(`hook-diagram-node-${event}`)).toHaveAttribute('data-configured', 'false')
     }
   })
 
@@ -93,7 +114,13 @@ describe('HookConfig', () => {
   it('lists plugins that contribute hooks', () => {
     mockPlugins = [
       plugin({ id: 'plain', name: 'Plain', hookCount: 0 }),
-      plugin({ id: 'guard', name: 'Guard Plugin', hookCount: 3, dir: '/tmp/guard' }),
+      plugin({
+        id: 'guard',
+        name: 'Guard Plugin',
+        hookCount: 3,
+        dir: '/tmp/guard',
+        hookEvents: ['PreToolUse', 'PermissionRequest'],
+      }),
     ]
     render(<HookConfig />)
     expect(screen.getByTestId('hook-source-guard')).toBeInTheDocument()
@@ -101,6 +128,16 @@ describe('HookConfig', () => {
     expect(screen.getByText('3 hooks')).toBeInTheDocument()
     expect(screen.getByText('/tmp/guard')).toBeInTheDocument()
     expect(screen.queryByTestId('hook-source-plain')).not.toBeInTheDocument()
+    expect(screen.getByTestId('hook-diagram-node-PreToolUse')).toHaveAttribute('data-configured', 'true')
+    expect(screen.getByTestId('hook-diagram-node-PermissionRequest')).toHaveAttribute(
+      'data-configured',
+      'true',
+    )
+    expect(screen.getByTestId('hook-diagram-node-SessionStart')).toHaveAttribute(
+      'data-configured',
+      'false',
+    )
+    expect(screen.getByTestId('hook-event-configured-PreToolUse')).toBeInTheDocument()
   })
 
   it('loads plugins when store is not yet loaded', () => {

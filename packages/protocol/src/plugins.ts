@@ -36,4 +36,6 @@ export interface PluginMeta {
   mcpServers: McpServerConfig[]       // MCP server configs extracted from manifest
   agents: string[]                    // agent IDs extracted from manifest
   hookCount: number                   // number of hook entries declared
+  /** Unique HookEvent names detected in the plugin's hooks module/JSON (best-effort scan). */
+  hookEvents: string[]
 }

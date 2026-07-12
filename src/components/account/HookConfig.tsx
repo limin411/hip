@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link2, Package } from 'lucide-react'
 import type { PluginMeta } from '@hip/protocol'
@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/Badge'
 import {
   HOOK_EVENT_CATALOG,
   HOOK_EVENT_DESC_KEYS,
+  configuredHookEvents,
   pluginsWithHooks,
   totalConfiguredHookCount,
 } from './hookCatalog'
+import { HookLifecycleDiagram } from './HookLifecycleDiagram'
 
 function ConfiguredPluginRow({ plugin }: { plugin: PluginMeta }) {
   const { t } = useTranslation()
@@ -30,8 +32,13 @@ function ConfiguredPluginRow({ plugin }: { plugin: PluginMeta }) {
           {plugin.dir}
         </div>
       </div>
-      <div className="shrink-0 text-meta text-ink-secondary">
-        {t('settings.hooks.hookCount', { count: plugin.hookCount })}
+      <div className="shrink-0 text-right text-meta text-ink-secondary">
+        <div>{t('settings.hooks.hookCount', { count: plugin.hookCount })}</div>
+        {(plugin.hookEvents?.length ?? 0) > 0 && (
+          <div className="mt-0.5 max-w-[14rem] truncate font-mono text-caption text-ink-tertiary" title={plugin.hookEvents.join(', ')}>
+            {plugin.hookEvents.join(', ')}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -47,6 +54,7 @@ export function HookConfig() {
 
   const sources = pluginsWithHooks(plugins)
   const total = totalConfiguredHookCount(plugins)
+  const configuredEvents = useMemo(() => configuredHookEvents(plugins), [plugins])
 
   return (
     <div className="p-6" data-testid="settings-hooks-page">
@@ -58,6 +66,14 @@ export function HookConfig() {
       <div className="mt-4 rounded-md border border-border bg-surface-subtle px-3 py-2.5 text-meta text-ink-secondary">
         {t('settings.hooks.editHint')}
       </div>
+
+      {/* ── Lifecycle diagram ────────────────────────────────────────── */}
+      <section className="mt-8" aria-labelledby="hooks-diagram-heading">
+        <h3 id="hooks-diagram-heading" className="sr-only">
+          {t('settings.hooks.diagram.title')}
+        </h3>
+        <HookLifecycleDiagram configuredEvents={configuredEvents} />
+      </section>
 
       {/* ── Currently configured ─────────────────────────────────────── */}
       <section className="mt-8" aria-labelledby="hooks-configured-heading">
@@ -116,6 +132,15 @@ export function HookConfig() {
               <span className="min-w-0 flex-1 text-meta text-ink-secondary">
                 {t(HOOK_EVENT_DESC_KEYS[event])}
               </span>
+              {configuredEvents.has(event) ? (
+                <Badge size="sm" variant="accent" data-testid={`hook-event-configured-${event}`}>
+                  {t('settings.hooks.diagram.configuredBadge')}
+                </Badge>
+              ) : (
+                <span className="shrink-0 text-caption text-ink-tertiary">
+                  {t('settings.hooks.diagram.notConfigured')}
+                </span>
+              )}
             </li>
           ))}
         </ul>

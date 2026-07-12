@@ -30,6 +30,7 @@ function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
     mcpServers: [],
     agents: [],
     hookCount: 0,
+    hookEvents: [],
     ...overrides,
   }
 }

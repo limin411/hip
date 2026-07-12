@@ -66,6 +66,7 @@ function makePlugin(id: string, name: string, servers: McpServerConfig[]): Plugi
     mcpServers: servers,
     agents: [],
     hookCount: 0,
+    hookEvents: [],
   }
 }
 

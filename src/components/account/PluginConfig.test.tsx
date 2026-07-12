@@ -72,6 +72,7 @@ function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
     mcpServers: [] as McpServerConfig[],
     agents: [] as string[],
     hookCount: 0,
+    hookEvents: [],
     ...overrides,
   }
 }

@@ -32,12 +32,27 @@ export const HOOK_EVENT_DESC_KEYS = {
   ActivityBudgetRequest: 'settings.hooks.events.ActivityBudgetRequest',
 } as const satisfies Record<HookEvent, string>
 
+export type LifecyclePhaseId = 'session' | 'turn' | 'turnEnd' | 'activity'
+
+const CATALOG_SET = new Set<string>(HOOK_EVENT_CATALOG)
+
 /** Plugins that declare at least one hook entry. */
 export function pluginsWithHooks(plugins: PluginMeta[]): PluginMeta[] {
-  return plugins.filter((p) => p.hookCount > 0)
+  return plugins.filter((p) => p.hookCount > 0 || (p.hookEvents?.length ?? 0) > 0)
 }
 
 /** Sum of hook entries declared by installed plugins. */
 export function totalConfiguredHookCount(plugins: PluginMeta[]): number {
   return plugins.reduce((n, p) => n + (p.hookCount > 0 ? p.hookCount : 0), 0)
+}
+
+/** Unique configured HookEvent names across installed plugins (catalog-filtered). */
+export function configuredHookEvents(plugins: PluginMeta[]): Set<string> {
+  const out = new Set<string>()
+  for (const p of plugins) {
+    for (const e of p.hookEvents ?? []) {
+      if (CATALOG_SET.has(e)) out.add(e)
+    }
+  }
+  return out
 }

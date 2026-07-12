@@ -78,6 +78,7 @@ function plugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
     mcpServers: [],
     agents: [],
     hookCount: 0,
+    hookEvents: [],
     ...overrides,
   }
 }
@@ -273,6 +274,7 @@ describe('derivePluginSkills duplicate policy', () => {
         mcpServers: [],
         agents: [],
         hookCount: 0,
+    hookEvents: [],
       },
     ]
     const result = derivePluginSkills(plugins, new Set(['shared']))

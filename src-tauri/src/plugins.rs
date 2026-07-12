@@ -37,6 +37,8 @@ pub struct PluginMeta {
     pub mcp_servers: Vec<PluginMcpServerConfig>,
     pub agents: Vec<String>,
     pub hook_count: u32,
+    /// Unique hook event names detected in the plugin hooks module/JSON (best-effort).
+    pub hook_events: Vec<String>,
 }
 
 /// Scan `<root>/*/.plugin/plugin.json`, parse each to build a `PluginMeta`.
@@ -69,7 +71,7 @@ pub fn scan_plugins(root: &Path) -> Vec<PluginMeta> {
         let skills = extract_skill_ids(meta.skills.as_ref(), &dir);
         let mcp_servers = extract_mcp_servers(meta.mcp_servers.as_ref(), &dir);
         let agents = extract_component_ids(meta.agents.as_ref(), &dir, "agents");
-        let hook_count = count_hooks(meta.hooks.as_ref(), &dir);
+        let (hook_count, hook_events) = scan_hooks(meta.hooks.as_ref(), &dir);
         out.push(PluginMeta {
             id,
             name,
@@ -80,6 +82,7 @@ pub fn scan_plugins(root: &Path) -> Vec<PluginMeta> {
             mcp_servers,
             agents,
             hook_count,
+            hook_events,
         });
     }
     out
@@ -315,36 +318,135 @@ fn parse_mcp_server_config(value: serde_json::Value) -> Option<PluginMcpServerCo
     })
 }
 
-/// Count hook entries from a `hooks` field.
+/// Known lifecycle hook event names (keep in sync with `@hip/protocol` HookEvent).
+const HOOK_EVENT_NAMES: &[&str] = &[
+    "SessionStart",
+    "TurnStart",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "TurnComplete",
+    "Stop",
+    "PermissionRequest",
+    "ActivityStart",
+    "ActivityEnd",
+    "ActivityBudgetRequest",
+];
+
+/// Scan a `hooks` field: return `(entry_count, unique_event_names)`.
 ///
-/// - String path → read JSON file, count array length.
-/// - Inline array → use its length.
-/// - absent/unreadable → `0`
-fn count_hooks(value: Option<&serde_json::Value>, plugin_dir: &Path) -> u32 {
+/// - Inline JSON array → length + `event` fields
+/// - String path → JSON array if parseable; otherwise best-effort text scan of CJS/JS
+/// - absent/unreadable → `(0, [])`
+fn scan_hooks(value: Option<&serde_json::Value>, plugin_dir: &Path) -> (u32, Vec<String>) {
     let raw = match value {
         Some(v) => v,
-        None => return 0,
+        None => return (0, Vec::new()),
     };
     match raw {
-        // String path: read the file and count.
         serde_json::Value::String(path_str) => {
             let resolved = match safe_resolve(path_str, plugin_dir) {
                 Some(p) => p,
-                None => return 0,
+                None => return (0, Vec::new()),
             };
-            let file_json = match read_json_file(&resolved) {
-                Some(j) => j,
-                None => return 0,
-            };
-            match file_json.as_array() {
-                Some(arr) => arr.len() as u32,
-                None => 0,
+            if let Some(j) = read_json_file(&resolved) {
+                if let Some(arr) = j.as_array() {
+                    return (arr.len() as u32, events_from_json_array(arr));
+                }
+            }
+            // CJS/JS modules are not JSON — scan source text for known event names.
+            match std::fs::read_to_string(&resolved) {
+                Ok(text) => {
+                    let events = events_from_source_text(&text);
+                    let count = count_event_assignments(&text).max(events.len() as u32);
+                    (count, events)
+                }
+                Err(_) => (0, Vec::new()),
             }
         }
-        // Inline array: count directly.
-        serde_json::Value::Array(arr) => arr.len() as u32,
-        _ => 0,
+        serde_json::Value::Array(arr) => (arr.len() as u32, events_from_json_array(arr)),
+        _ => (0, Vec::new()),
     }
+}
+
+fn events_from_json_array(arr: &[serde_json::Value]) -> Vec<String> {
+    let mut out = Vec::new();
+    for item in arr {
+        if let Some(ev) = item.get("event").and_then(|v| v.as_str()) {
+            if HOOK_EVENT_NAMES.contains(&ev) && !out.iter().any(|e| e == ev) {
+                out.push(ev.to_string());
+            }
+        }
+    }
+    // Stable order: catalog order, not first-seen order.
+    sort_hook_events(&mut out);
+    out
+}
+
+/// Detect `event: "Name"` / `event: 'Name'` / `"event": "Name"` assignments in source.
+fn events_from_source_text(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for name in HOOK_EVENT_NAMES {
+        if source_mentions_hook_event(text, name) && !out.iter().any(|e| e == *name) {
+            out.push((*name).to_string());
+        }
+    }
+    sort_hook_events(&mut out);
+    out
+}
+
+fn source_mentions_hook_event(text: &str, name: &str) -> bool {
+    // Common CJS patterns: event: "PreToolUse", event: 'PreToolUse', "event": "PreToolUse"
+    let patterns = [
+        format!("event: \"{}\"", name),
+        format!("event: '{}'", name),
+        format!("event:\"{}\"", name),
+        format!("event:'{}'", name),
+        format!("\"event\": \"{}\"", name),
+        format!("\"event\":\"{}\"", name),
+        format!("'event': '{}'", name),
+        format!("'event':'{}'", name),
+    ];
+    patterns.iter().any(|p| text.contains(p.as_str()))
+}
+
+/// Count how many times an `event: '…'` style assignment appears (for hookCount).
+fn count_event_assignments(text: &str) -> u32 {
+    let mut n = 0u32;
+    for name in HOOK_EVENT_NAMES {
+        let needles = [
+            format!("event: \"{}\"", name),
+            format!("event: '{}'", name),
+            format!("event:\"{}\"", name),
+            format!("event:'{}'", name),
+            format!("\"event\": \"{}\"", name),
+            format!("\"event\":\"{}\"", name),
+        ];
+        for needle in needles {
+            let mut start = 0;
+            while let Some(i) = text[start..].find(&needle) {
+                n += 1;
+                start += i + needle.len();
+            }
+        }
+    }
+    n
+}
+
+fn sort_hook_events(events: &mut Vec<String>) {
+    events.sort_by_key(|e| {
+        HOOK_EVENT_NAMES
+            .iter()
+            .position(|n| *n == e.as_str())
+            .unwrap_or(usize::MAX)
+    });
+}
+
+/// Back-compat helper for tests that only need the count.
+#[cfg(test)]
+fn count_hooks(value: Option<&serde_json::Value>, plugin_dir: &Path) -> u32 {
+    scan_hooks(value, plugin_dir).0
 }
 
 // ── public helpers ────────────────────────────────────────────────────────────
@@ -865,6 +967,24 @@ mod tests {
         }]);
         assert_eq!(meta.agents, vec!["coder", "reviewer"]);
         assert_eq!(meta.hook_count, 2);
+        assert_eq!(meta.hook_events, vec!["TurnStart", "TurnComplete"]);
+    }
+
+    #[test]
+    fn scan_hooks_from_cjs_source() {
+        let tmp = TempDir::new();
+        tmp.write(
+            "hooks.cjs",
+            r#"
+module.exports = [
+  { event: "PreToolUse", matcher: "run_script", handler: async () => ({ kind: "allow" }) },
+  { event: 'PermissionRequest', handler: async () => ({ kind: "ask" }) },
+]
+"#,
+        );
+        let (count, events) = scan_hooks(Some(&json!("hooks.cjs")), &tmp.path);
+        assert!(count >= 2);
+        assert_eq!(events, vec!["PreToolUse", "PermissionRequest"]);
     }
 
     #[test]
@@ -886,6 +1006,7 @@ mod tests {
         assert_eq!(meta.mcp_servers.len(), 0);
         assert_eq!(meta.agents.len(), 0);
         assert_eq!(meta.hook_count, 0);
+        assert!(meta.hook_events.is_empty());
     }
 
     #[test]

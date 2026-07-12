@@ -7,22 +7,46 @@ import type {
   ContextRequest,
 } from './types'
 import { loadPrefs } from './prefs'
+import { GROUP_ORDER, groupRank, sortMetaByGroup } from './groupOrder'
+import { agentConfigProvider } from './providers/agentConfig'
 import { checkpointProvider } from './providers/checkpoint'
+import { codeBlockProvider } from './providers/codeBlock'
 import { commitProvider } from './providers/commit'
 import { diffFileProvider } from './providers/diffFile'
 import { diffHunkProvider } from './providers/diffHunk'
+import { fileEntryProvider } from './providers/fileEntry'
+import { filePreviewProvider } from './providers/filePreview'
+import { mcpServerProvider } from './providers/mcpServer'
+import { messageProvider } from './providers/message'
+import { pluginProvider } from './providers/plugin'
+import { sessionHistoryProvider } from './providers/sessionHistory'
+import { sessionTabProvider } from './providers/sessionTab'
+import { skillConfigProvider } from './providers/skillConfig'
+import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
+import { toolCallProvider } from './providers/toolCall'
 
 /**
  * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
- * Surface PRs import and append here (message, codeBlock, sessionTab, …).
  */
 const BUILTIN_PROVIDERS: ContextProvider[] = [
+  agentConfigProvider,
+  checkpointProvider,
+  codeBlockProvider,
+  commitProvider,
   diffFileProvider,
   diffHunkProvider,
-  checkpointProvider,
-  commitProvider,
+  fileEntryProvider,
+  filePreviewProvider,
+  mcpServerProvider,
+  messageProvider,
+  pluginProvider,
+  sessionHistoryProvider,
+  sessionTabProvider,
+  skillConfigProvider,
+  subAgentProvider,
   terminalProvider,
+  toolCallProvider,
 ]
 
 const extraProviders: ContextProvider[] = []

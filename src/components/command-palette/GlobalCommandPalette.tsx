@@ -91,6 +91,7 @@ export function GlobalCommandPalette() {
         mcp: t('commandPalette.settings.mcp'),
         skill: t('commandPalette.settings.skill'),
         plugins: t('commandPalette.settings.plugins'),
+        hooks: t('commandPalette.settings.hooks'),
         memory: t('commandPalette.settings.memory'),
       },
       context: {

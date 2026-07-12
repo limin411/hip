@@ -10,7 +10,7 @@ export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
-export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'memory'
+export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'hooks' | 'memory'
 
 interface UiState {
   settingsNavCollapsed: boolean

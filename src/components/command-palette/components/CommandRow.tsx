@@ -19,6 +19,7 @@ import {
   Bot,
   Puzzle,
   GitBranch,
+  Link2,
   Star,
   type LucideIcon,
 } from 'lucide-react'
@@ -45,6 +46,7 @@ const ICONS: Record<PaletteIconName, LucideIcon> = {
   sparkles: Sparkles,
   bot: Bot,
   puzzle: Puzzle,
+  'link-2': Link2,
 }
 
 function HighlightLabel({ label, search }: { label: string; search?: string }) {

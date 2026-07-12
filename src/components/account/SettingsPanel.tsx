@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
-import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain } from 'lucide-react'
+import { SlidersHorizontal, Cpu, Bot, Plug, Sparkles, Package, Brain, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, type SettingsPageId } from '@/store/uiStore'
 
@@ -12,16 +12,18 @@ import { AgentManagement } from './AgentManagement'
 import { McpConfig } from './McpConfig'
 import { SkillConfig } from './SkillConfig'
 import { PluginConfig } from './PluginConfig'
+import { HookConfig } from './HookConfig'
 import { MemoryConfig } from './MemoryConfig'
 
 const PAGES = [
-  { id: 'general' as const, icon: SlidersHorizontal, labelKey: 'settings.general', Component: GeneralSettings },
-  { id: 'model' as const, icon: Cpu, labelKey: 'settings.model', Component: ModelConfig },
-  { id: 'agents' as const, icon: Bot, labelKey: 'settings.agentsLabel', Component: AgentManagement },
-  { id: 'mcp' as const, icon: Plug, labelKey: 'settings.mcpLabel', Component: McpConfig },
-  { id: 'skill' as const, icon: Sparkles, labelKey: 'settings.skillLabel', Component: SkillConfig },
-  { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel', Component: PluginConfig },
-  { id: 'memory' as const, icon: Brain, labelKey: 'settings.memoryLabel', Component: MemoryConfig },
+  { id: 'general' as const, icon: SlidersHorizontal, labelKey: 'settings.general' as const, Component: GeneralSettings },
+  { id: 'model' as const, icon: Cpu, labelKey: 'settings.model' as const, Component: ModelConfig },
+  { id: 'agents' as const, icon: Bot, labelKey: 'settings.agentsLabel' as const, Component: AgentManagement },
+  { id: 'mcp' as const, icon: Plug, labelKey: 'settings.mcpLabel' as const, Component: McpConfig },
+  { id: 'skill' as const, icon: Sparkles, labelKey: 'settings.skillLabel' as const, Component: SkillConfig },
+  { id: 'plugins' as const, icon: Package, labelKey: 'settings.pluginsLabel' as const, Component: PluginConfig },
+  { id: 'hooks' as const, icon: Link2, labelKey: 'settings.hooksLabel' as const, Component: HookConfig },
+  { id: 'memory' as const, icon: Brain, labelKey: 'settings.memoryLabel' as const, Component: MemoryConfig },
 ]
 
 export function SettingsPanel() {

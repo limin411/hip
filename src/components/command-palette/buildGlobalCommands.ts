@@ -45,6 +45,7 @@ export type GlobalCommandLabels = {
     mcp: string
     skill: string
     plugins: string
+    hooks: string
     memory: string
   }
   context: {
@@ -101,6 +102,7 @@ const ALL_SETTINGS_PAGES: SettingsPageId[] = [
   'mcp',
   'skill',
   'plugins',
+  'hooks',
   'memory',
 ]
 
@@ -114,6 +116,7 @@ const SETTINGS_ICON: Record<SettingsPageId, GlobalCommand['icon']> = {
   mcp: 'wrench',
   skill: 'sparkles',
   plugins: 'puzzle',
+  hooks: 'link-2',
   memory: 'brain',
 }
 

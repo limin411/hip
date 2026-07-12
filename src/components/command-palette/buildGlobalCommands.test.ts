@@ -36,6 +36,7 @@ const labels: GlobalCommandLabels = {
     mcp: 'Settings: MCP',
     skill: 'Settings: Skills',
     plugins: 'Settings: Plugins',
+    hooks: 'Settings: Hooks',
     memory: 'Settings: Memory',
   },
   context: {

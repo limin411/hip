@@ -33,6 +33,7 @@ export type PaletteIconName =
   | 'sparkles'
   | 'bot'
   | 'puzzle'
+  | 'link-2'
 
 export interface CommandWhen {
   views?: Array<'chat' | 'code' | 'history' | 'settings'>

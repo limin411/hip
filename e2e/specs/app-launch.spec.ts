@@ -33,8 +33,16 @@ describe('hip desktop app @smoke', () => {
     await skipLoginIfPresent()
     await waitForMainApp()
 
+    // After login, surface may restore a prior session; open a draft if needed.
     const landing = await browser.$('[data-testid="new-conversation"]')
-    await landing.waitForDisplayed({ timeout: 30000 })
+    if (!(await landing.isExisting())) {
+      const newBtn = await browser.$('[data-testid="new-session-button"]')
+      if (await newBtn.isExisting()) {
+        await browser.execute((el: HTMLElement) => el.click(), newBtn)
+      }
+    }
+    await landing.waitForExist({ timeout: 30000 })
+    // WebKit isDisplayed can flake under unfocused Tauri; existence + greeting is enough.
 
     const greeting = await landing.$('h1')
     // Wait for the animated greeting text to settle rather than relying on

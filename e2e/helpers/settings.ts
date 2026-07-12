@@ -1,8 +1,21 @@
+import { openSettingsPageForE2e, waitForHipE2E } from './e2e-hooks.js'
 import { SettingsPage } from '../page-objects/SettingsPage.js'
 
 const settings = new SettingsPage()
 
+/**
+ * Open Settings → General. Prefer DEV store bridge when available (shared-process residual);
+ * fall back to account menu for pure UI path.
+ */
 export async function openSettings(): Promise<void> {
+  try {
+    await waitForHipE2E(5000)
+    await openSettingsPageForE2e('general')
+    await settings.nav('general').waitForExist({ timeout: 10000 })
+    return
+  } catch {
+    // Fall through to UI menu.
+  }
   const button = await settings.accountMenuButton
   await button.waitForExist({ timeout: 10000 })
   await button.click()

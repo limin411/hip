@@ -41,6 +41,12 @@ type HipE2E = {
     generateMemories?: boolean
     incognito?: boolean
   } | null
+  getWorkflowSession?: (sessionId: string) => {
+    activeWorkflow: { id: string; name: string } | null
+    runId: string | null
+    runStatus: string | null
+    nodeStatuses: Record<string, string>
+  }
 }
 
 export async function getActiveSessionId(): Promise<string | null> {
@@ -170,4 +176,20 @@ export async function simulatePluginInstallError(error = 'e2e package structure 
     if (!hooks) throw new Error('__hipE2E missing')
     hooks.simulatePluginInstallError(msg)
   }, error)
+}
+
+export type WorkflowSessionSnapshot = {
+  activeWorkflow: { id: string; name: string } | null
+  runId: string | null
+  runStatus: string | null
+  nodeStatuses: Record<string, string>
+}
+
+/** Read workflow store projection after inject (DEV only; no product DAG shell). */
+export async function getWorkflowSession(sessionId: string): Promise<WorkflowSessionSnapshot> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.getWorkflowSession) throw new Error('__hipE2E.getWorkflowSession missing')
+    return hooks.getWorkflowSession(id)
+  }, sessionId)
 }

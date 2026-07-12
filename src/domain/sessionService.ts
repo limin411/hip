@@ -33,6 +33,7 @@ import type { LocalAttachment } from '@/components/chat/attachmentTypes'
 import { applyServerMessageEffects } from './serverMessageEffects'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
+import { useWorkflowStore } from '@/store/workflowStore'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -303,6 +304,30 @@ export class SessionService {
    */
   injectServerMessage(msg: ServerMessage): void {
     this.receive(msg)
+  }
+
+  /**
+   * E2E: snapshot workflow store for a session (product has no dedicated DAG shell).
+   */
+  getWorkflowSession(sessionId: string): {
+    activeWorkflow: { id: string; name: string } | null
+    runId: string | null
+    runStatus: string | null
+    nodeStatuses: Record<string, string>
+  } {
+    const slice = useWorkflowStore.getState().getSession(sessionId)
+    const def = slice.activeWorkflow
+    const nodes = slice.runState?.nodes ?? {}
+    const nodeStatuses: Record<string, string> = {}
+    for (const [nid, n] of Object.entries(nodes)) {
+      nodeStatuses[nid] = n.status
+    }
+    return {
+      activeWorkflow: def ? { id: def.id, name: def.name } : null,
+      runId: slice.runId,
+      runStatus: slice.runState?.status ?? null,
+      nodeStatuses,
+    }
   }
 
   /**
@@ -1178,6 +1203,13 @@ export type HipE2EHooks = {
     generateMemories?: boolean
     incognito?: boolean
   } | null
+  /** E2E: read workflow store projection (product path has no dedicated DAG shell). */
+  getWorkflowSession: (sessionId: string) => {
+    activeWorkflow: { id: string; name: string } | null
+    runId: string | null
+    runStatus: string | null
+    nodeStatuses: Record<string, string>
+  }
 }
 
 declare global {
@@ -1225,6 +1257,7 @@ function installE2eHooks(svc: SessionService): void {
         incognito: sess.config?.incognito,
       }
     },
+    getWorkflowSession: (sessionId) => svc.getWorkflowSession(sessionId),
   }
 }
 

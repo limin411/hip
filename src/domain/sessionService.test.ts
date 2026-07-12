@@ -747,6 +747,53 @@ describe('workspace diff', () => {
     })
   })
 
+  it('inject workflow messages project via getWorkflowSession (e2e store path)', async () => {
+    const { useWorkflowStore } = await import('@/store/workflowStore')
+    useWorkflowStore.setState({ bySession: {} })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const def = {
+      id: 'wf-unit',
+      name: 'Unit WF',
+      nodes: [{ id: 'n1', type: 'agent' as const, agentId: 'coder', inputTemplate: 'x' }],
+      edges: [] as { from: string; to: string }[],
+      entry: ['n1'],
+    }
+    svc.injectServerMessage({
+      type: 'workflow:started',
+      sessionId: 's1',
+      runId: 'r1',
+      def,
+    })
+    expect(svc.getWorkflowSession('s1')).toMatchObject({
+      activeWorkflow: { id: 'wf-unit', name: 'Unit WF' },
+      runId: 'r1',
+      runStatus: 'pending',
+    })
+    svc.injectServerMessage({
+      type: 'workflow:event',
+      sessionId: 's1',
+      runId: 'r1',
+      event: { type: 'run:started' },
+    })
+    svc.injectServerMessage({
+      type: 'workflow:event',
+      sessionId: 's1',
+      runId: 'r1',
+      event: { type: 'node:started', nodeId: 'n1' },
+    })
+    expect(svc.getWorkflowSession('s1')).toMatchObject({
+      runStatus: 'running',
+      nodeStatuses: { n1: 'running' },
+    })
+    svc.injectServerMessage({ type: 'workflow:cleared', sessionId: 's1' })
+    expect(svc.getWorkflowSession('s1')).toMatchObject({
+      activeWorkflow: null,
+      runId: null,
+      runStatus: null,
+    })
+  })
+
   it('ready resets a wedged loading state so requestDiff works again', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

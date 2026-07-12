@@ -143,7 +143,7 @@ describe('registry', () => {
     expect(ids).not.toContain('skill-off')
   })
 
-  it('runSkillHandoff selects session when composer is missing then inserts', async () => {
+  it('runSkillHandoff selects session when composer is missing then replaces', async () => {
     const { runSkillHandoff } = await import('./registry')
     const selectSession = vi.fn()
     // No inserter initially

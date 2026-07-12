@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { Pagination } from '@/components/ui/Pagination'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { DeleteSessionDialog } from './DeleteSessionDialog'
 import { ClearAllSessionsDialog } from './ClearAllSessionsDialog'
 
@@ -139,27 +140,47 @@ export function SessionHistory() {
                   key={session.id}
                   className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent"
                 >
-                  <button
-                    type="button"
-                    onClick={() => sessionService.selectSession(session.id)}
-                    className="flex min-w-0 flex-1 items-center justify-between text-left"
+                  {/* Layout on permanent outer so CONTEXT_MENUS=false keeps flex sizing. */}
+                  <div
+                    className="flex min-w-0 flex-1"
+                    data-testid={`session-history-row-${session.id}`}
                   >
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-body font-medium text-ink">{session.title}</span>
-                      <span className="truncate text-meta text-ink-secondary">{session.preview}</span>
-                    </div>
-                    <span
-                      className={cn(
-                        'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
-                        surface === 'code'
-                          ? 'bg-accent-subtle text-accent-strong'
-                          : 'bg-surface-subtle text-ink-secondary',
-                      )}
+                    <DeclarativeContextMenu
+                      kind="sessionHistory"
+                      payload={{
+                        sessionId: session.id,
+                        title: session.title,
+                        surface,
+                      }}
+                      className="flex min-w-0 flex-1"
                     >
-                      <Icon size={12} />
-                      {t(`nav.${surface}`)}
-                    </span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => sessionService.selectSession(session.id)}
+                        className="flex min-w-0 flex-1 items-center justify-between text-left"
+                      >
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <span className="truncate text-body font-medium text-ink">
+                            {session.title}
+                          </span>
+                          <span className="truncate text-meta text-ink-secondary">
+                            {session.preview}
+                          </span>
+                        </div>
+                        <span
+                          className={cn(
+                            'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
+                            surface === 'code'
+                              ? 'bg-accent-subtle text-accent-strong'
+                              : 'bg-surface-subtle text-ink-secondary',
+                          )}
+                        >
+                          <Icon size={12} />
+                          {t(`nav.${surface}`)}
+                        </span>
+                      </button>
+                    </DeclarativeContextMenu>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

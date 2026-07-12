@@ -8,6 +8,8 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
+import { DeclarativeContextMenu } from '@/components/context-menu'
+import { useActiveSessionId } from '@/domain'
 import { StreamingCursor } from './StreamingCursor'
 import { MessageActions } from './MessageActions'
 import { ArtifactCard } from '@/components/artifact/ArtifactCard'
@@ -35,6 +37,7 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, streaming, isLastAssistant }: MessageBubbleProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
+  const sessionId = useActiveSessionId()
   const isUser = message.role === 'user'
 
   // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
@@ -48,7 +51,16 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
   )
 
   return (
-    <div className="group flex gap-3">
+    <DeclarativeContextMenu
+      kind="message"
+      payload={{
+        message,
+        isLastAssistant: !!isLastAssistant,
+        sessionId,
+      }}
+      className="group flex gap-3"
+      data-testid="message-context-menu"
+    >
       {isUser ? (
         <Avatar name={t('chat.user')} size={28} />
       ) : (
@@ -139,6 +151,6 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
           </div>
         )}
       </div>
-    </div>
+    </DeclarativeContextMenu>
   )
 }

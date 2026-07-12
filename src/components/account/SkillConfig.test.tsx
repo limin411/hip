@@ -33,6 +33,27 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
   }
 })
 
+type MenuProps = {
+  kind: string
+  payload: {
+    skillId: string
+    name: string
+    canDelete: boolean
+    onView: () => void
+    onDelete: () => void
+  }
+  children: React.ReactNode
+}
+
+let lastSkillMenuProps: MenuProps | null = null
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: (props: MenuProps) => {
+    lastSkillMenuProps = props
+    return <>{props.children}</>
+  },
+}))
+
 import { SkillConfig, SkillCard, derivePluginSkills } from './SkillConfig'
 
 function skill(overrides: Partial<SkillMeta> = {}): SkillMeta {
@@ -64,6 +85,7 @@ function plugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
 beforeEach(() => {
   useSkillsStore.setState({ skills: [], enabled: {}, loaded: true })
   usePluginsStore.setState({ plugins: [], loaded: true })
+  lastSkillMenuProps = null
 })
 
 afterEach(() => cleanup())
@@ -131,6 +153,25 @@ describe('SkillCard plugin variant', () => {
     expect(screen.getByText('settings.skill.view')).toBeInTheDocument()
     expect(screen.queryByText('settings.skill.delete')).not.toBeInTheDocument()
   })
+
+  it('wires DeclarativeContextMenu with canDelete false for plugin skills', () => {
+    render(
+      <SkillCard
+        skill={skill({ id: 'plugin-skill', name: 'Plugin Skill', pluginId: 'p1', scope: 'plugin' })}
+        enabled={false}
+        onToggle={() => {}}
+        onView={() => {}}
+        onDelete={() => {}}
+        readOnly={{ pluginName: 'TestPlugin' }}
+      />,
+    )
+    expect(lastSkillMenuProps?.kind).toBe('skillConfig')
+    expect(lastSkillMenuProps?.payload).toMatchObject({
+      skillId: 'plugin-skill',
+      name: 'Plugin Skill',
+      canDelete: false,
+    })
+  })
 })
 
 describe('SkillCard standalone variant', () => {
@@ -149,6 +190,28 @@ describe('SkillCard standalone variant', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('settings.skill.view')).toBeInTheDocument()
     expect(screen.getByText('settings.skill.delete')).toBeInTheDocument()
+  })
+
+  it('wires DeclarativeContextMenu with canDelete true for standalone skills', () => {
+    const onView = vi.fn()
+    const onDelete = vi.fn()
+    render(
+      <SkillCard
+        skill={skill()}
+        enabled={true}
+        onToggle={() => {}}
+        onView={onView}
+        onDelete={onDelete}
+      />,
+    )
+    expect(lastSkillMenuProps?.kind).toBe('skillConfig')
+    expect(lastSkillMenuProps?.payload.skillId).toBe('standalone-skill')
+    expect(lastSkillMenuProps?.payload.canDelete).toBe(true)
+    lastSkillMenuProps!.payload.onView()
+    lastSkillMenuProps!.payload.onDelete()
+    expect(onView).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('skill-card')).toBeInTheDocument()
   })
 
   it('calls onToggle when the switch is clicked', () => {

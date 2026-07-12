@@ -21,6 +21,21 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+type PluginMenuProps = {
+  kind: string
+  payload: { pluginId: string; onUninstall: () => void }
+  children: React.ReactNode
+}
+
+let lastPluginMenuProps: PluginMenuProps | null = null
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: (props: PluginMenuProps) => {
+    lastPluginMenuProps = props
+    return <>{props.children}</>
+  },
+}))
+
 vi.mock('@/ipc/ws-client', () => ({
   wsClient: { send: vi.fn() },
 }))
@@ -127,6 +142,7 @@ describe('PluginConfigView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    lastPluginMenuProps = null
   })
 
   afterEach(() => {
@@ -152,6 +168,16 @@ describe('PluginConfigView', () => {
     expect(screen.getByText('Test Plugin')).toBeInTheDocument()
     expect(screen.getByText('A test plugin')).toBeInTheDocument()
     expect(screen.getByText('1 skills · 1 MCP · 1 agents · 2 hooks')).toBeInTheDocument()
+  })
+
+  it('wires DeclarativeContextMenu with plugin kind and uninstall handler', () => {
+    const plugins = [basePlugin({ id: 'plugin-x', name: 'Plugin X' })]
+    render(<PluginConfigView {...baseProps} plugins={plugins} />)
+    expect(lastPluginMenuProps?.kind).toBe('plugin')
+    expect(lastPluginMenuProps?.payload.pluginId).toBe('plugin-x')
+    lastPluginMenuProps!.payload.onUninstall()
+    expect(baseProps.onDelete).toHaveBeenCalledWith(plugins[0])
+    expect(screen.getByTestId('plugin-card')).toBeInTheDocument()
   })
 
   it('calls onDelete with the correct plugin when uninstall is clicked', () => {

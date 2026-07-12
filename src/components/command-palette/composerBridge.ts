@@ -1,27 +1,54 @@
-/** Lets the global palette insert text into the active composer when present. */
+/** Lets the global palette / context menus write into the active composer when present. */
 
-type Inserter = (text: string) => void
-
-let inserter: Inserter | null = null
-
-export function registerComposerInserter(fn: Inserter | null): void {
-  inserter = fn
+export type ComposerHandlers = {
+  /** Insert at caret (or append); preserves existing draft. */
+  insert: (text: string) => void
+  /** Replace entire composer value (skill handoff). */
+  replace: (text: string) => void
 }
 
-/** Returns true if an inserter was registered and invoked. */
+type LegacyInserter = (text: string) => void
+
+let handlers: ComposerHandlers | null = null
+
+/** Register insert + replace handlers. Pass null to clear. */
+export function registerComposerHandlers(next: ComposerHandlers | null): void {
+  handlers = next
+}
+
+/**
+ * Legacy single-fn registration: used as BOTH insert and replace.
+ * Prefer `registerComposerHandlers` when insert and replace differ (InputBar).
+ */
+export function registerComposerInserter(fn: LegacyInserter | null): void {
+  if (!fn) {
+    handlers = null
+    return
+  }
+  handlers = { insert: fn, replace: fn }
+}
+
+/** Insert at caret / append. Returns true if a handler was registered and invoked. */
 export function insertComposerText(text: string): boolean {
-  if (!inserter) return false
-  inserter(text)
+  if (!handlers) return false
+  handlers.insert(text)
+  return true
+}
+
+/** Replace entire composer. Returns true if a handler was registered and invoked. */
+export function replaceComposerText(text: string): boolean {
+  if (!handlers) return false
+  handlers.replace(text)
   return true
 }
 
 export function hasComposerInserter(): boolean {
-  return inserter != null
+  return handlers != null
 }
 
 /**
- * Retry insert until the composer mounts (e.g. after selectSession from History).
- * Resolves true if text was inserted within the attempt budget.
+ * Retry until the composer mounts (e.g. after selectSession from History).
+ * Resolves true if the action succeeded within the attempt budget.
  */
 function schedule(fn: () => void, ms: number): void {
   const g = globalThis as typeof globalThis & {
@@ -40,16 +67,16 @@ function schedule(fn: () => void, ms: number): void {
   void Promise.resolve().then(fn)
 }
 
-export function insertComposerTextWhenReady(
-  text: string,
+function whenReady(
+  tryOnce: () => boolean,
   opts?: { attempts?: number; intervalMs?: number },
 ): Promise<boolean> {
   const attempts = opts?.attempts ?? 8
   const intervalMs = opts?.intervalMs ?? 40
   return new Promise((resolve) => {
     let n = 0
-    const tryOnce = () => {
-      if (insertComposerText(text)) {
+    const tick = () => {
+      if (tryOnce()) {
         resolve(true)
         return
       }
@@ -58,9 +85,23 @@ export function insertComposerTextWhenReady(
         resolve(false)
         return
       }
-      schedule(tryOnce, intervalMs)
+      schedule(tick, intervalMs)
     }
     // Allow React to commit after navigation before first try.
-    schedule(tryOnce, 0)
+    schedule(tick, 0)
   })
+}
+
+export function insertComposerTextWhenReady(
+  text: string,
+  opts?: { attempts?: number; intervalMs?: number },
+): Promise<boolean> {
+  return whenReady(() => insertComposerText(text), opts)
+}
+
+export function replaceComposerTextWhenReady(
+  text: string,
+  opts?: { attempts?: number; intervalMs?: number },
+): Promise<boolean> {
+  return whenReady(() => replaceComposerText(text), opts)
 }

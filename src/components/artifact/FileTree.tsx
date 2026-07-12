@@ -8,6 +8,7 @@ import { useFsScope } from '@/store/useFsScope'
 import { useDraftStore } from '@/store/draftStore'
 import { pickDirectory } from '@/ipc/dialog'
 import { Button } from '@/components/ui/Button'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 
 function basename(p: string): string {
@@ -15,7 +16,19 @@ function basename(p: string): string {
   return parts[parts.length - 1] || p
 }
 
-function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: string; isDraft: boolean; depth: number }) {
+function Node({
+  entry,
+  scopeId,
+  isDraft,
+  depth,
+  cwd,
+}: {
+  entry: FsEntry
+  scopeId: string
+  isDraft: boolean
+  depth: number
+  cwd: string | null
+}) {
   const open = useFsStore((s) => !!s.bySession[scopeId]?.expanded[entry.path])
   const active = useFsStore((s) => s.bySession[scopeId]?.activePath === entry.path)
   const children = useFsStore((s) => s.bySession[scopeId]?.entriesByDir[entry.path])
@@ -36,25 +49,39 @@ function Node({ entry, scopeId, isDraft, depth }: { entry: FsEntry; scopeId: str
 
   return (
     <div>
-      <div
-        data-testid="tree-entry"
-        data-path={entry.path}
-        onClick={onClick}
-        className={cn(
-          'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors',
-          active ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink hover:bg-surface-muted',
-        )}
-        style={{ paddingLeft: depth * 14 + 6 }}
+      <DeclarativeContextMenu
+        kind="fileEntry"
+        payload={{
+          path: entry.path,
+          name: entry.name,
+          isDir: entry.isDir,
+          scopeId,
+          isDraft,
+          cwd,
+        }}
       >
-        {entry.isDir
-          ? open ? <ChevronDown size={14} className="text-ink-tertiary" /> : <ChevronRight size={14} className="text-ink-tertiary" />
-          : <span className="w-3.5" />}
-        {entry.isDir
-          ? open ? <FolderOpen size={15} className="text-accent-strong" /> : <Folder size={15} className="text-accent-strong" />
-          : <File size={15} className="text-ink-tertiary" />}
-        <span className="truncate">{entry.name}</span>
-      </div>
-      {entry.isDir && open && children?.map((c) => <Node key={c.path} entry={c} scopeId={scopeId} isDraft={isDraft} depth={depth + 1} />)}
+        <div
+          data-testid="tree-entry"
+          data-path={entry.path}
+          onClick={onClick}
+          className={cn(
+            'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors',
+            active ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink hover:bg-surface-muted',
+          )}
+          style={{ paddingLeft: depth * 14 + 6 }}
+        >
+          {entry.isDir
+            ? open ? <ChevronDown size={14} className="text-ink-tertiary" /> : <ChevronRight size={14} className="text-ink-tertiary" />
+            : <span className="w-3.5" />}
+          {entry.isDir
+            ? open ? <FolderOpen size={15} className="text-accent-strong" /> : <Folder size={15} className="text-accent-strong" />
+            : <File size={15} className="text-ink-tertiary" />}
+          <span className="truncate">{entry.name}</span>
+        </div>
+      </DeclarativeContextMenu>
+      {entry.isDir && open && children?.map((c) => (
+        <Node key={c.path} entry={c} scopeId={scopeId} isDraft={isDraft} depth={depth + 1} cwd={cwd} />
+      ))}
     </div>
   )
 }
@@ -136,7 +163,9 @@ export function FileTree() {
         </div>
       </div>
       <div className="flex-1 overflow-auto py-1">
-        {scopeId && rootEntries?.map((e) => <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} />)}
+        {scopeId && rootEntries?.map((e) => (
+          <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} cwd={cwd ?? null} />
+        ))}
       </div>
     </div>
   )

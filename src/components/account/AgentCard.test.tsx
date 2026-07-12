@@ -25,8 +25,25 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+type MenuProps = {
+  kind: string
+  payload: { agentId: string; onEdit: () => void; onDelete: () => void }
+  children: React.ReactNode
+  className?: string
+}
+
+let lastMenuProps: MenuProps | null = null
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: (props: MenuProps) => {
+    lastMenuProps = props
+    return <>{props.children}</>
+  },
+}))
+
 afterEach(() => {
   cleanup()
+  lastMenuProps = null
 })
 
 const acpAgent = (overrides?: Partial<AgentConfig>): AgentConfig => ({
@@ -169,5 +186,47 @@ describe('AgentCard — list view', () => {
     expect(sw).toBeChecked()
     expect(sw).not.toBeDisabled()
     expect(screen.getByText('Installed')).toBeInTheDocument()
+  })
+
+  it('wires DeclarativeContextMenu with agentConfig kind and handlers', () => {
+    const onEdit = vi.fn()
+    const onDelete = vi.fn()
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="list"
+        installed={{ opencode: true }}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />,
+    )
+    expect(lastMenuProps?.kind).toBe('agentConfig')
+    expect(lastMenuProps?.payload.agentId).toBe('a1')
+    lastMenuProps!.payload.onEdit()
+    lastMenuProps!.payload.onDelete()
+    expect(onEdit).toHaveBeenCalledTimes(1)
+    expect(onDelete).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('agent-card')).toBeInTheDocument()
+  })
+})
+
+describe('AgentCard — grid context menu wiring', () => {
+  it('wires DeclarativeContextMenu on grid cards', () => {
+    render(
+      <AgentCard
+        agent={internalAgent()}
+        viewMode="grid"
+        installed={{}}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    expect(lastMenuProps?.kind).toBe('agentConfig')
+    expect(lastMenuProps?.payload.agentId).toBe('i1')
+    expect(screen.getByTestId('agent-card')).toHaveClass('rounded-lg')
   })
 })

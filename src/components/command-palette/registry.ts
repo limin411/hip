@@ -2,7 +2,7 @@ import type { GlobalCommandContext, PaletteGroup } from './buildGlobalCommands'
 import { buildGlobalCommandGroups } from './buildGlobalCommands'
 import type { GlobalCommand } from './types'
 import type { SkillMeta } from '@hip/protocol'
-import { insertComposerText, insertComposerTextWhenReady } from './composerBridge'
+import { replaceComposerText, replaceComposerTextWhenReady } from './composerBridge'
 import { parsePaletteQuery, type PaletteQueryMode } from './queryPrefix'
 import i18n from '@/i18n'
 import { toast } from 'sonner'
@@ -67,10 +67,11 @@ export async function runSkillHandoff(
   ctx: Pick<GlobalCommandContext, 'sessionId' | 'selectSession'>,
 ): Promise<void> {
   const text = `/${skillName} `
-  if (insertComposerText(text)) return
+  // Skill handoff intentionally *replaces* the composer so the slash token is the full draft.
+  if (replaceComposerText(text)) return
   if (ctx.sessionId) {
     ctx.selectSession(ctx.sessionId)
-    const ok = await insertComposerTextWhenReady(text)
+    const ok = await replaceComposerTextWhenReady(text)
     if (ok) return
   }
   toast.message(i18n.t('commandPalette.skills.needComposer'))

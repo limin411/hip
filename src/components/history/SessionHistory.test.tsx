@@ -195,7 +195,7 @@ describe('SessionHistory', () => {
     fireEvent.click(screen.getAllByLabelText('history.deleteSession')[4])
     expect(screen.getByText('history.deleteSessionConfirmTitle:{"title":"Session 5"}')).toBeInTheDocument()
     fireEvent.click(screen.getByText('history.delete'))
-    expect(sessionService.deleteSession).toHaveBeenCalledWith('s5')
+    expect(sessionService.deleteSession).toHaveBeenCalledWith('s5', undefined)
   })
 
   it('does not delete a session when dialog is cancelled', () => {

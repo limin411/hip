@@ -20,7 +20,7 @@ import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
-import { registerComposerInserter } from '@/components/command-palette/composerBridge'
+import { registerComposerHandlers } from '@/components/command-palette/composerBridge'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
@@ -58,13 +58,38 @@ export function InputBar() {
   const [skillBody, setSkillBody] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Allow ⌘K skill handoff to fill the composer (Handoff A).
+  // Composer bridge: insert preserves draft (quote / context menus); replace for skill handoff.
   useEffect(() => {
-    registerComposerInserter((text) => {
-      setValue(text)
-      setTimeout(() => inputRef.current?.focus(), 0)
+    registerComposerHandlers({
+      insert: (text) => {
+        setValue((prev) => {
+          const el = inputRef.current
+          if (el) {
+            const start = Math.min(el.selectionStart ?? prev.length, prev.length)
+            const end = Math.min(Math.max(el.selectionEnd ?? start, start), prev.length)
+            const next = prev.slice(0, start) + text + prev.slice(end)
+            const caret = start + text.length
+            setTimeout(() => {
+              const ta = inputRef.current
+              if (!ta) return
+              ta.focus()
+              try {
+                ta.setSelectionRange(caret, caret)
+              } catch {
+                // ignore selection errors on unmounted / non-text controls
+              }
+            }, 0)
+            return next
+          }
+          return prev + text
+        })
+      },
+      replace: (text) => {
+        setValue(text)
+        setTimeout(() => inputRef.current?.focus(), 0)
+      },
     })
-    return () => registerComposerInserter(null)
+    return () => registerComposerHandlers(null)
   }, [])
 
   useEffect(() => {

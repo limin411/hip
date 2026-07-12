@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   registerComposerInserter,
+  registerComposerHandlers,
   insertComposerText,
+  replaceComposerText,
   insertComposerTextWhenReady,
+  replaceComposerTextWhenReady,
   hasComposerInserter,
 } from './composerBridge'
 
@@ -14,14 +17,29 @@ describe('composerBridge', () => {
 
   it('insertComposerText returns false without inserter', () => {
     expect(insertComposerText('/x ')).toBe(false)
+    expect(replaceComposerText('/x ')).toBe(false)
     expect(hasComposerInserter()).toBe(false)
   })
 
-  it('insertComposerText invokes registered inserter', () => {
+  it('legacy registerComposerInserter wires both insert and replace', () => {
     const fn = vi.fn()
     registerComposerInserter(fn)
     expect(insertComposerText('/x ')).toBe(true)
+    expect(replaceComposerText('/y ')).toBe(true)
     expect(fn).toHaveBeenCalledWith('/x ')
+    expect(fn).toHaveBeenCalledWith('/y ')
+  })
+
+  it('registerComposerHandlers separates insert and replace', () => {
+    const insert = vi.fn()
+    const replace = vi.fn()
+    registerComposerHandlers({ insert, replace })
+    insertComposerText('a')
+    replaceComposerText('b')
+    expect(insert).toHaveBeenCalledWith('a')
+    expect(replace).toHaveBeenCalledWith('b')
+    expect(insert).toHaveBeenCalledTimes(1)
+    expect(replace).toHaveBeenCalledTimes(1)
   })
 
   it('insertComposerTextWhenReady resolves after inserter appears', async () => {
@@ -33,5 +51,17 @@ describe('composerBridge', () => {
     const ok = await insertComposerTextWhenReady('/y ', { attempts: 5, intervalMs: 0 })
     expect(ok).toBe(true)
     expect(fn).toHaveBeenCalledWith('/y ')
+  })
+
+  it('replaceComposerTextWhenReady uses replace handler', async () => {
+    const insert = vi.fn()
+    const replace = vi.fn()
+    queueMicrotask(() => {
+      registerComposerHandlers({ insert, replace })
+    })
+    const ok = await replaceComposerTextWhenReady('/z ', { attempts: 5, intervalMs: 0 })
+    expect(ok).toBe(true)
+    expect(replace).toHaveBeenCalledWith('/z ')
+    expect(insert).not.toHaveBeenCalled()
   })
 })

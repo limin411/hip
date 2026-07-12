@@ -2,6 +2,7 @@ import { Package, Plus, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { PluginMeta } from '@hip/protocol'
 import type { PluginInstallState } from '@/domain/sessionStore'
 import { Button } from '@/components/ui/Button'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 const inputCls =
   'h-9 w-full rounded-md border border-border bg-surface px-2.5 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -158,28 +159,35 @@ export function PluginConfigView({
 }
 
 function PluginCard({ plugin, onDelete, t }: { plugin: PluginMeta; onDelete: () => void; t: Translate }) {
+  // Card chrome on permanent outer so CONTEXT_MENUS=false keeps layout.
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-            <Package size={18} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-body font-medium text-ink">{plugin.name}</span>
-              <span className="shrink-0 text-caption text-ink-tertiary">{plugin.version}</span>
+    <div data-testid="plugin-card" className="rounded-lg border border-border bg-surface p-4">
+      <DeclarativeContextMenu
+        kind="plugin"
+        payload={{ pluginId: plugin.id, onUninstall: onDelete }}
+        className="flex flex-col"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+              <Package size={18} />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-body font-medium text-ink">{plugin.name}</span>
+                <span className="shrink-0 text-caption text-ink-tertiary">{plugin.version}</span>
+              </div>
             </div>
           </div>
+          <Button variant="outline" size="sm" onClick={onDelete}>
+            <Trash2 size={14} /> {t('settings.plugins.uninstall')}
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={onDelete}>
-          <Trash2 size={14} /> {t('settings.plugins.uninstall')}
-        </Button>
-      </div>
-      {plugin.description && (
-        <div className="mt-3 truncate text-body text-ink-secondary">{plugin.description}</div>
-      )}
-      <div className="mt-3 text-caption text-ink-tertiary">{formatComponentCounts(plugin, t)}</div>
+        {plugin.description && (
+          <div className="mt-3 truncate text-body text-ink-secondary">{plugin.description}</div>
+        )}
+        <div className="mt-3 text-caption text-ink-tertiary">{formatComponentCounts(plugin, t)}</div>
+      </DeclarativeContextMenu>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent, cleanup, waitFor } from '@testing-library/react'
 import { useTerminalStore } from '@/store/terminalStore'
 
 const pickDirectory = vi.fn()
@@ -21,6 +21,34 @@ vi.mock('lucide-react', () => ({
   RotateCcw: () => React.createElement('span', { 'data-testid': 'icon-restart' }),
   Loader2: () => React.createElement('span', { 'data-testid': 'icon-loader' }),
   AlertCircle: () => React.createElement('span', { 'data-testid': 'icon-alert' }),
+}))
+
+// Pass-through host so surface tests do not pull full context-menu + lucide icon map.
+vi.mock('@/components/context-menu', () => ({
+  CONTEXT_MENUS: true,
+  DeclarativeContextMenu: ({
+    children,
+    className,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode
+    className?: string
+    'data-testid'?: string
+  }) => React.createElement('div', { className, 'data-testid': testId }, children),
+  ControlledContextMenu: ({
+    open,
+    point,
+  }: {
+    open: boolean
+    point: { x: number; y: number } | null
+  }) =>
+    open
+      ? React.createElement('div', {
+          'data-testid': 'controlled-context-menu-stub',
+          'data-x': point?.x,
+          'data-y': point?.y,
+        })
+      : null,
 }))
 
 vi.mock('@/ipc/dialog', () => ({
@@ -59,6 +87,9 @@ vi.mock('@xterm/xterm', () => {
     dispose = vi.fn()
     loadAddon = vi.fn()
     focus = vi.fn()
+    getSelection = vi.fn(() => '')
+    hasSelection = vi.fn(() => false)
+    paste = vi.fn()
     onData = vi.fn(() => ({ dispose: vi.fn() }))
   }
   return { Terminal }
@@ -162,5 +193,18 @@ describe('TerminalView', () => {
       expect(ring).not.toContain('old')
       expect(ptyOpen).toHaveBeenCalled()
     })
+  })
+
+  it('right-click on xterm canvas opens controlled menu at pointer', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+    const host = screen.getByTestId('terminal-xterm')
+    const ev = createEvent.contextMenu(host, { clientX: 42, clientY: 77 })
+    fireEvent(host, ev)
+    expect(ev.defaultPrevented).toBe(true)
+    const menu = await screen.findByTestId('controlled-context-menu-stub')
+    expect(menu).toHaveAttribute('data-x', '42')
+    expect(menu).toHaveAttribute('data-y', '77')
   })
 })

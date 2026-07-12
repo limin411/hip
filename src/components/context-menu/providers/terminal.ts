@@ -1,0 +1,124 @@
+import { pickDirectory } from '@/ipc/dialog'
+import { readText } from '@/ipc/clipboard'
+import { requestTerminalRestart } from '@/components/artifact/terminalRestartUi'
+import {
+  getTerminalCanvasSelection,
+  pasteToTerminalCanvas,
+  terminalCanvasHasSelection,
+} from '@/components/artifact/terminalCanvasUi'
+import { useDomainStore } from '@/domain/sessionStore'
+import { sessionService } from '@/domain/sessionService'
+import { useUiStore } from '@/store/uiStore'
+import type { ContextMenuItemDef, ContextProvider } from '../types'
+
+/**
+ * Terminal chrome (default) and xterm canvas (`target: 'canvas'`).
+ * - Chrome: restart, change folder, copy cwd, open Files tab.
+ * - Canvas: copy selection, paste, restart (via bridges into TerminalView).
+ */
+export const terminalProvider: ContextProvider = (req, ctx) => {
+  if (req.kind !== 'terminal') return []
+  const { sessionId, target = 'chrome' } = req.payload
+  if (!sessionId) return []
+
+  if (target === 'canvas') {
+    return canvasItems(sessionId, ctx)
+  }
+  return chromeItems(sessionId, ctx)
+}
+
+function canvasItems(
+  sessionId: string,
+  ctx: Parameters<ContextProvider>[1],
+): ContextMenuItemDef[] {
+  const hasSel = terminalCanvasHasSelection()
+  // Single group so mergeByGroup preserves copy → paste → restart (not primary-first).
+  // Manual separatorBefore on restart stays meaningful within the group.
+  return [
+    {
+      id: 'terminal.copySelection',
+      label: ctx.t('contextMenu.terminal.copySelection'),
+      group: 'clipboard',
+      disabled: !hasSel,
+      disabledReason: hasSel ? undefined : ctx.t('contextMenu.terminal.copySelectionDisabled'),
+      run: () => {
+        const text = getTerminalCanvasSelection()
+        if (!text) return
+        void ctx.copyText(text)
+      },
+    },
+    {
+      id: 'terminal.paste',
+      label: ctx.t('contextMenu.terminal.paste'),
+      group: 'clipboard',
+      run: async () => {
+        const text = await readText()
+        if (text == null || text === '') return
+        pasteToTerminalCanvas(text)
+      },
+    },
+    {
+      id: 'terminal.restart',
+      label: ctx.t('contextMenu.terminal.restart'),
+      group: 'clipboard',
+      icon: 'history',
+      separatorBefore: true,
+      run: async () => {
+        await requestTerminalRestart(sessionId)
+      },
+    },
+  ]
+}
+
+function chromeItems(
+  sessionId: string,
+  ctx: Parameters<ContextProvider>[1],
+): ContextMenuItemDef[] {
+  const domainSession = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+  const cwd = domainSession?.config.cwd?.trim() || undefined
+
+  const items: ContextMenuItemDef[] = [
+    {
+      id: 'terminal.restart',
+      label: ctx.t('contextMenu.terminal.restart'),
+      group: 'primary',
+      icon: 'history',
+      run: async () => {
+        await requestTerminalRestart(sessionId)
+      },
+    },
+    {
+      id: 'terminal.changeFolder',
+      label: ctx.t('contextMenu.terminal.changeFolder'),
+      group: 'workspace',
+      run: async () => {
+        const dir = await pickDirectory()
+        if (!dir) return
+        sessionService.setProjectDir(sessionId, dir)
+      },
+    },
+  ]
+
+  if (cwd) {
+    items.push({
+      id: 'terminal.copyCwd',
+      label: ctx.t('contextMenu.terminal.copyCwd'),
+      group: 'clipboard',
+      run: () => {
+        void ctx.copyText(cwd)
+      },
+    })
+  }
+
+  items.push({
+    id: 'terminal.openFiles',
+    label: ctx.t('contextMenu.terminal.openFiles'),
+    group: 'navigation',
+    icon: 'code',
+    run: () => {
+      useUiStore.getState().setTab('files')
+    },
+  })
+
+  return items
+}

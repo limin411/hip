@@ -69,11 +69,13 @@ unregister()
 
 ### Skills handoff
 
-Selecting a skill tries `insertComposerText('/{name} ')`. Register an inserter from the composer (`InputBar` already does).
+Selecting a skill tries `replaceComposerText('/{name} ')` — it **replaces** the entire composer draft with the slash token (not a caret insert). Register handlers from the composer (`InputBar` already does via `registerComposerHandlers`).
 
-1. If inserter is live → insert and done.  
-2. Else if a palette session id is known → `selectSession` then retry insert briefly (`insertComposerTextWhenReady`).  
+1. If replace handler is live → replace and done.  
+2. Else if a palette session id is known → `selectSession` then retry replace briefly (`replaceComposerTextWhenReady`).  
 3. Else toast `commandPalette.skills.needComposer` — **never** silently open Skills settings.
+
+**Related:** context-menu quote / other “add text” flows use `insertComposerText` (caret insert or append) so an in-progress draft is preserved. Skill handoff deliberately uses replace so the slash token is the full draft.
 
 Disabled skills (`skillsEnabled[id] === false`) are omitted.
 

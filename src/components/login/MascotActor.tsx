@@ -175,6 +175,13 @@ const IDLE_POOL: MascotAction[] = [
 const HOLD_MS = [4200, 5200, 6000, 7000] as const
 const FIRST_HOLD_MS = 4800
 const CROSSFADE_MS = 900
+const SLIDE_MS = 720
+/** Horizontal travel for 左进右退 (fraction of box width). */
+const SLIDE_X = '32%'
+const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+
+/** How clips swap on screen. */
+export type MascotTransition = 'none' | 'crossfade' | 'slide'
 
 function motionUrl(action: MascotAction): string {
   const base = import.meta.env.BASE_URL ?? '/'
@@ -204,7 +211,7 @@ function pickHold(): number {
   return HOLD_MS[Math.floor(Math.random() * HOLD_MS.length)]!
 }
 
-/** Decode next motion clip before flipping the crossfade front layer. */
+/** Decode next motion clip before flipping the dual-buffer front layer. */
 function preloadMotion(url: string): Promise<void> {
   return new Promise((resolve) => {
     const img = new Image()
@@ -216,14 +223,27 @@ function preloadMotion(url: string): Promise<void> {
   })
 }
 
+function resolveTransition(
+  transition: MascotTransition | undefined,
+  crossfade: boolean | undefined,
+): MascotTransition {
+  if (transition) return transition
+  return crossfade ? 'crossfade' : 'none'
+}
+
 interface MascotActorProps {
   size?: number
   className?: string
   /** First clip before the idle loop (default: wave). */
   initialAction?: MascotAction
   /**
-   * Soft opacity crossfade between clips (login brand stage).
-   * Default is a hard cut (chat empty-state).
+   * Clip swap style. Default `none` (hard cut).
+   * - `crossfade` — opacity blend (login brand stages)
+   * - `slide` — enter from left, exit to right (new conversation)
+   */
+  transition?: MascotTransition
+  /**
+   * @deprecated Prefer `transition="crossfade"`. Kept for login call sites.
    */
   crossfade?: boolean
   /**
@@ -249,16 +269,22 @@ export function MascotActor({
   size = 420,
   className,
   initialAction = 'wave',
+  transition: transitionProp,
   crossfade = false,
   collapseBottomPad = true,
   startDelayMs = 0,
 }: MascotActorProps) {
+  const mode = resolveTransition(transitionProp, crossfade)
+  const dual = mode === 'crossfade' || mode === 'slide'
+
   const [reduced, setReduced] = useState(prefersReducedMotion)
   const [action, setAction] = useState<MascotAction>(initialAction)
-  // Dual buffers for crossfade: only one is fully opaque at rest.
+  // Dual buffers: only one is fully on-screen at rest.
   const [layerA, setLayerA] = useState<MascotAction>(initialAction)
   const [layerB, setLayerB] = useState<MascotAction>(initialAction)
   const [frontIsA, setFrontIsA] = useState(true)
+  /** Slide only: layer parked at left (no transition) before entering. */
+  const [slidePrep, setSlidePrep] = useState<'a' | 'b' | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const actionRef = useRef<MascotAction>(initialAction)
   const layerARef = useRef<MascotAction>(initialAction)
@@ -267,6 +293,8 @@ export function MascotActor({
   const startDelayRef = useRef(startDelayMs)
   const frontIsARef = useRef(true)
   const playGenRef = useRef(0)
+  const modeRef = useRef(mode)
+  modeRef.current = mode
   startDelayRef.current = startDelayMs
 
   const clearTimer = useCallback(() => {
@@ -278,18 +306,20 @@ export function MascotActor({
 
   const play = useCallback(
     (name: MascotAction) => {
-      if (!crossfade) {
+      const m = modeRef.current
+      if (m === 'none') {
         actionRef.current = name
         setAction(name)
         setLayerA(name)
         layerARef.current = name
         setFrontIsA(true)
         frontIsARef.current = true
+        setSlidePrep(null)
         return
       }
 
       const frontAction = frontIsARef.current ? layerARef.current : layerBRef.current
-      // Already showing this clip — skip (avoids mount same-src 900ms fade).
+      // Already showing this clip — skip (avoids mount same-src transition).
       if (name === frontAction) {
         actionRef.current = name
         setAction(name)
@@ -301,6 +331,7 @@ export function MascotActor({
       const gen = ++playGenRef.current
       const wasFrontA = frontIsARef.current
       const nextFrontIsA = !wasFrontA
+      const prepLayer: 'a' | 'b' = nextFrontIsA ? 'a' : 'b'
 
       // Paint next clip on the hidden buffer first.
       if (wasFrontA) {
@@ -313,11 +344,27 @@ export function MascotActor({
 
       void preloadMotion(motionUrl(name)).then(() => {
         if (gen !== playGenRef.current) return
+
+        if (m === 'slide') {
+          // 1) Park incoming on the left with transition disabled.
+          setSlidePrep(prepLayer)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (gen !== playGenRef.current) return
+              // 2) Flip: incoming → center (左进), outgoing → right (右退).
+              setSlidePrep(null)
+              frontIsARef.current = nextFrontIsA
+              setFrontIsA(nextFrontIsA)
+            })
+          })
+          return
+        }
+
         frontIsARef.current = nextFrontIsA
         setFrontIsA(nextFrontIsA)
       })
     },
-    [crossfade],
+    [],
   )
 
   const scheduleNext = useCallback(
@@ -344,7 +391,7 @@ export function MascotActor({
     }
 
     const start = initialRef.current
-    // Establish action without a no-op crossfade when buffers already hold start.
+    // Establish action without a no-op transition when buffers already hold start.
     play(start)
     scheduleNext(FIRST_HOLD_MS + Math.max(0, startDelayRef.current))
 
@@ -359,17 +406,51 @@ export function MascotActor({
     return <HipLogo size={size} className={className} decorative />
   }
 
-  const fadeStyle = (visible: boolean): React.CSSProperties =>
-    crossfade
-      ? {
-          opacity: visible ? 1 : 0,
-          transition: `opacity ${CROSSFADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+  const layerStyle = (isFront: boolean, layer: 'a' | 'b'): React.CSSProperties => {
+    if (mode === 'crossfade') {
+      return {
+        opacity: isFront ? 1 : 0,
+        transition: `opacity ${CROSSFADE_MS}ms ${EASE}`,
+      }
+    }
+    if (mode === 'slide') {
+      // Parked left so the next flip can enter from the left.
+      if (slidePrep === layer) {
+        return {
+          opacity: 0,
+          transform: `translateX(-${SLIDE_X})`,
+          transition: 'none',
+          zIndex: 1,
         }
-      : { opacity: visible ? 1 : 0 }
+      }
+      if (isFront) {
+        return {
+          opacity: 1,
+          transform: 'translateX(0)',
+          transition: `transform ${SLIDE_MS}ms ${EASE}, opacity ${SLIDE_MS}ms ${EASE}`,
+          zIndex: 2,
+        }
+      }
+      // Resting / exiting off to the right.
+      return {
+        opacity: 0,
+        transform: `translateX(${SLIDE_X})`,
+        transition: `transform ${SLIDE_MS}ms ${EASE}, opacity ${SLIDE_MS}ms ${EASE}`,
+        zIndex: 1,
+      }
+    }
+    return { opacity: isFront ? 1 : 0 }
+  }
 
   return (
     <div
-      className={['relative flex items-center justify-center', className].filter(Boolean).join(' ')}
+      className={[
+        'relative flex items-center justify-center',
+        dual ? 'overflow-hidden' : '',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{
         width: size,
         height: size,
@@ -378,9 +459,10 @@ export function MascotActor({
       }}
       aria-hidden
       data-mascot-action={action}
-      data-mascot-crossfade={crossfade ? 'true' : undefined}
+      data-mascot-crossfade={mode === 'crossfade' ? 'true' : undefined}
+      data-mascot-transition={mode}
     >
-      {crossfade ? (
+      {dual ? (
         <>
           <img
             src={motionUrl(layerA)}
@@ -388,7 +470,7 @@ export function MascotActor({
             width={size}
             height={size}
             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
-            style={fadeStyle(frontIsA)}
+            style={layerStyle(frontIsA, 'a')}
             draggable={false}
           />
           <img
@@ -397,7 +479,7 @@ export function MascotActor({
             width={size}
             height={size}
             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
-            style={fadeStyle(!frontIsA)}
+            style={layerStyle(!frontIsA, 'b')}
             draggable={false}
           />
         </>

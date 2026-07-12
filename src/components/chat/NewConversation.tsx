@@ -130,6 +130,7 @@ export function NewConversation() {
             key={surface}
             size={420}
             initialAction={surface === 'code' ? 'code' : 'wave'}
+            transition="slide"
           />
         </div>
         <div key={surface} className="animate-greeting-enter">

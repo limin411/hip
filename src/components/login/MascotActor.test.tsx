@@ -87,5 +87,19 @@ describe('MascotActor', () => {
       'wave',
     )
   })
+
+  it('dual-buffers with slide transition for left-in right-out', () => {
+    const { container } = render(
+      <MascotActor size={160} transition="slide" collapseBottomPad={false} />,
+    )
+    const wrap = container.querySelector('[data-mascot-transition="slide"]')
+    expect(wrap).toBeInTheDocument()
+    expect(wrap).toHaveClass('overflow-hidden')
+    const imgs = container.querySelectorAll('img')
+    expect(imgs.length).toBe(2)
+    // Front at center; back parked off to the right at rest.
+    expect(imgs[0]).toHaveStyle({ opacity: '1', transform: 'translateX(0)' })
+    expect(imgs[1]).toHaveStyle({ opacity: '0' })
+  })
 })
 

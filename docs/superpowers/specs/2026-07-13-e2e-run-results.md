@@ -58,3 +58,19 @@ Exit: **1** (failures present)
 
 - No unpaid suite forced paid LLM or host-destructive tools outside temp dirs.
 - `@live` remains opt-in.
+
+## Post-remediation verification (same day)
+
+| Run | Result |
+|-----|--------|
+| Re-run original failing set + workflow | After fixes: complex loop, slash, memory, plugin, diff, project, workflow **green** |
+| `yarn test:e2e:gate` (`@smoke\|@core\|@harness`) | **26 passed, 7 skipped, 0 failed** (~1m 08s). Log: implementer scratch `e2e-gate2.log` |
+
+### Fix summary applied
+
+1. Draft folder pick → folder-chip (not draft FileTree); Files after session + panel.
+2. Complex agent loop expands ActivityBar for tool-row; soft delegation check.
+3. Slash: `/config` removed; `/init` requires session (match product).
+4. `openSettingsPageForE2e` store bridge for Settings nav residual isolation.
+5. App-launch forces chat surface for greeting smoke.
+6. Workflow inject projection + `getWorkflowSession` (new, green).

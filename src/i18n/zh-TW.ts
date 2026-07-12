@@ -765,6 +765,7 @@ export const zhTW = {
       tabList: '開啟的工作階段',
     },
     contextMenu: {
+      copyFailed: '無法複製到剪貼簿',
       sessionTab: {
         rename: '重新命名…',
         copyId: '複製工作階段 ID',

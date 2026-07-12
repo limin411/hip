@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import { sessionService } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
 import {
@@ -28,9 +29,10 @@ export const sessionTabProvider: ContextProvider = (req, ctx) => {
       id: 'sessionTab.copyId',
       label: ctx.t('contextMenu.sessionTab.copyId'),
       group: 'clipboard',
-      run: () => {
-        void ctx.copyText(sessionId)
-      },
+      run: () =>
+        ctx.copyText(sessionId).then((ok) => {
+          if (!ok) toast.error(ctx.t('contextMenu.copyFailed'))
+        }),
     },
     {
       id: 'sessionTab.revealInHistory',

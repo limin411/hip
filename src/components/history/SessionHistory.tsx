@@ -140,42 +140,47 @@ export function SessionHistory() {
                   key={session.id}
                   className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent"
                 >
-                  <DeclarativeContextMenu
-                    kind="sessionHistory"
-                    payload={{
-                      sessionId: session.id,
-                      title: session.title,
-                      surface,
-                    }}
+                  {/* Layout on permanent outer so CONTEXT_MENUS=false keeps flex sizing. */}
+                  <div
                     className="flex min-w-0 flex-1"
                     data-testid={`session-history-row-${session.id}`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => sessionService.selectSession(session.id)}
-                      className="flex min-w-0 flex-1 items-center justify-between text-left"
+                    <DeclarativeContextMenu
+                      kind="sessionHistory"
+                      payload={{
+                        sessionId: session.id,
+                        title: session.title,
+                        surface,
+                      }}
+                      className="flex min-w-0 flex-1"
                     >
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate text-body font-medium text-ink">
-                          {session.title}
-                        </span>
-                        <span className="truncate text-meta text-ink-secondary">
-                          {session.preview}
-                        </span>
-                      </div>
-                      <span
-                        className={cn(
-                          'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
-                          surface === 'code'
-                            ? 'bg-accent-subtle text-accent-strong'
-                            : 'bg-surface-subtle text-ink-secondary',
-                        )}
+                      <button
+                        type="button"
+                        onClick={() => sessionService.selectSession(session.id)}
+                        className="flex min-w-0 flex-1 items-center justify-between text-left"
                       >
-                        <Icon size={12} />
-                        {t(`nav.${surface}`)}
-                      </span>
-                    </button>
-                  </DeclarativeContextMenu>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <span className="truncate text-body font-medium text-ink">
+                            {session.title}
+                          </span>
+                          <span className="truncate text-meta text-ink-secondary">
+                            {session.preview}
+                          </span>
+                        </div>
+                        <span
+                          className={cn(
+                            'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
+                            surface === 'code'
+                              ? 'bg-accent-subtle text-accent-strong'
+                              : 'bg-surface-subtle text-ink-secondary',
+                          )}
+                        >
+                          <Icon size={12} />
+                          {t(`nav.${surface}`)}
+                        </span>
+                      </button>
+                    </DeclarativeContextMenu>
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

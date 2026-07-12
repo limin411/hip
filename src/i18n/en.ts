@@ -771,6 +771,7 @@ export const en = {
       tabList: 'Open sessions',
     },
     contextMenu: {
+      copyFailed: 'Could not copy to clipboard',
       sessionTab: {
         rename: 'Rename…',
         copyId: 'Copy session ID',

@@ -12,22 +12,21 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
+type MenuProps = {
+  kind: string
+  payload: unknown
+  children: React.ReactNode
+  className?: string
+}
+
+let lastMenuProps: MenuProps | null = null
+
 vi.mock('@/components/context-menu', () => ({
-  DeclarativeContextMenu: ({
-    children,
-    className,
-    'data-testid': testId,
-    'data-tauri-drag-region': dragRegion,
-  }: {
-    children: React.ReactNode
-    className?: string
-    'data-testid'?: string
-    'data-tauri-drag-region'?: string
-  }) => (
-    <div className={className} data-testid={testId} data-tauri-drag-region={dragRegion}>
-      {children}
-    </div>
-  ),
+  DeclarativeContextMenu: (props: MenuProps) => {
+    lastMenuProps = props
+    // Pass-through: when CONTEXT_MENUS is off, host returns children only.
+    return <>{props.children}</>
+  },
 }))
 
 const session = {
@@ -37,6 +36,10 @@ const session = {
 } as unknown as SessionVM
 
 describe('SessionTab', () => {
+  afterEach(() => {
+    lastMenuProps = null
+  })
+
   it('renders title and surface icon', () => {
     render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
     expect(screen.getByText('Test Session')).toBeInTheDocument()
@@ -57,19 +60,39 @@ describe('SessionTab', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('renders capsule shape and active state classes', () => {
+  it('renders capsule shape and active state classes on permanent outer chrome', () => {
     render(<SessionTab session={session} active onSelect={vi.fn()} onClose={vi.fn()} />)
     const tab = screen.getByTestId('session-tab-container')
     expect(tab).toHaveClass('rounded-md')
     expect(tab).toHaveClass('bg-state-active')
     expect(tab).toHaveClass('text-ink')
+    expect(tab).toHaveAttribute('data-tauri-drag-region', 'false')
   })
 
-  it('renders inactive state classes', () => {
+  it('renders inactive state classes on permanent outer chrome', () => {
     render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
     const tab = screen.getByTestId('session-tab-container')
     expect(tab).toHaveClass('rounded-md')
     expect(tab).toHaveClass('text-ink-secondary')
     expect(tab).not.toHaveClass('bg-state-active')
+  })
+
+  it('wires DeclarativeContextMenu with sessionTab kind and payload', () => {
+    render(<SessionTab session={session} active={false} onSelect={vi.fn()} onClose={vi.fn()} />)
+    expect(lastMenuProps?.kind).toBe('sessionTab')
+    expect(lastMenuProps?.payload).toEqual({
+      sessionId: 's1',
+      title: 'Test Session',
+      surface: 'chat',
+    })
+  })
+
+  it('keeps chrome classes when context menu host is a pass-through (feature-off shape)', () => {
+    // Mock returns children only — same as CONTEXT_MENUS=false.
+    render(<SessionTab session={session} active onSelect={vi.fn()} onClose={vi.fn()} />)
+    const outer = screen.getByTestId('session-tab-container')
+    expect(outer).toHaveClass('group', 'h-[28px]', 'min-w-[140px]', 'bg-state-active')
+    expect(screen.getByTestId('session-tab')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
   })
 })

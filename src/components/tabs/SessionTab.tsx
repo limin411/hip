@@ -22,10 +22,10 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
   const surface = surfaceOf(session.config)
   const Icon = ICON[surface] ?? MessageSquare
 
+  // Chrome lives on a permanent outer div so CONTEXT_MENUS=false rollback still keeps
+  // capsule sizing, active colors, group-hover close X, and drag-region attrs.
   return (
-    <DeclarativeContextMenu
-      kind="sessionTab"
-      payload={{ sessionId: session.id, title: session.title, surface }}
+    <div
       data-testid="session-tab-container"
       data-tauri-drag-region="false"
       className={cn(
@@ -35,41 +35,47 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
           : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
-      <div
-        role="tab"
-        data-testid="session-tab"
-        tabIndex={0}
-        aria-selected={active}
-        onClick={onSelect}
-        onMouseDown={(e) => e.button === 1 && onClose()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onSelect()
-          }
-        }}
-        className="flex min-w-0 flex-1 items-center gap-2 outline-none"
+      <DeclarativeContextMenu
+        kind="sessionTab"
+        payload={{ sessionId: session.id, title: session.title, surface }}
+        className="flex h-full min-w-0 flex-1 items-center gap-1"
       >
-        <Icon
-          size={14}
-          data-testid="surface-icon"
-          aria-label={surface}
-          className={cn('shrink-0', active ? 'text-accent-strong' : 'text-ink-tertiary')}
-        />
-        <span className="min-w-0 flex-1 truncate text-left">{session.title}</span>
-      </div>
-      <button
-        type="button"
-        aria-label={t('tabs.closeTab')}
-        data-no-drag
-        onClick={onClose}
-        className={cn(
-          'flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity',
-          'group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-muted',
-        )}
-      >
-        <X size={12} />
-      </button>
-    </DeclarativeContextMenu>
+        <div
+          role="tab"
+          data-testid="session-tab"
+          tabIndex={0}
+          aria-selected={active}
+          onClick={onSelect}
+          onMouseDown={(e) => e.button === 1 && onClose()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onSelect()
+            }
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2 outline-none"
+        >
+          <Icon
+            size={14}
+            data-testid="surface-icon"
+            aria-label={surface}
+            className={cn('shrink-0', active ? 'text-accent-strong' : 'text-ink-tertiary')}
+          />
+          <span className="min-w-0 flex-1 truncate text-left">{session.title}</span>
+        </div>
+        <button
+          type="button"
+          aria-label={t('tabs.closeTab')}
+          data-no-drag
+          onClick={onClose}
+          className={cn(
+            'flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity',
+            'group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-muted',
+          )}
+        >
+          <X size={12} />
+        </button>
+      </DeclarativeContextMenu>
+    </div>
   )
 }

@@ -1,7 +1,8 @@
-import { sessionService } from '@/domain'
+import { sessionService, useDomainStore } from '@/domain'
 import { RenameSessionDialog } from './RenameSessionDialog'
 import { DeleteSessionDialog } from './DeleteSessionDialog'
 import { ConfirmDeleteSessionsDialog } from './ConfirmDeleteSessionsDialog'
+import { orderBulkCloseIds } from './orderBulkCloseIds'
 import {
   closeSessionMenuDialog,
   useSessionMenuDialog,
@@ -41,14 +42,15 @@ export function SessionMenuDialogHost() {
     )
   }
 
-  // confirmBulkDelete
+  // confirmBulkDelete — close non-active first to avoid mid-loop select/load thrash
   const { sessionIds } = dialog
   return (
     <ConfirmDeleteSessionsDialog
       count={sessionIds.length}
       onCancel={closeSessionMenuDialog}
       onConfirm={() => {
-        for (const id of sessionIds) {
+        const activeId = useDomainStore.getState().activeSessionId
+        for (const id of orderBulkCloseIds(sessionIds, activeId)) {
           sessionService.closeSession(id)
         }
         closeSessionMenuDialog()

@@ -19,12 +19,16 @@ vi.mock('react-i18next', () => ({
 }))
 
 const closeSession = vi.fn()
+let activeSessionId: string | null = 'b'
 
 vi.mock('@/domain', () => ({
   sessionService: {
     closeSession: (...args: unknown[]) => closeSession(...args),
     renameSession: vi.fn(),
     deleteSession: vi.fn(),
+  },
+  useDomainStore: {
+    getState: () => ({ activeSessionId }),
   },
 }))
 
@@ -68,6 +72,7 @@ describe('SessionMenuDialogHost bulk delete', () => {
     cleanup()
     vi.clearAllMocks()
     resetSessionMenuDialogStore()
+    activeSessionId = 'b'
   })
 
   it('does not run closeSession until confirm is accepted', () => {
@@ -80,11 +85,23 @@ describe('SessionMenuDialogHost bulk delete', () => {
     expect(closeSession).not.toHaveBeenCalled()
   })
 
-  it('closeSession each id after accept', () => {
+  it('closeSession each id after accept, active last', () => {
+    activeSessionId = 'b'
+    openConfirmDeleteSessionsDialog(['a', 'b', 'c'])
+    render(<SessionMenuDialogHost />)
+    fireEvent.click(screen.getByTestId('confirm-delete-sessions'))
+    expect(closeSession).toHaveBeenCalledTimes(3)
+    // non-active first (stable relative order), active last → less select/load thrash
+    expect(closeSession).toHaveBeenNthCalledWith(1, 'a')
+    expect(closeSession).toHaveBeenNthCalledWith(2, 'c')
+    expect(closeSession).toHaveBeenNthCalledWith(3, 'b')
+  })
+
+  it('preserves order when active is not among targets', () => {
+    activeSessionId = 'x'
     openConfirmDeleteSessionsDialog(['a', 'b'])
     render(<SessionMenuDialogHost />)
     fireEvent.click(screen.getByTestId('confirm-delete-sessions'))
-    expect(closeSession).toHaveBeenCalledTimes(2)
     expect(closeSession).toHaveBeenNthCalledWith(1, 'a')
     expect(closeSession).toHaveBeenNthCalledWith(2, 'b')
   })

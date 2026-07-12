@@ -8,6 +8,11 @@ import {
 
 const closeSession = vi.fn()
 const setActiveView = vi.fn()
+const toastError = vi.fn()
+
+vi.mock('sonner', () => ({
+  toast: { error: (...args: unknown[]) => toastError(...args) },
+}))
 
 vi.mock('@/domain', () => ({
   sessionService: {
@@ -42,6 +47,7 @@ describe('sessionTabProvider', () => {
   beforeEach(() => {
     closeSession.mockClear()
     setActiveView.mockClear()
+    toastError.mockClear()
     resetSessionMenuDialogStore()
   })
 
@@ -157,6 +163,17 @@ describe('sessionTabProvider', () => {
     )
     await items.find((i) => i.id === 'sessionTab.copyId')!.run()
     expect(copyText).toHaveBeenCalledWith('s1')
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('copyId toasts when clipboard copy fails', async () => {
+    const copyText = vi.fn(async () => false)
+    const items = sessionTabProvider(
+      { kind: 'sessionTab', payload: { sessionId: 's1', title: 'Hello', surface: 'chat' } },
+      makeCtx({ copyText }),
+    )
+    await items.find((i) => i.id === 'sessionTab.copyId')!.run()
+    expect(toastError).toHaveBeenCalledWith('contextMenu.copyFailed')
   })
 
   it('revealInHistory switches to history view', () => {

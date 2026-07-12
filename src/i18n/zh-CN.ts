@@ -765,6 +765,7 @@ export const zhCN = {
       tabList: '打开的会话',
     },
     contextMenu: {
+      copyFailed: '无法复制到剪贴板',
       sessionTab: {
         rename: '重命名…',
         copyId: '复制会话 ID',

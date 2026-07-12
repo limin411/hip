@@ -4,6 +4,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   Handle,
   Position,
@@ -32,45 +33,57 @@ import './HookLifecycleDiagram.css'
 
 function SpineNode({ data }: NodeProps<HookFishboneNode>) {
   const isHead = data.kind === 'head'
+  const isTail = !isHead && data.label === '…'
+
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-full border px-2 py-1 text-center',
-        isHead
-          ? 'min-w-[7rem] rounded-lg border-accent/40 bg-accent/10 px-3 py-2 font-semibold text-accent-strong'
-          : 'min-w-[3.25rem] border-border bg-surface-muted text-caption font-medium text-ink-tertiary',
+        'relative text-center',
+        isHead ? 'hook-fishbone-head' : 'hook-fishbone-joint',
+        isTail && 'min-w-[2.25rem] px-2 text-ink-tertiary',
       )}
       data-testid={isHead ? 'hook-fishbone-head' : `hook-fishbone-joint-${data.label}`}
     >
       <Handle
         id="spine-in"
         type="target"
-        position={Position.Left}
-        className="!h-1.5 !w-1.5 !border-0 !bg-ink-tertiary opacity-0"
+        position={Position.Top}
+        className="!h-1.5 !w-1.5 !border-0 !bg-accent opacity-0"
       />
-      <span className={cn(isHead ? 'text-meta' : 'text-[10px] uppercase tracking-wide')}>
-        {data.label}
-      </span>
+      {isHead ? (
+        <>
+          <span className="hook-fishbone-head-dot" aria-hidden />
+          <span className="text-meta font-semibold tracking-tight">{data.label}</span>
+        </>
+      ) : (
+        <span
+          className={cn(
+            'text-[10px] font-semibold uppercase tracking-[0.08em]',
+            isTail ? 'tracking-normal' : 'text-ink-secondary',
+          )}
+        >
+          {data.label}
+        </span>
+      )}
       <Handle
         id="spine-out"
         type="source"
-        position={Position.Right}
-        className="!h-1.5 !w-1.5 !border-0 !bg-ink-tertiary opacity-0"
+        position={Position.Bottom}
+        className="!h-1.5 !w-1.5 !border-0 !bg-accent opacity-0"
       />
-      {/* Ribs attach from bottom/top of joints via additional handles */}
       {!isHead && (
         <>
           <Handle
-            id="rib-up"
+            id="rib-left"
             type="source"
-            position={Position.Top}
-            className="!h-1.5 !w-1.5 !border-0 !bg-ink-tertiary opacity-0"
+            position={Position.Left}
+            className="!h-1.5 !w-1.5 !border-0 !bg-accent opacity-0"
           />
           <Handle
-            id="rib-down"
+            id="rib-right"
             type="source"
-            position={Position.Bottom}
-            className="!h-1.5 !w-1.5 !border-0 !bg-ink-tertiary opacity-0"
+            position={Position.Right}
+            className="!h-1.5 !w-1.5 !border-0 !bg-accent opacity-0"
           />
         </>
       )}
@@ -87,48 +100,50 @@ function HookEventNode({ data }: NodeProps<HookFishboneNode>) {
 
   return (
     <div
-      className={cn(
-        'cursor-pointer rounded-md border px-2 py-1.5 text-left shadow-sm transition-colors',
-        'hover:ring-2 hover:ring-accent/30',
-        configured
-          ? 'border-accent/50 bg-accent/10 text-accent-strong'
-          : 'border-border bg-surface text-ink-secondary',
-        expanded && 'ring-2 ring-accent/50',
-      )}
+      className="hook-fishbone-event px-2.5 py-2 text-left"
       data-testid={event ? `hook-diagram-node-${event}` : 'hook-diagram-node'}
       data-configured={configured ? 'true' : 'false'}
       data-expanded={expanded ? 'true' : 'false'}
       title={event ? t(HOOK_EVENT_DESC_KEYS[event]) : data.label}
     >
-      {/* Ribs from spine: events above receive from Bottom; events below from Top */}
       <Handle
-        id="from-spine"
+        id="from-spine-right"
         type="target"
-        position={Position.Bottom}
+        position={Position.Right}
         className="!h-1.5 !w-1.5 !border-0 !bg-border opacity-0"
       />
       <Handle
-        id="from-spine-top"
+        id="from-spine-left"
         type="target"
-        position={Position.Top}
+        position={Position.Left}
         className="!h-1.5 !w-1.5 !border-0 !bg-border opacity-0"
       />
-      <div className="flex items-start gap-1">
-        <span className="mt-0.5 shrink-0 text-ink-tertiary">
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </span>
+      <div className="flex items-start gap-1.5">
+        <span className="hook-fishbone-event-status mt-1.5" aria-hidden />
         <div className="min-w-0 flex-1">
-          <code className="block truncate font-mono text-caption font-medium leading-tight">
-            {data.label}
-          </code>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] leading-none">
+          <div className="flex items-center gap-1">
+            <code
+              className={cn(
+                'block min-w-0 flex-1 truncate font-mono text-[11px] font-semibold leading-tight',
+                configured ? 'text-accent-strong' : 'text-ink-secondary',
+              )}
+            >
+              {data.label}
+            </code>
+            <span className="shrink-0 text-ink-tertiary opacity-70">
+              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </span>
+          </div>
+          <div className="mt-1">
             {configured ? (
-              <span className="font-medium text-accent">
+              <span className="hook-fishbone-event-badge on">
                 {t('settings.hooks.diagram.configuredBadge')}
                 {count > 0 ? ` · ${count}` : ''}
               </span>
             ) : (
-              <span className="text-ink-tertiary">{t('settings.hooks.diagram.notConfigured')}</span>
+              <span className="hook-fishbone-event-badge off">
+                {t('settings.hooks.diagram.notConfigured')}
+              </span>
             )}
           </div>
         </div>
@@ -156,20 +171,27 @@ function ExpandPanel({
   const { t } = useTranslation()
   return (
     <div
-      className="mt-3 rounded-lg border border-border bg-surface px-3 py-2.5"
+      className="hook-fishbone-expand mt-3 px-3.5 py-3"
       data-testid="hook-diagram-expand-panel"
       data-event={event}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <code className="font-mono text-meta font-semibold text-ink">{event}</code>
-          <span className="ml-2 text-caption text-ink-tertiary">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="font-mono text-meta font-semibold text-ink">{event}</code>
+            {sources.length > 0 && (
+              <span className="hook-fishbone-event-badge on">
+                {sources.length}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-caption text-ink-tertiary">
             {t(HOOK_EVENT_DESC_KEYS[event])}
-          </span>
+          </p>
         </div>
         <button
           type="button"
-          className="shrink-0 rounded-md px-2 py-1 text-caption text-ink-tertiary hover:bg-surface-muted hover:text-ink"
+          className="shrink-0 rounded-md px-2 py-1 text-caption text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
           onClick={onClose}
           data-testid="hook-diagram-expand-close"
         >
@@ -178,23 +200,28 @@ function ExpandPanel({
       </div>
 
       {sources.length > 0 ? (
-        <ul className="mt-2 divide-y divide-border">
+        <ul className="mt-2.5 space-y-1">
           {sources.map((s) => (
             <li
               key={s.pluginId}
-              className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0"
+              className="flex items-center gap-2 rounded-lg border border-border/70 bg-surface px-2.5 py-1.5"
               data-testid={`hook-diagram-source-${s.pluginId}`}
             >
-              <Package size={13} className="shrink-0 text-ink-tertiary" />
-              <span className="truncate text-meta text-ink">{s.name}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary" title={s.dir}>
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink-tertiary">
+                <Package size={13} />
+              </span>
+              <span className="truncate text-meta font-medium text-ink">{s.name}</span>
+              <span
+                className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary"
+                title={s.dir}
+              >
                 {s.dir}
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-1.5 text-meta text-ink-tertiary">{t('settings.hooks.diagram.expandEmptyHint')}</p>
+        <p className="mt-2 text-meta text-ink-tertiary">{t('settings.hooks.diagram.expandEmptyHint')}</p>
       )}
     </div>
   )
@@ -234,7 +261,7 @@ function FishboneCanvas({
   )
 
   return (
-    <div className="h-[380px] w-full overflow-hidden rounded-lg border border-border bg-surface">
+    <div className="hook-fishbone-canvas h-[600px] w-full overflow-hidden rounded-xl border border-border">
       <ReactFlow
         className="hook-fishbone-flow"
         nodes={nodes}
@@ -243,8 +270,8 @@ function FishboneCanvas({
         onNodeClick={onNodeClick}
         fitView
         fitViewOptions={{ padding: 0.12 }}
-        minZoom={0.35}
-        maxZoom={1.4}
+        minZoom={0.28}
+        maxZoom={1.45}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
@@ -253,7 +280,12 @@ function FishboneCanvas({
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background gap={18} size={1} color="var(--border)" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1.1}
+          color="var(--border)"
+        />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>
@@ -283,16 +315,18 @@ export function HookLifecycleDiagram({ plugins }: HookLifecycleDiagramProps) {
 
   return (
     <div data-testid="hook-lifecycle-diagram">
-      <div className="mb-2 flex items-center gap-3 text-caption text-ink-tertiary">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-sm border border-accent/50 bg-accent/10" />
+      <div className="mb-2.5 flex flex-wrap items-center gap-2">
+        <span className="hook-fishbone-legend-chip">
+          <span className="inline-block size-2 rounded-full bg-accent shadow-[0_0_0_2px] shadow-accent/20" />
           {t('settings.hooks.diagram.legendConfigured')}
         </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-sm border border-border bg-surface" />
+        <span className="hook-fishbone-legend-chip">
+          <span className="inline-block size-2 rounded-full border border-border bg-surface" />
           {t('settings.hooks.diagram.legendAvailable')}
         </span>
-        <span className="text-ink-tertiary/80">· {t('settings.hooks.diagram.clickHint')}</span>
+        <span className="text-caption text-ink-tertiary/90">
+          · {t('settings.hooks.diagram.clickHint')}
+        </span>
       </div>
 
       <ReactFlowProvider>

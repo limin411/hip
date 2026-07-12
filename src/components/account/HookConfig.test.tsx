@@ -67,6 +67,7 @@ vi.mock('@xyflow/react', () => ({
       children,
     ),
   Background: () => React.createElement('div', { 'data-testid': 'rf-background' }),
+  BackgroundVariant: { Dots: 'dots', Lines: 'lines', Cross: 'cross' },
   Controls: () => React.createElement('div', { 'data-testid': 'rf-controls' }),
   Handle: () => React.createElement('div', { 'data-testid': 'rf-handle' }),
   Position: { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' },

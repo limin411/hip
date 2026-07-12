@@ -2,12 +2,13 @@ import type { Edge, Node } from '@xyflow/react'
 import type { HookEvent } from '@hip/protocol'
 import type { HookEventSource } from './hookCatalog'
 
-/** Spine Y and rib offsets for the fishbone layout (fixed, no dagre). */
-const SPINE_Y = 210
-const RIB_UP = 48
-const RIB_DOWN = 340
-const NODE_W = 148
-const HEAD_W = 120
+/** Spine X and rib side offsets for the vertical fishbone (fixed, no dagre). */
+const SPINE_X = 300
+const RIB_LEFT = 12
+const RIB_RIGHT = 420
+const NODE_W = 168
+const HEAD_W = 136
+const JOINT_W = 76
 
 export type HookFishboneNodeData = {
   kind: 'head' | 'joint' | 'event'
@@ -17,6 +18,7 @@ export type HookFishboneNodeData = {
   sourceCount?: number
   expanded?: boolean
   phase?: string
+  side?: 'left' | 'right'
 } & Record<string, unknown>
 
 export type HookFishboneNode = Node<HookFishboneNodeData>
@@ -25,45 +27,45 @@ type RibSpec = {
   event: HookEvent
   /** Parent spine joint id */
   joint: string
-  /** 'up' | 'down' rib side */
-  side: 'up' | 'down'
-  /** X offset from joint center */
-  dx?: number
+  /** 'left' | 'right' rib side */
+  side: 'left' | 'right'
+  /** Y offset from joint center */
+  dy?: number
 }
 
-/** Lifecycle fishbone: head (left) → joints → ribs (events). */
-const JOINTS: Array<{ id: string; x: number; label: string; phase: string }> = [
-  { id: 'j-session', x: 200, label: 'Session', phase: 'session' },
-  { id: 'j-turn', x: 380, label: 'Turn', phase: 'turn' },
-  { id: 'j-tool', x: 580, label: 'Tool', phase: 'tool' },
-  { id: 'j-wrap', x: 800, label: 'Wrap', phase: 'turnEnd' },
-  { id: 'j-activity', x: 1000, label: 'Activity', phase: 'activity' },
+/** Lifecycle fishbone: head (top) → joints → ribs (events left/right). */
+const JOINTS: Array<{ id: string; y: number; label: string; phase: string }> = [
+  { id: 'j-session', y: 118, label: 'Session', phase: 'session' },
+  { id: 'j-turn', y: 248, label: 'Turn', phase: 'turn' },
+  { id: 'j-tool', y: 400, label: 'Tool', phase: 'tool' },
+  { id: 'j-wrap', y: 560, label: 'Wrap', phase: 'turnEnd' },
+  { id: 'j-activity', y: 720, label: 'Activity', phase: 'activity' },
 ]
 
 const RIBS: RibSpec[] = [
-  { event: 'SessionStart', joint: 'j-session', side: 'up' },
-  { event: 'UserPromptSubmit', joint: 'j-turn', side: 'up' },
-  { event: 'TurnStart', joint: 'j-turn', side: 'down' },
-  { event: 'PreToolUse', joint: 'j-tool', side: 'up', dx: -48 },
-  { event: 'PermissionRequest', joint: 'j-tool', side: 'down', dx: -48 },
-  { event: 'PostToolUse', joint: 'j-tool', side: 'up', dx: 64 },
-  { event: 'PostToolUseFailure', joint: 'j-tool', side: 'down', dx: 64 },
-  { event: 'Stop', joint: 'j-wrap', side: 'up' },
-  { event: 'TurnComplete', joint: 'j-wrap', side: 'down' },
-  { event: 'ActivityStart', joint: 'j-activity', side: 'up', dx: -40 },
-  { event: 'ActivityBudgetRequest', joint: 'j-activity', side: 'down' },
-  { event: 'ActivityEnd', joint: 'j-activity', side: 'up', dx: 72 },
+  { event: 'SessionStart', joint: 'j-session', side: 'left' },
+  { event: 'UserPromptSubmit', joint: 'j-turn', side: 'left' },
+  { event: 'TurnStart', joint: 'j-turn', side: 'right' },
+  { event: 'PreToolUse', joint: 'j-tool', side: 'left', dy: -36 },
+  { event: 'PermissionRequest', joint: 'j-tool', side: 'right', dy: -36 },
+  { event: 'PostToolUse', joint: 'j-tool', side: 'left', dy: 44 },
+  { event: 'PostToolUseFailure', joint: 'j-tool', side: 'right', dy: 44 },
+  { event: 'Stop', joint: 'j-wrap', side: 'left' },
+  { event: 'TurnComplete', joint: 'j-wrap', side: 'right' },
+  { event: 'ActivityStart', joint: 'j-activity', side: 'left', dy: -32 },
+  { event: 'ActivityBudgetRequest', joint: 'j-activity', side: 'right' },
+  { event: 'ActivityEnd', joint: 'j-activity', side: 'left', dy: 48 },
 ]
 
-const HEAD_X = 24
-const TAIL_X = 1160
+const HEAD_Y = 20
+const TAIL_Y = 850
 
-function jointX(id: string): number {
-  return JOINTS.find((j) => j.id === id)?.x ?? 0
+function jointY(id: string): number {
+  return JOINTS.find((j) => j.id === id)?.y ?? 0
 }
 
 /**
- * Build React Flow nodes/edges for the hooks fishbone diagram.
+ * Build React Flow nodes/edges for the vertical hooks fishbone diagram.
  * Pure + deterministic for tests.
  */
 export function buildHookFishboneGraph(input: {
@@ -78,7 +80,7 @@ export function buildHookFishboneGraph(input: {
   nodes.push({
     id: 'head',
     type: 'spine',
-    position: { x: HEAD_X, y: SPINE_Y - 18 },
+    position: { x: SPINE_X - HEAD_W / 2, y: HEAD_Y },
     data: {
       kind: 'head',
       label: 'Agent loop',
@@ -93,7 +95,7 @@ export function buildHookFishboneGraph(input: {
     nodes.push({
       id: j.id,
       type: 'spine',
-      position: { x: j.x - 28, y: SPINE_Y - 12 },
+      position: { x: SPINE_X - JOINT_W / 2, y: j.y },
       data: {
         kind: 'joint',
         label: j.label,
@@ -101,14 +103,14 @@ export function buildHookFishboneGraph(input: {
       },
       draggable: false,
       selectable: false,
-      style: { width: 56 },
+      style: { width: JOINT_W },
     })
   }
 
   nodes.push({
     id: 'tail',
     type: 'spine',
-    position: { x: TAIL_X, y: SPINE_Y - 12 },
+    position: { x: SPINE_X - 18, y: TAIL_Y },
     data: {
       kind: 'joint',
       label: '…',
@@ -116,10 +118,10 @@ export function buildHookFishboneGraph(input: {
     },
     draggable: false,
     selectable: false,
-    style: { width: 40 },
+    style: { width: 36 },
   })
 
-  // Spine chain
+  // Spine chain (top → bottom)
   const spineIds = ['head', ...JOINTS.map((j) => j.id), 'tail']
   for (let i = 0; i < spineIds.length - 1; i++) {
     edges.push({
@@ -138,15 +140,15 @@ export function buildHookFishboneGraph(input: {
   for (const rib of RIBS) {
     const configured = configuredEvents.has(rib.event)
     const sources = sourcesByEvent.get(rib.event) ?? []
-    const jx = jointX(rib.joint)
-    const dx = rib.dx ?? 0
-    const y = rib.side === 'up' ? RIB_UP : RIB_DOWN
+    const jy = jointY(rib.joint)
+    const dy = rib.dy ?? 0
+    const x = rib.side === 'left' ? RIB_LEFT : RIB_RIGHT
     const expanded = expandedEvent === rib.event
 
     nodes.push({
       id: `event-${rib.event}`,
       type: 'hookEvent',
-      position: { x: jx + dx - NODE_W / 2, y },
+      position: { x, y: jy + dy },
       data: {
         kind: 'event',
         label: rib.event,
@@ -154,6 +156,7 @@ export function buildHookFishboneGraph(input: {
         configured,
         sourceCount: sources.length,
         expanded,
+        side: rib.side,
       },
       draggable: false,
       selectable: true,
@@ -163,9 +166,9 @@ export function buildHookFishboneGraph(input: {
     edges.push({
       id: `rib-${rib.joint}-${rib.event}`,
       source: rib.joint,
-      sourceHandle: rib.side === 'up' ? 'rib-up' : 'rib-down',
+      sourceHandle: rib.side === 'left' ? 'rib-left' : 'rib-right',
       target: `event-${rib.event}`,
-      targetHandle: rib.side === 'up' ? 'from-spine' : 'from-spine-top',
+      targetHandle: rib.side === 'left' ? 'from-spine-right' : 'from-spine-left',
       type: 'smoothstep',
       className: configured ? 'hook-fishbone-rib-on' : 'hook-fishbone-rib',
       selectable: false,

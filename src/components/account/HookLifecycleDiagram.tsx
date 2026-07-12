@@ -156,21 +156,16 @@ function ExpandPanel({
   const { t } = useTranslation()
   return (
     <div
-      className="mt-3 rounded-lg border border-accent/30 bg-surface px-3 py-3"
+      className="mt-3 rounded-lg border border-border bg-surface px-3 py-2.5"
       data-testid="hook-diagram-expand-panel"
       data-event={event}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <code className="font-mono text-meta font-semibold text-ink">{event}</code>
-            <span className="text-caption text-ink-tertiary">
-              {sources.length > 0
-                ? t('settings.hooks.diagram.expandSources', { count: sources.length })
-                : t('settings.hooks.diagram.expandEmpty')}
-            </span>
-          </div>
-          <p className="mt-1 text-meta text-ink-secondary">{t(HOOK_EVENT_DESC_KEYS[event])}</p>
+          <code className="font-mono text-meta font-semibold text-ink">{event}</code>
+          <span className="ml-2 text-caption text-ink-tertiary">
+            {t(HOOK_EVENT_DESC_KEYS[event])}
+          </span>
         </div>
         <button
           type="button"
@@ -183,28 +178,23 @@ function ExpandPanel({
       </div>
 
       {sources.length > 0 ? (
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-2 divide-y divide-border">
           {sources.map((s) => (
             <li
               key={s.pluginId}
-              className="flex items-start gap-2 rounded-md border border-border bg-surface-subtle px-2.5 py-2"
+              className="flex items-center gap-2 py-1.5 first:pt-0 last:pb-0"
               data-testid={`hook-diagram-source-${s.pluginId}`}
             >
-              <Package size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-meta font-medium text-ink">{s.name}</div>
-                <div className="truncate font-mono text-caption text-ink-tertiary" title={s.dir}>
-                  {s.dir}
-                </div>
-              </div>
-              <span className="shrink-0 text-caption text-ink-tertiary">
-                {t('settings.hooks.hookCount', { count: s.hookCount })}
+              <Package size={13} className="shrink-0 text-ink-tertiary" />
+              <span className="truncate text-meta text-ink">{s.name}</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-caption text-ink-tertiary" title={s.dir}>
+                {s.dir}
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-2 text-meta text-ink-tertiary">{t('settings.hooks.diagram.expandEmptyHint')}</p>
+        <p className="mt-1.5 text-meta text-ink-tertiary">{t('settings.hooks.diagram.expandEmptyHint')}</p>
       )}
     </div>
   )
@@ -244,7 +234,7 @@ function FishboneCanvas({
   )
 
   return (
-    <div className="h-[420px] w-full overflow-hidden rounded-md border border-border bg-surface">
+    <div className="h-[380px] w-full overflow-hidden rounded-lg border border-border bg-surface">
       <ReactFlow
         className="hook-fishbone-flow"
         nodes={nodes}
@@ -284,8 +274,6 @@ export function HookLifecycleDiagram({ plugins }: HookLifecycleDiagramProps) {
   const { t } = useTranslation()
   const [expandedEvent, setExpandedEvent] = useState<HookEvent | null>(null)
   const byEvent = useMemo(() => sourcesByHookEvent(plugins), [plugins])
-  const configuredEvents = useMemo(() => configuredHookEvents(plugins), [plugins])
-  const configuredCount = configuredEvents.size
 
   const onToggleEvent = useCallback((event: HookEvent) => {
     setExpandedEvent((prev) => (prev === event ? null : event))
@@ -294,28 +282,17 @@ export function HookLifecycleDiagram({ plugins }: HookLifecycleDiagramProps) {
   const sources = expandedEvent ? (byEvent.get(expandedEvent) ?? []) : []
 
   return (
-    <div
-      className="rounded-lg border border-border bg-surface-subtle p-4"
-      data-testid="hook-lifecycle-diagram"
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-meta font-semibold text-ink">{t('settings.hooks.diagram.title')}</div>
-          <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.hooks.diagram.subtitleFishbone')}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 text-meta text-ink-tertiary">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm border border-accent/50 bg-accent/10" />
-            {t('settings.hooks.diagram.legendConfigured')}
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm border border-border bg-surface" />
-            {t('settings.hooks.diagram.legendAvailable')}
-          </span>
-          <span className="text-caption">
-            {t('settings.hooks.diagram.ariaLabel', { count: configuredCount })}
-          </span>
-        </div>
+    <div data-testid="hook-lifecycle-diagram">
+      <div className="mb-2 flex items-center gap-3 text-caption text-ink-tertiary">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block size-2 rounded-sm border border-accent/50 bg-accent/10" />
+          {t('settings.hooks.diagram.legendConfigured')}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block size-2 rounded-sm border border-border bg-surface" />
+          {t('settings.hooks.diagram.legendAvailable')}
+        </span>
+        <span className="text-ink-tertiary/80">· {t('settings.hooks.diagram.clickHint')}</span>
       </div>
 
       <ReactFlowProvider>

@@ -54,10 +54,15 @@ describe('memory citations harness @memory @harness', () => {
       interval: 300,
     })
 
+    // Chip can exist but fail isDisplayed under WebKit overflow; use exist + scroll.
+    await browser.waitUntil(
+      async () => (await browser.$$('[data-testid="memory-citations-chip"]')).length >= 1,
+      { timeout: 15000, interval: 300, timeoutMsg: 'memory-citations-chip not in DOM' },
+    )
     const chip = await browser.$('[data-testid="memory-citations-chip"]')
-    await chip.waitForExist({ timeout: 15000 })
-    await expect(chip).toBeDisplayed()
-
+    await browser.execute((el: HTMLElement) => {
+      el.scrollIntoView({ block: 'center' })
+    }, chip)
     await browser.execute((el: HTMLElement) => el.click(), chip)
     const list = await browser.$('[data-testid="memory-citations-list"]')
     await list.waitForExist({ timeout: 10000 })

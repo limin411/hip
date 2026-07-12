@@ -737,6 +737,16 @@ describe('workspace diff', () => {
     expect(useCommandPaletteStore.getState().open).toBe(false)
   })
 
+  it('openSettingsPageForE2e sets activeView settings and settingsPage', () => {
+    useUiStore.setState({ activeView: 'chat', settingsPage: 'general', settingsNavCollapsed: true })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.openSettingsPageForE2e('memory')
+    expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().settingsPage).toBe('memory')
+    expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
+  })
+
   it('simulatePluginInstallError sets pluginInstall result failure', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

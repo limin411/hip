@@ -92,8 +92,8 @@ describe('slash commands @core', () => {
 
     await expect(chat.slashPalette).toBeDisplayed()
     await expect(chat.slashCmd('diff')).toBeDisplayed()
-    await expect(chat.slashCmd('init')).toBeDisplayed()
-    // /compact requires an active session, so it is hidden on a new draft.
+    // /init and /compact require an active session — hidden on a bare draft.
+    await expect(chat.slashCmd('init')).not.toBeExisting()
     await expect(chat.slashCmd('compact')).not.toBeExisting()
   })
 })

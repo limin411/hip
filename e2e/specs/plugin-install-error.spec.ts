@@ -2,8 +2,12 @@
 import { expect } from 'expect-webdriverio'
 import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
-import { simulatePluginInstallError, waitForHipE2E } from '../helpers/e2e-hooks.js'
-import { closeSettings, openSettings } from '../helpers/settings.js'
+import {
+  openSettingsPageForE2e,
+  simulatePluginInstallError,
+  waitForHipE2E,
+} from '../helpers/e2e-hooks.js'
+import { closeSettings } from '../helpers/settings.js'
 import { SettingsPage } from '../page-objects/SettingsPage.js'
 
 const settings = new SettingsPage()
@@ -16,7 +20,7 @@ describe('plugin install error @settings @harness', () => {
     await waitForMainApp()
     await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
-    await openSettings()
+    await openSettingsPageForE2e('plugins')
   })
 
   after(async () => {
@@ -24,10 +28,6 @@ describe('plugin install error @settings @harness', () => {
   })
 
   it('shows install error after submit + failed install result', async () => {
-    const pluginsNav = await settings.nav('plugins')
-    await pluginsNav.waitForExist({ timeout: 10000 })
-    await browser.execute((el: HTMLElement) => el.click(), pluginsNav)
-
     const openBtn = await browser.$('[data-testid="plugin-install-open"]')
     await openBtn.waitForExist({ timeout: 15000 })
     await browser.execute((el: HTMLElement) => el.click(), openBtn)

@@ -1,6 +1,7 @@
 // Memory slash commands (unpaid).
 import { expect } from 'expect-webdriverio'
 import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
+// closeSettings path used after /memory opens settings
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   createChatSessionForE2e,
@@ -61,11 +62,11 @@ describe('memory slash commands @memory', () => {
       { timeout: 15000, interval: 300, timeoutMsg: '/memory did not open memory settings' },
     )
 
-    const back = await browser.$('[data-testid="settings-back"]')
-    if (await back.isExisting()) await back.click()
+    await leaveSpecialViewsIfOpen()
   })
 
   it('M2.10 /memory-on and /memory-off toggle useMemories flag', async () => {
+    await leaveSpecialViewsIfOpen()
     await switchToChatSurface()
     const sessionId = await createChatSessionForE2e()
     expect(sessionId).toBeTruthy()

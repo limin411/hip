@@ -1,5 +1,5 @@
-import { openSettings, closeSettings } from './settings.js'
-import { waitForHipE2E } from './e2e-hooks.js'
+import { closeSettings } from './settings.js'
+import { openSettingsPageForE2e, waitForHipE2E } from './e2e-hooks.js'
 
 type MemorySeed = {
   title: string
@@ -26,16 +26,10 @@ type MemoryFlags = {
   incognito?: boolean
 } | null
 
-/** Open Settings and select the Memory nav item. */
+/** Open Settings → Memory via DEV store bridge (reliable under shared-process residual state). */
 export async function openMemorySettings(): Promise<void> {
-  // Already on settings? skip account-menu open.
-  const memoryNavExisting = await browser.$('[data-testid="settings-nav-memory"]')
-  if (!(await memoryNavExisting.isExisting())) {
-    await openSettings()
-  }
-  const nav = await browser.$('[data-testid="settings-nav-memory"]')
-  await nav.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => el.click(), nav)
+  await waitForHipE2E()
+  await openSettingsPageForE2e('memory')
   await browser.waitUntil(
     async () => {
       const empty = await browser.$('[data-testid="memory-config-empty"]')

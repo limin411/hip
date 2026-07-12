@@ -27,6 +27,7 @@ type HipE2E = {
   seedCheckpoints: (s: string) => { count: number }
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
+  openSettingsPageForE2e?: (page?: string) => void
   simulatePluginInstallError: (error?: string) => void
   getMemoryConfig?: () => Promise<Record<string, unknown>>
   setMemoryConfig?: (partial: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -168,6 +169,15 @@ export async function closeCommandPaletteForE2e(): Promise<void> {
     if (!hooks) throw new Error('__hipE2E missing')
     hooks.closeCommandPaletteForE2e()
   })
+}
+
+/** Open Settings → page via uiStore (DEV bridge). */
+export async function openSettingsPageForE2e(page = 'general'): Promise<void> {
+  await browser.execute((p: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.openSettingsPageForE2e) throw new Error('__hipE2E.openSettingsPageForE2e missing')
+    hooks.openSettingsPageForE2e(p)
+  }, page)
 }
 
 export async function simulatePluginInstallError(error = 'e2e package structure invalid'): Promise<void> {

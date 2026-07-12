@@ -569,6 +569,16 @@ export class SessionService {
     useCommandPaletteStore.getState().close()
   }
 
+  /**
+   * E2E: jump to Settings on a given nav page via uiStore (same path as SettingsPanel tabs).
+   * Prefer this over account-menu + Radix nav when residual suite state is flaky.
+   */
+  openSettingsPageForE2e(page = 'general'): void {
+    useUiStore.getState().setSettingsNavCollapsed(false)
+    useUiStore.getState().setSettingsPage(page as import('@/store/uiStore').SettingsPageId)
+    useUiStore.getState().setActiveView('settings')
+  }
+
   /** E2E T2: install failure payload (UI must have submitted form to show error). */
   simulatePluginInstallError(error = 'e2e package structure invalid'): void {
     this.receive({ type: 'plugin:install:result', ok: false, error })
@@ -1184,6 +1194,8 @@ export type HipE2EHooks = {
   seedCheckpoints: (sessionId: string) => { count: number }
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
+  /** E2E: open Settings on a nav page via store (avoids Radix menu flakes). */
+  openSettingsPageForE2e: (page?: string) => void
   simulatePluginInstallError: (error?: string) => void
   /** Cross-session memory (WS via SessionService). */
   getMemoryConfig: () => Promise<MemoryFileConfig>
@@ -1242,6 +1254,7 @@ function installE2eHooks(svc: SessionService): void {
     seedCheckpoints: (sessionId) => svc.seedCheckpoints(sessionId),
     openCommandPaletteForE2e: () => svc.openCommandPaletteForE2e(),
     closeCommandPaletteForE2e: () => svc.closeCommandPaletteForE2e(),
+    openSettingsPageForE2e: (page) => svc.openSettingsPageForE2e(page),
     simulatePluginInstallError: (error) => svc.simulatePluginInstallError(error),
     getMemoryConfig: () => svc.getMemoryConfig(),
     setMemoryConfig: (partial) => svc.setMemoryConfig(partial),

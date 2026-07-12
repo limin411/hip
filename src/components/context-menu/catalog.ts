@@ -1,11 +1,12 @@
 import type { ContextKind, ContextMenuItemMeta } from './types'
 
 const STATIC_CATALOG: ContextMenuItemMeta[] = [
+  // Message kind ordered to match mergeByGroup / live menu (GROUP_ORDER).
   {
-    id: 'message.copy',
-    labelKey: 'contextMenu.message.copy',
+    id: 'message.regenerate',
+    labelKey: 'contextMenu.message.regenerate',
     kind: 'message',
-    group: 'clipboard',
+    group: 'primary',
   },
   {
     id: 'message.quote',
@@ -14,16 +15,16 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'edit',
   },
   {
+    id: 'message.copy',
+    labelKey: 'contextMenu.message.copy',
+    kind: 'message',
+    group: 'clipboard',
+  },
+  {
     id: 'message.copyId',
     labelKey: 'contextMenu.message.copyId',
     kind: 'message',
     group: 'debug',
-  },
-  {
-    id: 'message.regenerate',
-    labelKey: 'contextMenu.message.regenerate',
-    kind: 'message',
-    group: 'primary',
   },
   {
     id: 'session.copyDebugBundle',

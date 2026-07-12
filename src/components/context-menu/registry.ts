@@ -7,36 +7,26 @@ import type {
   ContextProvider,
   ContextRequest,
 } from './types'
+import { groupRank } from './groupOrder'
 import { loadPrefs } from './prefs'
-import { GROUP_ORDER, groupRank } from './groupOrder'
 import { codeBlockProvider } from './providers/codeBlock'
 import { messageProvider } from './providers/message'
 import { sessionHistoryProvider } from './providers/sessionHistory'
 import { sessionTabProvider } from './providers/sessionTab'
 import { fileEntryProvider } from './providers/fileEntry'
-import { checkpointProvider } from './providers/checkpoint'
-import { commitProvider } from './providers/commit'
-import { diffFileProvider } from './providers/diffFile'
-import { diffHunkProvider } from './providers/diffHunk'
-import { terminalProvider } from './providers/terminal'
-import { filePreviewProvider } from './providers/filePreview'
-import { toolCallProvider } from './providers/toolCall'
-import { subAgentProvider } from './providers/subAgent'
 
+export { GROUP_ORDER, groupRank, sortMetaByGroup } from './groupOrder'
+
+/**
+ * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
+ * Surface PRs import and append here (message, codeBlock, sessionTab, fileEntry, …).
+ */
 const BUILTIN_PROVIDERS: ContextProvider[] = [
   codeBlockProvider,
   messageProvider,
   sessionHistoryProvider,
   sessionTabProvider,
   fileEntryProvider,
-  checkpointProvider,
-  commitProvider,
-  diffFileProvider,
-  diffHunkProvider,
-  terminalProvider,
-  filePreviewProvider,
-  toolCallProvider,
-  subAgentProvider,
 ]
 
 const extraProviders: ContextProvider[] = []
@@ -53,25 +43,6 @@ export function registerContextProvider(provider: ContextProvider): () => void {
 /** Test helper: clear all extra providers. Builtins always remain. */
 export function clearContextProviders(): void {
   extraProviders.length = 0
-}
-
-/** Stable group order for merge (not user-editable in PR-1). */
-const GROUP_ORDER: ContextGroupId[] = [
-  'primary',
-  'edit',
-  'clipboard',
-  'navigation',
-  'session',
-  'workspace',
-  'git',
-  'debug',
-  'danger',
-  'extensions',
-]
-
-function groupRank(group: ContextGroupId): number {
-  const i = GROUP_ORDER.indexOf(group)
-  return i >= 0 ? i : GROUP_ORDER.length
 }
 
 /**

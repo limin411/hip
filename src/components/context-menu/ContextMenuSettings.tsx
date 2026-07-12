@@ -10,6 +10,7 @@ import {
   resetPrefs,
   savePrefs,
 } from './prefs'
+import { sortMetaByGroup } from './groupOrder'
 import type { ContextKind, ContextMenuItemMeta, ContextMenuPrefs } from './types'
 
 /** Stable display order of kinds that currently have catalog entries. */
@@ -53,6 +54,19 @@ export function orderCatalogMeta(
   return ordered
 }
 
+/**
+ * Default Settings / first-write baseline for a kind:
+ * catalog items sorted with the same group rank as `mergeByGroup` (live menus).
+ */
+export function defaultItemsForKind(kind: ContextKind): ContextMenuItemMeta[] {
+  return sortMetaByGroup(listCatalogItems(kind))
+}
+
+/** Items for a kind: group baseline, then optional user orderByKind. */
+export function itemsForKind(kind: ContextKind, order?: string[]): ContextMenuItemMeta[] {
+  return orderCatalogMeta(defaultItemsForKind(kind), order)
+}
+
 /** Kinds present in the static catalog, in section order (extras last). */
 export function catalogKinds(): ContextKind[] {
   const present = new Set(listCatalogItems().map((m) => m.kind))
@@ -61,11 +75,6 @@ export function catalogKinds(): ContextKind[] {
     if (!ordered.includes(k)) ordered.push(k)
   }
   return ordered
-}
-
-function persist(prefs: ContextMenuPrefs): ContextMenuPrefs {
-  savePrefs(prefs)
-  return prefs
 }
 
 export function ContextMenuSettings() {
@@ -88,38 +97,36 @@ export function ContextMenuSettings() {
     [t],
   )
 
-  const update = useCallback((next: ContextMenuPrefs) => {
-    setPrefs(persist(next))
-  }, [])
-
-  const setVisible = useCallback(
-    (id: string, visible: boolean) => {
-      const disabled = new Set(prefs.disabledIds)
+  /** Functional update so rapid clicks don't drop intermediate prefs. */
+  const setVisible = useCallback((id: string, visible: boolean) => {
+    setPrefs((prev) => {
+      const disabled = new Set(prev.disabledIds)
       if (visible) disabled.delete(id)
       else disabled.add(id)
-      update({ ...prefs, disabledIds: [...disabled] })
-    },
-    [prefs, update],
-  )
+      const next: ContextMenuPrefs = { ...prev, disabledIds: [...disabled] }
+      savePrefs(next)
+      return next
+    })
+  }, [])
 
-  const moveItem = useCallback(
-    (kind: ContextKind, id: string, direction: -1 | 1) => {
-      const catalog = listCatalogItems(kind)
-      const current = orderCatalogMeta(catalog, prefs.orderByKind?.[kind]).map((m) => m.id)
+  const moveItem = useCallback((kind: ContextKind, id: string, direction: -1 | 1) => {
+    setPrefs((prev) => {
+      const current = itemsForKind(kind, prev.orderByKind?.[kind]).map((m) => m.id)
       const index = current.indexOf(id)
       const target = index + direction
-      if (index < 0 || target < 0 || target >= current.length) return
+      if (index < 0 || target < 0 || target >= current.length) return prev
       const nextOrder = current.slice()
       const tmp = nextOrder[index]!
       nextOrder[index] = nextOrder[target]!
       nextOrder[target] = tmp
-      update({
-        ...prefs,
-        orderByKind: { ...prefs.orderByKind, [kind]: nextOrder },
-      })
-    },
-    [prefs, update],
-  )
+      const next: ContextMenuPrefs = {
+        ...prev,
+        orderByKind: { ...prev.orderByKind, [kind]: nextOrder },
+      }
+      savePrefs(next)
+      return next
+    })
+  }, [])
 
   const handleReset = useCallback(() => {
     resetPrefs()
@@ -150,7 +157,7 @@ export function ContextMenuSettings() {
 
       <div className="mt-4 flex flex-col gap-5">
         {kinds.map((kind) => {
-          const items = orderCatalogMeta(listCatalogItems(kind), prefs.orderByKind?.[kind])
+          const items = itemsForKind(kind, prefs.orderByKind?.[kind])
           if (items.length === 0) return null
           return (
             <div key={kind} data-testid={`context-menu-settings-kind-${kind}`}>

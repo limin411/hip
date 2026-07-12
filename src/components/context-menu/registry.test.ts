@@ -6,7 +6,13 @@ import {
   mergeByGroup,
   registerContextProvider,
 } from './registry'
-import type { ContextMenuBuildContext, ContextMenuItemDef, ContextProvider } from './types'
+import { sortMetaByGroup } from './groupOrder'
+import type {
+  ContextMenuBuildContext,
+  ContextMenuItemDef,
+  ContextMenuItemMeta,
+  ContextProvider,
+} from './types'
 
 function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuBuildContext {
   return {
@@ -59,6 +65,18 @@ describe('mergeByGroup', () => {
     ])
     expect(merged).toHaveLength(1)
     expect(merged[0]?.label).toBe('First')
+  })
+})
+
+describe('sortMetaByGroup', () => {
+  it('orders meta by GROUP_ORDER ranks (stable within group)', () => {
+    const meta: ContextMenuItemMeta[] = [
+      { id: 'd', labelKey: 'd', kind: 'message', group: 'debug' },
+      { id: 'c', labelKey: 'c', kind: 'message', group: 'clipboard' },
+      { id: 'p', labelKey: 'p', kind: 'message', group: 'primary' },
+      { id: 'c2', labelKey: 'c2', kind: 'message', group: 'clipboard' },
+    ]
+    expect(sortMetaByGroup(meta).map((m) => m.id)).toEqual(['p', 'c', 'c2', 'd'])
   })
 })
 

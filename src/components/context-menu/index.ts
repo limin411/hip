@@ -10,6 +10,7 @@ export {
   applyPrefs,
   applyOrderByIds,
 } from './registry'
+export { GROUP_ORDER, groupRank, sortMetaByGroup } from './groupOrder'
 export { listCatalogItems, registerCatalogMeta, clearCatalogMeta } from './catalog'
 export {
   loadPrefs,

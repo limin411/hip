@@ -5,10 +5,13 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import {
   catalogKinds,
   ContextMenuSettings,
+  defaultItemsForKind,
+  itemsForKind,
   orderCatalogMeta,
 } from './ContextMenuSettings'
 import { CONTEXT_MENU_PREFS_KEY, loadPrefs } from './prefs'
 import { listCatalogItems } from './catalog'
+import { sortMetaByGroup } from './groupOrder'
 import type { ContextMenuItemMeta } from './types'
 
 vi.mock('react-i18next', () => ({
@@ -42,6 +45,30 @@ describe('orderCatalogMeta', () => {
   })
 })
 
+describe('defaultItemsForKind / group baseline', () => {
+  it('defaults to sortMetaByGroup (mergeByGroup rank), not raw catalog file order', () => {
+    // Even if listCatalogItems were out of group order, defaultItemsForKind sorts by group.
+    const raw = listCatalogItems('message')
+    const baseline = defaultItemsForKind('message')
+    expect(baseline.map((m) => m.id)).toEqual(sortMetaByGroup(raw).map((m) => m.id))
+    expect(baseline.map((m) => m.id)).toEqual([
+      'message.regenerate',
+      'message.quote',
+      'message.copy',
+      'message.copyId',
+      'session.copyDebugBundle',
+    ])
+  })
+
+  it('for every catalog kind, default Settings order equals group-sorted catalog', () => {
+    for (const kind of catalogKinds()) {
+      const expected = sortMetaByGroup(listCatalogItems(kind)).map((m) => m.id)
+      expect(defaultItemsForKind(kind).map((m) => m.id)).toEqual(expected)
+      expect(itemsForKind(kind).map((m) => m.id)).toEqual(expected)
+    }
+  })
+})
+
 describe('catalogKinds', () => {
   it('returns only kinds present in the static catalog', () => {
     const kinds = catalogKinds()
@@ -67,6 +94,19 @@ describe('ContextMenuSettings', () => {
     }
   })
 
+  it('shows message items in mergeByGroup order by default', () => {
+    render(<ContextMenuSettings />)
+    const section = screen.getByTestId('context-menu-settings-kind-message')
+    const rows = within(section).getAllByTestId(/context-menu-settings-item-/)
+    expect(rows.map((r) => r.getAttribute('data-testid'))).toEqual([
+      'context-menu-settings-item-message.regenerate',
+      'context-menu-settings-item-message.quote',
+      'context-menu-settings-item-message.copy',
+      'context-menu-settings-item-message.copyId',
+      'context-menu-settings-item-session.copyDebugBundle',
+    ])
+  })
+
   it('hides an item via checkbox and persists disabledIds', () => {
     render(<ContextMenuSettings />)
     const id = 'message.copy'
@@ -78,24 +118,34 @@ describe('ContextMenuSettings', () => {
     expect(localStorage.getItem(CONTEXT_MENU_PREFS_KEY)).toContain(id)
   })
 
-  it('reorders with up/down and persists orderByKind', () => {
+  it('sequential hides both land in disabledIds (functional setPrefs)', () => {
+    render(<ContextMenuSettings />)
+    fireEvent.click(screen.getByTestId('context-menu-settings-visible-message.copy'))
+    fireEvent.click(screen.getByTestId('context-menu-settings-visible-message.quote'))
+    const ids = loadPrefs().disabledIds
+    expect(ids).toEqual(expect.arrayContaining(['message.copy', 'message.quote']))
+    expect(ids).toHaveLength(2)
+  })
+
+  it('reorders from group baseline and persists orderByKind as a single adjacent swap', () => {
     render(<ContextMenuSettings />)
     const kind = 'message'
     const section = screen.getByTestId(`context-menu-settings-kind-${kind}`)
-    const items = listCatalogItems(kind)
-    expect(items.length).toBeGreaterThanOrEqual(2)
-    const firstId = items[0]!.id
-    const secondId = items[1]!.id
+    const baseline = defaultItemsForKind(kind).map((m) => m.id)
+    expect(baseline.length).toBeGreaterThanOrEqual(2)
+    const firstId = baseline[0]!
+    const secondId = baseline[1]!
 
     fireEvent.click(within(section).getByTestId(`context-menu-settings-down-${firstId}`))
 
-    const prefs = loadPrefs()
-    expect(prefs.orderByKind?.[kind]?.[0]).toBe(secondId)
-    expect(prefs.orderByKind?.[kind]?.[1]).toBe(firstId)
+    const expected = baseline.slice()
+    expected[0] = secondId
+    expected[1] = firstId
+    expect(loadPrefs().orderByKind?.[kind]).toEqual(expected)
 
-    // DOM order follows prefs
     const rows = within(section).getAllByTestId(/context-menu-settings-item-/)
     expect(rows[0]).toHaveAttribute('data-testid', `context-menu-settings-item-${secondId}`)
+    expect(rows[1]).toHaveAttribute('data-testid', `context-menu-settings-item-${firstId}`)
   })
 
   it('reset restores defaults and clears storage', () => {

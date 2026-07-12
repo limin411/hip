@@ -1,27 +1,46 @@
 import { CodePage } from '../page-objects/CodePage.js'
+import { selectPanelTab } from './panel.js'
 
 const codePage = new CodePage()
 
-/** One-click git init then open the Changes tab (git-gated). */
+/** One-click git init then open the Changes panel tab (git-gated). */
 export async function initGitAndOpenChanges(): Promise<void> {
   const init = await codePage.gitInitButton
   await init.waitForExist({ timeout: 30000 })
-  await init.click()
-  const changesTab = await browser.$('[data-testid="tab-changes"]')
-  await changesTab.waitForExist({ timeout: 30000 })
-  await changesTab.click()
+  await browser.execute((el: HTMLElement) => el.click(), init)
+
+  // After init, Changes appears in the panel menu as panel-tab-changes (not legacy tab-changes).
+  await browser.waitUntil(
+    async () => {
+      try {
+        await selectPanelTab('changes')
+        return true
+      } catch {
+        return false
+      }
+    },
+    {
+      timeout: 45000,
+      interval: 800,
+      timeoutMsg: 'panel-tab-changes never available after git init',
+    },
+  )
   await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 30000 })
 }
 
 /** Re-open Changes tab to force a diff refresh (no fs watcher). */
 export async function reopenChangesTab(): Promise<void> {
-  const filesTab = await browser.$('[data-testid="tab-files"]')
-  if (await filesTab.isExisting()) {
-    await filesTab.click()
+  const filesView = await browser.$('[data-testid="panel-view-files"]')
+  if (await filesView.isExisting()) {
+    // already on files — fine
+  } else {
+    try {
+      await selectPanelTab('files')
+    } catch {
+      // files may already be active without view marker in edge cases
+    }
   }
-  const changesTab = await browser.$('[data-testid="tab-changes"]')
-  await changesTab.waitForExist({ timeout: 15000 })
-  await changesTab.click()
+  await selectPanelTab('changes')
   await (await browser.$('[data-testid="changes-view"]')).waitForExist({ timeout: 15000 })
 }
 
@@ -44,7 +63,10 @@ export async function commitCodeSessionWithDir(dir: string, message: string, tre
 
 /** Collect text of all `[data-testid="diff-file"]` rows. */
 export async function diffFileTexts(): Promise<string> {
-  const rows = await browser.$$('[data-testid="diff-file"]')
-  const texts = await Promise.all(rows.map((r) => r.getText()))
-  return texts.join('\n')
+  // Prefer execute: WDIO ElementArray is not always a plain iterable under WebKit.
+  return browser.execute(() =>
+    Array.from(document.querySelectorAll('[data-testid="diff-file"]'))
+      .map((el) => (el.textContent ?? '').trim())
+      .join('\n'),
+  )
 }

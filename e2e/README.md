@@ -79,10 +79,12 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@live` | Real LLM (opt-in only) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 
-Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`.
+Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e
+# or panel-only:
+E2E_GREP='@context-menu @panel' yarn test:e2e --spec e2e/specs/context-menu-panel.spec.ts
 ```
 
 ## Isolation notes

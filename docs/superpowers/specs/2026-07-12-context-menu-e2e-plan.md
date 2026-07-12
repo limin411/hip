@@ -426,6 +426,9 @@ yarn tauri dev
 | T1 `e2e/helpers/context-menu.ts` | ✅ |
 | T2 smoke CM-S1–S4 | ✅ 真机绿 |
 | T3 core CM-C1 + CM-C4 | ✅ 真机绿 |
+| T4 CM-C2 rename / CM-C3 close / CM-C9 modal | ✅ 真机绿 |
+| T5 CM-C6/C7 prefs hide + reset | ✅ 真机绿 |
+| T6 CM-C8 history open | ✅ 真机绿 |
 | 命令 | `E2E_GREP=@context-menu yarn test:e2e --spec e2e/specs/context-menu-smoke.spec.ts --spec e2e/specs/context-menu-core.spec.ts` |
 
 **附带修复（阻塞真机白屏）：** 栈合并后 `index.ts` 再导出 `applyOrderByIds`，但 `registry.ts` 丢失实现 → ESM 链接失败 → 整站白屏。已恢复 `applyOrderByIds` + `applyPrefs(..., kind)` + `buildContextMenuItems` 传 `req.kind`。

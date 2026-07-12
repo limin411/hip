@@ -120,8 +120,9 @@ describe('DeclarativeContextMenu', () => {
       if (req.kind !== 'plugin') return []
       return [
         {
-          id: 'plugin.uninstall',
-          label: 'Uninstall plugin',
+          // Extra id — must not collide with builtin plugin.uninstall
+          id: 'plugin.testDanger',
+          label: 'Danger action',
           group: 'danger',
           danger: true,
           shortcut: '⌘W',
@@ -133,7 +134,7 @@ describe('DeclarativeContextMenu', () => {
     render(
       <DeclarativeContextMenu
         kind="plugin"
-        payload={{ pluginId: 'p1' }}
+        payload={{ pluginId: 'p1', onUninstall: () => {} }}
         data-testid="ctx-host"
       >
         <span>plugin</span>
@@ -142,10 +143,10 @@ describe('DeclarativeContextMenu', () => {
 
     fireEvent.contextMenu(screen.getByTestId('ctx-host'))
     await waitFor(() => {
-      expect(screen.getByTestId('context-menu-item-plugin.uninstall')).toBeInTheDocument()
+      expect(screen.getByTestId('context-menu-item-plugin.testDanger')).toBeInTheDocument()
     })
-    const row = screen.getByTestId('context-menu-item-plugin.uninstall')
-    expect(row).toHaveTextContent('Uninstall plugin')
+    const row = screen.getByTestId('context-menu-item-plugin.testDanger')
+    expect(row).toHaveTextContent('Danger action')
     expect(row).toHaveTextContent('⌘W')
     expect(row.className).toMatch(/text-danger/)
   })

@@ -20,6 +20,10 @@ const KIND_SECTION_ORDER: ContextKind[] = [
   'sessionTab',
   'sessionHistory',
   'fileEntry',
+  'agentConfig',
+  'skillConfig',
+  'mcpServer',
+  'plugin',
 ]
 
 const KIND_LABEL_KEY = {
@@ -28,6 +32,10 @@ const KIND_LABEL_KEY = {
   sessionTab: 'settings.contextMenu.kinds.sessionTab',
   sessionHistory: 'settings.contextMenu.kinds.sessionHistory',
   fileEntry: 'settings.contextMenu.kinds.fileEntry',
+  agentConfig: 'settings.contextMenu.kinds.agentConfig',
+  skillConfig: 'settings.contextMenu.kinds.skillConfig',
+  mcpServer: 'settings.contextMenu.kinds.mcpServer',
+  plugin: 'settings.contextMenu.kinds.plugin',
 } as const satisfies Partial<Record<ContextKind, string>>
 
 type KindLabelKey = (typeof KIND_LABEL_KEY)[keyof typeof KIND_LABEL_KEY]

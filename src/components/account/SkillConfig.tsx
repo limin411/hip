@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 // ── Display helpers (pure functions, testable) ──
 
@@ -228,94 +229,111 @@ export function SkillCard({
   const ctxBadge = badgeForContext(skill)
   const refLabel = refCountLabel(skill)
   const toolsPreview = toolAllowlistPreview(skill)
+  const canDelete = !readOnly
+  // Card chrome on permanent outer so CONTEXT_MENUS=false keeps layout.
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-      <div className="flex items-start gap-3">
-        <Avatar name={skill.name} shape="square" size={38} />
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{skill.name}</span>
-          {readOnly && (
-            <Badge variant="accent" className="shrink-0">
-              via {readOnly.pluginName}
+    <div
+      data-testid="skill-card"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
+    >
+      <DeclarativeContextMenu
+        kind="skillConfig"
+        payload={{
+          skillId: skill.id,
+          name: skill.name,
+          canDelete,
+          onView,
+          onDelete,
+        }}
+        className="flex flex-col gap-3"
+      >
+        <div className="flex items-start gap-3">
+          <Avatar name={skill.name} shape="square" size={38} />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">{skill.name}</span>
+            {readOnly && (
+              <Badge variant="accent" className="shrink-0">
+                via {readOnly.pluginName}
+              </Badge>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Switch
+              checked={enabled}
+              onCheckedChange={onToggle}
+              ariaLabel={t('settings.skill.enableThis')}
+            />
+            {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};
+                stacking them leaves the lock stuck after close. A kebab needs no trap, so non-modal is safe. */}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  aria-label={t('settings.skill.menuMore')}
+                >
+                  <MoreVertical size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={onView}>
+                  <Eye size={14} /> {t('settings.skill.view')}
+                </DropdownMenuItem>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
+                      <Trash2 size={14} /> {t('settings.skill.delete')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {skill.description && (
+          <p className="truncate text-caption text-ink-tertiary">{skill.description}</p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {skill.hasScripts && (
+            <Badge title={t('settings.skill.hasScriptsTitle')}>
+              <TerminalSquare size={11} />
+              {t('settings.skill.hasScripts')}
+            </Badge>
+          )}
+          {autoBadge && (
+            <Badge
+              className={
+                autoBadge.variant === 'auto'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-surface-muted text-ink-tertiary'
+              }
+            >
+              <Zap size={11} />
+              {autoBadge.label}
+            </Badge>
+          )}
+          {ctxBadge && (
+            <Badge variant="accent">
+              <GitFork size={11} />
+              {ctxBadge.label}
+            </Badge>
+          )}
+          {refLabel && (
+            <Badge>
+              <BookOpen size={11} />
+              {refLabel}
+            </Badge>
+          )}
+          {toolsPreview && (
+            <Badge title={skill.allowedTools?.join(', ')}>
+              <Wrench size={11} />
+              {toolsPreview}
             </Badge>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Switch
-            checked={enabled}
-            onCheckedChange={onToggle}
-            ariaLabel={t('settings.skill.enableThis')}
-          />
-          {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};
-              stacking them leaves the lock stuck after close. A kebab needs no trap, so non-modal is safe. */}
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                aria-label={t('settings.skill.menuMore')}
-              >
-                <MoreVertical size={16} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={onView}>
-                <Eye size={14} /> {t('settings.skill.view')}
-              </DropdownMenuItem>
-              {!readOnly && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-danger focus:bg-danger/10" onSelect={onDelete}>
-                    <Trash2 size={14} /> {t('settings.skill.delete')}
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {skill.description && (
-        <p className="truncate text-caption text-ink-tertiary">{skill.description}</p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        {skill.hasScripts && (
-          <Badge title={t('settings.skill.hasScriptsTitle')}>
-            <TerminalSquare size={11} />
-            {t('settings.skill.hasScripts')}
-          </Badge>
-        )}
-        {autoBadge && (
-          <Badge
-            className={
-              autoBadge.variant === 'auto'
-                ? 'bg-success/10 text-success'
-                : 'bg-surface-muted text-ink-tertiary'
-            }
-          >
-            <Zap size={11} />
-            {autoBadge.label}
-          </Badge>
-        )}
-        {ctxBadge && (
-          <Badge variant="accent">
-            <GitFork size={11} />
-            {ctxBadge.label}
-          </Badge>
-        )}
-        {refLabel && (
-          <Badge>
-            <BookOpen size={11} />
-            {refLabel}
-          </Badge>
-        )}
-        {toolsPreview && (
-          <Badge title={skill.allowedTools?.join(', ')}>
-            <Wrench size={11} />
-            {toolsPreview}
-          </Badge>
-        )}
-      </div>
+      </DeclarativeContextMenu>
     </div>
   )
 }

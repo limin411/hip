@@ -66,28 +66,46 @@ export type ContextPayloadMap = {
   diffHunk: { path: string; header?: string; text: string }
   checkpoint: { checkpointId: string; sessionId: string }
   commit: { sha: string; shortSha: string; message: string; sessionId: string }
+  terminal: { sessionId: string; status: string }
   /**
-   * Terminal chrome (`target: 'chrome'`, default) or xterm canvas (`target: 'canvas'`).
-   * Canvas menus use ControlledContextMenu; selection/paste via terminalCanvasUi bridge.
+   * Settings agent row. Hosts supply onEdit/onDelete so menus reuse existing
+   * editor / delete-dialog state (same as kebab actions).
    */
-  terminal: {
-    sessionId: string
-    status: string
-    /** Default `'chrome'`. Canvas adds copy selection / paste. */
-    target?: 'chrome' | 'canvas'
+  agentConfig: {
+    agentId: string
+    onEdit: () => void
+    onDelete: () => void
   }
-  agentConfig: { agentId: string }
-  skillConfig: { skillId: string; name: string }
-  mcpServer: { serverId: string }
-  plugin: { pluginId: string }
+  /**
+   * Settings skill row. `canDelete` false for plugin-provided read-only skills
+   * (kebab also hides delete). Hosts supply view/delete handlers.
+   */
+  skillConfig: {
+    skillId: string
+    name: string
+    canDelete: boolean
+    onView: () => void
+    onDelete: () => void
+  }
+  /** Settings MCP server row (standalone, not plugin-owned). */
+  mcpServer: {
+    serverId: string
+    onEdit: () => void
+    onDelete: () => void
+  }
+  /** Settings plugin row — uninstall only. */
+  plugin: {
+    pluginId: string
+    onUninstall: () => void
+  }
   chatEmpty: { sessionId: string | null }
   artifactChrome: { tab: string }
 }
 
-/** Correlated kind + payload (discriminated union). Prefer over independent unions. */
 export type ContextRequest<K extends ContextKind = ContextKind> = {
-  [P in K]: { kind: P; payload: ContextPayloadMap[P] }
-}[K]
+  kind: K
+  payload: ContextPayloadMap[K]
+}
 
 /** Serializable / settings-safe. No run(). */
 export interface ContextMenuItemMeta {

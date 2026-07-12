@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 import {
   buildMcpDraft,
@@ -384,156 +385,164 @@ function McpServerCard({
   const discoveredTools = status?.toolNames ?? []
   const hasTools = discoveredTools.length > 0
 
+  // Card chrome on permanent outer so CONTEXT_MENUS=false keeps layout.
   return (
     <div
+      data-testid="mcp-server-card"
       className={cn(
         'relative flex min-h-[180px] flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle',
         !server.enabled && 'opacity-60',
       )}
     >
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-          <Plug size={18} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-body font-medium text-ink">{server.name}</div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <Badge>{transportLabel}</Badge>
-            {status && (
-              <span
-                className="inline-flex items-center gap-1 text-caption text-ink-secondary"
-                title={statusTitle}
-              >
-                <StatusDot status={status.status} />
-                {statusLabel}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex-1">
-        <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
-        {status && (
-          <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
-            <span>
-              {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
-            </span>
-            {hasTools && (
-              <button
-                onClick={() => setToolsOpen((o) => !o)}
-                className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
-              >
-                {t('settings.mcp.manageTools')}
-                <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
-              </button>
-            )}
-          </div>
-        )}
-        {toolsOpen && hasTools && (
-          <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
-                {t('settings.mcp.sectionTools')}
-              </span>
-              {(server.enabledTools?.length || server.disabledTools?.length) ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setActionError(null)
-                    setResetBusy(true)
-                    try {
-                      await onResetTools()
-                    } catch {
-                      setActionError(t('settings.mcp.error'))
-                    } finally {
-                      setResetBusy(false)
-                    }
-                  }}
-                  disabled={resetBusy}
-                  className="text-caption text-accent hover:underline disabled:opacity-50"
+      <DeclarativeContextMenu
+        kind="mcpServer"
+        payload={{ serverId: server.id, onEdit, onDelete }}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+            <Plug size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-body font-medium text-ink">{server.name}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge>{transportLabel}</Badge>
+              {status && (
+                <span
+                  className="inline-flex items-center gap-1 text-caption text-ink-secondary"
+                  title={statusTitle}
                 >
-                  {t('settings.mcp.toolToggleAll')}
-                </button>
-              ) : null}
-            </div>
-            <div className="grid gap-1.5 sm:grid-cols-2">
-              {discoveredTools.map((toolName) => {
-                const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
-                return (
-                  <label
-                    key={toolName}
-                    className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
-                  >
-                    <Switch
-                      checked={enabled}
-                      disabled={!!toolBusy[toolName] || resetBusy}
-                      onCheckedChange={async () => {
-                        setActionError(null)
-                        setToolBusy((b) => ({ ...b, [toolName]: true }))
-                        try {
-                          await onToggleTool(toolName)
-                        } catch {
-                          setActionError(t('settings.mcp.error'))
-                        } finally {
-                          setToolBusy((b) => ({ ...b, [toolName]: false }))
-                        }
-                      }}
-                      ariaLabel={toolName}
-                    />
-                    <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
-                  </label>
-                )
-              })}
+                  <StatusDot status={status.status} />
+                  {statusLabel}
+                </span>
+              )}
             </div>
           </div>
-        )}
-      </div>
-
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <Switch
-            checked={server.enabled}
-            disabled={toggleBusy}
-            onCheckedChange={async (enabled) => {
-              setActionError(null)
-              setToggleBusy(true)
-              try {
-                await onToggle(enabled)
-              } catch {
-                setActionError(t('settings.mcp.error'))
-              } finally {
-                setToggleBusy(false)
-              }
-            }}
-            ariaLabel={t('settings.mcp.enableThis')}
-          />
-          {actionError && <span className="text-meta text-danger">{actionError}</span>}
         </div>
-        <div className="flex items-center gap-1">
-          {status?.status === 'disconnected' && server.enabled && (
-            <ActionButton
-              icon={<RefreshCw size={14} />}
-              label={t('settings.mcp.reconnect')}
-              onClick={() => {
+
+        <div className="mt-3 flex-1">
+          <div className="truncate font-mono text-caption text-ink-tertiary">{detail}</div>
+          {status && (
+            <div className="mt-2 flex items-center gap-3 text-caption text-ink-tertiary">
+              <span>
+                {toolCount} {toolCount === 1 ? t('settings.mcp.toolSingular') : t('settings.mcp.toolPlural')}
+              </span>
+              {hasTools && (
+                <button
+                  onClick={() => setToolsOpen((o) => !o)}
+                  className="inline-flex items-center gap-0.5 text-accent-strong transition-colors hover:text-accent"
+                >
+                  {t('settings.mcp.manageTools')}
+                  <ChevronDown size={14} className={cn('transition-transform', toolsOpen && 'rotate-180')} />
+                </button>
+              )}
+            </div>
+          )}
+          {toolsOpen && hasTools && (
+            <div className="mt-3 rounded-lg border border-border bg-surface-subtle p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-caption font-medium uppercase tracking-wide text-ink-tertiary">
+                  {t('settings.mcp.sectionTools')}
+                </span>
+                {(server.enabledTools?.length || server.disabledTools?.length) ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setActionError(null)
+                      setResetBusy(true)
+                      try {
+                        await onResetTools()
+                      } catch {
+                        setActionError(t('settings.mcp.error'))
+                      } finally {
+                        setResetBusy(false)
+                      }
+                    }}
+                    disabled={resetBusy}
+                    className="text-caption text-accent hover:underline disabled:opacity-50"
+                  >
+                    {t('settings.mcp.toolToggleAll')}
+                  </button>
+                ) : null}
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {discoveredTools.map((toolName) => {
+                  const enabled = resolveToolEnabled(toolName, server.enabledTools ?? [], server.disabledTools ?? [])
+                  return (
+                    <label
+                      key={toolName}
+                      className="flex items-center gap-2 rounded-md p-1.5 hover:bg-surface-muted cursor-pointer"
+                    >
+                      <Switch
+                        checked={enabled}
+                        disabled={!!toolBusy[toolName] || resetBusy}
+                        onCheckedChange={async () => {
+                          setActionError(null)
+                          setToolBusy((b) => ({ ...b, [toolName]: true }))
+                          try {
+                            await onToggleTool(toolName)
+                          } catch {
+                            setActionError(t('settings.mcp.error'))
+                          } finally {
+                            setToolBusy((b) => ({ ...b, [toolName]: false }))
+                          }
+                        }}
+                        ariaLabel={toolName}
+                      />
+                      <span className="truncate font-mono text-body text-ink-secondary">{toolName}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex flex-col gap-1">
+            <Switch
+              checked={server.enabled}
+              disabled={toggleBusy}
+              onCheckedChange={async (enabled) => {
                 setActionError(null)
-                setReconnectBusy(true)
+                setToggleBusy(true)
                 try {
-                  onReconnect()
-                  // Debounce only on success; synchronous failures allow immediate retry.
-                  reconnectTimerRef.current = setTimeout(() => { setReconnectBusy(false) }, 1000)
+                  await onToggle(enabled)
                 } catch {
                   setActionError(t('settings.mcp.error'))
-                  setReconnectBusy(false)
+                } finally {
+                  setToggleBusy(false)
                 }
               }}
-              disabled={reconnectBusy}
+              ariaLabel={t('settings.mcp.enableThis')}
             />
-          )}
-          <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
-          <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
+            {actionError && <span className="text-meta text-danger">{actionError}</span>}
+          </div>
+          <div className="flex items-center gap-1">
+            {status?.status === 'disconnected' && server.enabled && (
+              <ActionButton
+                icon={<RefreshCw size={14} />}
+                label={t('settings.mcp.reconnect')}
+                onClick={() => {
+                  setActionError(null)
+                  setReconnectBusy(true)
+                  try {
+                    onReconnect()
+                    // Debounce only on success; synchronous failures allow immediate retry.
+                    reconnectTimerRef.current = setTimeout(() => { setReconnectBusy(false) }, 1000)
+                  } catch {
+                    setActionError(t('settings.mcp.error'))
+                    setReconnectBusy(false)
+                  }
+                }}
+                disabled={reconnectBusy}
+              />
+            )}
+            <ActionButton icon={<Pencil size={14} />} label={t('settings.mcp.edit')} onClick={onEdit} />
+            <ActionButton icon={<Trash2 size={14} />} label={t('settings.mcp.delete')} onClick={onDelete} danger />
+          </div>
         </div>
-      </div>
+      </DeclarativeContextMenu>
     </div>
   )
 }

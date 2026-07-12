@@ -7,100 +7,63 @@ beforeEach(() => {
 })
 
 describe('listCatalogItems', () => {
-  it('includes static PR surface meta (diff / checkpoint / terminal)', () => {
+  it('includes static meta from message, session, file, and settings list surfaces', () => {
     const ids = listCatalogItems().map((m) => m.id)
-    expect(ids).toContain('diffFile.copyPath')
-    expect(ids).toContain('checkpoint.revert')
-    expect(ids).toContain('terminal.restart')
-    expect(ids).toContain('terminal.copySelection')
-    expect(ids).toContain('terminal.paste')
-    expect(listCatalogItems('message')).toEqual([])
+    for (const id of [
+      'message.copy', 'codeBlock.copy',
+      'sessionTab.close', 'sessionHistory.open',
+      'file.copyPath', 'file.openContainingFolder',
+      'agentConfig.edit', 'skillConfig.view', 'mcpServer.edit', 'plugin.uninstall',
+    ]) {
+      expect(ids).toContain(id)
+    }
+  })
+
+  it('filters by kind', () => {
+    expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
+    expect(listCatalogItems('sessionTab').map((m) => m.id)).toContain('sessionTab.close')
+    expect(listCatalogItems('agentConfig').map((m) => m.id)).toEqual([
+      'agentConfig.edit',
+      'agentConfig.delete',
+    ])
+    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual(['plugin.uninstall'])
   })
 
   it('lists extras and filters by kind', () => {
-    const staticCount = listCatalogItems().length
-    const meta: ContextMenuItemMeta[] = [
-      {
-        id: 'message.copy',
-        labelKey: 'contextMenu.message.copy',
-        kind: 'message',
-        group: 'clipboard',
-      },
-      {
-        id: 'codeBlock.copy',
-        labelKey: 'contextMenu.codeBlock.copy',
-        kind: 'codeBlock',
-        group: 'clipboard',
-      },
-      {
-        id: 'message.regenerate',
-        labelKey: 'contextMenu.message.regenerate',
-        kind: 'message',
-        group: 'primary',
-      },
-    ]
-    registerCatalogMeta(meta)
-    expect(listCatalogItems()).toHaveLength(staticCount + 3)
-    expect(listCatalogItems('message').map((m) => m.id)).toEqual([
-      'message.copy',
-      'message.regenerate',
+    registerCatalogMeta([
+      { id: 'plugin.extra', labelKey: 'plugin.extra', kind: 'plugin', group: 'extensions' },
     ])
-    expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
-    expect(listCatalogItems('diffFile').length).toBeGreaterThan(0)
+    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual([
+      'plugin.uninstall',
+      'plugin.extra',
+    ])
   })
 
-  it('dedupes by id on register', () => {
-    const staticCount = listCatalogItems().length
+  it('dedupes by id on register (static wins)', () => {
     registerCatalogMeta([
-      {
-        id: 'message.copy',
-        labelKey: 'a',
-        kind: 'message',
-        group: 'clipboard',
-      },
+      { id: 'message.copy', labelKey: 'override', kind: 'message', group: 'clipboard' },
     ])
-    registerCatalogMeta([
-      {
-        id: 'message.copy',
-        labelKey: 'b',
-        kind: 'message',
-        group: 'clipboard',
-      },
-    ])
-    expect(listCatalogItems()).toHaveLength(staticCount + 1)
-    expect(listCatalogItems().find((m) => m.id === 'message.copy')?.labelKey).toBe('a')
+    expect(listCatalogItems().find((m) => m.id === 'message.copy')?.labelKey).toBe(
+      'contextMenu.message.copy',
+    )
   })
 
-  it('unregister removes registered meta', () => {
-    const staticCount = listCatalogItems().length
+  it('unregister removes registered meta only', () => {
+    const before = listCatalogItems().length
     const unreg = registerCatalogMeta([
-      {
-        id: 'x',
-        labelKey: 'x',
-        kind: 'plugin',
-        group: 'extensions',
-      },
+      { id: 'x', labelKey: 'x', kind: 'plugin', group: 'extensions' },
     ])
-    expect(listCatalogItems()).toHaveLength(staticCount + 1)
+    expect(listCatalogItems()).toHaveLength(before + 1)
     unreg()
-    expect(listCatalogItems()).toHaveLength(staticCount)
+    expect(listCatalogItems()).toHaveLength(before)
   })
 
-  it('clearCatalogMeta only clears extras (static catalog is never wiped)', () => {
-    const staticCount = listCatalogItems().length
-    expect(staticCount).toBeGreaterThan(0)
+  it('clearCatalogMeta only clears extras', () => {
+    const staticIds = listCatalogItems().map((m) => m.id)
     registerCatalogMeta([
-      {
-        id: 'extra.only',
-        labelKey: 'extra',
-        kind: 'plugin',
-        group: 'extensions',
-      },
+      { id: 'extra.only', labelKey: 'extra', kind: 'plugin', group: 'extensions' },
     ])
-    expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(true)
     clearCatalogMeta()
-    expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(false)
-    expect(listCatalogItems()).toHaveLength(staticCount)
-    expect(listCatalogItems().map((m) => m.id)).toContain('diffFile.copyPath')
+    expect(listCatalogItems().map((m) => m.id)).toEqual(staticIds)
   })
 })

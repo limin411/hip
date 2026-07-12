@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, cleanup, waitFor } from '@testing-library/react'
+import { render, cleanup, waitFor, screen } from '@testing-library/react'
 import { derivePluginMcpServers, McpConfig } from './McpConfig'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { usePluginsStore } from '@/store/pluginsStore'
@@ -18,6 +18,21 @@ vi.mock(import('react-i18next'), async (importOriginal) => {
     }),
   } as any
 })
+
+type McpMenuProps = {
+  kind: string
+  payload: { serverId: string; onEdit: () => void; onDelete: () => void }
+  children: React.ReactNode
+}
+
+let lastMcpMenuProps: McpMenuProps | null = null
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: (props: McpMenuProps) => {
+    lastMcpMenuProps = props
+    return <>{props.children}</>
+  },
+}))
 
 vi.mock('@/ipc/ws-client', () => ({
   wsClient: {
@@ -126,6 +141,7 @@ describe('derivePluginMcpServers', () => {
 describe('McpConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    lastMcpMenuProps = null
     useHipConfigStore.setState({
       config: { version: 1, mcpServers: [] },
       loaded: true,
@@ -136,6 +152,34 @@ describe('McpConfig', () => {
 
   afterEach(() => {
     cleanup()
+  })
+
+  it('wires DeclarativeContextMenu on standalone server cards', async () => {
+    useHipConfigStore.setState({
+      config: {
+        version: 1,
+        mcpServers: [
+          {
+            id: 'standalone-1',
+            name: 'Standalone Server',
+            transport: 'stdio',
+            command: 'npx',
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+    })
+
+    render(<McpConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mcp-server-card')).toBeInTheDocument()
+    })
+    expect(lastMcpMenuProps?.kind).toBe('mcpServer')
+    expect(lastMcpMenuProps?.payload.serverId).toBe('standalone-1')
+    expect(typeof lastMcpMenuProps?.payload.onEdit).toBe('function')
+    expect(typeof lastMcpMenuProps?.payload.onDelete).toBe('function')
   })
 
   it('sends mcp:reconnect automatically after config and plugins are loaded', async () => {

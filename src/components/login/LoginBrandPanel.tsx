@@ -149,15 +149,13 @@ function buildWavePath(phase: number, amp = 10, w = 800, mid = 24): string {
 }
 
 /**
- * Login left brand panel — light studio surface with layered art direction.
- * White base keeps macOS window-edge chrome invisible (light-on-light).
+ * Login left brand panel — layered art direction without soft glow washes.
+ * Surface tokens keep chrome consistent in light and dark.
  */
 export function LoginBrandPanel() {
   const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
-  const orbsRef = useRef<HTMLDivElement>(null)
-  const cursorLightRef = useRef<HTMLDivElement>(null)
   const geoRef = useRef<SVGGElement>(null)
   const watermarkInnerRef = useRef<HTMLDivElement>(null)
   const wavePathRef = useRef<SVGPathElement>(null)
@@ -177,8 +175,6 @@ export function LoginBrandPanel() {
     let teardownInteractive: (() => void) | null = null
 
     const killInteractiveTweens = () => {
-      const light = cursorLightRef.current
-      if (light) gsap.killTweensOf(light)
       root.querySelectorAll('[data-parallax]').forEach((n) => gsap.killTweensOf(n))
     }
 
@@ -281,20 +277,6 @@ export function LoginBrandPanel() {
             ease: 'sine.inOut',
             yoyo: true,
             repeat: -1,
-          })
-        }
-
-        if (orbsRef.current) {
-          orbsRef.current.querySelectorAll<HTMLElement>('[data-orb]').forEach((el, i) => {
-            gsap.to(el, {
-              x: i % 2 === 0 ? 28 : -22,
-              y: i % 2 === 0 ? -18 : 24,
-              scale: 1.08 + i * 0.04,
-              duration: 7 + i * 1.5,
-              ease: 'sine.inOut',
-              yoyo: true,
-              repeat: -1,
-            })
           })
         }
 
@@ -435,23 +417,12 @@ export function LoginBrandPanel() {
         }
       }, root)
 
-      const light = cursorLightRef.current
       const layers = root.querySelectorAll<HTMLElement>('[data-parallax]')
 
       const onMove = (e: PointerEvent) => {
         if (e.pointerType === 'touch') return
         const rect = root.getBoundingClientRect()
         const nx = (e.clientX - rect.left) / rect.width - 0.5
-
-        if (light) {
-          gsap.to(light, {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            duration: 0.55,
-            ease: 'power2.out',
-            overwrite: 'auto',
-          })
-        }
 
         layers.forEach((layer) => {
           const depth = Number(layer.dataset.parallax) || 8
@@ -465,23 +436,17 @@ export function LoginBrandPanel() {
         })
       }
 
-      const onEnter = () => {
-        if (light) gsap.to(light, { opacity: 1, duration: 0.4 })
-      }
       const onLeave = () => {
-        if (light) gsap.to(light, { opacity: 0, duration: 0.5 })
         layers.forEach((layer) => {
           gsap.to(layer, { x: 0, y: 0, duration: 1, ease: 'power2.out' })
         })
       }
 
       root.addEventListener('pointermove', onMove)
-      root.addEventListener('pointerenter', onEnter)
       root.addEventListener('pointerleave', onLeave)
 
       teardownInteractive = () => {
         root.removeEventListener('pointermove', onMove)
-        root.removeEventListener('pointerenter', onEnter)
         root.removeEventListener('pointerleave', onLeave)
         killInteractiveTweens()
       }
@@ -523,38 +488,12 @@ export function LoginBrandPanel() {
       ref={rootRef}
       className="relative hidden h-full min-h-0 w-3/5 shrink-0 self-stretch overflow-hidden border-r border-border bg-surface md:flex"
     >
-      {/* Multi-color washes + perspective grid */}
+      {/* Perspective grid (no color washes / orbs) */}
       <div
         data-parallax="10"
-        ref={orbsRef}
         className="pointer-events-none absolute inset-0 will-change-transform"
         aria-hidden
       >
-        <div
-          data-orb
-          className="absolute -left-16 top-[12%] h-[20rem] w-[20rem] rounded-full opacity-55 blur-3xl"
-          style={{ background: `radial-gradient(circle, ${PLAY_COLORS.coral}33 0%, transparent 68%)` }}
-        />
-        <div
-          data-orb
-          className="absolute -right-20 top-[28%] h-[22rem] w-[22rem] rounded-full opacity-50 blur-3xl"
-          style={{ background: `radial-gradient(circle, ${PLAY_COLORS.sky}36 0%, transparent 70%)` }}
-        />
-        <div
-          data-orb
-          className="absolute left-[20%] bottom-[8%] h-[18rem] w-[18rem] rounded-full opacity-45 blur-3xl"
-          style={{ background: `radial-gradient(circle, ${PLAY_COLORS.violet}2e 0%, transparent 70%)` }}
-        />
-        <div
-          data-orb
-          className="absolute right-[18%] bottom-[22%] h-56 w-56 rounded-full opacity-40 blur-3xl"
-          style={{ background: `radial-gradient(circle, ${PLAY_COLORS.amber}30 0%, transparent 70%)` }}
-        />
-        <div
-          data-orb
-          className="absolute left-[40%] top-[40%] h-48 w-48 rounded-full opacity-35 blur-3xl"
-          style={{ background: `radial-gradient(circle, ${PLAY_COLORS.mint}28 0%, transparent 70%)` }}
-        />
         <div
           className="absolute inset-x-0 bottom-0 h-[55%] opacity-[0.4]"
           style={{
@@ -569,7 +508,7 @@ export function LoginBrandPanel() {
         />
       </div>
 
-      {/* Colorful dust */}
+      {/* Colorful dust (solid dots only — no glow) */}
       <div className="pointer-events-none absolute inset-0 z-[1]" aria-hidden>
         {Array.from({ length: 18 }, (_, i) => {
           const colors = Object.values(PLAY_COLORS)
@@ -579,7 +518,7 @@ export function LoginBrandPanel() {
               key={i}
               data-dust
               className="absolute h-1 w-1 rounded-full"
-              style={{ backgroundColor: c, boxShadow: `0 0 6px ${c}66` }}
+              style={{ backgroundColor: c }}
             />
           )
         })}
@@ -708,27 +647,6 @@ export function LoginBrandPanel() {
         </svg>
       </div>
 
-      {/* Cursor spotlight — soft multi-hue */}
-      <div
-        ref={cursorLightRef}
-        className="pointer-events-none absolute left-0 top-0 z-[1] h-[28rem] w-[28rem] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0"
-        style={{
-          background:
-            'radial-gradient(circle, rgba(76,201,240,0.14) 0%, rgba(155,93,229,0.08) 35%, transparent 68%)',
-        }}
-        aria-hidden
-      />
-
-      {/* Soft edge vignette (light) */}
-      <div
-        className="pointer-events-none absolute inset-0 z-[2]"
-        style={{
-          background:
-            'radial-gradient(ellipse at 40% 45%, transparent 40%, rgba(245,245,245,0.65) 100%)',
-        }}
-        aria-hidden
-      />
-
       {/* Vertical spine (poster index) */}
       <div
         className="pointer-events-none absolute bottom-16 left-5 z-10 hidden origin-bottom-left -rotate-90 select-none lg:block"
@@ -753,12 +671,6 @@ export function LoginBrandPanel() {
         style={{ opacity: 0 }}
         aria-hidden
       >
-        <div
-          className="absolute left-1/2 top-1/2 h-[75%] w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-60 blur-2xl"
-          style={{
-            background: `radial-gradient(circle, ${PLAY_COLORS.sky}38 0%, ${PLAY_COLORS.violet}22 50%, transparent 72%)`,
-          }}
-        />
         {MOTION_STAGE.map(({ action, delay }) => (
           <MascotActor
             key={action}
@@ -767,7 +679,7 @@ export function LoginBrandPanel() {
             collapseBottomPad={false}
             initialAction={action}
             startDelayMs={delay}
-            className="relative drop-shadow-sm"
+            className="relative"
           />
         ))}
       </div>

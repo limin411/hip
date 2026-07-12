@@ -1,0 +1,73 @@
+<svg viewBox="0 0 1100 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物骑自行车">
+  <defs>
+    <style>
+
+      .player { animation: pedal-bob 0.55s ease-in-out infinite; transform-origin: 520px 480px; }
+      .crank { animation: spin 0.55s linear infinite; transform-origin: 480px 720px; }
+      .leg-l { animation: pl 0.55s linear infinite; transform-origin: 480px 560px; }
+      .leg-r { animation: pr 0.55s linear infinite; transform-origin: 500px 560px; }
+      .wheel { animation: spin 0.55s linear infinite; }
+      .head { animation: head 0.55s ease-in-out infinite; transform-origin: 560px 280px; }
+      @keyframes pedal-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes pl { 0%{transform:rotate(25deg)} 50%{transform:rotate(-25deg)} 100%{transform:rotate(25deg)} }
+      @keyframes pr { 0%{transform:rotate(-25deg)} 50%{transform:rotate(25deg)} 100%{transform:rotate(-25deg)} }
+      @keyframes head { 0%,100%{transform:rotate(5deg)} 50%{transform:rotate(8deg)} }
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+<!-- bike frame -->
+  <g fill="none" stroke="#4a6fa5" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <circle class="wheel" cx="320" cy="780" r="70" stroke="#333" stroke-width="12" fill="#eee" transform-origin="320px 780px"/>
+    <circle class="wheel" cx="640" cy="780" r="70" stroke="#333" stroke-width="12" fill="#eee" transform-origin="640px 780px"/>
+    <path d="M320 780 L480 720 L640 780 M480 720 L520 560 L400 560 L480 720 M520 560 L600 540"/>
+  </g>
+  <circle cx="320" cy="780" r="12" fill="#333"/><circle cx="640" cy="780" r="12" fill="#333"/>
+  <g class="player">
+    <g class="leg-l"><line x1="480" y1="560" x2="420" y2="720" stroke="url(#skin2)" stroke-width="44" stroke-linecap="round"/></g>
+    <g class="leg-r"><line x1="500" y1="560" x2="540" y2="720" stroke="url(#skin)" stroke-width="44" stroke-linecap="round"/></g>
+    <ellipse cx="500" cy="470" rx="85" ry="100" fill="url(#skin)" transform="rotate(10 500 470)"/>
+    <path d="M430 400 C450 360 560 370 575 420 L580 540 C560 570 440 560 430 520 Z" fill="#e07a3a"/>
+    <line x1="560" y1="420" x2="600" y2="540" stroke="#a8b994" stroke-width="40" stroke-linecap="round"/>
+    <circle cx="608" cy="550" r="22" fill="#9faf8b"/>
+    <line x1="450" y1="420" x2="400" y2="555" stroke="url(#skin2)" stroke-width="40" stroke-linecap="round"/>
+    <circle cx="392" cy="565" r="22" fill="#9faf8b"/>
+    
+    <g class="head">
+      <line x1="540" y1="360" x2="540" y2="330" stroke="#9faf8b" stroke-width="34.0" stroke-linecap="round"/>
+      <circle cx="540" cy="280" r="88.0" fill="url(#skin)"/>
+      <line x1="500" y1="210" x2="480" y2="168" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <line x1="580" y1="208" x2="602" y2="166" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <circle cx="477" cy="163" r="11.0" fill="#9faf8b"/>
+      <circle cx="605" cy="162" r="11.0" fill="#9faf8b"/>
+      <circle cx="495" cy="300" r="16.0" fill="url(#blush)"/>
+      <circle cx="590" cy="298" r="15.0" fill="url(#blush)"/>
+      <path d="M495 250 Q520 238 542 250" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <path d="M552 248 Q575 236 600 250" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <ellipse cx="515" cy="280" rx="21.0" ry="19.0" fill="#fff"/>
+      <ellipse cx="575" cy="278" rx="21.0" ry="19.0" fill="#fff"/>
+      <circle cx="518" cy="280" r="8.5" fill="#1a1a1a"/>
+      <circle cx="578" cy="278" r="8.5" fill="#1a1a1a"/>
+      <circle cx="521" cy="275" r="2.8" fill="#fff"/>
+      <circle cx="581" cy="273" r="2.8" fill="#fff"/>
+      <path d="M515 318 Q545 338 575 316" fill="none" stroke="#1a1a1a" stroke-width="8.0" stroke-linecap="round"/>
+      <ellipse cx="515" cy="238" rx="18.0" ry="10.0" fill="#fff" opacity="0.28"/>
+    </g>
+  </g>
+
+</svg>

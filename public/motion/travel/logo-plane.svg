@@ -1,0 +1,59 @@
+<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物坐飞机">
+  <defs>
+    <style>
+
+      .player{animation:bob 1.5s ease-in-out infinite;transform-origin:500px 500px}
+      .plane{animation:fly 3s ease-in-out infinite}
+      .cloud{animation:cloud 4s linear infinite}
+      .head{animation:h 1.5s ease-in-out infinite;transform-origin:500px 300px}
+      @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+      @keyframes fly{0%,100%{transform:translate(0,0) rotate(-5deg)}50%{transform:translate(30px,-20px) rotate(5deg)}}
+      @keyframes cloud{from{transform:translateX(50px)}to{transform:translateX(-80px)}}
+      @keyframes h{0%,100%{transform:rotate(0)}50%{transform:rotate(5deg)}}
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+
+  </defs>
+
+  <g class="cloud" fill="#e8f4fc" opacity="0.8">
+    <ellipse cx="200" cy="200" rx="60" ry="30"/><ellipse cx="240" cy="190" rx="40" ry="25"/>
+    <ellipse cx="800" cy="280" rx="70" ry="35"/><ellipse cx="850" cy="270" rx="45" ry="28"/>
+  </g>
+  <g class="plane">
+    <ellipse cx="700" cy="400" rx="100" ry="28" fill="#e8e8e8"/>
+    <path d="M620 400 L560 360 L580 400 L560 440 Z" fill="#c45c5c"/>
+    <path d="M750 400 L820 340 L800 400 L820 460 Z" fill="#4a8fd4"/>
+    <path d="M780 390 L850 370 L840 390" fill="#4a8fd4"/>
+    <circle cx="660" cy="395" r="10" fill="#7ec4e0"/>
+  </g>
+  <g class="player">
+    <!-- window seat pose -->
+    <ellipse cx="400" cy="650" rx="80" ry="60" fill="url(#skin)"/>
+    <circle cx="400" cy="520" r="75" fill="url(#skin)"/>
+    <ellipse cx="380" cy="510" rx="14" ry="13" fill="#fff"/><ellipse cx="420" cy="508" rx="14" ry="13" fill="#fff"/>
+    <circle cx="383" cy="510" r="5" fill="#1a1a1a"/><circle cx="423" cy="508" r="5" fill="#1a1a1a"/>
+    <path d="M385 540 Q400 555 415 538" fill="none" stroke="#1a1a1a" stroke-width="4" stroke-linecap="round"/>
+    <line x1="370" y1="460" x2="355" y2="430" stroke="#9faf8b" stroke-width="10" stroke-linecap="round"/>
+    <line x1="430" y1="458" x2="448" y2="428" stroke="#9faf8b" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="352" cy="425" r="7" fill="#9faf8b"/><circle cx="451" cy="424" r="7" fill="#9faf8b"/>
+    <path d="M340 600 L460 600 L470 720 L330 720 Z" fill="#5bb8d4"/>
+    <line x1="450" y1="580" x2="520" y2="640" stroke="#a8b994" stroke-width="36" stroke-linecap="round"/>
+    <circle cx="532" cy="650" r="18" fill="#9faf8b"/>
+  </g>
+
+</svg>

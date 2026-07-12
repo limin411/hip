@@ -1,0 +1,81 @@
+<svg viewBox="0 0 1100 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物滑雪">
+  <defs>
+    <style>
+
+      .player { animation: ski 0.9s ease-in-out infinite; transform-origin: 500px 500px; }
+      .arm-l { animation: al 0.9s ease-in-out infinite; transform-origin: 420px 400px; }
+      .arm-r { animation: ar 0.9s ease-in-out infinite; transform-origin: 580px 400px; }
+      .head { animation: head 0.9s ease-in-out infinite; transform-origin: 500px 250px; }
+      .snow { animation: snow 0.9s ease-out infinite; }
+      @keyframes ski { 0%,100%{transform:translate(0,0) rotate(-5deg)} 50%{transform:translate(20px,-15px) rotate(5deg)} }
+      @keyframes al { 0%,100%{transform:rotate(30deg)} 50%{transform:rotate(-10deg)} }
+      @keyframes ar { 0%,100%{transform:rotate(-30deg)} 50%{transform:rotate(10deg)} }
+      @keyframes head { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(5deg)} }
+      @keyframes snow { 0%{opacity:0} 40%{opacity:.6} 100%{opacity:0;transform:translate(-30px,20px)} }
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+<!-- skis -->
+  <rect x="300" y="850" width="280" height="18" rx="9" fill="#4a8fd4" transform="rotate(-8 440 859)"/>
+  <rect x="480" y="840" width="280" height="18" rx="9" fill="#4a8fd4" transform="rotate(6 620 849)"/>
+  <g class="snow" fill="#a8d4f0">
+    <circle cx="350" cy="880" r="6"/><circle cx="320" cy="890" r="4"/><circle cx="380" cy="895" r="5"/>
+  </g>
+  <g class="player">
+    <line x1="460" y1="600" x2="400" y2="840" stroke="url(#skin2)" stroke-width="50" stroke-linecap="round"/>
+    <line x1="540" y1="600" x2="600" y2="830" stroke="url(#skin)" stroke-width="50" stroke-linecap="round"/>
+    <ellipse cx="500" cy="480" rx="95" ry="115" fill="url(#skin)"/>
+    <path d="M415 390 C430 345 570 345 585 390 L595 550 C575 590 425 590 405 550 Z" fill="#e85a5a"/>
+    <path d="M420 530 C440 590 560 590 580 530 L570 640 C530 665 470 665 430 640 Z" fill="#2a4a7a"/>
+    <g class="arm-l">
+      <line x1="420" y1="400" x2="320" y2="560" stroke="url(#skin2)" stroke-width="44" stroke-linecap="round"/>
+      <circle cx="310" cy="575" r="24" fill="#9faf8b"/>
+      <line x1="310" y1="575" x2="280" y2="780" stroke="#c4a060" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <g class="arm-r">
+      <line x1="580" y1="400" x2="700" y2="520" stroke="#a8b994" stroke-width="44" stroke-linecap="round"/>
+      <circle cx="712" cy="530" r="24" fill="#9faf8b"/>
+      <line x1="712" y1="530" x2="760" y2="750" stroke="#c4a060" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <!-- beanie -->
+    <ellipse cx="500" cy="195" rx="75" ry="35" fill="#4a8fd4"/>
+    <circle cx="500" cy="170" r="18" fill="#fff"/>
+    
+    <g class="head">
+      <line x1="500" y1="330" x2="500" y2="300" stroke="#9faf8b" stroke-width="34.0" stroke-linecap="round"/>
+      <circle cx="500" cy="250" r="88.0" fill="url(#skin)"/>
+      <line x1="460" y1="180" x2="440" y2="138" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <line x1="540" y1="178" x2="562" y2="136" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <circle cx="437" cy="133" r="11.0" fill="#9faf8b"/>
+      <circle cx="565" cy="132" r="11.0" fill="#9faf8b"/>
+      <circle cx="455" cy="270" r="16.0" fill="url(#blush)"/>
+      <circle cx="550" cy="268" r="15.0" fill="url(#blush)"/>
+      <path d="M455 220 Q480 208 502 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <path d="M512 218 Q535 206 560 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="250" rx="21.0" ry="19.0" fill="#fff"/>
+      <ellipse cx="535" cy="248" rx="21.0" ry="19.0" fill="#fff"/>
+      <circle cx="478" cy="250" r="8.5" fill="#1a1a1a"/>
+      <circle cx="538" cy="248" r="8.5" fill="#1a1a1a"/>
+      <circle cx="481" cy="245" r="2.8" fill="#fff"/>
+      <circle cx="541" cy="243" r="2.8" fill="#fff"/>
+      <path d="M475 288 Q505 308 535 286" fill="none" stroke="#1a1a1a" stroke-width="8.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="208" rx="18.0" ry="10.0" fill="#fff" opacity="0.28"/>
+    </g>
+  </g>
+
+</svg>

@@ -1,0 +1,72 @@
+<svg viewBox="0 0 1100 900" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物滑板">
+  <defs>
+    <style>
+
+      .player { animation: ollie 1.2s ease-in-out infinite; transform-origin: 500px 500px; }
+      .board { animation: board 1.2s ease-in-out infinite; transform-origin: 500px 780px; }
+      .arm-l { animation: al 1.2s ease-in-out infinite; transform-origin: 420px 400px; }
+      .arm-r { animation: ar 1.2s ease-in-out infinite; transform-origin: 580px 400px; }
+      .head { animation: head 1.2s ease-in-out infinite; transform-origin: 500px 250px; }
+      @keyframes ollie { 0%,20%{transform:translateY(0) rotate(0)} 45%{transform:translateY(-80px) rotate(-8deg)} 70%{transform:translateY(-40px) rotate(5deg)} 100%{transform:translateY(0) rotate(0)} }
+      @keyframes board { 0%,20%{transform:translateY(0) rotate(0)} 45%{transform:translateY(-100px) rotate(-25deg)} 70%{transform:translateY(-50px) rotate(15deg)} 100%{transform:translateY(0) rotate(0)} }
+      @keyframes al { 0%,100%{transform:rotate(15deg)} 50%{transform:rotate(-25deg)} }
+      @keyframes ar { 0%,100%{transform:rotate(-15deg)} 50%{transform:rotate(25deg)} }
+      @keyframes head { 0%,100%{transform:rotate(0)} 50%{transform:rotate(-8deg)} }
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+  </defs>
+<g class="board">
+    <rect x="320" y="770" width="360" height="28" rx="14" fill="#c45c5c"/>
+    <rect x="340" y="800" width="40" height="16" rx="6" fill="#333"/>
+    <rect x="620" y="800" width="40" height="16" rx="6" fill="#333"/>
+    <circle cx="350" cy="820" r="12" fill="#222"/><circle cx="370" cy="820" r="12" fill="#222"/>
+    <circle cx="630" cy="820" r="12" fill="#222"/><circle cx="650" cy="820" r="12" fill="#222"/>
+  </g>
+  <g class="player">
+    <line x1="460" y1="600" x2="420" y2="760" stroke="url(#skin2)" stroke-width="48" stroke-linecap="round"/>
+    <line x1="540" y1="600" x2="580" y2="760" stroke="url(#skin)" stroke-width="48" stroke-linecap="round"/>
+    <ellipse cx="410" cy="775" rx="28" ry="14" fill="#2a2a2a"/><ellipse cx="590" cy="775" rx="28" ry="14" fill="#2a2a2a"/>
+    <ellipse cx="500" cy="480" rx="90" ry="110" fill="url(#skin)"/>
+    <path d="M420 400 C435 355 565 355 580 400 L590 550 C570 590 430 590 410 550 Z" fill="#5b6bc0"/>
+    <path d="M425 530 C440 585 560 585 575 530 L565 620 C530 640 470 640 435 620 Z" fill="#2f3a5c"/>
+    <g class="arm-l"><line x1="420" y1="400" x2="340" y2="520" stroke="url(#skin2)" stroke-width="44" stroke-linecap="round"/><circle cx="328" cy="535" r="24" fill="#9faf8b"/></g>
+    <g class="arm-r"><line x1="580" y1="400" x2="680" y2="480" stroke="#a8b994" stroke-width="44" stroke-linecap="round"/><circle cx="692" cy="488" r="24" fill="#9faf8b"/></g>
+    
+    <g class="head">
+      <line x1="500" y1="330" x2="500" y2="300" stroke="#9faf8b" stroke-width="34.0" stroke-linecap="round"/>
+      <circle cx="500" cy="250" r="88.0" fill="url(#skin)"/>
+      <line x1="460" y1="180" x2="440" y2="138" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <line x1="540" y1="178" x2="562" y2="136" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <circle cx="437" cy="133" r="11.0" fill="#9faf8b"/>
+      <circle cx="565" cy="132" r="11.0" fill="#9faf8b"/>
+      <circle cx="455" cy="270" r="16.0" fill="url(#blush)"/>
+      <circle cx="550" cy="268" r="15.0" fill="url(#blush)"/>
+      <path d="M455 220 Q480 208 502 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <path d="M512 218 Q535 206 560 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="250" rx="21.0" ry="19.0" fill="#fff"/>
+      <ellipse cx="535" cy="248" rx="21.0" ry="19.0" fill="#fff"/>
+      <circle cx="478" cy="250" r="8.5" fill="#1a1a1a"/>
+      <circle cx="538" cy="248" r="8.5" fill="#1a1a1a"/>
+      <circle cx="481" cy="245" r="2.8" fill="#fff"/>
+      <circle cx="541" cy="243" r="2.8" fill="#fff"/>
+      <path d="M475 288 Q505 308 535 286" fill="none" stroke="#1a1a1a" stroke-width="8.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="208" rx="18.0" ry="10.0" fill="#fff" opacity="0.28"/>
+    </g>
+  </g>
+
+</svg>

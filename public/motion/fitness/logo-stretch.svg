@@ -1,0 +1,68 @@
+<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物拉伸">
+  <defs>
+    <style>
+
+      .player{animation:breathe 2s ease-in-out infinite;transform-origin:500px 550px}
+      .arm-l{animation:al 2s ease-in-out infinite;transform-origin:420px 420px}
+      .arm-r{animation:ar 2s ease-in-out infinite;transform-origin:580px 420px}
+      .leg-r{animation:lr 2s ease-in-out infinite;transform-origin:540px 600px}
+      .head{animation:h 2s ease-in-out infinite;transform-origin:500px 260px}
+      @keyframes breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+      @keyframes al{0%,100%{transform:rotate(-15deg)}50%{transform:rotate(-40deg)}}
+      @keyframes ar{0%,100%{transform:rotate(60deg)}50%{transform:rotate(80deg)}}
+      @keyframes lr{0%,100%{transform:rotate(5deg)}50%{transform:rotate(35deg)}}
+      @keyframes h{0%,100%{transform:rotate(0)}50%{transform:rotate(-10deg)}}
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+
+  </defs>
+
+  <g class="player">
+    <line x1="460" y1="620" x2="430" y2="820" stroke="url(#skin2)" stroke-width="48" stroke-linecap="round"/>
+    <g class="leg-r"><line x1="540" y1="600" x2="680" y2="720" stroke="url(#skin)" stroke-width="48" stroke-linecap="round"/>
+      <ellipse cx="700" cy="730" rx="30" ry="14" fill="#9faf8b" transform="rotate(20 700 730)"/></g>
+    <ellipse cx="420" cy="838" rx="30" ry="14" fill="#9faf8b"/>
+    <ellipse cx="500" cy="500" rx="95" ry="115" fill="url(#skin)"/>
+    <path d="M415 400 C430 355 570 355 585 400 L595 560 C575 600 425 600 405 560 Z" fill="#7eb89a"/>
+    <path d="M420 540 C440 600 560 600 580 540 L570 640 C530 665 470 665 430 640 Z" fill="#4a8a6a"/>
+    <g class="arm-l"><line x1="420" y1="420" x2="300" y2="300" stroke="url(#skin2)" stroke-width="44" stroke-linecap="round"/><circle cx="288" cy="288" r="24" fill="#9faf8b"/></g>
+    <g class="arm-r"><line x1="580" y1="420" x2="620" y2="560" stroke="#a8b994" stroke-width="44" stroke-linecap="round"/><circle cx="628" cy="575" r="24" fill="#9faf8b"/></g>
+    
+    <g class="head">
+      <line x1="500" y1="340" x2="500" y2="310" stroke="#9faf8b" stroke-width="34.0" stroke-linecap="round"/>
+      <circle cx="500" cy="260" r="88.0" fill="url(#skin)"/>
+      <line x1="460" y1="190" x2="440" y2="148" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <line x1="540" y1="188" x2="562" y2="146" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <circle cx="437" cy="143" r="11.0" fill="#9faf8b"/>
+      <circle cx="565" cy="142" r="11.0" fill="#9faf8b"/>
+      <circle cx="455" cy="280" r="16.0" fill="url(#blush)"/>
+      <circle cx="550" cy="278" r="15.0" fill="url(#blush)"/>
+      <path d="M455 230 Q480 218 502 230" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <path d="M512 228 Q535 216 560 230" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="260" rx="21.0" ry="19.0" fill="#fff"/>
+      <ellipse cx="535" cy="258" rx="21.0" ry="19.0" fill="#fff"/>
+      <circle cx="478" cy="260" r="8.5" fill="#1a1a1a"/>
+      <circle cx="538" cy="258" r="8.5" fill="#1a1a1a"/>
+      <circle cx="481" cy="255" r="2.8" fill="#fff"/>
+      <circle cx="541" cy="253" r="2.8" fill="#fff"/>
+      <path d="M475 298 Q505 318 535 296" fill="none" stroke="#1a1a1a" stroke-width="8.0" stroke-linecap="round"/>
+      <ellipse cx="475" cy="218" rx="18.0" ry="10.0" fill="#fff" opacity="0.28"/>
+    </g>
+  </g>
+
+</svg>

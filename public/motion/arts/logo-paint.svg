@@ -1,0 +1,77 @@
+<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="吉祥物画画">
+  <defs>
+    <style>
+
+      .player{animation:bob 1s ease-in-out infinite;transform-origin:450px 500px}
+      .arm{animation:paint .8s ease-in-out infinite;transform-origin:520px 400px}
+      .stroke{animation:stroke 2s ease-in-out infinite}
+      .head{animation:h 1s ease-in-out infinite;transform-origin:460px 250px}
+      @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+      @keyframes paint{0%,100%{transform:rotate(10deg)}50%{transform:rotate(-15deg) translate(-10px,-20px)}}
+      @keyframes stroke{0%{stroke-dashoffset:200}100%{stroke-dashoffset:0}}
+      @keyframes h{0%,100%{transform:rotate(5deg)}50%{transform:rotate(8deg)}}
+
+    </style>
+
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#b6c5a2"/>
+      <stop offset="50%" stop-color="#9faf8b"/>
+      <stop offset="100%" stop-color="#849672"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a6b892"/>
+      <stop offset="100%" stop-color="#7d926c"/>
+    </linearGradient>
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f2b7ad" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#f2b7ad" stop-opacity="0"/>
+    </radialGradient>
+
+
+  </defs>
+
+  <rect x="600" y="200" width="280" height="320" rx="8" fill="#f5f0e0" stroke="#ccc" stroke-width="4"/>
+  <path class="stroke" d="M660 400 Q720 300 820 380" fill="none" stroke="#e07a3a" stroke-width="8" stroke-linecap="round" stroke-dasharray="200"/>
+  <circle cx="750" cy="420" r="30" fill="#5bb8d4" opacity="0.6"/>
+  <g class="player">
+    <line x1="420" y1="580" x2="400" y2="810" stroke="url(#skin2)" stroke-width="48" stroke-linecap="round"/>
+    <line x1="500" y1="580" x2="540" y2="800" stroke="url(#skin)" stroke-width="48" stroke-linecap="round"/>
+    <ellipse cx="390" cy="828" rx="30" ry="14" fill="#5c4030"/><ellipse cx="555" cy="815" rx="30" ry="14" fill="#5c4030"/>
+    <ellipse cx="460" cy="470" rx="90" ry="110" fill="url(#skin)"/>
+    <path d="M380 390 C395 345 525 345 540 390 L550 540 C530 580 390 580 370 540 Z" fill="#e8e0d0"/>
+    <path d="M385 520 C400 575 520 575 535 520 L525 600 C490 620 430 620 395 600 Z" fill="#6a5a4a"/>
+    <line x1="400" y1="400" x2="360" y2="540" stroke="url(#skin2)" stroke-width="42" stroke-linecap="round"/>
+    <circle cx="350" cy="555" r="22" fill="#9faf8b"/>
+    <!-- palette -->
+    <ellipse cx="340" cy="580" rx="40" ry="28" fill="#f5f0e0" stroke="#c4a882" stroke-width="3"/>
+    <circle cx="325" cy="575" r="8" fill="#e85a5a"/><circle cx="350" cy="570" r="8" fill="#5bb8d4"/><circle cx="345" cy="590" r="8" fill="#f0c36a"/>
+    <g class="arm">
+      <line x1="520" y1="400" x2="620" y2="300" stroke="#a8b994" stroke-width="44" stroke-linecap="round"/>
+      <circle cx="632" cy="288" r="22" fill="#9faf8b"/>
+      <line x1="632" y1="288" x2="680" y2="240" stroke="#8b6914" stroke-width="8"/>
+      <circle cx="688" cy="232" r="10" fill="#e07a3a"/>
+    </g>
+    
+    <g class="head">
+      <line x1="460" y1="330" x2="460" y2="300" stroke="#9faf8b" stroke-width="34.0" stroke-linecap="round"/>
+      <circle cx="460" cy="250" r="88.0" fill="url(#skin)"/>
+      <line x1="420" y1="180" x2="400" y2="138" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <line x1="500" y1="178" x2="522" y2="136" stroke="#9faf8b" stroke-width="14.0" stroke-linecap="round"/>
+      <circle cx="397" cy="133" r="11.0" fill="#9faf8b"/>
+      <circle cx="525" cy="132" r="11.0" fill="#9faf8b"/>
+      <circle cx="415" cy="270" r="16.0" fill="url(#blush)"/>
+      <circle cx="510" cy="268" r="15.0" fill="url(#blush)"/>
+      <path d="M415 220 Q440 208 462 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <path d="M472 218 Q495 206 520 220" fill="none" stroke="#1a1a1a" stroke-width="10.0" stroke-linecap="round"/>
+      <ellipse cx="435" cy="250" rx="21.0" ry="19.0" fill="#fff"/>
+      <ellipse cx="495" cy="248" rx="21.0" ry="19.0" fill="#fff"/>
+      <circle cx="438" cy="250" r="8.5" fill="#1a1a1a"/>
+      <circle cx="498" cy="248" r="8.5" fill="#1a1a1a"/>
+      <circle cx="441" cy="245" r="2.8" fill="#fff"/>
+      <circle cx="501" cy="243" r="2.8" fill="#fff"/>
+      <path d="M435 288 Q465 308 495 286" fill="none" stroke="#1a1a1a" stroke-width="8.0" stroke-linecap="round"/>
+      <ellipse cx="435" cy="208" rx="18.0" ry="10.0" fill="#fff" opacity="0.28"/>
+    </g>
+  </g>
+
+</svg>

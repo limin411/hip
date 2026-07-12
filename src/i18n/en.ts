@@ -863,6 +863,25 @@ export const en = {
       session: {
         copyDebugBundle: 'Copy debug info',
       },
+      filePreview: {
+        copyPath: 'Copy path',
+        copyContent: 'Copy content',
+        openContainingFolder: 'Open containing folder',
+        refresh: 'Refresh',
+        contentNotText: 'Content is not plain text',
+      },
+      toolCall: {
+        copyInput: 'Copy input',
+        copyOutput: 'Copy output',
+        copyError: 'Copy error',
+        empty: 'Nothing to copy',
+      },
+      subAgent: {
+        copyId: 'Copy agent ID',
+        copyTask: 'Copy task',
+        copyOutput: 'Copy output',
+        empty: 'Nothing to copy',
+      },
     },
     commandPalette: {
       title: 'Command palette',

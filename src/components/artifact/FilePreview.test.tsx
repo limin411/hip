@@ -54,4 +54,17 @@ describe('FilePreview', () => {
     const frame = screen.getByTestId('preview-html')
     expect(frame).toHaveAttribute('sandbox', '')
   })
+
+  it('wraps ready preview with filePreview context menu host', () => {
+    setPreview({ status: 'ready', path: 'a.ts', content: 'x', mimeType: 'text/plain', encoding: 'utf8' })
+    render(<FilePreview />)
+    const host = document.querySelector('[data-context-menu-kind="filePreview"]')
+    expect(host).toBeTruthy()
+    expect(host).toHaveAttribute('data-context-menu-root')
+  })
+
+  it('does not wrap empty idle state with context menu', () => {
+    render(<FilePreview />)
+    expect(document.querySelector('[data-context-menu-kind="filePreview"]')).toBeNull()
+  })
 })

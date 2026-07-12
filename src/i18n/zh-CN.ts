@@ -856,6 +856,25 @@ export const zhCN = {
       session: {
         copyDebugBundle: '复制调试信息',
       },
+      filePreview: {
+        copyPath: '复制路径',
+        copyContent: '复制内容',
+        openContainingFolder: '打开所在文件夹',
+        refresh: '刷新',
+        contentNotText: '内容不是纯文本',
+      },
+      toolCall: {
+        copyInput: '复制输入',
+        copyOutput: '复制输出',
+        copyError: '复制错误',
+        empty: '无可复制内容',
+      },
+      subAgent: {
+        copyId: '复制 Agent ID',
+        copyTask: '复制任务',
+        copyOutput: '复制输出',
+        empty: '无可复制内容',
+      },
     },
     commandPalette: {
       title: '命令面板',

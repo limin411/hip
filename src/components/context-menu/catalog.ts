@@ -236,6 +236,66 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'navigation',
     icon: 'code',
   },
+  {
+    id: 'filePreview.copyPath',
+    labelKey: 'contextMenu.filePreview.copyPath',
+    kind: 'filePreview',
+    group: 'clipboard',
+  },
+  {
+    id: 'filePreview.copyContent',
+    labelKey: 'contextMenu.filePreview.copyContent',
+    kind: 'filePreview',
+    group: 'clipboard',
+  },
+  {
+    id: 'filePreview.openContainingFolder',
+    labelKey: 'contextMenu.filePreview.openContainingFolder',
+    kind: 'filePreview',
+    group: 'navigation',
+  },
+  {
+    id: 'filePreview.refresh',
+    labelKey: 'contextMenu.filePreview.refresh',
+    kind: 'filePreview',
+    group: 'workspace',
+  },
+  {
+    id: 'toolCall.copyInput',
+    labelKey: 'contextMenu.toolCall.copyInput',
+    kind: 'toolCall',
+    group: 'clipboard',
+  },
+  {
+    id: 'toolCall.copyOutput',
+    labelKey: 'contextMenu.toolCall.copyOutput',
+    kind: 'toolCall',
+    group: 'clipboard',
+  },
+  {
+    id: 'toolCall.copyError',
+    labelKey: 'contextMenu.toolCall.copyError',
+    kind: 'toolCall',
+    group: 'clipboard',
+  },
+  {
+    id: 'subAgent.copyId',
+    labelKey: 'contextMenu.subAgent.copyId',
+    kind: 'subAgent',
+    group: 'clipboard',
+  },
+  {
+    id: 'subAgent.copyTask',
+    labelKey: 'contextMenu.subAgent.copyTask',
+    kind: 'subAgent',
+    group: 'clipboard',
+  },
+  {
+    id: 'subAgent.copyOutput',
+    labelKey: 'contextMenu.subAgent.copyOutput',
+    kind: 'subAgent',
+    group: 'clipboard',
+  },
 ]
 
 /** Test / in-app extras only. Cleared by clearCatalogMeta. */

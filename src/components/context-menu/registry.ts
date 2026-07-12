@@ -7,6 +7,7 @@ import type {
   ContextRequest,
 } from './types'
 import { loadPrefs } from './prefs'
+import { GROUP_ORDER, groupRank } from './groupOrder'
 import { codeBlockProvider } from './providers/codeBlock'
 import { messageProvider } from './providers/message'
 import { sessionHistoryProvider } from './providers/sessionHistory'
@@ -17,6 +18,9 @@ import { commitProvider } from './providers/commit'
 import { diffFileProvider } from './providers/diffFile'
 import { diffHunkProvider } from './providers/diffHunk'
 import { terminalProvider } from './providers/terminal'
+import { filePreviewProvider } from './providers/filePreview'
+import { toolCallProvider } from './providers/toolCall'
+import { subAgentProvider } from './providers/subAgent'
 
 const BUILTIN_PROVIDERS: ContextProvider[] = [
   codeBlockProvider,
@@ -29,6 +33,9 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   diffFileProvider,
   diffHunkProvider,
   terminalProvider,
+  filePreviewProvider,
+  toolCallProvider,
+  subAgentProvider,
 ]
 
 const extraProviders: ContextProvider[] = []

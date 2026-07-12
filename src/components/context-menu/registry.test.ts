@@ -151,6 +151,63 @@ describe('buildContextMenuItems', () => {
     expect(out[0]?.separatorBefore).toBeFalsy()
   })
 
+  it('includes builtin filePreview / toolCall / subAgent providers', () => {
+    const preview = buildContextMenuItems(
+      {
+        kind: 'filePreview',
+        payload: {
+          path: '/p/a.ts',
+          content: 'x',
+          mimeType: 'text/plain',
+          cwd: '/p',
+        },
+      },
+      makeCtx(),
+      { version: 1, disabledIds: [] },
+    )
+    expect(preview.map((i) => i.id)).toContain('filePreview.copyPath')
+    expect(preview.map((i) => i.id)).toContain('filePreview.openContainingFolder')
+
+    const tool = buildContextMenuItems(
+      {
+        kind: 'toolCall',
+        payload: {
+          tool: {
+            callId: 'c1',
+            agentId: 'a1',
+            name: 'read_file',
+            input: '{}',
+            status: 'finished',
+            seq: 1,
+          },
+        },
+      },
+      makeCtx(),
+      { version: 1, disabledIds: [] },
+    )
+    expect(tool.map((i) => i.id)).toContain('toolCall.copyInput')
+
+    const sub = buildContextMenuItems(
+      {
+        kind: 'subAgent',
+        payload: {
+          agent: {
+            agentId: 'w1',
+            role: 'subagent',
+            reasoning: '',
+            tools: [],
+            status: 'done',
+            output: 'ok',
+            elapsedMs: 0,
+          },
+        },
+      },
+      makeCtx(),
+      { version: 1, disabledIds: [] },
+    )
+    expect(sub.map((i) => i.id)).toContain('subAgent.copyId')
+  })
+
   it('merges extra providers and applies disabledIds', () => {
     const provider: ContextProvider = (req) => {
       if (req.kind !== 'codeBlock') return []

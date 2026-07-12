@@ -856,6 +856,25 @@ export const zhTW = {
       session: {
         copyDebugBundle: '複製偵錯資訊',
       },
+      filePreview: {
+        copyPath: '複製路徑',
+        copyContent: '複製內容',
+        openContainingFolder: '開啟所在資料夾',
+        refresh: '重新整理',
+        contentNotText: '內容不是純文字',
+      },
+      toolCall: {
+        copyInput: '複製輸入',
+        copyOutput: '複製輸出',
+        copyError: '複製錯誤',
+        empty: '無可複製內容',
+      },
+      subAgent: {
+        copyId: '複製 Agent ID',
+        copyTask: '複製任務',
+        copyOutput: '複製輸出',
+        empty: '無可複製內容',
+      },
     },
     commandPalette: {
       title: '命令面板',

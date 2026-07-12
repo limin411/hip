@@ -804,6 +804,34 @@ export const zhTW = {
       newChat: '新增辦公對話',
       newCode: '新增編碼任務',
     },
+    contextMenu: {
+      diffFile: {
+        copyPath: '複製路徑',
+        copyAbsolutePath: '複製絕對路徑',
+        openInFiles: '在檔案中開啟',
+        collapse: '摺疊檔案',
+        expand: '展開檔案',
+        showFull: '顯示完整上下文',
+        collapseFull: '收合完整上下文',
+      },
+      diffHunk: {
+        copy: '複製程式碼區塊',
+      },
+      checkpoint: {
+        copyId: '複製檢查點 ID',
+        revert: '還原…',
+      },
+      commit: {
+        copySha: '複製提交 SHA',
+        copyMessage: '複製提交說明',
+      },
+      terminal: {
+        restart: '重新啟動終端機',
+        changeFolder: '變更資料夾…',
+        copyCwd: '複製工作目錄',
+        openFiles: '開啟檔案分頁',
+      },
+    },
     common: {
       clear: '清除',
       cancel: '取消',

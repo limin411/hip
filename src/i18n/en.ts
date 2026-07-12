@@ -810,6 +810,34 @@ export const en = {
       newChat: 'New Work Chat',
       newCode: 'New Coding Task',
     },
+    contextMenu: {
+      diffFile: {
+        copyPath: 'Copy path',
+        copyAbsolutePath: 'Copy absolute path',
+        openInFiles: 'Open in Files',
+        collapse: 'Collapse file',
+        expand: 'Expand file',
+        showFull: 'Show full context',
+        collapseFull: 'Collapse full context',
+      },
+      diffHunk: {
+        copy: 'Copy hunk',
+      },
+      checkpoint: {
+        copyId: 'Copy checkpoint ID',
+        revert: 'Revert…',
+      },
+      commit: {
+        copySha: 'Copy commit SHA',
+        copyMessage: 'Copy commit message',
+      },
+      terminal: {
+        restart: 'Restart terminal',
+        changeFolder: 'Change folder…',
+        copyCwd: 'Copy working directory',
+        openFiles: 'Open Files tab',
+      },
+    },
     common: {
       clear: 'Clear',
       cancel: 'Cancel',

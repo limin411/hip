@@ -5,6 +5,7 @@ import type { DiffFile, DiffHunk, DiffLine, DiffLineType, DiffFileStatus, DiffSu
 import { cn } from '@/lib/utils'
 import { computeHunkWordDiffs } from '@/lib/wordDiff'
 import { buildSplitRows } from '@/lib/diffSplit'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 export const STATUS_CHIP = {
   added: { cls: 'bg-success/15 text-success', key: 'artifact.diffView.statusAdded' },
@@ -16,16 +17,40 @@ export const STATUS_CHIP = {
 function lineStyle(t: DiffLineType): string { return t === 'add' ? 'bg-success/10' : t === 'del' ? 'bg-danger/10' : '' }
 function sign(t: DiffLineType): string { return t === 'add' ? '+' : t === 'del' ? '-' : ' ' }
 
-function HunkLines({ hunk, viewMode }: { hunk: DiffHunk; viewMode: 'unified' | 'split' }) {
+function formatHunkText(hunk: DiffHunk): string {
+  const header = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@${hunk.header ? ` ${hunk.header}` : ''}`
+  const body = hunk.lines.map((line) => `${sign(line.type)}${line.content}`).join('\n')
+  return `${header}\n${body}`
+}
+
+function HunkLines({
+  hunk,
+  viewMode,
+  path,
+}: {
+  hunk: DiffHunk
+  viewMode: 'unified' | 'split'
+  path: string
+}) {
   const { t } = useTranslation()
+  const hunkText = formatHunkText(hunk)
+  const headerRow = (
+    <DeclarativeContextMenu
+      kind="diffHunk"
+      payload={{ path, header: hunk.header, text: hunkText }}
+      className="flex bg-surface-muted/60 text-caption text-ink-tertiary"
+      data-testid="diff-hunk-header"
+    >
+      <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
+      {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
+    </DeclarativeContextMenu>
+  )
+
   if (viewMode === 'split') {
     const splitRows = buildSplitRows(hunk.lines)
     return (
       <>
-        <div className="flex bg-surface-muted/60 text-caption text-ink-tertiary">
-          <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
-          {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
-        </div>
+        {headerRow}
         {splitRows.map((row, i) => (
           <div key={i} className="flex">
             <div className={cn('flex flex-1 min-w-0', row.left ? lineStyle(row.left.type) : 'bg-surface-muted/30')}>
@@ -55,10 +80,7 @@ function HunkLines({ hunk, viewMode }: { hunk: DiffHunk; viewMode: 'unified' | '
   const spans = computeHunkWordDiffs(hunk.lines)
   return (
     <>
-      <div className="flex bg-surface-muted/60 text-caption text-ink-tertiary">
-        <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
-        {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
-      </div>
+      {headerRow}
       {hunk.lines.map((line: DiffLine, i) => (
         <div key={i} className={cn('flex', lineStyle(line.type))}>
           <span className="w-10 shrink-0 select-none px-1 text-right text-ink-tertiary">{line.oldNo ?? ''}</span>
@@ -74,9 +96,26 @@ function HunkLines({ hunk, viewMode }: { hunk: DiffHunk; viewMode: 'unified' | '
   )
 }
 
-function FileDiff({ file, expanded, collapsed, viewMode, onToggleCollapse, onShowFull, onCollapseFull }: {
-  file: DiffFile; expanded?: DiffFile; collapsed?: boolean; viewMode: 'unified' | 'split'
-  onToggleCollapse: (path: string) => void; onShowFull?: (path: string) => void; onCollapseFull?: (path: string) => void
+function FileDiff({
+  file,
+  expanded,
+  collapsed,
+  viewMode,
+  sessionId,
+  cwd,
+  onToggleCollapse,
+  onShowFull,
+  onCollapseFull,
+}: {
+  file: DiffFile
+  expanded?: DiffFile
+  collapsed?: boolean
+  viewMode: 'unified' | 'split'
+  sessionId: string
+  cwd: string | null
+  onToggleCollapse: (path: string) => void
+  onShowFull?: (path: string) => void
+  onCollapseFull?: (path: string) => void
 }) {
   const { t } = useTranslation()
   const chip = STATUS_CHIP[file.status]
@@ -85,7 +124,12 @@ function FileDiff({ file, expanded, collapsed, viewMode, onToggleCollapse, onSho
   const isCollapsed = !!collapsed
   return (
     <div id={`diff-file-${file.path}`} className="border-b border-border" data-testid="diff-file">
-      <div className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 bg-surface-muted px-3">
+      <DeclarativeContextMenu
+        kind="diffFile"
+        payload={{ path: file.path, status: file.status, sessionId, cwd }}
+        className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 bg-surface-muted px-3"
+        data-testid="diff-file-header"
+      >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none">
           <button
             aria-label={isCollapsed ? t('artifact.diffView.expand') : t('artifact.diffView.collapse')}
@@ -112,7 +156,7 @@ function FileDiff({ file, expanded, collapsed, viewMode, onToggleCollapse, onSho
           <span className="text-success">+{file.additions}</span>
           <span className="text-danger">-{file.deletions}</span>
         </span>
-      </div>
+      </DeclarativeContextMenu>
       {!isCollapsed && (shown.binary ? (
         <div className="px-3 py-2 text-meta text-ink-tertiary">{t('artifact.diffView.binary')}</div>
       ) : shown.hunks.length === 0 ? (
@@ -120,7 +164,9 @@ function FileDiff({ file, expanded, collapsed, viewMode, onToggleCollapse, onSho
       ) : (
         <>
           <div className="overflow-x-auto font-mono text-meta leading-relaxed">
-            {shown.hunks.map((h, i) => <HunkLines key={i} hunk={h} viewMode={viewMode} />)}
+            {shown.hunks.map((h, i) => (
+              <HunkLines key={i} hunk={h} viewMode={viewMode} path={file.path} />
+            ))}
           </div>
           {(onShowFull || onCollapseFull) && (
             <div className="flex justify-center gap-3 border-t border-border py-1 text-caption text-ink-tertiary">
@@ -147,12 +193,26 @@ export function Empty({ icon, title, desc, children }: { icon?: ReactNode; title
 }
 
 /** Pure, props-driven diff list (file jump-list + per-file hunks). Shared by Diff / Timeline / Changes. */
-export function DiffDisplay({ files, summary, viewMode, expanded, collapsed, onToggleCollapse, onShowFull, onCollapseFull }: {
+export function DiffDisplay({
+  files,
+  summary,
+  viewMode,
+  expanded,
+  collapsed,
+  sessionId,
+  cwd = null,
+  onToggleCollapse,
+  onShowFull,
+  onCollapseFull,
+}: {
   files: DiffFile[]
   summary?: DiffSummary
   viewMode: 'unified' | 'split'
   expanded?: Record<string, DiffFile>
   collapsed?: Record<string, boolean>
+  /** Required for context-menu path / collapse actions. */
+  sessionId: string
+  cwd?: string | null
   onToggleCollapse: (path: string) => void
   onShowFull?: (path: string) => void
   onCollapseFull?: (path: string) => void
@@ -186,6 +246,8 @@ export function DiffDisplay({ files, summary, viewMode, expanded, collapsed, onT
             expanded={expanded?.[file.path]}
             collapsed={collapsed?.[file.path]}
             viewMode={viewMode}
+            sessionId={sessionId}
+            cwd={cwd}
             onToggleCollapse={onToggleCollapse}
             onShowFull={onShowFull}
             onCollapseFull={onCollapseFull}

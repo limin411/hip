@@ -7,12 +7,17 @@ import { useDiffStore, EMPTY_DIFF } from '@/store/diffStore'
 import { useUiStore } from '@/store/uiStore'
 import { formatRelativeTime } from '@/lib/datetime'
 import { DiffDisplay, Empty } from './DiffDisplay'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 
 export function ChangesView() {
   const { t, i18n } = useTranslation()
   const sessionId = useDomainStore((s) => s.activeSessionId)
+  const cwd = useDomainStore((s) => {
+    if (!s.activeSessionId) return null
+    return s.sessions.find((x) => x.id === s.activeSessionId)?.config.cwd ?? null
+  })
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
   const setDiffViewMode = useUiStore((s) => s.setDiffViewMode)
@@ -73,6 +78,8 @@ export function ChangesView() {
               viewMode={diffViewMode}
               expanded={diff.expanded}
               collapsed={diff.collapsed}
+              sessionId={sessionId}
+              cwd={cwd}
               onToggleCollapse={(p) => useDiffStore.getState().toggleCollapsed(sessionId, p)}
               onShowFull={(p) => sessionService.requestDiffFile(sessionId, p, 'full')}
               onCollapseFull={(p) => useDiffStore.getState().collapseFile(sessionId, p)}
@@ -93,12 +100,18 @@ export function ChangesView() {
           ) : (
             <ul>
               {log.commits.map((c) => (
-                <li key={c.sha} className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5 text-meta" data-testid="commit-row">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="shrink-0 font-mono text-caption text-ink-tertiary">{c.shortSha}</span>
-                    <span className="min-w-0 truncate text-ink">{c.message}</span>
-                  </span>
-                  <span className="shrink-0 text-caption text-ink-tertiary">{c.author} · {formatRelativeTime(c.timestamp, i18n.language)}</span>
+                <li key={c.sha} data-testid="commit-row">
+                  <DeclarativeContextMenu
+                    kind="commit"
+                    payload={{ sha: c.sha, shortSha: c.shortSha, message: c.message, sessionId }}
+                    className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5 text-meta"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 font-mono text-caption text-ink-tertiary">{c.shortSha}</span>
+                      <span className="min-w-0 truncate text-ink">{c.message}</span>
+                    </span>
+                    <span className="shrink-0 text-caption text-ink-tertiary">{c.author} · {formatRelativeTime(c.timestamp, i18n.language)}</span>
+                  </DeclarativeContextMenu>
                 </li>
               ))}
             </ul>

@@ -1,10 +1,5 @@
 import type { ContextKind, ContextMenuItemMeta } from './types'
 
-/**
- * Authoritative hand-maintained static meta for prefs / Settings UI.
- * Surface PRs (message, tabs, file tree, …) append entries here.
- * Never cleared by tests — only `extraMeta` is mutable for register/clear.
- */
 const STATIC_CATALOG: ContextMenuItemMeta[] = [
   {
     id: 'message.copy',
@@ -142,6 +137,104 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     labelKey: 'contextMenu.file.refresh',
     kind: 'fileEntry',
     group: 'workspace',
+  },
+  {
+    id: 'diffFile.copyPath',
+    labelKey: 'contextMenu.diffFile.copyPath',
+    kind: 'diffFile',
+    group: 'clipboard',
+    icon: 'code',
+  },
+  {
+    id: 'diffFile.copyAbsolutePath',
+    labelKey: 'contextMenu.diffFile.copyAbsolutePath',
+    kind: 'diffFile',
+    group: 'clipboard',
+  },
+  {
+    id: 'diffFile.openInFiles',
+    labelKey: 'contextMenu.diffFile.openInFiles',
+    kind: 'diffFile',
+    group: 'navigation',
+    icon: 'code',
+  },
+  {
+    id: 'diffFile.toggleCollapse',
+    labelKey: 'contextMenu.diffFile.collapse',
+    kind: 'diffFile',
+    group: 'edit',
+  },
+  {
+    id: 'diffFile.showFull',
+    labelKey: 'contextMenu.diffFile.showFull',
+    kind: 'diffFile',
+    group: 'edit',
+  },
+  {
+    id: 'diffFile.collapseFull',
+    labelKey: 'contextMenu.diffFile.collapseFull',
+    kind: 'diffFile',
+    group: 'edit',
+  },
+  {
+    id: 'diffHunk.copy',
+    labelKey: 'contextMenu.diffHunk.copy',
+    kind: 'diffHunk',
+    group: 'clipboard',
+    icon: 'code',
+  },
+  {
+    id: 'checkpoint.copyId',
+    labelKey: 'contextMenu.checkpoint.copyId',
+    kind: 'checkpoint',
+    group: 'clipboard',
+  },
+  {
+    id: 'checkpoint.revert',
+    labelKey: 'contextMenu.checkpoint.revert',
+    kind: 'checkpoint',
+    group: 'danger',
+    danger: true,
+    icon: 'history',
+  },
+  {
+    id: 'commit.copySha',
+    labelKey: 'contextMenu.commit.copySha',
+    kind: 'commit',
+    group: 'clipboard',
+    icon: 'git-branch',
+  },
+  {
+    id: 'commit.copyMessage',
+    labelKey: 'contextMenu.commit.copyMessage',
+    kind: 'commit',
+    group: 'clipboard',
+  },
+  {
+    id: 'terminal.restart',
+    labelKey: 'contextMenu.terminal.restart',
+    kind: 'terminal',
+    group: 'primary',
+    icon: 'history',
+  },
+  {
+    id: 'terminal.changeFolder',
+    labelKey: 'contextMenu.terminal.changeFolder',
+    kind: 'terminal',
+    group: 'workspace',
+  },
+  {
+    id: 'terminal.copyCwd',
+    labelKey: 'contextMenu.terminal.copyCwd',
+    kind: 'terminal',
+    group: 'clipboard',
+  },
+  {
+    id: 'terminal.openFiles',
+    labelKey: 'contextMenu.terminal.openFiles',
+    kind: 'terminal',
+    group: 'navigation',
+    icon: 'code',
   },
 ]
 

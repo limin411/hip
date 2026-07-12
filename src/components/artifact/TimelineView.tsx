@@ -10,6 +10,8 @@ import { useUiStore } from '@/store/uiStore'
 import { formatRelativeTime } from '@/lib/datetime'
 import { checkpointModeOptions } from '@/lib/checkpointMode'
 import { DiffDisplay, Empty } from './DiffDisplay'
+import { bindCheckpointRevertOpener } from './checkpointRevertUi'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -22,6 +24,10 @@ export function TimelineView() {
   const sessionStatus = useDomainStore((s) => {
     if (!s.activeSessionId) return 'idle' as const
     return s.sessions.find((x) => x.id === s.activeSessionId)?.status ?? 'idle'
+  })
+  const cwd = useDomainStore((s) => {
+    if (!s.activeSessionId) return null
+    return s.sessions.find((x) => x.id === s.activeSessionId)?.config.cwd ?? null
   })
   const diff = useDiffStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_DIFF
   const diffViewMode = useUiStore((s) => s.diffViewMode)
@@ -71,6 +77,12 @@ export function TimelineView() {
     setRevertTarget(checkpointId)
   }, [sessionId, sessionStatus, t])
 
+  // Context-menu Revert… reuses this modal (no second domain path).
+  useEffect(() => {
+    bindCheckpointRevertOpener(openRevert)
+    return () => bindCheckpointRevertOpener(null)
+  }, [openRevert])
+
   // Mount === tab activation (Radix unmounts inactive tabs). Pull the list.
   useEffect(() => { if (sessionId) sessionService.requestCheckpoints(sessionId) }, [sessionId])
 
@@ -102,7 +114,13 @@ export function TimelineView() {
           const turnNo = diff.checkpoints.length - 1 - idx // oldest = #0; list is newest-first
           const label = c.kind === 'start' ? t('artifact.timelineView.sessionStart') : (c.label || t('artifact.timelineView.turn', { n: turnNo }))
           return (
-            <div key={c.id} data-testid="timeline-row" className={cn('flex w-full items-center gap-1 px-3 py-1.5 hover:bg-surface-muted', c.id === activeId && 'bg-accent/10')}>
+            <DeclarativeContextMenu
+              key={c.id}
+              kind="checkpoint"
+              payload={{ checkpointId: c.id, sessionId }}
+              className={cn('flex w-full items-center gap-1 px-3 py-1.5 hover:bg-surface-muted', c.id === activeId && 'bg-accent/10')}
+              data-testid="timeline-row"
+            >
               <button
                 onClick={() => useDiffStore.getState().setActiveCheckpoint(sessionId, c.id)}
                 className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-meta"
@@ -118,7 +136,7 @@ export function TimelineView() {
               >
                 <RotateCcw size={13} />
               </button>
-            </div>
+            </DeclarativeContextMenu>
           )
         })}
       </div>
@@ -147,6 +165,8 @@ export function TimelineView() {
             summary={cur.summary}
             viewMode={diffViewMode}
             collapsed={diff.collapsed}
+            sessionId={sessionId}
+            cwd={cwd}
             onToggleCollapse={(p) => useDiffStore.getState().toggleCollapsed(sessionId, p)}
           />
         )}

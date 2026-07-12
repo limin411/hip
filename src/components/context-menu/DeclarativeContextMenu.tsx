@@ -13,7 +13,7 @@ import { createContextMenuBuildContext } from './buildContext'
 import { CONTEXT_MENUS } from './feature'
 import { ContextMenuIcon } from './icons'
 import { buildContextMenuItems } from './registry'
-import type { ContextKind, ContextMenuItemDef, ContextPayloadMap } from './types'
+import type { ContextKind, ContextMenuItemDef, ContextPayloadMap, ContextRequest } from './types'
 
 export type DeclarativeContextMenuProps<K extends ContextKind> = {
   kind: K
@@ -75,7 +75,7 @@ export function DeclarativeContextMenu<K extends ContextKind>({
         sessionId: payloadSessionId(payload),
       })
       const built = buildContextMenuItems(
-        { kind, payload } as { kind: ContextKind; payload: ContextPayloadMap[ContextKind] },
+        { kind, payload } as ContextRequest,
         ctx,
       )
       if (built.length === 0) {

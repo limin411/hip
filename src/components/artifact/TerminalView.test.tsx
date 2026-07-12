@@ -23,6 +23,19 @@ vi.mock('lucide-react', () => ({
   AlertCircle: () => React.createElement('span', { 'data-testid': 'icon-alert' }),
 }))
 
+// Pass-through host so surface tests do not pull full context-menu + lucide icon map.
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: ({
+    children,
+    className,
+    'data-testid': testId,
+  }: {
+    children: React.ReactNode
+    className?: string
+    'data-testid'?: string
+  }) => React.createElement('div', { className, 'data-testid': testId }, children),
+}))
+
 vi.mock('@/ipc/dialog', () => ({
   pickDirectory: (...args: unknown[]) => pickDirectory(...args),
 }))

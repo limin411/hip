@@ -75,10 +75,10 @@ export type ContextPayloadMap = {
   artifactChrome: { tab: string }
 }
 
+/** Correlated kind + payload (discriminated union). Prefer over independent unions. */
 export type ContextRequest<K extends ContextKind = ContextKind> = {
-  kind: K
-  payload: ContextPayloadMap[K]
-}
+  [P in K]: { kind: P; payload: ContextPayloadMap[P] }
+}[K]
 
 /** Serializable / settings-safe. No run(). */
 export interface ContextMenuItemMeta {

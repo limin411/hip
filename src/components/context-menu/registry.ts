@@ -12,16 +12,23 @@ import { messageProvider } from './providers/message'
 import { sessionHistoryProvider } from './providers/sessionHistory'
 import { sessionTabProvider } from './providers/sessionTab'
 import { fileEntryProvider } from './providers/fileEntry'
+import { checkpointProvider } from './providers/checkpoint'
+import { commitProvider } from './providers/commit'
+import { diffFileProvider } from './providers/diffFile'
+import { diffHunkProvider } from './providers/diffHunk'
+import { terminalProvider } from './providers/terminal'
 
-/**
- * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
- */
 const BUILTIN_PROVIDERS: ContextProvider[] = [
   codeBlockProvider,
   messageProvider,
   sessionHistoryProvider,
   sessionTabProvider,
   fileEntryProvider,
+  checkpointProvider,
+  commitProvider,
+  diffFileProvider,
+  diffHunkProvider,
+  terminalProvider,
 ]
 
 const extraProviders: ContextProvider[] = []

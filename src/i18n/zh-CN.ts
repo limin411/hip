@@ -804,6 +804,34 @@ export const zhCN = {
       newChat: '新建办公对话',
       newCode: '新建编码任务',
     },
+    contextMenu: {
+      diffFile: {
+        copyPath: '复制路径',
+        copyAbsolutePath: '复制绝对路径',
+        openInFiles: '在文件中打开',
+        collapse: '折叠文件',
+        expand: '展开文件',
+        showFull: '显示完整上下文',
+        collapseFull: '收起完整上下文',
+      },
+      diffHunk: {
+        copy: '复制代码块',
+      },
+      checkpoint: {
+        copyId: '复制检查点 ID',
+        revert: '回滚…',
+      },
+      commit: {
+        copySha: '复制提交 SHA',
+        copyMessage: '复制提交说明',
+      },
+      terminal: {
+        restart: '重启终端',
+        changeFolder: '更改文件夹…',
+        copyCwd: '复制工作目录',
+        openFiles: '打开文件标签',
+      },
+    },
     common: {
       clear: '清除',
       cancel: '取消',

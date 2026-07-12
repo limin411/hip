@@ -9,6 +9,8 @@ import { ptyKill, ptyOpen, ptyResize, ptyWrite } from '@/ipc/pty'
 import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store/terminalStore'
 import { useUiStore } from '@/store/uiStore'
 import { buildXtermTheme, isDarkDom } from './terminalTheme'
+import { bindTerminalRestarter } from './terminalRestartUi'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -57,6 +59,19 @@ export function TerminalView() {
     useTerminalStore.getState().clearSession(sessionId)
     setBootKey((k) => k + 1)
   }, [sessionId])
+
+  // Context-menu Restart reuses the same handler as the chrome button (not xterm canvas).
+  useEffect(() => {
+    if (!sessionId) {
+      bindTerminalRestarter(null)
+      return
+    }
+    bindTerminalRestarter((id) => {
+      if (id !== sessionId) return
+      return restart()
+    })
+    return () => bindTerminalRestarter(null)
+  }, [sessionId, restart])
 
   // Boot xterm + PTY when session+cwd ready (lazy import modules).
   useEffect(() => {
@@ -280,28 +295,32 @@ export function TerminalView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface" data-testid="terminal-view">
-      <div
+      <DeclarativeContextMenu
+        kind="terminal"
+        payload={{ sessionId, status }}
         className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5"
-        data-tauri-drag-region="false"
+        data-testid="terminal-chrome"
       >
-        <span
-          className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
-          title={cwd}
-          data-testid="terminal-cwd"
-        >
-          {cwd}
-        </span>
-        <button
-          type="button"
-          data-testid="terminal-restart"
-          onClick={() => void restart()}
-          title={t('artifact.terminalView.restart')}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-meta font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
-        >
-          <RotateCcw size={13} />
-          {t('artifact.terminalView.restart')}
-        </button>
-      </div>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-2" data-tauri-drag-region="false">
+          <span
+            className="min-w-0 truncate font-mono text-meta text-ink-tertiary"
+            title={cwd}
+            data-testid="terminal-cwd"
+          >
+            {cwd}
+          </span>
+          <button
+            type="button"
+            data-testid="terminal-restart"
+            onClick={() => void restart()}
+            title={t('artifact.terminalView.restart')}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-meta font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <RotateCcw size={13} />
+            {t('artifact.terminalView.restart')}
+          </button>
+        </div>
+      </DeclarativeContextMenu>
 
       {showStatus && (
         <div

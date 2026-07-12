@@ -28,7 +28,7 @@ describe('LoginBrandPanel', () => {
     cleanup()
   })
 
-  it('renders promo headline, motion carousel, and features without static logo.svg', async () => {
+  it('renders couplet poster, stickers, motion carousel, without static logo.svg', async () => {
     const { container, getByText } = render(
       <I18nextProvider i18n={i18n}>
         <LoginBrandPanel />
@@ -37,6 +37,11 @@ describe('LoginBrandPanel', () => {
 
     expect(getByText(i18n.t('login.brandHeadline'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
+    // Two equal-weight poster lines (couplet) + floating stickers
+    expect(container.querySelectorAll('[data-poster-line]').length).toBe(2)
+    expect(container.querySelectorAll('[data-sticker]').length).toBe(3)
+    expect(getByText(i18n.t('login.sticker1'))).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-feature-index]').length).toBe(0)
     // public/motion row (3× crossfade stages), not the static logo mark
     expect(container.querySelectorAll('[data-mascot-action]').length).toBe(3)
     expect(container.querySelectorAll('[data-mascot-crossfade="true"]').length).toBe(3)
@@ -44,11 +49,10 @@ describe('LoginBrandPanel', () => {
     expect(container.querySelector('img[src="/logo.svg"]')).toBeNull()
     expect(container.querySelectorAll('[data-dust]').length).toBeGreaterThan(0)
     expect(container.querySelectorAll('[data-parallax]').length).toBeGreaterThan(0)
-    expect(container.querySelectorAll('[data-feature-index]').length).toBe(0)
 
     await waitFor(() => {
       const items = container.querySelectorAll('[data-brand-item]')
-      expect(items.length).toBeGreaterThanOrEqual(5)
+      expect(items.length).toBeGreaterThanOrEqual(2)
     })
   })
 

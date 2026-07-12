@@ -166,7 +166,6 @@ export function LoginBrandPanel() {
 
   const line1 = t('login.brandLine1')
   const line2 = t('login.brandLine2')
-  const line3 = t('login.brandLine3')
   const headline = t('login.brandHeadline')
 
   useLayoutEffect(() => {
@@ -517,7 +516,7 @@ export function LoginBrandPanel() {
       ctx = null
       killInteractiveTweens()
     }
-  }, [headline, line1, line2, line3, t])
+  }, [headline, line1, line2, t])
 
   return (
     <div
@@ -795,7 +794,7 @@ export function LoginBrandPanel() {
           </p>
         </div>
 
-        {/* Hero poster type */}
+        {/* Hero poster type — couplet: equal weight, monochrome */}
         <div className="my-auto py-8">
           <h2 className="sr-only">{headline}</h2>
           <div aria-hidden className="relative flex flex-col" style={{ perspective: '800px' }}>
@@ -839,47 +838,25 @@ export function LoginBrandPanel() {
 
             <p
               data-poster-line
-              className="text-[clamp(1.35rem,2.6vw,2rem)] font-medium leading-none tracking-tight text-ink-secondary"
-              style={{ opacity: 0 }}
+              className="font-bold leading-[0.9] tracking-[-0.04em] text-ink"
+              style={{
+                opacity: 0,
+                fontSize: 'clamp(2.75rem, 6.4vw, 5.25rem)',
+              }}
             >
               {splitHeadline(line1)}
             </p>
             <p
               data-poster-line
-              className="mt-1 font-bold leading-[0.9] tracking-[-0.045em] text-ink"
+              className="mt-2 font-bold leading-[0.9] tracking-[-0.04em] text-ink sm:mt-3"
               style={{
                 opacity: 0,
-                fontSize: 'clamp(3.25rem, 7.2vw, 5.75rem)',
+                fontSize: 'clamp(2.75rem, 6.4vw, 5.25rem)',
               }}
             >
               {splitHeadline(line2)}
             </p>
-            <div data-poster-line className="relative mt-1" style={{ opacity: 0 }}>
-              <p
-                className="font-bold leading-[0.9] tracking-[-0.045em] text-ink"
-                style={{ fontSize: 'clamp(3.25rem, 7.2vw, 5.75rem)' }}
-              >
-                {splitHeadline(line3)}
-              </p>
-              {/* Rainbow underline bars */}
-              <span className="mt-4 flex h-2 w-28 overflow-hidden rounded-full lg:h-2.5 lg:w-36" aria-hidden>
-                <span className="h-full flex-1" style={{ backgroundColor: PLAY_COLORS.coral }} />
-                <span className="h-full flex-1" style={{ backgroundColor: PLAY_COLORS.amber }} />
-                <span className="h-full flex-1" style={{ backgroundColor: PLAY_COLORS.mint }} />
-                <span className="h-full flex-1" style={{ backgroundColor: PLAY_COLORS.sky }} />
-                <span className="h-full flex-1" style={{ backgroundColor: PLAY_COLORS.violet }} />
-              </span>
-            </div>
           </div>
-
-          <p
-            data-brand-item
-            className="mt-8 max-w-md text-title font-medium leading-snug tracking-tight text-ink-secondary lg:mt-10"
-            style={{ opacity: 0 }}
-          >
-            {t('login.brandDesc')}
-          </p>
-
         </div>
 
         {/* Footer bar */}

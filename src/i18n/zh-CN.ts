@@ -789,6 +789,7 @@ export const zhCN = {
       sticker1: '✦ 开搞',
       sticker2: '本地优先',
       sticker3: '摸鱼合法',
+      liveBadge: '在线',
       title: '登录到 hip',
       subtitle: '选择一种方式继续',
       email: '使用邮箱登录',

@@ -176,7 +176,7 @@ const HOLD_MS = [4200, 5200, 6000, 7000] as const
 const FIRST_HOLD_MS = 4800
 const CROSSFADE_MS = 900
 
-export function motionUrl(action: MascotAction): string {
+function motionUrl(action: MascotAction): string {
   const base = import.meta.env.BASE_URL ?? '/'
   const root = base.endsWith('/') ? base : `${base}/`
   return `${root}motion/${ACTION_PATH[action]}`
@@ -202,6 +202,18 @@ function pickIdle(exclude?: MascotAction): MascotAction {
 
 function pickHold(): number {
   return HOLD_MS[Math.floor(Math.random() * HOLD_MS.length)]!
+}
+
+/** Decode next motion clip before flipping the crossfade front layer. */
+function preloadMotion(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const done = () => resolve()
+    img.onload = done
+    img.onerror = done
+    img.src = url
+    if (img.complete) done()
+  })
 }
 
 interface MascotActorProps {
@@ -249,9 +261,12 @@ export function MascotActor({
   const [frontIsA, setFrontIsA] = useState(true)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const actionRef = useRef<MascotAction>(initialAction)
+  const layerARef = useRef<MascotAction>(initialAction)
+  const layerBRef = useRef<MascotAction>(initialAction)
   const initialRef = useRef(initialAction)
   const startDelayRef = useRef(startDelayMs)
   const frontIsARef = useRef(true)
+  const playGenRef = useRef(0)
   startDelayRef.current = startDelayMs
 
   const clearTimer = useCallback(() => {
@@ -263,24 +278,44 @@ export function MascotActor({
 
   const play = useCallback(
     (name: MascotAction) => {
-      actionRef.current = name
-      setAction(name)
       if (!crossfade) {
+        actionRef.current = name
+        setAction(name)
         setLayerA(name)
+        layerARef.current = name
         setFrontIsA(true)
         frontIsARef.current = true
         return
       }
-      // Paint next clip on the hidden layer, then swap which layer is in front.
-      if (frontIsARef.current) {
+
+      const frontAction = frontIsARef.current ? layerARef.current : layerBRef.current
+      // Already showing this clip — skip (avoids mount same-src 900ms fade).
+      if (name === frontAction) {
+        actionRef.current = name
+        setAction(name)
+        return
+      }
+
+      actionRef.current = name
+      setAction(name)
+      const gen = ++playGenRef.current
+      const wasFrontA = frontIsARef.current
+      const nextFrontIsA = !wasFrontA
+
+      // Paint next clip on the hidden buffer first.
+      if (wasFrontA) {
         setLayerB(name)
-        frontIsARef.current = false
-        setFrontIsA(false)
+        layerBRef.current = name
       } else {
         setLayerA(name)
-        frontIsARef.current = true
-        setFrontIsA(true)
+        layerARef.current = name
       }
+
+      void preloadMotion(motionUrl(name)).then(() => {
+        if (gen !== playGenRef.current) return
+        frontIsARef.current = nextFrontIsA
+        setFrontIsA(nextFrontIsA)
+      })
     },
     [crossfade],
   )
@@ -309,10 +344,12 @@ export function MascotActor({
     }
 
     const start = initialRef.current
+    // Establish action without a no-op crossfade when buffers already hold start.
     play(start)
     scheduleNext(FIRST_HOLD_MS + Math.max(0, startDelayRef.current))
 
     return () => {
+      playGenRef.current += 1
       clearTimer()
       mq?.removeEventListener?.('change', onChange)
     }

@@ -73,5 +73,19 @@ describe('MascotActor', () => {
     expect(imgs[0]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
     expect(imgs[1]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
   })
+
+  it('keeps front buffer A on mount when crossfade starts on the same clip', () => {
+    const { container } = render(
+      <MascotActor size={160} crossfade collapseBottomPad={false} initialAction="wave" />,
+    )
+    const imgs = container.querySelectorAll('img')
+    // Layer A is front (opacity 1); no same-src flip to B on mount.
+    expect(imgs[0]).toHaveStyle({ opacity: '1' })
+    expect(imgs[1]).toHaveStyle({ opacity: '0' })
+    expect(container.querySelector('[data-mascot-action]')).toHaveAttribute(
+      'data-mascot-action',
+      'wave',
+    )
+  })
 })
 

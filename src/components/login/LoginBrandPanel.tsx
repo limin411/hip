@@ -177,23 +177,39 @@ export function LoginBrandPanel() {
     const content = contentRef.current
     if (!root || !content) return
 
-    const reduced =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let ctx: gsap.Context | null = null
+    let teardownInteractive: (() => void) | null = null
 
-    const items = root.querySelectorAll<HTMLElement>('[data-brand-item]')
-    const chars = content.querySelectorAll<HTMLElement>('[data-char]')
-    const posterLines = content.querySelectorAll<HTMLElement>('[data-poster-line]')
+    const killInteractiveTweens = () => {
+      const light = cursorLightRef.current
+      if (light) gsap.killTweensOf(light)
+      root.querySelectorAll('[data-parallax]').forEach((n) => gsap.killTweensOf(n))
+      root.querySelectorAll('[data-constellation]').forEach((n) => gsap.killTweensOf(n))
+      root.querySelectorAll('[data-feature-link]').forEach((n) => gsap.killTweensOf(n))
+    }
 
-    if (reduced) {
+    const applyReducedMotion = () => {
+      const items = root.querySelectorAll<HTMLElement>('[data-brand-item]')
+      const chars = content.querySelectorAll<HTMLElement>('[data-char]')
+      const posterLines = content.querySelectorAll<HTMLElement>('[data-poster-line]')
       gsap.set(items, { opacity: 1, y: 0 })
       gsap.set(chars, { opacity: 1, y: 0 })
       gsap.set(posterLines, { opacity: 1, y: 0 })
       gsap.set(root.querySelectorAll('[data-geo-line]'), { strokeDashoffset: 0 })
       gsap.set(watermarkInnerRef.current, { opacity: 0.06 })
-      gsap.set(root.querySelectorAll('[data-dust]'), { opacity: 0.45 })
+      // Scatter dust — without x/y every absolute node stacks at the origin.
+      root.querySelectorAll<HTMLElement>('[data-dust]').forEach((el) => {
+        gsap.set(el, {
+          x: gsap.utils.random(8, 92) + '%',
+          y: gsap.utils.random(8, 88) + '%',
+          opacity: 0.45,
+        })
+      })
       gsap.set(root.querySelectorAll('[data-confetti]'), { opacity: 0.9 })
-      gsap.set(root.querySelectorAll('[data-sticker]'), { opacity: 1, scale: 1 })
+      root.querySelectorAll<HTMLElement>('[data-sticker]').forEach((el) => {
+        const baseRot = Number(el.dataset.stickerRot) || 0
+        gsap.set(el, { opacity: 1, scale: 1, rotation: baseRot })
+      })
       if (wavePathRef.current) {
         wavePathRef.current.setAttribute('d', buildWavePath(0, 6))
       }
@@ -201,341 +217,382 @@ export function LoginBrandPanel() {
         taglineRef.current.textContent = t(`login.${TAGLINE_KEYS[0]}`)
         gsap.set(taglineRef.current, { opacity: 1 })
       }
-      return
     }
 
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        items,
-        { opacity: 0, y: 16 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.7,
-          stagger: 0.08,
-          ease: 'power3.out',
-          delay: 0.1,
-        },
-      )
+    const applyMotion = () => {
+      const items = root.querySelectorAll<HTMLElement>('[data-brand-item]')
+      const chars = content.querySelectorAll<HTMLElement>('[data-char]')
+      const posterLines = content.querySelectorAll<HTMLElement>('[data-poster-line]')
 
-      // Poster lines: hard slide-up, staggered by line then char
-      if (posterLines.length) {
-        gsap.set(posterLines, { opacity: 0, y: 48 })
-        gsap.to(posterLines, {
-          opacity: 1,
-          y: 0,
-          duration: 0.85,
-          stagger: 0.12,
-          ease: 'power4.out',
-          delay: 0.15,
-        })
-      }
-
-      if (chars.length) {
-        gsap.set(chars, { opacity: 0, y: 36 })
-        gsap.to(chars, {
-          opacity: 1,
-          y: 0,
-          duration: 0.55,
-          stagger: 0.014,
-          ease: 'power3.out',
-          delay: 0.22,
-        })
-      }
-
-      const lines = root.querySelectorAll<SVGGeometryElement>('[data-geo-line]')
-      lines.forEach((line, i) => {
-        const len = typeof line.getTotalLength === 'function' ? line.getTotalLength() : 400
-        gsap.set(line, { strokeDasharray: len, strokeDashoffset: len })
-        gsap.to(line, {
-          strokeDashoffset: 0,
-          duration: 1.6,
-          delay: 0.2 + i * 0.12,
-          ease: 'power2.inOut',
-        })
-      })
-
-      const linkPaths = root.querySelectorAll<SVGGeometryElement>('[data-feature-link]')
-      linkPaths.forEach((line, i) => {
-        const len = typeof line.getTotalLength === 'function' ? line.getTotalLength() : 200
-        gsap.set(line, { strokeDasharray: len, strokeDashoffset: len, opacity: 0.2 })
-        gsap.to(line, {
-          strokeDashoffset: 0,
-          duration: 1.2,
-          delay: 1.1 + i * 0.18,
-          ease: 'power2.out',
-        })
-      })
-
-      if (watermarkInnerRef.current) {
+      ctx = gsap.context(() => {
         gsap.fromTo(
-          watermarkInnerRef.current,
-          { opacity: 0, x: -24 },
-          { opacity: 0.07, x: 0, duration: 1.4, ease: 'power2.out', delay: 0.1 },
+          items,
+          { opacity: 0, y: 16 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.7,
+            stagger: 0.08,
+            ease: 'power3.out',
+            delay: 0.1,
+          },
         )
-        gsap.to(watermarkInnerRef.current, {
-          x: 10,
-          duration: 14,
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-        })
-      }
 
-      if (orbsRef.current) {
-        orbsRef.current.querySelectorAll<HTMLElement>('[data-orb]').forEach((el, i) => {
+        // Poster lines: hard slide-up, staggered by line then char
+        if (posterLines.length) {
+          gsap.set(posterLines, { opacity: 0, y: 48 })
+          gsap.to(posterLines, {
+            opacity: 1,
+            y: 0,
+            duration: 0.85,
+            stagger: 0.12,
+            ease: 'power4.out',
+            delay: 0.15,
+          })
+        }
+
+        if (chars.length) {
+          gsap.set(chars, { opacity: 0, y: 36 })
+          gsap.to(chars, {
+            opacity: 1,
+            y: 0,
+            duration: 0.55,
+            stagger: 0.014,
+            ease: 'power3.out',
+            delay: 0.22,
+          })
+        }
+
+        const lines = root.querySelectorAll<SVGGeometryElement>('[data-geo-line]')
+        lines.forEach((line, i) => {
+          const len = typeof line.getTotalLength === 'function' ? line.getTotalLength() : 400
+          gsap.set(line, { strokeDasharray: len, strokeDashoffset: len })
+          gsap.to(line, {
+            strokeDashoffset: 0,
+            duration: 1.6,
+            delay: 0.2 + i * 0.12,
+            ease: 'power2.inOut',
+          })
+        })
+
+        const linkPaths = root.querySelectorAll<SVGGeometryElement>('[data-feature-link]')
+        linkPaths.forEach((line, i) => {
+          const len = typeof line.getTotalLength === 'function' ? line.getTotalLength() : 200
+          gsap.set(line, { strokeDasharray: len, strokeDashoffset: len, opacity: 0.2 })
+          gsap.to(line, {
+            strokeDashoffset: 0,
+            duration: 1.2,
+            delay: 1.1 + i * 0.18,
+            ease: 'power2.out',
+          })
+        })
+
+        if (watermarkInnerRef.current) {
+          gsap.fromTo(
+            watermarkInnerRef.current,
+            { opacity: 0, x: -24 },
+            { opacity: 0.07, x: 0, duration: 1.4, ease: 'power2.out', delay: 0.1 },
+          )
+          gsap.to(watermarkInnerRef.current, {
+            x: 10,
+            duration: 14,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+          })
+        }
+
+        if (orbsRef.current) {
+          orbsRef.current.querySelectorAll<HTMLElement>('[data-orb]').forEach((el, i) => {
+            gsap.to(el, {
+              x: i % 2 === 0 ? 28 : -22,
+              y: i % 2 === 0 ? -18 : 24,
+              scale: 1.08 + i * 0.04,
+              duration: 7 + i * 1.5,
+              ease: 'sine.inOut',
+              yoyo: true,
+              repeat: -1,
+            })
+          })
+        }
+
+        if (geoRef.current) {
+          gsap.to(geoRef.current.querySelectorAll('[data-geo-spin]'), {
+            rotation: 360,
+            transformOrigin: '50% 50%',
+            duration: 48,
+            ease: 'none',
+            repeat: -1,
+          })
+          gsap.to(geoRef.current.querySelectorAll('[data-geo-spin-rev]'), {
+            rotation: -360,
+            transformOrigin: '50% 50%',
+            duration: 64,
+            ease: 'none',
+            repeat: -1,
+          })
+        }
+
+        root.querySelectorAll<HTMLElement>('[data-dust]').forEach((el, i) => {
+          gsap.set(el, {
+            x: gsap.utils.random(8, 92) + '%',
+            y: gsap.utils.random(8, 88) + '%',
+            opacity: gsap.utils.random(0.25, 0.7),
+            scale: gsap.utils.random(0.5, 1.4),
+          })
           gsap.to(el, {
-            x: i % 2 === 0 ? 28 : -22,
-            y: i % 2 === 0 ? -18 : 24,
-            scale: 1.08 + i * 0.04,
-            duration: 7 + i * 1.5,
+            y: `+=${gsap.utils.random(-48, 48)}`,
+            x: `+=${gsap.utils.random(-28, 28)}`,
+            duration: gsap.utils.random(8, 16),
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            delay: i * 0.15,
+          })
+          gsap.to(el, {
+            opacity: gsap.utils.random(0.15, 0.75),
+            duration: gsap.utils.random(2.5, 5),
             ease: 'sine.inOut',
             yoyo: true,
             repeat: -1,
           })
         })
-      }
 
-      if (geoRef.current) {
-        gsap.to(geoRef.current.querySelectorAll('[data-geo-spin]'), {
-          rotation: 360,
-          transformOrigin: '50% 50%',
-          duration: 48,
-          ease: 'none',
-          repeat: -1,
-        })
-        gsap.to(geoRef.current.querySelectorAll('[data-geo-spin-rev]'), {
-          rotation: -360,
-          transformOrigin: '50% 50%',
-          duration: 64,
-          ease: 'none',
-          repeat: -1,
-        })
-      }
-
-      root.querySelectorAll<HTMLElement>('[data-dust]').forEach((el, i) => {
-        gsap.set(el, {
-          x: gsap.utils.random(8, 92) + '%',
-          y: gsap.utils.random(8, 88) + '%',
-          opacity: gsap.utils.random(0.25, 0.7),
-          scale: gsap.utils.random(0.5, 1.4),
-        })
-        gsap.to(el, {
-          y: `+=${gsap.utils.random(-48, 48)}`,
-          x: `+=${gsap.utils.random(-28, 28)}`,
-          duration: gsap.utils.random(8, 16),
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-          delay: i * 0.15,
-        })
-        gsap.to(el, {
-          opacity: gsap.utils.random(0.15, 0.75),
-          duration: gsap.utils.random(2.5, 5),
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-        })
-      })
-
-      // Colorful confetti bob + spin
-      root.querySelectorAll<HTMLElement>('[data-confetti]').forEach((el, i) => {
-        gsap.fromTo(
-          el,
-          { opacity: 0, scale: 0, rotation: gsap.utils.random(-40, 40) },
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 0.6,
-            delay: 0.4 + i * 0.05,
-            ease: 'back.out(1.8)',
-          },
-        )
-        gsap.to(el, {
-          y: `+=${gsap.utils.random(-18, 18)}`,
-          x: `+=${gsap.utils.random(-14, 14)}`,
-          rotation: `+=${gsap.utils.random(-25, 25)}`,
-          duration: gsap.utils.random(3.5, 6.5),
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-          delay: i * 0.08,
-        })
-      })
-
-      // Sticker pop-in with gentle wiggle
-      root.querySelectorAll<HTMLElement>('[data-sticker]').forEach((el, i) => {
-        gsap.fromTo(
-          el,
-          { opacity: 0, scale: 0.6, rotation: (i % 2 === 0 ? -12 : 10) },
-          {
-            opacity: 1,
-            scale: 1,
-            duration: 0.55,
-            delay: 0.85 + i * 0.12,
-            ease: 'back.out(2)',
-          },
-        )
-        gsap.to(el, {
-          y: `+=${i % 2 === 0 ? -6 : 6}`,
-          rotation: `+=${i % 2 === 0 ? 3 : -3}`,
-          duration: 3.2 + i * 0.4,
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-          delay: 1.2 + i * 0.1,
-        })
-      })
-
-      if (wavePathRef.current) {
-        const wave = { phase: 0, amp: 9 }
-        gsap.to(wave, {
-          phase: Math.PI * 2,
-          amp: 14,
-          duration: 4.5,
-          ease: 'sine.inOut',
-          yoyo: true,
-          repeat: -1,
-          onUpdate: () => {
-            wavePathRef.current?.setAttribute('d', buildWavePath(wave.phase, wave.amp))
-          },
-        })
-      }
-
-      if (taglineRef.current) {
-        taglineRef.current.textContent = t(`login.${TAGLINE_KEYS[0]}`)
-        gsap.set(taglineRef.current, { opacity: 1 })
-        const cycle = () => {
-          const el = taglineRef.current
-          if (!el) return
+        // Colorful confetti bob + spin
+        root.querySelectorAll<HTMLElement>('[data-confetti]').forEach((el, i) => {
+          gsap.fromTo(
+            el,
+            { opacity: 0, scale: 0, rotation: gsap.utils.random(-40, 40) },
+            {
+              opacity: 1,
+              scale: 1,
+              duration: 0.6,
+              delay: 0.4 + i * 0.05,
+              ease: 'back.out(1.8)',
+            },
+          )
           gsap.to(el, {
-            opacity: 0,
-            y: -6,
-            duration: 0.45,
-            ease: 'power2.in',
-            onComplete: () => {
-              taglineIndex.current = (taglineIndex.current + 1) % TAGLINE_KEYS.length
-              el.textContent = t(`login.${TAGLINE_KEYS[taglineIndex.current]}`)
-              gsap.fromTo(
-                el,
-                { opacity: 0, y: 8 },
-                { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' },
-              )
+            y: `+=${gsap.utils.random(-18, 18)}`,
+            x: `+=${gsap.utils.random(-14, 14)}`,
+            rotation: `+=${gsap.utils.random(-25, 25)}`,
+            duration: gsap.utils.random(3.5, 6.5),
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            delay: i * 0.08,
+          })
+        })
+
+        // Sticker pop-in; base tilt lives in data-sticker-rot so GSAP does not wipe it.
+        root.querySelectorAll<HTMLElement>('[data-sticker]').forEach((el, i) => {
+          const baseRot = Number(el.dataset.stickerRot) || 0
+          gsap.fromTo(
+            el,
+            { opacity: 0, scale: 0.6, rotation: baseRot + (i % 2 === 0 ? -12 : 10) },
+            {
+              opacity: 1,
+              scale: 1,
+              rotation: baseRot,
+              duration: 0.55,
+              delay: 0.85 + i * 0.12,
+              ease: 'back.out(2)',
+            },
+          )
+          gsap.to(el, {
+            y: `+=${i % 2 === 0 ? -6 : 6}`,
+            rotation: baseRot + (i % 2 === 0 ? 3 : -3),
+            duration: 3.2 + i * 0.4,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            delay: 1.2 + i * 0.1,
+          })
+        })
+
+        if (wavePathRef.current) {
+          const wave = { phase: 0, amp: 9 }
+          gsap.to(wave, {
+            phase: Math.PI * 2,
+            amp: 14,
+            duration: 4.5,
+            ease: 'sine.inOut',
+            yoyo: true,
+            repeat: -1,
+            onUpdate: () => {
+              wavePathRef.current?.setAttribute('d', buildWavePath(wave.phase, wave.amp))
             },
           })
         }
-        gsap.delayedCall(4.2, function repeat() {
-          cycle()
-          gsap.delayedCall(4.2, repeat)
+
+        if (taglineRef.current) {
+          taglineRef.current.textContent = t(`login.${TAGLINE_KEYS[0]}`)
+          gsap.set(taglineRef.current, { opacity: 1 })
+          const cycle = () => {
+            const el = taglineRef.current
+            if (!el) return
+            gsap.to(el, {
+              opacity: 0,
+              y: -6,
+              duration: 0.45,
+              ease: 'power2.in',
+              onComplete: () => {
+                taglineIndex.current = (taglineIndex.current + 1) % TAGLINE_KEYS.length
+                el.textContent = t(`login.${TAGLINE_KEYS[taglineIndex.current]}`)
+                gsap.fromTo(
+                  el,
+                  { opacity: 0, y: 8 },
+                  { opacity: 1, y: 0, duration: 0.55, ease: 'power2.out' },
+                )
+              },
+            })
+          }
+          gsap.delayedCall(4.2, function repeat() {
+            cycle()
+            gsap.delayedCall(4.2, repeat)
+          })
+        }
+
+        const pulse = root.querySelector<HTMLElement>('[data-live-pulse]')
+        if (pulse) {
+          gsap.to(pulse, {
+            scale: 1.6,
+            opacity: 0,
+            duration: 1.6,
+            ease: 'power1.out',
+            repeat: -1,
+          })
+        }
+      }, root)
+
+      const light = cursorLightRef.current
+      const layers = root.querySelectorAll<HTMLElement>('[data-parallax]')
+
+      const onMove = (e: PointerEvent) => {
+        if (e.pointerType === 'touch') return
+        const rect = root.getBoundingClientRect()
+        const nx = (e.clientX - rect.left) / rect.width - 0.5
+
+        if (light) {
+          gsap.to(light, {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            duration: 0.55,
+            ease: 'power2.out',
+            overwrite: 'auto',
+          })
+        }
+
+        layers.forEach((layer) => {
+          const depth = Number(layer.dataset.parallax) || 8
+          gsap.to(layer, {
+            x: nx * depth,
+            y: 0,
+            duration: 0.85,
+            ease: 'power2.out',
+            overwrite: 'auto',
+          })
         })
       }
 
-      const pulse = root.querySelector<HTMLElement>('[data-live-pulse]')
-      if (pulse) {
-        gsap.to(pulse, {
-          scale: 1.6,
-          opacity: 0,
-          duration: 1.6,
-          ease: 'power1.out',
-          repeat: -1,
-        })
+      const onEnter = () => {
+        if (light) gsap.to(light, { opacity: 1, duration: 0.4 })
       }
-    }, root)
-
-    const light = cursorLightRef.current
-    const layers = root.querySelectorAll<HTMLElement>('[data-parallax]')
-
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType === 'touch') return
-      const rect = root.getBoundingClientRect()
-      const nx = (e.clientX - rect.left) / rect.width - 0.5
-
-      if (light) {
-        gsap.to(light, {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          duration: 0.55,
-          ease: 'power2.out',
-          overwrite: 'auto',
+      const onLeave = () => {
+        if (light) gsap.to(light, { opacity: 0, duration: 0.5 })
+        layers.forEach((layer) => {
+          gsap.to(layer, { x: 0, y: 0, duration: 1, ease: 'power2.out' })
+        })
+        root.querySelectorAll('[data-constellation]').forEach((n) => {
+          gsap.to(n, {
+            opacity: Number((n as HTMLElement).dataset.baseOpacity) || 0.45,
+            duration: 0.3,
+          })
+        })
+        root.querySelectorAll('[data-feature-link]').forEach((n) => {
+          gsap.to(n, { opacity: 0.2, attr: { 'stroke-width': 1 }, duration: 0.3 })
         })
       }
 
-      layers.forEach((layer) => {
-        const depth = Number(layer.dataset.parallax) || 8
-        gsap.to(layer, {
-          x: nx * depth,
-          y: 0,
-          duration: 0.85,
-          ease: 'power2.out',
-          overwrite: 'auto',
+      const featureItems = content.querySelectorAll<HTMLElement>('[data-feature-index]')
+      const clearFeatureFx = () => {
+        root.querySelectorAll<SVGCircleElement>('[data-constellation]').forEach((n) => {
+          const base = Number(n.dataset.baseOpacity) || 0.45
+          const baseR = Number(n.dataset.baseR) || 1.5
+          gsap.to(n, { opacity: base, attr: { r: baseR }, duration: 0.35 })
         })
-      })
-    }
-
-    const onEnter = () => {
-      if (light) gsap.to(light, { opacity: 1, duration: 0.4 })
-    }
-    const onLeave = () => {
-      if (light) gsap.to(light, { opacity: 0, duration: 0.5 })
-      layers.forEach((layer) => {
-        gsap.to(layer, { x: 0, y: 0, duration: 1, ease: 'power2.out' })
-      })
-      root.querySelectorAll('[data-constellation]').forEach((n) => {
-        gsap.to(n, {
-          opacity: Number((n as HTMLElement).dataset.baseOpacity) || 0.45,
-          duration: 0.3,
+        root.querySelectorAll<SVGElement>('[data-feature-link]').forEach((n) => {
+          gsap.to(n, { opacity: 0.2, attr: { 'stroke-width': 1 }, duration: 0.35 })
         })
+      }
+      const onFeatureEnter = (index: number) => {
+        clearFeatureFx()
+        root.querySelectorAll<SVGCircleElement>(`[data-constellation="${index}"]`).forEach((n) => {
+          const baseR = Number(n.dataset.baseR) || 1.5
+          gsap.to(n, { opacity: 1, attr: { r: baseR * 2.4 }, duration: 0.35 })
+        })
+        root.querySelectorAll<SVGElement>(`[data-feature-link="${index}"]`).forEach((n) => {
+          gsap.to(n, { opacity: 0.85, attr: { 'stroke-width': 1.5 }, duration: 0.35 })
+        })
+      }
+
+      const featureHandlers: Array<{
+        el: HTMLElement
+        enter: () => void
+        leave: () => void
+      }> = []
+      featureItems.forEach((el) => {
+        const idx = Number(el.dataset.featureIndex)
+        const enter = () => onFeatureEnter(idx)
+        const leave = clearFeatureFx
+        el.addEventListener('pointerenter', enter)
+        el.addEventListener('pointerleave', leave)
+        featureHandlers.push({ el, enter, leave })
       })
-      root.querySelectorAll('[data-feature-link]').forEach((n) => {
-        gsap.to(n, { opacity: 0.2, strokeWidth: 1, duration: 0.3 })
-      })
+
+      root.addEventListener('pointermove', onMove)
+      root.addEventListener('pointerenter', onEnter)
+      root.addEventListener('pointerleave', onLeave)
+
+      teardownInteractive = () => {
+        root.removeEventListener('pointermove', onMove)
+        root.removeEventListener('pointerenter', onEnter)
+        root.removeEventListener('pointerleave', onLeave)
+        featureHandlers.forEach(({ el, enter, leave }) => {
+          el.removeEventListener('pointerenter', enter)
+          el.removeEventListener('pointerleave', leave)
+        })
+        killInteractiveTweens()
+      }
     }
 
-    const featureItems = content.querySelectorAll<HTMLElement>('[data-feature-index]')
-    const clearFeatureFx = () => {
-      root.querySelectorAll<SVGCircleElement>('[data-constellation]').forEach((n) => {
-        const base = Number(n.dataset.baseOpacity) || 0.45
-        const baseR = Number(n.dataset.baseR) || 1.5
-        gsap.to(n, { opacity: base, attr: { r: baseR }, duration: 0.35 })
-      })
-      root.querySelectorAll<SVGElement>('[data-feature-link]').forEach((n) => {
-        gsap.to(n, { opacity: 0.2, attr: { 'stroke-width': 1 }, duration: 0.35 })
-      })
-    }
-    const onFeatureEnter = (index: number) => {
-      clearFeatureFx()
-      root.querySelectorAll<SVGCircleElement>(`[data-constellation="${index}"]`).forEach((n) => {
-        const baseR = Number(n.dataset.baseR) || 1.5
-        gsap.to(n, { opacity: 1, attr: { r: baseR * 2.4 }, duration: 0.35 })
-      })
-      root.querySelectorAll<SVGElement>(`[data-feature-link="${index}"]`).forEach((n) => {
-        gsap.to(n, { opacity: 0.85, attr: { 'stroke-width': 1.5 }, duration: 0.35 })
-      })
+    const setup = (reduced: boolean) => {
+      teardownInteractive?.()
+      teardownInteractive = null
+      ctx?.revert()
+      ctx = null
+      killInteractiveTweens()
+      if (reduced) {
+        applyReducedMotion()
+      } else {
+        applyMotion()
+      }
     }
 
-    featureItems.forEach((el) => {
-      const idx = Number(el.dataset.featureIndex)
-      const enter = () => onFeatureEnter(idx)
-      el.addEventListener('pointerenter', enter)
-      el.addEventListener('pointerleave', clearFeatureFx)
-      ;(el as HTMLElement & { _enter?: () => void; _leave?: () => void })._enter = enter
-      ;(el as HTMLElement & { _enter?: () => void; _leave?: () => void })._leave = clearFeatureFx
-    })
-
-    root.addEventListener('pointermove', onMove)
-    root.addEventListener('pointerenter', onEnter)
-    root.addEventListener('pointerleave', onLeave)
+    const mq =
+      typeof window !== 'undefined'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null
+    const onMqChange = () => setup(Boolean(mq?.matches))
+    mq?.addEventListener?.('change', onMqChange)
+    setup(Boolean(mq?.matches))
 
     return () => {
-      ctx.revert()
-      root.removeEventListener('pointermove', onMove)
-      root.removeEventListener('pointerenter', onEnter)
-      root.removeEventListener('pointerleave', onLeave)
-      featureItems.forEach((el) => {
-        const node = el as HTMLElement & { _enter?: () => void; _leave?: () => void }
-        if (node._enter) el.removeEventListener('pointerenter', node._enter)
-        if (node._leave) el.removeEventListener('pointerleave', node._leave)
-      })
+      mq?.removeEventListener?.('change', onMqChange)
+      teardownInteractive?.()
+      teardownInteractive = null
+      ctx?.revert()
+      ctx = null
+      killInteractiveTweens()
     }
   }, [headline, line1, line2, line3, t])
 
@@ -895,11 +952,11 @@ export function LoginBrandPanel() {
                   <span
                     key={key}
                     data-sticker
+                    data-sticker-rot={parseFloat(styles.rot)}
                     className="rounded-full px-3 py-1 text-caption font-bold tracking-wide shadow-sm"
                     style={{
                       backgroundColor: styles.bg,
                       color: styles.color,
-                      transform: `rotate(${styles.rot})`,
                       opacity: 0,
                     }}
                   >
@@ -1008,7 +1065,7 @@ export function LoginBrandPanel() {
               className="rounded-full px-2 py-0.5 text-caption font-bold uppercase tracking-[0.18em] text-white"
               style={{ backgroundColor: PLAY_COLORS.mint }}
             >
-              live
+              {t('login.liveBadge')}
             </span>
           </div>
         </div>

@@ -38,6 +38,7 @@ describe('LoginBrandPanel', () => {
     expect(getByText(i18n.t('login.brandHeadline'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.feature1'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
+    expect(getByText(i18n.t('login.liveBadge'))).toBeInTheDocument()
     // public/motion row (3× crossfade stages), not the static logo mark
     expect(container.querySelectorAll('[data-mascot-action]').length).toBe(3)
     expect(container.querySelectorAll('[data-mascot-crossfade="true"]').length).toBe(3)
@@ -50,6 +51,36 @@ describe('LoginBrandPanel', () => {
     await waitFor(() => {
       const items = container.querySelectorAll('[data-brand-item]')
       expect(items.length).toBeGreaterThanOrEqual(5)
+    })
+  })
+
+  it('scatters dust under prefers-reduced-motion instead of stacking at origin', async () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('prefers-reduced-motion'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+
+    const { container } = render(
+      <I18nextProvider i18n={i18n}>
+        <LoginBrandPanel />
+      </I18nextProvider>,
+    )
+
+    await waitFor(() => {
+      const dust = Array.from(container.querySelectorAll<HTMLElement>('[data-dust]'))
+      expect(dust.length).toBeGreaterThan(0)
+      // GSAP positions via transform; every particle must leave the origin stack.
+      const transformed = dust.filter((el) => {
+        const t = el.style.transform || ''
+        return t.includes('translate') || t.includes('matrix')
+      })
+      expect(transformed.length).toBe(dust.length)
     })
   })
 })

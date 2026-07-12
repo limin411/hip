@@ -11,7 +11,8 @@ describe('LoginBrandPanel', () => {
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation((query: string) => ({
-        matches: query.includes('prefers-reduced-motion'),
+        // Motion allowed so the public/motion carousel mounts (not static logo.svg).
+        matches: false,
         media: query,
         onchange: null,
         addListener: vi.fn(),
@@ -27,7 +28,7 @@ describe('LoginBrandPanel', () => {
     cleanup()
   })
 
-  it('renders promo headline and features without mascot', async () => {
+  it('renders promo headline, motion carousel, and features without static logo.svg', async () => {
     const { container, getByText } = render(
       <I18nextProvider i18n={i18n}>
         <LoginBrandPanel />
@@ -37,8 +38,11 @@ describe('LoginBrandPanel', () => {
     expect(getByText(i18n.t('login.brandHeadline'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.feature1'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
-    expect(container.querySelector('img')).toBeNull()
-    expect(container.querySelector('[data-mascot-action]')).toBeNull()
+    // public/motion row (3× crossfade stages), not the static logo mark
+    expect(container.querySelectorAll('[data-mascot-action]').length).toBe(3)
+    expect(container.querySelectorAll('[data-mascot-crossfade="true"]').length).toBe(3)
+    expect(container.querySelector('img[src*="/motion/"]')).toBeInTheDocument()
+    expect(container.querySelector('img[src="/logo.svg"]')).toBeNull()
     expect(container.querySelectorAll('[data-dust]').length).toBeGreaterThan(0)
     expect(container.querySelectorAll('[data-parallax]').length).toBeGreaterThan(0)
     expect(container.querySelectorAll('[data-feature-index]').length).toBe(3)

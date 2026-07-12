@@ -174,8 +174,9 @@ const IDLE_POOL: MascotAction[] = [
 /** How long each infinite SVG clip stays on screen before rotating (ms). */
 const HOLD_MS = [4200, 5200, 6000, 7000] as const
 const FIRST_HOLD_MS = 4800
+const CROSSFADE_MS = 900
 
-function motionUrl(action: MascotAction): string {
+export function motionUrl(action: MascotAction): string {
   const base = import.meta.env.BASE_URL ?? '/'
   const root = base.endsWith('/') ? base : `${base}/`
   return `${root}motion/${ACTION_PATH[action]}`
@@ -208,6 +209,18 @@ interface MascotActorProps {
   className?: string
   /** First clip before the idle loop (default: wave). */
   initialAction?: MascotAction
+  /**
+   * Soft opacity crossfade between clips (login brand stage).
+   * Default is a hard cut (chat empty-state).
+   */
+  crossfade?: boolean
+  /**
+   * Collapse transparent bottom canvas into following content (chat).
+   * Default true; set false when the actor sits free on a brand panel.
+   */
+  collapseBottomPad?: boolean
+  /** Extra delay before the first clip rotation (ms). Useful when staging several actors. */
+  startDelayMs?: number
 }
 
 /**
@@ -224,12 +237,22 @@ export function MascotActor({
   size = 420,
   className,
   initialAction = 'wave',
+  crossfade = false,
+  collapseBottomPad = true,
+  startDelayMs = 0,
 }: MascotActorProps) {
   const [reduced, setReduced] = useState(prefersReducedMotion)
   const [action, setAction] = useState<MascotAction>(initialAction)
+  // Dual buffers for crossfade: only one is fully opaque at rest.
+  const [layerA, setLayerA] = useState<MascotAction>(initialAction)
+  const [layerB, setLayerB] = useState<MascotAction>(initialAction)
+  const [frontIsA, setFrontIsA] = useState(true)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const actionRef = useRef<MascotAction>(initialAction)
   const initialRef = useRef(initialAction)
+  const startDelayRef = useRef(startDelayMs)
+  const frontIsARef = useRef(true)
+  startDelayRef.current = startDelayMs
 
   const clearTimer = useCallback(() => {
     if (timerRef.current != null) {
@@ -238,10 +261,29 @@ export function MascotActor({
     }
   }, [])
 
-  const play = useCallback((name: MascotAction) => {
-    actionRef.current = name
-    setAction(name)
-  }, [])
+  const play = useCallback(
+    (name: MascotAction) => {
+      actionRef.current = name
+      setAction(name)
+      if (!crossfade) {
+        setLayerA(name)
+        setFrontIsA(true)
+        frontIsARef.current = true
+        return
+      }
+      // Paint next clip on the hidden layer, then swap which layer is in front.
+      if (frontIsARef.current) {
+        setLayerB(name)
+        frontIsARef.current = false
+        setFrontIsA(false)
+      } else {
+        setLayerA(name)
+        frontIsARef.current = true
+        setFrontIsA(true)
+      }
+    },
+    [crossfade],
+  )
 
   const scheduleNext = useCallback(
     (delayMs: number) => {
@@ -268,7 +310,7 @@ export function MascotActor({
 
     const start = initialRef.current
     play(start)
-    scheduleNext(FIRST_HOLD_MS)
+    scheduleNext(FIRST_HOLD_MS + Math.max(0, startDelayRef.current))
 
     return () => {
       clearTimer()
@@ -280,26 +322,58 @@ export function MascotActor({
     return <HipLogo size={size} className={className} decorative />
   }
 
+  const fadeStyle = (visible: boolean): React.CSSProperties =>
+    crossfade
+      ? {
+          opacity: visible ? 1 : 0,
+          transition: `opacity ${CROSSFADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+        }
+      : { opacity: visible ? 1 : 0 }
+
   return (
     <div
-      className={['flex items-center justify-center', className].filter(Boolean).join(' ')}
+      className={['relative flex items-center justify-center', className].filter(Boolean).join(' ')}
       style={{
         width: size,
         height: size,
         // Collapse transparent bottom canvas into the gap before greeting text.
-        marginBottom: Math.round(size * -BOTTOM_PAD_RATIO),
+        marginBottom: collapseBottomPad ? Math.round(size * -BOTTOM_PAD_RATIO) : 0,
       }}
       aria-hidden
       data-mascot-action={action}
+      data-mascot-crossfade={crossfade ? 'true' : undefined}
     >
-      <img
-        src={motionUrl(action)}
-        alt=""
-        width={size}
-        height={size}
-        className="h-full w-full object-contain select-none"
-        draggable={false}
-      />
+      {crossfade ? (
+        <>
+          <img
+            src={motionUrl(layerA)}
+            alt=""
+            width={size}
+            height={size}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
+            style={fadeStyle(frontIsA)}
+            draggable={false}
+          />
+          <img
+            src={motionUrl(layerB)}
+            alt=""
+            width={size}
+            height={size}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
+            style={fadeStyle(!frontIsA)}
+            draggable={false}
+          />
+        </>
+      ) : (
+        <img
+          src={motionUrl(action)}
+          alt=""
+          width={size}
+          height={size}
+          className="h-full w-full select-none object-contain"
+          draggable={false}
+        />
+      )}
     </div>
   )
 }

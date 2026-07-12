@@ -1,10 +1,18 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import gsap from 'gsap'
+import { MascotActor } from '@/components/login/MascotActor'
 
 const FEATURE_KEYS = ['feature1', 'feature2', 'feature3'] as const
 const TAGLINE_KEYS = ['slogan', 'tagline2', 'tagline3'] as const
 const STICKER_KEYS = ['sticker1', 'sticker2', 'sticker3'] as const
+
+/** Bottom-right motion stage: three concurrent clips from public/motion. */
+const MOTION_STAGE = [
+  { action: 'wave' as const, delay: 0 },
+  { action: 'code' as const, delay: 1600 },
+  { action: 'dance' as const, delay: 3200 },
+]
 
 /** Soft, playful palette — pastel pops that stay readable on white. */
 const PLAY_COLORS = {
@@ -664,12 +672,17 @@ export function LoginBrandPanel() {
           <path data-geo-line d="M48 760 V828 H112" />
           <path data-geo-line d="M752 760 V828 H688" />
 
-          <g data-geo-spin transform="translate(620 320)">
-            <circle data-geo-line r="96" stroke="rgba(107,124,92,0.28)" />
-            <circle data-geo-line r="128" stroke="rgba(17,17,17,0.08)" strokeDasharray="4 10" />
+          {/* Outer translate is static; inner spins (keeps GSAP off SVG transform attrs). */}
+          <g transform="translate(620 320)">
+            <g data-geo-spin>
+              <circle data-geo-line r="96" stroke="rgba(107,124,92,0.28)" />
+              <circle data-geo-line r="128" stroke="rgba(17,17,17,0.08)" strokeDasharray="4 10" />
+            </g>
           </g>
-          <g data-geo-spin-rev transform="translate(620 320)">
-            <circle data-geo-line r="160" stroke="rgba(107,124,92,0.16)" strokeDasharray="2 14" />
+          <g transform="translate(620 320)">
+            <g data-geo-spin-rev>
+              <circle data-geo-line r="160" stroke="rgba(107,124,92,0.16)" strokeDasharray="2 14" />
+            </g>
           </g>
 
           <path data-geo-line d="M0 640 L320 900" stroke="rgba(17,17,17,0.06)" />
@@ -803,6 +816,35 @@ export function LoginBrandPanel() {
         </span>
       </div>
 
+      {/*
+        Motion row — three concurrent public/motion stages (crossfade each).
+        Bottom-right so poster type stays free; staggered startDelay avoids lockstep swaps.
+      */}
+      <div
+        data-brand-item
+        className="pointer-events-none absolute bottom-8 right-4 z-[8] flex items-end gap-1 lg:bottom-10 lg:right-8 lg:gap-2"
+        style={{ opacity: 0 }}
+        aria-hidden
+      >
+        <div
+          className="absolute left-1/2 top-1/2 h-[75%] w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-60 blur-2xl"
+          style={{
+            background: `radial-gradient(circle, ${PLAY_COLORS.sky}38 0%, ${PLAY_COLORS.violet}22 50%, transparent 72%)`,
+          }}
+        />
+        {MOTION_STAGE.map(({ action, delay }) => (
+          <MascotActor
+            key={action}
+            size={148}
+            crossfade
+            collapseBottomPad={false}
+            initialAction={action}
+            startDelayMs={delay}
+            className="relative drop-shadow-sm"
+          />
+        ))}
+      </div>
+
       {/* Poster copy stack */}
       <div
         ref={contentRef}
@@ -812,19 +854,17 @@ export function LoginBrandPanel() {
         {/* Masthead */}
         <div
           data-brand-item
-          className="flex items-start justify-between gap-6"
+          className="flex items-center gap-3"
           style={{ opacity: 0 }}
         >
-          <div className="flex items-center gap-3">
-            <span className="flex gap-1" aria-hidden>
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.coral }} />
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.sky }} />
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.violet }} />
-            </span>
-            <p className="text-meta font-semibold uppercase tracking-[0.32em] text-ink">
-              {t('login.brandLabel')}
-            </p>
-          </div>
+          <span className="flex gap-1" aria-hidden>
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.coral }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.sky }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PLAY_COLORS.violet }} />
+          </span>
+          <p className="text-meta font-semibold uppercase tracking-[0.32em] text-ink">
+            {t('login.brandLabel')}
+          </p>
         </div>
 
         {/* Hero poster type */}

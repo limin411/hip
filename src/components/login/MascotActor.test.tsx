@@ -63,4 +63,15 @@ describe('MascotActor', () => {
     const img = container.querySelector('img')
     expect(img?.getAttribute('src')).toMatch(/motion\/work\/logo-code\.svg$/)
   })
+
+  it('dual-buffers motion imgs when crossfade is enabled', () => {
+    const { container } = render(<MascotActor size={160} crossfade collapseBottomPad={false} />)
+    const wrap = container.querySelector('[data-mascot-crossfade="true"]')
+    expect(wrap).toBeInTheDocument()
+    const imgs = container.querySelectorAll('img')
+    expect(imgs.length).toBe(2)
+    expect(imgs[0]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
+    expect(imgs[1]?.getAttribute('src')).toMatch(/motion\/lifestyle\/logo-wave\.svg$/)
+  })
 })
+

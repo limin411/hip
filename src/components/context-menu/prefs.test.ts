@@ -4,6 +4,7 @@ import {
   CONTEXT_MENU_PREFS_KEY,
   defaultContextMenuPrefs,
   loadPrefs,
+  resetPrefs,
   savePrefs,
 } from './prefs'
 
@@ -69,5 +70,25 @@ describe('prefs', () => {
       }),
     )
     expect(loadPrefs().orderByKind).toBeUndefined()
+  })
+
+  it('round-trips orderByKind with savePrefs', () => {
+    savePrefs({
+      version: 1,
+      disabledIds: ['message.copy'],
+      orderByKind: { message: ['message.regenerate', 'message.copyId'] },
+    })
+    expect(loadPrefs()).toEqual({
+      version: 1,
+      disabledIds: ['message.copy'],
+      orderByKind: { message: ['message.regenerate', 'message.copyId'] },
+    })
+  })
+
+  it('resetPrefs clears storage back to defaults', () => {
+    savePrefs({ version: 1, disabledIds: ['x'], orderByKind: { message: ['a'] } })
+    resetPrefs()
+    expect(localStorage.getItem(CONTEXT_MENU_PREFS_KEY)).toBeNull()
+    expect(loadPrefs()).toEqual(defaultContextMenuPrefs())
   })
 })

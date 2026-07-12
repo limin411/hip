@@ -57,4 +57,14 @@ export function savePrefs(prefs: ContextMenuPrefs): void {
   }
 }
 
+/** Clear stored prefs (Settings “Reset to defaults”). */
+export function resetPrefs(): void {
+  if (!canUseStorage()) return
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export { KEY as CONTEXT_MENU_PREFS_KEY }

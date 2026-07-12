@@ -1,4 +1,5 @@
 export { CONTEXT_MENUS } from './feature'
+export { ContextMenuSettings } from './ContextMenuSettings'
 export { DeclarativeContextMenu } from './DeclarativeContextMenu'
 export type { DeclarativeContextMenuProps } from './DeclarativeContextMenu'
 export {
@@ -7,9 +8,16 @@ export {
   clearContextProviders,
   mergeByGroup,
   applyPrefs,
+  applyOrderByIds,
 } from './registry'
 export { listCatalogItems, registerCatalogMeta, clearCatalogMeta } from './catalog'
-export { loadPrefs, savePrefs, defaultContextMenuPrefs, CONTEXT_MENU_PREFS_KEY } from './prefs'
+export {
+  loadPrefs,
+  savePrefs,
+  resetPrefs,
+  defaultContextMenuPrefs,
+  CONTEXT_MENU_PREFS_KEY,
+} from './prefs'
 export { createContextMenuBuildContext } from './buildContext'
 export type {
   ContextKind,

@@ -8,6 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
+import { ContextMenuSettings } from '@/components/context-menu/ContextMenuSettings'
+import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 
 const LANGUAGE_KEYS = ['zh-CN', 'zh-TW', 'en'] as const
 type LanguageKey = (typeof LANGUAGE_KEYS)[number]
@@ -79,6 +81,7 @@ export function GeneralSettings() {
           </DropdownMenu>
         </div>
       </div>
+      {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>
   )
 }

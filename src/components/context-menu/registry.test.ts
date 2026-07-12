@@ -93,6 +93,82 @@ describe('applyPrefs', () => {
     expect(filtered[0]?.separatorBefore).toBeFalsy()
     expect(filtered.find((i) => i.id === 'd1')?.separatorBefore).toBe(true)
   })
+
+  it('reorders via orderByKind for the given kind', () => {
+    const items = [
+      item({ id: 'message.copy', group: 'clipboard' }),
+      item({ id: 'message.quote', group: 'edit' }),
+      item({ id: 'message.copyId', group: 'debug' }),
+    ]
+    const out = applyPrefs(
+      items,
+      {
+        version: 1,
+        disabledIds: [],
+        orderByKind: {
+          message: ['message.copyId', 'message.copy', 'message.quote'],
+        },
+      },
+      'message',
+    )
+    expect(out.map((i) => i.id)).toEqual([
+      'message.copyId',
+      'message.copy',
+      'message.quote',
+    ])
+  })
+
+  it('ignores orderByKind for other kinds', () => {
+    const items = [
+      item({ id: 'codeBlock.copy', group: 'clipboard' }),
+      item({ id: 'codeBlock.extra', group: 'clipboard' }),
+    ]
+    const out = applyPrefs(
+      items,
+      {
+        version: 1,
+        disabledIds: [],
+        orderByKind: {
+          message: ['message.copy'],
+          codeBlock: ['codeBlock.extra', 'codeBlock.copy'],
+        },
+      },
+      'message',
+    )
+    expect(out.map((i) => i.id)).toEqual(['codeBlock.copy', 'codeBlock.extra'])
+  })
+
+  it('filters then reorders; unknown order ids are skipped', () => {
+    const items = [
+      item({ id: 'a', group: 'primary' }),
+      item({ id: 'b', group: 'primary' }),
+      item({ id: 'c', group: 'primary' }),
+    ]
+    const out = applyPrefs(
+      items,
+      {
+        version: 1,
+        disabledIds: ['b'],
+        orderByKind: { message: ['missing', 'c', 'a', 'b'] },
+      },
+      'message',
+    )
+    expect(out.map((i) => i.id)).toEqual(['c', 'a'])
+  })
+
+  it('appends items not listed in orderByKind after ordered ones', () => {
+    const items = [
+      item({ id: 'a', group: 'primary' }),
+      item({ id: 'b', group: 'primary' }),
+      item({ id: 'c', group: 'primary' }),
+    ]
+    const out = applyPrefs(
+      items,
+      { version: 1, disabledIds: [], orderByKind: { message: ['c'] } },
+      'message',
+    )
+    expect(out.map((i) => i.id)).toEqual(['c', 'a', 'b'])
+  })
 })
 
 describe('buildContextMenuItems', () => {

@@ -4,6 +4,7 @@ WebdriverIO + `@wdio/tauri-service` against a debug Tauri binary and Vite on `:1
 
 Harness overview lives in this file. Feature plans:
 
+- Business coverage audit: [`docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md`](../docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md)
 - Context menu (recent): [`docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md`](../docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md)
 
 ## Prerequisites
@@ -108,9 +109,15 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 - `seedCheckpoints` — Timeline rows (P4); also makes `revertCheckpoint` auto-succeed (H8)
 - `openCommandPaletteForE2e` / `closeCommandPaletteForE2e` — S5
 - `simulatePluginInstallError` — T2 (after Settings form submit)
+- `getWorkflowSession` — read workflow store slice after inject (no product DAG shell)
 - Memory: `getMemoryConfig` / `setMemoryConfig` / `seedMemoryItem` / `listMemories` /
   `deleteMemory` / `restoreMemory` / `emptyMemoryTrash` / `triggerMemoryConsolidate` /
   `getActiveSessionMemoryFlags`
+
+Complex harness (safe inject chains, no paid LLM):
+
+- `harness-complex-agent-loop.spec.ts` — multi-step tool / multi-agent / permission / cancel
+- `harness-workflow-projection.spec.ts` — `workflow:*` messages → store + Agents tab on code
 
 Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`, `history.ts`.
 

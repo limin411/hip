@@ -783,6 +783,21 @@ export const en = {
       logoutConfirmTitle: 'Log out?',
       logoutConfirmDesc: 'You will need to log in again to continue.',
     },
+    contextMenu: {
+      message: {
+        copy: 'Copy text',
+        quote: 'Quote in composer',
+        copyId: 'Copy message ID',
+        regenerate: 'Regenerate',
+        regenerateDisabled: 'Cannot regenerate while a turn is running',
+      },
+      codeBlock: {
+        copy: 'Copy code',
+      },
+      session: {
+        copyDebugBundle: 'Copy debug info',
+      },
+    },
     commandPalette: {
       title: 'Command palette',
       searchPlaceholder: 'Type a command…  > cmds  # sessions  @ skills',

@@ -51,9 +51,10 @@ describe('DeclarativeContextMenu', () => {
       if (req.kind !== 'codeBlock') return []
       return [
         {
-          id: 'codeBlock.copy',
-          label: 'Copy code',
-          group: 'clipboard',
+          // Extra id — must not collide with builtin codeBlock.copy
+          id: 'codeBlock.testExtra',
+          label: 'Test extra',
+          group: 'extensions',
           run,
         },
       ]
@@ -75,9 +76,13 @@ describe('DeclarativeContextMenu', () => {
     await waitFor(() => {
       expect(screen.getByTestId('context-menu-content')).toBeInTheDocument()
     })
-    expect(screen.getByTestId('context-menu-item-codeBlock.copy')).toHaveTextContent('Copy code')
+    // Builtin + extra both present
+    expect(screen.getByTestId('context-menu-item-codeBlock.copy')).toBeInTheDocument()
+    expect(screen.getByTestId('context-menu-item-codeBlock.testExtra')).toHaveTextContent(
+      'Test extra',
+    )
 
-    fireEvent.click(screen.getByTestId('context-menu-item-codeBlock.copy'))
+    fireEvent.click(screen.getByTestId('context-menu-item-codeBlock.testExtra'))
     expect(run).toHaveBeenCalled()
   })
 

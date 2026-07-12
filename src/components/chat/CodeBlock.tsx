@@ -1,6 +1,7 @@
 import { useState, type ComponentPropsWithoutRef, type ReactElement } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Check } from 'lucide-react'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { copyText } from '@/ipc/clipboard'
 
 /** Extract the raw code text from react-markdown's <pre> children (a <code> element). */
@@ -8,6 +9,14 @@ function codeTextOf(children: unknown): string {
   const el = children as ReactElement<{ children?: unknown }> | undefined
   const inner = el?.props?.children
   return (typeof inner === 'string' ? inner : '').replace(/\n$/, '')
+}
+
+/** Optional language class from the inner <code class="language-…">. */
+function languageOf(children: unknown): string | undefined {
+  const el = children as ReactElement<{ className?: string }> | undefined
+  const cls = el?.props?.className ?? ''
+  const m = /language-([\w+-]+)/.exec(cls)
+  return m?.[1]
 }
 
 /**
@@ -20,6 +29,7 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const code = codeTextOf(children)
+  const language = languageOf(children)
 
   const onCopy = async () => {
     if (code && (await copyText(code))) {
@@ -29,7 +39,12 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
   }
 
   return (
-    <div className="group/code relative">
+    <DeclarativeContextMenu
+      kind="codeBlock"
+      payload={{ code, language }}
+      className="group/code relative"
+      data-testid="code-block-context-menu"
+    >
       <pre {...props}>{children}</pre>
       <button
         onClick={onCopy}
@@ -40,6 +55,6 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
-    </div>
+    </DeclarativeContextMenu>
   )
 }

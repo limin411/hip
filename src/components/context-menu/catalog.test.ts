@@ -7,67 +7,48 @@ beforeEach(() => {
 })
 
 describe('listCatalogItems', () => {
-  it('returns empty when catalog is empty', () => {
-    expect(listCatalogItems()).toEqual([])
-    expect(listCatalogItems('message')).toEqual([])
+  it('includes static message + codeBlock meta from builtins', () => {
+    const ids = listCatalogItems().map((m) => m.id)
+    expect(ids).toContain('message.copy')
+    expect(ids).toContain('message.quote')
+    expect(ids).toContain('message.copyId')
+    expect(ids).toContain('message.regenerate')
+    expect(ids).toContain('session.copyDebugBundle')
+    expect(ids).toContain('codeBlock.copy')
+    expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
+    expect(listCatalogItems('message').every((m) => m.kind === 'message')).toBe(true)
   })
 
-  it('lists all and filters by kind', () => {
+  it('lists all and filters by kind (extras + static)', () => {
     const meta: ContextMenuItemMeta[] = [
       {
-        id: 'message.copy',
-        labelKey: 'contextMenu.message.copy',
-        kind: 'message',
-        group: 'clipboard',
-      },
-      {
-        id: 'codeBlock.copy',
-        labelKey: 'contextMenu.codeBlock.copy',
-        kind: 'codeBlock',
-        group: 'clipboard',
-      },
-      {
-        id: 'message.regenerate',
-        labelKey: 'contextMenu.message.regenerate',
-        kind: 'message',
-        group: 'primary',
+        id: 'plugin.extra',
+        labelKey: 'plugin.extra',
+        kind: 'plugin',
+        group: 'extensions',
       },
     ]
     registerCatalogMeta(meta)
-    expect(listCatalogItems().map((m) => m.id)).toEqual([
-      'message.copy',
-      'codeBlock.copy',
-      'message.regenerate',
-    ])
-    expect(listCatalogItems('message').map((m) => m.id)).toEqual([
-      'message.copy',
-      'message.regenerate',
-    ])
+    expect(listCatalogItems().map((m) => m.id)).toContain('plugin.extra')
+    expect(listCatalogItems('plugin').map((m) => m.id)).toEqual(['plugin.extra'])
     expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
   })
 
-  it('dedupes by id on register', () => {
+  it('dedupes by id on register (static wins)', () => {
     registerCatalogMeta([
       {
         id: 'message.copy',
-        labelKey: 'a',
+        labelKey: 'override-should-not-apply',
         kind: 'message',
         group: 'clipboard',
       },
     ])
-    registerCatalogMeta([
-      {
-        id: 'message.copy',
-        labelKey: 'b',
-        kind: 'message',
-        group: 'clipboard',
-      },
-    ])
-    expect(listCatalogItems()).toHaveLength(1)
-    expect(listCatalogItems()[0]?.labelKey).toBe('a')
+    const copy = listCatalogItems().find((m) => m.id === 'message.copy')
+    expect(copy?.labelKey).toBe('contextMenu.message.copy')
   })
 
   it('unregister removes registered meta', () => {
+    const before = listCatalogItems().length
     const unreg = registerCatalogMeta([
       {
         id: 'x',
@@ -76,9 +57,9 @@ describe('listCatalogItems', () => {
         group: 'extensions',
       },
     ])
-    expect(listCatalogItems()).toHaveLength(1)
+    expect(listCatalogItems()).toHaveLength(before + 1)
     unreg()
-    expect(listCatalogItems()).toHaveLength(0)
+    expect(listCatalogItems()).toHaveLength(before)
   })
 
   it('clearCatalogMeta only clears extras (static catalog is never wiped)', () => {
@@ -93,8 +74,8 @@ describe('listCatalogItems', () => {
     expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(true)
     clearCatalogMeta()
     expect(listCatalogItems().some((m) => m.id === 'extra.only')).toBe(false)
-    // Static list stays empty in PR-1; after surface PRs fill STATIC_CATALOG,
-    // clear must not empty it — structure guarantees extras-only clear.
-    expect(listCatalogItems()).toEqual([])
+    // Static message/code entries remain after clear.
+    expect(listCatalogItems().map((m) => m.id)).toContain('message.copy')
+    expect(listCatalogItems().map((m) => m.id)).toContain('codeBlock.copy')
   })
 })

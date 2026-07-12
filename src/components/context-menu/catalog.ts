@@ -4,9 +4,45 @@ import type { ContextKind, ContextMenuItemMeta } from './types'
  * Authoritative hand-maintained static meta for prefs / Settings UI.
  * Surface PRs (message, tabs, file tree, …) append entries here.
  * Never cleared by tests — only `extraMeta` is mutable for register/clear.
- * Empty in PR-1 foundation — no production items until providers land.
  */
-const STATIC_CATALOG: ContextMenuItemMeta[] = []
+const STATIC_CATALOG: ContextMenuItemMeta[] = [
+  {
+    id: 'message.copy',
+    labelKey: 'contextMenu.message.copy',
+    kind: 'message',
+    group: 'clipboard',
+  },
+  {
+    id: 'message.quote',
+    labelKey: 'contextMenu.message.quote',
+    kind: 'message',
+    group: 'edit',
+  },
+  {
+    id: 'message.copyId',
+    labelKey: 'contextMenu.message.copyId',
+    kind: 'message',
+    group: 'debug',
+  },
+  {
+    id: 'message.regenerate',
+    labelKey: 'contextMenu.message.regenerate',
+    kind: 'message',
+    group: 'primary',
+  },
+  {
+    id: 'session.copyDebugBundle',
+    labelKey: 'contextMenu.session.copyDebugBundle',
+    kind: 'message',
+    group: 'debug',
+  },
+  {
+    id: 'codeBlock.copy',
+    labelKey: 'contextMenu.codeBlock.copy',
+    kind: 'codeBlock',
+    group: 'clipboard',
+  },
+]
 
 /** Test / in-app extras only. Cleared by clearCatalogMeta. */
 const extraMeta: ContextMenuItemMeta[] = []

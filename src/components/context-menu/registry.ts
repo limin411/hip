@@ -7,13 +7,14 @@ import type {
   ContextRequest,
 } from './types'
 import { loadPrefs } from './prefs'
+import { codeBlockProvider } from './providers/codeBlock'
+import { messageProvider } from './providers/message'
 
 /**
  * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
  * Surface PRs import and append here (message, codeBlock, sessionTab, …).
- * PR-1 foundation: empty.
  */
-const BUILTIN_PROVIDERS: ContextProvider[] = []
+const BUILTIN_PROVIDERS: ContextProvider[] = [messageProvider, codeBlockProvider]
 
 const extraProviders: ContextProvider[] = []
 

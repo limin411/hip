@@ -777,6 +777,21 @@ export const zhCN = {
       logoutConfirmTitle: '退出登录？',
       logoutConfirmDesc: '退出后需要重新登录才能继续。',
     },
+    contextMenu: {
+      message: {
+        copy: '复制文本',
+        quote: '引用到输入框',
+        copyId: '复制消息 ID',
+        regenerate: '重新生成',
+        regenerateDisabled: '回合进行中时无法重新生成',
+      },
+      codeBlock: {
+        copy: '复制代码',
+      },
+      session: {
+        copyDebugBundle: '复制调试信息',
+      },
+    },
     commandPalette: {
       title: '命令面板',
       searchPlaceholder: '输入命令…  > 命令  # 会话  @ 技能',

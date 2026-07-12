@@ -96,25 +96,46 @@ describe('applyPrefs', () => {
 })
 
 describe('buildContextMenuItems', () => {
-  it('returns empty when no providers match', () => {
+  it('returns empty when no providers match the kind', () => {
     const out = buildContextMenuItems(
-      { kind: 'message', payload: { message: {} as never, isLastAssistant: false, sessionId: null } },
+      { kind: 'chatEmpty', payload: { sessionId: null } },
       makeCtx(),
       { version: 1, disabledIds: [] },
     )
     expect(out).toEqual([])
   })
 
+  it('includes builtin message provider items', () => {
+    const out = buildContextMenuItems(
+      {
+        kind: 'message',
+        payload: {
+          message: { id: 'm1', role: 'user', content: 'hi', timestamp: 1 } as never,
+          isLastAssistant: false,
+          sessionId: null,
+        },
+      },
+      makeCtx({ activeSessionId: null }),
+      { version: 1, disabledIds: [] },
+    )
+    expect(out.map((i) => i.id)).toEqual(
+      expect.arrayContaining(['message.copy', 'message.quote', 'message.copyId']),
+    )
+  })
+
+  it('includes builtin codeBlock provider items', () => {
+    const out = buildContextMenuItems(
+      { kind: 'codeBlock', payload: { code: 'x' } },
+      makeCtx(),
+      { version: 1, disabledIds: [] },
+    )
+    expect(out.map((i) => i.id)).toEqual(['codeBlock.copy'])
+  })
+
   it('merges extra providers and applies disabledIds', () => {
     const provider: ContextProvider = (req) => {
       if (req.kind !== 'codeBlock') return []
       return [
-        item({
-          id: 'codeBlock.copy',
-          group: 'clipboard',
-          label: 'Copy',
-          run: () => {},
-        }),
         item({
           id: 'codeBlock.copyFenced',
           group: 'clipboard',
@@ -160,7 +181,7 @@ describe('buildContextMenuItems', () => {
     ).toHaveLength(0)
   })
 
-  it('clearContextProviders clears extras only', () => {
+  it('clearContextProviders clears extras only (builtins remain)', () => {
     registerContextProvider(() => [item({ id: 'e', group: 'extensions' })])
     clearContextProviders()
     expect(
@@ -170,5 +191,13 @@ describe('buildContextMenuItems', () => {
         { version: 1, disabledIds: [] },
       ),
     ).toHaveLength(0)
+    // Builtin codeBlock still works after clear.
+    expect(
+      buildContextMenuItems(
+        { kind: 'codeBlock', payload: { code: 'x' } },
+        makeCtx(),
+        { version: 1, disabledIds: [] },
+      ).map((i) => i.id),
+    ).toEqual(['codeBlock.copy'])
   })
 })

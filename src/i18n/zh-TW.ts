@@ -777,6 +777,21 @@ export const zhTW = {
       logoutConfirmTitle: '登出？',
       logoutConfirmDesc: '登出後需要重新登入才能繼續。',
     },
+    contextMenu: {
+      message: {
+        copy: '複製文字',
+        quote: '引用到輸入框',
+        copyId: '複製訊息 ID',
+        regenerate: '重新生成',
+        regenerateDisabled: '回合進行中時無法重新生成',
+      },
+      codeBlock: {
+        copy: '複製程式碼',
+      },
+      session: {
+        copyDebugBundle: '複製偵錯資訊',
+      },
+    },
     commandPalette: {
       title: '命令面板',
       searchPlaceholder: '輸入命令…  > 指令  # 對話  @ 技能',

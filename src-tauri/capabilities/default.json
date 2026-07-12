@@ -19,6 +19,8 @@
     "shell:allow-open",
     "core:window:default",
     "core:window:allow-start-dragging",
+    "core:window:allow-set-background-color",
+    "core:webview:allow-set-webview-background-color",
     "dialog:allow-open"
   ]
 }

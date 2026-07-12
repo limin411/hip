@@ -18,12 +18,16 @@ export function LoginScreen() {
 
   return (
     // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
-    <div data-tauri-drag-region onPointerDown={handlePointerDown} className="flex h-screen">
-      {/* 左侧品牌宣传区 —— 深灰底 + 文案，无吉祥物 */}
+    <div
+      data-tauri-drag-region
+      onPointerDown={handlePointerDown}
+      className="fixed inset-0 flex overflow-hidden bg-surface"
+    >
+      {/* 左侧品牌宣传区 —— 白底 + 文案 */}
       <LoginBrandPanel />
 
       {/* 右侧登录方式 */}
-      <div className="flex w-full items-center justify-center bg-surface px-8 md:w-2/5">
+      <div className="flex h-full min-h-0 w-full items-center justify-center self-stretch bg-surface px-8 md:w-2/5">
         <div className="w-full max-w-sm" data-tauri-drag-region="false" data-no-drag>
           <h1 className="text-display font-bold tracking-tight text-ink">{t('login.title')}</h1>
           <p className="mt-1.5 text-meta text-ink-secondary">{t('login.subtitle')}</p>

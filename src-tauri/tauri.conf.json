@@ -20,6 +20,7 @@
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
+        "backgroundColor": "#ffffff",
         "trafficLightPosition": {
           "x": 19,
           "y": 23

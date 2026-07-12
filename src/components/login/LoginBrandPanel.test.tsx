@@ -39,6 +39,9 @@ describe('LoginBrandPanel', () => {
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
     expect(container.querySelector('img')).toBeNull()
     expect(container.querySelector('[data-mascot-action]')).toBeNull()
+    expect(container.querySelectorAll('[data-dust]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-parallax]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-feature-index]').length).toBe(3)
 
     await waitFor(() => {
       const items = container.querySelectorAll('[data-brand-item]')
@@ -46,3 +49,4 @@ describe('LoginBrandPanel', () => {
     })
   })
 })
+

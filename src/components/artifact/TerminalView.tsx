@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { AlertCircle, Folder, Loader2, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Terminal as XTerm } from '@xterm/xterm'
@@ -10,7 +10,12 @@ import { attachDrainWrites, ringIndexForCursor, useTerminalStore } from '@/store
 import { useUiStore } from '@/store/uiStore'
 import { buildXtermTheme, isDarkDom } from './terminalTheme'
 import { bindTerminalRestarter } from './terminalRestartUi'
-import { DeclarativeContextMenu } from '@/components/context-menu'
+import { bindTerminalCanvas } from './terminalCanvasUi'
+import {
+  CONTEXT_MENUS,
+  ControlledContextMenu,
+  DeclarativeContextMenu,
+} from '@/components/context-menu'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -41,6 +46,12 @@ export function TerminalView() {
   const [bootKey, setBootKey] = useState(0)
   const [starting, setStarting] = useState(false)
   const [loadingXterm, setLoadingXterm] = useState(false)
+  /** Point-anchored canvas context menu (ControlledContextMenu). */
+  const [canvasMenu, setCanvasMenu] = useState<{
+    open: boolean
+    x: number
+    y: number
+  }>({ open: false, x: 0, y: 0 })
 
   const chooseFolder = useCallback(async () => {
     if (!sessionId) return
@@ -60,7 +71,7 @@ export function TerminalView() {
     setBootKey((k) => k + 1)
   }, [sessionId])
 
-  // Context-menu Restart reuses the same handler as the chrome button (not xterm canvas).
+  // Context-menu Restart reuses the same handler as the chrome button (chrome + canvas).
   useEffect(() => {
     if (!sessionId) {
       bindTerminalRestarter(null)
@@ -72,6 +83,13 @@ export function TerminalView() {
     })
     return () => bindTerminalRestarter(null)
   }, [sessionId, restart])
+
+  const onCanvasContextMenu = useCallback((e: MouseEvent) => {
+    if (!CONTEXT_MENUS) return
+    e.preventDefault()
+    e.stopPropagation()
+    setCanvasMenu({ open: true, x: e.clientX, y: e.clientY })
+  }, [])
 
   // Boot xterm + PTY when session+cwd ready (lazy import modules).
   useEffect(() => {
@@ -119,6 +137,21 @@ export function TerminalView() {
       el.style.padding = '4px 6px'
       termRef.current = term
       fitRef.current = fit
+
+      // Canvas menu bridge: copy selection / paste into live xterm.
+      bindTerminalCanvas({
+        getSelection: () => term?.getSelection() ?? '',
+        hasSelection: () => term?.hasSelection() ?? false,
+        paste: (text) => {
+          if (!term || !text) return
+          // xterm.paste respects bracketed paste when the shell supports it.
+          if (typeof term.paste === 'function') {
+            term.paste(text)
+          } else {
+            void ptyWrite(sessionId, text).catch(() => {})
+          }
+        },
+      })
 
       const applyTheme = () => {
         if (term) term.options.theme = buildXtermTheme(isDarkDom())
@@ -235,6 +268,7 @@ export function TerminalView() {
       disposed = true
       setStarting(false)
       setLoadingXterm(false)
+      bindTerminalCanvas(null)
       if (resizeTimer) clearTimeout(resizeTimer)
       unsubStore?.()
       dataDisp?.dispose()
@@ -381,7 +415,19 @@ export function TerminalView() {
         data-testid="terminal-xterm"
         data-no-drag
         data-tauri-drag-region="false"
+        data-context-menu-kind="terminal"
+        onContextMenu={onCanvasContextMenu}
       />
+
+      {CONTEXT_MENUS ? (
+        <ControlledContextMenu
+          kind="terminal"
+          payload={{ sessionId, status, target: 'canvas' }}
+          open={canvasMenu.open}
+          onOpenChange={(open) => setCanvasMenu((m) => ({ ...m, open }))}
+          point={canvasMenu.open ? { x: canvasMenu.x, y: canvasMenu.y } : null}
+        />
+      ) : null}
     </div>
   )
 }

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { bindTerminalRestarter } from '@/components/artifact/terminalRestartUi'
+import {
+  bindTerminalCanvas,
+} from '@/components/artifact/terminalCanvasUi'
 import { useDomainStore } from '@/domain/sessionStore'
 import { terminalProvider } from './terminal'
 import type { ContextMenuBuildContext } from '../types'
@@ -7,9 +10,14 @@ import type { ContextMenuBuildContext } from '../types'
 const copyText = vi.fn(async () => true)
 const setProjectDir = vi.fn()
 const pickDirectory = vi.fn()
+const readText = vi.fn(async () => 'pasted')
 
 vi.mock('@/ipc/dialog', () => ({
   pickDirectory: (...a: unknown[]) => pickDirectory(...a),
+}))
+
+vi.mock('@/ipc/clipboard', () => ({
+  readText: () => readText(),
 }))
 
 vi.mock('@/domain/sessionService', () => ({
@@ -36,7 +44,9 @@ beforeEach(() => {
   copyText.mockClear()
   setProjectDir.mockClear()
   pickDirectory.mockReset()
+  readText.mockReset().mockResolvedValue('pasted')
   bindTerminalRestarter(null)
+  bindTerminalCanvas(null)
   useDomainStore.setState({
     sessions: [
       {
@@ -51,7 +61,7 @@ beforeEach(() => {
 })
 
 describe('terminalProvider', () => {
-  it('includes restart, changeFolder, copyCwd, openFiles', async () => {
+  it('includes restart, changeFolder, copyCwd, openFiles for chrome (default)', async () => {
     const restart = vi.fn()
     bindTerminalRestarter(restart)
     const items = terminalProvider(
@@ -89,5 +99,52 @@ describe('terminalProvider', () => {
       makeCtx(),
     )
     expect(items.map((i) => i.id)).not.toContain('terminal.copyCwd')
+  })
+
+  it('canvas target: copy selection, paste, restart', async () => {
+    const restart = vi.fn()
+    const paste = vi.fn()
+    bindTerminalRestarter(restart)
+    bindTerminalCanvas({
+      getSelection: () => 'hello sel',
+      hasSelection: () => true,
+      paste,
+    })
+
+    const items = terminalProvider(
+      { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
+      makeCtx(),
+    )
+    expect(items.map((i) => i.id)).toEqual([
+      'terminal.copySelection',
+      'terminal.paste',
+      'terminal.restart',
+    ])
+    expect(items.find((i) => i.id === 'terminal.copySelection')!.disabled).toBe(false)
+
+    await items.find((i) => i.id === 'terminal.copySelection')!.run()
+    expect(copyText).toHaveBeenCalledWith('hello sel')
+
+    await items.find((i) => i.id === 'terminal.paste')!.run()
+    expect(readText).toHaveBeenCalled()
+    expect(paste).toHaveBeenCalledWith('pasted')
+
+    await items.find((i) => i.id === 'terminal.restart')!.run()
+    expect(restart).toHaveBeenCalledWith('s1')
+  })
+
+  it('canvas copy is disabled when there is no selection', () => {
+    bindTerminalCanvas({
+      getSelection: () => '',
+      hasSelection: () => false,
+      paste: () => {},
+    })
+    const items = terminalProvider(
+      { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
+      makeCtx(),
+    )
+    const copy = items.find((i) => i.id === 'terminal.copySelection')!
+    expect(copy.disabled).toBe(true)
+    expect(copy.disabledReason).toBe('contextMenu.terminal.copySelectionDisabled')
   })
 })

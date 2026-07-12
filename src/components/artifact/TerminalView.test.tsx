@@ -25,6 +25,7 @@ vi.mock('lucide-react', () => ({
 
 // Pass-through host so surface tests do not pull full context-menu + lucide icon map.
 vi.mock('@/components/context-menu', () => ({
+  CONTEXT_MENUS: true,
   DeclarativeContextMenu: ({
     children,
     className,
@@ -34,6 +35,20 @@ vi.mock('@/components/context-menu', () => ({
     className?: string
     'data-testid'?: string
   }) => React.createElement('div', { className, 'data-testid': testId }, children),
+  ControlledContextMenu: ({
+    open,
+    point,
+  }: {
+    open: boolean
+    point: { x: number; y: number } | null
+  }) =>
+    open
+      ? React.createElement('div', {
+          'data-testid': 'controlled-context-menu-stub',
+          'data-x': point?.x,
+          'data-y': point?.y,
+        })
+      : null,
 }))
 
 vi.mock('@/ipc/dialog', () => ({
@@ -72,6 +87,9 @@ vi.mock('@xterm/xterm', () => {
     dispose = vi.fn()
     loadAddon = vi.fn()
     focus = vi.fn()
+    getSelection = vi.fn(() => '')
+    hasSelection = vi.fn(() => false)
+    paste = vi.fn()
     onData = vi.fn(() => ({ dispose: vi.fn() }))
   }
   return { Terminal }
@@ -175,5 +193,16 @@ describe('TerminalView', () => {
       expect(ring).not.toContain('old')
       expect(ptyOpen).toHaveBeenCalled()
     })
+  })
+
+  it('right-click on xterm canvas opens controlled menu at pointer', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    render(<TerminalView />)
+    await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
+    const host = screen.getByTestId('terminal-xterm')
+    fireEvent.contextMenu(host, { clientX: 42, clientY: 77 })
+    const menu = await screen.findByTestId('controlled-context-menu-stub')
+    expect(menu).toHaveAttribute('data-x', '42')
+    expect(menu).toHaveAttribute('data-y', '77')
   })
 })

@@ -30,3 +30,18 @@ export async function copyText(text: string): Promise<boolean> {
     return false
   }
 }
+
+/**
+ * Read text from the system clipboard (async Clipboard API only).
+ * Returns null when unavailable or permission is denied (common outside a user gesture).
+ */
+export async function readText(): Promise<string | null> {
+  try {
+    if (navigator.clipboard?.readText) {
+      return await navigator.clipboard.readText()
+    }
+  } catch {
+    // permission denied or non-secure context
+  }
+  return null
+}

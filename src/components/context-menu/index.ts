@@ -2,6 +2,8 @@ export { CONTEXT_MENUS } from './feature'
 export { ContextMenuSettings } from './ContextMenuSettings'
 export { DeclarativeContextMenu } from './DeclarativeContextMenu'
 export type { DeclarativeContextMenuProps } from './DeclarativeContextMenu'
+export { ControlledContextMenu } from './ControlledContextMenu'
+export type { ControlledContextMenuProps } from './ControlledContextMenu'
 export {
   registerContextProvider,
   buildContextMenuItems,

@@ -1,20 +1,77 @@
 import { pickDirectory } from '@/ipc/dialog'
+import { readText } from '@/ipc/clipboard'
 import { requestTerminalRestart } from '@/components/artifact/terminalRestartUi'
+import {
+  getTerminalCanvasSelection,
+  pasteToTerminalCanvas,
+  terminalCanvasHasSelection,
+} from '@/components/artifact/terminalCanvasUi'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useUiStore } from '@/store/uiStore'
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
 /**
- * TerminalView chrome only (not xterm canvas — PR-9).
- * Restart PTY, change folder, copy cwd, open Files tab.
- * Restart reuses TerminalView's existing restart handler via terminalRestartUi bridge.
+ * Terminal chrome (default) and xterm canvas (`target: 'canvas'`).
+ * - Chrome: restart, change folder, copy cwd, open Files tab.
+ * - Canvas: copy selection, paste, restart (via bridges into TerminalView).
  */
 export const terminalProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'terminal') return []
-  const { sessionId } = req.payload
+  const { sessionId, target = 'chrome' } = req.payload
   if (!sessionId) return []
 
+  if (target === 'canvas') {
+    return canvasItems(sessionId, ctx)
+  }
+  return chromeItems(sessionId, ctx)
+}
+
+function canvasItems(
+  sessionId: string,
+  ctx: Parameters<ContextProvider>[1],
+): ContextMenuItemDef[] {
+  const hasSel = terminalCanvasHasSelection()
+  return [
+    {
+      id: 'terminal.copySelection',
+      label: ctx.t('contextMenu.terminal.copySelection'),
+      group: 'clipboard',
+      disabled: !hasSel,
+      disabledReason: hasSel ? undefined : ctx.t('contextMenu.terminal.copySelectionDisabled'),
+      run: () => {
+        const text = getTerminalCanvasSelection()
+        if (!text) return
+        void ctx.copyText(text)
+      },
+    },
+    {
+      id: 'terminal.paste',
+      label: ctx.t('contextMenu.terminal.paste'),
+      group: 'clipboard',
+      run: async () => {
+        const text = await readText()
+        if (text == null || text === '') return
+        pasteToTerminalCanvas(text)
+      },
+    },
+    {
+      id: 'terminal.restart',
+      label: ctx.t('contextMenu.terminal.restart'),
+      group: 'primary',
+      icon: 'history',
+      separatorBefore: true,
+      run: async () => {
+        await requestTerminalRestart(sessionId)
+      },
+    },
+  ]
+}
+
+function chromeItems(
+  sessionId: string,
+  ctx: Parameters<ContextProvider>[1],
+): ContextMenuItemDef[] {
   const domainSession = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
   const cwd = domainSession?.config.cwd?.trim() || undefined
 

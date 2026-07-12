@@ -66,7 +66,16 @@ export type ContextPayloadMap = {
   diffHunk: { path: string; header?: string; text: string }
   checkpoint: { checkpointId: string; sessionId: string }
   commit: { sha: string; shortSha: string; message: string; sessionId: string }
-  terminal: { sessionId: string; status: string }
+  /**
+   * Terminal chrome (`target: 'chrome'`, default) or xterm canvas (`target: 'canvas'`).
+   * Canvas menus use ControlledContextMenu; selection/paste via terminalCanvasUi bridge.
+   */
+  terminal: {
+    sessionId: string
+    status: string
+    /** Default `'chrome'`. Canvas adds copy selection / paste. */
+    target?: 'chrome' | 'canvas'
+  }
   agentConfig: { agentId: string }
   skillConfig: { skillId: string; name: string }
   mcpServer: { serverId: string }

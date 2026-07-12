@@ -347,21 +347,6 @@ export const en = {
         dark: 'Dark',
         system: 'System',
       },
-      contextMenu: {
-        title: 'Context menus',
-        description: 'Choose which right-click actions appear and in what order.',
-        reset: 'Reset to defaults',
-        showItem: 'Show {{label}}',
-        moveUp: 'Move {{label}} up',
-        moveDown: 'Move {{label}} down',
-        kinds: {
-          message: 'Messages',
-          codeBlock: 'Code blocks',
-          sessionTab: 'Session tabs',
-          sessionHistory: 'History',
-          fileEntry: 'File tree',
-        },
-      },
       apiKey: 'DeepSeek API Key',
       apiKeyDesc: 'Stored locally on this device. Used by the agent runtime.',
       apiKeyConfigured: 'Configured',
@@ -789,6 +774,37 @@ export const en = {
       newChat: 'New Work Chat',
       newCode: 'New Coding Task',
     },
+    contextMenu: {
+      diffFile: {
+        copyPath: 'Copy path',
+        copyAbsolutePath: 'Copy absolute path',
+        openInFiles: 'Open in Files',
+        collapse: 'Collapse file',
+        expand: 'Expand file',
+        showFull: 'Show full context',
+        collapseFull: 'Collapse full context',
+      },
+      diffHunk: {
+        copy: 'Copy hunk',
+      },
+      checkpoint: {
+        copyId: 'Copy checkpoint ID',
+        revert: 'Revert…',
+      },
+      commit: {
+        copySha: 'Copy commit SHA',
+        copyMessage: 'Copy commit message',
+      },
+      terminal: {
+        restart: 'Restart terminal',
+        changeFolder: 'Change folder…',
+        copyCwd: 'Copy working directory',
+        openFiles: 'Open Files tab',
+        copySelection: 'Copy',
+        copySelectionDisabled: 'No text selected',
+        paste: 'Paste',
+      },
+    },
     common: {
       clear: 'Clear',
       cancel: 'Cancel',
@@ -797,57 +813,6 @@ export const en = {
       logout: 'Log Out',
       logoutConfirmTitle: 'Log out?',
       logoutConfirmDesc: 'You will need to log in again to continue.',
-    },
-    contextMenu: {
-      message: {
-        copy: 'Copy text',
-        quote: 'Quote in composer',
-        quoteNoComposer:
-          'Open a conversation first to quote into the composer.',
-        copyId: 'Copy message ID',
-        regenerate: 'Regenerate',
-        regenerateDisabled: 'Cannot regenerate while a turn is running',
-      },
-      codeBlock: {
-        copy: 'Copy code',
-      },
-      session: {
-        copyDebugBundle: 'Copy debug info',
-      },
-      copyFailed: 'Could not copy to clipboard',
-      sessionTab: {
-        rename: 'Rename…',
-        copyId: 'Copy session ID',
-        revealInHistory: 'Open in History',
-        deleteOthers: 'Delete others…',
-        deleteToRight: 'Delete to the right…',
-        deleteAllOpen: 'Delete all open…',
-      },
-      sessionHistory: {
-        open: 'Open',
-        rename: 'Rename…',
-      },
-      renameSession: {
-        title: 'Rename conversation',
-        description: 'Enter a new title for this conversation',
-        label: 'Title',
-        save: 'Save',
-      },
-      confirmDeleteSessions: {
-        title: 'Permanently delete {{count}} conversation(s)?',
-        body: 'This will permanently delete {{count}} open conversation(s). This action cannot be undone.',
-        action: 'Delete permanently',
-      },
-      file: {
-        open: 'Open',
-        copyPath: 'Copy path',
-        copyRelativePath: 'Copy relative path',
-        copyName: 'Copy name',
-        openContainingFolder: 'Open containing folder',
-        refresh: 'Refresh',
-        pathOutsideCwd: 'Path is outside the project folder',
-        openContainingFolderFailed: 'Could not open folder',
-      },
     },
     commandPalette: {
       title: 'Command palette',

@@ -45,13 +45,15 @@ export async function reopenChangesTab(): Promise<void> {
 }
 
 /**
- * Bind a Code new-conversation draft to `dir`, wait for a tree entry, send first message.
+ * Bind a Code new-conversation draft to `dir`, send first message to commit the session.
+ * Product: FolderPill only sets draft cwd (folder-chip); FileTree lives in ArtifactPanel
+ * after a session exists and the Files panel is open — do not wait for tree-entry here.
  * Prefer createCodeSessionForE2e when no user message is required (avoids LLM).
  */
-export async function commitCodeSessionWithDir(dir: string, message: string, treeHint = '/hello.txt'): Promise<void> {
+export async function commitCodeSessionWithDir(dir: string, message: string, _treeHint = '/hello.txt'): Promise<void> {
   await codePage.newConversation.waitForExist({ timeout: 120000 })
   await codePage.pickDirectory(dir)
-  await (await codePage.entry(treeHint)).waitForExist({ timeout: 60000 })
+  await codePage.folderChip.waitForExist({ timeout: 30000 })
   const ta = await browser.$('[data-testid="new-conversation"] textarea')
   await ta.click()
   await browser.keys(message)

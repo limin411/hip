@@ -65,12 +65,19 @@ describe('harness complex agent loop @harness @core', () => {
       output: 'e2e tool ok',
     })
 
+    // ToolCallRow mounts inside expanded ActivityBar (collapsed by default).
+    const activityBarStep1 = await browser.$('[data-testid="activity-bar"]')
+    await activityBarStep1.waitForExist({ timeout: 15000 })
+    const expandStep1 = await activityBarStep1.$('button')
+    await expandStep1.waitForExist({ timeout: 5000 })
+    await browser.execute((el: HTMLElement) => el.click(), expandStep1)
+
     await browser.waitUntil(
       async () => (await (await browser.$$('[data-testid="tool-row"]')).length) >= 1,
       {
         timeout: 15000,
         interval: 300,
-        timeoutMsg: 'expected tool-row after tool:finished',
+        timeoutMsg: 'expected tool-row after tool:finished + activity-bar expand',
       },
     )
 

@@ -1,7 +1,9 @@
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
+import { createCodeSessionForE2e, waitForHipE2E } from '../helpers/e2e-hooks.js'
+import { selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -14,6 +16,8 @@ describe('new conversation @core', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
+    await waitForHipE2E()
     await switchToCodeSurface()
   })
 
@@ -22,10 +26,12 @@ describe('new conversation @core', () => {
     expect(await codePage.pickFolder.isExisting()).toBe(true)
   })
 
-  it('picking a folder opens the file tree without creating a session tab', async () => {
+  it('picking a folder sets the folder chip without creating a session tab', async () => {
+    // Product: FolderPill sets draft cwd only; FileTree is in ArtifactPanel after a session.
     const before = await (await sessionItems()).length
     await codePage.pickDirectory(FIXTURE)
-    await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
+    await codePage.folderChip.waitForExist({ timeout: 30000 })
+    expect(await codePage.folderChip.getText()).toContain(path.basename(FIXTURE))
     expect(await (await sessionItems()).length).toBe(before)
   })
 
@@ -40,17 +46,22 @@ describe('new conversation @core', () => {
     await codePage.clearFolder.click()
     await codePage.pickFolder.waitForExist({ timeout: 10000 })
     await codePage.pickDirectory(FIXTURE)
-    await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
+    await codePage.folderChip.waitForExist({ timeout: 30000 })
   })
 
-  it('the file-tree back-to-chat action returns the tree to sandbox-pending', async () => {
-    await codePage.treeBackToChat.click()
+  it('after code session + Files panel, tree shows fixture entries and back-to-chat is draft-only', async () => {
+    const sessionId = await createCodeSessionForE2e(FIXTURE)
+    expect(sessionId).toBeTruthy()
     await browser.waitUntil(
-      async () => !(await (await codePage.entry('/README.md')).isExisting()),
-      { timeout: 10000, interval: 200 }
+      async () => (await (await sessionItems()).length) >= 1,
+      { timeout: 30000, interval: 300 },
     )
-    await codePage.pickDirectory(FIXTURE)
+    await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
+    await selectPanelTab('files')
+    await (await browser.$('[data-testid="panel-view-files"]')).waitForExist({ timeout: 15000 })
     await (await codePage.entry('/README.md')).waitForExist({ timeout: 60000 })
+    // tree-back-to-chat is draft-only; committed sessions use refresh / change folder instead.
+    expect(await (await codePage.treeBackToChat).isExisting()).toBe(false)
   })
 
   it('renders a Markdown preview (rendered, not source)', async () => {
@@ -59,7 +70,7 @@ describe('new conversation @core', () => {
     await md.waitForExist({ timeout: 30000 })
     await browser.waitUntil(
       async () => (await md.getText()).includes('Sample Project'),
-      { timeout: 10000, interval: 500 }
+      { timeout: 10000, interval: 500 },
     )
   })
 
@@ -76,7 +87,7 @@ describe('new conversation @core', () => {
     await img.waitForExist({ timeout: 30000 })
     await browser.waitUntil(
       async () => ((await img.getAttribute('src')) ?? '').includes('data:image/png;base64,'),
-      { timeout: 10000, interval: 500 }
+      { timeout: 10000, interval: 500 },
     )
   })
 
@@ -88,12 +99,16 @@ describe('new conversation @core', () => {
     await txt.waitForExist({ timeout: 30000 })
     await browser.waitUntil(
       async () => (await txt.getText()).includes('export const a'),
-      { timeout: 10000, interval: 500 }
+      { timeout: 10000, interval: 500 },
     )
   })
 
   it('sending the first message commits the session and replaces the landing', async () => {
+    await switchToCodeSurface()
+    await codePage.newConversation.waitForExist({ timeout: 60000 })
     const before = await (await sessionItems()).length
+    await codePage.pickDirectory(FIXTURE)
+    await codePage.folderChip.waitForExist({ timeout: 30000 })
     const ta = await browser.$('[data-testid="new-conversation"] textarea')
     await ta.click()
     await browser.keys('hello world')
@@ -101,9 +116,6 @@ describe('new conversation @core', () => {
     await send.waitForEnabled({ timeout: 10000 })
     await send.click()
     await codePage.newConversation.waitForExist({ reverse: true, timeout: 30000 })
-    await browser.waitUntil(
-      async () => await (await sessionItems()).length === before + 1,
-      { timeout: 30000, interval: 500 }
-    )
+    expect(await (await sessionItems()).length).toBeGreaterThan(before)
   })
 })

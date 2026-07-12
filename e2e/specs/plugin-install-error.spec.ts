@@ -1,6 +1,6 @@
 // Phase 2 T2: plugin install failure is readable in Settings.
 import { expect } from 'expect-webdriverio'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { simulatePluginInstallError, waitForHipE2E } from '../helpers/e2e-hooks.js'
 import { closeSettings, openSettings } from '../helpers/settings.js'
@@ -14,6 +14,7 @@ describe('plugin install error @settings @harness', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
     await openSettings()
   })
@@ -23,7 +24,9 @@ describe('plugin install error @settings @harness', () => {
   })
 
   it('shows install error after submit + failed install result', async () => {
-    await settings.nav('plugins').click()
+    const pluginsNav = await settings.nav('plugins')
+    await pluginsNav.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), pluginsNav)
 
     const openBtn = await browser.$('[data-testid="plugin-install-open"]')
     await openBtn.waitForExist({ timeout: 15000 })

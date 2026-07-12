@@ -1,6 +1,6 @@
 // Memory slash commands (unpaid).
 import { expect } from 'expect-webdriverio'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   createChatSessionForE2e,
@@ -38,6 +38,7 @@ describe('memory slash commands @memory', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
     await switchToChatSurface()
   })

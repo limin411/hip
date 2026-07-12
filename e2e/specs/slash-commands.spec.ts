@@ -44,7 +44,9 @@ describe('slash commands @core', () => {
     await expect(chat.slashPalette).toBeDisplayed()
     await expect(chat.slashCmd('help')).toBeDisplayed()
     await expect(chat.slashCmd('clear')).toBeDisplayed()
-    await expect(chat.slashCmd('config')).toBeDisplayed()
+    // /config was removed in favor of global command palette Settings.
+    await expect(chat.slashCmd('config')).not.toBeExisting()
+    await expect(chat.slashCmd('memory')).toBeDisplayed()
   })
 
   it('filters the palette while typing', async () => {

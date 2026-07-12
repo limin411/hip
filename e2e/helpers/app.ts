@@ -24,3 +24,28 @@ export async function waitForMainApp(timeoutMs = 60000): Promise<void> {
   // Wait for main chrome.
   await (await browser.$('[data-testid="titlebar"]')).waitForExist({ timeout: 30000 })
 }
+
+/**
+ * Leave Settings / History special views so later specs see main shell chrome
+ * (new-session, surface switch, composer). Shared Tauri process retains activeView.
+ */
+export async function leaveSpecialViewsIfOpen(): Promise<void> {
+  for (let i = 0; i < 3; i++) {
+    const back = await browser.$('[data-testid="titlebar-back"]')
+    const settingsBack = await browser.$('[data-testid="settings-back"]')
+    const btn = (await back.isExisting()) ? back : (await settingsBack.isExisting()) ? settingsBack : null
+    if (!btn) break
+    await browser.execute((el: HTMLElement) => el.click(), btn)
+    await browser.pause(200)
+  }
+  await browser.waitUntil(
+    async () => {
+      const back = await browser.$('[data-testid="titlebar-back"]')
+      const settingsBack = await browser.$('[data-testid="settings-back"]')
+      return !(await back.isExisting()) && !(await settingsBack.isExisting())
+    },
+    { timeout: 10000, interval: 200, timeoutMsg: 'still on settings/history after leaveSpecialViewsIfOpen' },
+  ).catch(() => {
+    // Best-effort: some residual dialogs may keep a back affordance.
+  })
+}

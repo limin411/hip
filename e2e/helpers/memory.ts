@@ -28,10 +28,14 @@ type MemoryFlags = {
 
 /** Open Settings and select the Memory nav item. */
 export async function openMemorySettings(): Promise<void> {
-  await openSettings()
+  // Already on settings? skip account-menu open.
+  const memoryNavExisting = await browser.$('[data-testid="settings-nav-memory"]')
+  if (!(await memoryNavExisting.isExisting())) {
+    await openSettings()
+  }
   const nav = await browser.$('[data-testid="settings-nav-memory"]')
-  await nav.waitForClickable({ timeout: 10000 })
-  await nav.click()
+  await nav.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), nav)
   await browser.waitUntil(
     async () => {
       const empty = await browser.$('[data-testid="memory-config-empty"]')

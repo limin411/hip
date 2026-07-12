@@ -3,7 +3,7 @@ import { expect } from 'expect-webdriverio'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   commitCodeSessionWithDir,
@@ -11,6 +11,7 @@ import {
   initGitAndOpenChanges,
   reopenChangesTab,
 } from '../helpers/git-workspace.js'
+import { selectPanelTab } from '../helpers/panel.js'
 import { switchToCodeSurface } from '../helpers/surface.js'
 import { CodePage } from '../page-objects/CodePage.js'
 
@@ -24,6 +25,7 @@ describe('workspace git diff @core', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-e2e-diff-'))
     fs.writeFileSync(path.join(dir, 'hello.txt'), 'hello\n')
     await switchToCodeSurface()
@@ -35,6 +37,9 @@ describe('workspace git diff @core', () => {
 
   it('commits a session bound to the temp folder', async () => {
     await commitCodeSessionWithDir(dir, 'diff e2e', '/hello.txt')
+    await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
+    await selectPanelTab('files')
+    await (await browser.$('[data-testid="panel-view-files"]')).waitForExist({ timeout: 15000 })
   })
 
   it('shows the not-a-repo state with an init button on the Files tab', async () => {

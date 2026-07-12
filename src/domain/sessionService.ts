@@ -382,17 +382,22 @@ export class SessionService {
 
   /** E2E: create a chat session without sending a user message (no LLM turn). */
   createChatSessionForE2e(): string {
-    return this.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    const id = this.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    // selectSession sets activeView to chat so ChatPane is the visible shell.
+    this.selectSession(id)
+    return id
   }
 
   /** E2E: create a code session bound to cwd without an LLM turn. */
   createCodeSessionForE2e(cwd: string): string {
-    return this.createSession({
+    const id = this.createSession({
       ...DEFAULT_CONFIG,
       surface: 'code',
       cwd,
       permissionMode: 'edit',
     })
+    this.selectSession(id)
+    return id
   }
 
   /**

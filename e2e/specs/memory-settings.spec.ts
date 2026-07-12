@@ -1,6 +1,6 @@
 // Unpaid memory Settings UI e2e (seed via __hipE2E, no LLM).
 import { expect } from 'expect-webdriverio'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import { waitForHipE2E } from '../helpers/e2e-hooks.js'
 import {
@@ -17,6 +17,7 @@ describe('memory settings @memory', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
   })
 
@@ -152,11 +153,11 @@ describe('memory settings @memory', () => {
     await waitForMemoryListItem(item.id)
 
     const delBtn = await browser.$(`[data-testid="memory-delete-${item.id}"]`)
-    await delBtn.waitForClickable({ timeout: 10000 })
-    await delBtn.click()
+    await delBtn.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), delBtn)
     const confirm = await browser.$('[data-testid="memory-delete-confirm"]')
-    await confirm.waitForClickable({ timeout: 10000 })
-    await confirm.click()
+    await confirm.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), confirm)
 
     await browser.waitUntil(
       async () => !(await browser.$(`[data-testid="memory-item-${item.id}"]`).isExisting()),

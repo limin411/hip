@@ -87,18 +87,7 @@ describe('DeclarativeContextMenu', () => {
   })
 
   it('opens via keyboard context menu event (Shift+F10 / contextmenu key smoke)', async () => {
-    registerContextProvider((req) => {
-      if (req.kind !== 'fileEntry') return []
-      return [
-        {
-          id: 'file.copyName',
-          label: 'Copy name',
-          group: 'clipboard',
-          run: () => {},
-        },
-      ]
-    })
-
+    // Builtin fileEntry provider supplies items (PR-4).
     render(
       <DeclarativeContextMenu
         kind="fileEntry"

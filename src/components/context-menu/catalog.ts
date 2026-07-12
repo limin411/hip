@@ -107,6 +107,42 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'danger',
     danger: true,
   },
+  {
+    id: 'file.open',
+    labelKey: 'contextMenu.file.open',
+    kind: 'fileEntry',
+    group: 'primary',
+  },
+  {
+    id: 'file.copyPath',
+    labelKey: 'contextMenu.file.copyPath',
+    kind: 'fileEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'file.copyRelativePath',
+    labelKey: 'contextMenu.file.copyRelativePath',
+    kind: 'fileEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'file.copyName',
+    labelKey: 'contextMenu.file.copyName',
+    kind: 'fileEntry',
+    group: 'clipboard',
+  },
+  {
+    id: 'file.openContainingFolder',
+    labelKey: 'contextMenu.file.openContainingFolder',
+    kind: 'fileEntry',
+    group: 'navigation',
+  },
+  {
+    id: 'file.refresh',
+    labelKey: 'contextMenu.file.refresh',
+    kind: 'fileEntry',
+    group: 'workspace',
+  },
 ]
 
 /** Test / in-app extras only. Cleared by clearCatalogMeta. */

@@ -756,20 +756,21 @@ export const en = {
       },
       hooks: {
         title: 'Hooks',
-        intro: 'See which lifecycle hooks are configured and which events you can attach. This page is read-only — edit local config files to change hooks.',
-        introShort: 'Read-only overview. Hooks apply to the main loop, task subagents, and workflow agent nodes (not gates or external ACP). Click a node for sources; edit plugin hook files to change config.',
+        intro: 'See which lifecycle hooks plugins declare and which events you can attach. This page is read-only — edit local config files to change hooks.',
+        introShort:
+          'Read-only overview of lifecycle events declared by plugins (static scan, not a live session probe). Tool hooks run on the main loop, task subagents, and workflow agent nodes—not gates or external ACP sessions. Click a node for sources and path notes; edit plugin hook files to change config.',
         editHint:
           'Hooks are declared by plugins via the hooks field in plugin.json, with handlers in a CJS module under the plugin directory. After install or update, they appear here as declared counts.',
         loading: 'Loading…',
-        configuredTitle: 'Configured hooks',
-        configuredDesc: 'Installed plugins that declare hooks. Highlighted events on the diagram come from a static scan of those files.',
+        configuredTitle: 'Declared hooks',
+        configuredDesc: 'Installed plugins that declare hooks. Highlighted events on the diagram come from a static scan of those files (not a live session registry).',
         configuredSummary: '{{sources}} plugins · {{count}} hooks',
         eventsOn: '{{count}} events declared',
-        configuredEmpty: 'No hooks configured yet',
-        configuredEmptyHint: 'No hooks declared yet. Configure hooks in a plugin to highlight them on the diagram.',
+        configuredEmpty: 'No hooks declared yet',
+        configuredEmptyHint: 'No hooks declared yet. Declare hooks in a plugin to highlight them on the diagram.',
         sourcePlugin: 'Plugin',
         hookCount: '{{count}} hooks',
-        catalogTitle: 'Configurable hooks',
+        catalogTitle: 'Lifecycle hook events',
         catalogDesc: 'These events can be registered from a plugin hooks module.',
         howToTitle: 'How to configure',
         howToStep1: 'In the plugin’s .plugin/plugin.json, set "hooks": "./hooks.cjs" (path relative to the plugin root).',
@@ -777,19 +778,27 @@ export const en = {
         howToStep3: 'Reinstall or refresh the plugin and start a new session so the sidecar registers hooks; this page shows declared counts and scanned event names.',
         diagram: {
           title: 'Lifecycle diagram',
-          subtitle: 'Hooks fire in session → turn → tool call → wrap-up order. Highlighted nodes are declared by plugins.',
+          subtitle: 'Hooks fire in session → turn → tool call → wrap-up order. Highlighted nodes are declared by plugins (static scan).',
           subtitleFishbone:
-            'Fishbone: the spine is the session timeline; ribs are hook events. Click a node to expand or collapse plugins that declare it.',
+            'Fishbone: the spine is the session timeline; ribs are hook events. Highlight = declared by plugins. Click a node for sources and path notes.',
           clickHint: 'Click a node to expand',
-          ariaLabel: 'Hook lifecycle diagram with {{count}} configured events',
-          legendConfigured: 'On',
-          legendAvailable: 'Off',
-          configuredBadge: 'On',
-          notConfigured: 'Off',
+          ariaLabel: 'Hook lifecycle diagram with {{count}} declared events',
+          legendConfigured: 'Declared',
+          legendAvailable: 'Not declared',
+          configuredBadge: 'Declared',
+          notConfigured: 'Not declared',
+          scanHint: 'Highlight = static plugin scan',
+          pathMain: 'Main loop',
+          pathSubagent: 'Task subagents',
+          pathWorkflow: 'Workflow agents',
+          pathExcluded: 'Not gates / external ACP',
+          pathWorkflowNote: 'Workflow turn events fire once per run, not per node.',
           collapse: 'Collapse',
           expandSources: '{{count}} plugin source(s)',
           expandEmpty: 'No plugins declare this',
           expandEmptyHint: 'No plugin declares this event.',
+          expandScanDisclaimer:
+            'Plugins below declare this event via static scan; whether it registers in a session depends on plugin load and session type.',
           phaseSession: 'Session',
           phaseTurn: 'Turn (each user message)',
           phaseTurnEnd: 'Turn wrap-up',
@@ -802,18 +811,44 @@ export const en = {
           activityHint: 'Goal / activity budget hooks fire alongside the main turn',
         },
         events: {
-          SessionStart: 'Fires on the first message of a session; allow to proceed or deny to stop the session.',
+          SessionStart: 'Fires on the first chat message of a session (notification-level today).',
           TurnStart: 'Before each turn starts (before the model runs); allow or deny to abort the turn.',
           UserPromptSubmit: 'After the user submits a message, before the model runs; deny aborts with HOOK_DENIED.',
           PreToolUse: 'Before a tool runs; allow / deny / ask, or modify to rewrite tool input.',
           PostToolUse: 'After a tool succeeds; can attach additional context or related fields.',
           PostToolUseFailure: 'After a tool fails; can attach context or handle the failure.',
           TurnComplete: 'After a turn finishes (fire-and-forget; return value ignored).',
-          Stop: 'When a turn is about to stop; return continue with a prompt to inject another turn.',
+          Stop: 'When a turn is about to stop; on the main session, continue + prompt can inject another turn.',
           PermissionRequest: 'Before a human permission prompt; auto-allow, auto-deny, or ask.',
           ActivityStart: 'When a new activity starts for a user goal.',
           ActivityEnd: 'When the current activity ends.',
           ActivityBudgetRequest: 'When something requests more activity step budget; allow / deny, optional steps override.',
+          pathNotes: {
+            SessionStart:
+              'Primary path: first chat message. Bare workflow:run does not re-fire. Current code fires as notification (void); do not rely on deny to abort the session.',
+            UserPromptSubmit:
+              'Chat: processInput. Workflow: workflow:run when text is present. message+dag skips double-fire.',
+            TurnStart:
+              'Once per chat turn; once per workflow DAG run (not per agent node). Not fired per subagent.',
+            PreToolUse:
+              'Main loop, task subagents, and workflow agent nodes. Gate nodes do not fire tool hooks.',
+            PostToolUse:
+              'Main loop, task subagents, and workflow agent nodes. Gate nodes do not fire tool hooks.',
+            PostToolUseFailure:
+              'Main loop, task subagents, and workflow agent nodes. Gate nodes do not fire tool hooks.',
+            PermissionRequest:
+              'Primarily chat HITL. Workflow workers have no HITL by default; ask without a transport cannot prompt a user.',
+            Stop:
+              'continue + prompt only continues the main session. Workflow fires Stop at run end but does not start a second DAG.',
+            TurnComplete:
+              'Once per chat turn; once per workflow run. Subagent stop does not fire TurnComplete alone.',
+            ActivityStart:
+              'Activity / goal path. Pure workflow:run usually does not enter this path.',
+            ActivityEnd:
+              'Activity / goal path. Pure workflow:run usually does not enter this path.',
+            ActivityBudgetRequest:
+              'Activity budget path. Pure workflow:run usually does not enter this path.',
+          },
         },
       },
 

@@ -750,20 +750,21 @@ export const zhCN = {
       },
       hooks: {
         title: '挂钩配置',
-        intro: '查看智能体生命周期中已配置与可配置的挂钩。本页只读，修改请编辑本地配置文件。',
-        introShort: '只读概览。挂钩生效于主循环、task 子智能体与工作流 agent 节点（不含 gate / 外部 ACP）。点击节点查看来源；修改请编辑插件 hooks 文件。',
+        intro: '查看插件声明的生命周期挂钩与可挂接事件。本页只读，修改请编辑本地配置文件。',
+        introShort:
+          '只读概览：展示插件声明的生命周期事件（静态扫描，非当前会话探针）。工具类挂钩生效于主循环、task 子智能体与工作流 agent 节点；不含 gate 与外部 ACP 会话。点击节点查看来源与路径说明；修改请编辑插件 hooks 文件。',
         editHint:
           '挂钩通过插件清单（plugin.json 的 hooks 字段）声明，handler 写在插件目录下的 CJS 模块中。安装或更新插件后，在此刷新可见。',
         loading: '正在加载…',
-        configuredTitle: '已配置的挂钩',
-        configuredDesc: '当前已安装插件中声明了挂钩的来源；流程图中高亮的事件来自对这些文件的静态扫描。',
+        configuredTitle: '已声明的挂钩',
+        configuredDesc: '当前已安装插件中声明了挂钩的来源；流程图中高亮的事件来自对这些文件的静态扫描（非当前会话 live 注册表）。',
         configuredSummary: '{{sources}} 个插件 · {{count}} 条',
         eventsOn: '{{count}} 个事件已声明',
-        configuredEmpty: '尚未配置任何挂钩',
-        configuredEmptyHint: '尚未声明挂钩。在插件中配置 hooks 后会出现在图上。',
+        configuredEmpty: '尚未声明任何挂钩',
+        configuredEmptyHint: '尚未声明挂钩。在插件中声明 hooks 后会出现在图上。',
         sourcePlugin: '插件',
         hookCount: '{{count}} 个挂钩',
-        catalogTitle: '可配置的挂钩',
+        catalogTitle: '生命周期挂钩事件',
         catalogDesc: '下列事件可在插件 hooks 模块中注册 handler。',
         howToTitle: '如何配置',
         howToStep1: '在插件目录的 .plugin/plugin.json 中设置 "hooks": "./hooks.cjs"（路径相对插件根目录）。',
@@ -771,19 +772,27 @@ export const zhCN = {
         howToStep3: '重新安装或刷新插件后重启会话，挂钩会在 sidecar 中注册；本页只展示声明计数与扫描到的事件名。',
         diagram: {
           title: '生命周期流程图',
-          subtitle: '挂钩按会话 → 轮次 → 工具调用 → 收尾的顺序触发；高亮表示已在插件中声明。',
+          subtitle: '挂钩按会话 → 轮次 → 工具调用 → 收尾的顺序触发；高亮表示已在插件中声明（静态扫描）。',
           subtitleFishbone:
-            '鱼骨图：主脊为会话阶段，肋骨为 hook 事件。点击节点展开或收起该事件已配置的插件列表。',
+            '鱼骨图：主脊为会话阶段，肋骨为 hook 事件。高亮 = 插件声明。点击节点查看来源与路径说明。',
           clickHint: '点击节点展开',
-          ariaLabel: '挂钩生命周期流程图，其中 {{count}} 个事件已配置',
-          legendConfigured: '已配置',
-          legendAvailable: '可配置',
-          configuredBadge: '已配置',
-          notConfigured: '未配置',
+          ariaLabel: '挂钩生命周期流程图，其中 {{count}} 个事件已声明',
+          legendConfigured: '已声明',
+          legendAvailable: '未声明',
+          configuredBadge: '已声明',
+          notConfigured: '未声明',
+          scanHint: '高亮 = 静态扫描',
+          pathMain: '主循环',
+          pathSubagent: '子智能体',
+          pathWorkflow: '工作流 agent',
+          pathExcluded: '不含 gate / 外部 ACP',
+          pathWorkflowNote: '工作流回合事件按整次 run 触发，非每个 agent 节点。',
           collapse: '收起',
           expandSources: '{{count}} 个插件来源',
           expandEmpty: '暂无插件声明',
           expandEmptyHint: '未有插件声明此事件。',
+          expandScanDisclaimer:
+            '下列插件通过静态扫描声明了此事件；是否在本会话注册取决于插件加载与会话类型。',
           phaseSession: '会话',
           phaseTurn: '轮次（每次用户消息）',
           phaseTurnEnd: '轮次收尾',
@@ -796,18 +805,44 @@ export const zhCN = {
           activityHint: '目标 / Activity 预算相关挂钩，与主轮次并行触发',
         },
         events: {
-          SessionStart: '会话首条消息时触发；可 allow 继续或 deny 中止会话。',
+          SessionStart: '会话首条聊天消息时触发（当前实现为通知级）。',
           TurnStart: '每轮开始、调用模型前；可 allow 或 deny 中止本轮。',
           UserPromptSubmit: '用户提交消息后、模型运行前；deny 会以 HOOK_DENIED 中止。',
           PreToolUse: '工具调用前；可 allow / deny / ask，或 modify 改写入参。',
           PostToolUse: '工具成功完成后；可附加上下文或改写输出相关字段。',
           PostToolUseFailure: '工具调用失败后；可附加上下文或做后续处理。',
           TurnComplete: '一轮结束后（fire-and-forget，返回值忽略）。',
-          Stop: '轮次将结束时；返回 continue + prompt 可注入提示并再跑一轮。',
+          Stop: '轮次将结束时；主会话返回 continue + prompt 可注入提示并再跑一轮。',
           PermissionRequest: '向用户弹出权限确认前；可 auto-allow、auto-deny 或 ask。',
           ActivityStart: '为用户目标启动新 Activity 时。',
           ActivityEnd: '当前 Activity 结束时。',
           ActivityBudgetRequest: '请求扩展 Activity 步数预算时；可 allow / deny，并用 steps 覆盖数量。',
+          pathNotes: {
+            SessionStart:
+              '主路径：对话会话首条消息。纯 workflow:run 不重复触发。当前实现为 void 通知级，勿依赖 deny 中止会话。',
+            UserPromptSubmit:
+              '对话：processInput。工作流：workflow:run 有文本时。message+dag 不双 fire。',
+            TurnStart:
+              '主会话每 turn 一次；工作流每 DAG run 一次（非每 agent 节点）；子 agent 不单独 fire。',
+            PreToolUse:
+              '主循环、task 子智能体、工作流 agent 节点；gate 节点不 fire 工具钩。',
+            PostToolUse:
+              '主循环、task 子智能体、工作流 agent 节点；gate 节点不 fire 工具钩。',
+            PostToolUseFailure:
+              '主循环、task 子智能体、工作流 agent 节点；gate 节点不 fire 工具钩。',
+            PermissionRequest:
+              '主要用于对话 HITL。工作流默认无 HITL；无 transport 时 ask 无法向用户提问。',
+            Stop:
+              'continue + prompt 仅主会话可续跑。工作流 run 结束会 fire，但不注入第二轮 DAG。',
+            TurnComplete:
+              '主会话每 turn；工作流每 run；子 agent 结束不单独 fire。',
+            ActivityStart:
+              '依赖会话 activity / 目标路径；纯 workflow:run 通常不走。',
+            ActivityEnd:
+              '依赖会话 activity / 目标路径；纯 workflow:run 通常不走。',
+            ActivityBudgetRequest:
+              '依赖 activity 预算路径；纯 workflow:run 通常不走。',
+          },
         },
       },
 

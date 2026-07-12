@@ -32,6 +32,26 @@ export const HOOK_EVENT_DESC_KEYS = {
   ActivityBudgetRequest: 'settings.hooks.events.ActivityBudgetRequest',
 } as const satisfies Record<HookEvent, string>
 
+/** Per-event path footnotes (declare ≠ dispatch scope). */
+export const HOOK_EVENT_PATH_NOTE_KEYS = {
+  SessionStart: 'settings.hooks.events.pathNotes.SessionStart',
+  TurnStart: 'settings.hooks.events.pathNotes.TurnStart',
+  UserPromptSubmit: 'settings.hooks.events.pathNotes.UserPromptSubmit',
+  PreToolUse: 'settings.hooks.events.pathNotes.PreToolUse',
+  PostToolUse: 'settings.hooks.events.pathNotes.PostToolUse',
+  PostToolUseFailure: 'settings.hooks.events.pathNotes.PostToolUseFailure',
+  TurnComplete: 'settings.hooks.events.pathNotes.TurnComplete',
+  Stop: 'settings.hooks.events.pathNotes.Stop',
+  PermissionRequest: 'settings.hooks.events.pathNotes.PermissionRequest',
+  ActivityStart: 'settings.hooks.events.pathNotes.ActivityStart',
+  ActivityEnd: 'settings.hooks.events.pathNotes.ActivityEnd',
+  ActivityBudgetRequest: 'settings.hooks.events.pathNotes.ActivityBudgetRequest',
+} as const satisfies Record<HookEvent, string>
+
+export function pathNoteKey(event: HookEvent): string {
+  return HOOK_EVENT_PATH_NOTE_KEYS[event]
+}
+
 export type LifecyclePhaseId = 'session' | 'turn' | 'turnEnd' | 'activity'
 
 const CATALOG_SET = new Set<string>(HOOK_EVENT_CATALOG)

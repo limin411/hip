@@ -6,6 +6,7 @@ import React from 'react'
 import type { PluginMeta } from '@hip/protocol'
 import {
   HOOK_EVENT_CATALOG,
+  HOOK_EVENT_PATH_NOTE_KEYS,
   configuredHookEvents,
   pluginsWithHooks,
   sourcesByHookEvent,
@@ -98,6 +99,15 @@ describe('hookCatalog helpers', () => {
     expect(HOOK_EVENT_CATALOG).toHaveLength(12)
   })
 
+  it('has path-note keys for every catalog event', () => {
+    expect(Object.keys(HOOK_EVENT_PATH_NOTE_KEYS)).toHaveLength(HOOK_EVENT_CATALOG.length)
+    for (const event of HOOK_EVENT_CATALOG) {
+      expect(HOOK_EVENT_PATH_NOTE_KEYS[event]).toBe(
+        `settings.hooks.events.pathNotes.${event}`,
+      )
+    }
+  })
+
   it('filters plugins and aggregates sources', () => {
     const list = [
       plugin({ id: 'a', name: 'A', hookCount: 0 }),
@@ -126,6 +136,8 @@ describe('HookConfig (compact page)', () => {
     expect(screen.getByTestId('settings-hooks-page')).toBeInTheDocument()
     expect(screen.getByTestId('hook-lifecycle-diagram')).toBeInTheDocument()
     expect(screen.getByTestId('react-flow')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-diagram-path-chips')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-diagram-scan-hint')).toBeInTheDocument()
     expect(screen.queryByTestId('hooks-howto-heading')).not.toBeInTheDocument()
     for (const event of HOOK_EVENT_CATALOG) {
       expect(screen.getByTestId(`hook-diagram-node-${event}`)).toBeInTheDocument()
@@ -139,7 +151,7 @@ describe('HookConfig (compact page)', () => {
     expect(screen.queryByTestId('hook-source-plain')).not.toBeInTheDocument()
   })
 
-  it('shows summary and expand panel on node click', () => {
+  it('shows summary and expand panel with path note on node click', () => {
     mockPlugins = [
       plugin({
         id: 'guard',
@@ -155,9 +167,17 @@ describe('HookConfig (compact page)', () => {
 
     fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
     expect(screen.getByTestId('hook-diagram-expand-panel')).toHaveTextContent('Guard Plugin')
+    expect(screen.getByTestId('hook-diagram-path-note')).toHaveTextContent(
+      'settings.hooks.events.pathNotes.PreToolUse',
+    )
 
     fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
     expect(screen.queryByTestId('hook-diagram-expand-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('rf-node-event-PermissionRequest'))
+    expect(screen.getByTestId('hook-diagram-path-note')).toHaveTextContent(
+      'settings.hooks.events.pathNotes.PermissionRequest',
+    )
   })
 
   it('loads plugins when store is not yet loaded', () => {

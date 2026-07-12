@@ -750,20 +750,21 @@ export const zhTW = {
       },
       hooks: {
         title: '掛鉤設定',
-        intro: '檢視智能體生命週期中已設定與可設定的掛鉤。本頁唯讀，修改請編輯本機設定檔。',
-        introShort: '唯讀概覽。掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點（不含 gate / 外部 ACP）。點擊節點查看來源；修改請編輯外掛 hooks 檔案。',
+        intro: '檢視外掛宣告的生命週期掛鉤與可掛接事件。本頁唯讀，修改請編輯本機設定檔。',
+        introShort:
+          '唯讀概覽：展示外掛宣告的生命週期事件（靜態掃描，非目前工作階段探測）。工具類掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點；不含 gate 與外部 ACP 工作階段。點擊節點查看來源與路徑說明；修改請編輯外掛 hooks 檔案。',
         editHint:
           '掛鉤由外掛清單（plugin.json 的 hooks 欄位）宣告，handler 寫在外掛目錄下的 CJS 模組。安裝或更新外掛後可在此查看宣告計數。',
         loading: '載入中…',
-        configuredTitle: '已設定的掛鉤',
-        configuredDesc: '目前已安裝外掛中宣告了掛鉤的來源；流程圖中反白的事件來自對這些檔案的靜態掃描。',
+        configuredTitle: '已宣告的掛鉤',
+        configuredDesc: '目前已安裝外掛中宣告了掛鉤的來源；流程圖中反白的事件來自對這些檔案的靜態掃描（非目前工作階段 live 註冊表）。',
         configuredSummary: '{{sources}} 個外掛 · {{count}} 條',
         eventsOn: '{{count}} 個事件已宣告',
-        configuredEmpty: '尚未設定任何掛鉤',
-        configuredEmptyHint: '尚未宣告掛鉤。在外掛中設定 hooks 後會顯示於圖上。',
+        configuredEmpty: '尚未宣告任何掛鉤',
+        configuredEmptyHint: '尚未宣告掛鉤。在外掛中宣告 hooks 後會顯示於圖上。',
         sourcePlugin: '外掛',
         hookCount: '{{count}} 個掛鉤',
-        catalogTitle: '可設定的掛鉤',
+        catalogTitle: '生命週期掛鉤事件',
         catalogDesc: '下列事件可在外掛 hooks 模組中註冊 handler。',
         howToTitle: '如何設定',
         howToStep1: '在外掛目錄的 .plugin/plugin.json 中設定 "hooks": "./hooks.cjs"（路徑相對外掛根目錄）。',
@@ -771,19 +772,27 @@ export const zhTW = {
         howToStep3: '重新安裝或重新整理外掛後重啟工作階段，掛鉤會在 sidecar 註冊；本頁顯示宣告計數與掃描到的事件名。',
         diagram: {
           title: '生命週期流程圖',
-          subtitle: '掛鉤依工作階段 → 輪次 → 工具呼叫 → 收尾順序觸發；反白表示已在外掛中宣告。',
+          subtitle: '掛鉤依工作階段 → 輪次 → 工具呼叫 → 收尾順序觸發；反白表示已在外掛中宣告（靜態掃描）。',
           subtitleFishbone:
-            '魚骨圖：主脊為工作階段時間線，肋骨為 hook 事件。點擊節點展開或收起該事件已設定的外掛列表。',
+            '魚骨圖：主脊為工作階段時間線，肋骨為 hook 事件。反白 = 外掛宣告。點擊節點查看來源與路徑說明。',
           clickHint: '點擊節點展開',
-          ariaLabel: '掛鉤生命週期流程圖，其中 {{count}} 個事件已設定',
-          legendConfigured: '已設定',
-          legendAvailable: '可設定',
-          configuredBadge: '已設定',
-          notConfigured: '未設定',
+          ariaLabel: '掛鉤生命週期流程圖，其中 {{count}} 個事件已宣告',
+          legendConfigured: '已宣告',
+          legendAvailable: '未宣告',
+          configuredBadge: '已宣告',
+          notConfigured: '未宣告',
+          scanHint: '反白 = 靜態掃描',
+          pathMain: '主迴圈',
+          pathSubagent: '子智能體',
+          pathWorkflow: '工作流 agent',
+          pathExcluded: '不含 gate / 外部 ACP',
+          pathWorkflowNote: '工作流回合事件依整次 run 觸發，非每個 agent 節點。',
           collapse: '收起',
           expandSources: '{{count}} 個外掛來源',
           expandEmpty: '尚無外掛宣告',
           expandEmptyHint: '尚無外掛宣告此事件。',
+          expandScanDisclaimer:
+            '下列外掛透過靜態掃描宣告了此事件；是否在本工作階段註冊取決於外掛載入與工作階段類型。',
           phaseSession: '工作階段',
           phaseTurn: '輪次（每次使用者訊息）',
           phaseTurnEnd: '輪次收尾',
@@ -796,18 +805,44 @@ export const zhTW = {
           activityHint: '目標／Activity 預算相關掛鉤，與主輪次並行觸發',
         },
         events: {
-          SessionStart: '工作階段首則訊息時觸發；可 allow 繼續或 deny 中止工作階段。',
+          SessionStart: '工作階段首則聊天訊息時觸發（目前實作為通知級）。',
           TurnStart: '每輪開始、呼叫模型前；可 allow 或 deny 中止本輪。',
           UserPromptSubmit: '使用者送出訊息後、模型執行前；deny 會以 HOOK_DENIED 中止。',
           PreToolUse: '工具呼叫前；可 allow / deny / ask，或 modify 改寫入參。',
           PostToolUse: '工具成功完成後；可附加上下文或相關欄位。',
           PostToolUseFailure: '工具呼叫失敗後；可附加上下文或後續處理。',
           TurnComplete: '一輪結束後（fire-and-forget，回傳值忽略）。',
-          Stop: '輪次即將結束時；回傳 continue + prompt 可注入提示並再跑一輪。',
+          Stop: '輪次即將結束時；主工作階段回傳 continue + prompt 可注入提示並再跑一輪。',
           PermissionRequest: '向使用者彈出權限確認前；可 auto-allow、auto-deny 或 ask。',
           ActivityStart: '為使用者目標啟動新 Activity 時。',
           ActivityEnd: '目前 Activity 結束時。',
           ActivityBudgetRequest: '請求擴充 Activity 步數預算時；可 allow / deny，並用 steps 覆寫數量。',
+          pathNotes: {
+            SessionStart:
+              '主路徑：對話工作階段首則訊息。純 workflow:run 不重複觸發。目前實作為 void 通知級，勿依賴 deny 中止工作階段。',
+            UserPromptSubmit:
+              '對話：processInput。工作流：workflow:run 有文字時。message+dag 不雙 fire。',
+            TurnStart:
+              '主工作階段每 turn 一次；工作流每 DAG run 一次（非每 agent 節點）；子 agent 不單獨 fire。',
+            PreToolUse:
+              '主迴圈、task 子智能體、工作流 agent 節點；gate 節點不 fire 工具鉤。',
+            PostToolUse:
+              '主迴圈、task 子智能體、工作流 agent 節點；gate 節點不 fire 工具鉤。',
+            PostToolUseFailure:
+              '主迴圈、task 子智能體、工作流 agent 節點；gate 節點不 fire 工具鉤。',
+            PermissionRequest:
+              '主要用於對話 HITL。工作流預設無 HITL；無 transport 時 ask 無法向使用者提問。',
+            Stop:
+              'continue + prompt 僅主工作階段可續跑。工作流 run 結束會 fire，但不注入第二輪 DAG。',
+            TurnComplete:
+              '主工作階段每 turn；工作流每 run；子 agent 結束不單獨 fire。',
+            ActivityStart:
+              '依賴工作階段 activity／目標路徑；純 workflow:run 通常不走。',
+            ActivityEnd:
+              '依賴工作階段 activity／目標路徑；純 workflow:run 通常不走。',
+            ActivityBudgetRequest:
+              '依賴 activity 預算路徑；純 workflow:run 通常不走。',
+          },
         },
       },
 

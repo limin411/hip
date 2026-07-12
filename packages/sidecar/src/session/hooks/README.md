@@ -19,6 +19,8 @@ Workflow HITL: no `requestApproval` on workers (policy A). PreToolUse `ask` with
 
 `message:send` + `orchMode: dag` sets `skipUserPromptSubmit` so UserPromptSubmit is not double-fired.
 
+Settings UI「挂钩配置」shows **declared** events from a static plugin scan (not a live session probe). Runtime path coverage is the table above. Honesty copy for the settings page: `docs/superpowers/specs/2026-07-13-hooks-settings-honesty-spec.md`.
+
 ## Hook Event Types
 
 | # | Event | Fires When | Context Fields | Return Values |

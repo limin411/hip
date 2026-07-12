@@ -7,8 +7,6 @@ interface AuthButtonProps {
   label: string
   onClick: () => void
   variant?: 'solid' | 'outline'
-  onPointerEnter?: () => void
-  onPointerLeave?: () => void
 }
 
 /**
@@ -20,16 +18,12 @@ export function AuthButton({
   label,
   onClick,
   variant = 'outline',
-  onPointerEnter,
-  onPointerLeave,
 }: AuthButtonProps) {
   const isPrimary = variant === 'solid'
   return (
     <button
       type="button"
       onClick={onClick}
-      onPointerEnter={onPointerEnter}
-      onPointerLeave={onPointerLeave}
       className={cn(
         buttonVariants({
           variant: isPrimary ? 'primary' : 'secondary',

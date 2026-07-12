@@ -1,9 +1,8 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
-import { MascotActor } from '@/components/login/MascotActor'
+import { HipLogo } from '@/components/login/HipLogo'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useAuthStore } from '@/store/authStore'
 
@@ -12,7 +11,6 @@ export function LoginScreen() {
   const navigate = useNavigate()
   const login = useAuthStore((s) => s.login)
   const handlePointerDown = useWindowDrag()
-  const [cheer, setCheer] = useState(false)
   const enter = () => {
     login()
     navigate('/app')
@@ -21,9 +19,9 @@ export function LoginScreen() {
   return (
     // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
     <div data-tauri-drag-region onPointerDown={handlePointerDown} className="flex h-screen">
-      {/* 左侧品牌区 —— 白底 + 吉祥物 GIF */}
+      {/* 左侧品牌区 —— 白底 + 静态吉祥物 */}
       <div className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex">
-        <MascotActor size={320} cheer={cheer} />
+        <HipLogo size={320} decorative />
       </div>
 
       {/* 右侧登录方式 */}
@@ -38,8 +36,6 @@ export function LoginScreen() {
               label={t('login.email')}
               onClick={enter}
               variant="solid"
-              onPointerEnter={() => setCheer(true)}
-              onPointerLeave={() => setCheer(false)}
             />
             <AuthButton icon={Github} label={t('login.github')} onClick={enter} />
             <AuthButton icon={Chrome} label={t('login.google')} onClick={enter} />

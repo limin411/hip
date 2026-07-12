@@ -20,7 +20,7 @@ import { AttachmentButton } from './AttachmentButton'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
 import type { LocalAttachment } from './attachmentTypes'
-import { HipLogo } from '@/components/login/HipLogo'
+import { MascotActor } from '@/components/login/MascotActor'
 
 export function NewConversation() {
   const { t } = useTranslation()
@@ -123,10 +123,14 @@ export function NewConversation() {
   }, [globalPaletteOpen, text, handleDismiss])
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5" data-testid="new-conversation">
+    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5 pb-28" data-testid="new-conversation">
       <div className="w-full max-w-3xl">
-        <div className="mb-6 flex justify-center">
-          <HipLogo size={148} decorative />
+        <div className="mb-1 flex justify-center">
+          <MascotActor
+            key={surface}
+            size={420}
+            initialAction={surface === 'code' ? 'code' : 'wave'}
+          />
         </div>
         <div key={surface} className="animate-greeting-enter">
           <h1 className="mb-1 text-center text-display font-semibold text-ink">

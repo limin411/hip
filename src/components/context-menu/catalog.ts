@@ -1,7 +1,6 @@
 import type { ContextKind, ContextMenuItemMeta } from './types'
 
 const STATIC_CATALOG: ContextMenuItemMeta[] = [
-  // Message kind ordered to match mergeByGroup / live menu (GROUP_ORDER).
   {
     id: 'message.regenerate',
     labelKey: 'contextMenu.message.regenerate',
@@ -295,6 +294,64 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     id: 'subAgent.copyOutput',
     labelKey: 'contextMenu.subAgent.copyOutput',
     kind: 'subAgent',
+    group: 'clipboard',
+  },
+  {
+    id: 'agentConfig.edit',
+    labelKey: 'settings.agents.edit',
+    kind: 'agentConfig',
+    group: 'edit',
+  },
+  {
+    id: 'agentConfig.delete',
+    labelKey: 'settings.agents.delete',
+    kind: 'agentConfig',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'skillConfig.view',
+    labelKey: 'settings.skill.view',
+    kind: 'skillConfig',
+    group: 'primary',
+  },
+  {
+    id: 'skillConfig.delete',
+    labelKey: 'settings.skill.delete',
+    kind: 'skillConfig',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'mcpServer.edit',
+    labelKey: 'settings.mcp.edit',
+    kind: 'mcpServer',
+    group: 'edit',
+  },
+  {
+    id: 'mcpServer.delete',
+    labelKey: 'settings.mcp.delete',
+    kind: 'mcpServer',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'plugin.uninstall',
+    labelKey: 'settings.plugins.uninstall',
+    kind: 'plugin',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'terminal.copySelection',
+    labelKey: 'contextMenu.terminal.copySelection',
+    kind: 'terminal',
+    group: 'clipboard',
+  },
+  {
+    id: 'terminal.paste',
+    labelKey: 'contextMenu.terminal.paste',
+    kind: 'terminal',
     group: 'clipboard',
   },
 ]

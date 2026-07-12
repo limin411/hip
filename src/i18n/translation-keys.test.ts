@@ -4,6 +4,7 @@ import { en } from './en'
 import { zhCN } from './zh-CN'
 import { zhTW } from './zh-TW'
 import { SLASH_BUILTIN_COMMANDS } from '@/domain/commands/slashBuiltins'
+import { listCatalogItems } from '@/components/context-menu/catalog'
 
 /**
  * Recursively extract all dot-separated key paths from a nested object.
@@ -89,6 +90,15 @@ describe('Translation key consistency', () => {
         const key = `chat.slash.cmd.${cmd.id}`
         expect(keys.has(key), `${name} missing ${key}`).toBe(true)
       }
+    }
+  })
+
+  it('every context-menu catalog labelKey exists in all locales', () => {
+    const labelKeys = [...new Set(listCatalogItems().map((item) => item.labelKey))]
+    expect(labelKeys.length).toBeGreaterThan(0)
+    for (const { name, keys } of keySets) {
+      const missing = labelKeys.filter((key) => !keys.has(key))
+      expect(missing, `${name} missing catalog labelKeys:\n${missing.join('\n')}`).toEqual([])
     }
   })
 })

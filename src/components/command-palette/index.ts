@@ -16,6 +16,11 @@ export type {
 export type { PaletteIconName, CommandGroupId, CommandWhen } from './types'
 export { rankGroups, scoreItem } from './rankGlobalCommands'
 export { buildAllGroups, registerCommandProvider } from './registry'
-export { registerComposerInserter, insertComposerText } from './composerBridge'
+export {
+  registerComposerInserter,
+  registerComposerHandlers,
+  insertComposerText,
+  replaceComposerText,
+} from './composerBridge'
 export { parsePaletteQuery, filterGroupsByMode } from './queryPrefix'
 export { toggleFavorite, loadFavorites, isFavorite } from './favoritesStore'

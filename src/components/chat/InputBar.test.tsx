@@ -10,6 +10,11 @@ import * as domain from '@/domain'
 import { sessionService } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { pickAttachmentFiles } from '@/ipc/dialog'
+import {
+  insertComposerText,
+  replaceComposerText,
+  registerComposerHandlers,
+} from '@/components/command-palette/composerBridge'
 
 vi.mock('@/store/skillsStore', () => ({
   useSkillsStore: (selector?: (s: { skills: never[] }) => unknown) => {
@@ -62,9 +67,60 @@ describe('InputBar', () => {
   beforeEach(() => {
     cleanup()
     vi.restoreAllMocks()
+    registerComposerHandlers(null)
     providersStore.useProvidersStore.setState({ catalog: {}, config: { providers: {} }, keyConfigured: {}, loaded: false })
     hipConfigStore.useHipConfigStore.setState({ config: { version: 1 }, loaded: false, error: null })
     draftStore.useDraftStore.setState({ draft: null })
+  })
+
+  it('insertComposerText preserves existing draft (does not replace)', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const ta = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    ) as HTMLTextAreaElement
+    fireEvent.change(ta, { target: { value: 'draft in progress' } })
+    expect(ta).toHaveValue('draft in progress')
+
+    // Place caret at end so insert appends.
+    ta.focus()
+    ta.setSelectionRange(ta.value.length, ta.value.length)
+
+    const ok = insertComposerText('> quoted\n\n')
+    expect(ok).toBe(true)
+    await vi.waitFor(() => {
+      expect(ta).toHaveValue('draft in progress> quoted\n\n')
+    })
+  })
+
+  it('replaceComposerText replaces the entire composer (skill handoff)', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const ta = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    ) as HTMLTextAreaElement
+    fireEvent.change(ta, { target: { value: 'old draft' } })
+
+    expect(replaceComposerText('/pdf ')).toBe(true)
+    await vi.waitFor(() => {
+      expect(ta).toHaveValue('/pdf ')
+    })
   })
 
   it('clears existing attachments when the active session model loses attachment support', async () => {

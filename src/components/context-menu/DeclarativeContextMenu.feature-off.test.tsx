@@ -19,7 +19,7 @@ describe('DeclarativeContextMenu when CONTEXT_MENUS is false', () => {
     cleanup()
   })
 
-  it('renders bare children without trigger wrapper or menu', () => {
+  it('renders layout wrapper without menu chrome or data-context-menu-root', () => {
     registerContextProvider(() => [
       {
         id: 'codeBlock.copy',
@@ -33,6 +33,7 @@ describe('DeclarativeContextMenu when CONTEXT_MENUS is false', () => {
       <DeclarativeContextMenu
         kind="codeBlock"
         payload={{ code: 'x' }}
+        className="group/code relative"
         data-testid="ctx-host"
       >
         <button type="button">inner</button>
@@ -40,10 +41,13 @@ describe('DeclarativeContextMenu when CONTEXT_MENUS is false', () => {
     )
 
     expect(screen.getByRole('button', { name: 'inner' })).toBeInTheDocument()
-    expect(screen.queryByTestId('ctx-host')).not.toBeInTheDocument()
+    // Layout className is preserved on a plain div when menus are off.
+    const host = screen.getByTestId('ctx-host')
+    expect(host).toHaveClass('group/code', 'relative')
+    expect(host).not.toHaveAttribute('data-context-menu-root')
     expect(document.querySelector('[data-context-menu-root]')).toBeNull()
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'inner' }))
+    fireEvent.contextMenu(host)
     expect(screen.queryByTestId('context-menu-content')).not.toBeInTheDocument()
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })

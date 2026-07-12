@@ -781,6 +781,7 @@ export const zhCN = {
       message: {
         copy: '复制文本',
         quote: '引用到输入框',
+        quoteNoComposer: '请先打开会话再将引用插入输入框。',
         copyId: '复制消息 ID',
         regenerate: '重新生成',
         regenerateDisabled: '回合进行中时无法重新生成',

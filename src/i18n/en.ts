@@ -787,6 +787,8 @@ export const en = {
       message: {
         copy: 'Copy text',
         quote: 'Quote in composer',
+        quoteNoComposer:
+          'Open a conversation first to quote into the composer.',
         copyId: 'Copy message ID',
         regenerate: 'Regenerate',
         regenerateDisabled: 'Cannot regenerate while a turn is running',

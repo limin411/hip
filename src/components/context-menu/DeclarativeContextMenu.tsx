@@ -86,8 +86,14 @@ export function DeclarativeContextMenu<K extends ContextKind>({
     [kind, payload, t],
   )
 
+  // Feature-off: still apply layout className so surfaces that put flex/group/relative
+  // on the host do not break when CONTEXT_MENUS is rolled back.
   if (!CONTEXT_MENUS) {
-    return <>{children}</>
+    return (
+      <div className={cn(className)} data-testid={testId}>
+        {children}
+      </div>
+    )
   }
 
   return (

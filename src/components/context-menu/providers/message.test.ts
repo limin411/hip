@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Message } from '@hip/protocol'
+import { toast } from 'sonner'
 import { insertComposerText, registerComposerInserter } from '@/components/command-palette/composerBridge'
 import { sessionService, useDomainStore } from '@/domain'
 import {
@@ -8,6 +9,10 @@ import {
   messageProvider,
 } from './message'
 import type { ContextMenuBuildContext } from '../types'
+
+vi.mock('sonner', () => ({
+  toast: { message: vi.fn(), error: vi.fn(), success: vi.fn() },
+}))
 
 function makeMessage(partial: Partial<Message> & Pick<Message, 'id' | 'role' | 'content'>): Message {
   return {
@@ -36,6 +41,16 @@ describe('messageCopyText / formatQuoteForComposer', () => {
     expect(messageCopyText(makeMessage({ id: 'u1', role: 'user', content: 'hello' }))).toBe('hello')
   })
 
+  it('normalizes assistant content for copy (CJK line collapse)', () => {
+    const msg = makeMessage({
+      id: 'a1',
+      role: 'assistant',
+      content: '让\n我\n先\n看\n看\n项\n目\n。',
+    })
+    expect(messageCopyText(msg)).toBe('让我先看看项目。')
+    expect(formatQuoteForComposer(messageCopyText(msg))).toBe('> 让我先看看项目。\n\n')
+  })
+
   it('quotes each line for composer insert', () => {
     expect(formatQuoteForComposer('a\nb')).toBe('> a\n> b\n\n')
   })
@@ -44,6 +59,7 @@ describe('messageCopyText / formatQuoteForComposer', () => {
 describe('messageProvider', () => {
   beforeEach(() => {
     registerComposerInserter(null)
+    vi.mocked(toast.message).mockClear()
     useDomainStore.setState({
       sessions: [
         {
@@ -138,9 +154,9 @@ describe('messageProvider', () => {
   })
 
   it('quote inserts via insertComposerText (does not replace via domain)', () => {
-    const inserted: string[] = []
+    let draft = 'existing draft'
     registerComposerInserter((text) => {
-      inserted.push(text)
+      draft = draft + text
     })
     const msg = makeMessage({ id: 'm1', role: 'user', content: 'quoted' })
     const items = messageProvider(
@@ -148,9 +164,21 @@ describe('messageProvider', () => {
       makeCtx(),
     )
     items.find((i) => i.id === 'message.quote')!.run()
-    expect(inserted).toEqual(['> quoted\n\n'])
+    expect(draft).toBe('existing draft> quoted\n\n')
+    expect(toast.message).not.toHaveBeenCalled()
     // Sanity: bridge still works
     expect(insertComposerText('x')).toBe(true)
+  })
+
+  it('toasts when quote has no composer inserter', () => {
+    registerComposerInserter(null)
+    const msg = makeMessage({ id: 'm1', role: 'user', content: 'quoted' })
+    const items = messageProvider(
+      { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
+      makeCtx(),
+    )
+    items.find((i) => i.id === 'message.quote')!.run()
+    expect(toast.message).toHaveBeenCalledWith('contextMenu.message.quoteNoComposer')
   })
 
   it('copyId copies message.id', async () => {
@@ -176,7 +204,8 @@ describe('messageProvider', () => {
     spy.mockRestore()
   })
 
-  it('offers debug bundle when active session can produce JSON', () => {
+  it('offers debug bundle when active session matches without serializing on build', () => {
+    const spy = vi.spyOn(sessionService, 'getSessionDebugBundleJson')
     const items = messageProvider(
       {
         kind: 'message',
@@ -189,6 +218,9 @@ describe('messageProvider', () => {
       makeCtx({ activeSessionId: 's1' }),
     )
     expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(true)
+    // Visibility must not serialize the full bundle.
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
   })
 
   it('omits debug bundle when no active session', () => {
@@ -203,6 +235,21 @@ describe('messageProvider', () => {
         },
       },
       makeCtx({ activeSessionId: null }),
+    )
+    expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(false)
+  })
+
+  it('omits debug bundle when payload session differs from active', () => {
+    const items = messageProvider(
+      {
+        kind: 'message',
+        payload: {
+          message: makeMessage({ id: 'm1', role: 'user', content: 'x' }),
+          isLastAssistant: false,
+          sessionId: 'other',
+        },
+      },
+      makeCtx({ activeSessionId: 's1' }),
     )
     expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(false)
   })

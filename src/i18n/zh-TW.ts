@@ -781,6 +781,7 @@ export const zhTW = {
       message: {
         copy: '複製文字',
         quote: '引用到輸入框',
+        quoteNoComposer: '請先開啟對話再將引用插入輸入框。',
         copyId: '複製訊息 ID',
         regenerate: '重新生成',
         regenerateDisabled: '回合進行中時無法重新生成',

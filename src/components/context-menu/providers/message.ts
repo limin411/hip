@@ -1,4 +1,5 @@
 import type { Message } from '@hip/protocol'
+import { toast } from 'sonner'
 import { insertComposerText } from '@/components/command-palette/composerBridge'
 import { sessionService } from '@/domain'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
@@ -45,7 +46,10 @@ export const messageProvider: ContextProvider = (req, ctx) => {
     label: ctx.t('contextMenu.message.quote'),
     group: 'edit',
     run: () => {
-      insertComposerText(formatQuoteForComposer(messageCopyText(message)))
+      const ok = insertComposerText(formatQuoteForComposer(messageCopyText(message)))
+      if (!ok) {
+        toast.message(ctx.t('contextMenu.message.quoteNoComposer'))
+      }
     },
   })
 
@@ -91,13 +95,17 @@ export const messageProvider: ContextProvider = (req, ctx) => {
   return items
 }
 
+/**
+ * Cheap visibility gate — do not serialize the full debug bundle on every right-click.
+ * getSessionDebugBundleJson only reads the active session; offer when payload targets it
+ * (or omits sessionId and an active session exists). Serialization happens only in run().
+ */
 function canOfferDebugBundle(
   sessionId: string | null,
   ctx: ContextMenuBuildContext,
 ): boolean {
-  const id = sessionId ?? ctx.activeSessionId
-  if (!id) return false
-  // getSessionDebugBundleJson only reads the active session — only offer when it matches.
-  if (ctx.activeSessionId && id !== ctx.activeSessionId) return false
-  return sessionService.getSessionDebugBundleJson() != null
+  const activeId = ctx.activeSessionId
+  if (!activeId) return false
+  if (sessionId != null && sessionId !== activeId) return false
+  return true
 }

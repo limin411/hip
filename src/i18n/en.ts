@@ -780,6 +780,14 @@ export const en = {
     },
     login: {
       slogan: 'Nobody knows slacking better than me',
+      brandLabel: 'hip workbench',
+      brandHeadline: 'Build with agents that ship',
+      brandDesc:
+        'A desktop AI workbench for real projects — chat, code, and artifacts in one place.',
+      brandFeaturesLabel: 'Highlights',
+      feature1: 'Local-first agents you control',
+      feature2: 'Multi-agent collaboration',
+      feature3: 'Chat, code & previews together',
       title: 'Log in to hip',
       subtitle: 'Choose a way to continue',
       email: 'Continue with Email',

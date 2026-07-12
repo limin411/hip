@@ -774,6 +774,13 @@ export const zhCN = {
     },
     login: {
       slogan: '没有人比我更懂摸鱼',
+      brandLabel: 'hip 工作台',
+      brandHeadline: '用智能体交付真实工作',
+      brandDesc: '桌面端 AI 工作台：对话、编码与产物一站完成，数据留在本地。',
+      brandFeaturesLabel: '产品亮点',
+      feature1: '本地优先，数据由你掌控',
+      feature2: '多智能体协作编排',
+      feature3: '对话、代码与预览一体',
       title: '登录到 hip',
       subtitle: '选择一种方式继续',
       email: '使用邮箱登录',

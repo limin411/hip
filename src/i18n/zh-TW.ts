@@ -774,6 +774,13 @@ export const zhTW = {
     },
     login: {
       slogan: '沒有人比我更懂摸魚',
+      brandLabel: 'hip 工作台',
+      brandHeadline: '用智能體交付真實工作',
+      brandDesc: '桌面端 AI 工作台：對話、編碼與產物一站完成，資料留在本地。',
+      brandFeaturesLabel: '產品亮點',
+      feature1: '本地優先，資料由你掌控',
+      feature2: '多智能體協作編排',
+      feature3: '對話、程式碼與預覽一體',
       title: '登錄到 hip',
       subtitle: '選擇一種方式繼續',
       email: '使用郵箱登錄',

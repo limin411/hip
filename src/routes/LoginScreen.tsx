@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
-import { HipLogo } from '@/components/login/HipLogo'
+import { LoginBrandPanel } from '@/components/login/LoginBrandPanel'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useAuthStore } from '@/store/authStore'
 
@@ -19,13 +19,11 @@ export function LoginScreen() {
   return (
     // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
     <div data-tauri-drag-region onPointerDown={handlePointerDown} className="flex h-screen">
-      {/* 左侧品牌区 —— 白底 + 静态吉祥物 */}
-      <div className="relative hidden w-1/2 items-center justify-center overflow-hidden md:flex">
-        <HipLogo size={320} decorative />
-      </div>
+      {/* 左侧品牌宣传区 —— 深灰底 + 文案，无吉祥物 */}
+      <LoginBrandPanel />
 
       {/* 右侧登录方式 */}
-      <div className="flex flex-1 items-center justify-center px-8">
+      <div className="flex w-full items-center justify-center bg-surface px-8 md:w-2/5">
         <div className="w-full max-w-sm" data-tauri-drag-region="false" data-no-drag>
           <h1 className="text-display font-bold tracking-tight text-ink">{t('login.title')}</h1>
           <p className="mt-1.5 text-meta text-ink-secondary">{t('login.subtitle')}</p>

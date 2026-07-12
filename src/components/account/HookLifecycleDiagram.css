@@ -1,0 +1,47 @@
+/* Hooks fishbone — React Flow theming (aligned with DagEditor) */
+
+.hook-fishbone-flow.react-flow {
+  --xy-background-color-default: transparent;
+  --xy-background-pattern-dot-color-default: var(--border);
+  border-radius: 0.5rem;
+}
+
+.hook-fishbone-flow .react-flow__controls {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.hook-fishbone-flow .react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  fill: var(--ink-secondary);
+}
+
+.hook-fishbone-flow .react-flow__controls-button:hover {
+  background: var(--surface-muted);
+}
+
+.hook-fishbone-flow .react-flow__edge.hook-fishbone-spine .react-flow__edge-path {
+  stroke: var(--ink-tertiary);
+  stroke-width: 2.5;
+}
+
+.hook-fishbone-flow .react-flow__edge.hook-fishbone-rib .react-flow__edge-path {
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.hook-fishbone-flow .react-flow__edge.hook-fishbone-rib-on .react-flow__edge-path {
+  stroke: color-mix(in srgb, var(--accent) 70%, var(--border));
+  stroke-width: 1.75;
+}
+
+.hook-fishbone-flow .react-flow__node {
+  font-size: 12px;
+}
+
+.hook-fishbone-flow .react-flow__attribution {
+  display: none;
+}

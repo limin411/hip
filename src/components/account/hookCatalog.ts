@@ -56,3 +56,29 @@ export function configuredHookEvents(plugins: PluginMeta[]): Set<string> {
   }
   return out
 }
+
+export type HookEventSource = {
+  pluginId: string
+  name: string
+  dir: string
+  hookCount: number
+}
+
+/** Map each HookEvent → plugins that declare it (for diagram expand panel). */
+export function sourcesByHookEvent(plugins: PluginMeta[]): Map<string, HookEventSource[]> {
+  const map = new Map<string, HookEventSource[]>()
+  for (const p of plugins) {
+    for (const e of p.hookEvents ?? []) {
+      if (!CATALOG_SET.has(e)) continue
+      const list = map.get(e) ?? []
+      list.push({
+        pluginId: p.id,
+        name: p.name,
+        dir: p.dir,
+        hookCount: p.hookCount,
+      })
+      map.set(e, list)
+    }
+  }
+  return map
+}

@@ -72,7 +72,7 @@ export function HookConfig() {
         <h3 id="hooks-diagram-heading" className="sr-only">
           {t('settings.hooks.diagram.title')}
         </h3>
-        <HookLifecycleDiagram configuredEvents={configuredEvents} />
+        <HookLifecycleDiagram plugins={plugins} />
       </section>
 
       {/* ── Currently configured ─────────────────────────────────────── */}

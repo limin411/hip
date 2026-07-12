@@ -770,11 +770,17 @@ export const zhTW = {
         diagram: {
           title: '生命週期流程圖',
           subtitle: '掛鉤依工作階段 → 輪次 → 工具呼叫 → 收尾順序觸發；反白表示已在外掛中宣告。',
+          subtitleFishbone:
+            '魚骨圖：主脊為工作階段時間線，肋骨為 hook 事件。點擊節點展開或收起該事件已設定的外掛列表。',
           ariaLabel: '掛鉤生命週期流程圖，其中 {{count}} 個事件已設定',
           legendConfigured: '已設定',
           legendAvailable: '可設定',
           configuredBadge: '已設定',
           notConfigured: '未設定',
+          collapse: '收起',
+          expandSources: '{{count}} 個外掛來源',
+          expandEmpty: '尚無外掛宣告',
+          expandEmptyHint: '在外掛 hooks 模組中註冊此 event 後，將顯示於此。',
           phaseSession: '工作階段',
           phaseTurn: '輪次（每次使用者訊息）',
           phaseTurnEnd: '輪次收尾',

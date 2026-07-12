@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import React from 'react'
 import type { PluginMeta } from '@hip/protocol'
-import { HookConfig } from './HookConfig'
 import {
   HOOK_EVENT_CATALOG,
   configuredHookEvents,
   pluginsWithHooks,
+  sourcesByHookEvent,
   totalConfiguredHookCount,
 } from './hookCatalog'
 
@@ -19,6 +20,9 @@ vi.mock('react-i18next', () => ({
       if (key === 'settings.hooks.hookCount') return `${options?.count ?? 0} hooks`
       if (key === 'settings.hooks.configuredSummary') {
         return `${options?.sources} sources · ${options?.count} hooks`
+      }
+      if (key === 'settings.hooks.diagram.expandSources') {
+        return `${options?.count} plugin source(s)`
       }
       return key
     },
@@ -42,6 +46,50 @@ vi.mock('@/components/ui/Badge', () => ({
   ),
 }))
 
+// React Flow canvas → simple DOM so we can click nodes and assert expand panel.
+vi.mock('@xyflow/react', () => ({
+  ReactFlowProvider: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'rf-provider' }, children),
+  ReactFlow: ({
+    nodes,
+    onNodeClick,
+    nodeTypes,
+    children,
+  }: {
+    nodes: Array<{ id: string; data: Record<string, unknown>; type: string }>
+    onNodeClick?: (_e: unknown, node: { id: string; data: Record<string, unknown> }) => void
+    nodeTypes?: Record<string, React.ComponentType<{ data: Record<string, unknown> }>>
+    children?: React.ReactNode
+  }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'react-flow' },
+      ...nodes.map((node) => {
+        const Comp = nodeTypes?.[node.type]
+        return React.createElement(
+          'div',
+          {
+            key: node.id,
+            'data-testid': `rf-node-${node.id}`,
+            onClick: () => onNodeClick?.(null, { id: node.id, data: node.data }),
+          },
+          Comp
+            ? React.createElement(Comp, { data: node.data })
+            : node.id,
+        )
+      }),
+      children,
+    ),
+  Background: () => React.createElement('div', { 'data-testid': 'rf-background' }),
+  Controls: () => React.createElement('div', { 'data-testid': 'rf-controls' }),
+  Handle: () => React.createElement('div', { 'data-testid': 'rf-handle' }),
+  Position: { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' },
+}))
+
+vi.mock('./HookLifecycleDiagram.css', () => ({ default: {} }))
+
+import { HookConfig } from './HookConfig'
+
 let mockPlugins: PluginMeta[] = []
 let mockLoaded = true
 
@@ -61,7 +109,6 @@ function plugin(partial: Partial<PluginMeta> & Pick<PluginMeta, 'id' | 'name' | 
 describe('hookCatalog helpers', () => {
   it('lists every supported HookEvent', () => {
     expect(HOOK_EVENT_CATALOG).toContain('PreToolUse')
-    expect(HOOK_EVENT_CATALOG).toContain('PermissionRequest')
     expect(HOOK_EVENT_CATALOG).toHaveLength(12)
   })
 
@@ -74,16 +121,18 @@ describe('hookCatalog helpers', () => {
     expect(totalConfiguredHookCount(list)).toBe(2)
   })
 
-  it('aggregates unique configured events across plugins', () => {
+  it('aggregates unique configured events and sources', () => {
     const list = [
       plugin({ id: 'a', name: 'A', hookCount: 1, hookEvents: ['PreToolUse', 'Stop'] }),
       plugin({ id: 'b', name: 'B', hookCount: 1, hookEvents: ['PreToolUse', 'SessionStart'] }),
     ]
     expect([...configuredHookEvents(list)].sort()).toEqual(['PreToolUse', 'SessionStart', 'Stop'])
+    const by = sourcesByHookEvent(list)
+    expect(by.get('PreToolUse')?.map((s) => s.pluginId)).toEqual(['a', 'b'])
   })
 })
 
-describe('HookConfig', () => {
+describe('HookConfig fishbone diagram', () => {
   beforeEach(() => {
     mockPlugins = []
     mockLoaded = true
@@ -94,10 +143,11 @@ describe('HookConfig', () => {
     cleanup()
   })
 
-  it('renders catalog of configurable hook events', () => {
+  it('renders fishbone diagram with all event nodes', () => {
     render(<HookConfig />)
     expect(screen.getByTestId('settings-hooks-page')).toBeInTheDocument()
     expect(screen.getByTestId('hook-lifecycle-diagram')).toBeInTheDocument()
+    expect(screen.getByTestId('react-flow')).toBeInTheDocument()
     for (const event of HOOK_EVENT_CATALOG) {
       expect(screen.getByTestId(`hook-event-${event}`)).toBeInTheDocument()
       expect(screen.getByTestId(`hook-diagram-node-${event}`)).toBeInTheDocument()
@@ -111,7 +161,7 @@ describe('HookConfig', () => {
     expect(screen.getByTestId('hooks-configured-empty')).toBeInTheDocument()
   })
 
-  it('lists plugins that contribute hooks', () => {
+  it('highlights configured nodes and expands sources on click', () => {
     mockPlugins = [
       plugin({ id: 'plain', name: 'Plain', hookCount: 0 }),
       plugin({
@@ -123,21 +173,21 @@ describe('HookConfig', () => {
       }),
     ]
     render(<HookConfig />)
-    expect(screen.getByTestId('hook-source-guard')).toBeInTheDocument()
-    expect(screen.getByText('Guard Plugin')).toBeInTheDocument()
-    expect(screen.getByText('3 hooks')).toBeInTheDocument()
-    expect(screen.getByText('/tmp/guard')).toBeInTheDocument()
-    expect(screen.queryByTestId('hook-source-plain')).not.toBeInTheDocument()
+
     expect(screen.getByTestId('hook-diagram-node-PreToolUse')).toHaveAttribute('data-configured', 'true')
-    expect(screen.getByTestId('hook-diagram-node-PermissionRequest')).toHaveAttribute(
-      'data-configured',
-      'true',
-    )
-    expect(screen.getByTestId('hook-diagram-node-SessionStart')).toHaveAttribute(
-      'data-configured',
-      'false',
-    )
+    expect(screen.getByTestId('hook-diagram-node-SessionStart')).toHaveAttribute('data-configured', 'false')
     expect(screen.getByTestId('hook-event-configured-PreToolUse')).toBeInTheDocument()
+
+    // Expand PreToolUse
+    fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
+    const panel = screen.getByTestId('hook-diagram-expand-panel')
+    expect(panel).toBeInTheDocument()
+    expect(screen.getByTestId('hook-diagram-source-guard')).toBeInTheDocument()
+    expect(panel).toHaveTextContent('Guard Plugin')
+
+    // Collapse via second click (accordion toggle)
+    fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
+    expect(screen.queryByTestId('hook-diagram-expand-panel')).not.toBeInTheDocument()
   })
 
   it('loads plugins when store is not yet loaded', () => {

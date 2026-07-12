@@ -770,11 +770,17 @@ export const zhCN = {
         diagram: {
           title: '生命周期流程图',
           subtitle: '挂钩按会话 → 轮次 → 工具调用 → 收尾的顺序触发；高亮表示已在插件中声明。',
+          subtitleFishbone:
+            '鱼骨图：主脊为会话阶段，肋骨为 hook 事件。点击节点展开或收起该事件已配置的插件列表。',
           ariaLabel: '挂钩生命周期流程图，其中 {{count}} 个事件已配置',
           legendConfigured: '已配置',
           legendAvailable: '可配置',
           configuredBadge: '已配置',
           notConfigured: '未配置',
+          collapse: '收起',
+          expandSources: '{{count}} 个插件来源',
+          expandEmpty: '暂无插件声明',
+          expandEmptyHint: '在插件 hooks 模块中注册此 event 后，将显示在此处。',
           phaseSession: '会话',
           phaseTurn: '轮次（每次用户消息）',
           phaseTurnEnd: '轮次收尾',

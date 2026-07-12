@@ -776,11 +776,17 @@ export const en = {
         diagram: {
           title: 'Lifecycle diagram',
           subtitle: 'Hooks fire in session → turn → tool call → wrap-up order. Highlighted nodes are declared by plugins.',
+          subtitleFishbone:
+            'Fishbone: the spine is the session timeline; ribs are hook events. Click a node to expand or collapse plugins that declare it.',
           ariaLabel: 'Hook lifecycle diagram with {{count}} configured events',
           legendConfigured: 'Configured',
           legendAvailable: 'Available',
           configuredBadge: 'On',
           notConfigured: 'Off',
+          collapse: 'Collapse',
+          expandSources: '{{count}} plugin source(s)',
+          expandEmpty: 'No plugins declare this',
+          expandEmptyHint: 'Register this event in a plugin hooks module to list sources here.',
           phaseSession: 'Session',
           phaseTurn: 'Turn (each user message)',
           phaseTurnEnd: 'Turn wrap-up',

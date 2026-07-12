@@ -8,6 +8,7 @@ import { sessionService } from '@/domain'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }))
 
 vi.mock('@radix-ui/react-dropdown-menu', () => ({
@@ -21,6 +22,10 @@ vi.mock('@radix-ui/react-dropdown-menu', () => ({
   Separator: () => <hr />,
   Group: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Label: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 vi.mock('@/domain', () => ({

@@ -118,16 +118,24 @@ describe('terminal gating matrix', () => {
   })
 
   it('activeTab is not persisted (leftover terminal is in-memory only)', () => {
-    // partialize only codeSessionId + theme — terminal tab is session-local UI state
-    const partialize = (s: { codeSessionId: string | null; theme: string; activeTab: string }) => ({
+    // hip-ui partialize includes tabs/settings but never activeTab — terminal is session-local UI state
+    const partialize = (s: {
+      codeSessionId: string | null
+      theme: string
+      openSessionIds: string[]
+      activeTab: string
+    }) => ({
       codeSessionId: s.codeSessionId,
       theme: s.theme,
+      openSessionIds: s.openSessionIds,
     })
     const persisted = partialize({
       codeSessionId: 's1',
       theme: 'dark',
+      openSessionIds: ['s1'],
       activeTab: 'terminal',
     })
     expect(persisted).not.toHaveProperty('activeTab')
+    expect(persisted.openSessionIds).toEqual(['s1'])
   })
 })

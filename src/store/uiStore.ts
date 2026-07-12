@@ -8,9 +8,57 @@ export type ActiveView = 'chat' | 'code' | 'settings' | 'history'
 export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
+export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
 export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'hooks' | 'memory'
+
+const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
+
+function isAppLanguage(v: unknown): v is AppLanguage {
+  return typeof v === 'string' && (APP_LANGUAGES as readonly string[]).includes(v)
+}
+
+/** Resolve a stored / browser language tag to one of the three app locales. */
+export function normalizeAppLanguage(raw: string | null | undefined): AppLanguage | null {
+  if (!raw) return null
+  if (isAppLanguage(raw)) return raw
+  if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
+  if (raw.startsWith('zh')) return 'zh-CN'
+  if (raw.startsWith('en')) return 'en'
+  return null
+}
+
+/** Seed language before rehydrate: prefer i18next cache, then navigator, then zh-CN. */
+function seedLanguage(): AppLanguage {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const fromI18n = normalizeAppLanguage(localStorage.getItem('i18nextLng'))
+      if (fromI18n) return fromI18n
+    } catch {
+      // ignore
+    }
+  }
+  if (typeof navigator !== 'undefined') {
+    const fromNav = normalizeAppLanguage(navigator.language)
+    if (fromNav) return fromNav
+  }
+  return 'zh-CN'
+}
+
+/** Slice of uiStore written to localStorage under `hip-ui`. */
+export type UiPersistedState = {
+  openSessionIds: string[]
+  chatSessionId: string | null
+  codeSessionId: string | null
+  activeView: ActiveView
+  theme: Theme
+  language: AppLanguage
+  settingsPage: SettingsPageId
+  settingsNavCollapsed: boolean
+  diffViewMode: 'unified' | 'split'
+  checkpointMode: CheckpointMode
+}
 
 interface UiState {
   settingsNavCollapsed: boolean
@@ -35,14 +83,13 @@ interface UiState {
   selectedArtifactPath: string | null
   setSelectedArtifactPath: (p: string | null) => void
 
-  // Per-surface open conversation. codeSessionId is persisted (Code restores last on launch);
-  // chatSessionId is in-memory only (Chat opens new on cold launch — industry norm).
+  // Per-surface open conversation (persisted; restored with openSessionIds on launch).
   chatSessionId: string | null
   setChatSessionId: (id: string | null) => void
   codeSessionId: string | null
   setCodeSessionId: (id: string | null) => void
 
-  // Browser-style session tabs in the title bar.
+  // Browser-style session tabs in the title bar (persisted; pruned against session:list on ready).
   openSessionIds: string[]
   addOpenSession: (id: string) => void
   removeOpenSession: (id: string) => void
@@ -60,6 +107,9 @@ interface UiState {
 
   theme: Theme
   setTheme: (t: Theme) => void
+
+  language: AppLanguage
+  setLanguage: (l: AppLanguage) => void
 }
 
 // In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
@@ -72,7 +122,7 @@ function memoryStorage(): StateStorage {
   }
 }
 
-const storage = createJSONStorage<{ codeSessionId: string | null; theme: Theme }>(() =>
+const storage = createJSONStorage<UiPersistedState>(() =>
   typeof localStorage !== 'undefined' ? localStorage : memoryStorage(),
 )
 
@@ -137,7 +187,33 @@ export const useUiStore = create<UiState>()(
 
       theme: 'system',
       setTheme: (t) => set((s) => (s.theme === t ? s : { theme: t })),
+
+      language: seedLanguage(),
+      setLanguage: (l) => set((s) => (s.language === l ? s : { language: l })),
     }),
-    { name: 'hip-ui', storage, partialize: (s) => ({ codeSessionId: s.codeSessionId, theme: s.theme }) },
+    {
+      name: 'hip-ui',
+      storage,
+      partialize: (s): UiPersistedState => ({
+        openSessionIds: s.openSessionIds,
+        chatSessionId: s.chatSessionId,
+        codeSessionId: s.codeSessionId,
+        activeView: s.activeView,
+        theme: s.theme,
+        language: s.language,
+        settingsPage: s.settingsPage,
+        settingsNavCollapsed: s.settingsNavCollapsed,
+        diffViewMode: s.diffViewMode,
+        checkpointMode: s.checkpointMode,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        // Clamp language from older / partial storage (i18n sync is owned by LanguageProvider).
+        const lang = isAppLanguage(state.language) ? state.language : seedLanguage()
+        if (state.language !== lang) {
+          useUiStore.setState({ language: lang })
+        }
+      },
+    },
   ),
 )

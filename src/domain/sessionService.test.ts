@@ -166,6 +166,65 @@ describe('SessionService', () => {
     expect(useUiStore.getState().openSessionIds).toEqual([a])
   })
 
+  it('session:list:result restores open tabs and selects the remembered session', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({
+      openSessionIds: ['gone', 'keep-chat', 'keep-code'],
+      activeView: 'chat',
+      chatSessionId: 'keep-chat',
+      codeSessionId: 'keep-code',
+    })
+
+    t.push({
+      type: 'session:list:result',
+      sessions: [
+        { id: 'keep-chat', title: 'Chat', preview: '', updatedAt: 2, messageCount: 1, surface: 'chat' },
+        { id: 'keep-code', title: 'Code', preview: '', updatedAt: 1, messageCount: 1, surface: 'code' },
+      ],
+    })
+
+    expect(useUiStore.getState().openSessionIds).toEqual(['keep-chat', 'keep-code'])
+    expect(useDomainStore.getState().activeSessionId).toBe('keep-chat')
+    expect(useUiStore.getState().activeView).toBe('chat')
+  })
+
+  it('session:list:result keeps an already-active session and only prunes missing tabs', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    useDomainStore.setState({
+      sessions: [{
+        id: 'live',
+        config: { ...DEFAULT_CONFIG, surface: 'chat' },
+        title: 'Live',
+        preview: '',
+        updatedAtMs: 1,
+        loaded: true,
+        messages: [],
+        status: 'idle',
+        error: null,
+      }],
+      activeSessionId: 'live',
+    })
+    useUiStore.setState({
+      openSessionIds: ['live', 'stale'],
+      activeView: 'chat',
+      chatSessionId: 'live',
+    })
+
+    t.push({
+      type: 'session:list:result',
+      sessions: [
+        { id: 'live', title: 'Live', preview: '', updatedAt: 1, messageCount: 1, surface: 'chat' },
+        { id: 'other', title: 'Other', preview: '', updatedAt: 0, messageCount: 0, surface: 'chat' },
+      ],
+    })
+
+    expect(useUiStore.getState().openSessionIds).toEqual(['live'])
+    expect(useDomainStore.getState().activeSessionId).toBe('live')
+  })
+
   it('previewSurface changes activeView without restoring a remembered session', () => {
     const svc = new SessionService(new FakeTransport())
     const id = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })

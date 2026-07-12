@@ -209,6 +209,11 @@ export class SessionService {
       requestCommitLog: (sessionId) => this.requestCommitLog(sessionId),
       resyncActiveIfRunning: () => this.resyncActiveIfRunning(),
     })
+    // After the session catalog lands (or re-lands on reconnect), re-attach open tabs
+    // from localStorage and re-select the last active conversation when needed.
+    if (msg.type === 'session:list:result') {
+      this.restoreOpenTabsFromPersistence()
+    }
     // E2E seed wins over empty/real sidecar list:result for the seeded session.
     if (
       msg.type === 'git:checkpoint:list:result' &&
@@ -219,6 +224,77 @@ export class SessionService {
       useDiffStore.getState().setCheckpoints(seed.sessionId, seed.checkpoints, true, seed.branch)
     }
     this.fulfillWaiters(msg)
+  }
+
+  /**
+   * Wait for hip-ui rehydration (openSessionIds / surface pointers) then prune + restore.
+   * session:list:result can race persist rehydrate on cold start.
+   */
+  private restoreOpenTabsFromPersistence(): void {
+    const run = () => this.applyRestoredOpenTabs()
+    const api = useUiStore.persist
+    if (api.hasHydrated()) {
+      run()
+      return
+    }
+    api.onFinishHydration(run)
+  }
+
+  /**
+   * Prune persisted open tabs to sessions that still exist, then select the remembered
+   * active conversation for the current surface (cold launch / reconnect with no active).
+   */
+  private applyRestoredOpenTabs(): void {
+    const sessions = useDomainStore.getState().sessions
+    const existing = new Set(sessions.map((s) => s.id))
+    const ui = useUiStore.getState()
+
+    const pruned = ui.openSessionIds.filter((id) => existing.has(id))
+    if (
+      pruned.length !== ui.openSessionIds.length ||
+      pruned.some((id, i) => id !== ui.openSessionIds[i])
+    ) {
+      ui.reorderOpenSessions(pruned)
+    }
+
+    if (ui.chatSessionId != null && !existing.has(ui.chatSessionId)) {
+      ui.setChatSessionId(null)
+    }
+    if (ui.codeSessionId != null && !existing.has(ui.codeSessionId)) {
+      ui.setCodeSessionId(null)
+    }
+
+    const active = useDomainStore.getState().activeSessionId
+    // Reconnect while a tab is already live: keep selection; only ensure it's in the open list.
+    if (active != null && existing.has(active)) {
+      if (!useUiStore.getState().openSessionIds.includes(active)) {
+        useUiStore.getState().addOpenSession(active)
+      }
+      return
+    }
+
+    const st = useUiStore.getState()
+    // Settings / history: tabs stay restored in state for when the user leaves the special view.
+    if (st.activeView === 'settings' || st.activeView === 'history') return
+
+    const surface: Surface = st.activeView === 'code' ? 'code' : 'chat'
+    const matchesSurface = (id: string) =>
+      sessions.some((s) => s.id === id && surfaceOf(s.config) === surface)
+
+    let want = surface === 'chat' ? st.chatSessionId : st.codeSessionId
+    if (want == null || !existing.has(want) || !pruned.includes(want) || !matchesSurface(want)) {
+      want =
+        pruned.find((id) => matchesSurface(id)) ??
+        (pruned.length > 0 ? pruned[0] : null)
+    }
+
+    if (want != null) {
+      this.selectSession(want)
+      // selectSession prepends the id; put the bar back to the persisted order.
+      useUiStore.getState().reorderOpenSessions(pruned)
+    } else {
+      useDomainStore.getState().deselect()
+    }
   }
 
   /**
@@ -508,8 +584,8 @@ export class SessionService {
   }
 
   /** Switch the active top-level surface. Snapshots the leaving surface's open conversation, then
-   *  restores the entering surface's (validated against the loaded list + its surface). Code restores
-   *  its last conversation; Chat starts at new-conversation on cold launch (chatSessionId starts null). */
+   *  restores the entering surface's (validated against the loaded list + its surface). Both Chat and
+   *  Code restore their last conversation from the persisted surface pointer when present. */
   setSurface(view: Surface): void {
     const cur = useUiStore.getState().activeView
     const activeId = useDomainStore.getState().activeSessionId

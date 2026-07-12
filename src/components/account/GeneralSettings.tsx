@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useUiStore, type Theme } from '@/store/uiStore'
+import { useUiStore, type AppLanguage, type Theme } from '@/store/uiStore'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,8 +11,7 @@ import {
 import { ContextMenuSettings } from '@/components/context-menu/ContextMenuSettings'
 import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 
-const LANGUAGE_KEYS = ['zh-CN', 'zh-TW', 'en'] as const
-type LanguageKey = (typeof LANGUAGE_KEYS)[number]
+const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
 
 const THEME_KEYS: Theme[] = ['light', 'dark', 'system']
 
@@ -20,11 +19,9 @@ const selectTriggerCls =
   'flex cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
 
 export function GeneralSettings() {
-  const { t, i18n } = useTranslation()
-  const currentLang: LanguageKey = LANGUAGE_KEYS.includes(i18n.language as LanguageKey)
-    ? (i18n.language as LanguageKey)
-    : LANGUAGE_KEYS[0]
-
+  const { t } = useTranslation()
+  const language = useUiStore((s) => s.language)
+  const setLanguage = useUiStore((s) => s.setLanguage)
   const theme = useUiStore((s) => s.theme)
   const setTheme = useUiStore((s) => s.setTheme)
 
@@ -42,14 +39,14 @@ export function GeneralSettings() {
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={selectTriggerCls}>
-                <span>{t(`settings.languages.${currentLang}`)}</span>
+                <span>{t(`settings.languages.${language}`)}</span>
                 <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {LANGUAGE_KEYS.map((lang) => (
-                <DropdownMenuItem key={lang} onSelect={() => i18n.changeLanguage(lang)}>
-                  <Check size={14} className={cn('shrink-0', currentLang === lang ? 'opacity-100' : 'opacity-0')} />
+                <DropdownMenuItem key={lang} onSelect={() => setLanguage(lang)}>
+                  <Check size={14} className={cn('shrink-0', language === lang ? 'opacity-100' : 'opacity-0')} />
                   <span>{t(`settings.languages.${lang}`)}</span>
                 </DropdownMenuItem>
               ))}

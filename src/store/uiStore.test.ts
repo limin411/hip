@@ -1,13 +1,20 @@
 // src/store/uiStore.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useUiStore } from './uiStore'
+import { useUiStore, normalizeAppLanguage, type UiPersistedState } from './uiStore'
 
 beforeEach(() => {
   useUiStore.setState({
     settingsNavCollapsed: false,
     activeTab: 'agents',
     theme: 'system',
+    language: 'zh-CN',
     openSessionIds: [],
+    chatSessionId: null,
+    codeSessionId: null,
+    activeView: 'chat',
+    settingsPage: 'general',
+    diffViewMode: 'unified',
+    checkpointMode: 'this-turn',
   })
 })
 
@@ -229,6 +236,35 @@ describe('uiStore - theme', () => {
   })
 })
 
+describe('uiStore - language', () => {
+  it('setLanguage switches locales', () => {
+    useUiStore.getState().setLanguage('en')
+    expect(useUiStore.getState().language).toBe('en')
+
+    useUiStore.getState().setLanguage('zh-TW')
+    expect(useUiStore.getState().language).toBe('zh-TW')
+  })
+
+  it('setLanguage to the same value is a no-op', () => {
+    useUiStore.getState().setLanguage('zh-CN')
+    const before = useUiStore.getState()
+    useUiStore.getState().setLanguage('zh-CN')
+    expect(useUiStore.getState()).toBe(before)
+  })
+})
+
+describe('normalizeAppLanguage', () => {
+  it('maps browser tags onto app locales', () => {
+    expect(normalizeAppLanguage('zh-CN')).toBe('zh-CN')
+    expect(normalizeAppLanguage('zh-TW')).toBe('zh-TW')
+    expect(normalizeAppLanguage('en')).toBe('en')
+    expect(normalizeAppLanguage('en-US')).toBe('en')
+    expect(normalizeAppLanguage('zh-HK')).toBe('zh-TW')
+    expect(normalizeAppLanguage('zh')).toBe('zh-CN')
+    expect(normalizeAppLanguage('fr')).toBeNull()
+  })
+})
+
 describe('uiStore open sessions', () => {
   beforeEach(() => {
     useUiStore.setState({ openSessionIds: [] })
@@ -255,5 +291,52 @@ describe('uiStore open sessions', () => {
     useUiStore.getState().addOpenSession('s2')
     useUiStore.getState().addOpenSession('s1')
     expect(useUiStore.getState().openSessionIds).toEqual(['s1', 's2'])
+  })
+})
+
+describe('uiStore persistence partialize', () => {
+  it('includes open tabs, surface pointers, and settings (not ephemeral UI)', () => {
+    useUiStore.setState({
+      openSessionIds: ['a', 'b'],
+      chatSessionId: 'a',
+      codeSessionId: 'c',
+      activeView: 'code',
+      theme: 'dark',
+      language: 'en',
+      settingsPage: 'model',
+      settingsNavCollapsed: true,
+      diffViewMode: 'split',
+      checkpointMode: 'since-start',
+      activeTab: 'terminal',
+      scrollTargetMessageId: 'm1',
+      selectedArtifactPath: '/x',
+    })
+    const s = useUiStore.getState()
+    const persisted: UiPersistedState = {
+      openSessionIds: s.openSessionIds,
+      chatSessionId: s.chatSessionId,
+      codeSessionId: s.codeSessionId,
+      activeView: s.activeView,
+      theme: s.theme,
+      language: s.language,
+      settingsPage: s.settingsPage,
+      settingsNavCollapsed: s.settingsNavCollapsed,
+      diffViewMode: s.diffViewMode,
+      checkpointMode: s.checkpointMode,
+    }
+    expect(persisted).toEqual({
+      openSessionIds: ['a', 'b'],
+      chatSessionId: 'a',
+      codeSessionId: 'c',
+      activeView: 'code',
+      theme: 'dark',
+      language: 'en',
+      settingsPage: 'model',
+      settingsNavCollapsed: true,
+      diffViewMode: 'split',
+      checkpointMode: 'since-start',
+    })
+    expect(persisted).not.toHaveProperty('activeTab')
+    expect(persisted).not.toHaveProperty('scrollTargetMessageId')
   })
 })

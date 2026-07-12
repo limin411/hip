@@ -15,9 +15,14 @@ i18n
       en,
     },
     fallbackLng: 'zh-CN',
+    // Exact codes only. Do NOT enable nonExplicitSupportedLngs: it breaks lookup for
+    // region-tagged locales like zh-CN / zh-TW (bundle exists but t() returns keys).
+    // Browser tags (en-US, zh, …) are normalized in uiStore / LanguageProvider instead.
+    supportedLngs: ['zh-CN', 'zh-TW', 'en'],
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
+      lookupLocalStorage: 'i18nextLng',
     },
     interpolation: {
       escapeValue: false,

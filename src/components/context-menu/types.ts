@@ -66,7 +66,8 @@ export type ContextPayloadMap = {
   diffHunk: { path: string; header?: string; text: string }
   checkpoint: { checkpointId: string; sessionId: string }
   commit: { sha: string; shortSha: string; message: string; sessionId: string }
-  terminal: { sessionId: string; status: string }
+  /** `target` distinguishes chrome vs xterm canvas (ControlledContextMenu). */
+  terminal: { sessionId: string; status: string; target?: 'chrome' | 'canvas' }
   /**
    * Settings agent row. Hosts supply onEdit/onDelete so menus reuse existing
    * editor / delete-dialog state (same as kebab actions).

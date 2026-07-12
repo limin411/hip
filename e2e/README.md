@@ -2,7 +2,9 @@
 
 WebdriverIO + `@wdio/tauri-service` against a debug Tauri binary and Vite on `:1420`.
 
-Full plan: [`docs/superpowers/specs/2026-07-10-e2e-test-plan.md`](../docs/superpowers/specs/2026-07-10-e2e-test-plan.md).
+Harness overview lives in this file. Feature plans:
+
+- Context menu (recent): [`docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md`](../docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md)
 
 ## Prerequisites
 
@@ -75,6 +77,13 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@settings` | Settings smoke, usage chip | optional |
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
+| `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
+
+Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`.
+
+```bash
+E2E_GREP=@context-menu yarn test:e2e
+```
 
 ## Isolation notes
 

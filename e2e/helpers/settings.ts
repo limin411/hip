@@ -13,9 +13,11 @@ export async function openSettings(): Promise<void> {
 }
 
 export async function closeSettings(): Promise<void> {
-  await settings.backButton.click()
+  const back = await settings.backButton
+  if (!(await back.isExisting())) return
+  await browser.execute((el: HTMLElement) => el.click(), back)
   await browser.waitUntil(
-    async () => !(await settings.backButton.isExisting()),
+    async () => !(await (await settings.backButton).isExisting()),
     { timeout: 10000, interval: 200 },
   )
 }

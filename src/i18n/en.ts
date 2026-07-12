@@ -771,6 +771,16 @@ export const en = {
       tabList: 'Open sessions',
     },
     contextMenu: {
+      file: {
+        open: 'Open',
+        copyPath: 'Copy path',
+        copyRelativePath: 'Copy relative path',
+        copyName: 'Copy name',
+        openContainingFolder: 'Open containing folder',
+        refresh: 'Refresh',
+        pathOutsideCwd: 'Path is outside the project folder',
+        openContainingFolderFailed: 'Could not open folder',
+      },
       copyFailed: 'Could not copy to clipboard',
       sessionTab: {
         rename: 'Rename…',

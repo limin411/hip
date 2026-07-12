@@ -765,6 +765,16 @@ export const zhCN = {
       tabList: '打开的会话',
     },
     contextMenu: {
+      file: {
+        open: '打开',
+        copyPath: '复制路径',
+        copyRelativePath: '复制相对路径',
+        copyName: '复制名称',
+        openContainingFolder: '打开所在文件夹',
+        refresh: '刷新',
+        pathOutsideCwd: '路径不在项目文件夹内',
+        openContainingFolderFailed: '无法打开文件夹',
+      },
       copyFailed: '无法复制到剪贴板',
       sessionTab: {
         rename: '重命名…',

@@ -765,6 +765,16 @@ export const zhTW = {
       tabList: '開啟的工作階段',
     },
     contextMenu: {
+      file: {
+        open: '開啟',
+        copyPath: '複製路徑',
+        copyRelativePath: '複製相對路徑',
+        copyName: '複製名稱',
+        openContainingFolder: '開啟所在資料夾',
+        refresh: '重新整理',
+        pathOutsideCwd: '路徑不在專案資料夾內',
+        openContainingFolderFailed: '無法開啟資料夾',
+      },
       copyFailed: '無法複製到剪貼簿',
       sessionTab: {
         rename: '重新命名…',

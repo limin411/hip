@@ -795,7 +795,6 @@ export const en = {
       sticker1: '✦ ship it',
       sticker2: 'local only',
       sticker3: 'no drama',
-      liveBadge: 'live',
       title: 'Log in to hip',
       subtitle: 'Choose a way to continue',
       email: 'Continue with Email',

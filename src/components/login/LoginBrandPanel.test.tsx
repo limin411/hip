@@ -37,7 +37,6 @@ describe('LoginBrandPanel', () => {
 
     expect(getByText(i18n.t('login.brandHeadline'))).toBeInTheDocument()
     expect(getByText(i18n.t('login.slogan'))).toBeInTheDocument()
-    expect(getByText(i18n.t('login.liveBadge'))).toBeInTheDocument()
     // public/motion row (3× crossfade stages), not the static logo mark
     expect(container.querySelectorAll('[data-mascot-action]').length).toBe(3)
     expect(container.querySelectorAll('[data-mascot-crossfade="true"]').length).toBe(3)

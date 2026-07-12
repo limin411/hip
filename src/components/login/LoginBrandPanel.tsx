@@ -434,17 +434,6 @@ export function LoginBrandPanel() {
             gsap.delayedCall(4.2, repeat)
           })
         }
-
-        const pulse = root.querySelector<HTMLElement>('[data-live-pulse]')
-        if (pulse) {
-          gsap.to(pulse, {
-            scale: 1.6,
-            opacity: 0,
-            duration: 1.6,
-            ease: 'power1.out',
-            repeat: -1,
-          })
-        }
       }, root)
 
       const light = cursorLightRef.current
@@ -896,7 +885,7 @@ export function LoginBrandPanel() {
         {/* Footer bar */}
         <div
           data-brand-item
-          className="flex items-end justify-between gap-6 border-t border-ink/10 pt-5"
+          className="border-t border-ink/10 pt-5"
           style={{ opacity: 0 }}
         >
           <p
@@ -905,19 +894,6 @@ export function LoginBrandPanel() {
           >
             {t('login.slogan')}
           </p>
-          <div className="flex items-center gap-2" aria-hidden>
-            <span
-              data-live-pulse
-              className="h-2 w-2 rounded-full"
-              style={{ backgroundColor: PLAY_COLORS.mint }}
-            />
-            <span
-              className="rounded-full px-2 py-0.5 text-caption font-bold uppercase tracking-[0.18em] text-white"
-              style={{ backgroundColor: PLAY_COLORS.mint }}
-            >
-              {t('login.liveBadge')}
-            </span>
-          </div>
         </div>
       </div>
     </div>

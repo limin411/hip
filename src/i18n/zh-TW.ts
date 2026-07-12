@@ -789,7 +789,6 @@ export const zhTW = {
       sticker1: '✦ 開搞',
       sticker2: '本地優先',
       sticker3: '摸魚合法',
-      liveBadge: '線上',
       title: '登錄到 hip',
       subtitle: '選擇一種方式繼續',
       email: '使用郵箱登錄',

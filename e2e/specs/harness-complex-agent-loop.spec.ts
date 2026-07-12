@@ -2,7 +2,7 @@
 // Chains: turn+tool → multi-agent collab → permission HITL → cancel keeps partial.
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   createCodeSessionForE2e,
@@ -25,6 +25,7 @@ describe('harness complex agent loop @harness @core', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
     await switchToCodeSurface()
   })

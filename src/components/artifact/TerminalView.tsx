@@ -424,7 +424,11 @@ export function TerminalView() {
           kind="terminal"
           payload={{ sessionId, status, target: 'canvas' }}
           open={canvasMenu.open}
-          onOpenChange={(open) => setCanvasMenu((m) => ({ ...m, open }))}
+          onOpenChange={(open) => {
+            setCanvasMenu((m) => ({ ...m, open }))
+            // After dismiss, return keyboard focus to xterm (virtual anchor must not keep it).
+            if (!open) termRef.current?.focus()
+          }}
           point={canvasMenu.open ? { x: canvasMenu.x, y: canvasMenu.y } : null}
         />
       ) : null}

@@ -93,9 +93,14 @@ describe('applyPrefs', () => {
     ])
   })
 
-  it('returns all when disabledIds empty', () => {
-    const items = [item({ id: 'a', group: 'primary' })]
-    expect(applyPrefs(items, { version: 1, disabledIds: [] })).toEqual(items)
+  it('returns all when disabledIds empty and strips leading separator', () => {
+    const items = [
+      item({ id: 'a', group: 'primary', separatorBefore: true }),
+      item({ id: 'b', group: 'primary' }),
+    ]
+    const out = applyPrefs(items, { version: 1, disabledIds: [] })
+    expect(out.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(out[0]?.separatorBefore).toBeFalsy()
   })
 
   it('does not leave a leading separator when the first group is fully disabled', () => {

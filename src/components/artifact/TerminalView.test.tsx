@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent, cleanup, waitFor } from '@testing-library/react'
 import { useTerminalStore } from '@/store/terminalStore'
 
 const pickDirectory = vi.fn()
@@ -200,7 +200,9 @@ describe('TerminalView', () => {
     render(<TerminalView />)
     await waitFor(() => expect(ptyOpen).toHaveBeenCalled())
     const host = screen.getByTestId('terminal-xterm')
-    fireEvent.contextMenu(host, { clientX: 42, clientY: 77 })
+    const ev = createEvent.contextMenu(host, { clientX: 42, clientY: 77 })
+    fireEvent(host, ev)
+    expect(ev.defaultPrevented).toBe(true)
     const menu = await screen.findByTestId('controlled-context-menu-stub')
     expect(menu).toHaveAttribute('data-x', '42')
     expect(menu).toHaveAttribute('data-y', '77')

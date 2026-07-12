@@ -107,6 +107,10 @@ export function ControlledContextMenu<K extends ContextKind>({
           sideOffset={0}
           alignOffset={0}
           data-testid="controlled-context-menu-content"
+          // Virtual anchor must not steal focus on dismiss — keep xterm / host focused.
+          onCloseAutoFocus={(e) => {
+            e.preventDefault()
+          }}
         >
           {items.map((item) => (
             <ControlledMenuItemRow key={item.id} item={item} />

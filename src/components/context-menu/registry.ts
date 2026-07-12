@@ -1,32 +1,28 @@
 import type {
   ContextGroupId,
-  ContextKind,
   ContextMenuBuildContext,
   ContextMenuItemDef,
   ContextMenuPrefs,
   ContextProvider,
   ContextRequest,
 } from './types'
-import { groupRank } from './groupOrder'
 import { loadPrefs } from './prefs'
-import { codeBlockProvider } from './providers/codeBlock'
-import { messageProvider } from './providers/message'
-import { sessionHistoryProvider } from './providers/sessionHistory'
-import { sessionTabProvider } from './providers/sessionTab'
-import { fileEntryProvider } from './providers/fileEntry'
-
-export { GROUP_ORDER, groupRank, sortMetaByGroup } from './groupOrder'
+import { checkpointProvider } from './providers/checkpoint'
+import { commitProvider } from './providers/commit'
+import { diffFileProvider } from './providers/diffFile'
+import { diffHunkProvider } from './providers/diffHunk'
+import { terminalProvider } from './providers/terminal'
 
 /**
  * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
- * Surface PRs import and append here (message, codeBlock, sessionTab, fileEntry, …).
+ * Surface PRs import and append here (message, codeBlock, sessionTab, …).
  */
 const BUILTIN_PROVIDERS: ContextProvider[] = [
-  codeBlockProvider,
-  messageProvider,
-  sessionHistoryProvider,
-  sessionTabProvider,
-  fileEntryProvider,
+  diffFileProvider,
+  diffHunkProvider,
+  checkpointProvider,
+  commitProvider,
+  terminalProvider,
 ]
 
 const extraProviders: ContextProvider[] = []
@@ -43,6 +39,25 @@ export function registerContextProvider(provider: ContextProvider): () => void {
 /** Test helper: clear all extra providers. Builtins always remain. */
 export function clearContextProviders(): void {
   extraProviders.length = 0
+}
+
+/** Stable group order for merge (not user-editable in PR-1). */
+const GROUP_ORDER: ContextGroupId[] = [
+  'primary',
+  'edit',
+  'clipboard',
+  'navigation',
+  'session',
+  'workspace',
+  'git',
+  'debug',
+  'danger',
+  'extensions',
+]
+
+function groupRank(group: ContextGroupId): number {
+  const i = GROUP_ORDER.indexOf(group)
+  return i >= 0 ? i : GROUP_ORDER.length
 }
 
 /**
@@ -102,49 +117,17 @@ export function restampSeparators(items: ContextMenuItemDef[]): ContextMenuItemD
   })
 }
 
-/**
- * Reorder items using a preferred id list.
- * Known ids appear first in `order` sequence; unknown ids keep relative order after.
- */
-export function applyOrderByIds(
-  items: ContextMenuItemDef[],
-  order: string[],
-): ContextMenuItemDef[] {
-  if (!order.length || items.length <= 1) return items
-  const byId = new Map(items.map((item) => [item.id, item]))
-  const ordered: ContextMenuItemDef[] = []
-  const used = new Set<string>()
-  for (const id of order) {
-    const item = byId.get(id)
-    if (item && !used.has(id)) {
-      ordered.push(item)
-      used.add(id)
-    }
-  }
-  for (const item of items) {
-    if (!used.has(item.id)) ordered.push(item)
-  }
-  return ordered
-}
-
-/**
- * Filter disabledIds, optionally reorder via orderByKind[kind], then restamp separators.
+/** PR-1: filter disabledIds only. orderByKind deferred to PR-7.
+ * Always restamp separators so a leading separatorBefore never survives merge
+ * (e.g. empty disabledIds used to early-return without restamp).
  */
 export function applyPrefs(
   items: ContextMenuItemDef[],
   prefs: ContextMenuPrefs = loadPrefs(),
-  kind?: ContextKind,
 ): ContextMenuItemDef[] {
-  let next = items
-  if (prefs.disabledIds.length) {
-    const disabled = new Set(prefs.disabledIds)
-    next = next.filter((item) => !disabled.has(item.id))
-  }
-  if (kind && prefs.orderByKind?.[kind]?.length) {
-    next = applyOrderByIds(next, prefs.orderByKind[kind]!)
-  }
-  if (next === items) return items
-  return restampSeparators(next)
+  if (!prefs.disabledIds.length) return restampSeparators(items)
+  const disabled = new Set(prefs.disabledIds)
+  return restampSeparators(items.filter((item) => !disabled.has(item.id)))
 }
 
 export function buildContextMenuItems(
@@ -155,5 +138,5 @@ export function buildContextMenuItems(
   const raw = [...BUILTIN_PROVIDERS, ...extraProviders]
     .flatMap((p) => p(req, ctx))
     .filter((item) => Boolean(item?.id))
-  return applyPrefs(mergeByGroup(raw), prefs, req.kind)
+  return applyPrefs(mergeByGroup(raw), prefs)
 }

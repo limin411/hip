@@ -32,6 +32,8 @@ function canvasItems(
   ctx: Parameters<ContextProvider>[1],
 ): ContextMenuItemDef[] {
   const hasSel = terminalCanvasHasSelection()
+  // Single group so mergeByGroup preserves copy → paste → restart (not primary-first).
+  // Manual separatorBefore on restart stays meaningful within the group.
   return [
     {
       id: 'terminal.copySelection',
@@ -58,7 +60,7 @@ function canvasItems(
     {
       id: 'terminal.restart',
       label: ctx.t('contextMenu.terminal.restart'),
-      group: 'primary',
+      group: 'clipboard',
       icon: 'history',
       separatorBefore: true,
       run: async () => {

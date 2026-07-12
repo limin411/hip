@@ -4,6 +4,7 @@ import {
   bindTerminalCanvas,
 } from '@/components/artifact/terminalCanvasUi'
 import { useDomainStore } from '@/domain/sessionStore'
+import { buildContextMenuItems } from '../registry'
 import { terminalProvider } from './terminal'
 import type { ContextMenuBuildContext } from '../types'
 
@@ -146,5 +147,24 @@ describe('terminalProvider', () => {
     const copy = items.find((i) => i.id === 'terminal.copySelection')!
     expect(copy.disabled).toBe(true)
     expect(copy.disabledReason).toBe('contextMenu.terminal.copySelectionDisabled')
+  })
+
+  it('buildContextMenuItems preserves canvas order and strips leading separator', () => {
+    bindTerminalCanvas({
+      getSelection: () => 'x',
+      hasSelection: () => true,
+      paste: () => {},
+    })
+    const items = buildContextMenuItems(
+      { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
+      makeCtx(),
+    )
+    expect(items.map((i) => i.id)).toEqual([
+      'terminal.copySelection',
+      'terminal.paste',
+      'terminal.restart',
+    ])
+    expect(items[0]!.separatorBefore).toBeFalsy()
+    expect(items.find((i) => i.id === 'terminal.restart')!.separatorBefore).toBe(true)
   })
 })

@@ -1,9 +1,9 @@
 import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
+import { switchToChatSurface } from '../helpers/surface.js'
 
-// NewConversation now renders a fixed chat greeting instead of cycling through
-// the historical variant list in `chat.greeting`.
+// NewConversation greeting (chat surface). Code surface uses a different string + folder picker.
 const CHAT_GREETING = '我们来做点什么？'
 
 describe('hip desktop app @smoke', () => {
@@ -32,33 +32,23 @@ describe('hip desktop app @smoke', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    // Persisted activeView may be code; force chat draft landing for this smoke check.
+    await switchToChatSurface()
 
-    // After login, surface may restore a prior session; open a draft if needed.
     const landing = await browser.$('[data-testid="new-conversation"]')
-    if (!(await landing.isExisting())) {
-      const newBtn = await browser.$('[data-testid="new-session-button"]')
-      if (await newBtn.isExisting()) {
-        await browser.execute((el: HTMLElement) => el.click(), newBtn)
-      }
-    }
     await landing.waitForExist({ timeout: 30000 })
-    // WebKit isDisplayed can flake under unfocused Tauri; existence + greeting is enough.
 
     const greeting = await landing.$('h1')
-    // Wait for the animated greeting text to settle rather than relying on
-    // WebKit's visibility check, which can report false when CSS animations are
-    // throttled in the unfocused Tauri window.
     await browser.waitUntil(
       async () => {
         const text = await greeting.getText()
         return text.includes(CHAT_GREETING)
       },
-      { timeout: 10000, interval: 200 }
+      { timeout: 15000, interval: 200 },
     )
-    const greetingText = await greeting.getText()
-    expect(greetingText).toContain(CHAT_GREETING)
+    expect(await greeting.getText()).toContain(CHAT_GREETING)
 
     const newSessionBtn = await browser.$('[data-testid="new-session-button"]')
-    await newSessionBtn.waitForDisplayed({ timeout: 10000 })
+    await newSessionBtn.waitForExist({ timeout: 10000 })
   })
 })

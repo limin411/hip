@@ -770,6 +770,31 @@ export const en = {
       newSession: 'New session',
       tabList: 'Open sessions',
     },
+    contextMenu: {
+      sessionTab: {
+        rename: 'Rename…',
+        copyId: 'Copy session ID',
+        revealInHistory: 'Open in History',
+        deleteOthers: 'Delete others…',
+        deleteToRight: 'Delete to the right…',
+        deleteAllOpen: 'Delete all open…',
+      },
+      sessionHistory: {
+        open: 'Open',
+        rename: 'Rename…',
+      },
+      renameSession: {
+        title: 'Rename conversation',
+        description: 'Enter a new title for this conversation',
+        label: 'Title',
+        save: 'Save',
+      },
+      confirmDeleteSessions: {
+        title: 'Permanently delete {{count}} conversation(s)?',
+        body: 'This will permanently delete {{count}} open conversation(s). This action cannot be undone.',
+        action: 'Delete permanently',
+      },
+    },
     dropdown: {
       newChat: 'New Work Chat',
       newCode: 'New Coding Task',

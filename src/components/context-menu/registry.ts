@@ -9,12 +9,19 @@ import type {
 import { loadPrefs } from './prefs'
 import { codeBlockProvider } from './providers/codeBlock'
 import { messageProvider } from './providers/message'
+import { sessionHistoryProvider } from './providers/sessionHistory'
+import { sessionTabProvider } from './providers/sessionTab'
 
 /**
  * Builtin providers — assembled inside buildContextMenuItems (not side-effect registration).
  * Surface PRs import and append here (message, codeBlock, sessionTab, …).
  */
-const BUILTIN_PROVIDERS: ContextProvider[] = [messageProvider, codeBlockProvider]
+const BUILTIN_PROVIDERS: ContextProvider[] = [
+  codeBlockProvider,
+  messageProvider,
+  sessionHistoryProvider,
+  sessionTabProvider,
+]
 
 const extraProviders: ContextProvider[] = []
 

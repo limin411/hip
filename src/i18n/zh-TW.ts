@@ -764,6 +764,31 @@ export const zhTW = {
       newSession: '新增工作階段',
       tabList: '開啟的工作階段',
     },
+    contextMenu: {
+      sessionTab: {
+        rename: '重新命名…',
+        copyId: '複製工作階段 ID',
+        revealInHistory: '在歷史中開啟',
+        deleteOthers: '刪除其他…',
+        deleteToRight: '刪除右側…',
+        deleteAllOpen: '刪除全部開啟的…',
+      },
+      sessionHistory: {
+        open: '開啟',
+        rename: '重新命名…',
+      },
+      renameSession: {
+        title: '重新命名工作階段',
+        description: '為此工作階段輸入新標題',
+        label: '標題',
+        save: '儲存',
+      },
+      confirmDeleteSessions: {
+        title: '永久刪除 {{count}} 個工作階段？',
+        body: '將永久刪除 {{count}} 個已開啟的工作階段。此操作無法復原。',
+        action: '永久刪除',
+      },
+    },
     dropdown: {
       newChat: '新增辦公對話',
       newCode: '新增編碼任務',

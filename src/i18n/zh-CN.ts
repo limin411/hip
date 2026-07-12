@@ -764,6 +764,31 @@ export const zhCN = {
       newSession: '新建会话',
       tabList: '打开的会话',
     },
+    contextMenu: {
+      sessionTab: {
+        rename: '重命名…',
+        copyId: '复制会话 ID',
+        revealInHistory: '在历史中打开',
+        deleteOthers: '删除其他…',
+        deleteToRight: '删除右侧…',
+        deleteAllOpen: '删除全部打开的…',
+      },
+      sessionHistory: {
+        open: '打开',
+        rename: '重命名…',
+      },
+      renameSession: {
+        title: '重命名会话',
+        description: '为此会话输入新标题',
+        label: '标题',
+        save: '保存',
+      },
+      confirmDeleteSessions: {
+        title: '永久删除 {{count}} 个会话？',
+        body: '将永久删除 {{count}} 个已打开的会话。此操作无法撤销。',
+        action: '永久删除',
+      },
+    },
     dropdown: {
       newChat: '新建办公对话',
       newCode: '新建编码任务',

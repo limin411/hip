@@ -42,6 +42,71 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     kind: 'codeBlock',
     group: 'clipboard',
   },
+  {
+    id: 'sessionTab.rename',
+    labelKey: 'contextMenu.sessionTab.rename',
+    kind: 'sessionTab',
+    group: 'edit',
+  },
+  {
+    id: 'sessionTab.copyId',
+    labelKey: 'contextMenu.sessionTab.copyId',
+    kind: 'sessionTab',
+    group: 'clipboard',
+  },
+  {
+    id: 'sessionTab.revealInHistory',
+    labelKey: 'contextMenu.sessionTab.revealInHistory',
+    kind: 'sessionTab',
+    group: 'navigation',
+    icon: 'history',
+  },
+  {
+    id: 'sessionTab.close',
+    labelKey: 'tabs.closeTab',
+    kind: 'sessionTab',
+    group: 'session',
+  },
+  {
+    id: 'sessionTab.deleteOthers',
+    labelKey: 'contextMenu.sessionTab.deleteOthers',
+    kind: 'sessionTab',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'sessionTab.deleteToRight',
+    labelKey: 'contextMenu.sessionTab.deleteToRight',
+    kind: 'sessionTab',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'sessionTab.deleteAllOpen',
+    labelKey: 'contextMenu.sessionTab.deleteAllOpen',
+    kind: 'sessionTab',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'sessionHistory.open',
+    labelKey: 'contextMenu.sessionHistory.open',
+    kind: 'sessionHistory',
+    group: 'primary',
+  },
+  {
+    id: 'sessionHistory.rename',
+    labelKey: 'contextMenu.sessionHistory.rename',
+    kind: 'sessionHistory',
+    group: 'edit',
+  },
+  {
+    id: 'sessionHistory.delete',
+    labelKey: 'history.deleteSession',
+    kind: 'sessionHistory',
+    group: 'danger',
+    danger: true,
+  },
 ]
 
 /** Test / in-app extras only. Cleared by clearCatalogMeta. */

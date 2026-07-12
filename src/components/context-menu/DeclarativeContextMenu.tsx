@@ -27,6 +27,8 @@ export type DeclarativeContextMenuProps<K extends ContextKind> = {
   className?: string
   /** Optional test id on the trigger wrapper */
   'data-testid'?: string
+  /** e.g. false on session tabs inside the titlebar drag region */
+  'data-tauri-drag-region'?: string
 }
 
 function payloadSessionId(payload: unknown): string | null | undefined {
@@ -53,6 +55,7 @@ export function DeclarativeContextMenu<K extends ContextKind>({
   children,
   className,
   'data-testid': testId,
+  'data-tauri-drag-region': tauriDragRegion,
 }: DeclarativeContextMenuProps<K>) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -104,6 +107,7 @@ export function DeclarativeContextMenu<K extends ContextKind>({
           data-context-menu-root=""
           data-context-menu-kind={kind}
           data-testid={testId}
+          data-tauri-drag-region={tauriDragRegion}
         >
           {children}
         </div>

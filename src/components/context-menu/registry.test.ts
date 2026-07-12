@@ -132,6 +132,25 @@ describe('buildContextMenuItems', () => {
     expect(out.map((i) => i.id)).toEqual(['codeBlock.copy'])
   })
 
+  it('includes builtin sessionTab items', () => {
+    const out = buildContextMenuItems(
+      {
+        kind: 'sessionTab',
+        payload: { sessionId: 's1', title: 'T', surface: 'chat' },
+      },
+      makeCtx({ openSessionIds: ['s1', 's2'] }),
+      { version: 1, disabledIds: [] },
+    )
+    expect(out.map((i) => i.id)).toEqual(
+      expect.arrayContaining([
+        'sessionTab.close',
+        'sessionTab.deleteOthers',
+        'sessionTab.rename',
+      ]),
+    )
+    expect(out[0]?.separatorBefore).toBeFalsy()
+  })
+
   it('merges extra providers and applies disabledIds', () => {
     const provider: ContextProvider = (req) => {
       if (req.kind !== 'codeBlock') return []
@@ -199,5 +218,36 @@ describe('buildContextMenuItems', () => {
         { version: 1, disabledIds: [] },
       ).map((i) => i.id),
     ).toEqual(['codeBlock.copy'])
+    // session builtins still work
+    expect(
+      buildContextMenuItems(
+        {
+          kind: 'sessionHistory',
+          payload: { sessionId: 's1', title: 'T', surface: 'chat' },
+        },
+        makeCtx(),
+        { version: 1, disabledIds: [] },
+      ).map((i) => i.id),
+    ).toEqual(['sessionHistory.open', 'sessionHistory.rename', 'sessionHistory.delete'])
+  })
+
+  it('includes builtin fileEntry items when payload has path', () => {
+    const out = buildContextMenuItems(
+      {
+        kind: 'fileEntry',
+        payload: {
+          path: 'src/a.ts',
+          name: 'a.ts',
+          isDir: false,
+          cwd: '/proj',
+          isDraft: false,
+        },
+      },
+      makeCtx(),
+      { version: 1, disabledIds: [] },
+    )
+    expect(out.map((i) => i.id)).toEqual(
+      expect.arrayContaining(['file.copyPath', 'file.openContainingFolder']),
+    )
   })
 })

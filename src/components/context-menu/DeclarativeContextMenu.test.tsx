@@ -127,34 +127,38 @@ describe('DeclarativeContextMenu', () => {
   })
 
   it('marks danger items and shows shortcut when set', async () => {
-    registerContextProvider(() => [
-      {
-        id: 'sessionTab.close',
-        label: 'Delete tab',
-        group: 'danger',
-        danger: true,
-        shortcut: '⌘W',
-        run: () => {},
-      },
-    ])
+    registerContextProvider((req) => {
+      if (req.kind !== 'plugin') return []
+      return [
+        {
+          id: 'plugin.uninstall',
+          label: 'Uninstall plugin',
+          group: 'danger',
+          danger: true,
+          shortcut: '⌘W',
+          run: () => {},
+        },
+      ]
+    })
 
     render(
       <DeclarativeContextMenu
-        kind="sessionTab"
-        payload={{ sessionId: 's1', title: 'T', surface: 'chat' }}
+        kind="plugin"
+        payload={{ pluginId: 'p1' }}
         data-testid="ctx-host"
       >
-        <span>tab</span>
+        <span>plugin</span>
       </DeclarativeContextMenu>,
     )
 
     fireEvent.contextMenu(screen.getByTestId('ctx-host'))
     await waitFor(() => {
-      expect(screen.getByTestId('context-menu-item-sessionTab.close')).toBeInTheDocument()
+      expect(screen.getByTestId('context-menu-item-plugin.uninstall')).toBeInTheDocument()
     })
-    const row = screen.getByTestId('context-menu-item-sessionTab.close')
-    expect(row).toHaveTextContent('Delete tab')
+    const row = screen.getByTestId('context-menu-item-plugin.uninstall')
+    expect(row).toHaveTextContent('Uninstall plugin')
     expect(row).toHaveTextContent('⌘W')
     expect(row.className).toMatch(/text-danger/)
   })
 })
+

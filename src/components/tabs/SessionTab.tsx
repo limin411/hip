@@ -3,6 +3,7 @@ import { MessageSquare, FolderGit2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SessionVM } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 
 interface SessionTabProps {
   session: SessionVM
@@ -22,7 +23,9 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
   const Icon = ICON[surface] ?? MessageSquare
 
   return (
-    <div
+    <DeclarativeContextMenu
+      kind="sessionTab"
+      payload={{ sessionId: session.id, title: session.title, surface }}
       data-testid="session-tab-container"
       data-tauri-drag-region="false"
       className={cn(
@@ -67,6 +70,6 @@ export function SessionTab({ session, active, onSelect, onClose }: SessionTabPro
       >
         <X size={12} />
       </button>
-    </div>
+    </DeclarativeContextMenu>
   )
 }

@@ -9,6 +9,25 @@ afterEach(cleanup)
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}))
+
+vi.mock('@/components/context-menu', () => ({
+  DeclarativeContextMenu: ({
+    children,
+    className,
+    'data-testid': testId,
+    'data-tauri-drag-region': dragRegion,
+  }: {
+    children: React.ReactNode
+    className?: string
+    'data-testid'?: string
+    'data-tauri-drag-region'?: string
+  }) => (
+    <div className={className} data-testid={testId} data-tauri-drag-region={dragRegion}>
+      {children}
+    </div>
+  ),
 }))
 
 const session = {

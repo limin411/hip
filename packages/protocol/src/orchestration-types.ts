@@ -2,8 +2,13 @@
 export type NodeId = string
 
 // ── 编排模式 ──
-/** Per-session orchestration mode. 'fast' uses the existing single-agent
- *  StateGraph loop. 'dag' runs the workflow orchestrator. */
+/**
+ * Per-session orchestration mode field (compat storage only).
+ * @deprecated Product path ignores orchMode for turn routing (agent-driven orchestration).
+ * Kept for session JSON / `session:setOrchMode` WS compatibility. Prefer explicit
+ * `pendingWorkflowDef` / `workflow:run` for DAG. Historical meaning: 'fast' = ReAct,
+ * 'dag' = workflow orchestrator — routing no longer keys off this.
+ */
 export type OrchestrationMode = 'fast' | 'dag'
 
 // ── 并行合并策略 ──

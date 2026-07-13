@@ -172,10 +172,18 @@ export function handleSessionMessage(
       return
     }
     case 'session:setOrchMode': {
+      // Deprecated API: product path ignores orchMode for turn routing (agent-driven).
+      // Still persist for old clients; echo includes ignoredForTurnRouting for honesty.
+      // Does not set pendingWorkflowDef or force workflow turns.
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setOrchMode(msg.orchMode)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
-      send({ type: 'session:orchMode', sessionId: msg.sessionId, orchMode: s.orchMode })
+      send({
+        type: 'session:orchMode',
+        sessionId: msg.sessionId,
+        orchMode: s.orchMode,
+        ignoredForTurnRouting: true,
+      })
       return
     }
     case 'session:setThinking': {

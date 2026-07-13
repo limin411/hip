@@ -311,6 +311,15 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'session:orchMode', sessionId: 's1', orchMode: 'dag' }, 0)
     expect(next.sessions[0].config.orchMode).toBe('dag')
   })
+  it('session:orchMode with ignoredForTurnRouting still updates stored orchMode only', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(
+      s0,
+      { type: 'session:orchMode', sessionId: 's1', orchMode: 'dag', ignoredForTurnRouting: true },
+      0,
+    )
+    expect(next.sessions[0].config.orchMode).toBe('dag')
+  })
   it('session:orchMode for an unknown session is a no-op', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:orchMode', sessionId: 'nope', orchMode: 'dag' }, 0)

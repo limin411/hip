@@ -23,6 +23,8 @@
     "test:e2e:live": "E2E_LIVE_LLM=1 E2E_GREP=@live wdio run wdio.conf.ts"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language-data": "^6.5.2",
     "@hip/protocol": "*",
     "@radix-ui/react-context-menu": "^2.3.0",
     "@radix-ui/react-dialog": "^1",
@@ -32,6 +34,9 @@
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-shell": "^2",
+    "@uiw/codemirror-theme-github": "^4.25.11",
+    "@uiw/codemirror-themes": "^4.25.11",
+    "@uiw/react-codemirror": "^4.25.11",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "@xyflow/react": "^12.11.2",

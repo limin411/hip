@@ -1,7 +1,25 @@
-import type { WorkflowDef, NodeId } from '@hip/protocol'
+/**
+ * Workflow definition validation (C-validate).
+ *
+ * Supported node kinds: `agent`, `gate`, `parallel`.
+ * - ParallelNode is fully supported (structural fan-out + reduce merge:
+ *   all / any / vote). Nested children are walked for tool/human rejection
+ *   and graph checks still apply to top-level edge endpoints.
+ * - `tool` and `human` are hard-rejected (fail-closed; no executor path).
+ *   C-shrink may later hard-delete those types from the protocol union after
+ *   a deprecate window; keep ParallelNode and reduce merge.
+ */
+import type { WorkflowDef, WorkflowNode, NodeId } from '@hip/protocol'
 import type { AgentRegistry } from './registry.js'
 
-export type ValidationCode = 'unknown-agent' | 'dangling-edge' | 'cycle' | 'unreachable' | 'bad-template-ref'
+export type ValidationCode =
+  | 'unknown-agent'
+  | 'dangling-edge'
+  | 'cycle'
+  | 'unreachable'
+  | 'bad-template-ref'
+  | 'unsupported-node'
+
 export interface ValidationError {
   code: ValidationCode
   detail: string
@@ -9,9 +27,33 @@ export interface ValidationError {
 
 const TEMPLATE_RE = /\{\{\s*([^}\s]+)\s*\}\}/g
 
+/** Walk top-level and nested ParallelNode children. */
+function walkNodes(nodes: WorkflowNode[], visit: (n: WorkflowNode) => void): void {
+  for (const n of nodes) {
+    visit(n)
+    if (n.type === 'parallel') walkNodes(n.nodes, visit)
+  }
+}
+
 export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): ValidationError[] {
   const errors: ValidationError[] = []
   const ids = new Set(def.nodes.map((n) => n.id))
+
+  // 0. unsupported-node: tool / human are fail-closed (no launch path).
+  //    ParallelNode remains fully supported (structural + merge in reduce).
+  walkNodes(def.nodes, (n) => {
+    if (n.type === 'tool') {
+      errors.push({
+        code: 'unsupported-node',
+        detail: `${n.id}: type 'tool' is not supported (fail-closed; use agent tools instead)`,
+      })
+    } else if (n.type === 'human') {
+      errors.push({
+        code: 'unsupported-node',
+        detail: `${n.id}: type 'human' is not supported (fail-closed; use ReAct planPause / agent:interrupt for HITL)`,
+      })
+    }
+  })
 
   // 1. unknown-agent (only check agent-type nodes)
   for (const n of def.nodes) {

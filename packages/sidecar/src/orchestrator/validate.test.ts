@@ -124,4 +124,83 @@ describe('validateWorkflow', () => {
     })
     expect(validateWorkflow(def, regA)).toEqual([])
   })
+
+  it('tool leaf node → unsupported-node', () => {
+    const def = wf({
+      nodes: [
+        node('a', 'a'),
+        { type: 'tool', id: 't1', toolName: 'read_file', inputTemplate: '{{input}}' },
+      ],
+      edges: [{ from: 'a', to: 't1' } as WorkflowEdge],
+      entry: ['a'],
+    })
+    const errs = validateWorkflow(def, regA)
+    expect(codes(errs)).toContain('unsupported-node')
+    const err = errs.find((e) => e.code === 'unsupported-node')
+    expect(err?.detail).toContain('t1')
+    expect(err?.detail).toContain('tool')
+  })
+
+  it('human leaf node → unsupported-node', () => {
+    const def = wf({
+      nodes: [
+        node('a', 'a'),
+        { type: 'human', id: 'h1', question: 'Approve?' },
+      ],
+      edges: [{ from: 'a', to: 'h1' } as WorkflowEdge],
+      entry: ['a'],
+    })
+    const errs = validateWorkflow(def, regA)
+    expect(codes(errs)).toContain('unsupported-node')
+    const err = errs.find((e) => e.code === 'unsupported-node')
+    expect(err?.detail).toContain('h1')
+    expect(err?.detail).toContain('human')
+  })
+
+  it('tool nested under ParallelNode → unsupported-node', () => {
+    const def = wf({
+      nodes: [
+        {
+          type: 'parallel',
+          id: 'p1',
+          mergeStrategy: 'all',
+          nodes: [
+            node('a', 'a'),
+            { type: 'tool', id: 't-nested', toolName: 'bash', inputTemplate: 'ls' },
+          ],
+        },
+      ],
+      edges: [],
+      entry: ['p1'],
+    })
+    const errs = validateWorkflow(def, regA)
+    expect(codes(errs)).toContain('unsupported-node')
+    expect(errs.find((e) => e.code === 'unsupported-node')?.detail).toContain('t-nested')
+  })
+
+  it('ParallelNode with agent children → no unsupported-node', () => {
+    const def = wf({
+      nodes: [
+        {
+          type: 'parallel',
+          id: 'p1',
+          mergeStrategy: 'any',
+          nodes: [node('a1', 'a'), node('a2', 'a')],
+        },
+      ],
+      edges: [],
+      entry: ['p1'],
+    })
+    const errs = validateWorkflow(def, regA)
+    expect(codes(errs)).not.toContain('unsupported-node')
+  })
+
+  it('gate node alone → no unsupported-node', () => {
+    const def = wf({
+      nodes: [{ type: 'gate', id: 'g1', gateKind: 'lint' }],
+      edges: [],
+      entry: ['g1'],
+    })
+    expect(codes(validateWorkflow(def, regA))).not.toContain('unsupported-node')
+  })
 })

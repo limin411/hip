@@ -38,9 +38,9 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 
 - Protocol shapes exist (`ToolNode`, `HumanNode`).
 - UI (`DagEditor`) can **render** cards for both.
-- `validateWorkflow` currently does **not** reject `tool` | `human` (planned for C-validate).
+- `validateWorkflow` **rejects** `tool` | `human` with `unsupported-node` (C-validate). Nested under `parallel` is also rejected. Types remain in protocol as `@deprecated` until C-shrink.
 - `launchResolvedNode` fail-closes any non-`agent`/`gate` type (covers tool, human, parallel if ever called).
-- **Normal loop:** executor/durable-executor **skip** non-agent/gate ready nodes; they remain `ready` and do not fail the run — a ready tool/human can currently leave `run.status === 'succeeded'` with unfinished ready nodes.
+- **Normal loop:** executor/durable-executor **skip** non-agent/gate ready nodes; they remain `ready` and do not fail the run — a ready tool/human can currently leave `run.status === 'succeeded'` with unfinished ready nodes (pre-validate bypass only).
 - Product path for human interaction: ReAct interrupt, not DAG `HumanNode`.
 
 ---
@@ -200,12 +200,12 @@ In-repo “fixtures” for node types live **inside unit tests** (especially `Da
 
 ---
 
-## Implications for later Track C work (documentation only)
+## Implications for later Track C work
 
-1. **C-validate:** reject `type: 'tool' | 'human'` at validate time; document ParallelNode as structural + merge strategies; leave reduce merge tests green.
-2. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union; **retain** `parallel` and reduce merge.
+1. **C-validate (done):** `validateWorkflow` rejects `type: 'tool' | 'human'` (`unsupported-node`); ParallelNode documented as structural + merge strategies; reduce merge tests remain green.
+2. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union (types already `@deprecated`); **retain** `parallel` and reduce merge.
 3. **Do not** remove ParallelNode reduce for “honesty”; parallel is a real structural capability, not a fake leaf runner.
-4. **Current** loop: skip leaves non-agent/gate nodes `ready` and can still finish `succeeded` (stranding — see fail-closed legend / tool-human detail). **C-validate** should reject tool/human **before** run so that path cannot strand a “succeeded” run with unfinished ready nodes. Launch-time fail-closed (`Unsupported…`) only applies if `launchResolvedNode` is called directly.
+4. **Validate-before-run** closes the stranding path for tool/human. Launch-time fail-closed (`Unsupported…`) remains a safety net if `launchResolvedNode` is called directly.
 
 ---
 

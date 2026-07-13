@@ -940,7 +940,9 @@ export const en = {
       },
       doc: {
         edit: 'Edit',
+        preview: 'Preview',
         done: 'Done',
+        placeholder: 'Start writing…',
         untitled: 'Untitled',
         saveFailed: 'Could not save document',
         loadFailed: 'Could not load document',

@@ -934,7 +934,9 @@ export const zhCN = {
       },
       doc: {
         edit: '编辑',
+        preview: '预览',
         done: '完成',
+        placeholder: '开始写作…',
         untitled: '未命名',
         saveFailed: '保存失败',
         loadFailed: '无法加载文档',

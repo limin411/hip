@@ -359,8 +359,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
       set({ nodes, busy: false })
       get().runSearch(get().searchQuery)
+      // openDoc defaults to editing: true
       await get().openDoc(id)
-      await get().setEditing(true)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
@@ -444,7 +444,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      set({ activeDocId: id, docBody: body, draftBody: body, editing: false, saveState: 'idle' })
+      set({ activeDocId: id, docBody: body, draftBody: body, editing: true, saveState: 'idle' })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,

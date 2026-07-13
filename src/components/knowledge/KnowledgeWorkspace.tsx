@@ -31,7 +31,6 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
-  const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
@@ -175,7 +174,7 @@ export function KnowledgeWorkspace() {
               {editing ? (
                 <>
                   <Check size={14} />
-                  {t('knowledge.doc.done')}
+                  {t('knowledge.doc.preview')}
                 </>
               ) : (
                 <>
@@ -186,19 +185,28 @@ export function KnowledgeWorkspace() {
             </Button>
           )}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-          {!activeDocId ? (
+        {!activeDocId ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
             <p className="text-body text-ink-tertiary">{t('knowledge.tree.empty')}</p>
-          ) : editing ? (
-            <DocEditor
-              value={draftBody}
-              onChange={setDraftBody}
-              onBlur={() => void flushSave()}
-            />
-          ) : (
+          </div>
+        ) : editing ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6">
+              <DocEditor
+                key={`${activeDocId}-edit`}
+                docId={activeDocId}
+                initialValue={docBody}
+                onDraftChange={setDraftBody}
+                onBlur={() => void flushSave()}
+                placeholder={t('knowledge.doc.placeholder')}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
             <DocReader content={docBody} />
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
       <Modal

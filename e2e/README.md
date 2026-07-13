@@ -81,13 +81,20 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
+| `@knowledge` | Knowledge base surface + doc editor UX | main path also `@core` → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
+
+Knowledge editor helpers: `e2e/helpers/knowledge.ts`. Spec: `knowledge-editor.spec.ts` (KE1–KE8: open → space → default edit → type → preview round-trip → chip). Unpaid; uses isolated `HIP_DATA_DIR` (no `@live`).
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e
 # or panel-only:
 E2E_GREP='@context-menu @panel' yarn test:e2e --spec e2e/specs/context-menu-panel.spec.ts
+
+# Knowledge editor UX
+E2E_GREP=@knowledge yarn test:e2e
+yarn test:e2e --spec e2e/specs/knowledge-editor.spec.ts
 ```
 
 ## Isolation notes

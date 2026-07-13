@@ -242,7 +242,11 @@ export function KnowledgeHome() {
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={() => void submitCreate()} disabled={!createName.trim() || busy}>
+            <Button
+              data-testid="knowledge-create-space-confirm"
+              onClick={() => void submitCreate()}
+              disabled={!createName.trim() || busy}
+            >
               {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
@@ -250,6 +254,7 @@ export function KnowledgeHome() {
       >
         <Input
           autoFocus
+          data-testid="knowledge-create-space-name"
           value={createName}
           onChange={(e) => setCreateName(e.target.value)}
           placeholder={t('knowledge.space.namePlaceholder')}

@@ -934,7 +934,9 @@ export const zhTW = {
       },
       doc: {
         edit: '編輯',
+        preview: '預覽',
         done: '完成',
+        placeholder: '開始寫作…',
         untitled: '未命名',
         saveFailed: '儲存失敗',
         loadFailed: '無法載入文件',

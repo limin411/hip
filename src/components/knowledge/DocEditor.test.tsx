@@ -8,13 +8,16 @@ vi.mock('@uiw/react-codemirror', () => ({
   default: ({
     value,
     onChange,
+    placeholder,
   }: {
     value: string
     onChange?: (v: string) => void
+    placeholder?: string
   }) => (
     <textarea
       data-testid="knowledge-doc-editor-cm"
       value={value}
+      placeholder={placeholder}
       onChange={(e) => onChange?.(e.target.value)}
     />
   ),
@@ -37,26 +40,32 @@ vi.mock('@codemirror/view', () => ({
   },
 }))
 
-vi.mock('@uiw/codemirror-theme-github', () => ({
-  githubLight: {},
-  githubDark: {},
-}))
-
 afterEach(() => cleanup())
 
 describe('DocEditor', () => {
   it('renders the CodeMirror host with knowledge editor testid', () => {
-    render(<DocEditor value="# hi" onChange={() => {}} />)
+    render(
+      <DocEditor
+        docId="d1"
+        initialValue="# hi"
+        onDraftChange={() => {}}
+        placeholder="Start writing…"
+      />,
+    )
     expect(screen.getByTestId('knowledge-doc-editor')).toBeInTheDocument()
     expect(screen.getByTestId('knowledge-doc-editor-cm')).toHaveValue('# hi')
+    expect(screen.getByTestId('knowledge-doc-editor-cm')).toHaveAttribute(
+      'placeholder',
+      'Start writing…',
+    )
   })
 
-  it('forwards onChange from the editor', () => {
-    const onChange = vi.fn()
-    render(<DocEditor value="" onChange={onChange} />)
+  it('forwards onDraftChange from the editor', () => {
+    const onDraftChange = vi.fn()
+    render(<DocEditor docId="d1" initialValue="" onDraftChange={onDraftChange} />)
     fireEvent.change(screen.getByTestId('knowledge-doc-editor-cm'), {
       target: { value: 'hello' },
     })
-    expect(onChange).toHaveBeenCalledWith('hello')
+    expect(onDraftChange).toHaveBeenCalledWith('hello')
   })
 })

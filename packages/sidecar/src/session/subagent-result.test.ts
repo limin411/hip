@@ -40,6 +40,16 @@ describe('formatPausedToolResult / isSubagentPausedText', () => {
     expect(isSubagentPausedText('normal prose')).toBe(false)
     expect(isSubagentPausedText(`prefix\n${SUBAGENT_PAUSE_MARKER} buried`)).toBe(false)
   })
+
+  it('trims question whitespace on the marker line', () => {
+    expect(formatPausedToolResult('  Q?  ')).toBe(`${SUBAGENT_PAUSE_MARKER} Q?`)
+  })
+
+  it('detects task_batch [id] prefix on the first line', () => {
+    const paused = formatPausedToolResult('Need path?', 'partial')
+    expect(isSubagentPausedText(`[0] ${paused}`)).toBe(true)
+    expect(isUselessSubagentText(`[0] ${paused}`)).toBe(false)
+  })
 })
 
 describe('isUselessSubagentText', () => {
@@ -111,5 +121,16 @@ describe('synthesizeSubagentResult', () => {
     const out = synthesizeSubagentResult(PROSE_PLUS_DSML, [])
     expect(out).not.toMatch(/DSML/)
     expect(out).toContain('Zuolin-related sync')
+  })
+
+  it('short-circuits pause marker — no reconstruct even with DSML partial + tools', () => {
+    const paused = formatPausedToolResult('Which path?', `partial with unfinished calls\n${DSML}`)
+    const out = synthesizeSubagentResult(paused, [
+      { name: 'grep', status: 'finished', output: 'should-not-appear' },
+    ])
+    expect(out).toBe(paused)
+    expect(out).toMatch(/^\[hip:subagent_paused\]/)
+    expect(out).not.toMatch(/reconstructed from tool results/)
+    expect(out).not.toContain('should-not-appear')
   })
 })

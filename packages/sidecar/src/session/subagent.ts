@@ -85,8 +85,8 @@ export function lastAiText(messages: BaseMessage[]): string {
  *
  * - Shares the parent cwd (`root`) and the parent AbortSignal (cancel propagates into the child stream).
  * - Capped at `childMaxSteps` (independent of the parent MAX_STEPS).
- * - If the child would HITL-pause (status === 'awaiting_user'), it does NOT escalate: returns its
- *   partial assistant text with the pending question appended as context (P3-D3, no agent:interrupt).
+ * - If the child would HITL-pause (status === 'awaiting_user'), it does NOT escalate (no agent:interrupt):
+ *   returns first-line `[hip:subagent_paused] <question>` plus optional partial body (P3-D3).
  * - Depth-aware: when currentDepth < MAX_DEPTH, the child gets `task`/`task_batch` tools for
  *   recursive delegation. At depth >= MAX_DEPTH, those tools are filtered out.
  */

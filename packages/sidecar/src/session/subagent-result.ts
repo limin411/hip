@@ -19,7 +19,10 @@ const EMPTY_ERROR =
 const RECONSTRUCTED_PREFIX =
   '[sub-agent finished without a prose summary; reconstructed from tool results]'
 
-/** First-line marker for sub-agent HITL pause (not an Error prefix). */
+/**
+ * First-line marker for sub-agent HITL pause (not an Error prefix).
+ * SubagentOutcome is string-encoded via this marker for now (no discriminated-union return type yet).
+ */
 export const SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]'
 
 /**
@@ -28,16 +31,23 @@ export const SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]'
  *   <optional partial>
  */
 export function formatPausedToolResult(question: string, partial?: string): string {
-  const first = `${SUBAGENT_PAUSE_MARKER} ${question}`
+  const first = `${SUBAGENT_PAUSE_MARKER} ${question.trim()}`
   const body = (partial ?? '').trim()
   return body ? `${first}\n${body}` : first
 }
 
-/** True when the first line of text starts with the sub-agent pause marker. */
+/**
+ * True when the first line encodes a sub-agent pause.
+ * Accepts bare marker (primary wire format) or task_batch's `[id] ` prefix before the marker.
+ * Does not scan later lines — mid-body mentions are not pauses.
+ */
 export function isSubagentPausedText(text: string | null | undefined): boolean {
   if (text == null) return false
-  const firstLine = text.split('\n', 1)[0] ?? ''
-  return firstLine.startsWith(SUBAGENT_PAUSE_MARKER)
+  const firstLine = (text.split('\n', 1)[0] ?? '').trimStart()
+  if (firstLine.startsWith(SUBAGENT_PAUSE_MARKER)) return true
+  // task_batch joins as `[${id}] ${r.text}` — first line may be `[0] [hip:subagent_paused] …`
+  const afterId = firstLine.match(/^\[[^\]]+\]\s+(.*)$/)
+  return !!afterId && afterId[1].startsWith(SUBAGENT_PAUSE_MARKER)
 }
 
 /**
@@ -88,6 +98,7 @@ function reconstructFromTools(
 
 /**
  * Produce a supervisor-safe sub-agent result.
+ * - Pause marker handoffs → returned intact (never reconstruct over them)
  * - Clean prose → returned as-is
  * - Empty / DSML-only / prose+DSML → strip DSML; reconstruct from tools when available
  * - Never returns raw DSML markup
@@ -97,6 +108,9 @@ export function synthesizeSubagentResult(
   tools: ToolSummary[],
   opts?: { maxTools?: number; maxChars?: number },
 ): string {
+  // Pause is a distinct wire outcome — do not strip/reconstruct over the marker body.
+  if (isSubagentPausedText(text)) return (text ?? '').trimEnd()
+
   const raw = (text ?? '').trim()
 
   // Strip any DSML tool_calls block so markup never leaks upward.

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import * as path from 'node:path'
 import {
   compileGrepPattern,
   isExcludedDirName,
+  resolveFull,
   sliceFileLines,
   toGlobRegex,
 } from './helpers.js'
@@ -93,5 +95,35 @@ describe('isExcludedDirName', () => {
     expect(isExcludedDirName('$Recycle.Bin')).toBe(true)
     expect(isExcludedDirName('System Volume Information')).toBe(true)
     expect(isExcludedDirName('src')).toBe(false)
+  })
+})
+
+describe('resolveFull', () => {
+  const cwd = path.resolve('/tmp/hip-project')
+
+  it('maps bare / and empty string to cwd (never OS drive/FS root alone)', () => {
+    expect(resolveFull(cwd, '/')).toBe(path.resolve(cwd))
+    expect(resolveFull(cwd, '')).toBe(path.resolve(cwd))
+  })
+
+  it('resolves relative paths against cwd', () => {
+    expect(resolveFull(cwd, 'src/a.ts')).toBe(path.resolve(cwd, 'src/a.ts'))
+    expect(resolveFull(cwd, '.')).toBe(path.resolve(cwd))
+  })
+
+  it('keeps real OS absolute paths outside the project (POSIX / full-mode grant)', () => {
+    if (process.platform === 'win32') {
+      const abs = 'D:\\other\\file.txt'
+      expect(resolveFull(cwd, abs)).toBe(path.normalize(abs))
+    } else {
+      expect(resolveFull(cwd, '/var/tmp/outside.txt')).toBe(path.normalize('/var/tmp/outside.txt'))
+    }
+  })
+
+  it('on Windows maps /src form under cwd, not the drive root', () => {
+    if (process.platform !== 'win32') return
+    const resolved = resolveFull('D:\\proj', '/src/a.ts')
+    expect(resolved.toLowerCase()).toContain(path.join('proj', 'src', 'a.ts').toLowerCase())
+    expect(resolved).not.toMatch(/^[a-zA-Z]:\\src\\/i)
   })
 })

@@ -24,8 +24,13 @@ export type SessionDebugBundle = {
 }
 
 const SENSITIVE_KEY = /api[_-]?key|token|authorization|password|secret|credential/i
-const MAX_CONTENT = 4000
-const MAX_TOOL_FIELD = 2000
+/** Message body / agent-run output cap for clipboard debug exports. */
+export const MAX_CONTENT = 12_000
+/**
+ * Per tool-call field cap. Kept well above the old 2KB export clip so bug dumps
+ * retain usable code snippets; marker text distinguishes export vs runtime caps.
+ */
+export const MAX_TOOL_FIELD = 16_384
 
 function redactValue(key: string, value: unknown): unknown {
   if (SENSITIVE_KEY.test(key)) return '[redacted]'
@@ -46,9 +51,13 @@ export function redactObject(obj: Record<string, unknown>): Record<string, unkno
   return out
 }
 
-function clip(s: string, max: number): string {
-  if (s.length <= max) return s
-  return `${s.slice(0, max)}…[truncated ${s.length - max} chars]`
+/** Clip for export only. Marker states this is NOT the runtime tool-output bound. */
+export function clipForExport(s: string, max: number): { text: string; exportClipped: boolean } {
+  if (s.length <= max) return { text: s, exportClipped: false }
+  return {
+    text: `${s.slice(0, max)}…[export clipped ${s.length - max} chars; not a runtime tool cap]`,
+    exportClipped: true,
+  }
 }
 
 function sanitizeConfig(config: SessionConfig | Record<string, unknown> | undefined): Record<string, unknown> {
@@ -65,9 +74,17 @@ function sanitizeToolCalls(toolCalls: unknown[] | undefined): unknown[] | undefi
   return toolCalls.map((tc) => {
     if (!tc || typeof tc !== 'object') return tc
     const o = { ...(tc as Record<string, unknown>) }
-    if (typeof o.input === 'string') o.input = clip(o.input, MAX_TOOL_FIELD)
-    if (typeof o.output === 'string') o.output = clip(o.output, MAX_TOOL_FIELD)
-    if (typeof o.error === 'string') o.error = clip(o.error, MAX_TOOL_FIELD)
+    // Preserve runtime `truncated` (from TOOL_BLOB_CAP / event path) if present.
+    let exportClipped = false
+    for (const key of ['input', 'output', 'error'] as const) {
+      const v = o[key]
+      if (typeof v === 'string') {
+        const clipped = clipForExport(v, MAX_TOOL_FIELD)
+        o[key] = clipped.text
+        if (clipped.exportClipped) exportClipped = true
+      }
+    }
+    if (exportClipped) o.exportClipped = true
     return o
   })
 }
@@ -101,7 +118,7 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
     messages: input.messages.map((m) => ({
       id: m.id,
       role: m.role,
-      content: clip(m.content ?? '', MAX_CONTENT),
+      content: clipForExport(m.content ?? '', MAX_CONTENT).text,
       ...(m.agentId ? { agentId: m.agentId } : {}),
       ...(m.stopped ? { stopped: true } : {}),
       ...(m.toolCalls?.length ? { toolCalls: sanitizeToolCalls(m.toolCalls) } : {}),
@@ -110,7 +127,7 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
             agentRuns: m.agentRuns.map((r) => ({
               agentId: r.agentId,
               role: r.role,
-              output: clip(r.output ?? '', MAX_CONTENT),
+              output: clipForExport(r.output ?? '', MAX_CONTENT).text,
               startedAt: r.startedAt,
               finishedAt: r.finishedAt,
               ...(r.usage ? { usage: r.usage } : {}),

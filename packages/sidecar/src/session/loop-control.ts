@@ -2,14 +2,16 @@
 export const MAX_STEPS = 800
 
 /** A sub-agent's own loop cap (P3-J4), independent of the parent MAX_STEPS. Each `task` call is
- *  one parent step, so the parent cap bounds spawns; this bounds each child. */
-export const CHILD_MAX_STEPS = 15
+ *  one parent step, so the parent cap bounds spawns; this bounds each child.
+ *  25 covers multi-file research without hitting the text-only wrap-up mid-exploration
+ *  (codebase questions often need ~15–20 tool rounds). */
+export const CHILD_MAX_STEPS = 25
 
 /**
  * Explore fixed-agent loop cap. Codebase search often needs more than the default child budget
  * before a usable summary; keep generic `task` workers on {@link CHILD_MAX_STEPS}.
  */
-export const EXPLORE_CHILD_MAX_STEPS = 30
+export const EXPLORE_CHILD_MAX_STEPS = 40
 
 /** Per-agent child step budget for internal managed agents. */
 export function childMaxStepsForAgent(agentId: string): number {

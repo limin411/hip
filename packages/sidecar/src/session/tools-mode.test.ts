@@ -88,6 +88,14 @@ describe('buildTools permissionMode — path jail', () => {
     }
   })
 
+  it("full mode maps bare / under cwd (project root), never the OS drive/FS root alone", async () => {
+    writeFileSync(join(root, 'root-marker.txt'), 'ROOT')
+    const tools = buildTools(root, undefined, root, undefined, { permissionMode: 'full' })
+    const lsRoot = String(await byName(tools, 'ls').invoke({ path: '/' }))
+    expect(lsRoot).toContain('root-marker.txt')
+    expect(lsRoot).not.toMatch(/ENOTDIR|Error:/)
+  })
+
   it("full mode writes to an absolute path OUTSIDE the project root as-is", async () => {
     const outside = mkdtempSync(join(tmpdir(), 'hip-outside-'))
     try {

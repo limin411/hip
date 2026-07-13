@@ -166,9 +166,35 @@ export async function realInSkill(skillDirs: string[], p: string): Promise<strin
   return null
 }
 
-/** Resolve a model-supplied path in 'full' (un-jailed) mode. Absolute paths are taken AS-IS; relative
- *  paths resolve against `cwd`. No symlink/escape check — 'full' is an explicit "all directories" grant. */
+/**
+ * Resolve a model-supplied path in 'full' (un-jailed) mode.
+ * No symlink/escape check — 'full' is an explicit "all directories" grant.
+ *
+ * Semantics (aligned with the full-mode cwd prompt):
+ * - Relative paths resolve against `cwd`
+ * - Bare `/` or `\` means the project root (`cwd`), never the OS drive/FS root
+ * - On Windows, `/src/foo`-style paths are project-root form (not `D:\src\foo`);
+ *   only drive-letter (`C:\...`) and UNC (`\\server\share`) paths stay as OS absolute
+ * - On POSIX, real absolute paths (`/Users/...`, `/tmp/...`) stay as-is so full mode
+ *   can reach outside the project
+ */
 export function resolveFull(cwd: string, p: string): string {
+  // Project-root sentinel used throughout hip prompts and default tool paths.
+  if (p === '/' || p === '\\' || p === '') {
+    return path.resolve(cwd)
+  }
+  if (process.platform === 'win32') {
+    // Drive letter (C:\...) or UNC (\\server\share or //server/share)
+    if (/^[a-zA-Z]:[\\/]/.test(p) || /^[\\/]{2}/.test(p)) {
+      return path.normalize(p)
+    }
+    // Leading-slash paths are the project-relative absolute form from prompts
+    // ("/src/a.ts"), not the Windows drive root — join under cwd.
+    if (p.startsWith('/') || p.startsWith('\\')) {
+      return path.resolve(cwd, p.replace(/^[\\/]+/, ''))
+    }
+    return path.resolve(cwd, p)
+  }
   return path.isAbsolute(p) ? path.normalize(p) : path.resolve(cwd, p)
 }
 

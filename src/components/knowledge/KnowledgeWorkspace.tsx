@@ -9,10 +9,12 @@ import {
   MoreHorizontal,
   Search,
 } from 'lucide-react'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -37,6 +39,7 @@ import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
+import { LiveMarkdownPreview } from './LiveMarkdownPreview'
 
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
@@ -45,7 +48,9 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editing = useKnowledgeStore((s) => s.editing)
+  const sourceLayout = useKnowledgeStore((s) => s.sourceLayout)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
@@ -56,6 +61,7 @@ export function KnowledgeWorkspace() {
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
   const setEditing = useKnowledgeStore((s) => s.setEditing)
+  const setSourceLayout = useKnowledgeStore((s) => s.setSourceLayout)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
@@ -332,6 +338,19 @@ export function KnowledgeWorkspace() {
               >
                 <Download size={14} />
               </Button>
+              {editing && (
+                <SegmentedControl
+                  data-testid="knowledge-layout-toggle"
+                  aria-label={t('knowledge.doc.layoutLabel')}
+                  size="sm"
+                  value={sourceLayout}
+                  onChange={(v) => setSourceLayout(v)}
+                  options={[
+                    { value: 'source', label: t('knowledge.doc.layoutSource') },
+                    { value: 'split', label: t('knowledge.doc.layoutSplit') },
+                  ]}
+                />
+              )}
               <SegmentedControl
                 data-testid="knowledge-edit-toggle"
                 aria-label={t('knowledge.doc.modeLabel')}
@@ -357,27 +376,72 @@ export function KnowledgeWorkspace() {
           </div>
         ) : editing ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-8">
-              <InlineDocTitle
-                docId={activeDocId}
-                title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                onCommit={(title) => void renameNode(activeDocId, title)}
-              />
-              <MarkdownToolbar
-                getView={() => editorRef.current?.getView() ?? null}
-                onAfterEdit={(text) => setDraftBody(text)}
-              />
-              <DocEditor
-                ref={editorRef}
-                key={`${activeDocId}-edit`}
-                docId={activeDocId}
-                initialValue={docBody}
-                onDraftChange={setDraftBody}
-                onBlur={() => void flushSave()}
-                onSave={() => void flushSave()}
-                placeholder={t('knowledge.doc.placeholder')}
-              />
-            </div>
+            {/*
+              Stable PanelGroup shell so DocEditor is not remounted when
+              toggling source ↔ split (left Panel stays mounted).
+            */}
+            <PanelGroup direction="horizontal" className="min-h-0 flex-1">
+              <Panel
+                id="kb-editor"
+                order={1}
+                defaultSize={sourceLayout === 'split' ? 50 : 100}
+                minSize={sourceLayout === 'split' ? 28 : 40}
+                className="flex min-h-0 min-w-0 flex-col"
+              >
+                <div
+                  className={cn(
+                    'mx-auto flex min-h-0 w-full flex-1 flex-col',
+                    sourceLayout === 'source' ? 'max-w-3xl px-8' : 'px-4',
+                  )}
+                >
+                  <InlineDocTitle
+                    docId={activeDocId}
+                    title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                    onCommit={(title) => void renameNode(activeDocId, title)}
+                  />
+                  <MarkdownToolbar
+                    getView={() => editorRef.current?.getView() ?? null}
+                    onAfterEdit={(text) => setDraftBody(text)}
+                  />
+                  <DocEditor
+                    ref={editorRef}
+                    key={`${activeDocId}-edit`}
+                    docId={activeDocId}
+                    initialValue={docBody}
+                    onDraftChange={setDraftBody}
+                    onBlur={() => void flushSave()}
+                    onSave={() => void flushSave()}
+                    placeholder={t('knowledge.doc.placeholder')}
+                  />
+                </div>
+              </Panel>
+              {sourceLayout === 'split' && (
+                <>
+                  <PanelResizeHandle
+                    className="group relative z-10 flex w-3 items-center justify-center bg-transparent"
+                    data-testid="knowledge-split-handle"
+                  >
+                    <div
+                      className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-accent/30 group-data-[resize-handle-state=drag]:bg-accent/50"
+                      aria-hidden
+                    />
+                    <div
+                      className="relative h-7 w-[3px] rounded-full bg-border transition-colors group-hover:bg-accent/70 group-data-[resize-handle-state=drag]:bg-accent"
+                      aria-hidden
+                    />
+                  </PanelResizeHandle>
+                  <Panel
+                    id="kb-preview"
+                    order={2}
+                    defaultSize={50}
+                    minSize={25}
+                    className="min-h-0 min-w-0 border-l border-border bg-surface"
+                  >
+                    <LiveMarkdownPreview body={draftBody} />
+                  </Panel>
+                </>
+              )}
+            </PanelGroup>
           </div>
         ) : (
           <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">

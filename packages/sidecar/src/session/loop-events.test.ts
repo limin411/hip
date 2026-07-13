@@ -32,11 +32,23 @@ describe('LoopEvent union', () => {
     expect(new Set(events.map((e) => e.type)).size).toBe(6)
   })
 
-  it('narrows on type in a switch', () => {
+  it('narrows on type discriminant', () => {
     const e: LoopEvent = { type: 'loop.nudge', ...base, reason: 'doom' }
     let reason: string | undefined
-    if (e.type === 'loop.nudge') {
-      reason = e.reason
+    switch (e.type) {
+      case 'loop.nudge':
+        reason = e.reason
+        break
+      case 'loop.step':
+      case 'loop.replan':
+      case 'loop.pause':
+      case 'loop.budget':
+      case 'loop.end':
+        break
+      default: {
+        const _exhaustive: never = e
+        void _exhaustive
+      }
     }
     expect(reason).toBe('doom')
   })

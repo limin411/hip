@@ -32,6 +32,8 @@ export function emitLoopSignal(sink: LoopEventSink | undefined, e: LoopEvent): v
   try {
     sink(e)
   } catch {
-    // best-effort: never throw into the agent loop
+    // best-effort: never throw into the agent loop.
+    // E1+: when real sinks (JSONL / debug-logger) are wired, consider a non-throwing
+    // debug log or counter here — keep zero-cost when no logger is configured.
   }
 }

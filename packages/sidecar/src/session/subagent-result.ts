@@ -5,21 +5,6 @@
 
 import { hasDsmlToolCalls, isDsmlOnlyOrEmpty, parseDsmlToolCalls } from './dsml.js'
 
-/**
- * First-line marker for sub-agent HITL pause (Track B).
- * Never starts with "Error" — loop guards must not treat it as tool failure.
- */
-export const SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]'
-
-/**
- * True when tool content is a sub-agent pause handoff (first line only).
- * Loop guards (error-streak / replan / plan hasToolFailure) must exclude these.
- */
-export function isSubagentPausedText(content: string): boolean {
-  const first = content.split('\n', 1)[0] ?? ''
-  return first.startsWith(SUBAGENT_PAUSE_MARKER)
-}
-
 export interface ToolSummary {
   name: string
   status: string
@@ -35,8 +20,9 @@ const RECONSTRUCTED_PREFIX =
   '[sub-agent finished without a prose summary; reconstructed from tool results]'
 
 /**
- * First-line marker for sub-agent HITL pause (not an Error prefix).
+ * First-line marker for sub-agent HITL pause (Track B; not an Error prefix).
  * SubagentOutcome is string-encoded via this marker for now (no discriminated-union return type yet).
+ * Loop guards (error-streak / replan / plan hasToolFailure) must exclude these.
  */
 export const SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]'
 

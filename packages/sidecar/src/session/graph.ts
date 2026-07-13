@@ -39,7 +39,7 @@ import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { PlanMode } from './plan-mode.js'
 import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
-import type { LoopEventSink } from './loop-events.js'
+import { emitLoopSignal, type LoopEventSink } from './loop-events.js'
 // decideReplan only — do not import planner PlanMode (collides with plan-mode.PlanMode).
 import { decideReplan, TurnReplanGuard, REPLAN_ERROR_THRESHOLD } from './planner.js'
 
@@ -127,6 +127,11 @@ export interface GraphCtx {
    * Created once per invoke if missing; not LangGraph state.
    */
   replanGuard?: TurnReplanGuard
+}
+
+/** sessionId + turnId fields shared by every LoopEvent (turnId may be unset on GraphCtx). */
+function loopIds(ctx: GraphCtx): { sessionId: string; turnId: string } {
+  return { sessionId: ctx.sessionId, turnId: ctx.turnId ?? '' }
 }
 
 const LoopState = Annotation.Root({
@@ -346,6 +351,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           ) ?? false
           const decision = ctx.circuitBreaker.step(tokensUsed, hadFileWrite)
           if (decision.action === 'terminate') {
+            emitLoopSignal(emit.loopSignal, {
+              type: 'loop.end',
+              ...loopIds(ctx),
+              reason: 'circuit_breaker',
+            })
             return {
               messages: [new AIMessage(`CIRCUIT BREAKER TRIPPED: ${decision.reason}\n\nTerminating execution.`)],
               steps: state.steps + 1,
@@ -588,18 +598,34 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
    * Priority MUST match routeAfterTools: doom > error-streak, so nudgedSig
    * latches the same key the router uses for pause on the next identical batch.
    */
-  function nudge(state: State): Partial<State> {
+  function nudge(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
     const recentToolContents = collectRecentToolContents(state)
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     const isDoom =
       lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
     if (isDoom) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.nudge',
+        ...loopIds(ctx),
+        reason: 'doom',
+      })
       return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
     }
     if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.nudge',
+        ...loopIds(ctx),
+        reason: 'error_streak',
+      })
       return { messages: [new SystemMessage(ERROR_STREAK_NUDGE)], nudgedSig: 'error-streak' }
     }
     // Fallback: doom-shaped nudge (route only sends us here for doom/streak).
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.nudge',
+      ...loopIds(ctx),
+      reason: 'doom',
+    })
     return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
   }
 
@@ -608,29 +634,67 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
    * Does NOT set nudgedSig — preserves error-streak machine for post-replan failures.
    */
   function replanNode(state: State, config: LangGraphRunnableConfig): Partial<State> {
-    const guard = getReplanGuard(ctxOf(config))
+    const ctx = ctxOf(config)
+    const guard = getReplanGuard(ctx)
     const errors = harvestTrailingToolErrors(collectRecentToolContents(state))
     const decision = decideReplan(errors, guard)
     if (decision.replan && decision.prompt) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.replan',
+        ...loopIds(ctx),
+        reason: decision.reason,
+      })
       return { messages: [new SystemMessage(decision.prompt)] }
     }
     return {}
   }
 
   /** Stop the turn pending user input (Option Z: session.ts reads this and emits agent:interrupt). */
-  function pause(_state: State): Partial<State> {
-    return { status: 'awaiting_user', pendingQuestion: PAUSE_QUESTION }
+  function pause(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const question = PAUSE_QUESTION
+    const lastSig = state.recentSigs[state.recentSigs.length - 1]
+    const isDoomPause =
+      lastSig !== undefined &&
+      state.nudgedSig === lastSig &&
+      trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.pause',
+      ...loopIds(ctx),
+      question,
+      ...(isDoomPause ? { kind: 'doom' as const } : {}),
+    })
+    return { status: 'awaiting_user', pendingQuestion: question }
   }
 
-  function planPause(state: State): Partial<State> {
-    return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
+  function planPause(_state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const question = 'Review the plan above. Approve, reject, or suggest changes.'
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.pause',
+      ...loopIds(ctx),
+      question,
+      kind: 'plan',
+    })
+    return { status: 'awaiting_user', pendingQuestion: question }
   }
 
   function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
-    const stepCap = ctxOf(config).maxSteps ?? maxSteps
-    return wantsTools && state.steps < stepCap ? 'tools' : END
+    const ctx = ctxOf(config)
+    const stepCap = ctx.maxSteps ?? maxSteps
+    if (wantsTools && state.steps < stepCap) return 'tools'
+    // Terminal (not via pause node). Skip if status already terminal — e.g. circuit breaker
+    // emitted loop.end at trip time; pause/planPause emit loop.pause and end via their edges.
+    if (state.status !== 'awaiting_user') {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.end',
+        ...loopIds(ctx),
+        reason: wantsTools ? 'max_steps' : 'completed',
+      })
+    }
+    return END
   }
 
   /**
@@ -654,6 +718,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       const plan = state.plan ?? []
       const allCompleted = plan.length > 0 && plan.every((item) => item.status === 'completed')
       if (allCompleted) {
+        const ctx = ctxOf(config)
+        emitLoopSignal(ctx.emit.loopSignal, {
+          type: 'loop.end',
+          ...loopIds(ctx),
+          reason: 'completed',
+        })
         return END
       }
     }

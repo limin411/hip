@@ -14,6 +14,7 @@ import { setActiveModel } from '../config/providers.js'
 import { TurnReplanGuard } from './planner.js'
 import { ERROR_STREAK_NUDGE, DOOM_LOOP_NUDGE, sigOf } from './doom-loop.js'
 import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
+import type { LoopEvent } from './loop-events.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -630,6 +631,194 @@ describe('replan × error-streak decision table (Track A)', () => {
       )
       expect(ctx.replanGuard).toBeInstanceOf(TurnReplanGuard)
       expect(ctx.replanGuard!.hasReplanned).toBe(true)
+    })
+  })
+})
+
+describe('loopSignal emissions (Track E1)', () => {
+  function collectingEmit(): { emit: GraphEmit; events: LoopEvent[] } {
+    const events: LoopEvent[] = []
+    return {
+      events,
+      emit: {
+        ...noopEmit,
+        loopSignal: (e) => {
+          events.push(e)
+        },
+      },
+    }
+  }
+
+  it('default-preserving: undefined loopSignal does not throw on nudge/pause', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const loop = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+      const out = await app.invoke(
+        { messages: [new HumanMessage('doom')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, fakeRunner([loop(), loop(), loop(), loop()]), {
+              emit: noopEmit, // no loopSignal
+            }),
+          },
+          recursionLimit: 90,
+        },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(noopEmit.loopSignal).toBeUndefined()
+    })
+  })
+
+  it('emits loop.nudge (doom) then loop.pause (kind=doom) on repeated identical tool calls', async () => {
+    await withTmp(async (root) => {
+      const { emit, events } = collectingEmit()
+      const app = buildGraph()
+      const loop = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+      const out = await app.invoke(
+        { messages: [new HumanMessage('doom')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, fakeRunner([loop(), loop(), loop(), loop()]), {
+              emit,
+              turnId: 'turn-doom',
+            }),
+          },
+          recursionLimit: 90,
+        },
+      )
+      expect(out.status).toBe('awaiting_user')
+      const types = events.map((e) => e.type)
+      expect(types).toContain('loop.nudge')
+      expect(types).toContain('loop.pause')
+      const nudge = events.find((e) => e.type === 'loop.nudge')
+      expect(nudge).toMatchObject({
+        type: 'loop.nudge',
+        sessionId: 'test-session',
+        turnId: 'turn-doom',
+        reason: 'doom',
+      })
+      const pause = events.find((e) => e.type === 'loop.pause')
+      expect(pause).toMatchObject({
+        type: 'loop.pause',
+        sessionId: 'test-session',
+        turnId: 'turn-doom',
+        kind: 'doom',
+      })
+      // Pause path ends via pause node — no loop.end on awaiting_user
+      expect(events.some((e) => e.type === 'loop.end')).toBe(false)
+    })
+  })
+
+  it('emits loop.replan then loop.nudge (error_streak) then loop.pause on error ladder', async () => {
+    await withTmp(async (root) => {
+      const { emit, events } = collectingEmit()
+      const app = buildGraph()
+      const guard = new TurnReplanGuard()
+      // replan (2 errs) → error-streak nudge (3 errs) → pause
+      const runner = fakeRunner([errBatch2('p1'), errBatch3('p2'), errBatch3('p3')])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('keep failing')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, runner, { replanGuard: guard, emit, turnId: 'turn-replan' }),
+          },
+          recursionLimit: 50,
+        },
+      )
+      expect(out.status).toBe('awaiting_user')
+      const types = events.map((e) => e.type)
+      expect(types).toContain('loop.replan')
+      expect(types).toContain('loop.nudge')
+      expect(types).toContain('loop.pause')
+      const replan = events.find((e) => e.type === 'loop.replan')
+      expect(replan).toMatchObject({
+        type: 'loop.replan',
+        sessionId: 'test-session',
+        turnId: 'turn-replan',
+      })
+      expect(replan && replan.type === 'loop.replan' && replan.reason.length).toBeGreaterThan(0)
+      const nudge = events.find((e) => e.type === 'loop.nudge')
+      expect(nudge).toMatchObject({ type: 'loop.nudge', reason: 'error_streak' })
+    })
+  })
+
+  it('emits loop.pause kind=plan on planPause', async () => {
+    await withTmp(async (root) => {
+      const { emit, events } = collectingEmit()
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'c1' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('plan ready')],
+          steps: 0,
+          planStatus: 'ready',
+          planningMode: 'plan',
+          plan: [{ content: 'do thing', status: 'pending' }],
+        },
+        {
+          configurable: {
+            ctx: baseCtx(root, runner, { emit, turnId: 'turn-plan' }),
+          },
+          recursionLimit: 20,
+        },
+      )
+      expect(out.status).toBe('awaiting_user')
+      const pause = events.find((e) => e.type === 'loop.pause')
+      expect(pause).toMatchObject({
+        type: 'loop.pause',
+        kind: 'plan',
+        turnId: 'turn-plan',
+      })
+      expect(events.some((e) => e.type === 'loop.end')).toBe(false)
+    })
+  })
+
+  it('emits loop.end reason=completed when model returns plain text', async () => {
+    await withTmp(async (root) => {
+      const { emit, events } = collectingEmit()
+      const app = buildGraph()
+      await app.invoke(
+        { messages: [new HumanMessage('hi')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, fakeRunner([new AIMessage('done')]), {
+              emit,
+              turnId: 'turn-end',
+            }),
+          },
+        },
+      )
+      expect(events).toEqual([
+        {
+          type: 'loop.end',
+          sessionId: 'test-session',
+          turnId: 'turn-end',
+          reason: 'completed',
+        },
+      ])
+    })
+  })
+
+  it('sink throw does not break the agent loop (emitLoopSignal best-effort)', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const emit: GraphEmit = {
+        ...noopEmit,
+        loopSignal: () => {
+          throw new Error('sink blew up')
+        },
+      }
+      const out = await app.invoke(
+        { messages: [new HumanMessage('hi')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, fakeRunner([new AIMessage('ok')]), { emit }),
+          },
+        },
+      )
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('ok')
     })
   })
 })

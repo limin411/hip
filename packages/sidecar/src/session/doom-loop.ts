@@ -5,8 +5,28 @@ import { isSubagentPausedText } from './subagent-result.js'
 
 export type { DoomLoopStrategy }
 
+/** Canonical allowlist — single source for config parse + runtime resolve. */
+export const DOOM_LOOP_STRATEGIES: readonly DoomLoopStrategy[] = [
+  'nudge_then_pause',
+  'pause_immediately',
+  'auto_continue',
+] as const
+
 /** Default matches historical graph behavior (nudge once, then pause). */
 export const DEFAULT_DOOM_LOOP_STRATEGY: DoomLoopStrategy = 'nudge_then_pause'
+
+/**
+ * Parse a raw config string into a strategy, or `undefined` if invalid/absent.
+ * Used by hip-config normalize (omit field) and by {@link resolveDoomLoopStrategy}.
+ */
+export function parseDoomLoopStrategy(
+  strategy?: string | null,
+): DoomLoopStrategy | undefined {
+  if (typeof strategy !== 'string') return undefined
+  return (DOOM_LOOP_STRATEGIES as readonly string[]).includes(strategy)
+    ? (strategy as DoomLoopStrategy)
+    : undefined
+}
 
 /**
  * Normalize an optional config / GraphCtx value to a valid strategy.
@@ -15,14 +35,7 @@ export const DEFAULT_DOOM_LOOP_STRATEGY: DoomLoopStrategy = 'nudge_then_pause'
 export function resolveDoomLoopStrategy(
   strategy?: DoomLoopStrategy | string | null,
 ): DoomLoopStrategy {
-  if (
-    strategy === 'nudge_then_pause' ||
-    strategy === 'pause_immediately' ||
-    strategy === 'auto_continue'
-  ) {
-    return strategy
-  }
-  return DEFAULT_DOOM_LOOP_STRATEGY
+  return parseDoomLoopStrategy(strategy ?? undefined) ?? DEFAULT_DOOM_LOOP_STRATEGY
 }
 
 export const DOOM_LOOP_N = 3

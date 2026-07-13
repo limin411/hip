@@ -1,9 +1,11 @@
 import { SystemMessage, HumanMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import type { GraphEmit, GraphCtx } from './graph.js'
 import { buildGraph } from './graph.js'
 import { buildTools } from './tools.js'
 import { recursionLimit } from './loop-control.js'
+import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { buildManagedAgentPrompt } from './system-prompt.js'
 import { mcpManager } from './mcp/manager.js'
 import { lastAiText } from './subagent.js'
@@ -73,6 +75,10 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
   const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
   const toolNames = tools.map((t) => t.name)
+  // Inherit doom strategy from effective hip.toml (same as parent turn path).
+  const doomLoopStrategy = resolveDoomLoopStrategy(
+    resolveEffectiveConfig(cwd).agentLoop?.doomLoopStrategy,
+  )
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -89,6 +95,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     guardianReviewer,
     requestApproval,
     permissionMode,
+    doomLoopStrategy,
   }
   let humanParts: ContentPart[]
   if (attachmentParts?.length) {

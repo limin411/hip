@@ -12,8 +12,8 @@ import type {
   TeamMember,
   TeamPipelineStep,
   AgentLoopConfig,
-  DoomLoopStrategy,
 } from '@hip/protocol'
+import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
 
@@ -164,10 +164,9 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.subagentHitl === 'inline_partial') {
     out.subagentHitl = 'inline_partial'
   }
-  const strategyRaw = raw.doomLoopStrategy
-  if (typeof strategyRaw === 'string') {
-    const allowed = new Set(['nudge_then_pause', 'pause_immediately', 'auto_continue'])
-    if (allowed.has(strategyRaw)) out.doomLoopStrategy = strategyRaw as DoomLoopStrategy
+  if (typeof raw.doomLoopStrategy === 'string') {
+    const parsed = parseDoomLoopStrategy(raw.doomLoopStrategy)
+    if (parsed) out.doomLoopStrategy = parsed
   }
   return out
 }

@@ -2,6 +2,7 @@ import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langc
 import type { PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools, type ApprovalFn } from './tools.js'
 import type { NetworkPolicy } from './network-policy.js'
@@ -9,6 +10,7 @@ import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
 import { recursionLimit, MAX_DEPTH } from './loop-control.js'
+import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { childSystemPrompt } from './system-prompt.js'
 import { formatPausedToolResult } from './subagent-result.js'
 import { linkSubagentParentObservation, type TraceObservation } from './trace-export.js'
@@ -157,6 +159,10 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     const blocked = new Set(['task', 'task_batch', 'dispatch_agent'])
     tools = tools.filter((t) => !blocked.has(t.name))
   }
+  // Inherit doom strategy from effective hip.toml (same as parent turn path).
+  const doomLoopStrategy = resolveDoomLoopStrategy(
+    resolveEffectiveConfig(root).agentLoop?.doomLoopStrategy,
+  )
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -173,6 +179,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     guardianReviewer,
     requestApproval,
     permissionMode,
+    doomLoopStrategy,
   }
   const app = buildGraph(childMaxSteps)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0

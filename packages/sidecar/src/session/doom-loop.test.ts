@@ -11,7 +11,9 @@ import {
   isLoopToolError,
   PATH_HIT_LIMIT,
   resolveDoomLoopStrategy,
+  parseDoomLoopStrategy,
   DEFAULT_DOOM_LOOP_STRATEGY,
+  DOOM_LOOP_STRATEGIES,
 } from './doom-loop.js'
 import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
 
@@ -29,6 +31,18 @@ describe('resolveDoomLoopStrategy', () => {
     expect(resolveDoomLoopStrategy('nudge_then_pause')).toBe('nudge_then_pause')
     expect(resolveDoomLoopStrategy('pause_immediately')).toBe('pause_immediately')
     expect(resolveDoomLoopStrategy('auto_continue')).toBe('auto_continue')
+  })
+
+  it('parseDoomLoopStrategy omits invalid (config-normalize semantics)', () => {
+    expect(parseDoomLoopStrategy(undefined)).toBeUndefined()
+    expect(parseDoomLoopStrategy(null)).toBeUndefined()
+    expect(parseDoomLoopStrategy('bogus')).toBeUndefined()
+    expect(parseDoomLoopStrategy('pause_immediately')).toBe('pause_immediately')
+    expect(DOOM_LOOP_STRATEGIES).toEqual([
+      'nudge_then_pause',
+      'pause_immediately',
+      'auto_continue',
+    ])
   })
 })
 

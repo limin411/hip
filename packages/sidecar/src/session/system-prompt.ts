@@ -66,6 +66,9 @@ const BASE =
   'to delegate it to a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
   'Prefer specialized agents when available: explore for read-only codebase search, plan for design-only ' +
   'planning, coder for implementation with scripts. ' +
+  'When a task or dispatch_agent result returns, treat it as the research source of truth: do not re-run ' +
+  'the same ls/glob/grep/read_file exploration the sub-agent already did unless the result is empty, ' +
+  'errored, clearly incomplete, or you need a specific file section the summary omitted. ' +
   'For a simple, single-step request (greetings, list a directory, read one file, answer a short question), ' +
   'do it yourself with tools and answer directly — do not call task, write_todos, or spawn sub-agents. ' +
   'Never thrash on .git/objects or invent shell tool names; use run_script for shell, and stop probing ' +

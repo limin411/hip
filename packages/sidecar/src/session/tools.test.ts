@@ -96,6 +96,28 @@ describe('file tools', () => {
     expect(out).not.toContain('node_modules')
   })
 
+  it('grep skips $RECYCLE.BIN', async () => {
+    mkdirSync(join(root, '$RECYCLE.BIN', 'old'), { recursive: true })
+    writeFileSync(join(root, '$RECYCLE.BIN', 'old', 'a.js'), 'NEEDLE in recycle')
+    writeFileSync(join(root, 'app.js'), 'NEEDLE in app')
+    const out = String(await byName(root, 'grep').invoke({ pattern: 'NEEDLE' }))
+    expect(out).toContain('/app.js')
+    expect(out).not.toMatch(/RECYCLE/i)
+  })
+
+  it('grep accepts a file path without ENOTDIR', async () => {
+    mkdirSync(join(root, 'src'), { recursive: true })
+    writeFileSync(join(root, 'src', 'a.ts'), 'export const FOO = 1\nexport const BAR = 2\n')
+    writeFileSync(join(root, 'src', 'b.ts'), 'export const FOO = 99\n')
+    const out = String(
+      await byName(root, 'grep').invoke({ pattern: 'FOO', path: '/src/a.ts' }),
+    )
+    expect(out).not.toMatch(/ENOTDIR|not a directory|scandir/i)
+    expect(out).toContain('a.ts')
+    expect(out).toContain('FOO')
+    expect(out).not.toContain('b.ts')
+  })
+
   it('grep accepts PCRE-style (?i) and caseInsensitive', async () => {
     writeFileSync(join(root, 'ZuolinConfig.java'), 'class ZuolinConfig {}')
     const viaInline = String(await byName(root, 'grep').invoke({ pattern: '(?i)zuolin|zuo_lin|zuo-lin' }))
@@ -109,6 +131,40 @@ describe('file tools', () => {
     const out = String(await byName(root, 'grep').invoke({ pattern: '(unclosed' }))
     expect(out).toMatch(/invalid regex/i)
     expect(out).toMatch(/caseInsensitive/)
+  })
+
+  it('read_file honors 1-based offset and limit', async () => {
+    writeFileSync(join(root, 'big.txt'), ['L1', 'L2', 'L3', 'L4', 'L5'].join('\n'))
+    const mid = String(
+      await byName(root, 'read_file').invoke({ path: '/big.txt', offset: 2, limit: 2 }),
+    )
+    expect(mid).toContain('L2')
+    expect(mid).toContain('L3')
+    expect(mid).not.toMatch(/^L1/)
+    expect(mid).toMatch(/lines 2-3 of 5/)
+    expect(mid).toMatch(/offset=4/)
+
+    const cont = String(
+      await byName(root, 'read_file').invoke({ path: '/big.txt', offset: 4, limit: 10 }),
+    )
+    expect(cont).toContain('L4')
+    expect(cont).toContain('L5')
+    expect(cont).not.toMatch(/use offset=/)
+  })
+
+  it('glob caseInsensitive matches mixed-case filenames', async () => {
+    writeFileSync(join(root, 'SyncDataConfig.java'), 'class SyncDataConfig {}')
+    const sensitive = String(
+      await byName(root, 'glob').invoke({ pattern: '**/*sync*', caseInsensitive: false }),
+    )
+    // Case-sensitive: lowercase "sync" does not match "SyncDataConfig"
+    expect(sensitive).toMatch(/No files match|^\s*$/)
+    expect(sensitive).not.toContain('SyncDataConfig')
+
+    const insensitive = String(
+      await byName(root, 'glob').invoke({ pattern: '**/*sync*', caseInsensitive: true }),
+    )
+    expect(insensitive).toContain('SyncDataConfig')
   })
 
   it('write_todos returns a one-line confirmation with the count', async () => {

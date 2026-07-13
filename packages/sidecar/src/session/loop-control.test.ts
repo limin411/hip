@@ -15,12 +15,13 @@ describe('loop-control', () => {
   })
 
   it('recursionLimit accepts a custom maxSteps for sub-agents', () => {
-    expect(CHILD_MAX_STEPS).toBe(15)
+    expect(CHILD_MAX_STEPS).toBe(25)
     expect(recursionLimit(CHILD_MAX_STEPS)).toBe(CHILD_MAX_STEPS * 3 + 10)
     expect(recursionLimit(5)).toBe(25)
   })
 
   it('gives explore a higher child step budget than generic workers', () => {
+    expect(EXPLORE_CHILD_MAX_STEPS).toBe(40)
     expect(EXPLORE_CHILD_MAX_STEPS).toBeGreaterThan(CHILD_MAX_STEPS)
     expect(childMaxStepsForAgent('explore')).toBe(EXPLORE_CHILD_MAX_STEPS)
     expect(childMaxStepsForAgent('coder')).toBe(CHILD_MAX_STEPS)

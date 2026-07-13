@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { buildSessionDebugBundle, redactObject, sessionDebugBundleJson } from './sessionDebugBundle'
+import {
+  buildSessionDebugBundle,
+  clipForExport,
+  MAX_CONTENT,
+  MAX_TOOL_FIELD,
+  redactObject,
+  sessionDebugBundleJson,
+} from './sessionDebugBundle'
 
 describe('sessionDebugBundle', () => {
   it('redacts sensitive keys deeply', () => {
@@ -28,7 +35,7 @@ describe('sessionDebugBundle', () => {
         {
           id: 'm2',
           role: 'assistant',
-          content: 'x'.repeat(5000),
+          content: 'x'.repeat(MAX_CONTENT + 500),
           timestamp: 2,
           stopped: true,
           agentId: 'supervisor',
@@ -40,7 +47,8 @@ describe('sessionDebugBundle', () => {
     expect(bundle.exportedAt).toBe('2026-07-10T00:00:00.000Z')
     expect(bundle.session.config.apiKey).toBeUndefined()
     expect(bundle.session.surface).toBe('code')
-    expect(bundle.messages[1]!.content).toContain('truncated')
+    expect(bundle.messages[1]!.content).toContain('export clipped')
+    expect(bundle.messages[1]!.content).toContain('not a runtime tool cap')
     expect(bundle.messages[1]!.stopped).toBe(true)
     expect(sessionDebugBundleJson({
       sessionId: 's1',
@@ -48,5 +56,80 @@ describe('sessionDebugBundle', () => {
       messages: [],
       now: () => 't',
     })).toContain('"version": 1')
+  })
+
+  it('marks tool fields with exportClipped and preserves runtime truncated', () => {
+    const longOut = 'y'.repeat(MAX_TOOL_FIELD + 100)
+    const bundle = buildSessionDebugBundle({
+      sessionId: 's1',
+      title: 'T',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'ok',
+          timestamp: 1,
+          toolCalls: [
+            {
+              callId: 'c1',
+              name: 'read_file',
+              input: '{}',
+              output: longOut,
+              status: 'finished',
+              truncated: true,
+            },
+          ],
+        },
+      ],
+      now: () => 't',
+    })
+    const tc = bundle.messages[0]!.toolCalls![0] as Record<string, unknown>
+    expect(tc.truncated).toBe(true)
+    expect(tc.exportClipped).toBe(true)
+    expect(String(tc.output)).toContain('export clipped')
+    expect(String(tc.output)).toContain('not a runtime tool cap')
+    expect(String(tc.output).length).toBeLessThan(longOut.length)
+  })
+
+  it('does not set exportClipped when tool fields fit under the cap', () => {
+    const bundle = buildSessionDebugBundle({
+      sessionId: 's1',
+      title: 'T',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'ok',
+          timestamp: 1,
+          toolCalls: [
+            {
+              callId: 'c1',
+              name: 'ls',
+              input: '{"path":"."}',
+              output: 'a.txt',
+              status: 'finished',
+            },
+          ],
+        },
+      ],
+      now: () => 't',
+    })
+    const tc = bundle.messages[0]!.toolCalls![0] as Record<string, unknown>
+    expect(tc.exportClipped).toBeUndefined()
+    expect(tc.output).toBe('a.txt')
+  })
+})
+
+describe('clipForExport', () => {
+  it('passes through short strings', () => {
+    expect(clipForExport('hi', 10)).toEqual({ text: 'hi', exportClipped: false })
+  })
+
+  it('labels export clips distinctly from runtime caps', () => {
+    const r = clipForExport('abcdefghij', 4)
+    expect(r.exportClipped).toBe(true)
+    expect(r.text).toMatch(/^abcd/)
+    expect(r.text).toContain('export clipped 6 chars')
+    expect(r.text).toContain('not a runtime tool cap')
   })
 })

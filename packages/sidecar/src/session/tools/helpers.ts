@@ -6,11 +6,27 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { resolveWithin } from '../workspace-fs.js'
 import type { NetworkPolicy } from '../network-policy.js'
 
-export const EXCLUDE_DIRS = new Set(['node_modules', '.git'])
+/** Directory basenames skipped by recursive file tools (grep/glob walks). */
+export const EXCLUDE_DIRS = new Set([
+  'node_modules',
+  '.git',
+  // Windows junk / system trees that full-mode walks must never enter
+  '$RECYCLE.BIN',
+  'System Volume Information',
+  'Recovery',
+])
 export const MAX_SCAN_FILE_BYTES = 256 * 1024
 export const SCRIPT_TIMEOUT_MS = 120_000
 export const SCRIPT_OUTPUT_CAP = 64 * 1024
 export const WEB_OUTPUT_CAP = 64 * 1024
+
+/** True when a directory basename should be skipped during recursive scans. */
+export function isExcludedDirName(name: string): boolean {
+  if (EXCLUDE_DIRS.has(name)) return true
+  // Case variants on Windows (e.g. $Recycle.Bin)
+  const upper = name.toUpperCase()
+  return upper === '$RECYCLE.BIN' || upper === 'SYSTEM VOLUME INFORMATION'
+}
 
 /** Clip text to `cap` bytes, appending a truncation note when shortened. */
 export function clipText(text: string, cap: number): string {
@@ -150,9 +166,35 @@ export async function realInSkill(skillDirs: string[], p: string): Promise<strin
   return null
 }
 
-/** Resolve a model-supplied path in 'full' (un-jailed) mode. Absolute paths are taken AS-IS; relative
- *  paths resolve against `cwd`. No symlink/escape check — 'full' is an explicit "all directories" grant. */
+/**
+ * Resolve a model-supplied path in 'full' (un-jailed) mode.
+ * No symlink/escape check — 'full' is an explicit "all directories" grant.
+ *
+ * Semantics (aligned with the full-mode cwd prompt):
+ * - Relative paths resolve against `cwd`
+ * - Bare `/` or `\` means the project root (`cwd`), never the OS drive/FS root
+ * - On Windows, `/src/foo`-style paths are project-root form (not `D:\src\foo`);
+ *   only drive-letter (`C:\...`) and UNC (`\\server\share`) paths stay as OS absolute
+ * - On POSIX, real absolute paths (`/Users/...`, `/tmp/...`) stay as-is so full mode
+ *   can reach outside the project
+ */
 export function resolveFull(cwd: string, p: string): string {
+  // Project-root sentinel used throughout hip prompts and default tool paths.
+  if (p === '/' || p === '\\' || p === '') {
+    return path.resolve(cwd)
+  }
+  if (process.platform === 'win32') {
+    // Drive letter (C:\...) or UNC (\\server\share or //server/share)
+    if (/^[a-zA-Z]:[\\/]/.test(p) || /^[\\/]{2}/.test(p)) {
+      return path.normalize(p)
+    }
+    // Leading-slash paths are the project-relative absolute form from prompts
+    // ("/src/a.ts"), not the Windows drive root — join under cwd.
+    if (p.startsWith('/') || p.startsWith('\\')) {
+      return path.resolve(cwd, p.replace(/^[\\/]+/, ''))
+    }
+    return path.resolve(cwd, p)
+  }
   return path.isAbsolute(p) ? path.normalize(p) : path.resolve(cwd, p)
 }
 
@@ -243,13 +285,46 @@ export function substituteSkillBody(
 }
 
 /** Minimal glob: `**` matches any chars incl. `/`; `*` matches any chars except `/`. Anchored full-match. */
-export function toGlobRegex(pattern: string): RegExp {
+export function toGlobRegex(pattern: string, caseInsensitive?: boolean): RegExp {
   const rx = pattern
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, ' ')
     .replace(/\*/g, '[^/]*')
     .replace(/ /g, '.*')
-  return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`)
+  const flags = caseInsensitive ? 'i' : ''
+  return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`, flags)
+}
+
+/**
+ * Slice a text file by 1-based line offset and optional line limit.
+ * When the slice does not reach EOF, appends a continuation hint.
+ */
+export function sliceFileLines(
+  text: string,
+  offset?: number,
+  limit?: number,
+): { text: string; totalLines: number } {
+  const lines = text.split('\n')
+  const totalLines = lines.length
+  const start = offset !== undefined ? Math.max(0, Math.floor(offset) - 1) : 0
+  if (start >= totalLines) {
+    return {
+      text: `Error: offset ${offset} is past end of file (${totalLines} lines)`,
+      totalLines,
+    }
+  }
+  const end =
+    limit !== undefined ? Math.min(totalLines, start + Math.max(0, Math.floor(limit))) : totalLines
+  const body = lines.slice(start, end).join('\n')
+  if (end < totalLines) {
+    return {
+      text:
+        body +
+        `\n\n…[lines ${start + 1}-${end} of ${totalLines}; use offset=${end + 1} to continue]`,
+      totalLines,
+    }
+  }
+  return { text: body, totalLines }
 }
 
 const GREP_INLINE_FLAGS = /^\(\?([ims]+)\)/

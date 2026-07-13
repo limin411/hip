@@ -3,7 +3,7 @@
  * rebuild a short result from its tool trajectory so the supervisor can continue.
  */
 
-import { isDsmlOnlyOrEmpty } from './dsml.js'
+import { hasDsmlToolCalls, isDsmlOnlyOrEmpty, parseDsmlToolCalls } from './dsml.js'
 
 export interface ToolSummary {
   name: string
@@ -19,25 +19,26 @@ const EMPTY_ERROR =
 const RECONSTRUCTED_PREFIX =
   '[sub-agent finished without a prose summary; reconstructed from tool results]'
 
+/**
+ * True when the sub-agent's final text is not a usable handoff to the parent:
+ * empty, placeholder, DSML-only, or any residual DSML tool_calls block (must never leak to supervisor).
+ */
 export function isUselessSubagentText(text: string | null | undefined): boolean {
   if (text == null) return true
   const t = text.trim()
   if (!t) return true
   if (t === '(sub-agent produced no output)') return true
   if (t.startsWith('Error: sub-agent produced empty output')) return true
+  // Any unfinished DSML tool_calls in the final answer is not a valid handoff — even with long prose.
+  if (hasDsmlToolCalls(t)) return true
   if (isDsmlOnlyOrEmpty(t)) return true
   return false
 }
 
-export function synthesizeSubagentResult(
-  text: string | null | undefined,
+function reconstructFromTools(
   tools: ToolSummary[],
   opts?: { maxTools?: number; maxChars?: number },
 ): string {
-  if (!isUselessSubagentText(text)) return (text ?? '').trim()
-
-  if (!tools.length) return EMPTY_ERROR
-
   const maxTools = opts?.maxTools ?? 12
   const maxChars = opts?.maxChars ?? 4000
   const lines: string[] = [RECONSTRUCTED_PREFIX]
@@ -59,4 +60,44 @@ export function synthesizeSubagentResult(
   }
 
   return lines.join('\n')
+}
+
+/**
+ * Produce a supervisor-safe sub-agent result.
+ * - Clean prose → returned as-is
+ * - Empty / DSML-only / prose+DSML → strip DSML; reconstruct from tools when available
+ * - Never returns raw DSML markup
+ */
+export function synthesizeSubagentResult(
+  text: string | null | undefined,
+  tools: ToolSummary[],
+  opts?: { maxTools?: number; maxChars?: number },
+): string {
+  const raw = (text ?? '').trim()
+
+  // Strip any DSML tool_calls block so markup never leaks upward.
+  let prose = raw
+  if (raw && hasDsmlToolCalls(raw)) {
+    prose = parseDsmlToolCalls(raw).content.trim()
+  }
+
+  // Usable prose and no DSML → hand off directly.
+  if (prose && !isUselessSubagentText(prose) && !(raw && hasDsmlToolCalls(raw))) {
+    return prose
+  }
+
+  // Had DSML (or empty/useless): prefer tool trajectory reconstruction.
+  if (tools.length > 0) {
+    const recon = reconstructFromTools(tools, opts)
+    // Keep substantial stripped prose above the reconstruction so the parent still sees findings.
+    if (prose.length >= 20 && hasDsmlToolCalls(raw)) {
+      return `${prose}\n\n${recon}`
+    }
+    return recon
+  }
+
+  // No tools — return stripped prose if it stands alone, else error.
+  if (prose.length >= 20) return prose
+  if (prose && !hasDsmlToolCalls(raw) && !isDsmlOnlyOrEmpty(prose)) return prose
+  return EMPTY_ERROR
 }

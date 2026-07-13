@@ -7,12 +7,22 @@ const DSML = `<｜｜DSML｜｜tool_calls>
 </｜｜DSML｜｜invoke>
 </｜｜DSML｜｜tool_calls>`
 
+/** Prose + unfinished DSML (logs/bug.json worker handoff shape). */
+const PROSE_PLUS_DSML =
+  'Let me explore the project structure and focus on the Zuolin-related sync files.' +
+  'Let me also check for configuration files and the station module\'s Zuolin references:' +
+  DSML
+
 describe('isUselessSubagentText', () => {
   it('flags empty, placeholder, and DSML-only', () => {
     expect(isUselessSubagentText('')).toBe(true)
     expect(isUselessSubagentText('  ')).toBe(true)
     expect(isUselessSubagentText('(sub-agent produced no output)')).toBe(true)
     expect(isUselessSubagentText(DSML)).toBe(true)
+  })
+
+  it('flags long prose that still embeds DSML tool_calls (must not leak to supervisor)', () => {
+    expect(isUselessSubagentText(PROSE_PLUS_DSML)).toBe(true)
   })
 
   it('keeps real prose', () => {
@@ -47,5 +57,24 @@ describe('synthesizeSubagentResult', () => {
     ])
     expect(out).toMatch(/reconstructed/)
     expect(out).toContain('SyncDataConfig')
+    expect(out).not.toMatch(/DSML/)
+  })
+
+  it('strips DSML and reconstructs when prose+DSML is the final handoff', () => {
+    const out = synthesizeSubagentResult(PROSE_PLUS_DSML, [
+      { name: 'grep', status: 'finished', output: 'DataSyncServiceImpl.java: ZuolinConfig' },
+      { name: 'ls', status: 'finished', output: 'SyncDataConfig.java' },
+    ])
+    expect(out).not.toMatch(/DSML/)
+    expect(out).not.toMatch(/tool_calls/)
+    expect(out).toContain('Zuolin-related sync')
+    expect(out).toMatch(/reconstructed/)
+    expect(out).toContain('DataSyncServiceImpl')
+  })
+
+  it('returns stripped prose when DSML present but no tools', () => {
+    const out = synthesizeSubagentResult(PROSE_PLUS_DSML, [])
+    expect(out).not.toMatch(/DSML/)
+    expect(out).toContain('Zuolin-related sync')
   })
 })

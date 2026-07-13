@@ -81,7 +81,7 @@ export function countPathHits(pathHits: readonly string[], key: string): number 
  */
 export function isLoopToolError(content: string): boolean {
   if (isSubagentPausedText(content)) return false
-  return typeof content === 'string' && content.startsWith('Error')
+  return content.startsWith('Error')
 }
 
 /** How many trailing tool results (from the end) look like errors. */

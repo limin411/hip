@@ -583,13 +583,24 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
   }
 
-  /** Corrective note after the Nth identical batch or error streak. */
+  /**
+   * Corrective note after doom or error-streak.
+   * Priority MUST match routeAfterTools: doom > error-streak, so nudgedSig
+   * latches the same key the router uses for pause on the next identical batch.
+   */
   function nudge(state: State): Partial<State> {
     const recentToolContents = collectRecentToolContents(state)
+    const lastSig = state.recentSigs[state.recentSigs.length - 1]
+    const isDoom =
+      lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    if (isDoom) {
+      return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
+    }
     if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
       return { messages: [new SystemMessage(ERROR_STREAK_NUDGE)], nudgedSig: 'error-streak' }
     }
-    return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: state.recentSigs[state.recentSigs.length - 1] }
+    // Fallback: doom-shaped nudge (route only sends us here for doom/streak).
+    return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
   }
 
   /**

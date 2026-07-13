@@ -12,7 +12,7 @@ import type { Summarizer } from './compaction.js'
 import type { TurnUsage } from '@hip/protocol'
 import { setActiveModel } from '../config/providers.js'
 import { TurnReplanGuard } from './planner.js'
-import { ERROR_STREAK_NUDGE } from './doom-loop.js'
+import { ERROR_STREAK_NUDGE, DOOM_LOOP_NUDGE, sigOf } from './doom-loop.js'
 import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
@@ -534,10 +534,30 @@ describe('replan × error-streak decision table (Track A)', () => {
           recursionLimit: 30,
         },
       )
-      // Without exclusion, startsWith('Error') would not match pause either — but a
-      // pause-only batch must not force plan-mode tool-failure pause.
+      // Pause marker is not a tool failure; plan-mode must not pause.
       expect(out.status).toBe('running')
       expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('continue plan')
+    })
+  })
+
+  it('plan-mode hasToolFailure still pauses on real Error tool results', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'missing_tool', args: {}, id: 'err1' }] }),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('planned work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'pending' }],
+        },
+        { configurable: { ctx: baseCtx(root, runner) }, recursionLimit: 20 },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.pendingQuestion).toBeTruthy()
     })
   })
 
@@ -552,6 +572,50 @@ describe('replan × error-streak decision table (Track A)', () => {
       expect(out.status).toBe('awaiting_user')
       expect(countReplanMessages(out.messages)).toBe(0)
       expect(out.messages.some((m) => m instanceof SystemMessage && typeof m.content === 'string' && m.content.includes('重复'))).toBe(true)
+    })
+  })
+
+  it('doom∩error-streak: same-sig multi-error batches latch doom nudgedSig and pause (not infinite nudge)', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const guard = new TurnReplanGuard()
+      // Fixed name+args so sigOf matches across batches (ids may differ).
+      const sameFail3 = (id: string) =>
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            { name: 'ghost_a', args: { path: '/x' }, id: `${id}-a` },
+            { name: 'ghost_b', args: { path: '/y' }, id: `${id}-b` },
+            { name: 'ghost_c', args: { path: '/z' }, id: `${id}-c` },
+          ],
+        })
+      const expectedSig = sigOf([
+        { name: 'ghost_a', args: { path: '/x' } },
+        { name: 'ghost_b', args: { path: '/y' } },
+        { name: 'ghost_c', args: { path: '/z' } },
+      ])
+      // Ladder: replan (batch1) → error-streak nudge (batch2, sigs=2) →
+      // doom nudge (batch3, sigs=3, must stamp lastSig not error-streak) →
+      // doom pause (batch4). Without doom-first nudge, this loops forever.
+      const runner = fakeRunner([
+        sameFail3('1'),
+        sameFail3('2'),
+        sameFail3('3'),
+        sameFail3('4'),
+        sameFail3('5'), // must not be needed if pause works
+      ])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('same fail forever')], steps: 0 },
+        { configurable: { ctx: baseCtx(root, runner, { replanGuard: guard }) }, recursionLimit: 40 },
+      )
+      expect(countReplanMessages(out.messages)).toBe(1)
+      expect(out.status).toBe('awaiting_user')
+      expect(out.pendingQuestion).toBeTruthy()
+      // Doom latch, not stuck on error-streak (the bug: infinite doom→nudge).
+      expect(out.nudgedSig).toBe(expectedSig)
+      expect(out.messages.some((m) => m instanceof SystemMessage && m.content === DOOM_LOOP_NUDGE)).toBe(true)
+      // Bounded: should pause within a few steps, not thrash to recursion limit.
+      expect(out.steps).toBeLessThanOrEqual(5)
     })
   })
 

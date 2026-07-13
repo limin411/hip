@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import { EXCLUDE_DIRS, MAX_SCAN_FILE_BYTES, real, realInSkill, resolveFull, toGlobRegex } from './helpers.js'
+import { EXCLUDE_DIRS, MAX_SCAN_FILE_BYTES, compileGrepPattern, real, realInSkill, resolveFull, toGlobRegex } from './helpers.js'
 
 export interface FileTools {
   writeFile: StructuredToolInterface
@@ -150,13 +150,10 @@ export function buildFileTools(
   )
 
   const grep = tool(
-    async ({ pattern, path: p }) => {
-      let re: RegExp
-      try {
-        re = new RegExp(pattern)
-      } catch (err) {
-        return `Error: invalid regex: ${(err as Error).message}`
-      }
+    async ({ pattern, path: p, caseInsensitive }) => {
+      const compiled = compileGrepPattern(pattern, caseInsensitive)
+      if (!compiled.ok) return compiled.error
+      const { re, notes } = compiled
       const hits: string[] = []
       async function walk(dir: string): Promise<void> {
         if (hits.length >= 200) return
@@ -179,12 +176,24 @@ export function buildFileTools(
         }
       }
       await walk(await resolvePath(p ?? '/'))
-      return hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
+      const body = hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
+      if (notes.length === 0) return body
+      return `${notes.map((n) => `Note: ${n}`).join('\n')}\n${body}`
     },
     {
       name: 'grep',
-      description: 'Search file contents by regex. Optional `path` scopes the search. Returns up to 200 `file:line` hits.',
-      schema: z.object({ pattern: z.string(), path: z.string().optional() }),
+      description:
+        'Search file contents by JavaScript RegExp. Optional `path` scopes the search. ' +
+        'Set caseInsensitive=true for case-insensitive match (prefer this over PCRE (?i) flags). ' +
+        'Returns up to 200 `file:line` hits.',
+      schema: z.object({
+        pattern: z.string(),
+        path: z.string().optional(),
+        caseInsensitive: z
+          .boolean()
+          .optional()
+          .describe('Case-insensitive match. Prefer this over (?i) inline flags. Default false.'),
+      }),
     },
   )
 

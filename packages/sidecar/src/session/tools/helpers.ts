@@ -252,6 +252,49 @@ export function toGlobRegex(pattern: string): RegExp {
   return new RegExp(`^${rx.startsWith('/') ? '' : '.*'}${rx}$`)
 }
 
+const GREP_INLINE_FLAGS = /^\(\?([ims]+)\)/
+const GREP_INVALID_HINT =
+  'Hint: This tool uses JavaScript RegExp. Do not use PCRE flags like (?i); set caseInsensitive=true instead.'
+
+export type CompileGrepResult =
+  | { ok: true; re: RegExp; notes: string[] }
+  | { ok: false; error: string }
+
+/**
+ * Build a JS RegExp for the grep tool. Strips common PCRE-style leading inline flags
+ * (e.g. `(?i)`) that models often emit but JavaScript does not accept as groups.
+ */
+export function compileGrepPattern(pattern: string, caseInsensitive?: boolean): CompileGrepResult {
+  let body = pattern
+  const notes: string[] = []
+  const flagSet = new Set<string>()
+
+  const m = body.match(GREP_INLINE_FLAGS)
+  if (m) {
+    body = body.slice(m[0].length)
+    for (const ch of m[1]) {
+      if (ch === 'i' || ch === 'm' || ch === 's') flagSet.add(ch)
+    }
+    if (m[1].includes('i')) {
+      notes.push('stripped PCRE-style (?i); used case-insensitive flag instead')
+    } else {
+      notes.push(`stripped PCRE-style (?${m[1]}); mapped to JavaScript RegExp flags`)
+    }
+  }
+
+  if (caseInsensitive) flagSet.add('i')
+
+  const flags = [...flagSet].join('')
+  try {
+    return { ok: true, re: new RegExp(body, flags), notes }
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Error: invalid regex: ${(err as Error).message}\n${GREP_INVALID_HINT}`,
+    }
+  }
+}
+
 /** A resolved HITL decision for run_script. `kind` is the SEMANTIC of the chosen option
  *  (allow_once|allow_always|reject_once|reject_always) — NOT the opaque agent/UI optionId.
  *  This mirrors the codebase convention (PermissionOption.kind, PermissionModal): optionId is an

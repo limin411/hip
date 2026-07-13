@@ -96,6 +96,21 @@ describe('file tools', () => {
     expect(out).not.toContain('node_modules')
   })
 
+  it('grep accepts PCRE-style (?i) and caseInsensitive', async () => {
+    writeFileSync(join(root, 'ZuolinConfig.java'), 'class ZuolinConfig {}')
+    const viaInline = String(await byName(root, 'grep').invoke({ pattern: '(?i)zuolin|zuo_lin|zuo-lin' }))
+    expect(viaInline).toMatch(/ZuolinConfig/)
+    expect(viaInline).toMatch(/Note:.*\(\?i\)/)
+    const viaFlag = String(await byName(root, 'grep').invoke({ pattern: 'zuolin', caseInsensitive: true }))
+    expect(viaFlag).toMatch(/ZuolinConfig/)
+  })
+
+  it('grep invalid pattern includes caseInsensitive hint', async () => {
+    const out = String(await byName(root, 'grep').invoke({ pattern: '(unclosed' }))
+    expect(out).toMatch(/invalid regex/i)
+    expect(out).toMatch(/caseInsensitive/)
+  })
+
   it('write_todos returns a one-line confirmation with the count', async () => {
     const out = String(
       await byName(root, 'write_todos').invoke({

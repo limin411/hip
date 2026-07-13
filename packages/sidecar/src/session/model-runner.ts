@@ -1,12 +1,11 @@
-import type { AIMessage, AIMessageChunk, BaseMessage } from '@langchain/core/messages'
-import { SystemMessage } from '@langchain/core/messages'
+import { AIMessage, SystemMessage, type AIMessageChunk, type BaseMessage } from '@langchain/core/messages'
 import { concat } from '@langchain/core/utils/stream'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { ChatOpenAI } from '@langchain/openai'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { MAX_STEPS_NOTE } from './loop-control.js'
 import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
+import { parseDsmlToolCalls, hasDsmlToolCalls } from './dsml.js'
 
 /** Per-step run options: the streaming sinks + whether tools are bound (off on the final, capped step). */
 export interface ModelRunOptions {
@@ -50,6 +49,55 @@ export function reasoningDelta(chunk: AIMessageChunk): string {
   return typeof rc === 'string' ? rc : ''
 }
 
+/**
+ * If the model put DSML tool-call markup in content (DeepSeek V4) and left
+ * structured tool_calls empty, recover them so the agent loop can execute tools.
+ */
+export function recoverDsmlToolCalls(msg: AIMessage): AIMessage {
+  const existing = msg.tool_calls
+  if (existing && existing.length > 0) return msg
+
+  const raw =
+    typeof msg.content === 'string'
+      ? msg.content
+      : Array.isArray(msg.content)
+        ? msg.content
+            .filter((b): b is { type: 'text'; text: string } => (b as { type?: string }).type === 'text')
+            .map((b) => b.text)
+            .join('')
+        : ''
+  if (!raw || !hasDsmlToolCalls(raw)) return msg
+
+  const parsed = parseDsmlToolCalls(raw)
+  if (parsed.recovered) {
+    logInfo('model', 'dsml_recovered', { count: parsed.toolCalls.length, names: parsed.toolCalls.map((t) => t.name) })
+    return new AIMessage({
+      content: parsed.content,
+      tool_calls: parsed.toolCalls.map((t) => ({
+        id: t.id,
+        name: t.name,
+        args: t.args,
+        type: 'tool_call' as const,
+      })),
+      id: msg.id,
+      additional_kwargs: msg.additional_kwargs,
+      response_metadata: msg.response_metadata,
+    })
+  }
+
+  // Incomplete/unparseable DSML: strip markup so raw tags are not the final answer.
+  if (parsed.content !== raw) {
+    logInfo('model', 'dsml_stripped', { reason: 'parse_failed' })
+    return new AIMessage({
+      content: parsed.content,
+      id: msg.id,
+      additional_kwargs: msg.additional_kwargs,
+      response_metadata: msg.response_metadata,
+    })
+  }
+  return msg
+}
+
 /** Production runner over a ChatOpenAI/ReasoningChatOpenAI instance. */
 export class RealModelRunner implements ModelRunner {
   constructor(private readonly model: BaseChatModel) {}
@@ -76,7 +124,7 @@ export class RealModelRunner implements ModelRunner {
       }
       logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')
-      return gathered as AIMessage
+      return recoverDsmlToolCalls(gathered as AIMessage)
     }
     // Retry only transient failures thrown BEFORE the first delta — retrying mid-stream would
     // duplicate already-emitted tokens. Once `emitted` is true, shouldRetry returns false → rethrow.

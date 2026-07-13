@@ -35,6 +35,7 @@ import { mcpManager } from './mcp/manager.js'
 import { readAgentsConfig } from './agents/index.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { runSubagent } from './subagent.js'
+import { synthesizeSubagentResult } from './subagent-result.js'
 import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
@@ -781,8 +782,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       hooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
       ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}),
     })
-    ensureFinished(childId, text)
-    return text
+    const run = trajectory.get(childId)
+    const tools = run
+      ? Array.from(run.toolCalls.values())
+          .sort((a, b) => a.seq - b.seq)
+          .map((t) => ({ name: t.name, status: t.status, output: t.output, error: t.error, input: t.input }))
+      : []
+    // Prefer invoker text; fall back to tee'd stream (empty lastAiText but tokens streamed).
+    const result = synthesizeSubagentResult(text || run?.output, tools)
+    ensureFinished(childId, result)
+    return result
   }
 
   const retrySubagentWrapper = async (agentId: string): Promise<string> => {
@@ -822,7 +831,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
         pluginHooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
       })
-      ensureFinished(childId, text); return text || '(sub-agent produced no output)'
+      const run = trajectory.get(childId)
+      const tools = run
+        ? Array.from(run.toolCalls.values())
+            .sort((a, b) => a.seq - b.seq)
+            .map((t) => ({ name: t.name, status: t.status, output: t.output, error: t.error, input: t.input }))
+        : []
+      // Prefer invoker text; fall back to tee'd stream (empty lastAiText but tokens streamed).
+      const result = synthesizeSubagentResult(text || run?.output, tools)
+      ensureFinished(childId, result)
+      return result
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') throw err
       const msg = safeErrorMessage(err); ensureFinished(childId, `Error: ${msg}`); return `Error: ${msg}`

@@ -3,12 +3,17 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AIMessage, HumanMessage, SystemMessage, type AIMessage as AIMsg, type BaseMessage } from '@langchain/core/messages'
+import { tool } from '@langchain/core/tools'
+import { z } from 'zod'
 import { buildTools } from './tools.js'
-import { buildGraph, type GraphEmit } from './graph.js'
+import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import type { ModelRunner, ModelRunOptions } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import type { TurnUsage } from '@hip/protocol'
 import { setActiveModel } from '../config/providers.js'
+import { TurnReplanGuard } from './planner.js'
+import { ERROR_STREAK_NUDGE } from './doom-loop.js'
+import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
 
 function fakeRunner(script: AIMsg[]): ModelRunner {
   let i = 0
@@ -369,6 +374,198 @@ describe('agent loop graph', () => {
         { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
       )
       expect(out.plan).toEqual(originalPlan)
+    })
+  })
+})
+
+/** Two unknown tools → trailing error streak of 2 (replan threshold). */
+function errBatch2(idPrefix: string): AIMsg {
+  return new AIMessage({
+    content: '',
+    tool_calls: [
+      { name: `ghost_${idPrefix}_a`, args: {}, id: `${idPrefix}-a` },
+      { name: `ghost_${idPrefix}_b`, args: {}, id: `${idPrefix}-b` },
+    ],
+  })
+}
+
+/** Three unknown tools → trailing error streak of 3 (error-streak limit). */
+function errBatch3(idPrefix: string): AIMsg {
+  return new AIMessage({
+    content: '',
+    tool_calls: [
+      { name: `ghost_${idPrefix}_a`, args: {}, id: `${idPrefix}-a` },
+      { name: `ghost_${idPrefix}_b`, args: {}, id: `${idPrefix}-b` },
+      { name: `ghost_${idPrefix}_c`, args: {}, id: `${idPrefix}-c` },
+    ],
+  })
+}
+
+function countReplanMessages(messages: BaseMessage[]): number {
+  return messages.filter(
+    (m) => m instanceof SystemMessage && typeof m.content === 'string' && m.content.includes('Replanning required'),
+  ).length
+}
+
+function baseCtx(
+  root: string,
+  runner: ModelRunner,
+  extra?: Partial<GraphCtx>,
+): GraphCtx {
+  return {
+    sessionId: 'test-session',
+    runner,
+    tools: buildTools(root),
+    emit: noopEmit,
+    summarizer: noopSummarizer,
+    ...extra,
+  }
+}
+
+describe('replan × error-streak decision table (Track A)', () => {
+  it('happy path: no tool errors does not inject replan or error-streak nudge', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'ok1' }] }),
+        new AIMessage('all good'),
+      ])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('list')], steps: 0 },
+        { configurable: { ctx: baseCtx(root, runner) }, recursionLimit: 30 },
+      )
+      expect(countReplanMessages(out.messages)).toBe(0)
+      expect(out.messages.some((m) => m instanceof SystemMessage && m.content === ERROR_STREAK_NUDGE)).toBe(false)
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('all good')
+      expect(out.status).toBe('running')
+    })
+  })
+
+  it('≥2 tool errors → exactly one replan inject; guard blocks a second replan', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const guard = new TurnReplanGuard()
+      // batch2 → replan → batch2 (no second replan, streak < 3) → done
+      const runner = fakeRunner([errBatch2('r1'), errBatch2('r2'), new AIMessage('revised approach')])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('fail twice')], steps: 0 },
+        { configurable: { ctx: baseCtx(root, runner, { replanGuard: guard }) }, recursionLimit: 40 },
+      )
+      expect(countReplanMessages(out.messages)).toBe(1)
+      expect(guard.hasReplanned).toBe(true)
+      expect(out.messages.some((m) => m instanceof SystemMessage && m.content === ERROR_STREAK_NUDGE)).toBe(false)
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('revised approach')
+    })
+  })
+
+  it('replan does not set error-streak nudgedSig; post-replan errors≥3 → nudge then pause', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const guard = new TurnReplanGuard()
+      // replan (2 errs) → error-streak nudge (3 errs) → pause (3 errs again)
+      const runner = fakeRunner([errBatch2('p1'), errBatch3('p2'), errBatch3('p3')])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('keep failing')], steps: 0 },
+        { configurable: { ctx: baseCtx(root, runner, { replanGuard: guard }) }, recursionLimit: 50 },
+      )
+      expect(countReplanMessages(out.messages)).toBe(1)
+      expect(out.messages.some((m) => m instanceof SystemMessage && m.content === ERROR_STREAK_NUDGE)).toBe(true)
+      expect(out.status).toBe('awaiting_user')
+      expect(out.pendingQuestion).toBeTruthy()
+      expect(out.nudgedSig).toBe('error-streak')
+    })
+  })
+
+  it('subagent pause marker does not trigger replan or error-streak', async () => {
+    await withTmp(async (root) => {
+      const pauseTool = tool(
+        async () => `${SUBAGENT_PAUSE_MARKER} Which API should we target?`,
+        { name: 'pause_probe', description: 'returns pause marker', schema: z.object({}) },
+      )
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            { name: 'pause_probe', args: {}, id: 'pp1' },
+            { name: 'pause_probe', args: {}, id: 'pp2' },
+            { name: 'pause_probe', args: {}, id: 'pp3' },
+          ],
+        }),
+        new AIMessage('handled pause'),
+      ])
+      const out = await app.invoke(
+        { messages: [new HumanMessage('delegate')], steps: 0 },
+        {
+          configurable: {
+            ctx: baseCtx(root, runner, { tools: [pauseTool] }),
+          },
+          recursionLimit: 30,
+        },
+      )
+      expect(countReplanMessages(out.messages)).toBe(0)
+      expect(out.messages.some((m) => m instanceof SystemMessage && m.content === ERROR_STREAK_NUDGE)).toBe(false)
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('handled pause')
+    })
+  })
+
+  it('plan-mode hasToolFailure ignores subagent pause marker', async () => {
+    await withTmp(async (root) => {
+      const pauseTool = tool(
+        async () => `${SUBAGENT_PAUSE_MARKER} need input`,
+        { name: 'pause_probe', description: 'pause', schema: z.object({}) },
+      )
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({ content: '', tool_calls: [{ name: 'pause_probe', args: {}, id: 'pl1' }] }),
+        new AIMessage('continue plan'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('planned work')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'approved',
+          plan: [{ content: 'step one', status: 'pending' }],
+        },
+        {
+          configurable: { ctx: baseCtx(root, runner, { tools: [pauseTool] }) },
+          recursionLimit: 30,
+        },
+      )
+      // Without exclusion, startsWith('Error') would not match pause either — but a
+      // pause-only batch must not force plan-mode tool-failure pause.
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('continue plan')
+    })
+  })
+
+  it('doom sig repeat still nudges then pauses (priority over replan)', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const loop = () => new AIMessage({ content: '', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+      const out = await app.invoke(
+        { messages: [new HumanMessage('doom')], steps: 0 },
+        { configurable: { ctx: baseCtx(root, fakeRunner([loop(), loop(), loop(), loop()])) }, recursionLimit: 90 },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(countReplanMessages(out.messages)).toBe(0)
+      expect(out.messages.some((m) => m instanceof SystemMessage && typeof m.content === 'string' && m.content.includes('重复'))).toBe(true)
+    })
+  })
+
+  it('creates TurnReplanGuard on GraphCtx when missing', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const ctx = baseCtx(root, fakeRunner([errBatch2('g1'), new AIMessage('after replan')]))
+      expect(ctx.replanGuard).toBeUndefined()
+      await app.invoke(
+        { messages: [new HumanMessage('auto guard')], steps: 0 },
+        { configurable: { ctx }, recursionLimit: 30 },
+      )
+      expect(ctx.replanGuard).toBeInstanceOf(TurnReplanGuard)
+      expect(ctx.replanGuard!.hasReplanned).toBe(true)
     })
   })
 })

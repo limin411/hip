@@ -7,8 +7,11 @@ import {
   countPathHits,
   normalizeToolPath,
   trailingErrorStreak,
+  harvestTrailingToolErrors,
+  isLoopToolError,
   PATH_HIT_LIMIT,
 } from './doom-loop.js'
+import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
 
 describe('doom-loop signatures', () => {
   it('identical calls produce identical signatures', () => {
@@ -53,5 +56,20 @@ describe('doom-loop signatures', () => {
     expect(trailingErrorStreak(['ok', 'Error: a', 'Error: b'])).toBe(2)
     expect(trailingErrorStreak(['Error: a', 'ok', 'Error: b'])).toBe(1)
     expect(trailingErrorStreak(['Error: a', 'Error: b', 'Error: c'])).toBe(3)
+  })
+
+  it('trailingErrorStreak excludes subagent pause markers', () => {
+    const paused = `${SUBAGENT_PAUSE_MARKER} Which API?`
+    expect(trailingErrorStreak([paused, paused])).toBe(0)
+    expect(trailingErrorStreak(['Error: a', paused])).toBe(0)
+    expect(trailingErrorStreak(['Error: a', 'Error: b', paused])).toBe(0)
+    expect(isLoopToolError(paused)).toBe(false)
+    expect(isLoopToolError('Error: boom')).toBe(true)
+  })
+
+  it('harvestTrailingToolErrors collects trailing errors for replan prompts', () => {
+    expect(harvestTrailingToolErrors(['ok', 'Error: a', 'Error: b'])).toEqual(['Error: a', 'Error: b'])
+    expect(harvestTrailingToolErrors([`${SUBAGENT_PAUSE_MARKER} q`, 'Error: x'])).toEqual(['Error: x'])
+    expect(harvestTrailingToolErrors([`${SUBAGENT_PAUSE_MARKER} q`])).toEqual([])
   })
 })

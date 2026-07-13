@@ -1,5 +1,7 @@
 /** Doom-loop detection: an identical batch of tool calls repeated N times in a row. */
 
+import { isSubagentPausedText } from './subagent-result.js'
+
 export const DOOM_LOOP_N = 3
 
 /** How many recent EXECUTED batch signatures to retain for the consecutive-repeat check. */
@@ -73,13 +75,36 @@ export function countPathHits(pathHits: readonly string[], key: string): number 
   return n
 }
 
+/**
+ * True when a tool result is a loop-guard "tool error".
+ * Sub-agent pause markers are never errors (A↔B contract).
+ */
+export function isLoopToolError(content: string): boolean {
+  if (isSubagentPausedText(content)) return false
+  return typeof content === 'string' && content.startsWith('Error')
+}
+
 /** How many trailing tool results (from the end) look like errors. */
 export function trailingErrorStreak(contents: readonly string[]): number {
   let n = 0
   for (let i = contents.length - 1; i >= 0; i--) {
     const c = contents[i] ?? ''
-    if (typeof c === 'string' && c.startsWith('Error')) n++
+    if (typeof c === 'string' && isLoopToolError(c)) n++
     else break
   }
   return n
+}
+
+/**
+ * Harvest trailing consecutive tool-error strings (for replan prompts).
+ * Stops at the first non-error (including sub-agent pause).
+ */
+export function harvestTrailingToolErrors(contents: readonly string[]): string[] {
+  const errors: string[] = []
+  for (let i = contents.length - 1; i >= 0; i--) {
+    const c = contents[i] ?? ''
+    if (typeof c === 'string' && isLoopToolError(c)) errors.unshift(c)
+    else break
+  }
+  return errors
 }

@@ -50,6 +50,13 @@ describe('formatPausedToolResult / isSubagentPausedText', () => {
     expect(isSubagentPausedText(`[0] ${paused}`)).toBe(true)
     expect(isUselessSubagentText(`[0] ${paused}`)).toBe(false)
   })
+
+  it('matches first-line pause marker only (A-core extras)', () => {
+    expect(isSubagentPausedText(`${SUBAGENT_PAUSE_MARKER} Which API?`)).toBe(true)
+    expect(isSubagentPausedText(`${SUBAGENT_PAUSE_MARKER} q\npartial findings`)).toBe(true)
+    expect(isSubagentPausedText('Error: unknown tool')).toBe(false)
+    expect(isSubagentPausedText(`prefix ${SUBAGENT_PAUSE_MARKER}`)).toBe(false)
+  })
 })
 
 describe('isUselessSubagentText', () => {

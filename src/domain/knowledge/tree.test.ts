@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   assertTreeInvariants,
   filterNodesByTitle,
+  filterTreeVisible,
+  getPath,
   getPathTitles,
   insertNode,
   listChildren,
@@ -48,6 +50,23 @@ describe('knowledge tree helpers', () => {
 
   it('getPathTitles walks to root', () => {
     expect(getPathTitles([folder, docA], 'doc_aaaaaaa1')).toEqual(['决策', '权限 v2'])
+  })
+
+  it('getPath returns nodes by id (duplicate titles safe)', () => {
+    const path = getPath([folder, docA], 'doc_aaaaaaa1')
+    expect(path.map((p) => p.id)).toEqual(['nod_folder001', 'doc_aaaaaaa1'])
+  })
+
+  it('filterTreeVisible includes matches and ancestors', () => {
+    const visible = filterTreeVisible([folder, docA, docB, rootDoc], 'faq')
+    expect(visible).not.toBeNull()
+    expect(visible!.has('doc_bbbbbbb2')).toBe(true)
+    expect(visible!.has('nod_folder001')).toBe(true)
+    expect(visible!.has('doc_aaaaaaa1')).toBe(false)
+  })
+
+  it('filterTreeVisible null when query empty', () => {
+    expect(filterTreeVisible([folder], '  ')).toBeNull()
   })
 
   it('insertNode appends immutably', () => {

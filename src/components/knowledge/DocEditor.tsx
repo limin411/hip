@@ -1,8 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
-import { EditorView } from '@codemirror/view'
+import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
+import { Prec } from '@codemirror/state'
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
+import {
+  headingAndDispatch,
+  insertFence,
+  prefixAndDispatch,
+  wrapAndDispatch,
+} from '@/domain/knowledge/mdEdit'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -11,6 +26,12 @@ export interface DocEditorProps {
   onDraftChange: (v: string) => void
   onBlur?: () => void
   placeholder?: string
+  /** Optional Cmd/Ctrl+S → flush save (Workspace). */
+  onSave?: () => void
+}
+
+export type DocEditorHandle = {
+  getView: () => EditorView | null
 }
 
 /** Token-driven CM chrome — no stock light/dark skin (K26). */
@@ -18,7 +39,7 @@ function buildProseTheme(isDark: boolean) {
   return EditorView.theme(
     {
       '&': {
-        fontSize: '14px', // matches tailwind `prose`
+        fontSize: '14px',
         height: '100%',
         color: 'var(--text-primary)',
         backgroundColor: 'transparent',
@@ -30,7 +51,7 @@ function buildProseTheme(isDark: boolean) {
         height: '100%',
       },
       '.cm-content': {
-        padding: '20px 4px 64px',
+        padding: '8px 4px 64px',
         caretColor: 'var(--text-primary)',
         minHeight: '100%',
         color: 'var(--text-primary)',
@@ -64,7 +85,6 @@ function buildProseTheme(isDark: boolean) {
         color: 'var(--text-tertiary)',
         fontStyle: 'normal',
       },
-      // Keep syntax marks readable but monochrome-friendly
       '.cm-header': {
         color: 'var(--text-primary)',
         fontWeight: '600',
@@ -106,25 +126,31 @@ function useIsDark(): boolean {
   return dark
 }
 
+function pushDraft(view: EditorView, onDraftChange: (v: string) => void) {
+  onDraftChange(view.state.doc.toString())
+}
+
 /**
  * Local-text CodeMirror host.
- * Keep `value` in sync with local state only — never echo store `docBody` while typing,
- * or @uiw/react-codemirror will forceUpdate after its 200ms typing latch and wipe draft.
- * Parent remounts via key={docId} (and when toggling preview↔edit) to re-seed.
+ * Keep `value` in sync with local state only — never echo store `docBody` while typing.
  */
-export function DocEditor({
-  docId: _docId,
-  initialValue,
-  onDraftChange,
-  onBlur,
-  placeholder,
-}: DocEditorProps) {
+export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
+  { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
+  ref,
+) {
   const isDark = useIsDark()
   const [text, setText] = useState(initialValue)
+  const viewRef = useRef<EditorView | null>(null)
   const onBlurRef = useRef(onBlur)
   onBlurRef.current = onBlur
   const onDraftChangeRef = useRef(onDraftChange)
   onDraftChangeRef.current = onDraftChange
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+
+  useImperativeHandle(ref, () => ({
+    getView: () => viewRef.current,
+  }))
 
   const extensions = useMemo(() => {
     const blurHandler = EditorView.domEventHandlers({
@@ -133,11 +159,73 @@ export function DocEditor({
         return false
       },
     })
+
+    const run =
+      (fn: (view: EditorView) => boolean): KeyBinding['run'] =>
+      (view) => {
+        if (view.composing) return false
+        const ok = fn(view)
+        if (ok) pushDraft(view, onDraftChangeRef.current)
+        return ok
+      }
+
+    const knowledgeKeys: KeyBinding[] = [
+      {
+        key: 'Mod-b',
+        run: run((v) => wrapAndDispatch(v, '**')),
+      },
+      {
+        key: 'Mod-i',
+        run: run((v) => wrapAndDispatch(v, '*')),
+      },
+      {
+        key: 'Mod-e',
+        run: run((v) => wrapAndDispatch(v, '`')),
+      },
+      {
+        key: 'Mod-Alt-1',
+        run: run((v) => headingAndDispatch(v, 1)),
+      },
+      {
+        key: 'Mod-Alt-2',
+        run: run((v) => headingAndDispatch(v, 2)),
+      },
+      {
+        key: 'Mod-Alt-3',
+        run: run((v) => headingAndDispatch(v, 3)),
+      },
+      {
+        key: 'Mod-Shift-8',
+        run: run((v) => prefixAndDispatch(v, '- ')),
+      },
+      {
+        key: 'Mod-Shift-7',
+        run: run((v) => prefixAndDispatch(v, '1. ')),
+      },
+      {
+        key: 'Mod-Shift-.',
+        run: run((v) => prefixAndDispatch(v, '> ')),
+      },
+      {
+        key: 'Mod-Shift-c',
+        run: run((v) => insertFence(v)),
+      },
+      {
+        key: 'Mod-s',
+        run: () => {
+          onSaveRef.current?.()
+          return true
+        },
+      },
+    ]
+
     return [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       buildProseTheme(isDark),
       blurHandler,
+      highlightSelectionMatches(),
+      Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
   }, [isDark])
 
@@ -161,6 +249,9 @@ export function DocEditor({
         }}
         placeholder={placeholder}
         autoFocus
+        onCreateEditor={(view) => {
+          viewRef.current = view
+        }}
         onChange={(v) => {
           setText(v)
           onDraftChangeRef.current(v)
@@ -169,4 +260,4 @@ export function DocEditor({
       />
     </div>
   )
-}
+})

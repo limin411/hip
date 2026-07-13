@@ -26,19 +26,51 @@ export function listChildren(nodes: KnowledgeNode[], parentId: string | null): K
   return nodes.filter((n) => n.parentId === parentId).sort(compareNodes)
 }
 
-export function getPathTitles(nodes: KnowledgeNode[], nodeId: string): string[] {
+/** Ancestor chain root → node (inclusive), by id — safe with duplicate titles. */
+export function getPath(nodes: KnowledgeNode[], nodeId: string): KnowledgeNode[] {
   const byId = new Map(nodes.map((n) => [n.id, n]))
-  const titles: string[] = []
+  const chain: KnowledgeNode[] = []
   let cur = byId.get(nodeId)
   const seen = new Set<string>()
   while (cur) {
     if (seen.has(cur.id)) break
     seen.add(cur.id)
-    titles.unshift(cur.title)
+    chain.unshift(cur)
     if (cur.parentId == null) break
     cur = byId.get(cur.parentId)
   }
-  return titles
+  return chain
+}
+
+export function getPathTitles(nodes: KnowledgeNode[], nodeId: string): string[] {
+  return getPath(nodes, nodeId).map((n) => n.title)
+}
+
+/**
+ * Visible set for tree filter: title matches ∪ ancestors of matches.
+ * Empty query returns null (caller shows full tree).
+ */
+export function filterTreeVisible(
+  nodes: KnowledgeNode[],
+  query: string,
+): Set<string> | null {
+  const q = query.trim().toLowerCase()
+  if (!q) return null
+  const matches = filterNodesByTitle(nodes, q)
+  const visible = new Set<string>()
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  for (const m of matches) {
+    let cur: KnowledgeNode | undefined = m
+    const seen = new Set<string>()
+    while (cur) {
+      if (seen.has(cur.id)) break
+      seen.add(cur.id)
+      visible.add(cur.id)
+      if (cur.parentId == null) break
+      cur = byId.get(cur.parentId)
+    }
+  }
+  return visible
 }
 
 export function insertNode(nodes: KnowledgeNode[], node: KnowledgeNode): KnowledgeNode[] {

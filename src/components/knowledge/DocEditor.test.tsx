@@ -38,6 +38,23 @@ vi.mock('@codemirror/view', () => ({
     theme: (_styles?: unknown, _opts?: unknown) => ({}),
     domEventHandlers: () => ({}),
   },
+  keymap: { of: () => ({}) },
+}))
+
+vi.mock('@codemirror/state', () => ({
+  Prec: { highest: (x: unknown) => x },
+}))
+
+vi.mock('@codemirror/search', () => ({
+  searchKeymap: [],
+  highlightSelectionMatches: () => ({}),
+}))
+
+vi.mock('@/domain/knowledge/mdEdit', () => ({
+  headingAndDispatch: () => true,
+  insertFence: () => true,
+  prefixAndDispatch: () => true,
+  wrapAndDispatch: () => true,
 }))
 
 afterEach(() => cleanup())

@@ -111,6 +111,65 @@ export function skillsCommandProvider(
   ]
 }
 
+/**
+ * Knowledge docs appear when searching (search-only long tail).
+ * Opens via openKnowledgeView + openRecent — never setActiveView alone.
+ */
+export function knowledgeCommandProvider(
+  ctx: GlobalCommandContext,
+  opts?: { force?: boolean },
+): PaletteGroup[] {
+  const search = (ctx.search ?? '').trim()
+  if (!search && !opts?.force) return []
+  if (!ctx.searchKnowledgeDocs) return []
+
+  if (ctx.knowledgeIndexReady === false) {
+    return [
+      {
+        id: 'knowledge',
+        heading: ctx.labels.groupKnowledge,
+        items: [
+          {
+            id: 'knowledge-indexing',
+            label: ctx.labels.knowledgeIndexing,
+            group: 'knowledge',
+            icon: 'package',
+            run: () => {},
+          },
+        ],
+      },
+    ]
+  }
+
+  const hits = ctx.searchKnowledgeDocs(search).slice(0, 12)
+  if (hits.length === 0) return []
+
+  const items: GlobalCommand[] = hits.map((h) => ({
+    id: `knowledge-doc-${h.spaceId}-${h.docId}`,
+    label: h.title,
+    description: [h.spaceName, h.path, h.snippet].filter(Boolean).join(' · ') || undefined,
+    icon: 'package' as const,
+    keywords: [h.title, h.spaceName, h.path, 'knowledge', '知识库', '知識庫'],
+    group: 'knowledge' as const,
+    run: () => {
+      ctx.openKnowledgeDoc?.({
+        spaceId: h.spaceId,
+        docId: h.docId,
+        title: h.title,
+        spaceName: h.spaceName,
+      })
+    },
+  }))
+
+  return [
+    {
+      id: 'knowledge',
+      heading: ctx.labels.groupKnowledge,
+      items,
+    },
+  ]
+}
+
 export type BuildAllGroupsOpts = {
   search?: string
   /** Pre-parsed mode; if omitted, derived from search. */
@@ -134,6 +193,7 @@ export function buildAllGroups(
   })
   const extras = [
     skillsCommandProvider(ctxWithSearch, { force: mode === 'skills' }),
+    knowledgeCommandProvider(ctxWithSearch),
     ...extraProviders.map((p) => p(ctxWithSearch)),
   ].flat()
   return mergeGroups(core, extras)

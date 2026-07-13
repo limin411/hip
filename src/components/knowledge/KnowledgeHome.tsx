@@ -131,6 +131,14 @@ export function KnowledgeHome() {
                       {hit.spaceName}
                       {hit.path ? ` · ${hit.path}` : ''}
                     </div>
+                    {hit.snippet && (
+                      <div
+                        className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
+                        data-testid="knowledge-search-snippet"
+                      >
+                        {hit.snippet}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}

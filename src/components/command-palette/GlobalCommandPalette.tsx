@@ -7,6 +7,12 @@ import { sessionService, useSessions } from '@/domain'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useUiStore } from '@/store/uiStore'
+import {
+  isKnowledgeIndexReady,
+  searchKnowledgeDocs,
+  useKnowledgeStore,
+} from '@/store/knowledgeStore'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   buildThemePageGroups,
@@ -44,8 +50,10 @@ export function GlobalCommandPalette() {
   const chatSessionId = useUiStore((s) => s.chatSessionId)
   const codeSessionId = useUiStore((s) => s.codeSessionId)
   const setActiveView = useUiStore((s) => s.setActiveView)
+  const openKnowledgeView = useUiStore((s) => s.openKnowledgeView)
   const setTheme = useUiStore((s) => s.setTheme)
   const setSettingsPage = useUiStore((s) => s.setSettingsPage)
+  const knowledgeIndexStatus = useKnowledgeStore((s) => s.indexStatus)
   const [search, setSearch] = useState('')
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [usageTick, setUsageTick] = useState(0)
@@ -73,10 +81,16 @@ export function GlobalCommandPalette() {
       groupAppearance: t('commandPalette.groups.appearance'),
       groupSkills: t('commandPalette.groups.skills'),
       groupFavorites: t('commandPalette.groups.favorites'),
+      groupKnowledge: t('commandPalette.groups.knowledge'),
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
       navSettings: t('nav.settings'),
+      navKnowledge: t('commandPalette.navKnowledge'),
+      knowledgeHome: t('commandPalette.knowledgeHome'),
+      knowledgeNewDoc: t('commandPalette.knowledgeNewDoc'),
+      knowledgeIndexing: t('commandPalette.knowledgeIndexing'),
+      knowledgeNeedSpace: t('commandPalette.knowledgeNeedSpace'),
       actionNewConversation: t('commandPalette.actions.newConversation'),
       actionKeyboardShortcuts: t('commandPalette.actions.keyboardShortcuts'),
       actionChangeTheme: t('commandPalette.actions.changeTheme'),
@@ -134,6 +148,36 @@ export function GlobalCommandPalette() {
       search: parsed.needle,
       skills,
       skillsEnabled,
+      openKnowledgeView: () => {
+        openKnowledgeView()
+        void useKnowledgeStore.getState().loadSpaces()
+      },
+      openKnowledgeDoc: (item: {
+        spaceId: string
+        docId: string
+        title: string
+        spaceName: string
+      }) => {
+        openKnowledgeView()
+        void useKnowledgeStore.getState().openRecent({
+          ...item,
+          at: Date.now(),
+        })
+      },
+      knowledgeOpenHome: () => {
+        openKnowledgeView()
+        void useKnowledgeStore.getState().openHome()
+      },
+      knowledgeCreateDoc: () => {
+        const st = useKnowledgeStore.getState()
+        if (!st.activeSpaceId || st.mode !== 'workspace') {
+          toast.message(t('commandPalette.knowledgeNeedSpace'))
+          return
+        }
+        void st.createDoc(null, t('knowledge.doc.untitled'))
+      },
+      searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
+      knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),
     }),
     [
       sessions,
@@ -142,6 +186,7 @@ export function GlobalCommandPalette() {
       labels,
       sessionId,
       setActiveView,
+      openKnowledgeView,
       setTheme,
       setSettingsPage,
       t,
@@ -149,6 +194,7 @@ export function GlobalCommandPalette() {
       parsed.needle,
       skills,
       skillsEnabled,
+      knowledgeIndexStatus,
     ],
   )
 

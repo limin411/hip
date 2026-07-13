@@ -84,7 +84,7 @@ interface KnowledgeState {
   openSpace: (id: string, opts?: { selectDocId?: string }) => Promise<void>
   openRecent: (item: KnowledgeRecentItem) => Promise<void>
   openHome: () => Promise<void>
-  createFolder: (parentId: string | null) => Promise<void>
+  createFolder: (parentId: string | null, title: string) => Promise<void>
   createDoc: (parentId: string | null, title: string) => Promise<void>
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
@@ -308,7 +308,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })
   },
 
-  createFolder: async (parentId) => {
+  createFolder: async (parentId, title) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
     set({ busy: true })
@@ -318,7 +318,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         id: newFolderId(),
         parentId,
         kind: 'folder' as const,
-        title: 'New folder',
+        title: title.trim() || 'New folder',
         order: nextOrder(get().nodes, parentId),
         createdAt: now,
         updatedAt: now,
@@ -540,3 +540,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })
   },
 }))
+
+/** Palette / external search against the live MiniSearch index. */
+export function searchKnowledgeDocs(q: string, limit = 20): KnowledgeSearchHit[] {
+  return searchKnowledge(kbIndex, q, limit)
+}
+
+export function isKnowledgeIndexReady(): boolean {
+  return useKnowledgeStore.getState().indexStatus === 'ready'
+}

@@ -17,9 +17,11 @@ import { Button } from '@/components/ui/Button'
 interface SpaceTreeProps {
   onRename: (node: KnowledgeNode) => void
   onDelete: (node: KnowledgeNode) => void
+  /** When set, only render nodes in this set (matches ∪ ancestors). */
+  visibleIds?: Set<string> | null
 }
 
-export function SpaceTree({ onRename, onDelete }: SpaceTreeProps) {
+export function SpaceTree({ onRename, onDelete, visibleIds }: SpaceTreeProps) {
   const { t } = useTranslation()
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
@@ -39,6 +41,8 @@ export function SpaceTree({ onRename, onDelete }: SpaceTreeProps) {
   }
 
   const renderNode = (node: KnowledgeNode, depth: number) => {
+    if (visibleIds && !visibleIds.has(node.id)) return null
+
     if (node.kind === 'folder') {
       const isOpen = expanded[node.id] === true
       const kids = listChildren(nodes, node.id)

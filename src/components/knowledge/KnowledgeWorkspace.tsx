@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
@@ -6,9 +6,10 @@ import {
   FileText,
   FolderPlus,
   MoreHorizontal,
+  Search,
 } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { getPathTitles } from '@/domain/knowledge/tree'
+import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -23,7 +24,9 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
-import { DocEditor } from './DocEditor'
+import { DocEditor, type DocEditorHandle } from './DocEditor'
+import { InlineDocTitle } from './InlineDocTitle'
+import { MarkdownToolbar } from './MarkdownToolbar'
 
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
@@ -45,13 +48,55 @@ export function KnowledgeWorkspace() {
   const setEditing = useKnowledgeStore((s) => s.setEditing)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
+  const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
+  const openDoc = useKnowledgeStore((s) => s.openDoc)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
-  const crumbs = useMemo(
-    () => (activeDocId ? getPathTitles(nodes, activeDocId) : []),
+  const pathNodes = useMemo(
+    () => (activeDocId ? getPath(nodes, activeDocId) : []),
     [nodes, activeDocId],
   )
+
+  const editorRef = useRef<DocEditorHandle>(null)
+  const [treeFilter, setTreeFilter] = useState('')
+  const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
+    string,
+    boolean
+  > | null>(null)
+
+  const visibleIds = useMemo(
+    () => filterTreeVisible(nodes, treeFilter),
+    [nodes, treeFilter],
+  )
+
+  // Force-expand ancestors while filtering; restore on clear.
+  useEffect(() => {
+    const q = treeFilter.trim()
+    if (q && visibleIds) {
+      if (!filterExpandSnapshot) {
+        setFilterExpandSnapshot(useKnowledgeStore.getState().expandedFolderIds)
+      }
+      const expand: Record<string, boolean> = {
+        ...useKnowledgeStore.getState().expandedFolderIds,
+      }
+      for (const id of visibleIds) {
+        const n = nodes.find((x) => x.id === id)
+        if (n?.kind === 'folder') expand[id] = true
+        // also expand ancestors
+        let cur = n
+        while (cur?.parentId) {
+          expand[cur.parentId] = true
+          cur = nodes.find((x) => x.id === cur?.parentId)
+        }
+      }
+      useKnowledgeStore.setState({ expandedFolderIds: expand })
+    } else if (!q && filterExpandSnapshot) {
+      useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
+      setFilterExpandSnapshot(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot only on filter edge
+  }, [treeFilter, visibleIds, nodes])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
@@ -66,6 +111,15 @@ export function KnowledgeWorkspace() {
       : activeNode?.parentId ?? null
 
   const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
+
+  const onCrumbClick = (node: KnowledgeNode) => {
+    if (node.kind === 'folder') {
+      toggleFolder(node.id)
+      // keep active doc; only expand
+    } else {
+      void openDoc(node.id)
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
@@ -134,20 +188,41 @@ export function KnowledgeWorkspace() {
               data-testid="knowledge-new-folder"
               title={t('knowledge.tree.newFolder')}
               aria-label={t('knowledge.tree.newFolder')}
-              onClick={() => void createFolder(parentForNew)}
+              onClick={() =>
+                void createFolder(parentForNew, t('knowledge.folder.untitled'))
+              }
             >
               <FolderPlus size={15} />
             </Button>
           </div>
+          <div className="relative">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-tertiary"
+            />
+            <Input
+              data-testid="knowledge-tree-filter"
+              value={treeFilter}
+              onChange={(e) => setTreeFilter(e.target.value)}
+              placeholder={t('knowledge.tree.filterPlaceholder')}
+              className="h-8 pl-7 text-meta"
+            />
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <SpaceTree
+            visibleIds={visibleIds}
             onRename={(node) => {
               setNodeEdit(node)
               setNodeTitle(node.title)
             }}
             onDelete={(node) => setNodeDelete(node)}
           />
+          {visibleIds && visibleIds.size === 0 && (
+            <p className="px-2 py-2 text-meta text-ink-tertiary">
+              {t('knowledge.tree.filterEmpty')}
+            </p>
+          )}
         </div>
       </aside>
 
@@ -155,10 +230,20 @@ export function KnowledgeWorkspace() {
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
           <div className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">
             {space?.name}
-            {crumbs.map((c, i) => (
-              <span key={`${c}-${i}`}>
+            {pathNodes.map((n, i) => (
+              <span key={n.id}>
                 {' / '}
-                <span className={i === crumbs.length - 1 ? 'text-ink' : undefined}>{c}</span>
+                {i < pathNodes.length - 1 ? (
+                  <button
+                    type="button"
+                    className="text-ink-secondary hover:text-ink hover:underline"
+                    onClick={() => onCrumbClick(n)}
+                  >
+                    {n.title}
+                  </button>
+                ) : (
+                  <span className="text-ink">{n.title}</span>
+                )}
               </span>
             ))}
           </div>
@@ -194,19 +279,38 @@ export function KnowledgeWorkspace() {
         ) : editing ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-8">
+              <InlineDocTitle
+                docId={activeDocId}
+                title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                onCommit={(title) => void renameNode(activeDocId, title)}
+              />
+              <MarkdownToolbar
+                getView={() => editorRef.current?.getView() ?? null}
+                onAfterEdit={(text) => setDraftBody(text)}
+              />
               <DocEditor
+                ref={editorRef}
                 key={`${activeDocId}-edit`}
                 docId={activeDocId}
                 initialValue={docBody}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}
+                onSave={() => void flushSave()}
                 placeholder={t('knowledge.doc.placeholder')}
               />
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
-            <DocReader content={docBody} />
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+            <div className="mx-auto w-full max-w-3xl">
+              <InlineDocTitle
+                docId={activeDocId}
+                title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                readOnly
+                onCommit={() => {}}
+              />
+              <DocReader content={docBody} />
+            </div>
           </div>
         )}
       </main>
@@ -306,9 +410,7 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <p className="text-body text-ink-secondary">
-          {nodeDelete?.title}
-        </p>
+        <p className="text-body text-ink-secondary">{nodeDelete?.title}</p>
       </Modal>
     </div>
   )

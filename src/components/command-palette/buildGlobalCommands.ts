@@ -27,10 +27,16 @@ export type GlobalCommandLabels = {
   groupAppearance: string
   groupSkills: string
   groupFavorites: string
+  groupKnowledge: string
   navChat: string
   navCode: string
   navHistory: string
   navSettings: string
+  navKnowledge: string
+  knowledgeHome: string
+  knowledgeNewDoc: string
+  knowledgeIndexing: string
+  knowledgeNeedSpace: string
   actionNewConversation: string
   actionKeyboardShortcuts: string
   actionChangeTheme: string
@@ -63,6 +69,15 @@ export type GlobalCommandLabels = {
   }
 }
 
+export type KnowledgeDocHit = {
+  spaceId: string
+  docId: string
+  title: string
+  spaceName: string
+  path: string
+  snippet?: string
+}
+
 export type GlobalCommandContext = {
   sessions: SessionVM[]
   activeView: ActiveView
@@ -88,6 +103,18 @@ export type GlobalCommandContext = {
   skills?: SkillMeta[]
   /** Skill id → enabled; missing key means enabled. */
   skillsEnabled?: Record<string, boolean>
+  /** Open knowledge surface (chip + activeView). */
+  openKnowledgeView?: () => void
+  openKnowledgeDoc?: (item: {
+    spaceId: string
+    docId: string
+    title: string
+    spaceName: string
+  }) => void
+  knowledgeOpenHome?: () => void
+  knowledgeCreateDoc?: () => void
+  searchKnowledgeDocs?: (q: string) => KnowledgeDocHit[]
+  knowledgeIndexReady?: boolean
 }
 
 /** Source cap for search-time session list. */
@@ -278,6 +305,38 @@ export function buildGlobalCommandGroups(
       keywords: ['prefs', 'preferences', 'config', '设置', '設定'],
       group: 'navigation',
       run: () => ctx.setActiveView('settings'),
+    },
+    {
+      id: 'nav-knowledge',
+      label: labels.navKnowledge,
+      icon: 'package',
+      keywords: ['knowledge', 'notes', 'docs', '知识库', '知識庫', 'markdown'],
+      group: 'navigation',
+      run: () => {
+        ctx.openKnowledgeView?.()
+      },
+    },
+    {
+      id: 'knowledge-go-home',
+      label: labels.knowledgeHome,
+      icon: 'package',
+      keywords: ['knowledge', 'home', 'spaces', '知识库首页', '知識庫首頁'],
+      group: 'navigation',
+      when: { views: ['knowledge'] },
+      run: () => {
+        ctx.knowledgeOpenHome?.()
+      },
+    },
+    {
+      id: 'knowledge-new-doc',
+      label: labels.knowledgeNewDoc,
+      icon: 'plus',
+      keywords: ['knowledge', 'new', 'doc', '新建文档', '新增文件'],
+      group: 'actions',
+      when: { views: ['knowledge'] },
+      run: () => {
+        ctx.knowledgeCreateDoc?.()
+      },
     },
   ]
 

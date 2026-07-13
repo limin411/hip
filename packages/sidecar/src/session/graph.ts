@@ -37,6 +37,7 @@ import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { PlanMode } from './plan-mode.js'
 import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
+import type { LoopEvent } from './loop-events.js'
 
 function fullPlanReminder(planFilePath: string): string {
   return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
@@ -78,6 +79,12 @@ export interface GraphEmit {
   compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
   /** Optional: signal that work is still progressing (keeps idle watchdog alive during long tools). */
   activity?(): void
+  /**
+   * Optional loop lifecycle sink (Track E / K16).
+   * A/E call via `ctx.emit.loopSignal?.(e)` — **not** on GraphCtx.
+   * Sync, best-effort; implementations must not throw.
+   */
+  loopSignal?(e: LoopEvent): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */

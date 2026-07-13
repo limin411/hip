@@ -37,8 +37,8 @@ export function TitleBar() {
       className="relative flex h-11 shrink-0 items-center"
       style={{
         background: 'var(--titlebar-bg)',
-        WebkitBackdropFilter: 'var(--titlebar-backdrop, saturate(180%) blur(20px))',
-        backdropFilter: 'var(--titlebar-backdrop, saturate(180%) blur(20px))',
+        WebkitBackdropFilter: 'var(--titlebar-backdrop, blur(24px))',
+        backdropFilter: 'var(--titlebar-backdrop, blur(24px))',
       }}
     >
       {/* 为 macOS 红绿灯整簇让位（约 x19→77），留足间距后再放内容，避免与绿灯相撞 */}

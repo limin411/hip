@@ -79,6 +79,11 @@ pub fn worktrees_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "worktrees")
 }
 
+/// Local-first knowledge base root (`<base>/knowledge`).
+pub fn knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "knowledge")
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;

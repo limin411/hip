@@ -31,6 +31,7 @@ vi.mock('@/components/chat/NewConversation', () => ({ NewConversation: () => <di
 vi.mock('@/components/chat/ChatPane', () => ({ ChatPane: () => <div data-testid="chat-pane" /> }))
 vi.mock('@/components/chat/InputBar', () => ({ InputBar: () => <div data-testid="input-bar" /> }))
 vi.mock('@/components/account/SettingsPage', () => ({ SettingsPage: () => <div data-testid="settings-page" /> }))
+vi.mock('@/components/knowledge/KnowledgePage', () => ({ KnowledgePage: () => <div data-testid="knowledge-page" /> }))
 
 describe('AppLayout', () => {
   it('renders without sidebar', () => {
@@ -45,6 +46,12 @@ describe('AppLayout', () => {
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('session-history')).toBeInTheDocument()
     expect(screen.getByTestId('title-bar')).toBeInTheDocument()
+  })
+
+  it('renders knowledge view', () => {
+    useUiStore.setState({ activeView: 'knowledge' })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.getByTestId('knowledge-page')).toBeInTheDocument()
   })
 
   it('renders settings view below title bar', () => {

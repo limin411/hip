@@ -8,6 +8,7 @@ mod logging;
 mod hip_config;
 mod path_tools;
 mod pty;
+mod knowledge;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
@@ -491,6 +492,16 @@ pub fn run() {
             pty::pty_resize,
             pty::pty_kill,
             pty::pty_list,
+            knowledge::knowledge_ensure_root,
+            knowledge::knowledge_list_spaces,
+            knowledge::knowledge_create_space,
+            knowledge::knowledge_update_space,
+            knowledge::knowledge_delete_space,
+            knowledge::knowledge_get_tree,
+            knowledge::knowledge_save_tree,
+            knowledge::knowledge_read_doc,
+            knowledge::knowledge_write_doc,
+            knowledge::knowledge_delete_doc_file,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

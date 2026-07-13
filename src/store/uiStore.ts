@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import type { CheckpointMode } from '@hip/protocol'
+// Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
+// are imported dynamically in that method.
 
 export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes' | 'terminal'
 
-export type ActiveView = 'chat' | 'code' | 'settings' | 'history'
+export type ActiveView = 'chat' | 'code' | 'settings' | 'history' | 'knowledge'
 export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
@@ -99,6 +101,13 @@ interface UiState {
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
 
+  /** Knowledge base chip is open in the tab bar (independent of session ids). */
+  knowledgeTabOpen: boolean
+  setKnowledgeTabOpen: (v: boolean) => void
+  openKnowledgeView: () => void
+  /** Flush knowledge draft then restore chat/code from domain active session. */
+  closeKnowledgeView: () => Promise<void>
+
   diffViewMode: 'unified' | 'split'
   setDiffViewMode: (m: 'unified' | 'split') => void
 
@@ -179,6 +188,31 @@ export const useUiStore = create<UiState>()(
           }
         }),
 
+      knowledgeTabOpen: false,
+      setKnowledgeTabOpen: (v) =>
+        set((s) => (s.knowledgeTabOpen === v ? s : { knowledgeTabOpen: v })),
+      openKnowledgeView: () =>
+        set({ knowledgeTabOpen: true, activeView: 'knowledge' }),
+      closeKnowledgeView: async () => {
+        // Tier A: await draft flush before leaving.
+        try {
+          const { useKnowledgeStore } = await import('@/store/knowledgeStore')
+          await useKnowledgeStore.getState().flushSave()
+        } catch {
+          // ignore — non-Tauri / not loaded
+        }
+        const { useDomainStore } = await import('@/domain')
+        const { surfaceOf } = await import('@/lib/sessions')
+        const active = useDomainStore.getState().sessions.find(
+          (s) => s.id === useDomainStore.getState().activeSessionId,
+        )
+        const surface = active ? surfaceOf(active.config) : 'chat'
+        set({
+          knowledgeTabOpen: false,
+          activeView: surface === 'code' ? 'code' : 'chat',
+        })
+      },
+
       diffViewMode: 'unified',
       setDiffViewMode: (m) => set({ diffViewMode: m }),
 
@@ -212,6 +246,10 @@ export const useUiStore = create<UiState>()(
         const lang = isAppLanguage(state.language) ? state.language : seedLanguage()
         if (state.language !== lang) {
           useUiStore.setState({ language: lang })
+        }
+        // Knowledge is not cold-restored as the main surface (half-empty shell risk).
+        if (state.activeView === 'knowledge') {
+          useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
         }
       },
     },

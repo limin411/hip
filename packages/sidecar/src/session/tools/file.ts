@@ -3,7 +3,14 @@ import * as path from 'node:path'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import { EXCLUDE_DIRS, MAX_SCAN_FILE_BYTES, compileGrepPattern, real, realInSkill, resolveFull, toGlobRegex } from './helpers.js'
+import {
+  MAX_SCAN_FILE_BYTES,
+  compileGrepPattern,
+  isExcludedDirName,
+  realInSkill,
+  sliceFileLines,
+  toGlobRegex,
+} from './helpers.js'
 
 export interface FileTools {
   writeFile: StructuredToolInterface
@@ -14,6 +21,9 @@ export interface FileTools {
   grep: StructuredToolInterface
 }
 
+/** Default scope for recursive tools: project-relative `.` (never bare `/`, which is drive root in full mode on Windows). */
+const DEFAULT_SCAN_PATH = '.'
+
 export function buildFileTools(
   resolvePath: (p: string) => Promise<string>,
   root: string,
@@ -21,6 +31,8 @@ export function buildFileTools(
   isFull: boolean,
   pathRoot: string,
 ): FileTools {
+  const scanBase = isFull ? pathRoot : root
+
   const writeFile = tool(
     async ({ path: p, content }) => {
       try {
@@ -41,14 +53,18 @@ export function buildFileTools(
   )
 
   const readFile = tool(
-    async ({ path: p }) => {
+    async ({ path: p, offset, limit }) => {
+      const applySlice = (raw: string): string => {
+        if (offset === undefined && limit === undefined) return raw
+        return sliceFileLines(raw, offset, limit).text
+      }
       // First, allow an absolute path that canonicalizes to within an enabled skill dir (read-only
       // bundled reference files live outside the project root). Anything else stays jailed to `root`.
       if (skillDirs.length > 0) {
         const inSkill = await realInSkill(skillDirs, p)
         if (inSkill) {
           try {
-            return await fs.readFile(inSkill, 'utf8')
+            return applySlice(await fs.readFile(inSkill, 'utf8'))
           } catch {
             return `Error: file not found: ${p}`
           }
@@ -56,7 +72,7 @@ export function buildFileTools(
       }
       try {
         const abs = await resolvePath(p)
-        return await fs.readFile(abs, 'utf8')
+        return applySlice(await fs.readFile(abs, 'utf8'))
       } catch (err) {
         const msg = (err as Error).message
         if (msg.includes('escapes')) return `Error: ${msg}`
@@ -67,8 +83,24 @@ export function buildFileTools(
       name: 'read_file',
       description:
         'Read a text file. `path` is absolute relative to the project root, OR an absolute path to a ' +
-        'bundled file inside a loaded skill dir (as disclosed by use_skill).',
-      schema: z.object({ path: z.string() }),
+        'bundled file inside a loaded skill dir (as disclosed by use_skill). ' +
+        'Optional `offset` (1-based start line) and `limit` (max lines) for large files — use these ' +
+        'instead of re-reading the whole file when you only need a section.',
+      schema: z.object({
+        path: z.string(),
+        offset: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe('1-based start line. Omit to start at line 1.'),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Maximum number of lines to return from offset.'),
+      }),
     },
   )
 
@@ -100,7 +132,8 @@ export function buildFileTools(
   const ls = tool(
     async ({ path: p }) => {
       try {
-        const abs = await resolvePath(p ?? '/')
+        // Default `.` so full mode never treats bare `/` as the OS drive root.
+        const abs = await resolvePath(p ?? DEFAULT_SCAN_PATH)
         const ents = await fs.readdir(abs, { withFileTypes: true })
         return ents.map((e) => (e.isDirectory() ? `${e.name}/` : e.name)).sort().join('\n') || '(empty)'
       } catch (err) {
@@ -109,32 +142,37 @@ export function buildFileTools(
     },
     {
       name: 'ls',
-      description: 'List the immediate children of a directory. `path` defaults to "/".',
+      description:
+        'List the immediate children of a directory. `path` defaults to the project root (`.`). ' +
+        'Prefer project-relative paths (e.g. `/src` or `src`) over OS absolute roots.',
       schema: z.object({ path: z.string().optional() }),
     },
   )
 
+  const defaultGlobCaseInsensitive = process.platform === 'win32'
+
   const glob = tool(
-    async ({ pattern }) => {
+    async ({ pattern, caseInsensitive }) => {
+      const ci = caseInsensitive ?? defaultGlobCaseInsensitive
       let rx: RegExp
       try {
-        rx = toGlobRegex(pattern)
+        rx = toGlobRegex(pattern, ci)
       } catch (err) {
         return `Error: invalid pattern: ${(err as Error).message}`
       }
       const out: string[] = []
       // In 'full' (un-jailed) mode glob scans the un-jailed root (cwd) and reports paths relative to it,
       // matching ls/read_file/grep via resolvePath. Otherwise it stays jailed to `root`.
-      const globBase = isFull ? pathRoot : root
+      const globBase = scanBase
       async function walk(dir: string): Promise<void> {
         if (out.length >= 200) return
         for (const e of await fs.readdir(dir, { withFileTypes: true })) {
           if (e.name.startsWith('.')) continue
-          if (EXCLUDE_DIRS.has(e.name)) continue
+          if (isExcludedDirName(e.name)) continue
           const full = path.join(dir, e.name)
           if (e.isDirectory()) await walk(full)
           else {
-            const rel = '/' + path.relative(globBase, full)
+            const rel = '/' + path.relative(globBase, full).split(path.sep).join('/')
             if (rx.test(rel)) out.push(rel)
           }
         }
@@ -144,8 +182,16 @@ export function buildFileTools(
     },
     {
       name: 'glob',
-      description: 'Find files by a glob-ish pattern (supports * and **). Returns up to 200 paths.',
-      schema: z.object({ pattern: z.string() }),
+      description:
+        'Find files by a glob-ish pattern (supports * and **). Returns up to 200 paths. ' +
+        'Matching is case-insensitive on Windows by default; set caseInsensitive explicitly to override.',
+      schema: z.object({
+        pattern: z.string(),
+        caseInsensitive: z
+          .boolean()
+          .optional()
+          .describe('Case-insensitive path match. Default true on Windows, false elsewhere.'),
+      }),
     },
   )
 
@@ -155,27 +201,53 @@ export function buildFileTools(
       if (!compiled.ok) return compiled.error
       const { re, notes } = compiled
       const hits: string[] = []
+      const relOf = (full: string): string =>
+        '/' + path.relative(scanBase, full).split(path.sep).join('/')
+
+      async function scanFile(full: string): Promise<void> {
+        if (hits.length >= 200) return
+        const st = await fs.stat(full).catch(() => null)
+        if (!st || !st.isFile() || st.size > MAX_SCAN_FILE_BYTES) return
+        const text = await fs.readFile(full, 'utf8').catch(() => '')
+        if (text.slice(0, 8000).includes('\0')) return
+        text.split('\n').forEach((line, i) => {
+          if (hits.length < 200 && re.test(line)) {
+            hits.push(`${relOf(full)}:${i + 1}: ${line.trim().slice(0, 200)}`)
+          }
+        })
+      }
+
       async function walk(dir: string): Promise<void> {
         if (hits.length >= 200) return
         for (const e of await fs.readdir(dir, { withFileTypes: true })) {
           if (hits.length >= 200) return
           if (e.name.startsWith('.')) continue
-          if (EXCLUDE_DIRS.has(e.name)) continue
+          if (isExcludedDirName(e.name)) continue
           const full = path.join(dir, e.name)
           if (e.isDirectory()) {
             await walk(full)
           } else {
-            const st = await fs.stat(full)
-            if (st.size > MAX_SCAN_FILE_BYTES) continue
-            const text = await fs.readFile(full, 'utf8').catch(() => '')
-            if (text.slice(0, 8000).includes('\0')) continue
-            text.split('\n').forEach((line, i) => {
-              if (hits.length < 200 && re.test(line)) hits.push(`/${path.relative(root, full)}:${i + 1}: ${line.trim().slice(0, 200)}`)
-            })
+            await scanFile(full)
           }
         }
       }
-      await walk(await resolvePath(p ?? '/'))
+
+      try {
+        // Default `.` (project/cwd), never bare `/` — on Windows full mode `/` is the drive root
+        // and previously walked into $RECYCLE.BIN.
+        const abs = await resolvePath(p ?? DEFAULT_SCAN_PATH)
+        const st = await fs.stat(abs)
+        if (st.isFile()) {
+          await scanFile(abs)
+        } else if (st.isDirectory()) {
+          await walk(abs)
+        } else {
+          return `Error: path is neither a file nor a directory: ${p ?? DEFAULT_SCAN_PATH}`
+        }
+      } catch (err) {
+        return `Error: ${(err as Error).message}`
+      }
+
       const body = hits.slice(0, 200).join('\n') || `No matches for ${pattern}`
       if (notes.length === 0) return body
       return `${notes.map((n) => `Note: ${n}`).join('\n')}\n${body}`
@@ -183,9 +255,9 @@ export function buildFileTools(
     {
       name: 'grep',
       description:
-        'Search file contents by JavaScript RegExp. Optional `path` scopes the search. ' +
-        'Set caseInsensitive=true for case-insensitive match (prefer this over PCRE (?i) flags). ' +
-        'Returns up to 200 `file:line` hits.',
+        'Search file contents by JavaScript RegExp. Optional `path` scopes the search to a file or directory ' +
+        '(defaults to the project root). Set caseInsensitive=true for case-insensitive match ' +
+        '(prefer this over PCRE (?i) flags). Returns up to 200 `file:line` hits.',
       schema: z.object({
         pattern: z.string(),
         path: z.string().optional(),

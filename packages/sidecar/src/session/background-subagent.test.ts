@@ -330,7 +330,9 @@ describe('background subagent mode', () => {
     await session.sendMessage('do background research', (m) => events.push(m))
     await Promise.allSettled(session.backgroundTasks.values())
 
-    const notification = events.find((e) => e.type === 'agent:notification')
+    // Isolation may emit an earlier agent:notification with the worktree path; use the final one.
+    const notifications = events.filter((e) => e.type === 'agent:notification')
+    const notification = notifications[notifications.length - 1]
     expect(notification).toBeTruthy()
     expect((notification as { status?: string }).status).toBe('completed')
     expect((notification as { result?: string }).result).toBe('notified result')
@@ -346,7 +348,9 @@ describe('background subagent mode', () => {
     const ac = new AbortController()
     await session.runBackgroundSubagent('direct-1', 'direct task', ac.signal, (m) => events.push(m))
 
-    const notification = events.find((e) => e.type === 'agent:notification')
+    // Isolation may emit an earlier agent:notification with the worktree path; use the final one.
+    const notifications = events.filter((e) => e.type === 'agent:notification')
+    const notification = notifications[notifications.length - 1]
     expect(notification).toBeTruthy()
     expect((notification as { result?: string }).result).toBe('direct bg')
 

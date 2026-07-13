@@ -212,7 +212,9 @@ describe('Session idle-timeout watchdog', () => {
     // idleTimeoutMs = 20; the model's stream hangs until the watchdog aborts the turn.
     const session = new Session('t-stall', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] }, new HangingChatModel(), undefined, undefined, 20)
     await session.sendMessage('hi', (m) => sent.push(m as Ev))
-    expect(sent.some((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT')).toBe(true)
+    const timeout = sent.find((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT') as Ev | undefined
+    expect(timeout).toBeDefined()
+    expect(String((timeout as { message?: string })?.message ?? '')).toMatch(/Idle timeout/i)
   })
 
   it('does not emit a TIMEOUT error for a normal fast turn', async () => {

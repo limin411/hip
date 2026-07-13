@@ -7,7 +7,7 @@ import type { ToolOutputStore } from '../tool-output-store.js'
 import type { GuardianReviewer } from '../guardian.js'
 import type { AttachmentPayload, ContentPart } from '../attachments.js'
 import { runManagedAgent } from '../internal-runner.js'
-import { CHILD_MAX_STEPS } from '../loop-control.js'
+import { childMaxStepsForAgent } from '../loop-control.js'
 import { createAgentProvider } from './index.js'
 import { readAgentsConfig, resolveAgentModel, type ResolvedModel } from './registry.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
@@ -57,6 +57,8 @@ export interface RunInternalArgs {
   task: string
   emit: GraphEmit
   signal: AbortSignal
+  /** Loop budget for this managed agent (explore uses a higher cap). */
+  childMaxSteps?: number
   mcpTools?: StructuredToolInterface[]
   skills?: SkillMeta[]
   requestApproval?: ApprovalFn
@@ -107,7 +109,9 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
   const runInternal = deps.runInternal ?? ((a: RunInternalArgs) =>
     runManagedAgent({
       resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, task: a.task,
-      emit: a.emit, signal: a.signal, childMaxSteps: CHILD_MAX_STEPS,
+      emit: a.emit, signal: a.signal,
+      // Prefer explicit budget (from config agent id); fall back if tests omit it.
+      childMaxSteps: a.childMaxSteps ?? childMaxStepsForAgent(a.agentId),
       mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval, permissionMode: a.permissionMode,
       sessionId: a.sessionId, networkPolicy: a.networkPolicy,
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
@@ -139,6 +143,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         const narrowedMcp = extras?.mcpTools?.filter((t) => serverIds.some((id) => t.name.startsWith(`mcp__${id}__`)))
         return runInternal({
           agentId: extras?.agentId ?? agentId,
+          // Budget from config id (`explore`), not runtime child id (`subagent-N`).
+          childMaxSteps: childMaxStepsForAgent(agentId),
           resolved: resolveModel(agent, cwd), cwd, prompt: agent.prompt ?? '',
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,

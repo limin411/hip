@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { DispatchSpec } from './helpers.js'
 import { SubagentBatch } from '../subagent-batch.js'
 import type { RunSubagentFn } from '../orchestrator-adapter.js'
+import { isUselessSubagentText } from '../subagent-result.js'
 
 export interface SubagentTools {
   task: StructuredToolInterface | null
@@ -24,7 +25,7 @@ export function buildSubagentTools(
   const task = tool(
     async ({ description, mode }) => {
       const result = await spawnSubagent(description, mode)
-      if (!result?.trim()) {
+      if (isUselessSubagentText(result)) {
         return (
           'Error: sub-agent produced empty output. ' +
           'Do not treat this as success — retry with a clearer task description, or complete the work yourself.'
@@ -107,7 +108,7 @@ export function buildSubagentTools(
   const dispatchAgent = tool(
     async ({ agent, task: t }) => {
       const result = await dispatch.run(agent, t, dispatch.signal)
-      if (!result?.trim()) {
+      if (isUselessSubagentText(result)) {
         return (
           'Error: dispatched agent produced empty output. ' +
           'Do not treat this as success — retry with a clearer task, pick another agent, or do the work yourself.'

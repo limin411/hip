@@ -525,6 +525,198 @@ export class SessionService {
   }
 
   /**
+   * E2E multi-track B: project subagent pause handoff (first-line marker, not Error:).
+   * Mirrors sidecar `formatPausedToolResult` wire format without a real LLM/task tool.
+   */
+  seedSubagentPause(sessionId: string): {
+    turnId: string
+    callId: string
+    marker: typeof SessionService.SUBAGENT_PAUSE_MARKER
+  } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-task-${nanoid(8)}`
+    const childCallId = `e2e-child-${nanoid(8)}`
+    const marker = SessionService.SUBAGENT_PAUSE_MARKER
+    const question = 'Which API should we target?'
+    const output = `${marker} ${question}\npartial subagent progress`
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'coder-1',
+      role: 'coder',
+      parentAgentId: 'supervisor',
+      taskInput: 'e2e implement feature',
+    })
+    // Parent task tool (row suppressed in TurnTimeline; result carries pause marker).
+    this.receive({
+      type: 'tool:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+      callId,
+      name: 'task',
+      input: JSON.stringify({ description: 'e2e implement feature', prompt: 'do the work' }),
+      seq: 1,
+    })
+    // Child timeline step so delegation-row can bind taskInput (same pattern as seedAgentCollaboration).
+    this.receive({
+      type: 'tool:started',
+      sessionId,
+      turnId,
+      agentId: 'coder-1',
+      role: 'coder',
+      callId: childCallId,
+      name: 'read_file',
+      input: '{"path":"README.md"}',
+      seq: 2,
+    })
+    // Wire: task finishes with pause marker in output (not Error: prefix; not tool failure streak).
+    this.receive({
+      type: 'tool:finished',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      callId,
+      status: 'finished',
+      output,
+    })
+    this.receive({
+      type: 'token:stream',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      delta: `${marker} ${question}`,
+    })
+    return { turnId, callId, marker }
+  }
+
+  /** E2E: supervisor agent:interrupt HITL question banner. */
+  seedAgentInterrupt(sessionId: string, question = 'How should I proceed with the e2e task?'): {
+    turnId: string
+    question: string
+  } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'token:stream',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      delta: 'Need clarification before continuing.',
+    })
+    this.receive({
+      type: 'agent:interrupt',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      question,
+    })
+    return { turnId, question }
+  }
+
+  /** E2E: plan:published + plan_approval interrupt → PlanApprovalCard. */
+  seedPlanApproval(sessionId: string): {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const planItems = [
+      { content: 'e2e plan step one', status: 'pending' as const },
+      { content: 'e2e plan step two', status: 'pending' as const },
+    ]
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'plan:published',
+      sessionId,
+      turnId,
+      plan: planItems,
+    })
+    this.receive({
+      type: 'agent:interrupt',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      question: 'Approve this plan?',
+      context: JSON.stringify({ kind: 'plan_approval' }),
+    })
+    return { turnId, planItems }
+  }
+
+  /** E2E: background task killed notification (synthetic assistant message). */
+  seedBackgroundTaskKilled(sessionId: string): {
+    turnId: string
+    agentId: string
+    taskId: string
+  } {
+    const taskId = `e2e-bg-${nanoid(8)}`
+    this.receive({
+      type: 'agent:notification',
+      sessionId,
+      taskId,
+      description: 'e2e background job',
+      status: 'killed',
+      error: 'killed by user: cancel',
+    })
+    return { turnId: `notif-${taskId}`, agentId: taskId, taskId }
+  }
+
+  /** E2E: sidecar rejected workflow def (INVALID_WORKFLOW) error projection. */
+  simulateInvalidWorkflowError(
+    sessionId: string,
+    reason = 'workflow nodes of type tool|human are not supported',
+  ): void {
+    this.receive({
+      type: 'error',
+      sessionId,
+      code: 'INVALID_WORKFLOW',
+      message: reason,
+    })
+  }
+
+  /** E2E probe: last assistant message text (pause marker / notification). */
+  getLastAssistantText(sessionId: string): string | null {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+    if (!sess) return null
+    for (let i = sess.messages.length - 1; i >= 0; i--) {
+      const m = sess.messages[i]
+      if (m.role === 'assistant') return m.content ?? ''
+    }
+    return null
+  }
+
+  /** E2E probe: pending interrupt question. */
+  getPendingInterrupt(sessionId: string): { turnId: string; question: string } | null {
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === sessionId)
+    const i = sess?.interrupt
+    if (!i) return null
+    return { turnId: i.turnId, question: i.question }
+  }
+
+  /** Matches packages/sidecar `SUBAGENT_PAUSE_MARKER` (Track B). */
+  static readonly SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]' as const
+
+  /**
    * E2E P4: seed checkpoint list + isGitRepo so Timeline tab is gated open
    * without a real git repo on disk.
    *
@@ -1231,6 +1423,24 @@ export type HipE2EHooks = {
     runStatus: string | null
     nodeStatuses: Record<string, string>
   }
+  seedSubagentPause: (sessionId: string) => {
+    turnId: string
+    callId: string
+    marker: '[hip:subagent_paused]'
+  }
+  seedAgentInterrupt: (sessionId: string, question?: string) => { turnId: string; question: string }
+  seedPlanApproval: (sessionId: string) => {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  }
+  seedBackgroundTaskKilled: (sessionId: string) => {
+    turnId: string
+    agentId: string
+    taskId: string
+  }
+  simulateInvalidWorkflowError: (sessionId: string, reason?: string) => void
+  getLastAssistantText: (sessionId: string) => string | null
+  getPendingInterrupt: (sessionId: string) => { turnId: string; question: string } | null
 }
 
 declare global {
@@ -1280,6 +1490,13 @@ function installE2eHooks(svc: SessionService): void {
       }
     },
     getWorkflowSession: (sessionId) => svc.getWorkflowSession(sessionId),
+    seedSubagentPause: (sessionId) => svc.seedSubagentPause(sessionId),
+    seedAgentInterrupt: (sessionId, question) => svc.seedAgentInterrupt(sessionId, question),
+    seedPlanApproval: (sessionId) => svc.seedPlanApproval(sessionId),
+    seedBackgroundTaskKilled: (sessionId) => svc.seedBackgroundTaskKilled(sessionId),
+    simulateInvalidWorkflowError: (sessionId, reason) => svc.simulateInvalidWorkflowError(sessionId, reason),
+    getLastAssistantText: (sessionId) => svc.getLastAssistantText(sessionId),
+    getPendingInterrupt: (sessionId) => svc.getPendingInterrupt(sessionId),
   }
 }
 

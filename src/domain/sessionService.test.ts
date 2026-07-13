@@ -683,6 +683,60 @@ describe('workspace diff', () => {
     expect(sess.pendingPermission?.options).toHaveLength(2)
   })
 
+  it('seedSubagentPause projects marker without Error: sub-agent paused prefix', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId, callId, marker } = svc.seedSubagentPause('s1')
+    expect(marker).toBe('[hip:subagent_paused]')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    const turn = sess.messages.find((m) => m.id === turnId)!
+    expect(turn.agentRuns?.map((r) => r.agentId).sort()).toEqual(['coder-1', 'supervisor'])
+    const task = turn.toolCalls?.find((tc) => tc.callId === callId)
+    expect(task).toMatchObject({ name: 'task', status: 'finished' })
+    expect(task?.output).toMatch(/^\[hip:subagent_paused\]/)
+    expect(task?.output).not.toMatch(/^Error:\s*sub-agent paused/i)
+    expect(svc.getLastAssistantText('s1')).toContain('[hip:subagent_paused]')
+  })
+
+  it('seedAgentInterrupt sets session.interrupt', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { turnId, question } = svc.seedAgentInterrupt('s1', 'e2e question?')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.interrupt).toEqual({ turnId, question: 'e2e question?', context: undefined })
+    expect(svc.getPendingInterrupt('s1')).toEqual({ turnId, question: 'e2e question?' })
+  })
+
+  it('seedPlanApproval sets planApprovalPending and activeTurnPlan', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { planItems } = svc.seedPlanApproval('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(true)
+    expect(sess.activeTurnPlan).toEqual(planItems)
+    expect(sess.interrupt?.question).toContain('Approve')
+  })
+
+  it('seedBackgroundTaskKilled appends synthetic killed notification', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { taskId, turnId } = svc.seedBackgroundTaskKilled('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    const msg = sess.messages.find((m) => m.id === turnId)
+    expect(msg?.content).toContain('killed')
+    expect(msg?.content).toContain('e2e background job')
+    expect(msg?.id).toBe(`notif-${taskId}`)
+  })
+
+  it('simulateInvalidWorkflowError sets INVALID_WORKFLOW error', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.simulateInvalidWorkflowError('s1', 'tool nodes rejected')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('error')
+    expect(sess.error).toMatchObject({ code: 'INVALID_WORKFLOW', message: 'tool nodes rejected' })
+  })
+
   it('seedCheckpoints folds isGitRepo and rows into diffStore', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

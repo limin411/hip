@@ -91,11 +91,13 @@ Related: [e2e/README.md](../../../e2e/README.md).
 
 ## Follow-ups from this audit
 
-1. Add `harness-complex-agent-loop.spec.ts` (`@harness`) — multi-step conversation projection.
-2. Add `harness-workflow-projection.spec.ts` (`@harness`) — inject workflow messages; store + Agents focus.
-3. Expose `getWorkflowSession` on `__hipE2E` (DEV only) for honest store assertions.
-4. Optional later: plan-approval inject seed (gap, not blocking unpaid gate).
+1. ~~Add `harness-complex-agent-loop.spec.ts`~~ done
+2. ~~Add `harness-workflow-projection.spec.ts`~~ done (+ failed / cancelled / stale)
+3. ~~Expose `getWorkflowSession` on `__hipE2E`~~ done
+4. ~~Plan-approval / interrupt / pause / INVALID_WORKFLOW / bg-killed seeds~~ done (2026-07-13 multi-track E2E plan Implemented)
 5. Run full unpaid `yarn test:e2e`; record results; then fix-spec before remediations.
+
+See also: [`2026-07-13-agent-runtime-e2e-plan.md`](./2026-07-13-agent-runtime-e2e-plan.md).
 
 ## Files inventory (current)
 

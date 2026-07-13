@@ -182,4 +182,158 @@ describe('harness workflow projection @harness @core', () => {
       expect(snap.runStatus).toBe('pending')
     }
   })
+
+  it('multi-node failed run projects failed statuses', async () => {
+    await switchToCodeSurface()
+    const sessionId = await createCodeSessionForE2e(FIXTURE)
+    const multiDef = {
+      id: 'wf-e2e-fail',
+      name: 'E2E Fail WF',
+      nodes: [
+        { id: 'n1', type: 'agent' as const, agentId: 'coder', inputTemplate: 'ok' },
+        { id: 'n2', type: 'agent' as const, agentId: 'coder', inputTemplate: 'boom' },
+      ],
+      edges: [{ from: 'n1', to: 'n2' }],
+      entry: ['n1'],
+    }
+    const runId = 'run-e2e-fail'
+    await injectServerMessage({
+      type: 'workflow:started',
+      sessionId,
+      runId,
+      def: multiDef,
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'run:started' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'node:started', nodeId: 'n1' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'node:succeeded', nodeId: 'n1', output: { text: 'ok' } },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'node:started', nodeId: 'n2' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'node:failed', nodeId: 'n2', error: 'e2e node boom' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'run:finished', status: 'failed' },
+    })
+
+    await browser.waitUntil(
+      async () => {
+        const snap = await getWorkflowSession(sessionId)
+        return (
+          snap.runStatus === 'failed' &&
+          snap.nodeStatuses.n1 === 'succeeded' &&
+          snap.nodeStatuses.n2 === 'failed'
+        )
+      },
+      {
+        timeout: 15000,
+        interval: 300,
+        timeoutMsg: 'failed multi-node workflow not projected',
+      },
+    )
+  })
+
+  it('run:cancelled projects cancelled status', async () => {
+    await switchToCodeSurface()
+    const sessionId = await createCodeSessionForE2e(FIXTURE)
+    const runId = 'run-e2e-cancel'
+    await injectServerMessage({
+      type: 'workflow:started',
+      sessionId,
+      runId,
+      def: MOCK_DEF,
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'run:started' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'run:cancelled' },
+    })
+
+    await browser.waitUntil(
+      async () => {
+        const snap = await getWorkflowSession(sessionId)
+        return snap.runStatus === 'cancelled'
+      },
+      {
+        timeout: 15000,
+        interval: 300,
+        timeoutMsg: 'cancelled workflow not projected',
+      },
+    )
+  })
+
+  it('stale runId events are ignored', async () => {
+    await switchToCodeSurface()
+    const sessionId = await createCodeSessionForE2e(FIXTURE)
+    const runId = 'run-e2e-stale-live'
+    await injectServerMessage({
+      type: 'workflow:started',
+      sessionId,
+      runId,
+      def: MOCK_DEF,
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'run:started' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId,
+      event: { type: 'node:started', nodeId: 'n1' },
+    })
+
+    // Wrong runId must not clobber current slice.
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId: 'run-e2e-stale-other',
+      event: { type: 'run:finished', status: 'failed' },
+    })
+    await injectServerMessage({
+      type: 'workflow:event',
+      sessionId,
+      runId: 'run-e2e-stale-other',
+      event: { type: 'node:failed', nodeId: 'n1', error: 'stale' },
+    })
+
+    await browser.pause(400)
+    const snap = await getWorkflowSession(sessionId)
+    expect(snap.runId).toBe(runId)
+    expect(snap.runStatus).toBe('running')
+    expect(snap.nodeStatuses.n1).toBe('running')
+  })
 })

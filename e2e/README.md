@@ -7,6 +7,7 @@ Harness overview lives in this file. Feature plans:
 - Business coverage audit: [`docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md`](../docs/superpowers/specs/2026-07-13-e2e-business-coverage-audit.md)
 - Run results (2026-07-13 unpaid): [`docs/superpowers/specs/2026-07-13-e2e-run-results.md`](../docs/superpowers/specs/2026-07-13-e2e-run-results.md)
 - Fix plan: [`docs/superpowers/specs/2026-07-13-e2e-fix-spec.md`](../docs/superpowers/specs/2026-07-13-e2e-fix-spec.md)
+- **Agent runtime multi-track E2E plan:** [`docs/superpowers/specs/2026-07-13-agent-runtime-e2e-plan.md`](../docs/superpowers/specs/2026-07-13-agent-runtime-e2e-plan.md)
 - Context menu (recent): [`docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md`](../docs/superpowers/specs/2026-07-12-context-menu-e2e-plan.md)
 
 ## Prerequisites
@@ -126,7 +127,18 @@ Non-production frontend installs `window.__hipE2E` (see `sessionService.installE
 Complex harness (safe inject chains, no paid LLM):
 
 - `harness-complex-agent-loop.spec.ts` — multi-step tool / multi-agent / permission / cancel
-- `harness-workflow-projection.spec.ts` — `workflow:*` messages → store + Agents tab on code
+- `harness-workflow-projection.spec.ts` — `workflow:*` messages → store + Agents tab on code; failed / cancelled / stale runId
+- `harness-subagent-pause.spec.ts` — `[hip:subagent_paused]` marker + delegation (not `Error: sub-agent paused`)
+- `harness-agent-interrupt.spec.ts` — `agent:interrupt` banner + resume clears interrupt
+- `harness-plan-approval.spec.ts` — plan approval card + approve
+- `harness-invalid-workflow.spec.ts` — `INVALID_WORKFLOW` error bar; workflow store idle
+- `harness-background-killed.spec.ts` — background task killed notification (`@panel`)
+- `harness-orchmode-compat.spec.ts` — deprecated `session:orchMode` does not break session (optional gate)
+
+Bridge seeds (DEV `__hipE2E`):
+
+- `seedSubagentPause` / `seedAgentInterrupt` / `seedPlanApproval` / `seedBackgroundTaskKilled`
+- `simulateInvalidWorkflowError` / `getLastAssistantText` / `getPendingInterrupt`
 
 Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`, `history.ts`.
 

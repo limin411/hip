@@ -48,6 +48,24 @@ type HipE2E = {
     runStatus: string | null
     nodeStatuses: Record<string, string>
   }
+  seedSubagentPause?: (sessionId: string) => {
+    turnId: string
+    callId: string
+    marker: '[hip:subagent_paused]'
+  }
+  seedAgentInterrupt?: (sessionId: string, question?: string) => { turnId: string; question: string }
+  seedPlanApproval?: (sessionId: string) => {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  }
+  seedBackgroundTaskKilled?: (sessionId: string) => {
+    turnId: string
+    agentId: string
+    taskId: string
+  }
+  simulateInvalidWorkflowError?: (sessionId: string, reason?: string) => void
+  getLastAssistantText?: (sessionId: string) => string | null
+  getPendingInterrupt?: (sessionId: string) => { turnId: string; question: string } | null
 }
 
 export async function getActiveSessionId(): Promise<string | null> {
@@ -201,5 +219,81 @@ export async function getWorkflowSession(sessionId: string): Promise<WorkflowSes
     const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
     if (!hooks?.getWorkflowSession) throw new Error('__hipE2E.getWorkflowSession missing')
     return hooks.getWorkflowSession(id)
+  }, sessionId)
+}
+
+/** Subagent pause marker handoff (Track B) — first-line `[hip:subagent_paused]`. */
+export async function seedSubagentPause(
+  sessionId: string,
+): Promise<{ turnId: string; callId: string; marker: '[hip:subagent_paused]' }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.seedSubagentPause) throw new Error('__hipE2E.seedSubagentPause missing')
+    return hooks.seedSubagentPause(id)
+  }, sessionId)
+}
+
+export async function seedAgentInterrupt(
+  sessionId: string,
+  question?: string,
+): Promise<{ turnId: string; question: string }> {
+  return browser.execute(
+    (id: string, q: string | undefined) => {
+      const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+      if (!hooks?.seedAgentInterrupt) throw new Error('__hipE2E.seedAgentInterrupt missing')
+      return hooks.seedAgentInterrupt(id, q)
+    },
+    sessionId,
+    question,
+  )
+}
+
+export async function seedPlanApproval(
+  sessionId: string,
+): Promise<{ turnId: string; planItems: { content: string; status: string }[] }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.seedPlanApproval) throw new Error('__hipE2E.seedPlanApproval missing')
+    return hooks.seedPlanApproval(id)
+  }, sessionId)
+}
+
+export async function seedBackgroundTaskKilled(
+  sessionId: string,
+): Promise<{ turnId: string; agentId: string; taskId: string }> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.seedBackgroundTaskKilled) throw new Error('__hipE2E.seedBackgroundTaskKilled missing')
+    return hooks.seedBackgroundTaskKilled(id)
+  }, sessionId)
+}
+
+export async function simulateInvalidWorkflowError(sessionId: string, reason?: string): Promise<void> {
+  await browser.execute(
+    (id: string, r: string | undefined) => {
+      const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+      if (!hooks?.simulateInvalidWorkflowError) throw new Error('__hipE2E.simulateInvalidWorkflowError missing')
+      hooks.simulateInvalidWorkflowError(id, r)
+    },
+    sessionId,
+    reason,
+  )
+}
+
+export async function getLastAssistantText(sessionId: string): Promise<string | null> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.getLastAssistantText) throw new Error('__hipE2E.getLastAssistantText missing')
+    return hooks.getLastAssistantText(id)
+  }, sessionId)
+}
+
+export async function getPendingInterrupt(
+  sessionId: string,
+): Promise<{ turnId: string; question: string } | null> {
+  return browser.execute((id: string) => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.getPendingInterrupt) throw new Error('__hipE2E.getPendingInterrupt missing')
+    return hooks.getPendingInterrupt(id)
   }, sessionId)
 }

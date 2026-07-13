@@ -74,6 +74,13 @@ export interface ToolRunnerDeps {
   onToolFinished?: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
   /** Optional emit for guardian risk classification (emitted for medium/high risk tools). */
   emitRisk?: (toolName: string, risk: RiskLevel, approval: string) => void
+  /**
+   * Called periodically while a tool is executing so idle watchdogs do not fire mid-walk.
+   * Interval is controlled by the runner (see TOOL_ACTIVITY_INTERVAL_MS).
+   */
+  onActivity?: () => void
+  /** Override activity kick interval (tests). Default 5000ms. */
+  activityIntervalMs?: number
 }
 
 function frameCtx(deps: ToolRunnerDeps): {
@@ -252,6 +259,7 @@ export class ToolRunner {
 
     // ── 5. Invoke tool ─────────────────────────────────────────────────────
     this.emitStarted(call.name, call.callId, invokeArgs)
+    const stopActivity = this.startActivityPulse()
     try {
       const rawResult = String(await tool.invoke(invokeArgs))
       const bound = this.deps.toolOutputStore
@@ -330,7 +338,22 @@ export class ToolRunner {
         tool_call_id: call.callId,
         name: call.name,
       }
+    } finally {
+      stopActivity()
     }
+  }
+
+  /** Pulse onActivity while a tool is in flight so idle watchdogs stay armed. */
+  private startActivityPulse(): () => void {
+    const onActivity = this.deps.onActivity
+    if (!onActivity) return () => {}
+    const ms = this.deps.activityIntervalMs ?? 5_000
+    onActivity()
+    const timer = setInterval(() => onActivity(), ms)
+    if (typeof timer === 'object' && timer && 'unref' in timer) {
+      ;(timer as NodeJS.Timeout).unref()
+    }
+    return () => clearInterval(timer)
   }
 
   private emitStarted(name: string, callId: string, input: unknown): void {

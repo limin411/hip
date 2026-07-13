@@ -76,6 +76,8 @@ export interface GraphEmit {
   usage(u: TurnUsage): void
   planDelta(itemId: string, delta: string): void
   compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
+  /** Optional: signal that work is still progressing (keeps idle watchdog alive during long tools). */
+  activity?(): void
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -366,6 +368,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       guardianReviewer: ctx.guardianReviewer,
       onToolStarted: (name, callId, input) => ctx.emit.toolStarted(name, callId, input),
       onToolFinished: (callId, status, output, error) => ctx.emit.toolFinished(callId, status, output, error),
+      onActivity: () => ctx.emit.activity?.(),
     })
     return ctx.toolRunner
   }

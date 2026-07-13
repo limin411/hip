@@ -23,7 +23,7 @@ import { FIXED_AGENTS } from '@hip/protocol'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
-import { IdleWatchdog } from './idle-watchdog.js'
+import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
@@ -756,6 +756,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         ...(meta?.replacedMessageIds?.length ? { replacedMessageIds: meta.replacedMessageIds } : {}),
       })
     },
+    // Keep idle watchdog alive during long tool walks (grep/glob) without extra WS traffic.
+    activity: () => { watchdog.kick() },
   })
   const emit = makeEmit('supervisor', 'supervisor')
   let subagentSeq = 0
@@ -1085,7 +1087,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         type: 'error',
         sessionId: host.id,
         code: timedOut ? 'TIMEOUT' : 'CANCELLED',
-        message: timedOut ? '' : 'User cancelled the request',
+        message: timedOut ? idleTimeoutMessage(host.idleTimeoutMs) : 'User cancelled the request',
       })
       return text
     }

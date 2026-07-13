@@ -1,7 +1,7 @@
 import type { ServerMessage, SessionConfig, AgentRole, WorkflowDef, OrchestratorEvent } from '@hip/protocol'
 import type { TraceRun } from './tool-trace.js'
 import { ReasoningTracker, stringify } from './tool-trace.js'
-import { IdleWatchdog } from './idle-watchdog.js'
+import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import { runWorkflow } from '../orchestrator/executor.js'
@@ -147,6 +147,7 @@ export async function runWorkflowTurn(
       usage: () => {},
       planDelta: () => {},
       compaction: () => {},
+      activity: () => { watchdog.kick() },
     }
   }
 
@@ -343,7 +344,7 @@ export async function runWorkflowTurn(
         type: 'error',
         sessionId: deps.id,
         code: timedOut ? 'TIMEOUT' : 'CANCELLED',
-        message: timedOut ? '' : 'User cancelled the request',
+        message: timedOut ? idleTimeoutMessage(deps.idleTimeoutMs) : 'User cancelled the request',
       })
       const stoppedNote = timedOut
         ? '(timed out)'
@@ -357,7 +358,7 @@ export async function runWorkflowTurn(
       type: 'error',
       sessionId: deps.id,
       code: timedOut ? 'TIMEOUT' : 'AGENT_ERROR',
-      message: timedOut ? '' : safeErrorMessage(err),
+      message: timedOut ? idleTimeoutMessage(deps.idleTimeoutMs) : safeErrorMessage(err),
     })
     const text = partialText.trim()
       ? `${partialText.trim()}\n\n(error)`

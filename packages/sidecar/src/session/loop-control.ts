@@ -5,9 +5,21 @@ export const MAX_STEPS = 800
  *  one parent step, so the parent cap bounds spawns; this bounds each child. */
 export const CHILD_MAX_STEPS = 15
 
+/**
+ * Explore fixed-agent loop cap. Codebase search often needs more than the default child budget
+ * before a usable summary; keep generic `task` workers on {@link CHILD_MAX_STEPS}.
+ */
+export const EXPLORE_CHILD_MAX_STEPS = 30
+
+/** Per-agent child step budget for internal managed agents. */
+export function childMaxStepsForAgent(agentId: string): number {
+  return agentId === 'explore' ? EXPLORE_CHILD_MAX_STEPS : CHILD_MAX_STEPS
+}
+
 /** Injected as a system message on the final step: tools are off, answer in text only. */
 export const MAX_STEPS_NOTE =
   'MAXIMUM STEPS REACHED. Tools are now disabled. Do not attempt any tool call. ' +
+  'Do not emit DSML, XML tool markup, or function-call tags. ' +
   'Respond with a short plain-text summary of what you have done so far and what remains.'
 
 /** Sub-agent max recursion depth. At depth >= MAX_DEPTH the task/dispatch_agent tools are filtered out. */

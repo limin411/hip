@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { IdleWatchdog } from './idle-watchdog.js'
+import { IdleWatchdog, idleTimeoutMessage, TOOL_ACTIVITY_INTERVAL_MS } from './idle-watchdog.js'
 
 beforeEach(() => vi.useFakeTimers())
 afterEach(() => vi.useRealTimers())
@@ -37,5 +37,13 @@ describe('IdleWatchdog', () => {
     w.kick() // no-op after stop
     vi.advanceTimersByTime(200)
     expect(onTimeout).not.toHaveBeenCalled()
+  })
+})
+
+describe('idleTimeoutMessage', () => {
+  it('mentions idle (not wall-clock) and the duration', () => {
+    expect(idleTimeoutMessage(60_000)).toMatch(/Idle timeout after 60000ms/)
+    expect(idleTimeoutMessage(60_000)).toMatch(/no outbound activity/)
+    expect(TOOL_ACTIVITY_INTERVAL_MS).toBe(5_000)
   })
 })

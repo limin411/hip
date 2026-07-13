@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-13 |
-| 状态 | **P0 Implemented**（T1 grep + T2 DSML + T3 子代理合成）；T4/T5 可选后续 |
+| 状态 | **Implemented**（T1–T5：grep / DSML / 合成 / explore 步数 / idle TIMEOUT） |
 | 范围 | Code surface 会话：`grep` 工具、DeepSeek V4 tool-call 归一化、`dispatch_agent` 结果回传、turn idle TIMEOUT |
 | 证据 | [`logs/bug.json`](../../../logs/bug.json)（session `UvOv31jfhzrA8Q_alfTgH`） |
 | 关联 plan | [`../plans/2026-07-13-code-surface-grep-dsml-timeout.md`](../plans/2026-07-13-code-surface-grep-dsml-timeout.md) |

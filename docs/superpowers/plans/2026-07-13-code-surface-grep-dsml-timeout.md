@@ -118,9 +118,9 @@ T6 文档与工具 description                        ──► 随 T1/T2
 
 **Steps:**
 
-- [ ] 评估将 `CHILD_MAX_STEPS` 自 15 提到 25，**或** 仅 explore profile 更高 cap（优先局部，避免全局涨费用）
-- [ ] `MAX_STEPS_NOTE` 后仍无 prose 时依赖 T3 合成（不单靠模型）
-- [ ] explore 提示增加：结束时必须纯文本结论；禁止 XML/DSML
+- [x] 评估将 `CHILD_MAX_STEPS` 自 15 提到 25，**或** 仅 explore profile 更高 cap（优先局部，避免全局涨费用）→ `EXPLORE_CHILD_MAX_STEPS = 30`
+- [x] `MAX_STEPS_NOTE` 后仍无 prose 时依赖 T3 合成（不单靠模型）
+- [x] explore 提示增加：结束时必须纯文本结论；禁止 XML/DSML
 
 **Acceptance:** 大任务探索更少「做到一半无总结」；单测不依赖真模型时可 mock steps。
 
@@ -136,9 +136,9 @@ T6 文档与工具 description                        ──► 随 T1/T2
 
 **Steps:**
 
-- [ ] `grep`/`glob` 长 walk 每 N 文件或每 2s 触发 activity（经 GraphEmit 或注入的 `onActivity` → kick）
-- [ ] TIMEOUT 的 `error.message` 改为非空可读字符串
-- [ ] 文档注明 60s 为 **idle** 非 wall-clock
+- [x] 长工具执行期间 ToolRunner `onActivity` 脉冲 → GraphEmit.activity → idle kick（覆盖 grep/glob walk）
+- [x] TIMEOUT 的 `error.message` 改为非空可读字符串（`idleTimeoutMessage`）
+- [x] 文档注明 60s 为 **idle** 非 wall-clock
 
 **Acceptance:** 单测或 mock 长 walk 期间 watchdog 被 kick；TIMEOUT 文案断言。
 

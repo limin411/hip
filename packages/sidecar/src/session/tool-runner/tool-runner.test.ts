@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { StructuredToolInterface } from '@langchain/core/tools'
@@ -127,6 +127,39 @@ describe('ToolRunner', () => {
       })
       expect(result.content).toMatch(/refusing read_file on git object path/)
       expect(invoked).toBe(false)
+    })
+  })
+
+  describe('activity pulse during long tools', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    it('calls onActivity at start and on interval while tool runs', async () => {
+      let resolveTool!: () => void
+      const gate = new Promise<void>((r) => { resolveTool = r })
+      const slow = tool(
+        async () => {
+          await gate
+          return 'done'
+        },
+        { name: 'slow', description: 'slow', schema: z.object({}) },
+      )
+      const onActivity = vi.fn()
+      const deps = makeDeps({
+        tools: new Map([['slow', slow]]),
+        onActivity,
+        activityIntervalMs: 50,
+      })
+      const runner = new ToolRunner(deps)
+      const pending = runner.runToolCall({ name: 'slow', callId: 'c-slow', args: {} })
+      expect(onActivity.mock.calls.length).toBeGreaterThanOrEqual(1)
+      await vi.advanceTimersByTimeAsync(120)
+      expect(onActivity.mock.calls.length).toBeGreaterThanOrEqual(3)
+      resolveTool()
+      await pending
+      const after = onActivity.mock.calls.length
+      await vi.advanceTimersByTimeAsync(200)
+      expect(onActivity.mock.calls.length).toBe(after)
     })
   })
 

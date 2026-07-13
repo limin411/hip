@@ -3,7 +3,18 @@
  * kick, `onTimeout` fires once. `stop()` cancels it permanently (later kicks are no-ops). Used to
  * abort a turn whose provider stream has stalled (no activity), without killing a turn that is
  * still progressing — any outbound activity kicks it.
+ *
+ * Note: the timeout is **idle** (no outbound activity), not wall-clock turn duration.
  */
+
+/** How often a long-running tool should signal activity so the idle watchdog does not fire mid-walk. */
+export const TOOL_ACTIVITY_INTERVAL_MS = 5_000
+
+/** Human-readable TIMEOUT error body for the client. */
+export function idleTimeoutMessage(idleTimeoutMs: number): string {
+  return `Idle timeout after ${idleTimeoutMs}ms with no outbound activity`
+}
+
 export class IdleWatchdog {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopped = false

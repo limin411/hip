@@ -3,9 +3,11 @@ import type { WorkflowDef } from '@hip/protocol'
 /**
  * Internal/test cluster template: linear planner → coder, no gates.
  *
- * NOT a product default. User-facing turns no longer force this via orchMode
- * (agent-driven orchestration). Only used when pendingWorkflowDef is set
- * explicitly (tests / advanced internal callers).
+ * NOT a product default and NOT selected by orchMode (routing ignores orchMode;
+ * only an explicit pendingWorkflowDef / workflow:run enters the DAG path).
+ * Product default remains Supervisor ReAct + task/dispatch_agent.
+ * Callers that need this template must set pendingWorkflowDef themselves
+ * (tests / advanced internal use).
  */
 export function buildClusterDefaultWorkflow(): WorkflowDef {
   return {

@@ -17,7 +17,10 @@ Plugins load CJS handlers via `ConfigManager.loadPluginComponents` into the sess
 
 Workflow HITL: no `requestApproval` on workers (policy A). PreToolUse `ask` without transport is denied. Workflow `Stop` `continue` does **not** start a second DAG.
 
-`message:send` + `orchMode: dag` sets `skipUserPromptSubmit` so UserPromptSubmit is not double-fired.
+When `message:send` enters the workflow branch via an explicit `pendingWorkflowDef`
+(product routing ignores `orchMode`), `runTurn` passes `skipUserPromptSubmit: true`
+so UserPromptSubmit is not double-fired after `processInput`. Direct `workflow:run`
+leaves the flag false and may fire UserPromptSubmit itself when run text is present.
 
 Settings UI「挂钩配置」shows **declared** events from a static plugin scan (not a live session probe). Runtime path coverage is the table above. Honesty copy for the settings page: `docs/superpowers/specs/2026-07-13-hooks-settings-honesty-spec.md`.
 

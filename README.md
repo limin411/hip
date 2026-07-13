@@ -2,9 +2,10 @@
 
 A desktop AI agent app (à la Claude Code Desktop / Codex Desktop). A single
 Node.js **sidecar** process manages multiple [LangGraph](https://langchain-ai.github.io/langgraphjs/)
-agent instances; each UI tab is an independent session, and within a session a
-Supervisor agent delegates sequentially to sub-agents (Planner → Coder → Reviewer)
-via the deepagents `task` tool.
+agent instances; each UI tab is an independent session. The product default is a
+**Supervisor ReAct** loop: the agent decides when to delegate via tools
+(`task` / `dispatch_agent` / `task_batch`). There is no forced Planner → Coder →
+Reviewer pipeline on ordinary turns.
 
 ## Architecture
 
@@ -20,6 +21,18 @@ The Tauri shell spawns the sidecar on startup (via `tauri-plugin-shell`'s
 sidecar mechanism). The sidecar binds a WebSocket server on a free port and
 prints `{"port":NNNN}` to stdout; Rust captures it and exposes it through the
 `get_sidecar_port` command. The frontend then connects to `ws://localhost:NNNN`.
+
+### Delegation entries (agent runtime)
+
+Product turns enter one of three paths. Only an **explicit** workflow def
+switches off the default ReAct loop; session `orchMode` is ignored for routing
+(UI toggle removed; API remains deprecated).
+
+| Entry | When | Behavior |
+|-------|------|----------|
+| **Default ReAct + task/dispatch** | Ordinary `message:send` (no pending workflow) | Supervisor ReAct graph (`buildGraph`). Agent-driven isolation via `task` / `dispatch_agent`; parallel sub-tasks via `task_batch`. |
+| **Explicit DAG** | `pendingWorkflowDef` set, or `workflow:run` | Orchestrator / workflow-runner DAG. Not forced by mode flags. Builtin cluster templates (e.g. planner→coder) are internal/test helpers only. |
+| **Multi-agent handoff** | Optional / non-default callers | `multi-agent-graph` handoff (`handoff_to_*`) composition. Experimental surface; not the product default session path. |
 
 This is a **yarn workspaces** monorepo:
 

@@ -916,7 +916,9 @@ export class SessionService {
 
   /**
    * @deprecated Agent-driven orchestration ignores orchMode for turn routing.
-   * Kept for protocol compatibility with old clients; no-op for product UI.
+   * Kept for protocol compatibility with old clients; product UI does not call this.
+   * Sidecar still stores the field and echoes `session:orchMode` (optionally with
+   * `ignoredForTurnRouting: true`). Does not imply `pendingWorkflowDef` / workflow turns.
    */
   setOrchMode(id: string, orchMode: OrchestrationMode): void {
     useDomainStore.getState().apply({ type: 'session:orchMode', sessionId: id, orchMode })

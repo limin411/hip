@@ -97,6 +97,11 @@ export type ClientMessage =
   | { type: 'mcp:getPrompt'; serverId: string; name: string; arguments?: Record<string, string> }
   | { type: 'mcp:reconnect'; servers: McpServerConfig[] }
   | { type: 'plan:respond'; sessionId: string; action: 'approve' | 'reject' | 'amend'; amendContent?: string }
+  /**
+   * @deprecated Product path ignores orchMode for turn routing (agent-driven orchestration).
+   * Still accepted and stored for old clients / session JSON compatibility.
+   * Prefer explicit `pendingWorkflowDef` / `workflow:run` for DAG turns.
+   */
   | { type: 'session:setOrchMode'; sessionId: string; orchMode: OrchestrationMode }
   | { type: 'agent:setProfile'; sessionId: string; id: string }
   | { type: 'subagent:background'; sessionId: string; taskId: string; description: string }
@@ -133,7 +138,18 @@ export type ServerMessage =
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
-  | { type: 'session:orchMode'; sessionId: string; orchMode: OrchestrationMode }
+  /**
+   * Echo of stored orchMode (compat). `ignoredForTurnRouting` is optional honesty:
+   * when true (always set by current sidecar), product turn routing does not use orchMode.
+   * Old clients may omit the field; presence does not change stored orchMode.
+   */
+  | {
+      type: 'session:orchMode'
+      sessionId: string
+      orchMode: OrchestrationMode
+      /** When true, orchMode is stored but ignored for turn routing. */
+      ignoredForTurnRouting?: true
+    }
   | { type: 'config:activeModel'; providerID: string; modelID: string; hasApiKey: boolean }
   | {
       type: 'config:testProvider:result'
@@ -187,7 +203,7 @@ export type ServerMessage =
   | { type: 'plan:delta'; sessionId: string; turnId: string; itemId: string; delta: string }
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
-  | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
+  | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }

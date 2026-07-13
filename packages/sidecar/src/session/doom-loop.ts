@@ -1,5 +1,43 @@
 /** Doom-loop detection: an identical batch of tool calls repeated N times in a row. */
 
+import type { DoomLoopStrategy } from '@hip/protocol'
+import { isSubagentPausedText } from './subagent-result.js'
+
+export type { DoomLoopStrategy }
+
+/** Canonical allowlist — single source for config parse + runtime resolve. */
+export const DOOM_LOOP_STRATEGIES: readonly DoomLoopStrategy[] = [
+  'nudge_then_pause',
+  'pause_immediately',
+  'auto_continue',
+] as const
+
+/** Default matches historical graph behavior (nudge once, then pause). */
+export const DEFAULT_DOOM_LOOP_STRATEGY: DoomLoopStrategy = 'nudge_then_pause'
+
+/**
+ * Parse a raw config string into a strategy, or `undefined` if invalid/absent.
+ * Used by hip-config normalize (omit field) and by {@link resolveDoomLoopStrategy}.
+ */
+export function parseDoomLoopStrategy(
+  strategy?: string | null,
+): DoomLoopStrategy | undefined {
+  if (typeof strategy !== 'string') return undefined
+  return (DOOM_LOOP_STRATEGIES as readonly string[]).includes(strategy)
+    ? (strategy as DoomLoopStrategy)
+    : undefined
+}
+
+/**
+ * Normalize an optional config / GraphCtx value to a valid strategy.
+ * Unknown / empty values fall back to {@link DEFAULT_DOOM_LOOP_STRATEGY}.
+ */
+export function resolveDoomLoopStrategy(
+  strategy?: DoomLoopStrategy | string | null,
+): DoomLoopStrategy {
+  return parseDoomLoopStrategy(strategy ?? undefined) ?? DEFAULT_DOOM_LOOP_STRATEGY
+}
+
 export const DOOM_LOOP_N = 3
 
 /** How many recent EXECUTED batch signatures to retain for the consecutive-repeat check. */
@@ -73,13 +111,36 @@ export function countPathHits(pathHits: readonly string[], key: string): number 
   return n
 }
 
+/**
+ * True when a tool result is a loop-guard "tool error".
+ * Sub-agent pause markers are never errors (A↔B contract).
+ */
+export function isLoopToolError(content: string): boolean {
+  if (isSubagentPausedText(content)) return false
+  return content.startsWith('Error')
+}
+
 /** How many trailing tool results (from the end) look like errors. */
 export function trailingErrorStreak(contents: readonly string[]): number {
   let n = 0
   for (let i = contents.length - 1; i >= 0; i--) {
     const c = contents[i] ?? ''
-    if (typeof c === 'string' && c.startsWith('Error')) n++
+    if (typeof c === 'string' && isLoopToolError(c)) n++
     else break
   }
   return n
+}
+
+/**
+ * Harvest trailing consecutive tool-error strings (for replan prompts).
+ * Stops at the first non-error (including sub-agent pause).
+ */
+export function harvestTrailingToolErrors(contents: readonly string[]): string[] {
+  const errors: string[] = []
+  for (let i = contents.length - 1; i >= 0; i--) {
+    const c = contents[i] ?? ''
+    if (typeof c === 'string' && isLoopToolError(c)) errors.unshift(c)
+    else break
+  }
+  return errors
 }

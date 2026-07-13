@@ -10,6 +10,7 @@ import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 import type { SqliteWorkflowStore } from '../persistence/workflow-store.js'
 import type { Blackboard } from './blackboard.js'
 import { launchResolvedNode } from './node-runner.js'
+import { assertSupportedWorkflowNodes } from './validate.js'
 
 export interface DurableRunOpts {
   runId: string
@@ -31,6 +32,10 @@ export class DurableExecutor {
     ports: OrchestratorPorts,
     opts: DurableRunOpts,
   ): Promise<RunState> {
+    // C-validate: hard-reject tool/human before init/resume work that would strand.
+    // Registry-free — does not run unknown-agent checks (session agentIds are dynamic).
+    assertSupportedWorkflowNodes(def)
+
     // Attempt to recover an existing run
     const existing = await this.store.loadRun(opts.runId)
     let state: RunState

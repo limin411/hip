@@ -69,7 +69,12 @@ vi.mock('@xyflow/react', () => ({
 // Mock CSS imports
 vi.mock('./DagEditor.css', () => ({ default: {} }))
 
-import { DagEditor } from './DagEditor'
+import {
+  DagEditor,
+  DAG_PALETTE_NODE_TYPES,
+  DAG_DEPRECATED_NODE_TYPES,
+  isPaletteNodeType,
+} from './DagEditor'
 import { RunStateOverlay } from './RunStateOverlay'
 
 // ── Test fixtures ──
@@ -224,6 +229,51 @@ describe('DagEditor', () => {
     expect(screen.getByTestId('rf-background')).toBeInTheDocument()
     expect(screen.getByTestId('rf-controls')).toBeInTheDocument()
     expect(screen.getByTestId('rf-minimap')).toBeInTheDocument()
+  })
+
+  it('palette offers only agent, gate, parallel (no tool/human)', () => {
+    render(<DagEditor workflow={minimalWorkflow} />)
+    expect(screen.getByTestId('dag-node-palette')).toBeInTheDocument()
+    for (const type of DAG_PALETTE_NODE_TYPES) {
+      const item = screen.getByTestId(`dag-palette-${type}`)
+      expect(item).toBeInTheDocument()
+      expect(item).toHaveAttribute('data-enabled', 'true')
+      expect(item).toHaveAttribute('data-node-type', type)
+    }
+    expect(screen.queryByTestId('dag-palette-tool')).toBeNull()
+    expect(screen.queryByTestId('dag-palette-human')).toBeNull()
+  })
+
+  it('hides palette when showPalette is false', () => {
+    render(<DagEditor workflow={minimalWorkflow} showPalette={false} />)
+    expect(screen.queryByTestId('dag-node-palette')).toBeNull()
+  })
+
+  it('still projects legacy tool/human nodes even though they are not in the palette', () => {
+    render(<DagEditor workflow={fullWorkflow} />)
+    expect(screen.getByTestId('node-tool-1')).toBeInTheDocument()
+    expect(screen.getByTestId('node-human-1')).toBeInTheDocument()
+    // Palette must still exclude them
+    expect(screen.queryByTestId('dag-palette-tool')).toBeNull()
+    expect(screen.queryByTestId('dag-palette-human')).toBeNull()
+  })
+})
+
+describe('DAG palette type guards', () => {
+  it('DAG_PALETTE_NODE_TYPES is agent/gate/parallel only', () => {
+    expect([...DAG_PALETTE_NODE_TYPES]).toEqual(['agent', 'gate', 'parallel'])
+  })
+
+  it('DAG_DEPRECATED_NODE_TYPES is tool/human', () => {
+    expect([...DAG_DEPRECATED_NODE_TYPES]).toEqual(['tool', 'human'])
+  })
+
+  it('isPaletteNodeType accepts authorable types and rejects deprecated ones', () => {
+    expect(isPaletteNodeType('agent')).toBe(true)
+    expect(isPaletteNodeType('gate')).toBe(true)
+    expect(isPaletteNodeType('parallel')).toBe(true)
+    expect(isPaletteNodeType('tool')).toBe(false)
+    expect(isPaletteNodeType('human')).toBe(false)
   })
 })
 

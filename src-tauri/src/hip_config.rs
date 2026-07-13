@@ -109,6 +109,14 @@ pub(crate) struct PermissionEntry {
     pub(crate) tool_permissions: Option<ToolPermissionConfig>,
 }
 
+/// Optional `[agentLoop]` section (Track A-config). JSON uses camelCase for the UI.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AgentLoopConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) doom_loop_strategy: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -127,6 +135,9 @@ pub(crate) struct HipConfig {
     pub(crate) fixed_agents: Option<HashMap<String, bool>>,
     #[serde(default)]
     pub(crate) permissions: Option<PermissionEntry>,
+    /// Optional agent-loop controls (doom strategy, etc.). Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) agent_loop: Option<AgentLoopConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -260,6 +271,15 @@ pub(crate) struct TomlPermissionEntry {
     pub(crate) tool_permissions: Option<TomlToolPermissionConfig>,
 }
 
+/// TOML mirror for `[agent_loop]` / `[agentLoop]`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlAgentLoopConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "doomLoopStrategy")]
+    pub(crate) doom_loop_strategy: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -279,6 +299,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) fixed_agents: Option<HashMap<String, bool>>,
     #[serde(default)]
     pub(crate) permissions: Option<TomlPermissionEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "agentLoop")]
+    pub(crate) agent_loop: Option<TomlAgentLoopConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -477,6 +499,22 @@ impl From<TomlPermissionEntry> for PermissionEntry {
     }
 }
 
+impl From<AgentLoopConfig> for TomlAgentLoopConfig {
+    fn from(a: AgentLoopConfig) -> Self {
+        TomlAgentLoopConfig {
+            doom_loop_strategy: a.doom_loop_strategy,
+        }
+    }
+}
+
+impl From<TomlAgentLoopConfig> for AgentLoopConfig {
+    fn from(a: TomlAgentLoopConfig) -> Self {
+        AgentLoopConfig {
+            doom_loop_strategy: a.doom_loop_strategy,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -488,6 +526,7 @@ impl From<HipConfig> for TomlHipConfig {
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
+            agent_loop: cfg.agent_loop.map(|x| x.into()),
         }
     }
 }
@@ -503,6 +542,7 @@ impl From<TomlHipConfig> for HipConfig {
             agents: cfg.agents.into_iter().map(|x| x.into()).collect(),
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
+            agent_loop: cfg.agent_loop.map(|x| x.into()),
         }
     }
 }

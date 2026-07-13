@@ -26,8 +26,12 @@ import {
   PATH_HIT_LIMIT,
   PATH_REPEAT_MESSAGE,
   trailingErrorStreak,
+  harvestTrailingToolErrors,
+  isLoopToolError,
   ERROR_STREAK_LIMIT,
   ERROR_STREAK_NUDGE,
+  resolveDoomLoopStrategy,
+  type DoomLoopStrategy,
 } from './doom-loop.js'
 import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import { applySlidingWindow } from './context/sliding-window.js'
@@ -37,6 +41,9 @@ import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { PlanMode } from './plan-mode.js'
 import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
+import { emitLoopSignal, type LoopEventSink } from './loop-events.js'
+// decideReplan only — do not import planner PlanMode (collides with plan-mode.PlanMode).
+import { decideReplan, TurnReplanGuard, REPLAN_ERROR_THRESHOLD } from './planner.js'
 
 function fullPlanReminder(planFilePath: string): string {
   return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
@@ -78,6 +85,12 @@ export interface GraphEmit {
   compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
   /** Optional: signal that work is still progressing (keeps idle watchdog alive during long tools). */
   activity?(): void
+  /**
+   * Optional loop lifecycle sink (Track E / K16).
+   * A/E call via `ctx.emit.loopSignal?.(e)` — **not** on GraphCtx.
+   * Sync, best-effort; implementations must not throw.
+   */
+  loopSignal?: LoopEventSink
 }
 
 /** Per-turn context passed via config.configurable.ctx (keeps the compiled graph reusable). */
@@ -109,8 +122,27 @@ export interface GraphCtx {
   /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
   maxSteps?: number
   planMode?: PlanMode
-  /** Optional circuit breaker that detects stalled agent loops and budget exhaustion. */
+  /**
+   * @experimental Test / harness only. Product session-turn paths never inject.
+   * Optional circuit breaker for stalled-loop / budget experiments. Prefer doom /
+   * error-streak / MAX_STEPS for product loop safety.
+   */
   circuitBreaker?: CircuitBreaker
+  /**
+   * Doom-loop strategy from `HipConfig.agentLoop.doomLoopStrategy`.
+   * When omitted, defaults to `nudge_then_pause` (current behavior).
+   */
+  doomLoopStrategy?: DoomLoopStrategy
+  /**
+   * Turn-local replan guard (max 1 replan per graph invoke).
+   * Created once per invoke if missing; not LangGraph state.
+   */
+  replanGuard?: TurnReplanGuard
+}
+
+/** sessionId + turnId fields shared by every LoopEvent (turnId may be unset on GraphCtx). */
+function loopIds(ctx: GraphCtx): { sessionId: string; turnId: string } {
+  return { sessionId: ctx.sessionId, turnId: ctx.turnId ?? '' }
 }
 
 const LoopState = Annotation.Root({
@@ -138,6 +170,23 @@ function ctxOf(config: LangGraphRunnableConfig): GraphCtx {
   const ctx = (config.configurable as { ctx?: GraphCtx } | undefined)?.ctx
   if (!ctx) throw new Error('graph invoked without configurable.ctx')
   return ctx
+}
+
+/** Turn-local guard: create once per GraphCtx if the caller did not inject one. */
+function getReplanGuard(ctx: GraphCtx): TurnReplanGuard {
+  if (!ctx.replanGuard) ctx.replanGuard = new TurnReplanGuard()
+  return ctx.replanGuard
+}
+
+/** Tool results from the most recent AI→tools batch (walks back until AIMessage). */
+function collectRecentToolContents(state: State): string[] {
+  const out: string[] = []
+  for (let i = state.messages.length - 1; i >= 0; i--) {
+    const m = state.messages[i]
+    if (m instanceof ToolMessage) out.unshift(String(m.content))
+    else if (m instanceof AIMessage) break
+  }
+  return out
 }
 
 /** Scan the last AIMessage's tool_calls and return IDs without a matching ToolMessage in the message history. */
@@ -313,6 +362,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
           ) ?? false
           const decision = ctx.circuitBreaker.step(tokensUsed, hadFileWrite)
           if (decision.action === 'terminate') {
+            emitLoopSignal(emit.loopSignal, {
+              type: 'loop.end',
+              ...loopIds(ctx),
+              reason: 'circuit_breaker',
+            })
             return {
               messages: [new AIMessage(`CIRCUIT BREAKER TRIPPED: ${decision.reason}\n\nTerminating execution.`)],
               steps: state.steps + 1,
@@ -550,64 +604,170 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
   }
 
-  /** Corrective note after the Nth identical batch or error streak. */
-  function nudge(state: State): Partial<State> {
-    const recentToolContents: string[] = []
-    for (let i = state.messages.length - 1; i >= 0 && recentToolContents.length < ERROR_STREAK_LIMIT; i--) {
-      const m = state.messages[i]
-      if (m instanceof ToolMessage) recentToolContents.unshift(String(m.content))
-      else if (m instanceof AIMessage) break
+  /**
+   * Corrective note after doom or error-streak.
+   * Priority MUST match routeAfterTools: doom > error-streak, so nudgedSig
+   * latches the same key the router uses for pause on the next identical batch.
+   */
+  function nudge(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const recentToolContents = collectRecentToolContents(state)
+    const lastSig = state.recentSigs[state.recentSigs.length - 1]
+    const isDoom =
+      lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    if (isDoom) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.nudge',
+        ...loopIds(ctx),
+        reason: 'doom',
+      })
+      return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
     }
     if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.nudge',
+        ...loopIds(ctx),
+        reason: 'error_streak',
+      })
       return { messages: [new SystemMessage(ERROR_STREAK_NUDGE)], nudgedSig: 'error-streak' }
     }
-    return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: state.recentSigs[state.recentSigs.length - 1] }
+    // Fallback: doom-shaped nudge (route only sends us here for doom/streak).
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.nudge',
+      ...loopIds(ctx),
+      reason: 'doom',
+    })
+    return { messages: [new SystemMessage(DOOM_LOOP_NUDGE)], nudgedSig: lastSig }
+  }
+
+  /**
+   * Reactive replan (Track A): inject buildReplanPrompt once per turn.
+   * Does NOT set nudgedSig — preserves error-streak machine for post-replan failures.
+   */
+  function replanNode(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const guard = getReplanGuard(ctx)
+    const errors = harvestTrailingToolErrors(collectRecentToolContents(state))
+    const decision = decideReplan(errors, guard)
+    if (decision.replan && decision.prompt) {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.replan',
+        ...loopIds(ctx),
+        reason: decision.reason,
+      })
+      return { messages: [new SystemMessage(decision.prompt)] }
+    }
+    return {}
   }
 
   /** Stop the turn pending user input (Option Z: session.ts reads this and emits agent:interrupt). */
-  function pause(_state: State): Partial<State> {
-    return { status: 'awaiting_user', pendingQuestion: PAUSE_QUESTION }
+  function pause(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const question = PAUSE_QUESTION
+    const lastSig = state.recentSigs[state.recentSigs.length - 1]
+    const isDoomPause =
+      lastSig !== undefined &&
+      state.nudgedSig === lastSig &&
+      trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.pause',
+      ...loopIds(ctx),
+      question,
+      ...(isDoomPause ? { kind: 'doom' as const } : {}),
+    })
+    return { status: 'awaiting_user', pendingQuestion: question }
   }
 
-  function planPause(state: State): Partial<State> {
-    return { status: 'awaiting_user', pendingQuestion: 'Review the plan above. Approve, reject, or suggest changes.' }
+  function planPause(_state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    const question = 'Review the plan above. Approve, reject, or suggest changes.'
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.pause',
+      ...loopIds(ctx),
+      question,
+      kind: 'plan',
+    })
+    return { status: 'awaiting_user', pendingQuestion: question }
   }
 
   function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
-    const stepCap = ctxOf(config).maxSteps ?? maxSteps
-    return wantsTools && state.steps < stepCap ? 'tools' : END
+    const ctx = ctxOf(config)
+    const stepCap = ctx.maxSteps ?? maxSteps
+    if (wantsTools && state.steps < stepCap) return 'tools'
+    // Terminal (not via pause node). Skip if status already terminal — e.g. circuit breaker
+    // emitted loop.end at trip time; pause/planPause emit loop.pause and end via their edges.
+    if (state.status !== 'awaiting_user') {
+      emitLoopSignal(ctx.emit.loopSignal, {
+        type: 'loop.end',
+        ...loopIds(ctx),
+        reason: wantsTools ? 'max_steps' : 'completed',
+      })
+    }
+    return END
   }
 
-  function routeAfterTools(state: State): 'nudge' | 'pause' | 'compact' | 'planPause' | typeof END {
+  /**
+   * Decision table (Track A §A.2.2): priority doom > replan > error-streak.
+   * Same tools→route cycle injects at most one corrective path.
+   */
+  function routeAfterTools(
+    state: State,
+    config: LangGraphRunnableConfig,
+  ): 'replan' | 'nudge' | 'pause' | 'compact' | 'planPause' | typeof END {
     if (state.planStatus === 'ready') return 'planPause'
     if (state.planningMode === 'plan' && state.planStatus === 'approved') {
-      const hasToolFailure = state.messages.some((m) => m instanceof ToolMessage && m.content.toString().startsWith('Error'))
+      const hasToolFailure = state.messages.some((m) => {
+        if (!(m instanceof ToolMessage)) return false
+        const c = m.content.toString()
+        return isLoopToolError(c)
+      })
       if (hasToolFailure) {
         return 'pause'
       }
       const plan = state.plan ?? []
       const allCompleted = plan.length > 0 && plan.every((item) => item.status === 'completed')
       if (allCompleted) {
+        const ctx = ctxOf(config)
+        emitLoopSignal(ctx.emit.loopSignal, {
+          type: 'loop.end',
+          ...loopIds(ctx),
+          reason: 'completed',
+        })
         return END
       }
     }
-    // LoopGuard v2: consecutive tool errors → nudge (text-only wrap-up).
-    const recentToolContents: string[] = []
-    for (let i = state.messages.length - 1; i >= 0 && recentToolContents.length < ERROR_STREAK_LIMIT; i--) {
-      const m = state.messages[i]
-      if (m instanceof ToolMessage) recentToolContents.unshift(String(m.content))
-      else if (m instanceof AIMessage) break
+
+    const recentToolContents = collectRecentToolContents(state)
+    const trailingErrors = harvestTrailingToolErrors(recentToolContents)
+    const lastSig = state.recentSigs[state.recentSigs.length - 1]
+    const isDoom =
+      lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    const doomStrategy = resolveDoomLoopStrategy(ctxOf(config).doomLoopStrategy)
+
+    // 1) Doom first (more specific than generic error replan).
+    // Strategies: nudge_then_pause (default) | pause_immediately | auto_continue (fall through).
+    if (isDoom) {
+      if (doomStrategy === 'pause_immediately') return 'pause'
+      if (doomStrategy === 'nudge_then_pause') {
+        return state.nudgedSig === lastSig ? 'pause' : 'nudge'
+      }
+      // auto_continue: skip doom corrective path; replan / error-streak may still apply.
     }
+
+    // 2) Replan once when trailing errors ≥ threshold and guard allows.
+    const guard = getReplanGuard(ctxOf(config))
+    if (trailingErrors.length >= REPLAN_ERROR_THRESHOLD && guard.canReplan()) {
+      return 'replan'
+    }
+
+    // 3) After replan (or when replan unavailable): error-streak nudge then pause.
     if (trailingErrorStreak(recentToolContents) >= ERROR_STREAK_LIMIT) {
       const errSig = 'error-streak'
       return state.nudgedSig === errSig ? 'pause' : 'nudge'
     }
-    const lastSig = state.recentSigs[state.recentSigs.length - 1]
-    if (lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N) {
-      return state.nudgedSig === lastSig ? 'pause' : 'nudge'
-    }
+
     return 'compact'
   }
 
@@ -615,6 +775,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addNode('compact', compactNode)
     .addNode('agent', agent)
     .addNode('tools', toolsNode)
+    .addNode('replan', replanNode)
     .addNode('nudge', nudge)
     .addNode('pause', pause)
     .addNode('planPause', planPause)
@@ -622,7 +783,15 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addEdge('compact', 'agent')
     .addEdge('planPause', END)
     .addConditionalEdges('agent', routeAfterAgent, { tools: 'tools', [END]: END })
-    .addConditionalEdges('tools', routeAfterTools, { nudge: 'nudge', pause: 'pause', compact: 'compact', planPause: 'planPause', [END]: END })
+    .addConditionalEdges('tools', routeAfterTools, {
+      replan: 'replan',
+      nudge: 'nudge',
+      pause: 'pause',
+      compact: 'compact',
+      planPause: 'planPause',
+      [END]: END,
+    })
+    .addEdge('replan', 'agent')
     .addEdge('nudge', 'agent')
     .addEdge('pause', END)
     .compile()

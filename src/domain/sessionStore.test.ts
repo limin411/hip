@@ -311,6 +311,15 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'session:orchMode', sessionId: 's1', orchMode: 'dag' }, 0)
     expect(next.sessions[0].config.orchMode).toBe('dag')
   })
+  it('session:orchMode with ignoredForTurnRouting still updates stored orchMode only', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(
+      s0,
+      { type: 'session:orchMode', sessionId: 's1', orchMode: 'dag', ignoredForTurnRouting: true },
+      0,
+    )
+    expect(next.sessions[0].config.orchMode).toBe('dag')
+  })
   it('session:orchMode for an unknown session is a no-op', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:orchMode', sessionId: 'nope', orchMode: 'dag' }, 0)
@@ -465,6 +474,22 @@ describe('applyServerMessage', () => {
     const next = applyServerMessage(s0, { type: 'agent:notification', sessionId: 's1', taskId: 'bg-2', description: 'build', status: 'failed', error: 'exit 1' }, 1000)
     expect(next.sessions[0].messages).toHaveLength(1)
     expect(next.sessions[0].messages[0].content).toBe('[Background task "build" failed: exit 1]')
+  })
+
+  it('agent:notification appends a synthetic assistant message for killed background tasks', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, {
+      type: 'agent:notification',
+      sessionId: 's1',
+      taskId: 'bg-3',
+      description: 'slow job',
+      status: 'killed',
+      error: 'killed by user: cancel',
+    }, 1000)
+    expect(next.sessions[0].messages).toHaveLength(1)
+    expect(next.sessions[0].messages[0].content).toBe(
+      '[Background task "slow job" killed: killed by user: cancel]',
+    )
   })
 
   it('agent:notification for an unknown session is a no-op', () => {

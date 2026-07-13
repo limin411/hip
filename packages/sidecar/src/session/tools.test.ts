@@ -230,6 +230,34 @@ describe('task tool gating (depth-1)', () => {
     expect(outBg).toBe('done: bg task')
     expect(calls[1]).toEqual({ desc: 'bg task', mode: 'background' })
   })
+
+  it('passes pause marker results through task without rewriting as empty-output Error', async () => {
+    const { formatPausedToolResult } = await import('./subagent-result.js')
+    const paused = formatPausedToolResult('Need path?', 'partial progress')
+    const spawn = async () => paused
+    const tools = buildTools(root, spawn)
+    const task = tools.find((t) => t.name === 'task')
+    expect(task).toBeDefined()
+    const out = String(await task!.invoke({ description: 'blocked' }))
+    expect(out).toBe(paused)
+    expect(out).toMatch(/^\[hip:subagent_paused\]/)
+    expect(out).not.toMatch(/produced empty output/)
+  })
+
+  it('passes pause marker results through dispatch_agent without rewrite', async () => {
+    const { formatPausedToolResult } = await import('./subagent-result.js')
+    const paused = formatPausedToolResult('Approve?', 'looked around')
+    const tools = buildTools(root, async () => 'unused', undefined, {
+      agents: [{ id: 'researcher', name: 'Researcher', description: 'research' }],
+      run: async () => paused,
+      signal: new AbortController().signal,
+    })
+    const dispatch = tools.find((t) => t.name === 'dispatch_agent')
+    expect(dispatch).toBeDefined()
+    const out = String(await dispatch!.invoke({ agent: 'researcher', task: 'find x' }))
+    expect(out).toBe(paused)
+    expect(out).not.toMatch(/produced empty output/)
+  })
 })
 
 describe('git tools (cwd-gated)', () => {

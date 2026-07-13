@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { DispatchSpec } from './helpers.js'
 import { SubagentBatch } from '../subagent-batch.js'
 import type { RunSubagentFn } from '../orchestrator-adapter.js'
-import { isUselessSubagentText } from '../subagent-result.js'
+import { isSubagentPausedText, isUselessSubagentText } from '../subagent-result.js'
 
 export interface SubagentTools {
   task: StructuredToolInterface | null
@@ -25,6 +25,8 @@ export function buildSubagentTools(
   const task = tool(
     async ({ description, mode }) => {
       const result = await spawnSubagent(description, mode)
+      // Pause is a distinct outcome — pass through; do not rewrite as empty-success error.
+      if (isSubagentPausedText(result)) return result
       if (isUselessSubagentText(result)) {
         return (
           'Error: sub-agent produced empty output. ' +
@@ -108,6 +110,8 @@ export function buildSubagentTools(
   const dispatchAgent = tool(
     async ({ agent, task: t }) => {
       const result = await dispatch.run(agent, t, dispatch.signal)
+      // Pause is a distinct outcome — pass through; do not rewrite as empty-success error.
+      if (isSubagentPausedText(result)) return result
       if (isUselessSubagentText(result)) {
         return (
           'Error: dispatched agent produced empty output. ' +
@@ -136,6 +140,10 @@ export function buildSubagentTools(
 /**
  * Build the task_batch tool that dispatches multiple subagent tasks in parallel.
  * Returns an empty array when spawnSubagent is not provided (same guard as task/dispatchAgent).
+ *
+ * Each task line is `[id] ${text}`. Pause detection accepts that prefix on the first line
+ * (`isSubagentPausedText`), so a single-task (or first-task) pause remains detectable on the
+ * aggregate ToolMessage. Multi-task pause on a non-first segment still needs per-segment scan (B4).
  */
 export function buildTaskBatchTools(
   spawnSubagent?: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>,
@@ -156,6 +164,8 @@ export function buildTaskBatchTools(
       return results
         .map((r) => {
           if (r.error) return `[${r.id}] Error: ${r.error}`
+          // Per-task text may already be a pause marker; keep `[id] ` prefix for grouping.
+          // isSubagentPausedText accepts the prefix on the first line.
           return `[${r.id}] ${r.text}`
         })
         .join('\n\n')

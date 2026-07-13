@@ -78,6 +78,19 @@ function spyRunner(): { runner: ModelRunner; seen: () => string[] } {
   }
 }
 
+/** Scripted ModelRunner that returns each AIMessage in order (for doom-loop pause). */
+function scriptRunner(script: AIMessage[]): ModelRunner {
+  let i = 0
+  return {
+    async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
+      opts.signal?.throwIfAborted?.()
+      const m = script[Math.min(i, script.length - 1)]; i++
+      if (typeof m.content === 'string' && m.content) opts.onText(m.content)
+      return m
+    },
+  }
+}
+
 describe('runManagedAgent', () => {
   it('runs the loop with the injected runner and returns the final text', async () => {
     const cwd = tmp()
@@ -90,6 +103,22 @@ describe('runManagedAgent', () => {
     })
     expect(text).toBe('done')
     expect(tokens.join('')).toBe('done')
+  })
+
+  it('returns first-line [hip:subagent_paused] when the child pauses (awaiting_user)', async () => {
+    const cwd = tmp()
+    // Repeat identical tool call to trip doom-loop → nudge → pause (see graph.test.ts / subagent.test.ts).
+    const loop = () => new AIMessage({ content: '部分进展', tool_calls: [{ name: 'ls', args: { path: '/' }, id: 'x' }] })
+    const text = await runManagedAgent({
+      resolved: null, cwd, prompt: 'You are a tester.',
+      task: 'loops', emit: collectingEmit().emit, signal: new AbortController().signal, childMaxSteps: 15,
+      runner: scriptRunner([loop(), loop(), loop(), loop(), loop()]),
+      summarizer: { async summarize() { return '' } },
+    })
+    expect(text).toContain('部分进展')
+    expect(text).toMatch(/^\[hip:subagent_paused\]/)
+    expect(text).not.toMatch(/sub-agent paused — open question/)
+    expect(text).not.toMatch(/^Error: sub-agent paused/)
   })
 })
 

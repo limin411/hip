@@ -328,6 +328,16 @@ describe('Session orchMode', () => {
     expect(session.config.orchMode).toBe('dag')
   })
 
+  it('setOrchMode does not imply pendingWorkflowDef', () => {
+    const session = new Session('test-om-no-pending', { ...testConfig, orchMode: 'fast' })
+    expect(session.pendingWorkflowDef).toBeNull()
+    expect(session.setOrchMode('dag')).toBe(true)
+    expect(session.orchMode).toBe('dag')
+    expect(session.config.orchMode).toBe('dag')
+    // Deprecated orchMode is storage-only; workflow turns require explicit pending def.
+    expect(session.pendingWorkflowDef).toBeNull()
+  })
+
   it('setPendingWorkflowDef stores and clears the pending def', () => {
     const session = new Session('test-om-pending', { ...testConfig, orchMode: 'dag' })
     const def = {

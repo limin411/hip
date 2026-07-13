@@ -197,6 +197,56 @@ describe('runWorkflowTurn lifecycle hooks', () => {
   })
 })
 
+describe('runWorkflowTurn C-validate tool/human reject', () => {
+  it('tool def → INVALID_WORKFLOW error, no workflow:started, does not call runWorkflow', async () => {
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-tool',
+      name: 'Tool Reject',
+      nodes: [
+        { id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'x' },
+        { id: 't1', type: 'tool', toolName: 'bash', inputTemplate: 'ls' },
+      ],
+      edges: [{ from: 'n1', to: 't1' }],
+      entry: ['n1'],
+    }
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const sent: ServerMessage[] = []
+    const result = await runWorkflowTurn(deps, def, (m) => sent.push(m), (_s, _t, text) => text)
+
+    expect(runWorkflowMock).not.toHaveBeenCalled()
+    expect(sent.some((m) => m.type === 'workflow:started')).toBe(false)
+    const err = sent.find((m) => m.type === 'error') as { type: 'error'; code?: string; message?: string } | undefined
+    expect(err?.code).toBe('INVALID_WORKFLOW')
+    expect(err?.message).toMatch(/tool/)
+    expect(result).toMatch(/invalid workflow/i)
+  })
+
+  it('human def → INVALID_WORKFLOW error, no workflow:started', async () => {
+    const deps = makeDeps()
+    const def: WorkflowDef = {
+      id: 'wf-human',
+      name: 'Human Reject',
+      nodes: [
+        { id: 'n1', type: 'agent', agentId: 'worker', inputTemplate: 'x' },
+        { id: 'h1', type: 'human', question: 'ok?' },
+      ],
+      edges: [{ from: 'n1', to: 'h1' }],
+      entry: ['n1'],
+    }
+    const { runWorkflowTurn } = await import('./workflow-runner.js')
+    const sent: ServerMessage[] = []
+    const result = await runWorkflowTurn(deps, def, (m) => sent.push(m), (_s, _t, text) => text)
+
+    expect(runWorkflowMock).not.toHaveBeenCalled()
+    expect(sent.some((m) => m.type === 'workflow:started')).toBe(false)
+    const err = sent.find((m) => m.type === 'error') as { type: 'error'; code?: string; message?: string } | undefined
+    expect(err?.code).toBe('INVALID_WORKFLOW')
+    expect(err?.message).toMatch(/human/)
+    expect(result).toMatch(/invalid workflow/i)
+  })
+})
+
 describe('runWorkflowTurn runInputs', () => {
   it('forwards opts.runInputs to runWorkflow', async () => {
     runWorkflowMock.mockImplementation(async (_def: unknown, _ports: unknown, opts: { runId: string; runInputs?: { text: string } }) => {

@@ -7,8 +7,44 @@ import {
   countPathHits,
   normalizeToolPath,
   trailingErrorStreak,
+  harvestTrailingToolErrors,
+  isLoopToolError,
   PATH_HIT_LIMIT,
+  resolveDoomLoopStrategy,
+  parseDoomLoopStrategy,
+  DEFAULT_DOOM_LOOP_STRATEGY,
+  DOOM_LOOP_STRATEGIES,
 } from './doom-loop.js'
+import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
+
+describe('resolveDoomLoopStrategy', () => {
+  it('defaults to nudge_then_pause', () => {
+    expect(DEFAULT_DOOM_LOOP_STRATEGY).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy()).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy(undefined)).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy(null)).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('')).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('bogus')).toBe('nudge_then_pause')
+  })
+
+  it('passes through valid strategies', () => {
+    expect(resolveDoomLoopStrategy('nudge_then_pause')).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('pause_immediately')).toBe('pause_immediately')
+    expect(resolveDoomLoopStrategy('auto_continue')).toBe('auto_continue')
+  })
+
+  it('parseDoomLoopStrategy omits invalid (config-normalize semantics)', () => {
+    expect(parseDoomLoopStrategy(undefined)).toBeUndefined()
+    expect(parseDoomLoopStrategy(null)).toBeUndefined()
+    expect(parseDoomLoopStrategy('bogus')).toBeUndefined()
+    expect(parseDoomLoopStrategy('pause_immediately')).toBe('pause_immediately')
+    expect(DOOM_LOOP_STRATEGIES).toEqual([
+      'nudge_then_pause',
+      'pause_immediately',
+      'auto_continue',
+    ])
+  })
+})
 
 describe('doom-loop signatures', () => {
   it('identical calls produce identical signatures', () => {
@@ -53,5 +89,20 @@ describe('doom-loop signatures', () => {
     expect(trailingErrorStreak(['ok', 'Error: a', 'Error: b'])).toBe(2)
     expect(trailingErrorStreak(['Error: a', 'ok', 'Error: b'])).toBe(1)
     expect(trailingErrorStreak(['Error: a', 'Error: b', 'Error: c'])).toBe(3)
+  })
+
+  it('trailingErrorStreak excludes subagent pause markers', () => {
+    const paused = `${SUBAGENT_PAUSE_MARKER} Which API?`
+    expect(trailingErrorStreak([paused, paused])).toBe(0)
+    expect(trailingErrorStreak(['Error: a', paused])).toBe(0)
+    expect(trailingErrorStreak(['Error: a', 'Error: b', paused])).toBe(0)
+    expect(isLoopToolError(paused)).toBe(false)
+    expect(isLoopToolError('Error: boom')).toBe(true)
+  })
+
+  it('harvestTrailingToolErrors collects trailing errors for replan prompts', () => {
+    expect(harvestTrailingToolErrors(['ok', 'Error: a', 'Error: b'])).toEqual(['Error: a', 'Error: b'])
+    expect(harvestTrailingToolErrors([`${SUBAGENT_PAUSE_MARKER} q`, 'Error: x'])).toEqual(['Error: x'])
+    expect(harvestTrailingToolErrors([`${SUBAGENT_PAUSE_MARKER} q`])).toEqual([])
   })
 })

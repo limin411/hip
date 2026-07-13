@@ -2,6 +2,7 @@ import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langc
 import type { PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools, type ApprovalFn } from './tools.js'
 import type { NetworkPolicy } from './network-policy.js'
@@ -9,7 +10,10 @@ import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
 import { recursionLimit, MAX_DEPTH } from './loop-control.js'
+import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { childSystemPrompt } from './system-prompt.js'
+import { formatPausedToolResult } from './subagent-result.js'
+import { linkSubagentParentObservation, type TraceObservation } from './trace-export.js'
 
 const NOOP_EMIT: GraphEmit = {
   token: () => {},
@@ -59,10 +63,19 @@ export interface RunSubagentArgs {
   runId?: string
   nodeId?: string
   agentId?: string
+  /**
+   * Parent agent id for observation / hook framing (who delegated this run).
+   * Propagated to GraphCtx and recorded as TraceObservation.parentId (E2).
+   */
   parentAgentId?: string
   /** Current delegation depth. 0 for top-level session, increments with each `task` delegation.
    *  At depth >= MAX_DEPTH, task/task_batch/dispatch_agent tools are filtered. */
   depth?: number
+  /**
+   * Optional observation collector (E2). When set, each spawn records a parent-linked
+   * span into this sink for JSONL export. Product path leaves this unset.
+   */
+  onObservation?: (o: TraceObservation) => void
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
@@ -84,8 +97,8 @@ export function lastAiText(messages: BaseMessage[]): string {
  *
  * - Shares the parent cwd (`root`) and the parent AbortSignal (cancel propagates into the child stream).
  * - Capped at `childMaxSteps` (independent of the parent MAX_STEPS).
- * - If the child would HITL-pause (status === 'awaiting_user'), it does NOT escalate: returns its
- *   partial assistant text with the pending question appended as context (P3-D3, no agent:interrupt).
+ * - If the child would HITL-pause (status === 'awaiting_user'), it does NOT escalate (no agent:interrupt):
+ *   returns first-line `[hip:subagent_paused] <question>` plus optional partial body (P3-D3).
  * - Depth-aware: when currentDepth < MAX_DEPTH, the child gets `task`/`task_batch` tools for
  *   recursive delegation. At depth >= MAX_DEPTH, those tools are filtered out.
  */
@@ -94,19 +107,44 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     runner, root, summarizer, emit, signal, description, childMaxSteps,
     permissionMode, requestApproval, existingMessages, mode, sessionId,
     networkPolicy, toolOutputStore, guardianReviewer, hooks,
-    turnId, runId, nodeId, agentId, parentAgentId,
+    turnId, runId, nodeId, agentId, parentAgentId, onObservation,
   } = args
   const currentDepth = args.depth ?? 0
+  const childAgentId = agentId ?? 'worker'
+
+  // E2: parent observation link (debug-logger + optional collector).
+  // Spawn is a span with parentId = parentAgentId — not a LoopEvent (E0 frozen).
+  // Lifecycle LoopEvents go through GraphEmit.loopSignal separately if wired.
+  linkSubagentParentObservation(
+    {
+      sessionId: sessionId ?? 'subagent',
+      turnId,
+      runId,
+      agentId: childAgentId,
+      parentAgentId,
+      task: description,
+      depth: currentDepth,
+      mode: mode ?? 'foreground',
+    },
+    { collect: onObservation },
+  )
 
   // Create a spawn function for recursive delegation that increments depth on each call.
+  // Parent observation link: child.parentAgentId = this agent (not the grandparent).
+  // Per-parent counter keeps sibling agentIds unique at the same depth.
+  let nestSeq = 0
   const childSpawn = async (desc: string, submode?: 'foreground' | 'background'): Promise<string> => {
+    const seq = nestSeq++
     return runSubagent({
       ...args,
       depth: currentDepth + 1,
       description: desc,
       mode: submode,
       existingMessages: undefined, // each delegation is a fresh sub-agent
-      // hooks / frame fields stay on ...args so children share the session registry
+      parentAgentId: childAgentId,
+      // unique per sibling: parent:d{depth}.{seq}
+      agentId: `${childAgentId}:d${currentDepth + 1}.${seq}`,
+      // hooks / onObservation stay on ...args so children share the session registry
     })
   }
 
@@ -121,6 +159,10 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     const blocked = new Set(['task', 'task_batch', 'dispatch_agent'])
     tools = tools.filter((t) => !blocked.has(t.name))
   }
+  // Inherit doom strategy from effective hip.toml (same as parent turn path).
+  const doomLoopStrategy = resolveDoomLoopStrategy(
+    resolveEffectiveConfig(root).agentLoop?.doomLoopStrategy,
+  )
   const ctx: GraphCtx = {
     runner,
     tools,
@@ -131,12 +173,13 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     turnId,
     runId,
     nodeId,
-    agentId: agentId ?? 'worker',
+    agentId: childAgentId,
     parentAgentId,
     toolOutputStore,
     guardianReviewer,
     requestApproval,
     permissionMode,
+    doomLoopStrategy,
   }
   const app = buildGraph(childMaxSteps)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0
@@ -155,7 +198,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {
     const q = final.pendingQuestion
-    return q ? `${text}\n\n[sub-agent paused — open question: ${q}]` : text
+    return q ? formatPausedToolResult(q, text) : text
   }
   return text
 }

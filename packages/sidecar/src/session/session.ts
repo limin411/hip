@@ -120,8 +120,9 @@ export class Session {
   private readonly injectedRunner?: ModelRunner
   _config: SessionConfig
   private readonly injectedModel?: BaseLanguageModel
+  /** @deprecated Stored for compat; product turn routing ignores this (see setOrchMode). */
   orchMode: OrchestrationMode
-  /** When set, the next runTurn in 'dag' mode delegates to the workflow runner. */
+  /** When set, the next runTurn delegates to the workflow runner (independent of orchMode). */
   pendingWorkflowDef: WorkflowDef | null = null
   private readonly messages: BaseMessage[] = []
   private abortController: AbortController | null = null
@@ -487,19 +488,20 @@ export class Session {
   setSystemPrompt(systemPrompt: string | null): boolean { return this.configMgr.setSystemPrompt(systemPrompt) }
   /**
    * @deprecated Product path ignores orchMode for turn routing (agent-driven orchestration).
-   * Still persists the field for old clients; does not change runTurn behavior.
+   * Still persists the field for old clients; does not change runTurn behavior and does not
+   * set pendingWorkflowDef. Prefer explicit pendingWorkflowDef / workflow:run for DAG.
    */
   setOrchMode(orchMode: OrchestrationMode): boolean {
     if (this.running) return false
     const changed = this.orchMode !== orchMode
     this._config = { ...this._config, orchMode }
     this.orchMode = orchMode
-    // Sprint C: log once-style deprecation when clients still call setOrchMode.
+    // Deprecation notice when clients still call setOrchMode (stored, ignored for routing).
     if (changed) {
       try {
         // Lazy import avoid circular — use console when logger not available at top.
         console.debug?.(
-          `[hip] session:setOrchMode is deprecated; orchMode=${orchMode} is stored but does not force workflow turns`,
+          `[hip] session:setOrchMode is deprecated; orchMode=${orchMode} is stored but ignored for turn routing (does not set pendingWorkflowDef)`,
         )
       } catch {
         /* ignore */

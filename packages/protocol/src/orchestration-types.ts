@@ -2,8 +2,13 @@
 export type NodeId = string
 
 // ── 编排模式 ──
-/** Per-session orchestration mode. 'fast' uses the existing single-agent
- *  StateGraph loop. 'dag' runs the workflow orchestrator. */
+/**
+ * Per-session orchestration mode field (compat storage only).
+ * @deprecated Product path ignores orchMode for turn routing (agent-driven orchestration).
+ * Kept for session JSON / `session:setOrchMode` WS compatibility. Prefer explicit
+ * `pendingWorkflowDef` / `workflow:run` for DAG. Historical meaning: 'fast' = ReAct,
+ * 'dag' = workflow orchestrator — routing no longer keys off this.
+ */
 export type OrchestrationMode = 'fast' | 'dag'
 
 // ── 并行合并策略 ──
@@ -16,7 +21,12 @@ export type VerificationGateKind = 'typecheck' | 'lint' | 'test' | 'script'
 
 // ── 扩展的工作流节点类型 ──
 
-/** Execute a specific tool directly (not via LLM agent). */
+/**
+ * Execute a specific tool directly (not via LLM agent).
+ * @deprecated Rejected by `validateWorkflow` (unsupported-node). No executor
+ * launch path. Prefer agent tools. C-shrink may hard-delete this type after
+ * the deprecate window.
+ */
 export interface ToolNode {
   type: 'tool'
   id: NodeId
@@ -25,7 +35,10 @@ export interface ToolNode {
   inputTemplate: string
 }
 
-/** Fan-out sub-DAGs that execute in parallel. */
+/**
+ * Fan-out sub-DAGs that execute in parallel.
+ * Fully supported: structural in validate; merge strategies (all/any/vote) in reduce.
+ */
 export interface ParallelNode {
   type: 'parallel'
   id: NodeId
@@ -42,7 +55,12 @@ export interface GateNode {
   config?: Record<string, unknown>
 }
 
-/** Pause execution and require human input before continuing. */
+/**
+ * Pause execution and require human input before continuing.
+ * @deprecated Rejected by `validateWorkflow` (unsupported-node). No executor
+ * launch path. Prefer ReAct planPause / agent:interrupt for HITL. C-shrink
+ * may hard-delete this type after the deprecate window.
+ */
 export interface HumanNode {
   type: 'human'
   id: NodeId

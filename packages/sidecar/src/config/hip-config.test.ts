@@ -365,6 +365,83 @@ enabled = true
 // resolveEffectiveConfig
 // ──────────────────────────────────────────────────────────────
 
+// ──────────────────────────────────────────────────────────────
+// agentLoop section
+// ──────────────────────────────────────────────────────────────
+
+describe('agentLoop config', () => {
+  it('parses camelCase [agentLoop] with step budgets and hitl placeholder', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[agentLoop]
+childMaxSteps = 25
+exploreChildMaxSteps = 40
+subagentHitl = "inline_partial"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({
+      childMaxSteps: 25,
+      exploreChildMaxSteps: 40,
+      subagentHitl: 'inline_partial',
+    })
+  })
+
+  it('normalizes snake_case agent_loop keys', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[agent_loop]
+child_max_steps = 10
+explore_child_max_steps = 20
+subagent_hitl = "inline_partial"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({
+      childMaxSteps: 10,
+      exploreChildMaxSteps: 20,
+      subagentHitl: 'inline_partial',
+    })
+  })
+
+  it('drops unsupported subagentHitl values (placeholder accepts only inline_partial)', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[agentLoop]
+childMaxSteps = 8
+subagentHitl = "escalate"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ childMaxSteps: 8 })
+    expect(cfg.agentLoop?.subagentHitl).toBeUndefined()
+  })
+
+  it('project agentLoop replaces global agentLoop', () => {
+    const dir = tmpDir()
+    const globalFile = writeToml(dir, 'global.toml', `version = 1
+
+[agentLoop]
+childMaxSteps = 25
+exploreChildMaxSteps = 40
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const { root } = setupProjectDir()
+    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
+
+[agentLoop]
+childMaxSteps = 5
+`)
+
+    const cfg = resolveEffectiveConfig(root)
+    expect(cfg.agentLoop).toEqual({ childMaxSteps: 5 })
+  })
+})
+
 describe('resolveEffectiveConfig', () => {
   it('returns defaults when no config files exist anywhere', () => {
     delete process.env.HIP_CONFIG_PATH
@@ -425,4 +502,68 @@ enabled = true
     expect(cfg.providers![0]).toMatchObject({ id: 'openai' })
   })
 
+  it('project agentLoop replaces global agentLoop wholesale', () => {
+    const dir = tmpDir()
+    const globalFile = writeToml(dir, 'global.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "nudge_then_pause"
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const { root } = setupProjectDir()
+    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "pause_immediately"
+`)
+
+    const cfg = resolveEffectiveConfig(root)
+    expect(cfg.agentLoop?.doomLoopStrategy).toBe('pause_immediately')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────
+// agentLoop section (Track A-config)
+// ──────────────────────────────────────────────────────────────
+
+describe('agentLoop config', () => {
+  it('parses camelCase [agentLoop] doomLoopStrategy', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "pause_immediately"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ doomLoopStrategy: 'pause_immediately' })
+  })
+
+  it('parses snake_case [agent_loop] doom_loop_strategy', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agent_loop]
+doom_loop_strategy = "auto_continue"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ doomLoopStrategy: 'auto_continue' })
+  })
+
+  it('drops invalid doomLoopStrategy values', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "not_a_real_strategy"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({})
+    expect(cfg.agentLoop?.doomLoopStrategy).toBeUndefined()
+  })
+
+  it('omits agentLoop when section is absent', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().agentLoop).toBeUndefined()
+  })
 })

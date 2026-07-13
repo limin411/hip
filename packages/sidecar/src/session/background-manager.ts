@@ -48,8 +48,12 @@ export class BackgroundTaskPersistence {
     appendFileSync(this.outputPath(sessionId, taskId), chunk, 'utf8')
   }
 
-  /** Write the final meta marker (status, result, error) so a reconciled session can see the outcome. */
-  flushMeta(sessionId: string, taskId: string, meta: { status: string; result?: string; error?: string }): void {
+  /** Write the meta marker (status, description, result, error) so a reconciled session can see the outcome. */
+  flushMeta(
+    sessionId: string,
+    taskId: string,
+    meta: { status: string; description?: string; result?: string; error?: string },
+  ): void {
     const dir = this.taskDir(sessionId, taskId)
     mkdirSync(dir, { recursive: true })
     writeFileSync(this.metaPath(sessionId, taskId), JSON.stringify(meta), 'utf8')
@@ -66,12 +70,20 @@ export class BackgroundTaskPersistence {
     }
   }
 
-  /** Read the persisted meta (status, result, error). Returns null if no meta exists. */
-  readMeta(sessionId: string, taskId: string): { status: string; result?: string; error?: string } | null {
+  /** Read the persisted meta (status, description, result, error). Returns null if no meta exists. */
+  readMeta(
+    sessionId: string,
+    taskId: string,
+  ): { status: string; description?: string; result?: string; error?: string } | null {
     const path = this.metaPath(sessionId, taskId)
     if (!existsSync(path)) return null
     try {
-      return JSON.parse(readFileSync(path, 'utf8')) as { status: string; result?: string; error?: string }
+      return JSON.parse(readFileSync(path, 'utf8')) as {
+        status: string
+        description?: string
+        result?: string
+        error?: string
+      }
     } catch {
       return null
     }
@@ -206,6 +218,12 @@ export class BackgroundManager {
     }
     this.meta.set(taskId, meta)
 
+    // Persist running status so crash recovery (reconcile) can detect orphans.
+    this.persistence?.flushMeta(this.sessionId, taskId, {
+      status: 'running',
+      description,
+    })
+
     const promise = runner(ac.signal)
       .catch((_err) => {
         // Errors are handled by the specific runner implementation;
@@ -244,9 +262,10 @@ export class BackgroundManager {
     m.abortController.abort()
     this.tasks.delete(taskId)
 
-    // Persist the killed status
+    // Persist the killed status (aligned with in-memory meta)
     this.persistence?.flushMeta(this.sessionId, taskId, {
       status: 'killed',
+      description: m.description,
       error: m.error,
     })
 
@@ -311,43 +330,95 @@ export class BackgroundManager {
     this.persistence?.saveOutput(this.sessionId, taskId, chunk)
   }
 
-  /** Get the collected output for a task (in-memory). */
+  /**
+   * Get the collected output for a task.
+   *
+   * Policy:
+   * - Terminal + `result` set → prefer final result over streamed chunks
+   * - Otherwise prefer in-memory chunks, then `output.log`
+   * - Terminal errors (`failed` / `killed` / `lost`) surface via `error` when no result/chunks
+   * - Missing in-memory meta falls back to disk (output log + meta.json) for crash recovery
+   */
   getOutput(taskId: string): string {
     const m = this.meta.get(taskId)
-    if (!m) return `Error: background task ${taskId} not found`
-    if (!m.outputChunks || m.outputChunks.length === 0) {
-      // Try persisted output as fallback
-      const persisted = this.persistence?.readOutput(this.sessionId, taskId)
-      if (persisted) return persisted
-      return `Error: no output for background task ${taskId}`
+    if (!m) {
+      // Rehydrate from disk when the process no longer holds in-memory meta
+      if (this.persistence) {
+        const persistedLog = this.persistence.readOutput(this.sessionId, taskId)
+        if (persistedLog != null) return persistedLog
+        const pm = this.persistence.readMeta(this.sessionId, taskId)
+        if (pm?.result !== undefined) return pm.result
+        if (pm?.error) {
+          if (pm.status === 'lost') return `Error: lost: ${pm.error}`
+          return `Error: ${pm.error}`
+        }
+      }
+      return `Error: background task ${taskId} not found`
     }
-    return m.outputChunks.join('')
+
+    // Terminal tasks: prefer final result over partial stream text
+    if (m.status !== 'running' && m.result !== undefined) {
+      return m.result
+    }
+
+    // Running (or terminal without result): streamed chunks
+    if (m.outputChunks && m.outputChunks.length > 0) {
+      return m.outputChunks.join('')
+    }
+
+    // Try persisted output log (empty string is valid output)
+    const persisted = this.persistence?.readOutput(this.sessionId, taskId)
+    if (persisted != null) return persisted
+
+    // Terminal failure/kill/lost without chunks — mirror wait() formatting
+    if (m.error) {
+      if (m.status === 'lost') return `Error: lost: ${m.error}`
+      return `Error: ${m.error}`
+    }
+
+    // Persisted meta result/error (in-memory meta present but result only on disk)
+    const persistedMeta = this.persistence?.readMeta(this.sessionId, taskId)
+    if (persistedMeta?.result !== undefined) return persistedMeta.result
+    if (persistedMeta?.error) {
+      if (persistedMeta.status === 'lost') return `Error: lost: ${persistedMeta.error}`
+      return `Error: ${persistedMeta.error}`
+    }
+
+    return `Error: no output for background task ${taskId}`
   }
 
   // ── Completion hook ──────────────────────────────────────────────────────
 
   /**
    * Called by `runBackgroundSubagent` after a task settles.
-   * Updates meta and persists output.
+   * Updates meta and persists it. Only `running` → terminal transitions are applied
+   * (killed/lost/already-complete are immutable).
+   *
+   * @returns `true` if the transition was applied, `false` if skipped
    */
   completeTask(
     taskId: string,
     status: 'completed' | 'failed',
     result?: string,
     error?: string,
-  ): void {
+  ): boolean {
     const m = this.meta.get(taskId)
-    if (!m) return
+    if (!m) return false
+    // Only running tasks may transition; stop()/reconcile own their terminal states
+    if (m.status !== 'running') return false
+
     m.status = status
     if (result !== undefined) m.result = result
     if (error !== undefined) m.error = error
 
-    // Persist meta
+    // Persist meta (aligned with in-memory fields)
     this.persistence?.flushMeta(this.sessionId, taskId, {
       status,
+      description: m.description,
       ...(result !== undefined ? { result } : {}),
       ...(error !== undefined ? { error } : {}),
     })
+    return true
   }
 
   // ── Cleanup ──────────────────────────────────────────────────────────────
@@ -381,7 +452,7 @@ export class BackgroundManager {
         // Task was running when the process died — mark as lost
         const ac = new AbortController()
         const meta: BackgroundTaskMeta = {
-          description: taskId,
+          description: persistedMeta.description ?? taskId,
           status: 'lost',
           error: 'process terminated while task was running',
           abortController: ac,
@@ -393,6 +464,7 @@ export class BackgroundManager {
 
         this.persistence.flushMeta(this.sessionId, taskId, {
           status: 'lost',
+          description: meta.description,
           error: meta.error,
         })
 

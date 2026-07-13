@@ -341,3 +341,41 @@ describe('runWorkflow — 取消', () => {
     expect(sink.ofType('run:cancelled').length).toBeGreaterThanOrEqual(1)
   })
 })
+
+describe('runWorkflow — C-validate tool/human reject', () => {
+  it('rejects tool node before run starts (no run:started, no agent calls)', async () => {
+    const def = wf({
+      nodes: [
+        node('a'),
+        { type: 'tool', id: 't1', toolName: 'read_file', inputTemplate: '{{input}}' },
+      ],
+      edges: [{ from: 'a', to: 't1' } as WorkflowEdge],
+      entry: ['a'],
+    })
+    const { runner, sink, ports } = harness({ a: { text: 'ok' } })
+    const ac = new AbortController()
+    await expect(runWorkflow(def, ports, { runId: 'r-tool', signal: ac.signal })).rejects.toThrow(
+      /Invalid workflow|tool/,
+    )
+    expect(runner.calls).toHaveLength(0)
+    expect(sink.ofType('run:started')).toHaveLength(0)
+  })
+
+  it('rejects human node before run starts', async () => {
+    const def = wf({
+      nodes: [
+        node('a'),
+        { type: 'human', id: 'h1', question: 'Approve?' },
+      ],
+      edges: [{ from: 'a', to: 'h1' } as WorkflowEdge],
+      entry: ['a'],
+    })
+    const { runner, sink, ports } = harness({ a: { text: 'ok' } })
+    const ac = new AbortController()
+    await expect(runWorkflow(def, ports, { runId: 'r-human', signal: ac.signal })).rejects.toThrow(
+      /Invalid workflow|human/,
+    )
+    expect(runner.calls).toHaveLength(0)
+    expect(sink.ofType('run:started')).toHaveLength(0)
+  })
+})

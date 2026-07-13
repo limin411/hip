@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { CircuitBreaker } from './circuit-breaker.js'
 
 describe('CircuitBreaker', () => {
@@ -88,5 +91,32 @@ describe('CircuitBreaker', () => {
     expect(cb.getSnapshot().consecutiveNoFileChange).toBe(0)
     expect(cb.getSnapshot().warnCount).toBe(0)
     expect(cb.getSnapshot().lastFileChangedAt).toBeNull()
+  })
+})
+
+describe('CircuitBreaker product path (Track A-config)', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+
+  it('marks the class as experimental in source', () => {
+    const src = readFileSync(join(here, 'circuit-breaker.ts'), 'utf8')
+    expect(src).toMatch(/@experimental/)
+    expect(src).toMatch(/Product session-turn paths must \*\*not\*\*/)
+  })
+
+  it('session turn runner never constructs or injects CircuitBreaker', () => {
+    const src = readFileSync(join(here, '../session/session-turn-runner.ts'), 'utf8')
+    expect(src).not.toMatch(/new\s+CircuitBreaker/)
+    expect(src).not.toMatch(/circuitBreaker\s*:/)
+    expect(src).not.toMatch(/from\s+['"].*circuit-breaker/)
+  })
+
+  it('GraphCtx documents circuitBreaker as experimental / non-product', () => {
+    const src = readFileSync(join(here, '../session/graph.ts'), 'utf8')
+    expect(src).toMatch(/circuitBreaker\?:/)
+    // JSDoc immediately above the field should mark experimental.
+    const fieldIdx = src.indexOf('circuitBreaker?:')
+    const window = src.slice(Math.max(0, fieldIdx - 400), fieldIdx)
+    expect(window).toMatch(/@experimental/)
+    expect(window).toMatch(/never inject/i)
   })
 })

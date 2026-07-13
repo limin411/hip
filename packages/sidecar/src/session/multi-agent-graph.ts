@@ -1,6 +1,11 @@
 /**
  * multi-agent-graph — manual StateGraph composition for multi-agent handoff.
  *
+ * Optional / non-default product surface. Ordinary sessions use Supervisor ReAct
+ * (`buildGraph`) plus agent-driven `task` / `dispatch_agent` / `task_batch`.
+ * This handoff graph is for explicit multi-profile callers, not the default
+ * session path and not entered via orchMode.
+ *
  * Built WITHOUT `@langchain/langgraph-swarm`'s `createSwarm()` (immature on JS
  * — missing `createAgent`, pervasive `any` types). Instead we compose by hand:
  *

@@ -1,6 +1,11 @@
 /**
  * CircuitBreaker — stalls detection + token budget enforcement.
  *
+ * @experimental Test / harness only. Product session-turn paths must **not**
+ * construct or inject a CircuitBreaker into GraphCtx (doom / error-streak /
+ * MAX_STEPS already cover loop safety). Optional GraphCtx.circuitBreaker remains
+ * for unit tests and experimental harnesses that inject it deliberately.
+ *
  * Called after each agent step. Tracks tokens, steps, and consecutive
  * no-file-change steps. Produces three kinds of decisions:
  *  - 'continue' : everything is within limits

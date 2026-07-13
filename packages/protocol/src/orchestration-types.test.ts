@@ -35,6 +35,26 @@ describe('OrchestrationMode', () => {
     const mode: import('./orchestration-types.js').OrchestrationMode = 'dag'
     expect(mode).toBe('dag')
   })
+
+  it('session:orchMode response may include ignoredForTurnRouting honesty flag', () => {
+    type ServerMessage = import('./messages.js').ServerMessage
+    const withFlag: ServerMessage = {
+      type: 'session:orchMode',
+      sessionId: 's1',
+      orchMode: 'dag',
+      ignoredForTurnRouting: true,
+    }
+    const withoutFlag: ServerMessage = {
+      type: 'session:orchMode',
+      sessionId: 's1',
+      orchMode: 'fast',
+    }
+    const rt = JSON.parse(JSON.stringify(withFlag)) as Extract<ServerMessage, { type: 'session:orchMode' }>
+    expect(rt.ignoredForTurnRouting).toBe(true)
+    expect(rt.orchMode).toBe('dag')
+    expect(withoutFlag.orchMode).toBe('fast')
+    expect(withoutFlag.ignoredForTurnRouting).toBeUndefined()
+  })
 })
 
 describe('WorkflowNode', () => {

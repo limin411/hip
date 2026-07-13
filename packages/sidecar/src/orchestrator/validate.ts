@@ -1,7 +1,25 @@
-import type { WorkflowDef, NodeId } from '@hip/protocol'
+/**
+ * Workflow definition validation (C-validate).
+ *
+ * Supported node kinds: `agent`, `gate`, `parallel`.
+ * - ParallelNode is fully supported (structural fan-out + reduce merge:
+ *   all / any / vote). Nested children are walked for tool/human rejection
+ *   and graph checks still apply to top-level edge endpoints.
+ * - `tool` and `human` are hard-rejected (fail-closed; no executor path).
+ *   C-shrink may later hard-delete those types from the protocol union after
+ *   a deprecate window; keep ParallelNode and reduce merge.
+ */
+import type { WorkflowDef, WorkflowNode, NodeId } from '@hip/protocol'
 import type { AgentRegistry } from './registry.js'
 
-export type ValidationCode = 'unknown-agent' | 'dangling-edge' | 'cycle' | 'unreachable' | 'bad-template-ref'
+export type ValidationCode =
+  | 'unknown-agent'
+  | 'dangling-edge'
+  | 'cycle'
+  | 'unreachable'
+  | 'bad-template-ref'
+  | 'unsupported-node'
+
 export interface ValidationError {
   code: ValidationCode
   detail: string
@@ -9,9 +27,61 @@ export interface ValidationError {
 
 const TEMPLATE_RE = /\{\{\s*([^}\s]+)\s*\}\}/g
 
+/** Walk top-level and nested ParallelNode children. */
+function walkNodes(nodes: WorkflowNode[], visit: (n: WorkflowNode) => void): void {
+  for (const n of nodes) {
+    visit(n)
+    if (n.type === 'parallel') walkNodes(n.nodes, visit)
+  }
+}
+
+/**
+ * Registry-free hard reject for tool/human leaves (top-level + nested under parallel).
+ * Used by `validateWorkflow` and the run path (`runWorkflow` / DurableExecutor /
+ * `runWorkflowTurn`) so pre-run honesty does not depend on AgentRegistry /
+ * unknown-agent checks for dynamic session agents.
+ */
+export function rejectUnsupportedWorkflowNodes(def: WorkflowDef): ValidationError[] {
+  const errors: ValidationError[] = []
+  // ParallelNode remains fully supported (structural + merge in reduce).
+  walkNodes(def.nodes, (n) => {
+    if (n.type === 'tool') {
+      errors.push({
+        code: 'unsupported-node',
+        detail: `${n.id}: type 'tool' is not supported (fail-closed; use agent tools instead)`,
+      })
+    } else if (n.type === 'human') {
+      errors.push({
+        code: 'unsupported-node',
+        detail: `${n.id}: type 'human' is not supported (fail-closed; use ReAct planPause / agent:interrupt for HITL)`,
+      })
+    }
+  })
+  return errors
+}
+
+/** Format unsupported-node errors for throw / client error messages. */
+export function formatUnsupportedNodeErrors(errors: ValidationError[]): string {
+  return errors.map((e) => e.detail).join('; ')
+}
+
+/**
+ * Assert def has no tool/human leaves. Throws Error if rejected.
+ * Call before initRunState / workflow:started on every run entry.
+ */
+export function assertSupportedWorkflowNodes(def: WorkflowDef): void {
+  const unsupported = rejectUnsupportedWorkflowNodes(def)
+  if (unsupported.length > 0) {
+    throw new Error(`Invalid workflow: ${formatUnsupportedNodeErrors(unsupported)}`)
+  }
+}
+
 export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): ValidationError[] {
   const errors: ValidationError[] = []
   const ids = new Set(def.nodes.map((n) => n.id))
+
+  // 0. unsupported-node: tool / human are fail-closed (no launch path).
+  errors.push(...rejectUnsupportedWorkflowNodes(def))
 
   // 1. unknown-agent (only check agent-type nodes)
   for (const n of def.nodes) {

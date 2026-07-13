@@ -1,3 +1,6 @@
+import type { AgentLoopConfig } from '@hip/protocol'
+import { readHipConfig } from '../config/hip-config.js'
+
 /** Max model turns per user turn before the loop is forced to finish (OpenCode's value). */
 export const MAX_STEPS = 800
 
@@ -13,9 +16,25 @@ export const CHILD_MAX_STEPS = 25
  */
 export const EXPLORE_CHILD_MAX_STEPS = 40
 
-/** Per-agent child step budget for internal managed agents. */
+function positiveSteps(n: number | undefined, fallback: number): number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
+}
+
+/**
+ * Resolve per-agent child step budget from an optional `agentLoop` section.
+ * When `agentLoop` is omitted/undefined, returns the hard-coded defaults (25 / 40).
+ */
+export function childMaxStepsFromConfig(agentId: string, agentLoop?: AgentLoopConfig | null): number {
+  if (agentId === 'explore') {
+    return positiveSteps(agentLoop?.exploreChildMaxSteps, EXPLORE_CHILD_MAX_STEPS)
+  }
+  return positiveSteps(agentLoop?.childMaxSteps, CHILD_MAX_STEPS)
+}
+
+/** Per-agent child step budget for internal managed agents.
+ *  Reads global hip.toml `[agentLoop]` when present; otherwise defaults 25/40. */
 export function childMaxStepsForAgent(agentId: string): number {
-  return agentId === 'explore' ? EXPLORE_CHILD_MAX_STEPS : CHILD_MAX_STEPS
+  return childMaxStepsFromConfig(agentId, readHipConfig().agentLoop)
 }
 
 /** Injected as a system message on the final step: tools are off, answer in text only. */

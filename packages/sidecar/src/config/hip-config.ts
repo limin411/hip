@@ -11,7 +11,9 @@ import type {
   TeamConfig,
   TeamMember,
   TeamPipelineStep,
+  AgentLoopConfig,
 } from '@hip/protocol'
+import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
 
@@ -133,6 +135,43 @@ function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
   return raw as unknown as TeamConfig
 }
 
+
+function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
+  if (raw.child_max_steps !== undefined && raw.childMaxSteps === undefined) {
+    raw.childMaxSteps = raw.child_max_steps
+  }
+  if (raw.explore_child_max_steps !== undefined && raw.exploreChildMaxSteps === undefined) {
+    raw.exploreChildMaxSteps = raw.explore_child_max_steps
+  }
+  if (raw.subagent_hitl !== undefined && raw.subagentHitl === undefined) {
+    raw.subagentHitl = raw.subagent_hitl
+  }
+  if (raw.doom_loop_strategy !== undefined && raw.doomLoopStrategy === undefined) {
+    raw.doomLoopStrategy = raw.doom_loop_strategy
+  }
+  delete raw.child_max_steps
+  delete raw.explore_child_max_steps
+  delete raw.subagent_hitl
+  delete raw.doom_loop_strategy
+
+  const out: AgentLoopConfig = {}
+  if (typeof raw.childMaxSteps === 'number') {
+    out.childMaxSteps = raw.childMaxSteps
+  }
+  if (typeof raw.exploreChildMaxSteps === 'number') {
+    out.exploreChildMaxSteps = raw.exploreChildMaxSteps
+  }
+  if (raw.subagentHitl === 'inline_partial') {
+    out.subagentHitl = 'inline_partial'
+  }
+  if (typeof raw.doomLoopStrategy === 'string') {
+    const parsed = parseDoomLoopStrategy(raw.doomLoopStrategy)
+    if (parsed) out.doomLoopStrategy = parsed
+  }
+  return out
+}
+
+
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
   if (!parsed || typeof parsed !== 'object') {
@@ -181,6 +220,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const fixedAgents = obj.fixedAgents ?? obj.fixed_agents
   if (fixedAgents && typeof fixedAgents === 'object' && !Array.isArray(fixedAgents)) {
     config.fixedAgents = fixedAgents as Record<string, boolean>
+  }
+
+  const agentLoop = obj.agentLoop ?? obj.agent_loop
+  if (agentLoop && typeof agentLoop === 'object' && !Array.isArray(agentLoop)) {
+    config.agentLoop = normalizeAgentLoop(agentLoop as Record<string, unknown>)
   }
 
   return config
@@ -243,6 +287,10 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   }
   if (project.fixedAgents !== undefined) {
     merged.fixedAgents = project.fixedAgents
+  }
+  // Project agentLoop replaces global wholesale (same as activeModel / fixedAgents).
+  if (project.agentLoop !== undefined) {
+    merged.agentLoop = project.agentLoop
   }
 
   return merged

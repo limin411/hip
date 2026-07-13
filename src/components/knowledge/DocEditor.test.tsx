@@ -35,7 +35,7 @@ vi.mock('@codemirror/language-data', () => ({
 vi.mock('@codemirror/view', () => ({
   EditorView: {
     lineWrapping: {},
-    theme: () => ({}),
+    theme: (_styles?: unknown, _opts?: unknown) => ({}),
     domEventHandlers: () => ({}),
   },
 }))

@@ -1,9 +1,18 @@
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderOpen,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { listChildren } from '@/domain/knowledge/tree'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { Button } from '@/components/ui/Button'
 
 interface SpaceTreeProps {
   onRename: (node: KnowledgeNode) => void
@@ -37,36 +46,53 @@ export function SpaceTree({ onRename, onDelete }: SpaceTreeProps) {
         <div key={node.id}>
           <div
             className={cn(
-              'group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-body text-ink hover:bg-state-hover',
+              'group flex w-full items-center gap-0.5 rounded-md py-1 pr-1 text-body transition-colors',
+              'text-ink hover:bg-surface-muted',
             )}
-            style={{ paddingLeft: 8 + depth * 12 }}
+            style={{ paddingLeft: depth * 14 + 6 }}
           >
             <button
               type="button"
-              className="flex min-w-0 flex-1 items-center gap-1 text-left"
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
               onClick={() => toggleFolder(node.id)}
               disabled={busy}
             >
-              {isOpen ? <ChevronDown size={12} className="shrink-0 text-ink-tertiary" /> : <ChevronRight size={12} className="shrink-0 text-ink-tertiary" />}
-              <Folder size={14} className="shrink-0 text-ink-tertiary" />
+              {isOpen ? (
+                <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+              ) : (
+                <ChevronRight size={14} className="shrink-0 text-ink-tertiary" />
+              )}
+              {isOpen ? (
+                <FolderOpen size={15} className="shrink-0 text-accent-strong" />
+              ) : (
+                <Folder size={15} className="shrink-0 text-accent-strong" />
+              )}
               <span className="truncate">{node.title}</span>
             </button>
-            <button
-              type="button"
-              className="hidden text-meta text-ink-tertiary group-hover:inline"
-              onClick={() => onRename(node)}
-              disabled={busy}
-            >
-              {t('knowledge.tree.rename')}
-            </button>
-            <button
-              type="button"
-              className="hidden text-meta text-danger group-hover:inline"
-              onClick={() => onDelete(node)}
-              disabled={busy}
-            >
-              {t('knowledge.tree.delete')}
-            </button>
+            <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                disabled={busy}
+                aria-label={t('knowledge.tree.rename')}
+                onClick={() => onRename(node)}
+              >
+                <Pencil size={12} />
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-danger hover:text-danger"
+                disabled={busy}
+                aria-label={t('knowledge.tree.delete')}
+                onClick={() => onDelete(node)}
+              >
+                <Trash2 size={12} />
+              </Button>
+            </div>
           </div>
           {isOpen && kids.map((c) => renderNode(c, depth + 1))}
         </div>
@@ -78,38 +104,48 @@ export function SpaceTree({ onRename, onDelete }: SpaceTreeProps) {
       <div
         key={node.id}
         className={cn(
-          'group flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-body',
-          active ? 'bg-state-active font-medium text-ink' : 'text-ink hover:bg-state-hover',
+          'group flex w-full items-center gap-0.5 rounded-md py-1 pr-1 text-body transition-colors',
+          active
+            ? 'bg-accent-active font-medium text-accent-strong'
+            : 'text-ink hover:bg-surface-muted',
         )}
-        style={{ paddingLeft: 8 + depth * 12 }}
+        style={{ paddingLeft: depth * 14 + 6 }}
       >
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-1 text-left"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
           data-testid={`knowledge-tree-doc-${node.id}`}
           onClick={() => void openDoc(node.id)}
           disabled={busy}
         >
-          <span className="w-3" />
-          <FileText size={14} className="shrink-0 text-ink-tertiary" />
+          <span className="w-3.5 shrink-0" />
+          <FileText size={15} className="shrink-0 text-ink-tertiary" />
           <span className="truncate">{node.title}</span>
         </button>
-        <button
-          type="button"
-          className="hidden text-meta text-ink-tertiary group-hover:inline"
-          onClick={() => onRename(node)}
-          disabled={busy}
-        >
-          {t('knowledge.tree.rename')}
-        </button>
-        <button
-          type="button"
-          className="hidden text-meta text-danger group-hover:inline"
-          onClick={() => onDelete(node)}
-          disabled={busy}
-        >
-          {t('knowledge.tree.delete')}
-        </button>
+        <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6"
+            disabled={busy}
+            aria-label={t('knowledge.tree.rename')}
+            onClick={() => onRename(node)}
+          >
+            <Pencil size={12} />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-danger hover:text-danger"
+            disabled={busy}
+            aria-label={t('knowledge.tree.delete')}
+            onClick={() => onDelete(node)}
+          >
+            <Trash2 size={12} />
+          </Button>
+        </div>
       </div>
     )
   }

@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
-  Check,
   FilePlus,
+  FileText,
   FolderPlus,
   MoreHorizontal,
-  Pencil,
 } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { getPathTitles } from '@/domain/knowledge/tree'
@@ -14,6 +13,8 @@ import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -64,6 +65,8 @@ export function KnowledgeWorkspace() {
       ? activeNode.id
       : activeNode?.parentId ?? null
 
+  const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
+
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-subtle">
@@ -79,7 +82,6 @@ export function KnowledgeWorkspace() {
           <div className="flex items-center gap-1">
             <div className="min-w-0 flex-1">
               <div className="truncate text-body font-semibold text-ink">
-                {space?.icon ? `${space.icon} ` : ''}
                 {space?.name ?? t('tabs.knowledge')}
               </div>
             </div>
@@ -113,26 +115,28 @@ export function KnowledgeWorkspace() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
             <Button
-              size="sm"
+              size="icon"
               variant="secondary"
               disabled={busy}
               data-testid="knowledge-new-doc"
+              title={t('knowledge.tree.newDoc')}
+              aria-label={t('knowledge.tree.newDoc')}
               onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
             >
-              <FilePlus size={14} />
-              {t('knowledge.tree.newDoc')}
+              <FilePlus size={15} />
             </Button>
             <Button
-              size="sm"
+              size="icon"
               variant="secondary"
               disabled={busy}
               data-testid="knowledge-new-folder"
+              title={t('knowledge.tree.newFolder')}
+              aria-label={t('knowledge.tree.newFolder')}
               onClick={() => void createFolder(parentForNew)}
             >
-              <FolderPlus size={14} />
-              {t('knowledge.tree.newFolder')}
+              <FolderPlus size={15} />
             </Button>
           </div>
         </div>
@@ -147,14 +151,14 @@ export function KnowledgeWorkspace() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className="flex min-w-0 flex-1 flex-col bg-surface">
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
           <div className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">
             {space?.name}
-            {crumbs.map((c) => (
-              <span key={c}>
+            {crumbs.map((c, i) => (
+              <span key={`${c}-${i}`}>
                 {' / '}
-                <span className="text-ink">{c}</span>
+                <span className={i === crumbs.length - 1 ? 'text-ink' : undefined}>{c}</span>
               </span>
             ))}
           </div>
@@ -165,33 +169,31 @@ export function KnowledgeWorkspace() {
             <span className="text-meta text-ink-tertiary">{t('knowledge.doc.saved')}</span>
           )}
           {activeDocId && (
-            <Button
-              size="sm"
-              variant={editing ? 'primary' : 'secondary'}
+            <SegmentedControl
               data-testid="knowledge-edit-toggle"
-              onClick={() => void setEditing(!editing)}
-            >
-              {editing ? (
-                <>
-                  <Check size={14} />
-                  {t('knowledge.doc.preview')}
-                </>
-              ) : (
-                <>
-                  <Pencil size={14} />
-                  {t('knowledge.doc.edit')}
-                </>
-              )}
-            </Button>
+              aria-label={t('knowledge.doc.modeLabel')}
+              size="sm"
+              value={mode}
+              onChange={(v) => void setEditing(v === 'edit')}
+              options={[
+                { value: 'edit', label: t('knowledge.doc.edit') },
+                { value: 'preview', label: t('knowledge.doc.preview') },
+              ]}
+            />
           )}
         </div>
         {!activeDocId ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
-            <p className="text-body text-ink-tertiary">{t('knowledge.tree.empty')}</p>
+          <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6">
+            <EmptyState
+              icon={FileText}
+              title={t('knowledge.workspace.noDocTitle')}
+              description={t('knowledge.workspace.noDocHint')}
+              className="w-full max-w-md border-0"
+            />
           </div>
         ) : editing ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6">
+            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-8">
               <DocEditor
                 key={`${activeDocId}-edit`}
                 docId={activeDocId}
@@ -203,7 +205,7 @@ export function KnowledgeWorkspace() {
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
             <DocReader content={docBody} />
           </div>
         )}

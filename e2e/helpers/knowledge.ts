@@ -181,8 +181,15 @@ export async function typeInKnowledgeEditor(text: string): Promise<void> {
   )
 }
 
+/** Toggle Edit ↔ Preview via SegmentedControl (clicks the inactive tab). */
 export async function toggleKnowledgePreviewOrEdit(): Promise<void> {
-  await clickTestId('knowledge-edit-toggle')
+  const toggle = await browser.$('[data-testid="knowledge-edit-toggle"]')
+  await toggle.waitForExist({ timeout: 10000 })
+  await browser.execute((root: HTMLElement) => {
+    const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
+    const inactive = tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
+    inactive?.click()
+  }, toggle)
 }
 
 export async function expectKnowledgeEditor(): Promise<void> {

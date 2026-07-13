@@ -13,52 +13,81 @@ export interface DocEditorProps {
   placeholder?: string
 }
 
-const proseTheme = EditorView.theme({
-  '&': {
-    fontSize: '15px',
-    height: '100%',
-  },
-  '.cm-scroller': {
-    fontFamily:
-      'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
-    lineHeight: '1.7',
-    height: '100%',
-  },
-  '.cm-content': {
-    padding: '16px 20px 48px',
-    caretColor: 'var(--ink)',
-    minHeight: '100%',
-  },
-  '.cm-line': {
-    padding: '0 2px',
-  },
-  '.cm-focused': {
-    outline: 'none',
-  },
-  '&.cm-editor': {
-    height: '100%',
-    backgroundColor: 'transparent',
-  },
-  '&.cm-editor.cm-focused': {
-    outline: 'none',
-  },
-  '.cm-gutters': {
-    display: 'none',
-  },
-  '.cm-activeLine': {
-    backgroundColor: 'color-mix(in srgb, var(--state-hover) 50%, transparent)',
-  },
-  '.cm-placeholder': {
-    color: 'var(--text-tertiary)',
-    fontStyle: 'normal',
-  },
-})
-
-const markdownExtensions = [
-  markdown({ base: markdownLanguage, codeLanguages: languages }),
-  EditorView.lineWrapping,
-  proseTheme,
-]
+/** Token-driven CM chrome — no stock light/dark skin (K26). */
+function buildProseTheme(isDark: boolean) {
+  return EditorView.theme(
+    {
+      '&': {
+        fontSize: '14px', // matches tailwind `prose`
+        height: '100%',
+        color: 'var(--text-primary)',
+        backgroundColor: 'transparent',
+      },
+      '.cm-scroller': {
+        fontFamily:
+          'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+        lineHeight: '1.7',
+        height: '100%',
+      },
+      '.cm-content': {
+        padding: '20px 4px 64px',
+        caretColor: 'var(--text-primary)',
+        minHeight: '100%',
+        color: 'var(--text-primary)',
+      },
+      '.cm-line': {
+        padding: '0 2px',
+      },
+      '.cm-focused': {
+        outline: 'none',
+      },
+      '&.cm-editor': {
+        height: '100%',
+        backgroundColor: 'transparent',
+      },
+      '&.cm-editor.cm-focused': {
+        outline: 'none',
+      },
+      '.cm-gutters': {
+        display: 'none',
+      },
+      '.cm-activeLine': {
+        backgroundColor: 'color-mix(in srgb, var(--state-hover) 55%, transparent)',
+      },
+      '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+        backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent) !important',
+      },
+      '.cm-cursor, .cm-dropCursor': {
+        borderLeftColor: 'var(--text-primary)',
+      },
+      '.cm-placeholder': {
+        color: 'var(--text-tertiary)',
+        fontStyle: 'normal',
+      },
+      // Keep syntax marks readable but monochrome-friendly
+      '.cm-header': {
+        color: 'var(--text-primary)',
+        fontWeight: '600',
+      },
+      '.cm-link': {
+        color: 'var(--accent-strong)',
+      },
+      '.cm-url': {
+        color: 'var(--text-secondary)',
+      },
+      '.cm-meta, .cm-comment': {
+        color: 'var(--text-tertiary)',
+      },
+      '.cm-string, .cm-quote': {
+        color: 'var(--text-secondary)',
+      },
+      '.cm-keyword, .cm-operator': {
+        color: 'var(--accent-strong)',
+      },
+    },
+    { dark: isDark },
+  )
+}
 
 function useIsDark(): boolean {
   const [dark, setDark] = useState(() =>
@@ -104,8 +133,13 @@ export function DocEditor({
         return false
       },
     })
-    return [...markdownExtensions, blurHandler]
-  }, [])
+    return [
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      EditorView.lineWrapping,
+      buildProseTheme(isDark),
+      blurHandler,
+    ]
+  }, [isDark])
 
   return (
     <div
@@ -115,7 +149,7 @@ export function DocEditor({
       <CodeMirror
         value={text}
         height="100%"
-        theme={isDark ? 'dark' : 'light'}
+        theme="none"
         extensions={extensions}
         basicSetup={{
           lineNumbers: false,
@@ -131,7 +165,7 @@ export function DocEditor({
           setText(v)
           onDraftChangeRef.current(v)
         }}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden text-body [&_.cm-editor]:h-full"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"
       />
     </div>
   )

@@ -18,6 +18,7 @@ import { SubAgentCard, splitAgents } from '@/components/artifact/SubAgentCard'
 import { groupByAgent } from '@/lib/turnAgents'
 import { cn } from '@/lib/utils'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
+import { activityElapsedMs, formatElapsed } from '@/lib/activitySummary'
 import { MarkdownBody } from './MarkdownBody'
 
 function formatBytes(bytes?: number): string {
@@ -48,6 +49,17 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
   const displayContent = useMemo(
     () => (isUser ? message.content : normalizeMessageContent(message.content)),
     [isUser, message.content],
+  )
+
+  const hasProcess =
+    !isUser &&
+    ((message.timeline?.length ?? 0) > 0 ||
+      (message.toolCalls?.length ?? 0) > 0 ||
+      (message.agentRuns?.length ?? 0) > 0)
+
+  const elapsedMs = useMemo(
+    () => (isUser ? null : activityElapsedMs(message.agentRuns)),
+    [isUser, message.agentRuns],
   )
 
   return (
@@ -82,13 +94,28 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
             !isUser && 'bg-gradient-to-br from-accent/[0.02] to-accent/[0.04] rounded-lg -mx-2 px-2',
           )}
         >
-          {message.role === 'assistant' && (
-            <>
-              <ActivityBar steps={flatSteps} toolCalls={message.toolCalls} agentRuns={message.agentRuns} streaming={streaming} />
-              {nested.map((a) => <SubAgentCard key={a.agentId} agent={a} />)}
-            </>
+          {message.role === 'assistant' && (hasProcess || streaming) && (
+            <div className="mb-1 text-meta text-ink-tertiary" data-testid="message-process">
+              <ActivityBar
+                steps={flatSteps}
+                toolCalls={message.toolCalls}
+                agentRuns={message.agentRuns}
+                streaming={streaming}
+                stopped={!!message.stopped}
+                hasAssistantContent={!!displayContent.trim()}
+              />
+              {nested.map((a) => (
+                <SubAgentCard
+                  key={a.agentId}
+                  agent={a}
+                  showTools={false}
+                />
+              ))}
+            </div>
           )}
-          <MarkdownBody content={displayContent} />
+          <div data-testid="message-answer">
+            <MarkdownBody content={displayContent} />
+          </div>
           {isUser && message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {message.attachments.map((a) => (
@@ -139,13 +166,22 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {message.role === 'assistant' && message.usage && (
+            {message.role === 'assistant' && (elapsedMs != null || message.usage) && (
               <span
                 data-testid="message-usage"
-                title={t('chat.usage.io', { input: message.usage.inputTokens, output: message.usage.outputTokens })}
-                className="text-caption text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100"
+                title={
+                  message.usage
+                    ? t('chat.usage.io', { input: message.usage.inputTokens, output: message.usage.outputTokens })
+                    : undefined
+                }
+                className="text-caption text-ink-tertiary"
               >
-                {t('chat.usage.tokens', { total: message.usage.totalTokens })}
+                {[
+                  elapsedMs != null ? t('chat.activity.elapsed', { time: formatElapsed(elapsedMs) }) : null,
+                  message.usage ? t('chat.usage.tokens', { total: message.usage.totalTokens }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </span>
             )}
           </div>

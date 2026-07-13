@@ -56,8 +56,33 @@ describe('SubAgentCard context menu', () => {
     expect(screen.getByTestId('subagent-card')).toBeInTheDocument()
   })
 
-  it('nests toolCall host inside subAgent; right-click tool → tool items only', async () => {
+  it('defaults to collapsed when agent is done', () => {
     render(<SubAgentCard agent={agent} />)
+    expect(screen.getByTestId('subagent-card')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('subagent-card')).toHaveTextContent('fix bug')
+  })
+
+  it('strips DSML from expanded output', () => {
+    const dirty =
+      'Done.<｜｜DSML｜｜tool_calls>\n</｜｜DSML｜｜tool_calls>'
+    render(
+      <SubAgentCard
+        agent={{
+          ...agent,
+          output: dirty,
+        }}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('subagent-card'))
+    const out = screen.getByTestId('subagent-output')
+    expect(out.textContent).not.toMatch(/DSML/i)
+    expect(out.textContent).toContain('Done')
+  })
+
+  it('nests toolCall host inside subAgent; right-click tool → tool items only', async () => {
+    render(<SubAgentCard agent={agent} showTools />)
+
+    fireEvent.click(screen.getByTestId('subagent-card'))
 
     const toolHost = document.querySelector('[data-context-menu-kind="toolCall"]')
     expect(toolHost).toBeTruthy()

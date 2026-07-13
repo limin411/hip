@@ -1,18 +1,75 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Loader2, CheckCircle2, XCircle, Circle } from 'lucide-react'
+import { ChevronRight, Loader2, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { AgentBadge, TurnTimeline } from './TurnTimeline'
+import { buildActivitySummary, type SummaryPart } from '@/lib/activitySummary'
 
 interface ActivityBarProps {
   steps?: TimelineStep[]
   toolCalls?: ToolCall[]
   agentRuns?: AgentRun[]
   streaming?: boolean
+  stopped?: boolean
+  hasAssistantContent?: boolean
 }
 
-export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], streaming }: ActivityBarProps) {
+function formatParts(
+  parts: SummaryPart[],
+  t: (key: string, params?: Record<string, unknown>) => string,
+): string {
+  const bits: string[] = []
+  for (const p of parts) {
+    switch (p.type) {
+      case 'completed':
+        bits.push(t('chat.activity.completed'))
+        break
+      case 'stopped':
+        bits.push(t('chat.activity.stopped'))
+        break
+      case 'toolCount':
+        bits.push(t('chat.activity.toolCount', { finished: p.finished, total: p.total }))
+        break
+      case 'agentCount':
+        bits.push(t('chat.activity.agentCount', { agents: p.agents }))
+        break
+      case 'partialTools':
+        bits.push(t('chat.activity.partialTools', { count: p.count }))
+        break
+      case 'categorySummary': {
+        const segs: string[] = []
+        if (p.search > 0) segs.push(t('chat.activity.catSearch', { count: p.search }))
+        if (p.read > 0) segs.push(t('chat.activity.catRead', { count: p.read }))
+        if (p.browse > 0) segs.push(t('chat.activity.catBrowse', { count: p.browse }))
+        if (segs.length) bits.push(segs.join(' · '))
+        break
+      }
+      case 'taskHint':
+        bits.push(p.text)
+        break
+      case 'runningTool':
+        bits.push(t('chat.activity.runningTool', { name: p.label }))
+        break
+      case 'runningReasoning':
+        bits.push(t('chat.activity.runningReasoning'))
+        break
+      case 'initializing':
+        bits.push(t('chat.activity.initializing'))
+        break
+    }
+  }
+  return bits.join(' · ')
+}
+
+export function ActivityBar({
+  steps = [],
+  toolCalls = [],
+  agentRuns = [],
+  streaming,
+  stopped,
+  hasAssistantContent,
+}: ActivityBarProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -20,42 +77,22 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
   const lastStep = ordered[ordered.length - 1]
   const activeRole: AgentRole | null = lastStep?.role ?? agentRuns[agentRuns.length - 1]?.role ?? null
 
-  const agentCount = useMemo(() => {
-    const ids = new Set(agentRuns.filter((r) => r.role !== 'supervisor').map((r) => r.agentId))
-    return ids.size
-  }, [agentRuns])
+  const { status, parts } = useMemo(
+    () =>
+      buildActivitySummary({
+        streaming,
+        stopped,
+        hasAssistantContent,
+        steps,
+        toolCalls,
+        agentRuns,
+      }),
+    [streaming, stopped, hasAssistantContent, steps, toolCalls, agentRuns],
+  )
 
-  const byCallId = useMemo(() => new Map(toolCalls.map((tc) => [tc.callId, tc])), [toolCalls])
-
-  const currentStepText = useMemo(() => {
-    if (!lastStep) return null
-    if (lastStep.kind === 'reasoning') return t('chat.activity.runningReasoning')
-    const tool = byCallId.get(lastStep.callId)
-    if (tool) return t('chat.activity.runningTool', { name: tool.name })
-    return null
-  }, [lastStep, byCallId, t])
+  const summaryText = formatParts(parts, t as (key: string, params?: Record<string, unknown>) => string)
 
   const hasActivity = steps.length > 0 || toolCalls.length > 0 || agentRuns.length > 0
-
-  const totalCount = toolCalls.length
-  const finishedCount = toolCalls.filter((t) => t.status === 'finished').length
-  const hasError = toolCalls.some((t) => t.status === 'error')
-  const status: 'running' | 'finished' | 'error' = hasError ? 'error' : streaming ? 'running' : 'finished'
-
-  const summaryText = (() => {
-    if (streaming) return currentStepText ?? t('chat.activity.runningReasoning')
-    const parts: string[] = [t('chat.activity.completed')]
-    if (totalCount > 0) {
-      parts.push(t('chat.activity.toolCount', { finished: finishedCount, total: totalCount }))
-    }
-    if (agentCount > 0) {
-      parts.push(t('chat.activity.agentCount', { agents: agentCount }))
-    }
-    if (hasError) {
-      parts.push(t('chat.activity.someFailed'))
-    }
-    return parts.join(' · ')
-  })()
 
   if (!hasActivity) {
     if (!streaming) return null
@@ -73,6 +110,19 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
     )
   }
 
+  const statusIcon =
+    status === 'running' ? (
+      <Loader2 size={14} className="animate-spin text-accent-strong" />
+    ) : status === 'error' ? (
+      <XCircle size={14} className="text-danger" data-testid="activity-status-error" />
+    ) : status === 'success_partial' ? (
+      <AlertTriangle size={14} className="text-warning" data-testid="activity-status-partial" />
+    ) : status === 'stopped' ? (
+      <Circle size={14} className="text-ink-tertiary" data-testid="activity-status-stopped" />
+    ) : (
+      <CheckCircle2 size={14} className="text-success" data-testid="activity-status-success" />
+    )
+
   const barClassName = cn(
     'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',
   )
@@ -89,11 +139,11 @@ export function ActivityBar({ steps = [], toolCalls = [], agentRuns = [], stream
       {activeRole && (
         <span className="shrink-0 text-meta font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
       )}
-      <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">{summaryText}</span>
+      <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary" title={summaryText}>
+        {summaryText}
+      </span>
       <span className="ml-auto flex shrink-0 items-center gap-1.5">
-        {status === 'running' && <Loader2 size={14} className="animate-spin text-accent-strong" />}
-        {status === 'finished' && <CheckCircle2 size={14} className="text-success" />}
-        {status === 'error' && <XCircle size={14} className="text-danger" />}
+        {statusIcon}
         <ChevronRight size={14} className={cn('text-ink-tertiary transition-transform', open && 'rotate-90')} />
       </span>
     </>

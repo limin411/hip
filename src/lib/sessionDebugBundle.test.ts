@@ -72,10 +72,12 @@ describe('sessionDebugBundle', () => {
           toolCalls: [
             {
               callId: 'c1',
+              agentId: 'supervisor',
               name: 'read_file',
               input: '{}',
               output: longOut,
               status: 'finished',
+              seq: 1,
               truncated: true,
             },
           ],
@@ -104,10 +106,12 @@ describe('sessionDebugBundle', () => {
           toolCalls: [
             {
               callId: 'c1',
+              agentId: 'supervisor',
               name: 'ls',
               input: '{"path":"."}',
               output: 'a.txt',
               status: 'finished',
+              seq: 1,
             },
           ],
         },

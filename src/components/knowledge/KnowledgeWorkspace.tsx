@@ -9,7 +9,12 @@ import {
   MoreHorizontal,
   Search,
 } from 'lucide-react'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
+import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from 'react-resizable-panels'
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
@@ -75,44 +80,67 @@ export function KnowledgeWorkspace() {
   )
 
   const editorRef = useRef<DocEditorHandle>(null)
+  const editorPanelRef = useRef<ImperativePanelHandle>(null)
+  const previewPanelRef = useRef<ImperativePanelHandle>(null)
   const [treeFilter, setTreeFilter] = useState('')
   const [filterExpandSnapshot, setFilterExpandSnapshot] = useState<Record<
     string,
     boolean
   > | null>(null)
+  /** Only re-expand ancestors when the filter *string* changes (not on nodes ticks). */
+  const lastFilterExpandQuery = useRef('')
 
   const visibleIds = useMemo(
     () => filterTreeVisible(nodes, treeFilter),
     [nodes, treeFilter],
   )
 
-  // Force-expand ancestors while filtering; restore on clear.
+  // Expand ancestors when filter query changes; restore snapshot on clear.
   useEffect(() => {
     const q = treeFilter.trim()
-    if (q && visibleIds) {
-      if (!filterExpandSnapshot) {
-        setFilterExpandSnapshot(useKnowledgeStore.getState().expandedFolderIds)
+    if (!q) {
+      lastFilterExpandQuery.current = ''
+      if (filterExpandSnapshot) {
+        useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
+        setFilterExpandSnapshot(null)
       }
-      const expand: Record<string, boolean> = {
-        ...useKnowledgeStore.getState().expandedFolderIds,
-      }
-      for (const id of visibleIds) {
-        const n = nodes.find((x) => x.id === id)
-        if (n?.kind === 'folder') expand[id] = true
-        // also expand ancestors
-        let cur = n
-        while (cur?.parentId) {
-          expand[cur.parentId] = true
-          cur = nodes.find((x) => x.id === cur?.parentId)
-        }
-      }
-      useKnowledgeStore.setState({ expandedFolderIds: expand })
-    } else if (!q && filterExpandSnapshot) {
-      useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
-      setFilterExpandSnapshot(null)
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot only on filter edge
-  }, [treeFilter, visibleIds, nodes])
+    if (lastFilterExpandQuery.current === q || !visibleIds) return
+    lastFilterExpandQuery.current = q
+    if (!filterExpandSnapshot) {
+      setFilterExpandSnapshot(useKnowledgeStore.getState().expandedFolderIds)
+    }
+    const expand: Record<string, boolean> = {
+      ...useKnowledgeStore.getState().expandedFolderIds,
+    }
+    for (const id of visibleIds) {
+      const n = nodes.find((x) => x.id === id)
+      if (n?.kind === 'folder') expand[id] = true
+      let cur = n
+      while (cur?.parentId) {
+        expand[cur.parentId] = true
+        cur = nodes.find((x) => x.id === cur?.parentId)
+      }
+    }
+    useKnowledgeStore.setState({ expandedFolderIds: expand })
+  }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
+
+  // Apply panel sizes when switching source ↔ split (defaultSize only applies on mount).
+  useEffect(() => {
+    if (!editing) return
+    if (sourceLayout === 'split') {
+      // defer so preview panel is mounted
+      requestAnimationFrame(() => {
+        editorPanelRef.current?.resize(50)
+        previewPanelRef.current?.resize(50)
+      })
+    } else {
+      requestAnimationFrame(() => {
+        editorPanelRef.current?.resize(100)
+      })
+    }
+  }, [sourceLayout, editing])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
@@ -121,10 +149,8 @@ export function KnowledgeWorkspace() {
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
 
-  const parentForNew: string | null =
-    activeNode?.kind === 'folder'
-      ? activeNode.id
-      : activeNode?.parentId ?? null
+  // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
+  const parentForNew: string | null = activeNode?.parentId ?? null
 
   const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
 
@@ -149,6 +175,7 @@ export function KnowledgeWorkspace() {
 
   const exportSpaceZip = async () => {
     if (!activeSpaceId) return
+    await flushSave()
     const safe =
       (space?.name ?? 'space').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'space'
     const dest = await pickSavePath({
@@ -382,6 +409,7 @@ export function KnowledgeWorkspace() {
             */}
             <PanelGroup direction="horizontal" className="min-h-0 flex-1">
               <Panel
+                ref={editorPanelRef}
                 id="kb-editor"
                 order={1}
                 defaultSize={sourceLayout === 'split' ? 50 : 100}
@@ -431,6 +459,7 @@ export function KnowledgeWorkspace() {
                     />
                   </PanelResizeHandle>
                   <Panel
+                    ref={previewPanelRef}
                     id="kb-preview"
                     order={2}
                     defaultSize={50}

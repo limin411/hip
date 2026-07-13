@@ -1,7 +1,10 @@
 import { EditorSelection, type EditorState, type TransactionSpec } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 
-/** Wrap the current selection (or insert markers around empty selection). */
+/**
+ * Wrap the current selection (or insert markers around empty selection).
+ * Italic uses single `*` (MVP); prefer toolbar/keymap consistency over CommonMark edge cases.
+ */
 export function wrapSelection(
   state: EditorState,
   before: string,

@@ -125,7 +125,8 @@ interface KnowledgeState {
   setEditing: (v: boolean) => Promise<void>
   setSourceLayout: (layout: KnowledgeSourceLayout) => void
   setDraftBody: (v: string) => void
-  flushSave: () => Promise<void>
+  /** Returns false if a write was attempted and failed. */
+  flushSave: () => Promise<boolean>
   setSearchQuery: (q: string) => void
   toggleFolder: (id: string) => void
   dropRecent: (spaceId: string | null, docId: string) => void
@@ -152,7 +153,7 @@ function indexCurrentDoc(
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
-let saveChain: Promise<void> = Promise.resolve()
+let saveChain: Promise<boolean> = Promise.resolve(true)
 
 function scheduleSave(get: () => KnowledgeState) {
   if (saveTimer) clearTimeout(saveTimer)
@@ -440,7 +441,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   moveNode: async (id, parentId, toIndex) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
-    await get().flushSave()
+    const flushed = await get().flushSave()
+    if (!flushed) return
     set({ busy: true })
     try {
       const nodes = moveNodePure(get().nodes, id, parentId, toIndex)
@@ -472,7 +474,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   deleteNode: async (id) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
-    await get().flushSave()
+    const flushed = await get().flushSave()
+    if (!flushed) return
     set({ busy: true })
     try {
       const { nodes, removedDocIds } = removeNodeSubtree(get().nodes, id)
@@ -560,11 +563,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       clearTimeout(saveTimer)
       saveTimer = null
     }
-    const run = async () => {
+    const run = async (): Promise<boolean> => {
       const s = get()
-      if (!s.editing && s.draftBody === s.docBody) return
-      if (!s.activeSpaceId || !s.activeDocId) return
-      if (s.draftBody === s.docBody) return
+      if (!s.activeSpaceId || !s.activeDocId) return true
+      if (s.draftBody === s.docBody) return true
       set({ saveState: 'saving' })
       try {
         await knowledgeWriteDoc(s.activeSpaceId, s.activeDocId, s.draftBody)
@@ -585,13 +587,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
         }, 1500)
+        return true
       } catch (e) {
         const msg = knowledgeErrorMessage(e)
         set({ saveState: 'error' })
         toast.error(msg)
+        return false
       }
     }
-    saveChain = saveChain.then(run, run)
+    saveChain = saveChain.then(run, () => run())
     return saveChain
   },
 

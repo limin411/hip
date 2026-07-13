@@ -226,3 +226,58 @@ export async function closeKnowledgeChipIfOpen(): Promise<void> {
     await browser.pause(200)
   }
 }
+
+/** Select a layout tab on knowledge-layout-toggle (0=source, 1=split) — index, not i18n label. */
+export async function setKnowledgeLayout(layout: 'source' | 'split'): Promise<void> {
+  const toggle = await browser.$('[data-testid="knowledge-layout-toggle"]')
+  await toggle.waitForExist({ timeout: 10000 })
+  const idx = layout === 'split' ? 1 : 0
+  await browser.execute(
+    (root: HTMLElement, i: number) => {
+      const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
+      tabs[i]?.click()
+    },
+    toggle,
+    idx,
+  )
+  await browser.pause(150)
+}
+
+/** Rename via inline title input. */
+export async function setKnowledgeDocTitle(title: string): Promise<void> {
+  const input = await browser.$('[data-testid="knowledge-doc-title"]')
+  await input.waitForExist({ timeout: 10000 })
+  await browser.execute(
+    (el: HTMLInputElement, v: string) => {
+      el.focus()
+      const proto = window.HTMLInputElement.prototype
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+      desc?.set?.call(el, v)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+      el.blur()
+    },
+    input,
+    title,
+  )
+  await browser.pause(200)
+}
+
+/** Click markdown toolbar bold. */
+export async function clickKnowledgeBold(): Promise<void> {
+  await clickTestId('knowledge-md-bold')
+}
+
+/** Install e2e save-dialog seam returning a fixed path. */
+export async function installSavePathSeam(path: string): Promise<void> {
+  await browser.execute((p: string) => {
+    ;(window as unknown as { __hipSavePath?: () => Promise<string | null> }).__hipSavePath =
+      async () => p
+  }, path)
+}
+
+export async function clearSavePathSeam(): Promise<void> {
+  await browser.execute(() => {
+    delete (window as unknown as { __hipSavePath?: unknown }).__hipSavePath
+  })
+}

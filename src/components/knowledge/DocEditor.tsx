@@ -10,7 +10,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
-import { Prec } from '@codemirror/state'
+import { Compartment, Prec } from '@codemirror/state'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import {
   headingAndDispatch,
@@ -141,6 +141,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   const isDark = useIsDark()
   const [text, setText] = useState(initialValue)
   const viewRef = useRef<EditorView | null>(null)
+  const themeCompartment = useMemo(() => new Compartment(), [])
   const onBlurRef = useRef(onBlur)
   onBlurRef.current = onBlur
   const onDraftChangeRef = useRef(onDraftChange)
@@ -152,6 +153,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     getView: () => viewRef.current,
   }))
 
+  // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
   const extensions = useMemo(() => {
     const blurHandler = EditorView.domEventHandlers({
       blur: () => {
@@ -175,6 +177,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         run: run((v) => wrapAndDispatch(v, '**')),
       },
       {
+        // MVP: single * for italic (see wrapSelection note)
         key: 'Mod-i',
         run: run((v) => wrapAndDispatch(v, '*')),
       },
@@ -222,12 +225,20 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     return [
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
-      buildProseTheme(isDark),
+      themeCompartment.of(buildProseTheme(false)),
       blurHandler,
       highlightSelectionMatches(),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
-  }, [isDark])
+  }, [themeCompartment])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
+    })
+  }, [isDark, themeCompartment])
 
   return (
     <div
@@ -251,6 +262,9 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         autoFocus
         onCreateEditor={(view) => {
           viewRef.current = view
+          view.dispatch({
+            effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
+          })
         }}
         onChange={(v) => {
           setText(v)

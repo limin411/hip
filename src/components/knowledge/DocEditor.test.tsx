@@ -43,6 +43,14 @@ vi.mock('@codemirror/view', () => ({
 
 vi.mock('@codemirror/state', () => ({
   Prec: { highest: (x: unknown) => x },
+  Compartment: class {
+    of(v: unknown) {
+      return v
+    }
+    reconfigure(v: unknown) {
+      return v
+    }
+  },
 }))
 
 vi.mock('@codemirror/search', () => ({

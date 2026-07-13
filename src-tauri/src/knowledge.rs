@@ -414,6 +414,22 @@ fn unique_name(used: &mut std::collections::HashMap<String, u32>, base: &str) ->
     }
 }
 
+/// Reject zip-slip style entries: absolute paths or `..` / empty path components.
+/// Titles like `a..b` are fine after sanitize (they stay a single component).
+fn is_safe_zip_entry(name: &str) -> bool {
+    if name.is_empty() || name.starts_with('/') || name.starts_with('\\') {
+        return false;
+    }
+    for part in name.split(['/', '\\']) {
+        if part.is_empty() || part == "." || part == ".." {
+            return false;
+        }
+    }
+    true
+}
+
+const MAX_IMPORT_DOCS: u32 = 5000;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportDocArgs {
@@ -481,9 +497,13 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         by_id: &HashMap<String, &KnowledgeNode>,
         path_cache: &mut HashMap<String, String>,
         used_at_parent: &mut HashMap<String, HashMap<String, u32>>,
+        visiting: &mut std::collections::HashSet<String>,
     ) -> Result<String, String> {
         if let Some(p) = path_cache.get(id) {
             return Ok(p.clone());
+        }
+        if !visiting.insert(id.to_string()) {
+            return Err(format!("cycle in tree at {id}"));
         }
         let node = by_id.get(id).ok_or_else(|| format!("missing node {id}"))?;
         let base = sanitize_filename(&node.title);
@@ -491,11 +511,12 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         let bucket = used_at_parent.entry(parent_key.clone()).or_default();
         let unique = unique_name(bucket, &base);
         let full = if let Some(ref pid) = node.parent_id {
-            let parent_path = path_for(pid, by_id, path_cache, used_at_parent)?;
+            let parent_path = path_for(pid, by_id, path_cache, used_at_parent, visiting)?;
             format!("{parent_path}/{unique}")
         } else {
             unique
         };
+        visiting.remove(id);
         path_cache.insert(id.to_string(), full.clone());
         Ok(full)
     }
@@ -518,10 +539,16 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
         if n.kind != "doc" {
             continue;
         }
-        let rel = path_for(&n.id, &by_id, &mut path_cache, &mut used_at_parent)?;
+        let mut visiting = std::collections::HashSet::new();
+        let rel = path_for(
+            &n.id,
+            &by_id,
+            &mut path_cache,
+            &mut used_at_parent,
+            &mut visiting,
+        )?;
         let entry_name = format!("{rel}.md");
-        // zip-slip style: reject absolute / parent in entry name
-        if entry_name.contains("..") || entry_name.starts_with('/') {
+        if !is_safe_zip_entry(&entry_name) {
             return Err("illegal export path".into());
         }
         let body = {
@@ -574,13 +601,16 @@ pub fn knowledge_import_folder(
     if !source.is_dir() {
         return Err("sourcePath must be a directory".into());
     }
+    let source_canon = source
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve sourcePath: {e}"))?;
     let name = source
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("Imported")
         .to_string();
 
-    // Create space via same layout as create_space
+    // Create space via same layout as create_space; roll back on failure.
     let space = knowledge_create_space(
         app.clone(),
         CreateSpaceArgs {
@@ -591,14 +621,12 @@ pub fn knowledge_import_folder(
     let root = knowledge_root(&app)?;
     let space_root = space_dir(&root, &space.id)?;
 
-    // Walk .md files (non-recursive first level folders + nested)
     let mut nodes: Vec<KnowledgeNode> = Vec::new();
     let mut imported = 0u32;
     let mut folder_map: std::collections::HashMap<PathBuf, String> =
-        std::collections::HashMap::new(); // rel dir -> folder id
+        std::collections::HashMap::new();
 
     fn ensure_folder_chain(
-        source: &Path,
         rel_dir: &Path,
         folder_map: &mut std::collections::HashMap<PathBuf, String>,
         nodes: &mut Vec<KnowledgeNode>,
@@ -610,7 +638,7 @@ pub fn knowledge_import_folder(
             return Ok(Some(id.clone()));
         }
         let parent_rel = rel_dir.parent().unwrap_or_else(|| Path::new(""));
-        let parent_id = ensure_folder_chain(source, parent_rel, folder_map, nodes)?;
+        let parent_id = ensure_folder_chain(parent_rel, folder_map, nodes)?;
         let title = rel_dir
             .file_name()
             .and_then(|s| s.to_str())
@@ -639,12 +667,11 @@ pub fn knowledge_import_folder(
     }
 
     fn walk_md(
-        source: &Path,
+        source_canon: &Path,
         dir: &Path,
         rel: &Path,
         folder_map: &mut std::collections::HashMap<PathBuf, String>,
         nodes: &mut Vec<KnowledgeNode>,
-        space_root: &Path,
         space_id: &str,
         imported: &mut u32,
         root: &Path,
@@ -657,29 +684,44 @@ pub fn knowledge_import_folder(
             if name_str.starts_with('.') {
                 continue;
             }
-            // path safety: must stay under source
-            if !path.starts_with(source) {
+            // Skip symlinks entirely (prevents escape via link targets).
+            let meta = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() {
                 continue;
             }
-            if path.is_dir() {
+            // Resolved path must stay under source.
+            let Ok(canon) = path.canonicalize() else {
+                continue;
+            };
+            if !canon.starts_with(source_canon) {
+                continue;
+            }
+            if meta.is_dir() {
                 let child_rel = rel.join(&*name_str);
-                ensure_folder_chain(source, &child_rel, folder_map, nodes)?;
+                ensure_folder_chain(&child_rel, folder_map, nodes)?;
                 walk_md(
-                    source,
+                    source_canon,
                     &path,
                     &child_rel,
                     folder_map,
                     nodes,
-                    space_root,
                     space_id,
                     imported,
                     root,
                 )?;
             } else if name_str.to_lowercase().ends_with(".md") {
+                if *imported >= MAX_IMPORT_DOCS {
+                    return Err(format!(
+                        "import exceeds max documents ({MAX_IMPORT_DOCS})"
+                    ));
+                }
                 let parent_id = if rel.as_os_str().is_empty() {
                     None
                 } else {
-                    ensure_folder_chain(source, rel, folder_map, nodes)?
+                    ensure_folder_chain(rel, folder_map, nodes)?
                 };
                 let title = name_str.trim_end_matches(".md").trim_end_matches(".MD");
                 let doc_id = gen_id("doc");
@@ -709,25 +751,42 @@ pub fn knowledge_import_folder(
         Ok(())
     }
 
-    walk_md(
-        &source,
+    let walk_result = walk_md(
+        &source_canon,
         &source,
         Path::new(""),
         &mut folder_map,
         &mut nodes,
-        &space_root,
         &space.id,
         &mut imported,
         &root,
-    )?;
+    );
 
-    write_json_file(
+    if let Err(e) = walk_result {
+        let _ = knowledge_delete_space(
+            app,
+            DeleteSpaceArgs {
+                id: space.id.clone(),
+            },
+        );
+        return Err(e);
+    }
+
+    if let Err(e) = write_json_file(
         &space_root.join("tree.json"),
         &KnowledgeTreeFile {
             version: 1,
             nodes,
         },
-    )?;
+    ) {
+        let _ = knowledge_delete_space(
+            app,
+            DeleteSpaceArgs {
+                id: space.id.clone(),
+            },
+        );
+        return Err(e);
+    }
 
     Ok(ImportFolderResult {
         space_id: space.id,
@@ -740,16 +799,14 @@ pub fn knowledge_reveal_doc(app: AppHandle, args: DocArgs) -> Result<(), String>
     use tauri_plugin_opener::OpenerExt;
     let root = knowledge_root(&app)?;
     let path = doc_path(&root, &args.space_id, &args.doc_id)?;
-    // Ensure parent exists; file may be empty/missing — still reveal parent folder
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    if !path.exists() {
-        // create empty so reveal has a target
-        atomic_write_str(&path, "")?;
-    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| "doc path has no parent".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    // Never write empty files on reveal — show file if present, else docs folder.
+    let target = if path.is_file() { path.as_path() } else { parent };
     app.opener()
-        .reveal_item_in_dir(&path)
+        .reveal_item_in_dir(target)
         .map_err(|e| e.to_string())
 }
 
@@ -800,6 +857,19 @@ mod tests {
         assert!(safe_join(dest, "../evil").is_none());
         assert!(safe_join(dest, "a/../../b").is_none());
         assert!(safe_join(dest, "spc_oktoken1").is_some());
+    }
+
+    #[test]
+    fn sanitize_and_zip_entry_safety() {
+        assert_eq!(sanitize_filename("a/b"), "a_b");
+        assert_eq!(sanitize_filename("  "), "untitled");
+        // substring ".." in a single component is allowed
+        assert!(is_safe_zip_entry("notes..archive.md"));
+        assert!(is_safe_zip_entry("folder/a..b.md"));
+        assert!(!is_safe_zip_entry("../evil.md"));
+        assert!(!is_safe_zip_entry("a/../b.md"));
+        assert!(!is_safe_zip_entry("/abs.md"));
+        assert!(!is_safe_zip_entry(""));
     }
 
     #[test]

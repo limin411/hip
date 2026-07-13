@@ -81,8 +81,8 @@ export function KnowledgeHome() {
           defaultValue: `Imported ${result.importedDocs} documents`,
         }),
       )
+      // loadSpaces rebuilds the search index once
       await useKnowledgeStore.getState().loadSpaces()
-      await useKnowledgeStore.getState().rebuildSearchIndex()
       void openSpace(result.spaceId)
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))

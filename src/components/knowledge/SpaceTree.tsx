@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
-import { listChildren } from '@/domain/knowledge/tree'
+import { isUnderSubtree, listChildren } from '@/domain/knowledge/tree'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 
@@ -24,9 +24,40 @@ interface SpaceTreeProps {
   visibleIds?: Set<string> | null
 }
 
-type DropHint = { targetId: string; mode: 'into' | 'after' } | null
+type DropMode = 'before' | 'into' | 'after'
+type DropHint = { targetId: string; mode: DropMode } | null
 
 const DRAG_MIME = 'application/x-hip-knowledge-node'
+
+function dropModeFor(node: KnowledgeNode, clientY: number, rect: DOMRect): DropMode {
+  const ratio = (clientY - rect.top) / Math.max(rect.height, 1)
+  if (node.kind === 'folder') {
+    if (ratio < 0.25) return 'before'
+    if (ratio > 0.75) return 'after'
+    return 'into'
+  }
+  return ratio < 0.5 ? 'before' : 'after'
+}
+
+/** Whether dropping dragId onto target with mode would form an illegal reparent. */
+function isIllegalDrop(
+  nodes: KnowledgeNode[],
+  dragId: string,
+  target: KnowledgeNode,
+  mode: DropMode,
+): boolean {
+  if (dragId === target.id) return true
+  if (mode === 'into') {
+    // reparent under target folder — illegal if target is under dragId
+    return isUnderSubtree(nodes, dragId, target.id)
+  }
+  // before/after: parent is target.parentId — illegal if that parent is under dragId
+  // (only when parent is a descendant of dragged folder)
+  if (target.parentId != null && isUnderSubtree(nodes, dragId, target.parentId)) {
+    return true
+  }
+  return false
+}
 
 export function SpaceTree({
   onRename,
@@ -59,25 +90,21 @@ export function SpaceTree({
     )
   }
 
-  const onDropNode = (target: KnowledgeNode, dragId: string) => {
-    if (!dragId || dragId === target.id || busy) {
+  const applyDrop = (target: KnowledgeNode, dragId: string, mode: DropMode) => {
+    if (busy || isIllegalDrop(nodes, dragId, target, mode)) {
       setDropHint(null)
       setDraggingId(null)
       return
     }
-    // Temporarily set for resolveDrop cycle checks via draggingId
-    setDraggingId(dragId)
-    if (target.kind === 'folder') {
+    if (mode === 'into' && target.kind === 'folder') {
       const kids = listChildren(nodes, target.id)
       void moveNode(dragId, target.id, kids.length)
     } else {
       const siblings = listChildren(nodes, target.parentId)
       const idx = siblings.findIndex((s) => s.id === target.id)
-      void moveNode(
-        dragId,
-        target.parentId,
-        idx < 0 ? siblings.length : idx + 1,
-      )
+      const base = idx < 0 ? siblings.length : idx
+      const toIndex = mode === 'before' ? base : base + 1
+      void moveNode(dragId, target.parentId, toIndex)
     }
     setDropHint(null)
     setDraggingId(null)
@@ -87,8 +114,7 @@ export function SpaceTree({
     if (visibleIds && !visibleIds.has(node.id)) return null
 
     const spaceId = activeSpaceId ?? ''
-    const parentForNew =
-      node.kind === 'folder' ? node.id : node.parentId
+    const parentForNew = node.kind === 'folder' ? node.id : node.parentId
 
     const row = (
       <div
@@ -112,12 +138,16 @@ export function SpaceTree({
         }}
         onDragOver={(e) => {
           if (!draggingId || draggingId === node.id) return
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          const mode = dropModeFor(node, e.clientY, rect)
+          if (isIllegalDrop(nodes, draggingId, node, mode)) {
+            e.dataTransfer.dropEffect = 'none'
+            setDropHint(null)
+            return
+          }
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
-          setDropHint({
-            targetId: node.id,
-            mode: node.kind === 'folder' ? 'into' : 'after',
-          })
+          setDropHint({ targetId: node.id, mode })
         }}
         onDragLeave={() => {
           setDropHint((h) => (h?.targetId === node.id ? null : h))
@@ -126,7 +156,9 @@ export function SpaceTree({
           e.preventDefault()
           const id = e.dataTransfer.getData(DRAG_MIME) || draggingId
           if (!id) return
-          onDropNode(node, id)
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          const mode = dropModeFor(node, e.clientY, rect)
+          applyDrop(node, id, mode)
         }}
         className={cn(
           'group flex w-full items-center gap-0.5 rounded-md py-1 pr-1 text-body transition-colors',
@@ -137,6 +169,9 @@ export function SpaceTree({
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
             'ring-1 ring-accent/40 bg-state-hover',
+          dropHint?.targetId === node.id &&
+            dropHint.mode === 'before' &&
+            'border-t-2 border-accent',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'after' &&
             'border-b-2 border-accent',
@@ -197,9 +232,7 @@ export function SpaceTree({
           onRename: () => onRename(node),
           onDelete: () => onDelete(node),
           onReveal:
-            node.kind === 'doc' && onReveal
-              ? () => onReveal(node)
-              : undefined,
+            node.kind === 'doc' && onReveal ? () => onReveal(node) : undefined,
         }}
       >
         {row}
@@ -225,12 +258,10 @@ export function SpaceTree({
       data-testid="knowledge-tree"
       onDragOver={(e) => {
         if (!draggingId) return
-        // allow drop on root blank
         e.preventDefault()
       }}
       onDrop={(e) => {
         if (!draggingId || busy) return
-        // only if target is the tree root (not a row)
         if ((e.target as HTMLElement).closest('[data-testid^="knowledge-tree-"]')) return
         e.preventDefault()
         const kids = listChildren(nodes, null)

@@ -83,7 +83,14 @@ export function KnowledgeHome() {
       )
       // loadSpaces rebuilds the search index once
       await useKnowledgeStore.getState().loadSpaces()
-      void openSpace(result.spaceId)
+      await openSpace(result.spaceId)
+      // Expand all folders so nested imports are visible immediately
+      const st = useKnowledgeStore.getState()
+      const expand: Record<string, boolean> = { ...st.expandedFolderIds }
+      for (const n of st.nodes) {
+        if (n.kind === 'folder') expand[n.id] = true
+      }
+      useKnowledgeStore.setState({ expandedFolderIds: expand })
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
     }

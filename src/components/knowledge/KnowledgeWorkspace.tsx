@@ -207,6 +207,7 @@ export function KnowledgeWorkspace() {
         <div className="flex flex-col gap-2 border-b border-border p-3">
           <button
             type="button"
+            data-testid="knowledge-back-home"
             className="flex items-center gap-1 text-meta text-ink-secondary hover:text-ink"
             onClick={() => void openHome()}
           >

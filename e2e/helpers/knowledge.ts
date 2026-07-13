@@ -281,3 +281,129 @@ export async function clearSavePathSeam(): Promise<void> {
     delete (window as unknown as { __hipSavePath?: unknown }).__hipSavePath
   })
 }
+
+/** Install directory picker seam (import / project pick). */
+export async function installPickDirSeam(dir: string): Promise<void> {
+  await browser.execute((d: string) => {
+    ;(window as unknown as { __hipPickDir?: () => Promise<string | null> }).__hipPickDir =
+      async () => d
+  }, dir)
+}
+
+export async function clearPickDirSeam(): Promise<void> {
+  await browser.execute(() => {
+    delete (window as unknown as { __hipPickDir?: unknown }).__hipPickDir
+  })
+}
+
+/** Navigate to knowledge home from workspace (back button). */
+export async function goKnowledgeHome(): Promise<void> {
+  const back = await browser.$('[data-testid="knowledge-back-home"]')
+  await back.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), back)
+  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
+}
+
+/** First folder row testid under the tree, or null. */
+export async function firstKnowledgeFolderTestId(): Promise<string | null> {
+  return browser.execute(() => {
+    const el = document.querySelector('[data-testid^="knowledge-tree-folder-"]')
+    return el?.getAttribute('data-testid') ?? null
+  })
+}
+
+/**
+ * Expand collapsed folders only (lucide-chevron-right = collapsed).
+ * Never click open folders (avoids collapse).
+ */
+export async function expandAllKnowledgeFolders(): Promise<void> {
+  for (let pass = 0; pass < 6; pass++) {
+    const toClick = await browser.execute(() => {
+      const ids: string[] = []
+      document.querySelectorAll('[data-testid^="knowledge-tree-folder-"]').forEach((row) => {
+        const tid = row.getAttribute('data-testid')
+        if (!tid) return
+        // Collapsed folders use ChevronRight icon
+        if (row.querySelector('svg.lucide-chevron-right')) {
+          ids.push(tid)
+        }
+      })
+      return ids
+    })
+    if (!toClick.length) break
+    for (const tid of toClick) {
+      await browser.execute((id: string) => {
+        document
+          .querySelector(`[data-testid="${id}"]`)
+          ?.querySelector('button')
+          ?.click()
+      }, tid)
+      await browser.pause(80)
+    }
+    await browser.pause(150)
+  }
+}
+
+/** All doc row testids currently in the tree. */
+export async function listKnowledgeDocTestIds(): Promise<string[]> {
+  return browser.execute(() =>
+    Array.from(document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]')).map(
+      (el) => el.getAttribute('data-testid') ?? '',
+    ).filter(Boolean),
+  )
+}
+
+/**
+ * Synthetic HTML5 DnD: drag source row onto target row (into folder / after doc).
+ * Uses the same MIME type as SpaceTree.
+ */
+export async function dndKnowledgeTreeNode(
+  sourceTestId: string,
+  targetTestId: string,
+): Promise<void> {
+  await browser.execute(
+    (srcId: string, tgtId: string) => {
+      const source = document.querySelector(`[data-testid="${srcId}"]`) as HTMLElement | null
+      const target = document.querySelector(`[data-testid="${tgtId}"]`) as HTMLElement | null
+      if (!source || !target) throw new Error(`dnd nodes missing: ${srcId} -> ${tgtId}`)
+
+      const dt = new DataTransfer()
+      const mime = 'application/x-hip-knowledge-node'
+      // extract id from knowledge-tree-doc-XXX or knowledge-tree-folder-XXX
+      const nodeId = srcId.replace(/^knowledge-tree-(doc|folder)-/, '')
+      dt.setData(mime, nodeId)
+      dt.effectAllowed = 'move'
+
+      source.dispatchEvent(
+        new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }),
+      )
+      // Drop into folder center (into) or on doc (after)
+      const rect = target.getBoundingClientRect()
+      const clientY = rect.top + rect.height * 0.5
+      target.dispatchEvent(
+        new DragEvent('dragover', {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: dt,
+          clientY,
+          clientX: rect.left + rect.width / 2,
+        }),
+      )
+      target.dispatchEvent(
+        new DragEvent('drop', {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: dt,
+          clientY,
+          clientX: rect.left + rect.width / 2,
+        }),
+      )
+      source.dispatchEvent(
+        new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }),
+      )
+    },
+    sourceTestId,
+    targetTestId,
+  )
+  await browser.pause(400)
+}

@@ -394,6 +394,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
       set({ nodes, busy: false })
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+      }
       get().runSearch(get().searchQuery)
       // openDoc defaults to editing: true
       await get().openDoc(id)

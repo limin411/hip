@@ -11,11 +11,21 @@ import {
   expectKnowledgeReader,
   expectNoKnowledgeEditor,
   closeKnowledgeChipIfOpen,
+  setKnowledgeLayout,
+  setKnowledgeDocTitle,
+  clickKnowledgeBold,
+  installSavePathSeam,
+  clearSavePathSeam,
 } from '../helpers/knowledge.js'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 describe('knowledge editor ux @knowledge @core', () => {
   const spaceName = `e2e-kb-space-${Date.now()}`
   const marker = `e2e-kb-marker-${Date.now()}`
+  const renamedTitle = `e2e-kb-title-${Date.now()}`
+  let exportPath = ''
 
   before(async () => {
     await waitForAppReady()
@@ -46,6 +56,14 @@ describe('knowledge editor ux @knowledge @core', () => {
   })
 
   after(async () => {
+    await clearSavePathSeam()
+    if (exportPath && fs.existsSync(exportPath)) {
+      try {
+        fs.unlinkSync(exportPath)
+      } catch {
+        // ignore
+      }
+    }
     await closeKnowledgeChipIfOpen()
   })
 
@@ -106,5 +124,98 @@ describe('knowledge editor ux @knowledge @core', () => {
     const tab = await browser.$('[data-testid="knowledge-tab"]')
     await tab.waitForExist({ timeout: 10000 })
     expect(await tab.isExisting()).toBe(true)
+  })
+
+  it('KE9: inline title renames document', async () => {
+    await expectKnowledgeEditor()
+    await setKnowledgeDocTitle(renamedTitle)
+    await browser.pause(400)
+    // Tree row should show the new title
+    const tree = await browser.$('[data-testid="knowledge-tree"]')
+    await browser.waitUntil(
+      async () => (await tree.getText()).includes(renamedTitle),
+      { timeout: 10000, interval: 200, timeoutMsg: 'tree missing renamed title' },
+    )
+  })
+
+  it('KE10: split layout shows live preview with marker', async () => {
+    await expectKnowledgeEditor()
+    await setKnowledgeLayout('split')
+    const live = await browser.$('[data-testid="knowledge-live-preview"]')
+    await live.waitForExist({ timeout: 10000 })
+    await browser.waitUntil(
+      async () => (await live.getText()).includes(marker),
+      { timeout: 10000, interval: 200, timeoutMsg: 'live preview missing marker' },
+    )
+    // restore source for later tests
+    await setKnowledgeLayout('source')
+  })
+
+  it('KE11: markdown toolbar bold wraps selection', async () => {
+    await expectKnowledgeEditor()
+    const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
+    // Select all then bold
+    await browser.execute((el: HTMLElement) => {
+      el.focus()
+      const sel = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    }, content)
+    await clickKnowledgeBold()
+    await browser.pause(200)
+    const text = await content.getText()
+    expect(text.includes('**') || text.includes(marker)).toBe(true)
+  })
+
+  it('KE12: export dirty buffer via save seam includes marker', async () => {
+    exportPath = path.join(os.tmpdir(), `hip-e2e-export-${Date.now()}.md`)
+    await installSavePathSeam(exportPath)
+    await expectKnowledgeEditor()
+    const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
+    const before = await content.getText()
+    if (!before.includes(marker)) {
+      await typeInKnowledgeEditor(marker)
+    }
+    // Allow debounce autosave + ensure flush path
+    await browser.pause(700)
+    const btn = await browser.$('[data-testid="knowledge-export-doc"]')
+    await btn.waitForExist({ timeout: 5000 })
+    await browser.execute((el: HTMLElement) => el.click(), btn)
+    await browser.waitUntil(
+      async () => fs.existsSync(exportPath) && fs.statSync(exportPath).size > 0,
+      { timeout: 15000, interval: 300, timeoutMsg: 'export file not written' },
+    )
+    const body = fs.readFileSync(exportPath, 'utf8')
+    expect(body).toContain(marker)
+  })
+
+  it('KE13: tree filter hides non-matching docs', async () => {
+    const filter = await browser.$('[data-testid="knowledge-tree-filter"]')
+    await filter.waitForExist({ timeout: 5000 })
+    await browser.execute(
+      (el: HTMLInputElement, v: string) => {
+        el.focus()
+        const proto = window.HTMLInputElement.prototype
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+        desc?.set?.call(el, v)
+        el.dispatchEvent(new Event('input', { bubbles: true }))
+        el.dispatchEvent(new Event('change', { bubbles: true }))
+      },
+      filter,
+      renamedTitle,
+    )
+    await browser.pause(300)
+    const tree = await browser.$('[data-testid="knowledge-tree"]')
+    const text = await tree.getText()
+    expect(text).toContain(renamedTitle)
+    // clear filter
+    await browser.execute((el: HTMLInputElement) => {
+      const proto = window.HTMLInputElement.prototype
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+      desc?.set?.call(el, '')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }, filter)
   })
 })

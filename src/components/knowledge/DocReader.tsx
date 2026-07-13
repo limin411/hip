@@ -1,19 +1,30 @@
+import { useTranslation } from 'react-i18next'
+import { FileText } from 'lucide-react'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
+import { EmptyState } from '@/components/ui/EmptyState'
 
 interface DocReaderProps {
   content: string
 }
 
 export function DocReader({ content }: DocReaderProps) {
+  const { t } = useTranslation()
+
   if (!content.trim()) {
     return (
-      <p className="text-body text-ink-tertiary" data-testid="knowledge-doc-empty">
-        —
-      </p>
+      <div data-testid="knowledge-doc-empty">
+        <EmptyState
+          icon={FileText}
+          title={t('knowledge.doc.emptyTitle')}
+          description={t('knowledge.doc.emptyHint')}
+          className="border-0 py-16"
+        />
+      </div>
     )
   }
+
   return (
-    <div data-testid="knowledge-doc-reader" className="max-w-3xl">
+    <div data-testid="knowledge-doc-reader" className="mx-auto w-full max-w-3xl">
       <MarkdownBody content={content} />
     </div>
   )

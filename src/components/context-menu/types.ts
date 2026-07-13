@@ -24,6 +24,7 @@ export type ContextKind =
   | 'plugin'
   | 'chatEmpty'
   | 'artifactChrome'
+  | 'knowledgeNode'
 
 export type ContextGroupId =
   | 'primary'
@@ -101,6 +102,20 @@ export type ContextPayloadMap = {
   }
   chatEmpty: { sessionId: string | null }
   artifactChrome: { tab: string }
+  /**
+   * Knowledge tree node. Hosts supply callbacks so menus reuse Workspace modals
+   * (same pattern as skillConfig / agentConfig).
+   */
+  knowledgeNode: {
+    nodeId: string
+    kind: 'folder' | 'doc'
+    spaceId: string
+    onNewDoc: () => void
+    onNewFolder: () => void
+    onRename: () => void
+    onDelete: () => void
+    onReveal?: () => void
+  }
 }
 
 /** Discriminated union so `req.kind` narrows `req.payload` in providers. */

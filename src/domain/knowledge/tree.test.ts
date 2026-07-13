@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import {
   assertTreeInvariants,
+  collectDocIdsInSubtree,
   filterNodesByTitle,
+  filterTreeVisible,
+  getPath,
   getPathTitles,
   insertNode,
   listChildren,
+  moveNode,
   nextOrder,
   removeNodeSubtree,
   renameNode,
@@ -48,6 +52,56 @@ describe('knowledge tree helpers', () => {
 
   it('getPathTitles walks to root', () => {
     expect(getPathTitles([folder, docA], 'doc_aaaaaaa1')).toEqual(['决策', '权限 v2'])
+  })
+
+  it('getPath returns nodes by id (duplicate titles safe)', () => {
+    const path = getPath([folder, docA], 'doc_aaaaaaa1')
+    expect(path.map((p) => p.id)).toEqual(['nod_folder001', 'doc_aaaaaaa1'])
+  })
+
+  it('filterTreeVisible includes matches and ancestors', () => {
+    const visible = filterTreeVisible([folder, docA, docB, rootDoc], 'faq')
+    expect(visible).not.toBeNull()
+    expect(visible!.has('doc_bbbbbbb2')).toBe(true)
+    expect(visible!.has('nod_folder001')).toBe(true)
+    expect(visible!.has('doc_aaaaaaa1')).toBe(false)
+  })
+
+  it('filterTreeVisible null when query empty', () => {
+    expect(filterTreeVisible([folder], '  ')).toBeNull()
+  })
+
+  it('moveNode reparents and reorders', () => {
+    const next = moveNode([folder, docA, docB, rootDoc], 'doc_bbbbbbb2', null, 0, 50)
+    const moved = next.find((x) => x.id === 'doc_bbbbbbb2')!
+    expect(moved.parentId).toBeNull()
+    expect(moved.order).toBe(0)
+    assertTreeInvariants(next)
+  })
+
+  it('moveNode rejects cycle into descendant folder', () => {
+    const child = n({
+      id: 'nod_child0001',
+      kind: 'folder',
+      title: '子',
+      parentId: 'nod_folder001',
+      order: 2,
+    })
+    expect(() =>
+      moveNode([folder, child], 'nod_folder001', 'nod_child0001', 0),
+    ).toThrow(/descendant/)
+  })
+
+  it('moveNode rejects doc as parent', () => {
+    expect(() =>
+      moveNode([folder, docA, docB], 'doc_bbbbbbb2', 'doc_aaaaaaa1', 0),
+    ).toThrow(/folder/)
+  })
+
+  it('collectDocIdsInSubtree includes nested docs', () => {
+    expect(collectDocIdsInSubtree([folder, docA, docB], 'nod_folder001').sort()).toEqual(
+      ['doc_aaaaaaa1', 'doc_bbbbbbb2'].sort(),
+    )
   })
 
   it('insertNode appends immutably', () => {

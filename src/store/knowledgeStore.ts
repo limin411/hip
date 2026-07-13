@@ -2,7 +2,15 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
-import { getPathTitles, insertNode, nextOrder, removeNodeSubtree, renameNode } from '@/domain/knowledge/tree'
+import {
+  collectDocIdsInSubtree,
+  getPathTitles,
+  insertNode,
+  moveNode as moveNodePure,
+  nextOrder,
+  removeNodeSubtree,
+  renameNode,
+} from '@/domain/knowledge/tree'
 import {
   createKnowledgeIndex,
   docKey,
@@ -31,6 +39,28 @@ let indexBuildGen = 0
 
 const RECENT_KEY = 'hip-knowledge-recent'
 const RECENT_CAP = 20
+const LAYOUT_KEY = 'hip-knowledge-source-layout'
+
+export type KnowledgeSourceLayout = 'source' | 'split'
+
+function loadSourceLayout(): KnowledgeSourceLayout {
+  if (typeof localStorage === 'undefined') return 'source'
+  try {
+    const v = localStorage.getItem(LAYOUT_KEY)
+    return v === 'split' ? 'split' : 'source'
+  } catch {
+    return 'source'
+  }
+}
+
+function persistSourceLayout(layout: KnowledgeSourceLayout) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(LAYOUT_KEY, layout)
+  } catch {
+    // ignore quota
+  }
+}
 
 function loadRecent(): KnowledgeRecentItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -65,6 +95,8 @@ interface KnowledgeState {
   docBody: string
   draftBody: string
   editing: boolean
+  /** Meaningful when editing; persisted in localStorage. */
+  sourceLayout: KnowledgeSourceLayout
   mode: 'home' | 'workspace'
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
@@ -84,14 +116,17 @@ interface KnowledgeState {
   openSpace: (id: string, opts?: { selectDocId?: string }) => Promise<void>
   openRecent: (item: KnowledgeRecentItem) => Promise<void>
   openHome: () => Promise<void>
-  createFolder: (parentId: string | null) => Promise<void>
+  createFolder: (parentId: string | null, title: string) => Promise<void>
   createDoc: (parentId: string | null, title: string) => Promise<void>
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
+  moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
   openDoc: (id: string) => Promise<void>
   setEditing: (v: boolean) => Promise<void>
+  setSourceLayout: (layout: KnowledgeSourceLayout) => void
   setDraftBody: (v: string) => void
-  flushSave: () => Promise<void>
+  /** Returns false if a write was attempted and failed. */
+  flushSave: () => Promise<boolean>
   setSearchQuery: (q: string) => void
   toggleFolder: (id: string) => void
   dropRecent: (spaceId: string | null, docId: string) => void
@@ -118,7 +153,7 @@ function indexCurrentDoc(
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
-let saveChain: Promise<void> = Promise.resolve()
+let saveChain: Promise<boolean> = Promise.resolve(true)
 
 function scheduleSave(get: () => KnowledgeState) {
   if (saveTimer) clearTimeout(saveTimer)
@@ -137,6 +172,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   docBody: '',
   draftBody: '',
   editing: false,
+  sourceLayout: loadSourceLayout(),
   mode: 'home',
   searchQuery: '',
   searchHits: [],
@@ -308,7 +344,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })
   },
 
-  createFolder: async (parentId) => {
+  createFolder: async (parentId, title) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
     set({ busy: true })
@@ -318,7 +354,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         id: newFolderId(),
         parentId,
         kind: 'folder' as const,
-        title: 'New folder',
+        title: title.trim() || 'New folder',
         order: nextOrder(get().nodes, parentId),
         createdAt: now,
         updatedAt: now,
@@ -358,6 +394,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
       set({ nodes, busy: false })
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+      }
       get().runSearch(get().searchQuery)
       // openDoc defaults to editing: true
       await get().openDoc(id)
@@ -402,10 +441,44 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
+  moveNode: async (id, parentId, toIndex) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    const flushed = await get().flushSave()
+    if (!flushed) return
+    set({ busy: true })
+    try {
+      const nodes = moveNodePure(get().nodes, id, parentId, toIndex)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      set({ nodes, busy: false })
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+      }
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      const docIds = collectDocIdsInSubtree(nodes, id)
+      for (const docId of docIds) {
+        const title = nodes.find((n) => n.id === docId)?.title ?? ''
+        let body = ''
+        try {
+          body = await knowledgeReadDoc(spaceId, docId)
+        } catch {
+          body = get().activeDocId === docId ? get().docBody : ''
+        }
+        indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
+      }
+      get().runSearch(get().searchQuery)
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+    }
+  },
+
   deleteNode: async (id) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
-    await get().flushSave()
+    const flushed = await get().flushSave()
+    if (!flushed) return
     set({ busy: true })
     try {
       const { nodes, removedDocIds } = removeNodeSubtree(get().nodes, id)
@@ -476,6 +549,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
+  setSourceLayout: (layout) => {
+    if (layout !== 'source' && layout !== 'split') return
+    if (get().sourceLayout === layout) return
+    persistSourceLayout(layout)
+    set({ sourceLayout: layout })
+  },
+
   setDraftBody: (v) => {
     set({ draftBody: v })
     if (get().editing) scheduleSave(get)
@@ -486,11 +566,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       clearTimeout(saveTimer)
       saveTimer = null
     }
-    const run = async () => {
+    const run = async (): Promise<boolean> => {
       const s = get()
-      if (!s.editing && s.draftBody === s.docBody) return
-      if (!s.activeSpaceId || !s.activeDocId) return
-      if (s.draftBody === s.docBody) return
+      if (!s.activeSpaceId || !s.activeDocId) return true
+      if (s.draftBody === s.docBody) return true
       set({ saveState: 'saving' })
       try {
         await knowledgeWriteDoc(s.activeSpaceId, s.activeDocId, s.draftBody)
@@ -511,13 +590,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
         }, 1500)
+        return true
       } catch (e) {
         const msg = knowledgeErrorMessage(e)
         set({ saveState: 'error' })
         toast.error(msg)
+        return false
       }
     }
-    saveChain = saveChain.then(run, run)
+    saveChain = saveChain.then(run, () => run())
     return saveChain
   },
 
@@ -540,3 +621,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     })
   },
 }))
+
+/** Palette / external search against the live MiniSearch index. */
+export function searchKnowledgeDocs(q: string, limit = 20): KnowledgeSearchHit[] {
+  return searchKnowledge(kbIndex, q, limit)
+}
+
+export function isKnowledgeIndexReady(): boolean {
+  return useKnowledgeStore.getState().indexStatus === 'ready'
+}

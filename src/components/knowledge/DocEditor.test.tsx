@@ -35,9 +35,34 @@ vi.mock('@codemirror/language-data', () => ({
 vi.mock('@codemirror/view', () => ({
   EditorView: {
     lineWrapping: {},
-    theme: () => ({}),
+    theme: (_styles?: unknown, _opts?: unknown) => ({}),
     domEventHandlers: () => ({}),
   },
+  keymap: { of: () => ({}) },
+}))
+
+vi.mock('@codemirror/state', () => ({
+  Prec: { highest: (x: unknown) => x },
+  Compartment: class {
+    of(v: unknown) {
+      return v
+    }
+    reconfigure(v: unknown) {
+      return v
+    }
+  },
+}))
+
+vi.mock('@codemirror/search', () => ({
+  searchKeymap: [],
+  highlightSelectionMatches: () => ({}),
+}))
+
+vi.mock('@/domain/knowledge/mdEdit', () => ({
+  headingAndDispatch: () => true,
+  insertFence: () => true,
+  prefixAndDispatch: () => true,
+  wrapAndDispatch: () => true,
 }))
 
 afterEach(() => cleanup())

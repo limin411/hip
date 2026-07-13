@@ -26,19 +26,51 @@ export function listChildren(nodes: KnowledgeNode[], parentId: string | null): K
   return nodes.filter((n) => n.parentId === parentId).sort(compareNodes)
 }
 
-export function getPathTitles(nodes: KnowledgeNode[], nodeId: string): string[] {
+/** Ancestor chain root → node (inclusive), by id — safe with duplicate titles. */
+export function getPath(nodes: KnowledgeNode[], nodeId: string): KnowledgeNode[] {
   const byId = new Map(nodes.map((n) => [n.id, n]))
-  const titles: string[] = []
+  const chain: KnowledgeNode[] = []
   let cur = byId.get(nodeId)
   const seen = new Set<string>()
   while (cur) {
     if (seen.has(cur.id)) break
     seen.add(cur.id)
-    titles.unshift(cur.title)
+    chain.unshift(cur)
     if (cur.parentId == null) break
     cur = byId.get(cur.parentId)
   }
-  return titles
+  return chain
+}
+
+export function getPathTitles(nodes: KnowledgeNode[], nodeId: string): string[] {
+  return getPath(nodes, nodeId).map((n) => n.title)
+}
+
+/**
+ * Visible set for tree filter: title matches ∪ ancestors of matches.
+ * Empty query returns null (caller shows full tree).
+ */
+export function filterTreeVisible(
+  nodes: KnowledgeNode[],
+  query: string,
+): Set<string> | null {
+  const q = query.trim().toLowerCase()
+  if (!q) return null
+  const matches = filterNodesByTitle(nodes, q)
+  const visible = new Set<string>()
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  for (const m of matches) {
+    let cur: KnowledgeNode | undefined = m
+    const seen = new Set<string>()
+    while (cur) {
+      if (seen.has(cur.id)) break
+      seen.add(cur.id)
+      visible.add(cur.id)
+      if (cur.parentId == null) break
+      cur = byId.get(cur.parentId)
+    }
+  }
+  return visible
 }
 
 export function insertNode(nodes: KnowledgeNode[], node: KnowledgeNode): KnowledgeNode[] {
@@ -80,6 +112,101 @@ export function nextOrder(nodes: KnowledgeNode[], parentId: string | null): numb
   const children = nodes.filter((n) => n.parentId === parentId)
   if (children.length === 0) return 0
   return Math.max(...children.map((n) => n.order)) + 1
+}
+
+/** True if `maybeDescendantId` is `ancestorId` or under it. */
+export function isUnderSubtree(
+  nodes: KnowledgeNode[],
+  ancestorId: string,
+  maybeDescendantId: string,
+): boolean {
+  if (ancestorId === maybeDescendantId) return true
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  let cur: string | null | undefined = maybeDescendantId
+  const seen = new Set<string>()
+  while (cur) {
+    if (cur === ancestorId) return true
+    if (seen.has(cur)) break
+    seen.add(cur)
+    cur = byId.get(cur)?.parentId
+  }
+  return false
+}
+
+/**
+ * Move node under newParentId at sibling index `toIndex` (0-based among new siblings).
+ * Dropping onto a doc: caller passes that doc's parentId and toIndex after the doc.
+ */
+export function moveNode(
+  nodes: KnowledgeNode[],
+  id: string,
+  newParentId: string | null,
+  toIndex?: number,
+  now = Date.now(),
+): KnowledgeNode[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const node = byId.get(id)
+  if (!node) throw new Error(`missing node ${id}`)
+  if (newParentId === id) throw new Error('cannot parent to self')
+  if (newParentId != null) {
+    const parent = byId.get(newParentId)
+    if (!parent || parent.kind !== 'folder') {
+      throw new Error('newParentId must be a folder or null')
+    }
+    if (isUnderSubtree(nodes, id, newParentId)) {
+      throw new Error('cannot move into own descendant')
+    }
+  }
+
+  const oldParentId = node.parentId
+  let next = nodes.map((n) =>
+    n.id === id ? { ...n, parentId: newParentId, updatedAt: now } : { ...n },
+  )
+
+  const reindexSiblings = (
+    parentId: string | null,
+    insertId: string | null,
+    insertAt: number | undefined,
+  ) => {
+    let kids = listChildren(next, parentId)
+    if (insertId != null) {
+      kids = kids.filter((k) => k.id !== insertId)
+      const moved = next.find((n) => n.id === insertId)
+      if (moved) {
+        const idx =
+          insertAt === undefined
+            ? kids.length
+            : Math.max(0, Math.min(insertAt, kids.length))
+        kids = [...kids.slice(0, idx), moved, ...kids.slice(idx)]
+      }
+    }
+    const orderById = new Map(kids.map((k, i) => [k.id, i] as const))
+    next = next.map((n) => {
+      if (n.parentId === parentId && orderById.has(n.id)) {
+        return { ...n, order: orderById.get(n.id)! }
+      }
+      return n
+    })
+  }
+
+  if (oldParentId !== newParentId) {
+    reindexSiblings(oldParentId, null, undefined)
+  }
+  reindexSiblings(newParentId, id, toIndex)
+  return next
+}
+
+/** Collect all doc ids under a node (including self if doc). */
+export function collectDocIdsInSubtree(nodes: KnowledgeNode[], rootId: string): string[] {
+  const ids: string[] = []
+  const walk = (id: string) => {
+    const n = nodes.find((x) => x.id === id)
+    if (!n) return
+    if (n.kind === 'doc') ids.push(n.id)
+    for (const c of listChildren(nodes, id)) walk(c.id)
+  }
+  walk(rootId)
+  return ids
 }
 
 export function filterNodesByTitle(nodes: KnowledgeNode[], query: string): KnowledgeNode[] {

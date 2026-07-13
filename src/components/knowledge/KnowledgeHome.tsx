@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, MoreHorizontal, Plus } from 'lucide-react'
+import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +13,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/DropdownMenu'
+import { pickDirectory } from '@/ipc/dialog'
+import { knowledgeErrorMessage, knowledgeImportFolder } from '@/ipc/knowledge'
 
 export function KnowledgeHome() {
   const { t } = useTranslation()
@@ -67,30 +70,72 @@ export function KnowledgeHome() {
     setDeleteId(null)
   }
 
+  const importFolder = async () => {
+    const dir = await pickDirectory()
+    if (!dir) return
+    try {
+      const result = await knowledgeImportFolder(dir)
+      toast.success(
+        t('knowledge.import.done', {
+          count: result.importedDocs,
+          defaultValue: `Imported ${result.importedDocs} documents`,
+        }),
+      )
+      // loadSpaces rebuilds the search index once
+      await useKnowledgeStore.getState().loadSpaces()
+      await openSpace(result.spaceId)
+      // Expand all folders so nested imports are visible immediately
+      const st = useKnowledgeStore.getState()
+      const expand: Record<string, boolean> = { ...st.expandedFolderIds }
+      for (const n of st.nodes) {
+        if (n.kind === 'folder') expand[n.id] = true
+      }
+      useKnowledgeStore.setState({ expandedFolderIds: expand })
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto" data-testid="knowledge-home">
-      <div className="mx-auto w-full max-w-4xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="mx-auto w-full max-w-4xl px-6 py-6">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-display font-semibold text-ink">{t('knowledge.title')}</h1>
             <p className="mt-1 text-body text-ink-secondary">{t('knowledge.home.subtitle')}</p>
           </div>
-          <Button
-            data-testid="knowledge-create-space"
-            onClick={() => setCreateOpen(true)}
-            disabled={busy}
-          >
-            <Plus size={14} className="mr-1" />
-            {t('knowledge.home.createSpace')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-import-folder"
+              onClick={() => void importFolder()}
+              disabled={busy}
+            >
+              <Upload size={14} className="mr-1" />
+              {t('knowledge.import.folder')}
+            </Button>
+            <Button
+              data-testid="knowledge-create-space"
+              onClick={() => setCreateOpen(true)}
+              disabled={busy}
+            >
+              <Plus size={14} className="mr-1" />
+              {t('knowledge.home.createSpace')}
+            </Button>
+          </div>
         </div>
 
-        <div className="mb-6">
+        <div className="relative mb-6 max-w-md">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
+          />
           <Input
             data-testid="knowledge-search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('knowledge.home.searchPlaceholder')}
+            className="pl-9"
           />
           {q && indexStatus === 'building' && (
             <p className="mt-1 text-meta text-ink-tertiary">{t('knowledge.home.searchIndexing')}</p>
@@ -99,19 +144,16 @@ export function KnowledgeHome() {
 
         {q && searchHits.length > 0 && (
           <>
-            <p className="mb-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+            <p className="mb-2 text-meta font-medium text-ink-secondary">
               {t('knowledge.home.searchResults')}
             </p>
-            <div
-              className="mb-8 overflow-hidden rounded-xl border border-border"
-              data-testid="knowledge-search-results"
-            >
+            <div className="mb-8 flex flex-col gap-2" data-testid="knowledge-search-results">
               {searchHits.map((hit) => (
                 <button
                   key={`${hit.spaceId}:${hit.docId}`}
                   type="button"
                   data-testid="knowledge-search-hit"
-                  className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-3 text-left last:border-0 hover:bg-state-hover"
+                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent hover:bg-surface-subtle"
                   onClick={() =>
                     void openRecent({
                       spaceId: hit.spaceId,
@@ -122,10 +164,21 @@ export function KnowledgeHome() {
                     })
                   }
                 >
-                  <div className="truncate text-body text-ink">{hit.title}</div>
-                  <div className="truncate text-meta text-ink-tertiary">
-                    {hit.spaceName}
-                    {hit.path ? ` · ${hit.path}` : ''}
+                  <FileText size={16} className="shrink-0 text-ink-tertiary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-body text-ink">{hit.title}</div>
+                    <div className="truncate text-meta text-ink-tertiary">
+                      {hit.spaceName}
+                      {hit.path ? ` · ${hit.path}` : ''}
+                    </div>
+                    {hit.snippet && (
+                      <div
+                        className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
+                        data-testid="knowledge-search-snippet"
+                      >
+                        {hit.snippet}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}
@@ -139,7 +192,7 @@ export function KnowledgeHome() {
           </p>
         )}
 
-        <p className="mb-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+        <p className="mb-2 text-meta font-medium text-ink-secondary">
           {t('knowledge.home.mySpaces')}
         </p>
 
@@ -160,15 +213,19 @@ export function KnowledgeHome() {
               <div
                 key={space.id}
                 data-testid="knowledge-space-card"
-                className="relative flex flex-col rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent/40 hover:shadow-panel"
+                className="relative flex flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle"
               >
                 <button
                   type="button"
                   className="flex flex-1 flex-col items-start text-left"
                   onClick={() => void openSpace(space.id)}
                 >
-                  <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-surface-muted text-lg">
-                    {space.icon || '📚'}
+                  <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-surface-muted text-ink-secondary">
+                    {space.icon ? (
+                      <span className="text-lg leading-none">{space.icon}</span>
+                    ) : (
+                      <BookOpen size={18} className="text-accent-strong" />
+                    )}
                   </span>
                   <span className="text-body font-semibold text-ink">{space.name}</span>
                 </button>
@@ -210,19 +267,20 @@ export function KnowledgeHome() {
 
         {filteredRecent.length > 0 && (
           <>
-            <p className="mb-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+            <p className="mb-2 text-meta font-medium text-ink-secondary">
               {t('knowledge.home.recent')}
             </p>
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div className="flex flex-col gap-2">
               {filteredRecent.map((item) => (
                 <button
                   key={`${item.spaceId}:${item.docId}`}
                   type="button"
                   data-testid="knowledge-recent-item"
-                  className="flex w-full items-center justify-between gap-3 border-b border-border px-4 py-3 text-left last:border-0 hover:bg-state-hover"
+                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent hover:bg-surface-subtle"
                   onClick={() => void openRecent(item)}
                 >
-                  <div className="min-w-0">
+                  <FileText size={16} className="shrink-0 text-ink-tertiary" />
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-body text-ink">{item.title}</div>
                     <div className="truncate text-meta text-ink-tertiary">{item.spaceName}</div>
                   </div>

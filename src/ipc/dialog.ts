@@ -5,6 +5,11 @@ declare global {
     __hipPickDir?: () => Promise<string | null>
     __hipPickZip?: () => Promise<string | null>
     __hipPickAttachmentFiles?: () => Promise<string[] | null>
+    __hipSavePath?: (opts?: {
+      defaultPath?: string
+      title?: string
+      filters?: { name: string; extensions: string[] }[]
+    }) => Promise<string | null>
   }
 }
 
@@ -40,6 +45,24 @@ export async function pickAttachmentFiles(): Promise<string[] | null> {
   })
   if (result === null) return null
   return Array.isArray(result) ? result : [result]
+}
+
+/** Native save dialog; e2e via `window.__hipSavePath`. */
+export async function pickSavePath(opts?: {
+  defaultPath?: string
+  title?: string
+  filters?: { name: string; extensions: string[] }[]
+}): Promise<string | null> {
+  if (typeof window !== 'undefined' && window.__hipSavePath) {
+    return window.__hipSavePath(opts)
+  }
+  const { save } = await import('@tauri-apps/plugin-dialog')
+  const result = await save({
+    title: opts?.title,
+    defaultPath: opts?.defaultPath,
+    filters: opts?.filters,
+  })
+  return typeof result === 'string' ? result : null
 }
 
 export {}

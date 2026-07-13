@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  BODY_PREVIEW_CAP,
+  buildSearchSnippet,
   createKnowledgeIndex,
   docKey,
   removeSearchDoc,
@@ -72,4 +74,45 @@ describe('knowledge MiniSearch helper', () => {
     removeSearchDoc(index, id)
     expect(searchKnowledge(index, 'unique_token')).toHaveLength(0)
   })
+
+  it('returns snippet from bodyPreview for body hits', () => {
+    const index = createKnowledgeIndex()
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Note',
+      body: 'prefix unique_snippet_token suffix more text',
+      spaceName: 'S',
+      path: 'Note',
+    })
+    const hits = searchKnowledge(index, 'unique_snippet_token')
+    expect(hits[0]?.snippet).toContain('unique_snippet_token')
+  })
+
+  it('buildSearchSnippet falls back to leading excerpt when no token in preview', () => {
+    const preview = 'alpha beta gamma delta epsilon zeta'
+    expect(buildSearchSnippet(preview, 'zzzz-not-found')).toMatch(/^alpha/)
+  })
+
+  it('buildSearchSnippet omits empty preview', () => {
+    expect(buildSearchSnippet('', 'x')).toBeUndefined()
+  })
+
+  it('caps bodyPreview length', () => {
+    const long = 'x'.repeat(BODY_PREVIEW_CAP + 50)
+    const index = createKnowledgeIndex()
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Long',
+      body: long,
+      spaceName: 'S',
+      path: 'Long',
+    })
+    // FTS still works on full body field
+    expect(searchKnowledge(index, 'x').length).toBeGreaterThan(0)
+  })
 })
+

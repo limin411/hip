@@ -129,8 +129,8 @@ mod tests {
     fn windows_uses_app_data() {
         let base = hip_base_from(
             Some(PathBuf::from(r"C:\Users\x")),
-            Some(PathBuf::from(r"C:\AppData\com.ljm.app")),
+            Some(PathBuf::from(r"C:\AppData\com.ljm.hip")),
         );
-        assert_eq!(base, Some(PathBuf::from(r"C:\AppData\com.ljm.app")));
+        assert_eq!(base, Some(PathBuf::from(r"C:\AppData\com.ljm.hip")));
     }
 }

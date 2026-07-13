@@ -102,4 +102,50 @@ describe('normalizeMessageContent', () => {
     const input = '让\r\n我\r\n先\r\n看\r\n看\r\n然\r\n后\r\n继\r\n续\r\n。'
     expect(normalizeMessageContent(input)).toBe('让我先看看然后继续。')
   })
+
+  it('collapses blank-line-separated single CJK characters into prose', () => {
+    // Models sometimes emit paragraph breaks (double newlines) between chars;
+    // ReactMarkdown renders each as its own <p> → vertical stack.
+    const input = '让\n\n我\n\n先\n\n看\n\n看\n\n项\n\n目\n\n。'
+    expect(normalizeMessageContent(input)).toBe('让我先看看项目。')
+  })
+
+  it('collapses blank-line-separated short CJK words', () => {
+    const input = '项目\n\n目录\n\n结构\n\n如下'
+    expect(normalizeMessageContent(input)).toBe('项目目录结构如下')
+  })
+
+  it('does not collapse a single short CJK line separated by blanks from long prose', () => {
+    const input = '好\n\n这是正常的段落。'
+    expect(normalizeMessageContent(input)).toBe(input)
+  })
+
+  it('collapses runs of single Latin words (one word per line)', () => {
+    const input = 'Hello\nworld\nfrom\nthe\nassistant'
+    expect(normalizeMessageContent(input)).toBe('Hello world from the assistant')
+  })
+
+  it('collapses blank-line-separated Latin words into one paragraph', () => {
+    const input = 'Hello\n\nworld\n\nfrom\n\nthe\n\nassistant'
+    expect(normalizeMessageContent(input)).toBe('Hello world from the assistant')
+  })
+
+  it('does not collapse a short Latin run of only two words', () => {
+    // Below MIN_LATIN_RUN_LENGTH so intentional short paragraphs survive.
+    const input = 'Yes\n\nNo'
+    expect(normalizeMessageContent(input)).toBe(input)
+  })
+
+  it('preserves blank lines after a collapsed run before unrelated prose', () => {
+    const input = '让\n\n我\n\n先\n\n\n这是正常的段落。'
+    expect(normalizeMessageContent(input)).toBe('让我先\n\n\n这是正常的段落。')
+  })
+
+  it('still does not collapse Latin list markers', () => {
+    const input = 'a\nb\nc\nd'
+    // four bare words would collapse, but with list markers stay put
+    expect(normalizeMessageContent('- a\n- b\n- c\n- d')).toBe('- a\n- b\n- c\n- d')
+    // bare four+ words do collapse
+    expect(normalizeMessageContent(input)).toBe('a b c d')
+  })
 })

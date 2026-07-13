@@ -187,7 +187,7 @@ export type ServerMessage =
   | { type: 'plan:delta'; sessionId: string; turnId: string; itemId: string; delta: string }
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
-  | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed'; result?: string; error?: string }
+  | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }
   | { type: 'plugin:install:result'; ok: boolean; pluginId?: string; error?: string }
   | { type: 'plugin:delete:result'; pluginId: string; ok: boolean; error?: string }

@@ -365,7 +365,9 @@ export function applyServerMessage(
             role: 'assistant',
             content: msg.status === 'completed'
               ? `[Background task "${msg.description}" completed]`
-              : `[Background task "${msg.description}" failed: ${msg.error ?? 'unknown error'}]`,
+              : msg.status === 'killed'
+                ? `[Background task "${msg.description}" killed: ${msg.error ?? 'stopped'}]`
+                : `[Background task "${msg.description}" failed: ${msg.error ?? 'unknown error'}]`,
             timestamp: now,
             agentId: msg.taskId,
           },

@@ -360,4 +360,64 @@ describe('background subagent mode', () => {
       .map((r) => (r.data as { role: 'assistant'; content: string }).content)
     expect(assistantContents).toContain('direct bg')
   })
+
+  it('stop mid-run publishes killed notification, not completed/failed', async () => {
+    // Deterministic kill race: stop() first, then runner settlement via runBackgroundSubagent.
+    class QuickRunner implements ModelRunner {
+      async run(): Promise<AIMessage> {
+        return new AIMessage('should not be treated as success')
+      }
+    }
+
+    const session = makeRunnerSession('s-kill-race', new QuickRunner())
+    const events: ServerMessage[] = []
+
+    // Seed a running task the way spawn would, then kill it before the runner settles
+    const taskAc = new AbortController()
+    session.backgroundManager.meta.set('kill-1', {
+      description: 'long work',
+      status: 'running',
+      abortController: taskAc,
+    })
+    expect(session.backgroundManager.stop('kill-1', 'user cancel')).toBe('killed')
+    expect(session.backgroundManager.meta.get('kill-1')?.status).toBe('killed')
+
+    // Late settlement path (what runBackgroundSubagent does after abort/complete)
+    await session.runBackgroundSubagent(
+      'kill-1',
+      'long work',
+      AbortSignal.abort(),
+      (m) => events.push(m),
+    )
+
+    expect(session.backgroundManager.meta.get('kill-1')?.status).toBe('killed')
+
+    // Task-scoped notification must be killed (ignore worktree isolation notices)
+    const taskNotifications = events.filter(
+      (e) =>
+        e.type === 'agent:notification' &&
+        (e as { taskId?: string }).taskId === 'kill-1' &&
+        (e as { description?: string }).description === 'long work',
+    )
+    expect(taskNotifications.length).toBeGreaterThanOrEqual(1)
+    const finalNotif = taskNotifications[taskNotifications.length - 1] as {
+      status?: string
+      error?: string
+      result?: string
+    }
+    expect(finalNotif.status).toBe('killed')
+    expect(finalNotif.error).toContain('user cancel')
+    expect(finalNotif.result).toBeUndefined()
+
+    // Must not inject abort/success output as an assistant message
+    const aiMessages = (session as unknown as { messages: BaseMessage[] }).messages.filter(
+      (m) => m instanceof AIMessage,
+    )
+    expect(aiMessages.some((m) => m.content === 'should not be treated as success')).toBe(false)
+
+    const finished = events.some(
+      (e) => e.type === 'agent:finished' && (e as { agentId?: string }).agentId === 'kill-1',
+    )
+    expect(finished).toBe(true)
+  })
 })

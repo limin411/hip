@@ -270,7 +270,41 @@ describe('BackgroundManager output', () => {
     expect(mgr.getOutput('task-1')).toBe('final answer')
   })
 
-  it('getOutput prefers streamed chunks over result when both exist', () => {
+  it('getOutput surfaces error for failed tasks without chunks', () => {
+    const mgr = makeManager()
+
+    mgr.spawn('task-1', 'test', async () => {
+      await new Promise(() => {})
+    })
+    mgr.completeTask('task-1', 'failed', undefined, 'boom')
+
+    expect(mgr.getOutput('task-1')).toBe('Error: boom')
+  })
+
+  it('getOutput surfaces kill error when stopped with no chunks', () => {
+    const mgr = makeManager()
+
+    mgr.spawn('task-1', 'test', async () => {
+      await new Promise(() => {})
+    })
+    mgr.stop('task-1', 'no longer needed')
+
+    expect(mgr.getOutput('task-1')).toContain('killed by user: no longer needed')
+  })
+
+  it('getOutput prefers streamed chunks while still running', () => {
+    const mgr = makeManager()
+
+    mgr.spawn('task-1', 'test', async () => {
+      await new Promise(() => {})
+    })
+    mgr.appendOutput('task-1', 'streamed ')
+    mgr.appendOutput('task-1', 'partial')
+
+    expect(mgr.getOutput('task-1')).toBe('streamed partial')
+  })
+
+  it('getOutput prefers final result over chunks when terminal', () => {
     const mgr = makeManager()
 
     mgr.spawn('task-1', 'test', async () => {
@@ -280,7 +314,7 @@ describe('BackgroundManager output', () => {
     mgr.appendOutput('task-1', 'partial')
     mgr.completeTask('task-1', 'completed', 'final summary')
 
-    expect(mgr.getOutput('task-1')).toBe('streamed partial')
+    expect(mgr.getOutput('task-1')).toBe('final summary')
   })
 
   it('getOutput still works after stop when partial chunks were collected', () => {
@@ -292,8 +326,19 @@ describe('BackgroundManager output', () => {
     mgr.appendOutput('task-1', 'partial before kill')
     mgr.stop('task-1', 'timeout')
 
+    // Killed without result → chunks remain readable
     expect(mgr.getOutput('task-1')).toBe('partial before kill')
     expect(mgr.meta.get('task-1')!.status).toBe('killed')
+  })
+
+  it('completeTask is a no-op for non-running terminal statuses', () => {
+    const mgr = makeManager()
+
+    mgr.spawn('task-1', 'test', async () => {})
+    mgr.completeTask('task-1', 'completed', 'done')
+    expect(mgr.completeTask('task-1', 'failed', undefined, 'late')).toBe(false)
+    expect(mgr.meta.get('task-1')!.status).toBe('completed')
+    expect(mgr.meta.get('task-1')!.result).toBe('done')
   })
 })
 
@@ -510,6 +555,61 @@ describe('BackgroundManager with persistence', () => {
     const output = mgr.getOutput('persisted-task')
     // Should return persisted output since in-memory outputChunks is empty
     expect(output).toBe('persisted content')
+  })
+
+  it('getOutput rehydrates from disk when in-memory meta is missing', () => {
+    const persistence = new BackgroundTaskPersistence(tmpDir)
+    persistence.saveOutput('s1', 'disk-only', 'from log')
+    persistence.flushMeta('s1', 'disk-only', { status: 'completed', result: 'from meta', description: 'old' })
+
+    // Fresh manager — no in-memory meta (simulates post-restart before rehydrate)
+    const mgr = makeManager('s1', { persistence })
+    expect(mgr.meta.has('disk-only')).toBe(false)
+    // output.log wins over meta.result when log exists
+    expect(mgr.getOutput('disk-only')).toBe('from log')
+  })
+
+  it('getOutput rehydrates result from meta.json when only meta is on disk', () => {
+    const persistence = new BackgroundTaskPersistence(tmpDir)
+    persistence.flushMeta('s1', 'meta-only', {
+      status: 'completed',
+      description: 'done task',
+      result: 'final from disk',
+    })
+
+    const mgr = makeManager('s1', { persistence })
+    expect(mgr.getOutput('meta-only')).toBe('final from disk')
+  })
+
+  it('getOutput rehydrates error from meta.json for failed disk-only tasks', () => {
+    const persistence = new BackgroundTaskPersistence(tmpDir)
+    persistence.flushMeta('s1', 'fail-only', {
+      status: 'failed',
+      description: 'oops',
+      error: 'disk boom',
+    })
+
+    const mgr = makeManager('s1', { persistence })
+    expect(mgr.getOutput('fail-only')).toBe('Error: disk boom')
+  })
+
+  it('empty output.log is returned as empty string (not skipped as falsy)', () => {
+    const persistence = new BackgroundTaskPersistence(tmpDir)
+    persistence.saveOutput('s1', 'empty-log', '')
+    persistence.flushMeta('s1', 'empty-log', { status: 'completed', result: 'should not win' })
+
+    const mgr = makeManager('s1', { persistence })
+    const ac = new AbortController()
+    mgr.meta.set('empty-log', {
+      description: 'empty',
+      status: 'completed',
+      // no result in mem — disk log is empty string
+      abortController: ac,
+    })
+
+    // empty log is intentional first-class output when result is also unset in mem
+    // With terminal + no result, empty log ( != null ) wins before meta.result on disk
+    expect(mgr.getOutput('empty-log')).toBe('')
   })
 })
 

@@ -332,27 +332,57 @@ export class BackgroundManager {
 
   /**
    * Get the collected output for a task.
-   * Works for running (streamed chunks) and completed (chunks, persisted log, or result) tasks.
+   *
+   * Policy:
+   * - Terminal + `result` set → prefer final result over streamed chunks
+   * - Otherwise prefer in-memory chunks, then `output.log`
+   * - Terminal errors (`failed` / `killed` / `lost`) surface via `error` when no result/chunks
+   * - Missing in-memory meta falls back to disk (output log + meta.json) for crash recovery
    */
   getOutput(taskId: string): string {
     const m = this.meta.get(taskId)
-    if (!m) return `Error: background task ${taskId} not found`
+    if (!m) {
+      // Rehydrate from disk when the process no longer holds in-memory meta
+      if (this.persistence) {
+        const persistedLog = this.persistence.readOutput(this.sessionId, taskId)
+        if (persistedLog != null) return persistedLog
+        const pm = this.persistence.readMeta(this.sessionId, taskId)
+        if (pm?.result !== undefined) return pm.result
+        if (pm?.error) {
+          if (pm.status === 'lost') return `Error: lost: ${pm.error}`
+          return `Error: ${pm.error}`
+        }
+      }
+      return `Error: background task ${taskId} not found`
+    }
 
-    // Prefer in-memory streamed chunks
+    // Terminal tasks: prefer final result over partial stream text
+    if (m.status !== 'running' && m.result !== undefined) {
+      return m.result
+    }
+
+    // Running (or terminal without result): streamed chunks
     if (m.outputChunks && m.outputChunks.length > 0) {
       return m.outputChunks.join('')
     }
 
-    // Try persisted output log
+    // Try persisted output log (empty string is valid output)
     const persisted = this.persistence?.readOutput(this.sessionId, taskId)
-    if (persisted) return persisted
+    if (persisted != null) return persisted
 
-    // Completed tasks often only store the final result on meta (no streaming appends)
-    if (m.result !== undefined) return m.result
+    // Terminal failure/kill/lost without chunks — mirror wait() formatting
+    if (m.error) {
+      if (m.status === 'lost') return `Error: lost: ${m.error}`
+      return `Error: ${m.error}`
+    }
 
-    // Last resort: result from persisted meta (e.g. after restart with empty in-memory chunks)
+    // Persisted meta result/error (in-memory meta present but result only on disk)
     const persistedMeta = this.persistence?.readMeta(this.sessionId, taskId)
     if (persistedMeta?.result !== undefined) return persistedMeta.result
+    if (persistedMeta?.error) {
+      if (persistedMeta.status === 'lost') return `Error: lost: ${persistedMeta.error}`
+      return `Error: ${persistedMeta.error}`
+    }
 
     return `Error: no output for background task ${taskId}`
   }
@@ -361,18 +391,21 @@ export class BackgroundManager {
 
   /**
    * Called by `runBackgroundSubagent` after a task settles.
-   * Updates meta and persists it. Does not overwrite a user kill.
+   * Updates meta and persists it. Only `running` → terminal transitions are applied
+   * (killed/lost/already-complete are immutable).
+   *
+   * @returns `true` if the transition was applied, `false` if skipped
    */
   completeTask(
     taskId: string,
     status: 'completed' | 'failed',
     result?: string,
     error?: string,
-  ): void {
+  ): boolean {
     const m = this.meta.get(taskId)
-    if (!m) return
-    // stop() already marked killed + flushed meta; late runner settlement must not clobber it
-    if (m.status === 'killed') return
+    if (!m) return false
+    // Only running tasks may transition; stop()/reconcile own their terminal states
+    if (m.status !== 'running') return false
 
     m.status = status
     if (result !== undefined) m.result = result
@@ -385,6 +418,7 @@ export class BackgroundManager {
       ...(result !== undefined ? { result } : {}),
       ...(error !== undefined ? { error } : {}),
     })
+    return true
   }
 
   // ── Cleanup ──────────────────────────────────────────────────────────────

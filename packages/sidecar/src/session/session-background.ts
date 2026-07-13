@@ -70,6 +70,22 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
 
   host.backgroundManager.completeTask(taskId, status, error === undefined ? result : undefined, error)
 
+  // stop() may have already marked the task killed; do not publish completed/failed over a kill
+  const finalMeta = host.backgroundManager.meta.get(taskId)
+  if (finalMeta?.status === 'killed') {
+    const killError = finalMeta.error ?? 'task was killed'
+    send({
+      type: 'agent:notification',
+      sessionId: host.id,
+      taskId,
+      description,
+      status: 'killed',
+      error: killError,
+    })
+    send({ type: 'agent:finished', sessionId: host.id, turnId: syntheticTurnId, agentId: taskId })
+    return
+  }
+
   const ts = Date.now()
   host.emit({ type: 'step_started', sessionId: host.id, turnId: syntheticTurnId, agentId: syntheticAgentId, timestamp: ts })
   host.emit({ type: 'text_started', sessionId: host.id, messageId: syntheticTurnId, timestamp: ts })

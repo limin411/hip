@@ -334,6 +334,20 @@ describe('protocol: agent:notification ServerMessage', () => {
     expect(rt.error).toBe('boom')
     expect(rt.result).toBeUndefined()
   })
+
+  it('round-trips killed notification', () => {
+    const m: ServerMessage = {
+      type: 'agent:notification',
+      sessionId: 's',
+      taskId: 't1',
+      description: 'stopped',
+      status: 'killed',
+      error: 'killed by user',
+    }
+    const rt = JSON.parse(JSON.stringify(m)) as Extract<ServerMessage, { type: 'agent:notification' }>
+    expect(rt.status).toBe('killed')
+    expect(rt.error).toBe('killed by user')
+  })
 })
 
 // ──────────────────────────────────────────────────────────────────

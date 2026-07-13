@@ -54,8 +54,9 @@ export type WorkflowTurnOpts = {
   runInputs?: { text: string; data?: unknown }
   signal?: AbortSignal
   /**
-   * When true, skip UserPromptSubmit (already fired by processInput on message:send + dag).
-   * Default false for workflow:run direct entry.
+   * When true, skip UserPromptSubmit (already fired by processInput when
+   * message:send consumes pendingWorkflowDef via runTurn). Default false for
+   * workflow:run direct entry.
    */
   skipUserPromptSubmit?: boolean
 }

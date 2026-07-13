@@ -591,9 +591,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   plan?: PlanItem[]
 }): Promise<string> {
   // ── DAG orchestration branch ──
-  // orchMode === 'dag' always runs a workflow: pending def (workflow:run) or the
-  // builtin cluster-default template. Persistence goes through DurableExecutor when
-  // SQLite is available (see workflow-runner). User text is injected as runInputs.
+  // Only an explicit pendingWorkflowDef enters this path (resolveWorkflowDefForTurn
+  // ignores orchMode; no forced builtin:cluster-default). Persistence goes through
+  // DurableExecutor when SQLite is available (see workflow-runner). User text is
+  // injected as runInputs.
   const dagDef = resolveWorkflowDefForTurn(host)
   if (dagDef) {
     host.pendingWorkflowDef = null

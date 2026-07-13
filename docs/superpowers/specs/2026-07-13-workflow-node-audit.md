@@ -11,7 +11,7 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 |--------|---------|
 | **implemented** | Launch path runs the node to a real outcome (success/failure with domain semantics). |
 | **reduce-only** | Structural / graph-state only. Merge or flatten in `reduce.ts`; **not** launched by the executor loop. |
-| **fail-closed** | Protocol + UI may model the type; launch path does not execute domain logic. `launchResolvedNode` returns `ok: false` with `Unsupported workflow node type: …`. Executor/durable-executor also **skip** non-`agent`/`gate` ready nodes (`continue`), so they never enter the launch path in the normal loop. |
+| **fail-closed** | Protocol + UI may model the type; launch path does not execute domain logic. If called, `launchResolvedNode` returns `ok: false` with `Unsupported workflow node type: …`. In the **normal** executor/durable-executor loop, non-`agent`/`gate` ready nodes are **skipped** (`continue`) and never reach launch — they remain **`ready` forever** and do **not** fail the run; when `inFlight` drains, final status can still be **`succeeded`** if no node is `failed` (current stranding). |
 
 ## Summary table
 
@@ -31,7 +31,7 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
   - `any` — succeeded iff at least one leaf child succeeded
   - `vote` — succeeded iff `succeeded > total / 2`
   - empty children / unknown strategy → `failed`
-- **Propagate:** when all leaf descendants are terminal, parallel node status is set from merge; fail-fast cascade **skips** parallel ids so merge can still run bottom-up.
+- **Propagate:** when all leaf descendants are terminal, parallel node status is set from merge; fail-fast cascade **skips top-level** parallel ids in `def.nodes` (only those entries — nested `parallel` ids inside `ParallelNode.nodes` are not in that set) so top-level merge can still run bottom-up.
 - **Launch:** executor/durable-executor do not call `launchResolvedNode` for `type === 'parallel'`.
 
 ### Tool / human (fail-closed detail)
@@ -40,6 +40,7 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 - UI (`DagEditor`) can **render** cards for both.
 - `validateWorkflow` currently does **not** reject `tool` | `human` (planned for C-validate).
 - `launchResolvedNode` fail-closes any non-`agent`/`gate` type (covers tool, human, parallel if ever called).
+- **Normal loop:** executor/durable-executor **skip** non-agent/gate ready nodes; they remain `ready` and do not fail the run — a ready tool/human can currently leave `run.status === 'succeeded'` with unfinished ready nodes.
 - Product path for human interaction: ReAct interrupt, not DAG `HumanNode`.
 
 ---
@@ -103,10 +104,14 @@ Non-workflow note: `event-store` / transcript `type: 'human' | 'tool'` are **mes
 
 ## Frontend (`src/`) consumers
 
+Type-aware UI is listed first; opaque projection/store paths hold `WorkflowDef` without branching on node kinds.
+
 | File | Usage |
 |------|--------|
-| `src/components/workflow/DagEditor.tsx` | Renders **all five** types (cards + meta for agent/tool/gate/parallel/human). Display/edit surface only — does not execute. |
+| `src/components/workflow/DagEditor.tsx` | Renders **all five** types (cards + meta for agent/tool/gate/parallel/human). Display / projection surface only — does not author or execute (`nodesConnectable={false}`, no def rewrite). |
 | `src/components/workflow/DagEditor.test.tsx` | Fixtures for agent, **tool**, gate, **human**, **parallel**. |
+| `src/store/workflowStore.ts` | Opaque store: holds active def + run state; applies events by node id (status-agnostic to kind). |
+| `src/domain/serverMessageEffects.ts` | Opaque projection: `workflow:started` → `setActiveWorkflow`, event/snapshot/clear (status-agnostic). |
 | `src/store/workflowStore.test.ts` | Default `agent`; one test inserts `type: 'tool'` to assert multi-node event state isolation. |
 | `src/domain/sessionService.test.ts` | `agent` only in workflow def mocks. |
 | `src/components/workflow/RunStateOverlay.tsx` | Overlay on run state (status-agnostic to node kind). |
@@ -158,7 +163,7 @@ In-repo “fixtures” for node types live **inside unit tests** (especially `Da
 | Area | References |
 |------|------------|
 | Protocol | `ParallelNode`, `MergeStrategy = 'all' \| 'any' \| 'vote'` |
-| Reduce | `reduce.ts`: `collectChildIds`, `resolveParallelMerge`, `propagate`, fail-fast skip of parallel ids |
+| Reduce | `reduce.ts`: `collectChildIds`, `resolveParallelMerge`, `propagate`, fail-fast skip of **top-level** parallel ids in `def.nodes` |
 | Launch | **Not launched**; skip in executor; fail-closed if `launchResolvedNode` called |
 | UI | `DagEditor.tsx` ParallelNodeCard + layout sizing |
 | Tests | `reduce.test.ts` (all / any / vote / empty / single child / unknown strategy) |
@@ -200,7 +205,7 @@ In-repo “fixtures” for node types live **inside unit tests** (especially `Da
 1. **C-validate:** reject `type: 'tool' | 'human'` at validate time; document ParallelNode as structural + merge strategies; leave reduce merge tests green.
 2. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union; **retain** `parallel` and reduce merge.
 3. **Do not** remove ParallelNode reduce for “honesty”; parallel is a real structural capability, not a fake leaf runner.
-4. Executor skip vs launch-fail-closed: both mean non-executable leaves do not succeed; C-validate should fail closed **before** run so ready tool/human cannot strand a “succeeded” run with unfinished ready nodes.
+4. **Current** loop: skip leaves non-agent/gate nodes `ready` and can still finish `succeeded` (stranding — see fail-closed legend / tool-human detail). **C-validate** should reject tool/human **before** run so that path cannot strand a “succeeded” run with unfinished ready nodes. Launch-time fail-closed (`Unsupported…`) only applies if `launchResolvedNode` is called directly.
 
 ---
 

@@ -9,6 +9,7 @@ import {
   linkSubagentParentObservation,
   createLoopEventCollector,
   createDebugLoopSignalSink,
+  sortObservations,
   type TraceObservation,
 } from './trace-export.js'
 import { TOOL_BLOB_CAP, type TraceRun } from './tool-trace.js'
@@ -119,9 +120,27 @@ describe('loopEventsToObservations + observationsToJsonl', () => {
     expect(JSON.parse(lines[1]!).input).toBe('stuck?')
   })
 
+  it('clips long pause questions in both input and metadata (no full free-text re-embed)', () => {
+    const bigQ = 'q'.repeat(TOOL_BLOB_CAP + 250)
+    const obs = loopEventsToObservations([
+      { type: 'loop.pause', sessionId: 's1', turnId: 't1', question: bigQ, kind: 'doom' },
+    ])
+    expect(obs).toHaveLength(1)
+    expect(obs[0]!.truncated).toBe(true)
+    expect(obs[0]!.input!.length).toBe(TOOL_BLOB_CAP)
+    // metadata free-text is clipped to the same cap (not a full re-embed of bigQ)
+    expect(typeof obs[0]!.metadata?.question).toBe('string')
+    expect((obs[0]!.metadata!.question as string).length).toBe(TOOL_BLOB_CAP)
+    expect(obs[0]!.metadata?.question).toBe(obs[0]!.input)
+    // Full original question must not appear anywhere in the JSONL line.
+    const line = observationsToJsonl(obs)
+    expect(line).not.toContain(bigQ)
+    expect(line).not.toContain('q'.repeat(TOOL_BLOB_CAP + 1))
+  })
+
   it('exportTraceJsonl combines trajectory spans and loop events', () => {
     const traj = new Map<string, TraceRun>([
-      ['worker-1', run({ role: 'subagent', output: 'ok', parentAgentId: 'supervisor', taskInput: 'do' })],
+      ['worker-1', run({ role: 'subagent', output: 'ok', parentAgentId: 'supervisor', taskInput: 'do', startedAt: 10 })],
     ])
     const jsonl = exportTraceJsonl(traj, [
       { type: 'loop.end', sessionId: 's', turnId: 't', reason: 'completed' },
@@ -129,6 +148,30 @@ describe('loopEventsToObservations + observationsToJsonl', () => {
     const rows = jsonl.trimEnd().split('\n').map((l) => JSON.parse(l) as TraceObservation)
     expect(rows.some((r) => r.parentId === 'supervisor' && r.id === 'worker-1')).toBe(true)
     expect(rows.some((r) => r.type === 'loop' && r.name === 'loop.end')).toBe(true)
+  })
+})
+
+describe('sortObservations / merge order', () => {
+  it('sorts by startTime ascending with stable index for ties', () => {
+    const rows: TraceObservation[] = [
+      { type: 'span', id: 'late', name: 'agent.supervisor', startTime: 200 },
+      { type: 'loop', id: 'mid', name: 'loop.nudge', startTime: 100 },
+      { type: 'span', id: 'early', name: 'agent.coder', startTime: 50 },
+      { type: 'loop', id: 'tie-a', name: 'loop.end', startTime: 100 },
+    ]
+    const sorted = sortObservations(rows)
+    expect(sorted.map((o) => o.id)).toEqual(['early', 'mid', 'tie-a', 'late'])
+  })
+
+  it('exportTraceJsonl emits a globally time-ordered stream', () => {
+    const traj = new Map<string, TraceRun>([
+      ['late', run({ role: 'supervisor', output: 'L', startedAt: 500 })],
+      ['early', run({ role: 'coder', output: 'E', startedAt: 10, parentAgentId: 'late' })],
+    ])
+    // trajectoryToObservations sorts spans; loop rows get Date.now() (~now).
+    // early (10) should still precede late (500) in the combined export.
+    const rows = exportTraceJsonl(traj, []).trimEnd().split('\n').map((l) => JSON.parse(l) as TraceObservation)
+    expect(rows.map((r) => r.id)).toEqual(['early', 'late'])
   })
 })
 
@@ -160,16 +203,6 @@ describe('linkSubagentParentObservation', () => {
         },
       ),
     ).not.toThrow()
-  })
-
-  it('accepts loopSignal without emitting a non-LoopEvent through it', () => {
-    const loopSeen: LoopEvent[] = []
-    linkSubagentParentObservation(
-      { agentId: 'w', parentAgentId: 'supervisor', task: 'x' },
-      { loopSignal: (e) => loopSeen.push(e) },
-    )
-    // Spawn is not a LoopEvent — loopSignal must not receive a synthetic end/nudge.
-    expect(loopSeen).toEqual([])
   })
 })
 

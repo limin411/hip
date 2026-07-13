@@ -70,8 +70,3 @@ export function logObservation(msg: string, data?: Record<string, unknown>): voi
     /* logging must never crash the app */
   }
 }
-
-/** Whether HIP_DEBUG is enabled (for opt-in sinks that only want debug paths). */
-export function isDebugLoggingEnabled(): boolean {
-  return DEBUG_ENABLED
-}

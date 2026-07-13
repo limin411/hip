@@ -146,7 +146,7 @@ describe('runSubagent parent observation links (E2)', () => {
     expect(row.id).toBe('child-a')
   })
 
-  it('notes loopSignal presence without pushing a LoopEvent for spawn', async () => {
+  it('does not push a LoopEvent for spawn when loopSignal is attached', async () => {
     const loopEvents: unknown[] = []
     const emit: GraphEmit = {
       ...noopEmit,
@@ -165,6 +165,78 @@ describe('runSubagent parent observation links (E2)', () => {
       parentAgentId: 'supervisor',
       agentId: 'w1',
     })
+    // Spawn is not a LoopEvent — loopSignal stays idle for spawn path.
     expect(loopEvents).toEqual([])
+  })
+
+  it('nested task spawns get unique sibling agentIds and parentId = parent agent', async () => {
+    // Shared runner sequences parent ↔ nested (awaited) turns:
+    // 1 parent → task child-a
+    // 2 nested → done-a
+    // 3 parent → task child-b
+    // 4 nested → done-b
+    // 5 parent → parent-done
+    let step = 0
+    const runner: ModelRunner = {
+      async run(_messages: BaseMessage[], opts: ModelRunOptions): Promise<AIMsg> {
+        opts.signal?.throwIfAborted?.()
+        step++
+        if (step === 1) {
+          return new AIMessage({
+            content: '',
+            tool_calls: [{ name: 'task', args: { description: 'child-a' }, id: 't1' }],
+          })
+        }
+        if (step === 2) {
+          opts.onText?.('done-a')
+          return new AIMessage('done-a')
+        }
+        if (step === 3) {
+          return new AIMessage({
+            content: '',
+            tool_calls: [{ name: 'task', args: { description: 'child-b' }, id: 't2' }],
+          })
+        }
+        if (step === 4) {
+          opts.onText?.('done-b')
+          return new AIMessage('done-b')
+        }
+        opts.onText?.('parent-done')
+        return new AIMessage('parent-done')
+      },
+    }
+
+    const observed: TraceObservation[] = []
+    const text = await runSubagent({
+      runner,
+      root: process.cwd(),
+      summarizer: noopSummarizer,
+      emit: noopEmit,
+      signal: new AbortController().signal,
+      description: 'parent work',
+      childMaxSteps: 10,
+      agentId: 'parent',
+      parentAgentId: 'supervisor',
+      onObservation: (o) => observed.push(o),
+    })
+    expect(text).toBe('parent-done')
+
+    // Three spawns: parent + two nested siblings
+    expect(observed).toHaveLength(3)
+    expect(observed[0]).toMatchObject({ id: 'parent', parentId: 'supervisor' })
+
+    const siblings = observed.slice(1)
+    expect(siblings.map((o) => o.id).sort()).toEqual(['parent:d1.0', 'parent:d1.1'])
+    for (const s of siblings) {
+      expect(s.parentId).toBe('parent')
+    }
+    // Distinct ids — not depth-only collision
+    expect(new Set(siblings.map((o) => o.id)).size).toBe(2)
+
+    // GraphCtx frames match observation edges
+    const nestedCtxs = capturedGraphCtxs.filter((c) => c.agentId?.startsWith('parent:d1.'))
+    expect(nestedCtxs).toHaveLength(2)
+    expect(nestedCtxs.every((c) => c.parentAgentId === 'parent')).toBe(true)
+    expect(new Set(nestedCtxs.map((c) => c.agentId)).size).toBe(2)
   })
 })

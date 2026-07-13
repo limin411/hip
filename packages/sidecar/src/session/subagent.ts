@@ -110,9 +110,9 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const currentDepth = args.depth ?? 0
   const childAgentId = agentId ?? 'worker'
 
-  // E2: parent observation link (debug-logger + optional collector). Prefer
-  // GraphEmit.loopSignal when present for adjacent loop lifecycle; spawn itself
-  // is recorded as a span with parentId = parentAgentId (not a LoopEvent — E0 frozen).
+  // E2: parent observation link (debug-logger + optional collector).
+  // Spawn is a span with parentId = parentAgentId — not a LoopEvent (E0 frozen).
+  // Lifecycle LoopEvents go through GraphEmit.loopSignal separately if wired.
   linkSubagentParentObservation(
     {
       sessionId: sessionId ?? 'subagent',
@@ -124,15 +124,15 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       depth: currentDepth,
       mode: mode ?? 'foreground',
     },
-    {
-      collect: onObservation,
-      loopSignal: emit.loopSignal,
-    },
+    { collect: onObservation },
   )
 
   // Create a spawn function for recursive delegation that increments depth on each call.
   // Parent observation link: child.parentAgentId = this agent (not the grandparent).
+  // Per-parent counter keeps sibling agentIds unique at the same depth.
+  let nestSeq = 0
   const childSpawn = async (desc: string, submode?: 'foreground' | 'background'): Promise<string> => {
+    const seq = nestSeq++
     return runSubagent({
       ...args,
       depth: currentDepth + 1,
@@ -140,8 +140,8 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       mode: submode,
       existingMessages: undefined, // each delegation is a fresh sub-agent
       parentAgentId: childAgentId,
-      // nested child gets a distinct agent id so parentId edges stay unique in export
-      agentId: `${childAgentId}:d${currentDepth + 1}`,
+      // unique per sibling: parent:d{depth}.{seq}
+      agentId: `${childAgentId}:d${currentDepth + 1}.${seq}`,
       // hooks / onObservation stay on ...args so children share the session registry
     })
   }

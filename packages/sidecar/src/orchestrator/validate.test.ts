@@ -178,6 +178,27 @@ describe('validateWorkflow', () => {
     expect(errs.find((e) => e.code === 'unsupported-node')?.detail).toContain('t-nested')
   })
 
+  it('human nested under ParallelNode → unsupported-node', () => {
+    const def = wf({
+      nodes: [
+        {
+          type: 'parallel',
+          id: 'p1',
+          mergeStrategy: 'all',
+          nodes: [
+            node('a', 'a'),
+            { type: 'human', id: 'h-nested', question: 'Approve parallel branch?' },
+          ],
+        },
+      ],
+      edges: [],
+      entry: ['p1'],
+    })
+    const errs = validateWorkflow(def, regA)
+    expect(codes(errs)).toContain('unsupported-node')
+    expect(errs.find((e) => e.code === 'unsupported-node')?.detail).toContain('h-nested')
+  })
+
   it('ParallelNode with agent children → no unsupported-node', () => {
     const def = wf({
       nodes: [

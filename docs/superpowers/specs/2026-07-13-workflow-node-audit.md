@@ -1,9 +1,11 @@
 # Workflow node consumer audit (2026-07-13)
 
-Track C **C-audit** for the multi-track agent runtime plan.  
-**Scope:** inventory only — **no** changes to `validate.ts`, `executor.ts` / `durable-executor.ts`, `reduce.ts`, or `node-runner.ts` runtime behavior.
+Track C **C-audit** inventory plus **C-validate** run-path notes.
 
-Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode reduce; fail-closed tool/human; later C-validate / C-shrink).
+**C-audit (original):** inventory of workflow node consumers (protocol / orchestrator / UI).  
+**C-validate (done):** reject `tool` \| `human` via `rejectUnsupportedWorkflowNodes` (nested under `parallel` included); wired into `validateWorkflow`, `runWorkflow`, `DurableExecutor.runWorkflow`, and `runWorkflowTurn` (before `workflow:started`). ParallelNode reduce retained. **C-shrink** (hard-delete deprecated types) still backlog.
+
+Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode reduce; fail-closed tool/human; C-validate / later C-shrink).
 
 ## Status legend
 
@@ -20,8 +22,8 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 | `agent` | **implemented** | `node-runner` → `ports.agentRunner` | Empty text fails the node. Product templates and team pipelines emit only agents. |
 | `gate` | **implemented** | `node-runner` → `runGateNode` → registered `VerificationGate` | Unknown `gateKind` throws / fails. |
 | `parallel` | **reduce-only** | `reduce.ts` fan-out init + merge | Merge strategies: **`all` / `any` / `vote`**. Structural; not launched. |
-| `tool` | **fail-closed** | none at launch | Protocol + UI/tests only. No tool execution. |
-| `human` | **fail-closed** | none at launch | Protocol + UI/tests only. Product HITL is ReAct `planPause` / `agent:interrupt`, not DAG HumanNode. |
+| `tool` | **fail-closed** + **pre-run reject** | none at launch | Rejected by C-validate before run; `@deprecated` until C-shrink. |
+| `human` | **fail-closed** + **pre-run reject** | none at launch | Rejected by C-validate before run; HITL is ReAct `planPause` / `agent:interrupt`. |
 
 ### ParallelNode (structural detail)
 
@@ -36,11 +38,11 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 
 ### Tool / human (fail-closed detail)
 
-- Protocol shapes exist (`ToolNode`, `HumanNode`).
+- Protocol shapes exist (`ToolNode`, `HumanNode`) as `@deprecated`.
 - UI (`DagEditor`) can **render** cards for both.
-- `validateWorkflow` **rejects** `tool` | `human` with `unsupported-node` (C-validate). Nested under `parallel` is also rejected. Types remain in protocol as `@deprecated` until C-shrink.
-- `launchResolvedNode` fail-closes any non-`agent`/`gate` type (covers tool, human, parallel if ever called).
-- **Normal loop:** executor/durable-executor **skip** non-agent/gate ready nodes; they remain `ready` and do not fail the run — a ready tool/human can currently leave `run.status === 'succeeded'` with unfinished ready nodes (pre-validate bypass only).
+- **C-validate (wired):** `rejectUnsupportedWorkflowNodes` rejects `tool` \| `human` (`unsupported-node`), including nested under `parallel`. Called from `validateWorkflow` and pre-run gates: `runWorkflowTurn` (before `workflow:started`, client `INVALID_WORKFLOW`), `runWorkflow`, `DurableExecutor.runWorkflow` (throw). Registry-free so dynamic session agentIds are not false-failed by `unknown-agent`.
+- `launchResolvedNode` fail-closes any non-`agent`/`gate` type (covers tool, human, parallel if ever called) as a residual safety net.
+- **Historical stranding:** without pre-run reject, executor skip left tool/human `ready` forever and run could still finish `succeeded`. Pre-run reject closes that path for product entry points.
 - Product path for human interaction: ReAct interrupt, not DAG `HumanNode`.
 
 ---
@@ -202,10 +204,10 @@ In-repo “fixtures” for node types live **inside unit tests** (especially `Da
 
 ## Implications for later Track C work
 
-1. **C-validate (done):** `validateWorkflow` rejects `type: 'tool' | 'human'` (`unsupported-node`); ParallelNode documented as structural + merge strategies; reduce merge tests remain green.
+1. **C-validate (done + wired):** registry-free `rejectUnsupportedWorkflowNodes` rejects `type: 'tool' | 'human'`; used by `validateWorkflow` and pre-run entry (`runWorkflowTurn`, `runWorkflow`, `DurableExecutor`). ParallelNode documented as structural + merge strategies; reduce merge tests remain green.
 2. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union (types already `@deprecated`); **retain** `parallel` and reduce merge.
 3. **Do not** remove ParallelNode reduce for “honesty”; parallel is a real structural capability, not a fake leaf runner.
-4. **Validate-before-run** closes the stranding path for tool/human. Launch-time fail-closed (`Unsupported…`) remains a safety net if `launchResolvedNode` is called directly.
+4. **Validate-before-run** closes the stranding path for tool/human on product and executor entry points. Launch-time fail-closed (`Unsupported…`) remains a residual safety net if `launchResolvedNode` is called directly.
 
 ---
 
@@ -218,4 +220,4 @@ Grep/read across:
 - `src/` (workflow UI + stores)
 - `e2e/` (fixtures + harness-workflow-projection)
 
-No runtime code was modified for this PR.
+C-audit phase was inventory-only. C-validate adds validate + run-path reject (this track); reduce merge and node-runner launch semantics for agent/gate/parallel are unchanged.

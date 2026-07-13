@@ -6,6 +6,10 @@ import type { ModelRunner } from './model-runner.js'
 import type { Summarizer } from './compaction.js'
 import { runWorkflow } from '../orchestrator/executor.js'
 import { DurableExecutor } from '../orchestrator/durable-executor.js'
+import {
+  rejectUnsupportedWorkflowNodes,
+  formatUnsupportedNodeErrors,
+} from '../orchestrator/validate.js'
 import { createSessionAgentRunner } from './orchestrator-adapter.js'
 import { runSubagent } from './subagent.js'
 import { CHILD_MAX_STEPS } from './loop-control.js'
@@ -262,6 +266,25 @@ export async function runWorkflowTurn(
   }
 
   const workflowStore = deps.store ? new SqliteWorkflowStore(deps.store.getDb()) : undefined
+
+  // C-validate: reject tool/human before workflow:started (closes stranding path).
+  // Registry-free — product agentIds are dynamic; do not run unknown-agent here.
+  // Executor/DurableExecutor also assert as a safety net for direct callers.
+  const unsupported = rejectUnsupportedWorkflowNodes(def)
+  if (unsupported.length > 0) {
+    const message = formatUnsupportedNodeErrors(unsupported)
+    send({
+      type: 'error',
+      sessionId: deps.id,
+      code: 'INVALID_WORKFLOW',
+      message: `Invalid workflow: ${message}`,
+    })
+    void deps.hooks
+      .fire('TurnComplete', { sessionId: deps.id, turnId, runId: turnId })
+      .catch((err) => logNonCritical('TurnComplete', err))
+    watchdog.stop()
+    return finalize(send, turnId, `(invalid workflow: ${message})`, trajectory, true)
+  }
 
   try {
     // Prefer DurableExecutor when SQLite is available so each reduce() checkpoints

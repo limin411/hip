@@ -35,12 +35,15 @@ function walkNodes(nodes: WorkflowNode[], visit: (n: WorkflowNode) => void): voi
   }
 }
 
-export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): ValidationError[] {
+/**
+ * Registry-free hard reject for tool/human leaves (top-level + nested under parallel).
+ * Used by `validateWorkflow` and the run path (`runWorkflow` / DurableExecutor /
+ * `runWorkflowTurn`) so pre-run honesty does not depend on AgentRegistry /
+ * unknown-agent checks for dynamic session agents.
+ */
+export function rejectUnsupportedWorkflowNodes(def: WorkflowDef): ValidationError[] {
   const errors: ValidationError[] = []
-  const ids = new Set(def.nodes.map((n) => n.id))
-
-  // 0. unsupported-node: tool / human are fail-closed (no launch path).
-  //    ParallelNode remains fully supported (structural + merge in reduce).
+  // ParallelNode remains fully supported (structural + merge in reduce).
   walkNodes(def.nodes, (n) => {
     if (n.type === 'tool') {
       errors.push({
@@ -54,6 +57,31 @@ export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): Val
       })
     }
   })
+  return errors
+}
+
+/** Format unsupported-node errors for throw / client error messages. */
+export function formatUnsupportedNodeErrors(errors: ValidationError[]): string {
+  return errors.map((e) => e.detail).join('; ')
+}
+
+/**
+ * Assert def has no tool/human leaves. Throws Error if rejected.
+ * Call before initRunState / workflow:started on every run entry.
+ */
+export function assertSupportedWorkflowNodes(def: WorkflowDef): void {
+  const unsupported = rejectUnsupportedWorkflowNodes(def)
+  if (unsupported.length > 0) {
+    throw new Error(`Invalid workflow: ${formatUnsupportedNodeErrors(unsupported)}`)
+  }
+}
+
+export function validateWorkflow(def: WorkflowDef, registry: AgentRegistry): ValidationError[] {
+  const errors: ValidationError[] = []
+  const ids = new Set(def.nodes.map((n) => n.id))
+
+  // 0. unsupported-node: tool / human are fail-closed (no launch path).
+  errors.push(...rejectUnsupportedWorkflowNodes(def))
 
   // 1. unknown-agent (only check agent-type nodes)
   for (const n of def.nodes) {

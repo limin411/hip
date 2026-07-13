@@ -2,6 +2,7 @@ import type { WorkflowDef, RunState, NodeOutput, NodeId, OrchestratorEvent } fro
 import type { OrchestratorPorts } from './ports.js'
 import { initRunState, reduce, readyNodes, resolveInput } from './reduce.js'
 import { launchResolvedNode } from './node-runner.js'
+import { assertSupportedWorkflowNodes } from './validate.js'
 
 export interface RunWorkflowOpts {
   runId: string
@@ -14,6 +15,10 @@ export interface RunWorkflowOpts {
 }
 
 export async function runWorkflow(def: WorkflowDef, ports: OrchestratorPorts, opts: RunWorkflowOpts): Promise<RunState> {
+  // C-validate: hard-reject tool/human before init (closes skip→ready→succeeded stranding).
+  // Registry-free — does not run unknown-agent checks (session agentIds are dynamic).
+  assertSupportedWorkflowNodes(def)
+
   const sink = ports.eventSink
   let state = initRunState(def, opts.runId)
   const apply = async (e: OrchestratorEvent) => {

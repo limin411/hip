@@ -933,6 +933,17 @@ export const zhCN = {
         empty: '新建文档或文件夹以开始',
         filterPlaceholder: '过滤目录…',
         filterEmpty: '无匹配项',
+        reveal: '在访达中显示',
+      },
+      export: {
+        doc: '导出 Markdown…',
+        spaceZip: '导出空间为 ZIP…',
+        docDone: '文档已导出',
+        spaceDone: '空间已导出',
+      },
+      import: {
+        folder: '导入文件夹…',
+        done: '已导入 {{count}} 篇文档',
       },
       folder: {
         untitled: '新建文件夹',

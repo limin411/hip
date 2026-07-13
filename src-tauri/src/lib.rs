@@ -502,6 +502,10 @@ pub fn run() {
             knowledge::knowledge_read_doc,
             knowledge::knowledge_write_doc,
             knowledge::knowledge_delete_doc_file,
+            knowledge::knowledge_export_doc,
+            knowledge::knowledge_export_space_zip,
+            knowledge::knowledge_import_folder,
+            knowledge::knowledge_reveal_doc,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

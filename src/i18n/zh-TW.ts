@@ -933,6 +933,17 @@ export const zhTW = {
         empty: '新增文件或資料夾以開始',
         filterPlaceholder: '過濾目錄…',
         filterEmpty: '無符合項目',
+        reveal: '在 Finder 中顯示',
+      },
+      export: {
+        doc: '匯出 Markdown…',
+        spaceZip: '匯出空間為 ZIP…',
+        docDone: '文件已匯出',
+        spaceDone: '空間已匯出',
+      },
+      import: {
+        folder: '匯入資料夾…',
+        done: '已匯入 {{count}} 篇文件',
       },
       folder: {
         untitled: '新增資料夾',

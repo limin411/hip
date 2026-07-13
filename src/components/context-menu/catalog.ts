@@ -310,6 +310,37 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
+    id: 'knowledgeNode.newDoc',
+    labelKey: 'knowledge.tree.newDoc',
+    kind: 'knowledgeNode',
+    group: 'primary',
+  },
+  {
+    id: 'knowledgeNode.newFolder',
+    labelKey: 'knowledge.tree.newFolder',
+    kind: 'knowledgeNode',
+    group: 'primary',
+  },
+  {
+    id: 'knowledgeNode.rename',
+    labelKey: 'knowledge.tree.rename',
+    kind: 'knowledgeNode',
+    group: 'edit',
+  },
+  {
+    id: 'knowledgeNode.reveal',
+    labelKey: 'knowledge.tree.reveal',
+    kind: 'knowledgeNode',
+    group: 'navigation',
+  },
+  {
+    id: 'knowledgeNode.delete',
+    labelKey: 'knowledge.tree.delete',
+    kind: 'knowledgeNode',
+    group: 'danger',
+    danger: true,
+  },
+  {
     id: 'skillConfig.view',
     labelKey: 'settings.skill.view',
     kind: 'skillConfig',

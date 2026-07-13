@@ -2,7 +2,15 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
-import { getPathTitles, insertNode, nextOrder, removeNodeSubtree, renameNode } from '@/domain/knowledge/tree'
+import {
+  collectDocIdsInSubtree,
+  getPathTitles,
+  insertNode,
+  moveNode as moveNodePure,
+  nextOrder,
+  removeNodeSubtree,
+  renameNode,
+} from '@/domain/knowledge/tree'
 import {
   createKnowledgeIndex,
   docKey,
@@ -88,6 +96,7 @@ interface KnowledgeState {
   createDoc: (parentId: string | null, title: string) => Promise<void>
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
+  moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
   openDoc: (id: string) => Promise<void>
   setEditing: (v: boolean) => Promise<void>
   setDraftBody: (v: string) => void
@@ -395,6 +404,38 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         ),
       }))
       persistRecent(get().recent)
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+    }
+  },
+
+  moveNode: async (id, parentId, toIndex) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    await get().flushSave()
+    set({ busy: true })
+    try {
+      const nodes = moveNodePure(get().nodes, id, parentId, toIndex)
+      await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      set({ nodes, busy: false })
+      if (parentId) {
+        set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+      }
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      const docIds = collectDocIdsInSubtree(nodes, id)
+      for (const docId of docIds) {
+        const title = nodes.find((n) => n.id === docId)?.title ?? ''
+        let body = ''
+        try {
+          body = await knowledgeReadDoc(spaceId, docId)
+        } catch {
+          body = get().activeDocId === docId ? get().docBody : ''
+        }
+        indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
+      }
+      get().runSearch(get().searchQuery)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })

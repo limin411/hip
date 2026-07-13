@@ -53,3 +53,25 @@ export async function knowledgeWriteDoc(spaceId: string, docId: string, body: st
 export async function knowledgeDeleteDocFile(spaceId: string, docId: string): Promise<void> {
   await invoke('knowledge_delete_doc_file', { args: { spaceId, docId } })
 }
+
+export async function knowledgeExportDoc(
+  spaceId: string,
+  docId: string,
+  destPath: string,
+): Promise<void> {
+  await invoke('knowledge_export_doc', { args: { spaceId, docId, destPath } })
+}
+
+export async function knowledgeExportSpaceZip(spaceId: string, destPath: string): Promise<void> {
+  await invoke('knowledge_export_space_zip', { args: { spaceId, destPath } })
+}
+
+export async function knowledgeImportFolder(
+  sourcePath: string,
+): Promise<{ spaceId: string; importedDocs: number }> {
+  return invoke('knowledge_import_folder', { args: { sourcePath } })
+}
+
+export async function knowledgeRevealDoc(spaceId: string, docId: string): Promise<void> {
+  await invoke('knowledge_reveal_doc', { args: { spaceId, docId } })
+}

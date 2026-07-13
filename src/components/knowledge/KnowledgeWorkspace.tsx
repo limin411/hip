@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
+  Download,
   FilePlus,
   FileText,
   FolderPlus,
   MoreHorizontal,
   Search,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -21,7 +23,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
+import { pickSavePath } from '@/ipc/dialog'
+import {
+  knowledgeErrorMessage,
+  knowledgeExportDoc,
+  knowledgeExportSpaceZip,
+  knowledgeRevealDoc,
+} from '@/ipc/knowledge'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
@@ -112,6 +122,43 @@ export function KnowledgeWorkspace() {
 
   const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
 
+  const exportActiveDoc = async () => {
+    if (!activeSpaceId || !activeDocId) return
+    await flushSave()
+    const title = activeNode?.title ?? 'document'
+    const safe = title.replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'document'
+    const dest = await pickSavePath({
+      defaultPath: `${safe}.md`,
+      title: t('knowledge.export.doc'),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    if (!dest) return
+    try {
+      await knowledgeExportDoc(activeSpaceId, activeDocId, dest)
+      toast.success(t('knowledge.export.docDone'))
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  const exportSpaceZip = async () => {
+    if (!activeSpaceId) return
+    const safe =
+      (space?.name ?? 'space').replace(/[<>:"/\\|?*]/g, '_').slice(0, 80) || 'space'
+    const dest = await pickSavePath({
+      defaultPath: `${safe}.zip`,
+      title: t('knowledge.export.spaceZip'),
+      filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    })
+    if (!dest) return
+    try {
+      await knowledgeExportSpaceZip(activeSpaceId, dest)
+      toast.success(t('knowledge.export.spaceDone'))
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
   const onCrumbClick = (node: KnowledgeNode) => {
     if (node.kind === 'folder') {
       toggleFolder(node.id)
@@ -160,6 +207,13 @@ export function KnowledgeWorkspace() {
                 >
                   {t('knowledge.tree.rename')}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="knowledge-space-export"
+                  onClick={() => void exportSpaceZip()}
+                >
+                  {t('knowledge.export.spaceZip')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   data-testid="knowledge-space-delete"
                   onClick={() => setDeleteSpaceOpen(true)}
@@ -217,6 +271,18 @@ export function KnowledgeWorkspace() {
               setNodeTitle(node.title)
             }}
             onDelete={(node) => setNodeDelete(node)}
+            onNewDoc={(parentId) =>
+              void createDoc(parentId, t('knowledge.doc.untitled'))
+            }
+            onNewFolder={(parentId) =>
+              void createFolder(parentId, t('knowledge.folder.untitled'))
+            }
+            onReveal={(node) => {
+              if (!activeSpaceId || node.kind !== 'doc') return
+              void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
+                toast.error(knowledgeErrorMessage(e))
+              })
+            }}
           />
           {visibleIds && visibleIds.size === 0 && (
             <p className="px-2 py-2 text-meta text-ink-tertiary">
@@ -254,17 +320,30 @@ export function KnowledgeWorkspace() {
             <span className="text-meta text-ink-tertiary">{t('knowledge.doc.saved')}</span>
           )}
           {activeDocId && (
-            <SegmentedControl
-              data-testid="knowledge-edit-toggle"
-              aria-label={t('knowledge.doc.modeLabel')}
-              size="sm"
-              value={mode}
-              onChange={(v) => void setEditing(v === 'edit')}
-              options={[
-                { value: 'edit', label: t('knowledge.doc.edit') },
-                { value: 'preview', label: t('knowledge.doc.preview') },
-              ]}
-            />
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                title={t('knowledge.export.doc')}
+                aria-label={t('knowledge.export.doc')}
+                data-testid="knowledge-export-doc"
+                onClick={() => void exportActiveDoc()}
+              >
+                <Download size={14} />
+              </Button>
+              <SegmentedControl
+                data-testid="knowledge-edit-toggle"
+                aria-label={t('knowledge.doc.modeLabel')}
+                size="sm"
+                value={mode}
+                onChange={(v) => void setEditing(v === 'edit')}
+                options={[
+                  { value: 'edit', label: t('knowledge.doc.edit') },
+                  { value: 'preview', label: t('knowledge.doc.preview') },
+                ]}
+              />
+            </>
           )}
         </div>
         {!activeDocId ? (

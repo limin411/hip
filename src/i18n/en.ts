@@ -939,6 +939,17 @@ export const en = {
         empty: 'Create a document or folder to get started',
         filterPlaceholder: 'Filter tree…',
         filterEmpty: 'No matching items',
+        reveal: 'Reveal in Finder',
+      },
+      export: {
+        doc: 'Export Markdown…',
+        spaceZip: 'Export space as ZIP…',
+        docDone: 'Document exported',
+        spaceDone: 'Space exported',
+      },
+      import: {
+        folder: 'Import folder…',
+        done: 'Imported {{count}} documents',
       },
       folder: {
         untitled: 'New folder',

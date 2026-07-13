@@ -382,6 +382,377 @@ pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), St
     Ok(())
 }
 
+// ── Export / import / reveal ──────────────────────────────────────────────
+
+fn sanitize_filename(name: &str) -> String {
+    let mut s: String = name
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    s = s.trim().trim_matches('.').to_string();
+    if s.is_empty() {
+        s = "untitled".into();
+    }
+    // cap length
+    if s.chars().count() > 80 {
+        s = s.chars().take(80).collect();
+    }
+    s
+}
+
+fn unique_name(used: &mut std::collections::HashMap<String, u32>, base: &str) -> String {
+    let n = used.entry(base.to_string()).or_insert(0);
+    *n += 1;
+    if *n == 1 {
+        base.to_string()
+    } else {
+        format!("{base} ({n})")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportDocArgs {
+    pub space_id: String,
+    pub doc_id: String,
+    pub dest_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_export_doc(app: AppHandle, args: ExportDocArgs) -> Result<(), String> {
+    let root = knowledge_root(&app)?;
+    let src = doc_path(&root, &args.space_id, &args.doc_id)?;
+    let body = if src.exists() {
+        fs::read_to_string(&src).map_err(|e| e.to_string())?
+    } else {
+        String::new()
+    };
+    let dest = PathBuf::from(&args.dest_path);
+    if !dest.is_absolute() {
+        return Err("destPath must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write_str(&dest, &body)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSpaceZipArgs {
+    pub space_id: String,
+    pub dest_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> Result<(), String> {
+    use std::collections::HashMap;
+    use std::io::Write as _;
+    use zip::write::SimpleFileOptions;
+    use zip::ZipWriter;
+
+    let root = knowledge_root(&app)?;
+    require_id(&args.space_id, "spaceId")?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let tree: KnowledgeTreeFile = read_json_file(&dir.join("tree.json"))?;
+    let dest = PathBuf::from(&args.dest_path);
+    if !dest.is_absolute() {
+        return Err("destPath must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    // Build human path map
+    let by_id: HashMap<String, &KnowledgeNode> =
+        tree.nodes.iter().map(|n| (n.id.clone(), n)).collect();
+    let mut path_cache: HashMap<String, String> = HashMap::new();
+    let mut used_at_parent: HashMap<String, HashMap<String, u32>> = HashMap::new();
+
+    fn path_for(
+        id: &str,
+        by_id: &HashMap<String, &KnowledgeNode>,
+        path_cache: &mut HashMap<String, String>,
+        used_at_parent: &mut HashMap<String, HashMap<String, u32>>,
+    ) -> Result<String, String> {
+        if let Some(p) = path_cache.get(id) {
+            return Ok(p.clone());
+        }
+        let node = by_id.get(id).ok_or_else(|| format!("missing node {id}"))?;
+        let base = sanitize_filename(&node.title);
+        let parent_key = node.parent_id.clone().unwrap_or_else(|| "__root__".into());
+        let bucket = used_at_parent.entry(parent_key.clone()).or_default();
+        let unique = unique_name(bucket, &base);
+        let full = if let Some(ref pid) = node.parent_id {
+            let parent_path = path_for(pid, by_id, path_cache, used_at_parent)?;
+            format!("{parent_path}/{unique}")
+        } else {
+            unique
+        };
+        path_cache.insert(id.to_string(), full.clone());
+        Ok(full)
+    }
+
+    let mut doc_count = 0usize;
+    for n in &tree.nodes {
+        if n.kind == "doc" {
+            doc_count += 1;
+        }
+    }
+    if doc_count > 5000 {
+        return Err("space has too many documents to export (max 5000)".into());
+    }
+
+    let file = fs::File::create(&dest).map_err(|e| e.to_string())?;
+    let mut zip = ZipWriter::new(file);
+    let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    for n in &tree.nodes {
+        if n.kind != "doc" {
+            continue;
+        }
+        let rel = path_for(&n.id, &by_id, &mut path_cache, &mut used_at_parent)?;
+        let entry_name = format!("{rel}.md");
+        // zip-slip style: reject absolute / parent in entry name
+        if entry_name.contains("..") || entry_name.starts_with('/') {
+            return Err("illegal export path".into());
+        }
+        let body = {
+            let p = doc_path(&root, &args.space_id, &n.id)?;
+            if p.exists() {
+                fs::read_to_string(&p).map_err(|e| e.to_string())?
+            } else {
+                String::new()
+            }
+        };
+        zip.start_file(entry_name, opts)
+            .map_err(|e| e.to_string())?;
+        zip.write_all(body.as_bytes()).map_err(|e| e.to_string())?;
+    }
+
+    // optional lightweight manifest
+    let manifest = serde_json::json!({
+        "format": "hip-knowledge-export",
+        "version": 1,
+        "spaceId": args.space_id,
+        "exportedAt": now_ms(),
+    });
+    zip.start_file("hip-manifest.json", opts)
+        .map_err(|e| e.to_string())?;
+    zip.write_all(manifest.to_string().as_bytes())
+        .map_err(|e| e.to_string())?;
+    zip.finish().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFolderArgs {
+    pub source_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportFolderResult {
+    pub space_id: String,
+    pub imported_docs: u32,
+}
+
+#[tauri::command]
+pub fn knowledge_import_folder(
+    app: AppHandle,
+    args: ImportFolderArgs,
+) -> Result<ImportFolderResult, String> {
+    let source = PathBuf::from(&args.source_path);
+    if !source.is_dir() {
+        return Err("sourcePath must be a directory".into());
+    }
+    let name = source
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Imported")
+        .to_string();
+
+    // Create space via same layout as create_space
+    let space = knowledge_create_space(
+        app.clone(),
+        CreateSpaceArgs {
+            name,
+            icon: None,
+        },
+    )?;
+    let root = knowledge_root(&app)?;
+    let space_root = space_dir(&root, &space.id)?;
+
+    // Walk .md files (non-recursive first level folders + nested)
+    let mut nodes: Vec<KnowledgeNode> = Vec::new();
+    let mut imported = 0u32;
+    let mut folder_map: std::collections::HashMap<PathBuf, String> =
+        std::collections::HashMap::new(); // rel dir -> folder id
+
+    fn ensure_folder_chain(
+        source: &Path,
+        rel_dir: &Path,
+        folder_map: &mut std::collections::HashMap<PathBuf, String>,
+        nodes: &mut Vec<KnowledgeNode>,
+    ) -> Result<Option<String>, String> {
+        if rel_dir.as_os_str().is_empty() {
+            return Ok(None);
+        }
+        if let Some(id) = folder_map.get(rel_dir) {
+            return Ok(Some(id.clone()));
+        }
+        let parent_rel = rel_dir.parent().unwrap_or_else(|| Path::new(""));
+        let parent_id = ensure_folder_chain(source, parent_rel, folder_map, nodes)?;
+        let title = rel_dir
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("folder")
+            .to_string();
+        let id = gen_id("nod");
+        let now = now_ms();
+        let order = nodes
+            .iter()
+            .filter(|n| n.parent_id == parent_id)
+            .map(|n| n.order)
+            .max()
+            .map(|o| o + 1)
+            .unwrap_or(0);
+        nodes.push(KnowledgeNode {
+            id: id.clone(),
+            parent_id,
+            kind: "folder".into(),
+            title,
+            order,
+            created_at: now,
+            updated_at: now,
+        });
+        folder_map.insert(rel_dir.to_path_buf(), id.clone());
+        Ok(Some(id))
+    }
+
+    fn walk_md(
+        source: &Path,
+        dir: &Path,
+        rel: &Path,
+        folder_map: &mut std::collections::HashMap<PathBuf, String>,
+        nodes: &mut Vec<KnowledgeNode>,
+        space_root: &Path,
+        space_id: &str,
+        imported: &mut u32,
+        root: &Path,
+    ) -> Result<(), String> {
+        let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let name = ent.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') {
+                continue;
+            }
+            // path safety: must stay under source
+            if !path.starts_with(source) {
+                continue;
+            }
+            if path.is_dir() {
+                let child_rel = rel.join(&*name_str);
+                ensure_folder_chain(source, &child_rel, folder_map, nodes)?;
+                walk_md(
+                    source,
+                    &path,
+                    &child_rel,
+                    folder_map,
+                    nodes,
+                    space_root,
+                    space_id,
+                    imported,
+                    root,
+                )?;
+            } else if name_str.to_lowercase().ends_with(".md") {
+                let parent_id = if rel.as_os_str().is_empty() {
+                    None
+                } else {
+                    ensure_folder_chain(source, rel, folder_map, nodes)?
+                };
+                let title = name_str.trim_end_matches(".md").trim_end_matches(".MD");
+                let doc_id = gen_id("doc");
+                let body = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+                let dest = doc_path(root, space_id, &doc_id)?;
+                atomic_write_str(&dest, &body)?;
+                let now = now_ms();
+                let order = nodes
+                    .iter()
+                    .filter(|n| n.parent_id == parent_id)
+                    .map(|n| n.order)
+                    .max()
+                    .map(|o| o + 1)
+                    .unwrap_or(0);
+                nodes.push(KnowledgeNode {
+                    id: doc_id,
+                    parent_id,
+                    kind: "doc".into(),
+                    title: title.to_string(),
+                    order,
+                    created_at: now,
+                    updated_at: now,
+                });
+                *imported += 1;
+            }
+        }
+        Ok(())
+    }
+
+    walk_md(
+        &source,
+        &source,
+        Path::new(""),
+        &mut folder_map,
+        &mut nodes,
+        &space_root,
+        &space.id,
+        &mut imported,
+        &root,
+    )?;
+
+    write_json_file(
+        &space_root.join("tree.json"),
+        &KnowledgeTreeFile {
+            version: 1,
+            nodes,
+        },
+    )?;
+
+    Ok(ImportFolderResult {
+        space_id: space.id,
+        imported_docs: imported,
+    })
+}
+
+#[tauri::command]
+pub fn knowledge_reveal_doc(app: AppHandle, args: DocArgs) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let root = knowledge_root(&app)?;
+    let path = doc_path(&root, &args.space_id, &args.doc_id)?;
+    // Ensure parent exists; file may be empty/missing — still reveal parent folder
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    if !path.exists() {
+        // create empty so reveal has a target
+        atomic_write_str(&path, "")?;
+    }
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| e.to_string())
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

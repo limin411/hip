@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, FileText, MoreHorizontal, Plus, Search } from 'lucide-react'
+import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -12,6 +13,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/DropdownMenu'
+import { pickDirectory } from '@/ipc/dialog'
+import { knowledgeErrorMessage, knowledgeImportFolder } from '@/ipc/knowledge'
 
 export function KnowledgeHome() {
   const { t } = useTranslation()
@@ -67,6 +70,25 @@ export function KnowledgeHome() {
     setDeleteId(null)
   }
 
+  const importFolder = async () => {
+    const dir = await pickDirectory()
+    if (!dir) return
+    try {
+      const result = await knowledgeImportFolder(dir)
+      toast.success(
+        t('knowledge.import.done', {
+          count: result.importedDocs,
+          defaultValue: `Imported ${result.importedDocs} documents`,
+        }),
+      )
+      await useKnowledgeStore.getState().loadSpaces()
+      await useKnowledgeStore.getState().rebuildSearchIndex()
+      void openSpace(result.spaceId)
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-y-auto" data-testid="knowledge-home">
       <div className="mx-auto w-full max-w-4xl px-6 py-6">
@@ -75,14 +97,25 @@ export function KnowledgeHome() {
             <h1 className="text-display font-semibold text-ink">{t('knowledge.title')}</h1>
             <p className="mt-1 text-body text-ink-secondary">{t('knowledge.home.subtitle')}</p>
           </div>
-          <Button
-            data-testid="knowledge-create-space"
-            onClick={() => setCreateOpen(true)}
-            disabled={busy}
-          >
-            <Plus size={14} className="mr-1" />
-            {t('knowledge.home.createSpace')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-import-folder"
+              onClick={() => void importFolder()}
+              disabled={busy}
+            >
+              <Upload size={14} className="mr-1" />
+              {t('knowledge.import.folder')}
+            </Button>
+            <Button
+              data-testid="knowledge-create-space"
+              onClick={() => setCreateOpen(true)}
+              disabled={busy}
+            >
+              <Plus size={14} className="mr-1" />
+              {t('knowledge.home.createSpace')}
+            </Button>
+          </div>
         </div>
 
         <div className="relative mb-6 max-w-md">

@@ -50,6 +50,8 @@ export function classifyInstallError(raw: string): InstallErrorKind {
 }
 
 /** i18n key under settings.installErrors.* */
-export function installErrorI18nKey(kind: InstallErrorKind): string {
+export function installErrorI18nKey(
+  kind: InstallErrorKind,
+): `settings.installErrors.${InstallErrorKind}` {
   return `settings.installErrors.${kind}`
 }

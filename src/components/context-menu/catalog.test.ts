@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { clearCatalogMeta, listCatalogItems, registerCatalogMeta } from './catalog'
-import type { ContextMenuItemMeta } from './types'
 
 beforeEach(() => {
   clearCatalogMeta()

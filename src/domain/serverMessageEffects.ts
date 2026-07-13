@@ -28,7 +28,7 @@ export function formatCompactResultMessage(
   if (!msg.applied) {
     return i18n.t('chat.compact.noop', { n: COMPACT_KEEP_RECENT_TURNS })
   }
-  const lines = [
+  const lines: string[] = [
     i18n.t('chat.compact.applied', {
       before: msg.messagesBefore,
       after: msg.messagesAfter,

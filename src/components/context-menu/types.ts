@@ -103,10 +103,10 @@ export type ContextPayloadMap = {
   artifactChrome: { tab: string }
 }
 
+/** Discriminated union so `req.kind` narrows `req.payload` in providers. */
 export type ContextRequest<K extends ContextKind = ContextKind> = {
-  kind: K
-  payload: ContextPayloadMap[K]
-}
+  [P in K]: { kind: P; payload: ContextPayloadMap[P] }
+}[K]
 
 /** Serializable / settings-safe. No run(). */
 export interface ContextMenuItemMeta {

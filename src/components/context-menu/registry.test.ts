@@ -395,6 +395,7 @@ describe('buildContextMenuItems', () => {
           path: 'src/a.ts',
           name: 'a.ts',
           isDir: false,
+          scopeId: 's1',
           cwd: '/proj',
           isDraft: false,
         },

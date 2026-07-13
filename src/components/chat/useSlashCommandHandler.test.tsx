@@ -189,7 +189,7 @@ describe('useSlashCommandHandler', () => {
   })
 
   it('/diff in chat surface is not reachable and only clears input', () => {
-    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
+    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue('sent')
     const { result, setText } = setup('chat', 's1')
 
     result.current.handleCommandSelect(diffCmd)
@@ -200,7 +200,7 @@ describe('useSlashCommandHandler', () => {
   })
 
   it('/diff in code surface calls requestDiff and switches to changes tab', () => {
-    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
+    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue('sent')
     const { result, setText } = setup('code', 's1')
 
     result.current.handleCommandSelect(diffCmd)

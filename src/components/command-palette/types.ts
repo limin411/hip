@@ -36,7 +36,7 @@ export type PaletteIconName =
   | 'link-2'
 
 export interface CommandWhen {
-  views?: Array<'chat' | 'code' | 'history' | 'settings'>
+  views?: Array<'chat' | 'code' | 'history' | 'settings' | 'knowledge'>
   requiresSession?: boolean
   surfaces?: Array<'chat' | 'code'>
   enabled?: boolean

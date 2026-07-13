@@ -216,7 +216,7 @@ describe('InputBar slash commands', () => {
   it('/diff command calls requestDiff and switches to changes tab', async () => {
     baseMocks()
     vi.spyOn(domain, 'useActiveSession').mockReturnValue(stubSession('code'))
-    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue(undefined)
+    const requestDiffSpy = vi.spyOn(sessionService, 'requestDiff').mockReturnValue('sent')
     const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockReturnValue(undefined)
 
     render(<InputBar />)

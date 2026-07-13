@@ -24,6 +24,19 @@ vi.mock('@radix-ui/react-dropdown-menu', () => ({
   Label: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+vi.mock('@/store/knowledgeStore', () => ({
+  useKnowledgeStore: Object.assign(
+    (sel: (s: Record<string, unknown>) => unknown) =>
+      sel({
+        mode: 'home',
+        spaces: [],
+        activeSpaceId: null,
+        loadSpaces: vi.fn(),
+      }),
+    { getState: () => ({ loadSpaces: vi.fn() }) },
+  ),
+}))
+
 vi.mock('@/components/context-menu', () => ({
   DeclarativeContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -44,12 +57,16 @@ vi.mock('@/domain', () => ({
 describe('SessionTabBar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useUiStore.setState({ openSessionIds: ['s1', 's2'] })
+    useUiStore.setState({
+      openSessionIds: ['s1', 's2'],
+      activeView: 'chat',
+      knowledgeTabOpen: false,
+    })
   })
 
   afterEach(() => {
     cleanup()
-    useUiStore.setState({ openSessionIds: [] })
+    useUiStore.setState({ openSessionIds: [], knowledgeTabOpen: false, activeView: 'chat' })
   })
 
   it('renders one tab per open session', () => {
@@ -70,10 +87,17 @@ describe('SessionTabBar', () => {
     expect(sessionService.closeSession).toHaveBeenCalledWith('s2')
   })
 
-  it('renders chat and code dropdown options', () => {
+  it('renders chat, code, and knowledge dropdown options', () => {
     render(<SessionTabBar onNewSession={() => {}} />)
     expect(screen.getByText('dropdown.newChat')).toBeInTheDocument()
     expect(screen.getByText('dropdown.newCode')).toBeInTheDocument()
+    expect(screen.getByText('dropdown.newKnowledge')).toBeInTheDocument()
+  })
+
+  it('shows knowledge chip when knowledgeTabOpen', () => {
+    useUiStore.setState({ knowledgeTabOpen: true, activeView: 'knowledge' })
+    render(<SessionTabBar onNewSession={() => {}} />)
+    expect(screen.getByTestId('knowledge-tab')).toBeInTheDocument()
   })
 
   it('calls newConversation with "chat" when new chat is clicked', () => {

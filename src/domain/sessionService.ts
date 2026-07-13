@@ -275,8 +275,10 @@ export class SessionService {
     }
 
     const st = useUiStore.getState()
-    // Settings / history: tabs stay restored in state for when the user leaves the special view.
-    if (st.activeView === 'settings' || st.activeView === 'history') return
+    // Settings / history / knowledge: do not yank the user into a session surface.
+    if (st.activeView === 'settings' || st.activeView === 'history' || st.activeView === 'knowledge') {
+      return
+    }
 
     const surface: Surface = st.activeView === 'code' ? 'code' : 'chat'
     const matchesSurface = (id: string) =>

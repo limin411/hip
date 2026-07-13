@@ -13,6 +13,7 @@ import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { TitleBar } from '@/components/layout/TitleBar'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { SessionHistory } from '@/components/history/SessionHistory'
+import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
 import { FloatingAvatarButton } from '@/components/account/FloatingAvatarButton'
 import {
   GlobalCommandPalette,
@@ -89,6 +90,7 @@ export function AppLayout() {
   const renderMainContent = () => {
     if (activeView === 'history') return <SessionHistory />
     if (activeView === 'settings') return <SettingsPage />
+    if (activeView === 'knowledge') return <KnowledgePage />
     return activeSessionId == null ? (
       <NewConversation />
     ) : (

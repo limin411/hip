@@ -4,7 +4,7 @@ import { z } from 'zod'
 import type { DispatchSpec } from './helpers.js'
 import { SubagentBatch } from '../subagent-batch.js'
 import type { RunSubagentFn } from '../orchestrator-adapter.js'
-import { isUselessSubagentText } from '../subagent-result.js'
+import { isSubagentPausedText, isUselessSubagentText } from '../subagent-result.js'
 
 export interface SubagentTools {
   task: StructuredToolInterface | null
@@ -25,6 +25,8 @@ export function buildSubagentTools(
   const task = tool(
     async ({ description, mode }) => {
       const result = await spawnSubagent(description, mode)
+      // Pause is a distinct outcome — pass through; do not rewrite as empty-success error.
+      if (isSubagentPausedText(result)) return result
       if (isUselessSubagentText(result)) {
         return (
           'Error: sub-agent produced empty output. ' +
@@ -108,6 +110,8 @@ export function buildSubagentTools(
   const dispatchAgent = tool(
     async ({ agent, task: t }) => {
       const result = await dispatch.run(agent, t, dispatch.signal)
+      // Pause is a distinct outcome — pass through; do not rewrite as empty-success error.
+      if (isSubagentPausedText(result)) return result
       if (isUselessSubagentText(result)) {
         return (
           'Error: dispatched agent produced empty output. ' +

@@ -138,6 +138,9 @@ describe('runSubagent', () => {
         signal: new AbortController().signal, description: 'loops', childMaxSteps: 15,
       })
       expect(text).toContain('部分进展')
+      expect(text).toMatch(/^\[hip:subagent_paused\]/)
+      expect(text).not.toMatch(/sub-agent paused — open question/)
+      expect(text).not.toMatch(/^Error: sub-agent paused/)
     })
   })
 })

@@ -19,12 +19,36 @@ const EMPTY_ERROR =
 const RECONSTRUCTED_PREFIX =
   '[sub-agent finished without a prose summary; reconstructed from tool results]'
 
+/** First-line marker for sub-agent HITL pause (not an Error prefix). */
+export const SUBAGENT_PAUSE_MARKER = '[hip:subagent_paused]'
+
+/**
+ * Wire format for a paused sub-agent tool result:
+ *   [hip:subagent_paused] <question>
+ *   <optional partial>
+ */
+export function formatPausedToolResult(question: string, partial?: string): string {
+  const first = `${SUBAGENT_PAUSE_MARKER} ${question}`
+  const body = (partial ?? '').trim()
+  return body ? `${first}\n${body}` : first
+}
+
+/** True when the first line of text starts with the sub-agent pause marker. */
+export function isSubagentPausedText(text: string | null | undefined): boolean {
+  if (text == null) return false
+  const firstLine = text.split('\n', 1)[0] ?? ''
+  return firstLine.startsWith(SUBAGENT_PAUSE_MARKER)
+}
+
 /**
  * True when the sub-agent's final text is not a usable handoff to the parent:
  * empty, placeholder, DSML-only, or any residual DSML tool_calls block (must never leak to supervisor).
+ * Pause marker results are not useless empty output (they are a distinct outcome — use isSubagentPausedText).
  */
 export function isUselessSubagentText(text: string | null | undefined): boolean {
   if (text == null) return true
+  // Pause is a distinct outcome, not empty/useless success.
+  if (isSubagentPausedText(text)) return false
   const t = text.trim()
   if (!t) return true
   if (t === '(sub-agent produced no output)') return true

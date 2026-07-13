@@ -10,6 +10,7 @@ import type { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
 import { recursionLimit, MAX_DEPTH } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
+import { formatPausedToolResult } from './subagent-result.js'
 
 const NOOP_EMIT: GraphEmit = {
   token: () => {},
@@ -155,7 +156,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {
     const q = final.pendingQuestion
-    return q ? `${text}\n\n[sub-agent paused — open question: ${q}]` : text
+    return q ? formatPausedToolResult(q, text) : text
   }
   return text
 }

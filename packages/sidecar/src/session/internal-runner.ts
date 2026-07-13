@@ -7,6 +7,7 @@ import { recursionLimit } from './loop-control.js'
 import { buildManagedAgentPrompt } from './system-prompt.js'
 import { mcpManager } from './mcp/manager.js'
 import { lastAiText } from './subagent.js'
+import { formatPausedToolResult } from './subagent-result.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { getActiveModel } from '../config/providers.js'
@@ -127,7 +128,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {
     const q = final.pendingQuestion
-    return q ? `${text}\n\n[sub-agent paused — open question: ${q}]` : text
+    return q ? formatPausedToolResult(q, text) : text
   }
   return text
 }

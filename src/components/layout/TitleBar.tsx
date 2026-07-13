@@ -13,6 +13,12 @@ import { PanelToggle } from './PanelToggle'
  * 全宽标题栏 —— 应用唯一的横向 chrome 行：
  *   红绿灯让位区 | 会话标签栏 | 右侧连接状态/面板切换
  * 各列（菜单栏、侧栏、对话、产物）一律渲染在本行之下，不再单独叠头。
+ *
+ * Platform note: macOS uses Overlay + traffic lights (frameless content under
+ * the system chrome). Windows/Linux keep OS decorations for min/max/close; this
+ * bar is a toolbar under that chrome (CSS shrinks left inset / drops glass).
+ * A true custom Windows title bar would need decorations:false + in-content
+ * window controls — intentionally out of scope until those buttons exist.
  */
 export function TitleBar() {
   const { t } = useTranslation()

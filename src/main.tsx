@@ -10,10 +10,13 @@ import { Toaster } from 'sonner'
 
 // Set platform attribute on <html> so CSS can adapt title bar styling
 // (macOS needs traffic-light clearance; Windows/Linux don't).
+// Note: on Windows/Linux we keep OS decorations (see TitleBar); this flag only
+// tunes inset/background — not frameless chrome.
 if (typeof document !== 'undefined') {
-  const platform = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
-    ? 'mac' : 'windows'
-  document.documentElement.dataset.platform = platform
+  const ua = navigator.platform || navigator.userAgent
+  const isMac = /Mac|iPhone|iPad|iPod/i.test(ua)
+  const isLinux = !isMac && /Linux/i.test(navigator.userAgent)
+  document.documentElement.dataset.platform = isMac ? 'mac' : isLinux ? 'linux' : 'windows'
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

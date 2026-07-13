@@ -65,8 +65,10 @@
   --on-btn-primary: #fafafa;
 }
 
-/* Windows / Linux: no native traffic lights → remove mac-only clearance & glass effect */
-html[data-platform="windows"] {
+/* Windows / Linux: no native traffic lights → remove mac-only clearance & glass effect.
+   OS decorations stay enabled (native min/max/close); custom TitleBar is a toolbar row. */
+html[data-platform="windows"],
+html[data-platform="linux"] {
   --titlebar-lights-inset: 8px;
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;
@@ -121,7 +123,8 @@ html[data-platform="windows"] {
   --on-btn-primary: #141414;
 }
 
-html.dark[data-platform="windows"] {
+html.dark[data-platform="windows"],
+html.dark[data-platform="linux"] {
   --titlebar-lights-inset: 8px;
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;

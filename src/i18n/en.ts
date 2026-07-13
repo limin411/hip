@@ -916,12 +916,15 @@ export const en = {
       title: 'Knowledge base',
       home: {
         subtitle: 'Local spaces · folder tree · Markdown',
-        searchPlaceholder: 'Search spaces and recent titles…',
+        searchPlaceholder: 'Search titles, body, and paths…',
         mySpaces: 'My spaces',
         recent: 'Recent',
         emptyTitle: 'No spaces yet',
         emptyHint: 'Create a space to start organizing documents.',
         createSpace: 'New space',
+        searchResults: 'Search results',
+        searchEmpty: 'No documents match your search.',
+        searchIndexing: 'Building search index…',
       },
       space: {
         namePlaceholder: 'Space name',

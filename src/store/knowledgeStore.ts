@@ -2,7 +2,15 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
-import { insertNode, nextOrder, removeNodeSubtree, renameNode } from '@/domain/knowledge/tree'
+import { getPathTitles, insertNode, nextOrder, removeNodeSubtree, renameNode } from '@/domain/knowledge/tree'
+import {
+  createKnowledgeIndex,
+  docKey,
+  removeSearchDoc,
+  searchKnowledge,
+  upsertSearchDoc,
+  type KnowledgeSearchHit,
+} from '@/domain/knowledge/search'
 import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
@@ -16,6 +24,10 @@ import {
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
 } from '@/ipc/knowledge'
+
+/** Module-level index (not serializable; not stored in zustand state). */
+let kbIndex = createKnowledgeIndex()
+let indexBuildGen = 0
 
 const RECENT_KEY = 'hip-knowledge-recent'
 const RECENT_CAP = 20
@@ -42,6 +54,7 @@ function persistRecent(recent: KnowledgeRecentItem[]) {
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
 interface KnowledgeState {
   loaded: boolean
@@ -54,6 +67,8 @@ interface KnowledgeState {
   editing: boolean
   mode: 'home' | 'workspace'
   searchQuery: string
+  searchHits: KnowledgeSearchHit[]
+  indexStatus: IndexStatus
   recent: KnowledgeRecentItem[]
   expandedFolderIds: Record<string, boolean>
   busy: boolean
@@ -61,6 +76,8 @@ interface KnowledgeState {
   saveState: SaveState
 
   loadSpaces: () => Promise<void>
+  rebuildSearchIndex: () => Promise<void>
+  runSearch: (q: string) => void
   createSpace: (name: string, icon?: string) => Promise<KnowledgeSpace | null>
   renameSpace: (id: string, name: string, icon?: string) => Promise<void>
   deleteSpace: (id: string) => Promise<void>
@@ -78,6 +95,26 @@ interface KnowledgeState {
   setSearchQuery: (q: string) => void
   toggleFolder: (id: string) => void
   dropRecent: (spaceId: string | null, docId: string) => void
+}
+
+function indexCurrentDoc(
+  spaceId: string,
+  docId: string,
+  title: string,
+  body: string,
+  spaceName: string,
+  nodes: KnowledgeNode[],
+) {
+  const path = getPathTitles(nodes, docId).join(' / ') || title
+  upsertSearchDoc(kbIndex, {
+    id: docKey(spaceId, docId),
+    spaceId,
+    docId,
+    title,
+    body,
+    spaceName,
+    path,
+  })
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -102,6 +139,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   editing: false,
   mode: 'home',
   searchQuery: '',
+  searchHits: [],
+  indexStatus: 'idle',
   recent: [],
   expandedFolderIds: {},
   busy: false,
@@ -114,9 +153,60 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeEnsureRoot()
       const spaces = await knowledgeListSpaces()
       set({ spaces, loaded: true, recent: loadRecent() })
+      void get().rebuildSearchIndex()
     } catch (e) {
       set({ error: knowledgeErrorMessage(e), loaded: true })
     }
+  },
+
+  rebuildSearchIndex: async () => {
+    const gen = ++indexBuildGen
+    set({ indexStatus: 'building' })
+    const next = createKnowledgeIndex()
+    try {
+      const spaces = get().spaces
+      for (const space of spaces) {
+        if (gen !== indexBuildGen) return
+        const tree = await knowledgeGetTree(space.id)
+        const nodes = tree.nodes ?? []
+        for (const node of nodes) {
+          if (node.kind !== 'doc') continue
+          if (gen !== indexBuildGen) return
+          let body = ''
+          try {
+            body = await knowledgeReadDoc(space.id, node.id)
+          } catch {
+            body = ''
+          }
+          const path = getPathTitles(nodes, node.id).join(' / ') || node.title
+          upsertSearchDoc(next, {
+            id: docKey(space.id, node.id),
+            spaceId: space.id,
+            docId: node.id,
+            title: node.title,
+            body,
+            spaceName: space.name,
+            path,
+          })
+        }
+      }
+      if (gen !== indexBuildGen) return
+      kbIndex = next
+      set({ indexStatus: 'ready' })
+      get().runSearch(get().searchQuery)
+    } catch {
+      if (gen !== indexBuildGen) return
+      set({ indexStatus: 'error' })
+    }
+  },
+
+  runSearch: (q) => {
+    const query = q.trim()
+    if (!query || get().indexStatus !== 'ready') {
+      set({ searchHits: [] })
+      return
+    }
+    set({ searchHits: searchKnowledge(kbIndex, query) })
   },
 
   createSpace: async (name, icon) => {
@@ -156,12 +246,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     try {
       await knowledgeDeleteSpace(id)
       const wasActive = get().activeSpaceId === id
+      // Drop all index entries for this space (best-effort full rebuild also fine).
+      for (const hit of get().searchHits) {
+        if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId))
+      }
+      // Also discard by scanning stored ids: MiniSearch has no list-all API cheaply —
+      // rebuild keeps consistency after destructive space ops.
       set((s) => ({
         spaces: s.spaces.filter((x) => x.id !== id),
         recent: s.recent.filter((r) => r.spaceId !== id),
         busy: false,
       }))
       persistRecent(get().recent)
+      void get().rebuildSearchIndex()
       if (wasActive) await get().openHome()
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -258,7 +355,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
       const nodes = insertNode(get().nodes, node)
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+      indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
       set({ nodes, busy: false })
+      get().runSearch(get().searchQuery)
       await get().openDoc(id)
       await get().setEditing(true)
     } catch (e) {
@@ -276,6 +376,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const nodes = renameNode(get().nodes, id, title.trim() || 'Untitled')
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       set({ nodes, busy: false })
+      const renamed = nodes.find((n) => n.id === id)
+      if (renamed?.kind === 'doc') {
+        const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
+        let body = ''
+        try {
+          body = await knowledgeReadDoc(spaceId, id)
+        } catch {
+          body = get().activeDocId === id ? get().docBody : ''
+        }
+        indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes)
+        get().runSearch(get().searchQuery)
+      }
       // update recent title if needed
       set((s) => ({
         recent: s.recent.map((r) =>
@@ -300,6 +412,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       for (const docId of removedDocIds) {
         await knowledgeDeleteDocFile(spaceId, docId)
+        removeSearchDoc(kbIndex, docKey(spaceId, docId))
       }
       const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
       set((s) => ({
@@ -311,6 +424,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           : {}),
       }))
       persistRecent(get().recent)
+      get().runSearch(get().searchQuery)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
@@ -381,6 +495,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       try {
         await knowledgeWriteDoc(s.activeSpaceId, s.activeDocId, s.draftBody)
         set({ docBody: s.draftBody, saveState: 'saved' })
+        const node = get().nodes.find((n) => n.id === s.activeDocId)
+        const spaceName = get().spaces.find((sp) => sp.id === s.activeSpaceId)?.name ?? ''
+        if (node && s.activeSpaceId && s.activeDocId) {
+          indexCurrentDoc(
+            s.activeSpaceId,
+            s.activeDocId,
+            node.title,
+            s.draftBody,
+            spaceName,
+            get().nodes,
+          )
+          get().runSearch(get().searchQuery)
+        }
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
         }, 1500)
@@ -394,7 +521,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     return saveChain
   },
 
-  setSearchQuery: (q) => set({ searchQuery: q }),
+  setSearchQuery: (q) => {
+    set({ searchQuery: q })
+    get().runSearch(q)
+  },
 
   toggleFolder: (id) =>
     set((s) => ({

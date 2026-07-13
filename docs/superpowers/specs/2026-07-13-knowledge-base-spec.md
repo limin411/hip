@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |------|-----|
 | 日期 | 2026-07-13 |
-| 状态 | **P0 Implemented**（实现以 design 为准；MiniSearch 为 P1） |
+| 状态 | **P0 + P1 search Implemented**（实现以 design 为准；export/CodeMirror 仍为可选后续） |
 | 范围 | 顶部标签栏 `+` 入口；独立知识库工作表面；多空间 + 目录树 + Markdown 读写 + 搜索 |
 | 原型 | [`../../prototypes/knowledge-base/index.html`](../../prototypes/knowledge-base/index.html) |
 | 关联 plan | [`../plans/2026-07-13-knowledge-base.md`](../plans/2026-07-13-knowledge-base.md) |

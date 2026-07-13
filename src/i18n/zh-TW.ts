@@ -910,12 +910,15 @@ export const zhTW = {
       title: '知識庫',
       home: {
         subtitle: '本地優先 · 多空間 · 目錄樹 + Markdown',
-        searchPlaceholder: '搜尋空間名稱與最近文件…',
+        searchPlaceholder: '搜尋標題、正文與路徑…',
         mySpaces: '我的空間',
         recent: '最近開啟',
         emptyTitle: '尚無知識空間',
         emptyHint: '建立一個空間，開始整理文件。',
         createSpace: '新增空間',
+        searchResults: '搜尋結果',
+        searchEmpty: '沒有符合的文件。',
+        searchIndexing: '正在建立搜尋索引…',
       },
       space: {
         namePlaceholder: '空間名稱',

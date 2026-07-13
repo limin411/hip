@@ -19,6 +19,8 @@ export function KnowledgeHome() {
   const recent = useKnowledgeStore((s) => s.recent)
   const searchQuery = useKnowledgeStore((s) => s.searchQuery)
   const setSearchQuery = useKnowledgeStore((s) => s.setSearchQuery)
+  const searchHits = useKnowledgeStore((s) => s.searchHits)
+  const indexStatus = useKnowledgeStore((s) => s.indexStatus)
   const createSpace = useKnowledgeStore((s) => s.createSpace)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
@@ -90,7 +92,52 @@ export function KnowledgeHome() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('knowledge.home.searchPlaceholder')}
           />
+          {q && indexStatus === 'building' && (
+            <p className="mt-1 text-meta text-ink-tertiary">{t('knowledge.home.searchIndexing')}</p>
+          )}
         </div>
+
+        {q && searchHits.length > 0 && (
+          <>
+            <p className="mb-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
+              {t('knowledge.home.searchResults')}
+            </p>
+            <div
+              className="mb-8 overflow-hidden rounded-xl border border-border"
+              data-testid="knowledge-search-results"
+            >
+              {searchHits.map((hit) => (
+                <button
+                  key={`${hit.spaceId}:${hit.docId}`}
+                  type="button"
+                  data-testid="knowledge-search-hit"
+                  className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-3 text-left last:border-0 hover:bg-state-hover"
+                  onClick={() =>
+                    void openRecent({
+                      spaceId: hit.spaceId,
+                      docId: hit.docId,
+                      title: hit.title,
+                      spaceName: hit.spaceName,
+                      at: Date.now(),
+                    })
+                  }
+                >
+                  <div className="truncate text-body text-ink">{hit.title}</div>
+                  <div className="truncate text-meta text-ink-tertiary">
+                    {hit.spaceName}
+                    {hit.path ? ` · ${hit.path}` : ''}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {q && indexStatus === 'ready' && searchHits.length === 0 && (
+          <p className="mb-6 text-meta text-ink-tertiary" data-testid="knowledge-search-empty">
+            {t('knowledge.home.searchEmpty')}
+          </p>
+        )}
 
         <p className="mb-2 text-meta font-semibold uppercase tracking-wide text-ink-tertiary">
           {t('knowledge.home.mySpaces')}

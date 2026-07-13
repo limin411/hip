@@ -910,12 +910,15 @@ export const zhCN = {
       title: '知识库',
       home: {
         subtitle: '本地优先 · 多空间 · 目录树 + Markdown',
-        searchPlaceholder: '搜索空间名称与最近文档…',
+        searchPlaceholder: '搜索标题、正文与路径…',
         mySpaces: '我的空间',
         recent: '最近打开',
         emptyTitle: '还没有知识空间',
         emptyHint: '新建一个空间，开始整理文档。',
         createSpace: '新建空间',
+        searchResults: '搜索结果',
+        searchEmpty: '没有匹配的文档。',
+        searchIndexing: '正在建立搜索索引…',
       },
       space: {
         namePlaceholder: '空间名称',

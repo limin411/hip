@@ -9,7 +9,7 @@ import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
-import { recursionLimit, MAX_DEPTH } from './loop-control.js'
+import { recursionLimit, maxDepthForSession } from './loop-control.js'
 import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { childSystemPrompt } from './system-prompt.js'
 import { formatPausedToolResult } from './subagent-result.js'
@@ -155,7 +155,8 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   let tools = buildTools(root, childSpawn, root, undefined, { permissionMode, requestApproval, webSearchEnabled: true, sessionId, networkPolicy })
 
   // At max depth, strip delegation tools so the sub-agent cannot spawn further children.
-  if (currentDepth >= MAX_DEPTH) {
+  const maxDepth = maxDepthForSession(root)
+  if (currentDepth >= maxDepth) {
     const blocked = new Set(['task', 'task_batch', 'dispatch_agent'])
     tools = tools.filter((t) => !blocked.has(t.name))
   }

@@ -219,7 +219,7 @@ export interface BuildMultiAgentGraphOpts {
   emit: GraphEmit
   /** Profile id to route to when state.activeAgent is empty. Defaults to profiles[0].id. */
   defaultProfileId?: string
-  /** Per-agent step cap. Defaults to MAX_STEPS (25). */
+  /** Per-agent step cap. Defaults to MAX_STEPS (800). */
   maxSteps?: number
 }
 

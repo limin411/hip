@@ -1,4 +1,4 @@
-import { MAX_STEPS } from './loop-control.js'
+import { maxStepsForSession } from './loop-control.js'
 
 export interface Activity {
   readonly id: string
@@ -15,7 +15,7 @@ export class ActivityTracker implements Activity {
   stepsRemaining: number
   readonly totalStepsAllowed: number
 
-  constructor(id: string, description: string, totalStepsAllowed: number = MAX_STEPS) {
+  constructor(id: string, description: string, totalStepsAllowed: number = maxStepsForSession()) {
     this.id = id
     this.description = description
     this.startedAt = Date.now()

@@ -73,33 +73,47 @@ describe('protocol: HipConfig (Todo 1)', () => {
 })
 
 describe('protocol: AgentLoopConfig', () => {
-  it('models optional step budgets and inline_partial HITL', () => {
+  it('models optional step budgets, depth, and inline_partial HITL', () => {
     const loop: AgentLoopConfig = {
+      maxSteps: 800,
       childMaxSteps: 25,
       exploreChildMaxSteps: 40,
+      maxDepth: 3,
       subagentHitl: 'inline_partial',
     }
+    expect(loop.maxSteps).toBe(800)
     expect(loop.childMaxSteps).toBe(25)
     expect(loop.exploreChildMaxSteps).toBe(40)
+    expect(loop.maxDepth).toBe(3)
     expect(loop.subagentHitl).toBe('inline_partial')
   })
 
   it('allows all agentLoop fields to be absent', () => {
     const loop: AgentLoopConfig = {}
+    expect(loop.maxSteps).toBeUndefined()
     expect(loop.childMaxSteps).toBeUndefined()
     expect(loop.exploreChildMaxSteps).toBeUndefined()
+    expect(loop.maxDepth).toBeUndefined()
     expect(loop.subagentHitl).toBeUndefined()
   })
 
   it('round-trips agentLoop on HipConfig through JSON', () => {
     const cfg: HipConfig = {
       version: 1,
-      agentLoop: { childMaxSteps: 10, exploreChildMaxSteps: 15, subagentHitl: 'inline_partial' },
+      agentLoop: {
+        maxSteps: 100,
+        childMaxSteps: 10,
+        exploreChildMaxSteps: 15,
+        maxDepth: 2,
+        subagentHitl: 'inline_partial',
+      },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
     expect(round.agentLoop).toEqual({
+      maxSteps: 100,
       childMaxSteps: 10,
       exploreChildMaxSteps: 15,
+      maxDepth: 2,
       subagentHitl: 'inline_partial',
     })
   })

@@ -111,7 +111,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       resolved: a.resolved, cwd: a.cwd, prompt: a.prompt, task: a.task,
       emit: a.emit, signal: a.signal,
       // Prefer explicit budget (from config agent id); fall back if tests omit it.
-      childMaxSteps: a.childMaxSteps ?? childMaxStepsForAgent(a.agentId),
+      childMaxSteps: a.childMaxSteps ?? childMaxStepsForAgent(a.agentId, a.cwd),
       mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval, permissionMode: a.permissionMode,
       sessionId: a.sessionId, networkPolicy: a.networkPolicy,
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
@@ -144,7 +144,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         return runInternal({
           agentId: extras?.agentId ?? agentId,
           // Budget from config id (`explore`), not runtime child id (`subagent-N`).
-          childMaxSteps: childMaxStepsForAgent(agentId),
+          childMaxSteps: childMaxStepsForAgent(agentId, cwd),
           resolved: resolveModel(agent, cwd), cwd, prompt: agent.prompt ?? '',
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,

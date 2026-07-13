@@ -137,11 +137,17 @@ function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
 
 
 function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
+  if (raw.max_steps !== undefined && raw.maxSteps === undefined) {
+    raw.maxSteps = raw.max_steps
+  }
   if (raw.child_max_steps !== undefined && raw.childMaxSteps === undefined) {
     raw.childMaxSteps = raw.child_max_steps
   }
   if (raw.explore_child_max_steps !== undefined && raw.exploreChildMaxSteps === undefined) {
     raw.exploreChildMaxSteps = raw.explore_child_max_steps
+  }
+  if (raw.max_depth !== undefined && raw.maxDepth === undefined) {
+    raw.maxDepth = raw.max_depth
   }
   if (raw.subagent_hitl !== undefined && raw.subagentHitl === undefined) {
     raw.subagentHitl = raw.subagent_hitl
@@ -149,17 +155,25 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.doom_loop_strategy !== undefined && raw.doomLoopStrategy === undefined) {
     raw.doomLoopStrategy = raw.doom_loop_strategy
   }
+  delete raw.max_steps
   delete raw.child_max_steps
   delete raw.explore_child_max_steps
+  delete raw.max_depth
   delete raw.subagent_hitl
   delete raw.doom_loop_strategy
 
   const out: AgentLoopConfig = {}
+  if (typeof raw.maxSteps === 'number') {
+    out.maxSteps = raw.maxSteps
+  }
   if (typeof raw.childMaxSteps === 'number') {
     out.childMaxSteps = raw.childMaxSteps
   }
   if (typeof raw.exploreChildMaxSteps === 'number') {
     out.exploreChildMaxSteps = raw.exploreChildMaxSteps
+  }
+  if (typeof raw.maxDepth === 'number') {
+    out.maxDepth = raw.maxDepth
   }
   if (raw.subagentHitl === 'inline_partial') {
     out.subagentHitl = 'inline_partial'

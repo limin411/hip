@@ -37,7 +37,7 @@ import { readAgentsConfig } from './agents/index.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { runSubagent } from './subagent.js'
 import { synthesizeSubagentResult } from './subagent-result.js'
-import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
+import { recursionLimit, childMaxStepsForAgent, maxStepsForSession } from './loop-control.js'
 import type { Activity, ActivityTracker } from './activity.js'
 import type { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
@@ -779,7 +779,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     ensureStarted(childId, 'worker', 'supervisor', description, taskId)
     const text = await runSubagent({
       runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
-      signal: signal ?? host.abortController!.signal, description, childMaxSteps: CHILD_MAX_STEPS,
+      signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode, requestApproval, sessionId: host.id,
       networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
@@ -966,11 +966,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     send({ type: 'mcp:status', servers: mcpManager.connectionStatuses(host.configMgr.mcpConfigs) })
   }
 
-  const maxSteps = host.activeActivity?.stepsRemaining ?? MAX_STEPS
+  const effectiveLoop = resolveEffectiveConfig(cwd).agentLoop
+  const maxSteps = host.activeActivity?.stepsRemaining ?? maxStepsForSession(cwd)
   // Product path: pass doom strategy from hip.toml; never inject CircuitBreaker (experimental).
-  const doomLoopStrategy = resolveDoomLoopStrategy(
-    resolveEffectiveConfig(cwd).agentLoop?.doomLoopStrategy,
-  )
+  const doomLoopStrategy = resolveDoomLoopStrategy(effectiveLoop?.doomLoopStrategy)
   const ctx: GraphCtx = {
     runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: host.hooks, sessionId: host.id,
     turnId, agentId: 'supervisor',

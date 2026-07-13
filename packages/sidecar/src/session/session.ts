@@ -23,7 +23,7 @@ import { SELF_GATED_TOOLS } from './tools.js'
 import { RealModelRunner, type ModelRunner } from './model-runner.js'
 import { buildChatModel, createSummarizer } from './model-factory.js'
 import { runSubagent } from './subagent.js'
-import { recursionLimit, CHILD_MAX_STEPS, MAX_STEPS } from './loop-control.js'
+import { maxStepsForSession } from './loop-control.js'
 import { Activity, ActivityTracker } from './activity.js'
 import { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
@@ -210,14 +210,15 @@ export class Session {
 
   registerHook(hook: Hook): void { this.hooks.register(hook) }
 
-  startActivity(description: string, totalSteps: number = MAX_STEPS): Activity {
+  startActivity(description: string, totalSteps?: number): Activity {
     if (this.activeActivity) {
       this.endActivity()
     }
+    const cwd = this._config.cwd ?? process.cwd()
     const activity = new ActivityTracker(
       `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       description,
-      totalSteps,
+      totalSteps ?? maxStepsForSession(cwd),
     )
     this.activeActivity = activity
     void this.hooks.fire('ActivityStart', { sessionId: this.id, activityId: activity.id }).catch((err) => logNonCritical('ActivityStart', err))

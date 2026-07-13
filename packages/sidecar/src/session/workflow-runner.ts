@@ -12,7 +12,7 @@ import {
 } from '../orchestrator/validate.js'
 import { createSessionAgentRunner } from './orchestrator-adapter.js'
 import { runSubagent } from './subagent.js'
-import { CHILD_MAX_STEPS } from './loop-control.js'
+import { childMaxStepsForAgent } from './loop-control.js'
 import { SqliteWorkflowStore } from '../persistence/workflow-store.js'
 import type { OrchestratorEventSink, AgentRunner } from '../orchestrator/ports.js'
 import type { GraphEmit } from './graph.js'
@@ -211,7 +211,7 @@ export async function runWorkflowTurn(
           emit: makeEmit(agentId, 'worker'),
           signal,
           description: input,
-          childMaxSteps: CHILD_MAX_STEPS,
+          childMaxSteps: childMaxStepsForAgent('worker', deps.config.cwd ?? process.cwd()),
           // Inherit session permission mode (never force full — HITL/edit must apply).
           permissionMode: deps.config.permissionMode ?? 'edit',
           // Policy A: no HITL transport in workflow workers.
@@ -328,7 +328,7 @@ export async function runWorkflowTurn(
           emit: makeEmit('aggregator', 'supervisor'),
           signal: abortController.signal,
           description: `You are an aggregator. Merge these subagent results into one coherent summary:\n\n${rawTexts.join('\n\n---\n\n')}`,
-          childMaxSteps: CHILD_MAX_STEPS,
+          childMaxSteps: childMaxStepsForAgent('worker', deps.config.cwd ?? process.cwd()),
           permissionMode: 'chat',
           requestApproval: undefined,
           networkPolicy: deps.networkPolicy,

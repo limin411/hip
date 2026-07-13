@@ -6,7 +6,7 @@ import { join, dirname } from 'node:path'
 import type { GraphEmit } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
 import { runSubagent } from './subagent.js'
-import { CHILD_MAX_STEPS } from './loop-control.js'
+import { childMaxStepsForAgent } from './loop-control.js'
 import { GuardianReviewer } from './guardian.js'
 import { NetworkPolicy } from './network-policy.js'
 import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
@@ -251,7 +251,7 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
       emit: effectiveEmit,
       signal: new AbortController().signal,
       description: retryDescription,
-      childMaxSteps: CHILD_MAX_STEPS,
+      childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode,
       requestApproval,
       sessionId: host.id,
@@ -310,7 +310,7 @@ export async function resumeSubagent(host: SessionTurnHost, taskId: string, cont
   try {
     const text = await runSubagent({
       runner, root: cwd, summarizer, emit, signal: ac.signal,
-      description: content, childMaxSteps: CHILD_MAX_STEPS,
+      description: content, childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode, requestApproval,
       existingMessages: [...existingMessages, new HumanMessage(content)],
       sessionId: host.id,

@@ -375,15 +375,19 @@ describe('agentLoop config', () => {
     const p = writeToml(dir, 'hip.toml', `version = 1
 
 [agentLoop]
+maxSteps = 800
 childMaxSteps = 25
 exploreChildMaxSteps = 40
+maxDepth = 3
 subagentHitl = "inline_partial"
 `)
     process.env.HIP_CONFIG_PATH = p
     const cfg = readHipConfig()
     expect(cfg.agentLoop).toEqual({
+      maxSteps: 800,
       childMaxSteps: 25,
       exploreChildMaxSteps: 40,
+      maxDepth: 3,
       subagentHitl: 'inline_partial',
     })
   })
@@ -393,15 +397,19 @@ subagentHitl = "inline_partial"
     const p = writeToml(dir, 'hip.toml', `version = 1
 
 [agent_loop]
+max_steps = 90
 child_max_steps = 10
 explore_child_max_steps = 20
+max_depth = 2
 subagent_hitl = "inline_partial"
 `)
     process.env.HIP_CONFIG_PATH = p
     const cfg = readHipConfig()
     expect(cfg.agentLoop).toEqual({
+      maxSteps: 90,
       childMaxSteps: 10,
       exploreChildMaxSteps: 20,
+      maxDepth: 2,
       subagentHitl: 'inline_partial',
     })
   })

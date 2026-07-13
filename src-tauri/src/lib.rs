@@ -1111,6 +1111,11 @@ mod tests {
             fixed_agents: None,
             permissions: None,
             agent_loop: Some(super::AgentLoopConfig {
+                max_steps: Some(400),
+                child_max_steps: Some(20),
+                explore_child_max_steps: Some(35),
+                max_depth: Some(2),
+                subagent_hitl: Some("inline_partial".into()),
                 doom_loop_strategy: Some("pause_immediately".into()),
             }),
         };
@@ -1122,6 +1127,8 @@ mod tests {
             json.contains("\"doomLoopStrategy\""),
             "JSON must emit doomLoopStrategy: {json}"
         );
+        assert!(json.contains("\"maxSteps\""), "JSON must emit maxSteps: {json}");
+        assert!(json.contains("\"maxDepth\""), "JSON must emit maxDepth: {json}");
         let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
         let toml_cfg: super::TomlHipConfig = from_json.into();
         let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
@@ -1133,29 +1140,38 @@ mod tests {
             toml_str.contains("doom_loop_strategy") || toml_str.contains("pause_immediately"),
             "TOML should preserve doom_loop_strategy: {toml_str}"
         );
+        assert!(
+            toml_str.contains("max_steps") || toml_str.contains("400"),
+            "TOML should preserve max_steps: {toml_str}"
+        );
         let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
         let back: super::HipConfig = from_toml.into();
-        assert_eq!(
-            back.agent_loop
-                .as_ref()
-                .and_then(|a| a.doom_loop_strategy.as_deref()),
-            Some("pause_immediately")
-        );
+        let loop_cfg = back.agent_loop.as_ref().expect("agent_loop preserved");
+        assert_eq!(loop_cfg.doom_loop_strategy.as_deref(), Some("pause_immediately"));
+        assert_eq!(loop_cfg.max_steps, Some(400));
+        assert_eq!(loop_cfg.child_max_steps, Some(20));
+        assert_eq!(loop_cfg.explore_child_max_steps, Some(35));
+        assert_eq!(loop_cfg.max_depth, Some(2));
+        assert_eq!(loop_cfg.subagent_hitl.as_deref(), Some("inline_partial"));
 
         // Sidecar-written camelCase table alias
         let camel_toml = r#"
 version = 1
 [agentLoop]
+maxSteps = 100
+childMaxSteps = 15
+exploreChildMaxSteps = 30
+maxDepth = 4
 doomLoopStrategy = "auto_continue"
 "#;
         let from_camel: super::TomlHipConfig = toml::from_str(camel_toml).unwrap();
         let hip: super::HipConfig = from_camel.into();
-        assert_eq!(
-            hip.agent_loop
-                .as_ref()
-                .and_then(|a| a.doom_loop_strategy.as_deref()),
-            Some("auto_continue")
-        );
+        let camel_loop = hip.agent_loop.as_ref().expect("camel agentLoop");
+        assert_eq!(camel_loop.doom_loop_strategy.as_deref(), Some("auto_continue"));
+        assert_eq!(camel_loop.max_steps, Some(100));
+        assert_eq!(camel_loop.child_max_steps, Some(15));
+        assert_eq!(camel_loop.explore_child_max_steps, Some(30));
+        assert_eq!(camel_loop.max_depth, Some(4));
     }
 
     #[test]

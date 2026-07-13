@@ -21,12 +21,29 @@ export type DoomLoopStrategy = 'nudge_then_pause' | 'pause_immediately' | 'auto_
 /**
  * Optional `[agentLoop]` section in hip.toml.
  * All fields optional — omitted values keep defaults (loop-control / doom-loop).
+ *
+ * Defaults (when unset) are intentional safety ceilings, not typical run lengths:
+ * - maxSteps 800: OpenCode-style high ceiling (OpenCode default is unbounded;
+ *   hermes agent.max_turns is 90). Practical stops are doom-loop / error-streak.
+ * - childMaxSteps 25 / exploreChildMaxSteps 40: below hermes delegation.max_iterations (50)
+ *   to bound fan-out cost; explore needs more tool rounds for codebase search.
+ * - maxDepth 3: stop recursive task/dispatch nesting.
  */
 export interface AgentLoopConfig {
+  /**
+   * Supervisor / primary agent max model steps per user turn.
+   * @default 800
+   */
+  maxSteps?: number
   /** Generic child / task worker step budget. Default: 25. */
   childMaxSteps?: number
   /** Explore fixed-agent step budget. Default: 40. */
   exploreChildMaxSteps?: number
+  /**
+   * Max nested sub-agent depth. At depth >= maxDepth, task/dispatch tools are stripped.
+   * @default 3
+   */
+  maxDepth?: number
   /**
    * Sub-agent HITL strategy placeholder.
    * Only `inline_partial` is accepted for now (partial tool result + parent pause).

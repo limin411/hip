@@ -110,9 +110,20 @@ pub(crate) struct PermissionEntry {
 }
 
 /// Optional `[agentLoop]` section (Track A-config). JSON uses camelCase for the UI.
+/// Must preserve all sidecar-recognized fields so set_hip_config rewrites do not strip them.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AgentLoopConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) child_max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) explore_child_max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) max_depth: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) subagent_hitl: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) doom_loop_strategy: Option<String>,
 }
@@ -276,6 +287,16 @@ pub(crate) struct TomlPermissionEntry {
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
 pub(crate) struct TomlAgentLoopConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "maxSteps")]
+    pub(crate) max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "childMaxSteps")]
+    pub(crate) child_max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "exploreChildMaxSteps")]
+    pub(crate) explore_child_max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "maxDepth")]
+    pub(crate) max_depth: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "subagentHitl")]
+    pub(crate) subagent_hitl: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "doomLoopStrategy")]
     pub(crate) doom_loop_strategy: Option<String>,
 }
@@ -502,6 +523,11 @@ impl From<TomlPermissionEntry> for PermissionEntry {
 impl From<AgentLoopConfig> for TomlAgentLoopConfig {
     fn from(a: AgentLoopConfig) -> Self {
         TomlAgentLoopConfig {
+            max_steps: a.max_steps,
+            child_max_steps: a.child_max_steps,
+            explore_child_max_steps: a.explore_child_max_steps,
+            max_depth: a.max_depth,
+            subagent_hitl: a.subagent_hitl,
             doom_loop_strategy: a.doom_loop_strategy,
         }
     }
@@ -510,6 +536,11 @@ impl From<AgentLoopConfig> for TomlAgentLoopConfig {
 impl From<TomlAgentLoopConfig> for AgentLoopConfig {
     fn from(a: TomlAgentLoopConfig) -> Self {
         AgentLoopConfig {
+            max_steps: a.max_steps,
+            child_max_steps: a.child_max_steps,
+            explore_child_max_steps: a.explore_child_max_steps,
+            max_depth: a.max_depth,
+            subagent_hitl: a.subagent_hitl,
             doom_loop_strategy: a.doom_loop_strategy,
         }
     }

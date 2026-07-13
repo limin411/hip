@@ -41,8 +41,9 @@ describe('Activity boundary', () => {
     const session = new Session('t-act-start', { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] })
     const activity = session.startActivity('test goal')
     expect(activity.description).toBe('test goal')
-    expect(activity.totalStepsAllowed).toBe(25)
-    expect(activity.stepsRemaining).toBe(25)
+    // Default from [agentLoop].maxSteps (or MAX_STEPS = 800 when unset).
+    expect(activity.totalStepsAllowed).toBe(800)
+    expect(activity.stepsRemaining).toBe(800)
     expect(session.currentActivity()?.id).toBe(activity.id)
   })
 

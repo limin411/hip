@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -8,8 +8,13 @@ import {
   recursionLimit,
   CHILD_MAX_STEPS,
   EXPLORE_CHILD_MAX_STEPS,
+  MAX_DEPTH,
   childMaxStepsForAgent,
   childMaxStepsFromConfig,
+  maxStepsFromConfig,
+  maxStepsForSession,
+  maxDepthFromConfig,
+  maxDepthForSession,
 } from './loop-control.js'
 
 describe('loop-control', () => {
@@ -37,6 +42,10 @@ describe('loop-control', () => {
     expect(childMaxStepsFromConfig('coder', {})).toBe(CHILD_MAX_STEPS)
     expect(childMaxStepsFromConfig('explore', null)).toBe(EXPLORE_CHILD_MAX_STEPS)
     expect(childMaxStepsFromConfig('coder', null)).toBe(CHILD_MAX_STEPS)
+    expect(maxStepsFromConfig({})).toBe(MAX_STEPS)
+    expect(maxStepsFromConfig(null)).toBe(MAX_STEPS)
+    expect(maxDepthFromConfig({})).toBe(MAX_DEPTH)
+    expect(maxDepthFromConfig(null)).toBe(MAX_DEPTH)
   })
 
   it('honors agentLoop overrides for child and explore budgets', () => {
@@ -46,10 +55,18 @@ describe('loop-control', () => {
     expect(childMaxStepsFromConfig('worker-1', loop)).toBe(10)
   })
 
+  it('honors agentLoop overrides for maxSteps and maxDepth', () => {
+    expect(maxStepsFromConfig({ maxSteps: 120 })).toBe(120)
+    expect(maxDepthFromConfig({ maxDepth: 5 })).toBe(5)
+  })
+
   it('falls back to defaults for non-positive override values', () => {
     expect(childMaxStepsFromConfig('coder', { childMaxSteps: 0 })).toBe(CHILD_MAX_STEPS)
     expect(childMaxStepsFromConfig('coder', { childMaxSteps: -3 })).toBe(CHILD_MAX_STEPS)
     expect(childMaxStepsFromConfig('explore', { exploreChildMaxSteps: 0 })).toBe(EXPLORE_CHILD_MAX_STEPS)
+    expect(maxStepsFromConfig({ maxSteps: 0 })).toBe(MAX_STEPS)
+    expect(maxStepsFromConfig({ maxSteps: -1 })).toBe(MAX_STEPS)
+    expect(maxDepthFromConfig({ maxDepth: 0 })).toBe(MAX_DEPTH)
   })
 
   it('the max-steps note tells the model tools are disabled and to answer in text', () => {
@@ -59,7 +76,7 @@ describe('loop-control', () => {
   })
 })
 
-describe('childMaxStepsForAgent reads hip.toml agentLoop', () => {
+describe('loop-control reads hip.toml agentLoop', () => {
   let dir: string
   let prevConfigPath: string | undefined
 
@@ -78,21 +95,27 @@ describe('childMaxStepsForAgent reads hip.toml agentLoop', () => {
   it('uses defaults when no hip.toml is configured', () => {
     expect(childMaxStepsForAgent('explore')).toBe(EXPLORE_CHILD_MAX_STEPS)
     expect(childMaxStepsForAgent('coder')).toBe(CHILD_MAX_STEPS)
+    expect(maxStepsForSession()).toBe(MAX_STEPS)
+    expect(maxDepthForSession()).toBe(MAX_DEPTH)
   })
 
-  it('reads childMaxSteps / exploreChildMaxSteps from HIP_CONFIG_PATH', () => {
+  it('reads step budgets and depth from HIP_CONFIG_PATH', () => {
     const p = join(dir, 'hip.toml')
     writeFileSync(p, `version = 1
 
 [agentLoop]
+maxSteps = 100
 childMaxSteps = 7
 exploreChildMaxSteps = 33
+maxDepth = 2
 subagentHitl = "inline_partial"
 `)
     process.env.HIP_CONFIG_PATH = p
     expect(childMaxStepsForAgent('explore')).toBe(33)
     expect(childMaxStepsForAgent('coder')).toBe(7)
     expect(childMaxStepsForAgent('worker-1')).toBe(7)
+    expect(maxStepsForSession()).toBe(100)
+    expect(maxDepthForSession()).toBe(2)
   })
 
   it('accepts snake_case agent_loop keys', () => {
@@ -100,11 +123,43 @@ subagentHitl = "inline_partial"
     writeFileSync(p, `version = 1
 
 [agent_loop]
+max_steps = 50
 child_max_steps = 12
 explore_child_max_steps = 44
+max_depth = 4
 `)
     process.env.HIP_CONFIG_PATH = p
     expect(childMaxStepsForAgent('explore')).toBe(44)
     expect(childMaxStepsForAgent('coder')).toBe(12)
+    expect(maxStepsForSession()).toBe(50)
+    expect(maxDepthForSession()).toBe(4)
+  })
+
+  it('project hip.toml overrides global agentLoop budgets', () => {
+    const globalFile = join(dir, 'global.toml')
+    writeFileSync(globalFile, `version = 1
+
+[agentLoop]
+maxSteps = 200
+childMaxSteps = 25
+maxDepth = 3
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const projectRoot = join(dir, 'proj')
+    mkdirSync(join(projectRoot, '.hip'), { recursive: true })
+    writeFileSync(join(projectRoot, '.hip', 'hip.toml'), `version = 1
+
+[agentLoop]
+maxSteps = 60
+childMaxSteps = 9
+maxDepth = 1
+`)
+
+    expect(maxStepsForSession(projectRoot)).toBe(60)
+    expect(childMaxStepsForAgent('coder', projectRoot)).toBe(9)
+    expect(maxDepthForSession(projectRoot)).toBe(1)
+    // Without cwd, still global-only
+    expect(maxStepsForSession()).toBe(200)
   })
 })

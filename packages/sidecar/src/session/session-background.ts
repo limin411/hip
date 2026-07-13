@@ -2,7 +2,7 @@
 import type { PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import { runSubagent } from './subagent.js'
-import { CHILD_MAX_STEPS } from './loop-control.js'
+import { childMaxStepsForAgent } from './loop-control.js'
 import { GuardianReviewer } from './guardian.js'
 import { NetworkPolicy } from './network-policy.js'
 import { safeErrorMessage } from './error.js'
@@ -46,7 +46,7 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
       emit: { token: () => {}, reasoning: () => {}, toolStarted: () => {}, toolFinished: () => {}, usage: () => {}, planDelta: () => {}, compaction: () => {} },
       signal,
       description,
-      childMaxSteps: CHILD_MAX_STEPS,
+      childMaxSteps: childMaxStepsForAgent('worker', wt.root),
       permissionMode: mode,
       requestApproval,
       mode: 'background',

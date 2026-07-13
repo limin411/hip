@@ -30,6 +30,8 @@ import {
   isLoopToolError,
   ERROR_STREAK_LIMIT,
   ERROR_STREAK_NUDGE,
+  resolveDoomLoopStrategy,
+  type DoomLoopStrategy,
 } from './doom-loop.js'
 import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
 import { applySlidingWindow } from './context/sliding-window.js'
@@ -120,8 +122,17 @@ export interface GraphCtx {
   /** Per-activity step cap. When provided, overrides the `maxSteps` passed to `buildGraph`. */
   maxSteps?: number
   planMode?: PlanMode
-  /** Optional circuit breaker that detects stalled agent loops and budget exhaustion. */
+  /**
+   * @experimental Test / harness only. Product session-turn paths never inject.
+   * Optional circuit breaker for stalled-loop / budget experiments. Prefer doom /
+   * error-streak / MAX_STEPS for product loop safety.
+   */
   circuitBreaker?: CircuitBreaker
+  /**
+   * Doom-loop strategy from `HipConfig.agentLoop.doomLoopStrategy`.
+   * When omitted, defaults to `nudge_then_pause` (current behavior).
+   */
+  doomLoopStrategy?: DoomLoopStrategy
   /**
    * Turn-local replan guard (max 1 replan per graph invoke).
    * Created once per invoke if missing; not LangGraph state.
@@ -733,10 +744,16 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     const lastSig = state.recentSigs[state.recentSigs.length - 1]
     const isDoom =
       lastSig !== undefined && trailingRepeatCount(state.recentSigs, lastSig) >= DOOM_LOOP_N
+    const doomStrategy = resolveDoomLoopStrategy(ctxOf(config).doomLoopStrategy)
 
     // 1) Doom first (more specific than generic error replan).
+    // Strategies: nudge_then_pause (default) | pause_immediately | auto_continue (fall through).
     if (isDoom) {
-      return state.nudgedSig === lastSig ? 'pause' : 'nudge'
+      if (doomStrategy === 'pause_immediately') return 'pause'
+      if (doomStrategy === 'nudge_then_pause') {
+        return state.nudgedSig === lastSig ? 'pause' : 'nudge'
+      }
+      // auto_continue: skip doom corrective path; replan / error-streak may still apply.
     }
 
     // 2) Replan once when trailing errors ≥ threshold and guard allows.

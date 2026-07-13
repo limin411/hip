@@ -3,7 +3,6 @@ import { join } from 'node:path'
 import toml from '@iarna/toml'
 import type {
   HipConfig,
-  AgentLoopConfig,
   McpServerConfig,
   AgentConfig,
   ProviderEntry,
@@ -12,6 +11,8 @@ import type {
   TeamConfig,
   TeamMember,
   TeamPipelineStep,
+  AgentLoopConfig,
+  DoomLoopStrategy,
 } from '@hip/protocol'
 
 const DEFAULT_CONFIG: HipConfig = { version: 1 }
@@ -134,6 +135,7 @@ function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
   return raw as unknown as TeamConfig
 }
 
+
 function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.child_max_steps !== undefined && raw.childMaxSteps === undefined) {
     raw.childMaxSteps = raw.child_max_steps
@@ -144,9 +146,13 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.subagent_hitl !== undefined && raw.subagentHitl === undefined) {
     raw.subagentHitl = raw.subagent_hitl
   }
+  if (raw.doom_loop_strategy !== undefined && raw.doomLoopStrategy === undefined) {
+    raw.doomLoopStrategy = raw.doom_loop_strategy
+  }
   delete raw.child_max_steps
   delete raw.explore_child_max_steps
   delete raw.subagent_hitl
+  delete raw.doom_loop_strategy
 
   const out: AgentLoopConfig = {}
   if (typeof raw.childMaxSteps === 'number') {
@@ -155,12 +161,17 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (typeof raw.exploreChildMaxSteps === 'number') {
     out.exploreChildMaxSteps = raw.exploreChildMaxSteps
   }
-  // Placeholder: only inline_partial is accepted for now.
   if (raw.subagentHitl === 'inline_partial') {
     out.subagentHitl = 'inline_partial'
   }
+  const strategyRaw = raw.doomLoopStrategy
+  if (typeof strategyRaw === 'string') {
+    const allowed = new Set(['nudge_then_pause', 'pause_immediately', 'auto_continue'])
+    if (allowed.has(strategyRaw)) out.doomLoopStrategy = strategyRaw as DoomLoopStrategy
+  }
   return out
 }
+
 
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
@@ -278,8 +289,8 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   if (project.fixedAgents !== undefined) {
     merged.fixedAgents = project.fixedAgents
   }
+  // Project agentLoop replaces global wholesale (same as activeModel / fixedAgents).
   if (project.agentLoop !== undefined) {
-    // Project section replaces global entirely (same as activeModel / fixedAgents).
     merged.agentLoop = project.agentLoop
   }
 

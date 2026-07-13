@@ -1,6 +1,29 @@
 /** Doom-loop detection: an identical batch of tool calls repeated N times in a row. */
 
+import type { DoomLoopStrategy } from '@hip/protocol'
 import { isSubagentPausedText } from './subagent-result.js'
+
+export type { DoomLoopStrategy }
+
+/** Default matches historical graph behavior (nudge once, then pause). */
+export const DEFAULT_DOOM_LOOP_STRATEGY: DoomLoopStrategy = 'nudge_then_pause'
+
+/**
+ * Normalize an optional config / GraphCtx value to a valid strategy.
+ * Unknown / empty values fall back to {@link DEFAULT_DOOM_LOOP_STRATEGY}.
+ */
+export function resolveDoomLoopStrategy(
+  strategy?: DoomLoopStrategy | string | null,
+): DoomLoopStrategy {
+  if (
+    strategy === 'nudge_then_pause' ||
+    strategy === 'pause_immediately' ||
+    strategy === 'auto_continue'
+  ) {
+    return strategy
+  }
+  return DEFAULT_DOOM_LOOP_STRATEGY
+}
 
 export const DOOM_LOOP_N = 3
 

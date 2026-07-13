@@ -27,6 +27,7 @@ import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx, type LoopState } from './graph.js'
 import { selectImageAgent } from './agents/registry.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -42,7 +43,7 @@ import type { GoalManager } from './goal.js'
 import { addUsage, sumUsage } from './usage.js'
 import { estimateTokens, COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { ensureToolCallResults, hasValidToolCallPairing } from '../persistence/event-store.js'
-import { PAUSE_QUESTION } from './doom-loop.js'
+import { PAUSE_QUESTION, resolveDoomLoopStrategy } from './doom-loop.js'
 import type { ExternalAgentHooks, PermissionChoice } from './agents/types.js'
 import type { HookRegistry } from './hooks/registry.js'
 import type { AgentInvoker } from './agents/invoker.js'
@@ -966,13 +967,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   }
 
   const maxSteps = host.activeActivity?.stepsRemaining ?? MAX_STEPS
+  // Product path: pass doom strategy from hip.toml; never inject CircuitBreaker (experimental).
+  const doomLoopStrategy = resolveDoomLoopStrategy(
+    resolveEffectiveConfig(cwd).agentLoop?.doomLoopStrategy,
+  )
   const ctx: GraphCtx = {
     runner, tools: tooling?.tools ?? [], emit, summarizer, hooks: host.hooks, sessionId: host.id,
     turnId, agentId: 'supervisor',
     toolRunner: tooling?.toolRunner, toolPolicy: host.toolPolicy, approvalCache: host.approvalCache,
     requestApproval, permissionMode: mode, allowedTools: activeProfile.allowedTools,
     blockedTools: activeProfile.blockedTools, systemPrompt: system, activeProfileId: activeProfile.id,
-    maxSteps, planMode,
+    maxSteps, planMode, doomLoopStrategy,
   }
 
   let finalState: LoopState | undefined

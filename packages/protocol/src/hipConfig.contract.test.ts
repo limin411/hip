@@ -794,3 +794,14 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(round.disabledTools).toEqual(['tool3'])
   })
 })
+  it('admits all doomLoopStrategy literals', () => {
+    const strategies: DoomLoopStrategy[] = ['nudge_then_pause', 'pause_immediately', 'auto_continue']
+    expect(strategies).toHaveLength(3)
+  })
+
+  it('models agentLoop with doomLoopStrategy', () => {
+    const agentLoop: AgentLoopConfig = { doomLoopStrategy: 'nudge_then_pause' }
+    const cfg: HipConfig = { version: 1, agentLoop }
+    expect(cfg.agentLoop?.doomLoopStrategy).toBe('nudge_then_pause')
+  })
+

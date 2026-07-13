@@ -502,4 +502,68 @@ enabled = true
     expect(cfg.providers![0]).toMatchObject({ id: 'openai' })
   })
 
+  it('project agentLoop replaces global agentLoop wholesale', () => {
+    const dir = tmpDir()
+    const globalFile = writeToml(dir, 'global.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "nudge_then_pause"
+`)
+    process.env.HIP_CONFIG_PATH = globalFile
+
+    const { root } = setupProjectDir()
+    writeToml(join(root, '.hip'), 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "pause_immediately"
+`)
+
+    const cfg = resolveEffectiveConfig(root)
+    expect(cfg.agentLoop?.doomLoopStrategy).toBe('pause_immediately')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────
+// agentLoop section (Track A-config)
+// ──────────────────────────────────────────────────────────────
+
+describe('agentLoop config', () => {
+  it('parses camelCase [agentLoop] doomLoopStrategy', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "pause_immediately"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ doomLoopStrategy: 'pause_immediately' })
+  })
+
+  it('parses snake_case [agent_loop] doom_loop_strategy', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agent_loop]
+doom_loop_strategy = "auto_continue"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ doomLoopStrategy: 'auto_continue' })
+  })
+
+  it('drops invalid doomLoopStrategy values', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+[agentLoop]
+doomLoopStrategy = "not_a_real_strategy"
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({})
+    expect(cfg.agentLoop?.doomLoopStrategy).toBeUndefined()
+  })
+
+  it('omits agentLoop when section is absent', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', 'version = 1\n')
+    process.env.HIP_CONFIG_PATH = p
+    expect(readHipConfig().agentLoop).toBeUndefined()
+  })
 })

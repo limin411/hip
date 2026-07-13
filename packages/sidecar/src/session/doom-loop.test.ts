@@ -10,8 +10,27 @@ import {
   harvestTrailingToolErrors,
   isLoopToolError,
   PATH_HIT_LIMIT,
+  resolveDoomLoopStrategy,
+  DEFAULT_DOOM_LOOP_STRATEGY,
 } from './doom-loop.js'
 import { SUBAGENT_PAUSE_MARKER } from './subagent-result.js'
+
+describe('resolveDoomLoopStrategy', () => {
+  it('defaults to nudge_then_pause', () => {
+    expect(DEFAULT_DOOM_LOOP_STRATEGY).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy()).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy(undefined)).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy(null)).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('')).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('bogus')).toBe('nudge_then_pause')
+  })
+
+  it('passes through valid strategies', () => {
+    expect(resolveDoomLoopStrategy('nudge_then_pause')).toBe('nudge_then_pause')
+    expect(resolveDoomLoopStrategy('pause_immediately')).toBe('pause_immediately')
+    expect(resolveDoomLoopStrategy('auto_continue')).toBe('auto_continue')
+  })
+})
 
 describe('doom-loop signatures', () => {
   it('identical calls produce identical signatures', () => {

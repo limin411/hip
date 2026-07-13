@@ -34,7 +34,12 @@ export function TitleBar() {
       data-tauri-drag-region
       data-testid="titlebar"
       onPointerDown={handlePointerDown}
-      className="relative flex h-11 shrink-0 items-center bg-glass backdrop-blur-xl"
+      className="relative flex h-11 shrink-0 items-center"
+      style={{
+        background: 'var(--titlebar-bg)',
+        WebkitBackdropFilter: 'var(--titlebar-backdrop, saturate(180%) blur(20px))',
+        backdropFilter: 'var(--titlebar-backdrop, saturate(180%) blur(20px))',
+      }}
     >
       {/* 为 macOS 红绿灯整簇让位（约 x19→77），留足间距后再放内容，避免与绿灯相撞 */}
       <div className="shrink-0" style={{ width: 'var(--titlebar-lights-inset, 90px)' }} aria-hidden />

@@ -43,6 +43,9 @@
   /* 毛玻璃效果：仅标题栏使用，半透明背景 + 模糊 */
   --glass-bg: rgba(255, 255, 255, 0.85);
   --glass-border: rgba(0, 0, 0, 0.05);
+  /* 标题栏默认背景（非 macOS 平台使用纯色） */
+  --titlebar-bg: var(--glass-bg);
+  --titlebar-backdrop: saturate(180%) blur(20px);
   /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档） */
   --shadow-panel: 0 2px 12px -2px rgba(17, 17, 17, 0.12), 0 1px 3px rgba(17, 17, 17, 0.06);
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
@@ -60,6 +63,13 @@
   --btn-primary: #3a3a3a;
   --btn-primary-hover: #2e2e2e;
   --on-btn-primary: #fafafa;
+}
+
+/* Windows / Linux: no native traffic lights → remove mac-only clearance & glass effect */
+html[data-platform="windows"] {
+  --titlebar-lights-inset: 8px;
+  --titlebar-bg: var(--bg-app);
+  --titlebar-backdrop: none;
 }
 
 .dark {
@@ -91,6 +101,8 @@
   /* 毛玻璃效果：暗色半透明背景 + 浅色描边 */
   --glass-bg: rgba(20, 20, 20, 0.85);
   --glass-border: rgba(255, 255, 255, 0.06);
+  --titlebar-bg: var(--glass-bg);
+  --titlebar-backdrop: saturate(180%) blur(20px);
   --shadow-panel: 0 2px 12px -2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
   /* 公共交互状态 —— 复用暗色令牌 */
   --state-hover: var(--accent-subtle);
@@ -107,6 +119,12 @@
   --btn-primary: #d4d4d4;
   --btn-primary-hover: #e0e0e0;
   --on-btn-primary: #141414;
+}
+
+html.dark[data-platform="windows"] {
+  --titlebar-lights-inset: 8px;
+  --titlebar-bg: var(--bg-app);
+  --titlebar-backdrop: none;
 }
 
 html {

@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "sidecar:dev": "yarn workspace @hip/sidecar dev",
-    "sidecar:dev-bin": "bash scripts/make-sidecar-dev-bin.sh",
+    "sidecar:dev-bin": "node scripts/make-sidecar-dev-bin.js",
     "sidecar:build": "yarn workspace @hip/sidecar build",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

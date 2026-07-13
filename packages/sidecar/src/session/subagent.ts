@@ -11,6 +11,7 @@ import type { HookRegistry } from './hooks/registry.js'
 import { recursionLimit, MAX_DEPTH } from './loop-control.js'
 import { childSystemPrompt } from './system-prompt.js'
 import { formatPausedToolResult } from './subagent-result.js'
+import { linkSubagentParentObservation, type TraceObservation } from './trace-export.js'
 
 const NOOP_EMIT: GraphEmit = {
   token: () => {},
@@ -60,10 +61,19 @@ export interface RunSubagentArgs {
   runId?: string
   nodeId?: string
   agentId?: string
+  /**
+   * Parent agent id for observation / hook framing (who delegated this run).
+   * Propagated to GraphCtx and recorded as TraceObservation.parentId (E2).
+   */
   parentAgentId?: string
   /** Current delegation depth. 0 for top-level session, increments with each `task` delegation.
    *  At depth >= MAX_DEPTH, task/task_batch/dispatch_agent tools are filtered. */
   depth?: number
+  /**
+   * Optional observation collector (E2). When set, each spawn records a parent-linked
+   * span into this sink for JSONL export. Product path leaves this unset.
+   */
+  onObservation?: (o: TraceObservation) => void
 }
 
 /** Last assistant message's text content (string content, or joined text blocks). */
@@ -95,11 +105,33 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     runner, root, summarizer, emit, signal, description, childMaxSteps,
     permissionMode, requestApproval, existingMessages, mode, sessionId,
     networkPolicy, toolOutputStore, guardianReviewer, hooks,
-    turnId, runId, nodeId, agentId, parentAgentId,
+    turnId, runId, nodeId, agentId, parentAgentId, onObservation,
   } = args
   const currentDepth = args.depth ?? 0
+  const childAgentId = agentId ?? 'worker'
+
+  // E2: parent observation link (debug-logger + optional collector). Prefer
+  // GraphEmit.loopSignal when present for adjacent loop lifecycle; spawn itself
+  // is recorded as a span with parentId = parentAgentId (not a LoopEvent — E0 frozen).
+  linkSubagentParentObservation(
+    {
+      sessionId: sessionId ?? 'subagent',
+      turnId,
+      runId,
+      agentId: childAgentId,
+      parentAgentId,
+      task: description,
+      depth: currentDepth,
+      mode: mode ?? 'foreground',
+    },
+    {
+      collect: onObservation,
+      loopSignal: emit.loopSignal,
+    },
+  )
 
   // Create a spawn function for recursive delegation that increments depth on each call.
+  // Parent observation link: child.parentAgentId = this agent (not the grandparent).
   const childSpawn = async (desc: string, submode?: 'foreground' | 'background'): Promise<string> => {
     return runSubagent({
       ...args,
@@ -107,7 +139,10 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       description: desc,
       mode: submode,
       existingMessages: undefined, // each delegation is a fresh sub-agent
-      // hooks / frame fields stay on ...args so children share the session registry
+      parentAgentId: childAgentId,
+      // nested child gets a distinct agent id so parentId edges stay unique in export
+      agentId: `${childAgentId}:d${currentDepth + 1}`,
+      // hooks / onObservation stay on ...args so children share the session registry
     })
   }
 
@@ -132,7 +167,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     turnId,
     runId,
     nodeId,
-    agentId: agentId ?? 'worker',
+    agentId: childAgentId,
     parentAgentId,
     toolOutputStore,
     guardianReviewer,

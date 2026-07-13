@@ -56,3 +56,22 @@ export function logDebugEveryN(tag: string, n: number, msg: string, data?: Recor
   let c = 0
   return () => { c++; if (c % n === 1 || n <= 1) logDebug(tag, msg, { ...data, seq: c }) }
 }
+
+/**
+ * Structured debug line for observability observations (E2).
+ * Same HIP_DEBUG gate as logDebug; never throws.
+ * Prefer this over ad-hoc logDebug when emitting parent links / loop mirrors
+ * so log greps can key on `[observation]`.
+ */
+export function logObservation(msg: string, data?: Record<string, unknown>): void {
+  try {
+    logDebug('observation', msg, data)
+  } catch {
+    /* logging must never crash the app */
+  }
+}
+
+/** Whether HIP_DEBUG is enabled (for opt-in sinks that only want debug paths). */
+export function isDebugLoggingEnabled(): boolean {
+  return DEBUG_ENABLED
+}

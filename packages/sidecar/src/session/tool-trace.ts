@@ -81,6 +81,11 @@ export interface TraceRun {
   toolCalls: Map<string, ToolCall>
   reasoningBursts: ReasoningBurst[]
   taskInput?: string
+  /**
+   * Who delegated this run (observation parent). Used by trajectoryToRuns and
+   * JSONL export (`parentId` on TraceObservation). Prefer setting this at
+   * agent:started / ensureStarted time so export parent links stay accurate.
+   */
   parentAgentId?: string
 }
 

@@ -39,6 +39,29 @@ const V_GAP = 50
 const PARALLEL_W = 280
 const PARALLEL_H = 160
 
+/**
+ * Node types offered by the DagEditor authoring palette.
+ * `tool` / `human` are intentionally excluded: C-validate rejects them at run,
+ * protocol marks them `@deprecated`, and C-shrink may hard-delete them later.
+ * Render cards for tool/human remain for read-only projection of legacy defs.
+ */
+export const DAG_PALETTE_NODE_TYPES = ['agent', 'gate', 'parallel'] as const
+export type DagPaletteNodeType = (typeof DAG_PALETTE_NODE_TYPES)[number]
+
+/** Deprecated leaf types — not authorable via palette (still projectable). */
+export const DAG_DEPRECATED_NODE_TYPES = ['tool', 'human'] as const
+export type DagDeprecatedNodeType = (typeof DAG_DEPRECATED_NODE_TYPES)[number]
+
+const PALETTE_LABELS: Record<DagPaletteNodeType, string> = {
+  agent: 'Agent',
+  gate: 'Gate',
+  parallel: 'Parallel',
+}
+
+export function isPaletteNodeType(type: string): type is DagPaletteNodeType {
+  return (DAG_PALETTE_NODE_TYPES as readonly string[]).includes(type)
+}
+
 // ── Custom node data (extends Record<string,unknown> for @xyflow/react v12) ──
 interface DagNodeData extends Record<string, unknown> {
   nodeType: WorkflowNode['type']
@@ -351,7 +374,7 @@ function toFlowEdge(e: import('@hip/protocol').WorkflowEdge): Edge<{ label: stri
   }
 }
 
-// ── NodeTypes registry ──
+// ── NodeTypes registry (includes deprecated types for legacy projection only) ──
 const nodeTypes: NodeTypes = {
   agent:    AgentNodeCard,
   tool:     ToolNodeCard,
@@ -360,15 +383,41 @@ const nodeTypes: NodeTypes = {
   parallel: ParallelNodeCard,
 }
 
+/**
+ * Authoring palette — only agent / gate / parallel.
+ * tool and human are omitted (not merely disabled) so they cannot be added from the UI.
+ */
+function NodePalette() {
+  return (
+    <div className="dag-palette" data-testid="dag-node-palette" aria-label="Workflow node types">
+      <div className="dag-palette-title">Nodes</div>
+      {DAG_PALETTE_NODE_TYPES.map((type) => (
+        <div
+          key={type}
+          className={cn('dag-palette-item', type)}
+          data-testid={`dag-palette-${type}`}
+          data-node-type={type}
+          data-enabled="true"
+        >
+          <span className={cn('dag-palette-swatch', type)} />
+          {PALETTE_LABELS[type]}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Props ──
 export interface DagEditorProps {
   workflow: WorkflowDef
   runState?: RunState
   onNodeClick?: (nodeId: string) => void
+  /** When false, hides the authoring palette (default true). */
+  showPalette?: boolean
 }
 
 // ── Main component ──
-export function DagEditor({ workflow, runState, onNodeClick }: DagEditorProps) {
+export function DagEditor({ workflow, runState, onNodeClick, showPalette = true }: DagEditorProps) {
   const [tooltip, setTooltip] = useState<{
     id: string
     label: string
@@ -455,6 +504,8 @@ export function DagEditor({ workflow, runState, onNodeClick }: DagEditorProps) {
           style={{ border: '1px solid var(--border)' }}
         />
       </ReactFlow>
+
+      {showPalette && <NodePalette />}
 
       <RunStateOverlay
         runState={runState}

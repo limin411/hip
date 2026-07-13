@@ -39,7 +39,7 @@ Related design: multi-track evolution Track C (DAG honesty: retain ParallelNode 
 ### Tool / human (fail-closed detail)
 
 - Protocol shapes exist (`ToolNode`, `HumanNode`) as `@deprecated`.
-- UI (`DagEditor`) can **render** cards for both.
+- UI (`DagEditor`) can **render** cards for both (legacy projection); they are **not** in the authoring palette (`DAG_PALETTE_NODE_TYPES` = agent/gate/parallel only).
 - **C-validate (wired):** `rejectUnsupportedWorkflowNodes` rejects `tool` \| `human` (`unsupported-node`), including nested under `parallel`. Called from `validateWorkflow` and pre-run gates: `runWorkflowTurn` (before `workflow:started`, client `INVALID_WORKFLOW`), `runWorkflow`, `DurableExecutor.runWorkflow` (throw). Registry-free so dynamic session agentIds are not false-failed by `unknown-agent`.
 - `launchResolvedNode` fail-closes any non-`agent`/`gate` type (covers tool, human, parallel if ever called) as a residual safety net.
 - **Historical stranding:** without pre-run reject, executor skip left tool/human `ready` forever and run could still finish `succeeded`. Pre-run reject closes that path for product entry points.
@@ -110,8 +110,8 @@ Type-aware UI is listed first; opaque projection/store paths hold `WorkflowDef` 
 
 | File | Usage |
 |------|--------|
-| `src/components/workflow/DagEditor.tsx` | Renders **all five** types (cards + meta for agent/tool/gate/parallel/human). Display / projection surface only — does not author or execute (`nodesConnectable={false}`, no def rewrite). |
-| `src/components/workflow/DagEditor.test.tsx` | Fixtures for agent, **tool**, gate, **human**, **parallel**. |
+| `src/components/workflow/DagEditor.tsx` | Renders **all five** types (cards + meta for agent/tool/gate/parallel/human) for projection. **Authoring palette** (`DAG_PALETTE_NODE_TYPES`) offers only **agent / gate / parallel** — tool/human omitted (C-frontend). Still display-only for graph edits (`nodesConnectable={false}`, no def rewrite). |
+| `src/components/workflow/DagEditor.test.tsx` | Fixtures for agent, **tool**, gate, **human**, **parallel**; palette excludes tool/human. |
 | `src/store/workflowStore.ts` | Opaque store: holds active def + run state; applies events by node id (status-agnostic to kind). |
 | `src/domain/serverMessageEffects.ts` | Opaque projection: `workflow:started` → `setActiveWorkflow`, event/snapshot/clear (status-agnostic). |
 | `src/store/workflowStore.test.ts` | Default `agent`; one test inserts `type: 'tool'` to assert multi-node event state isolation. |
@@ -205,9 +205,10 @@ In-repo “fixtures” for node types live **inside unit tests** (especially `Da
 ## Implications for later Track C work
 
 1. **C-validate (done + wired):** registry-free `rejectUnsupportedWorkflowNodes` rejects `type: 'tool' | 'human'`; used by `validateWorkflow` and pre-run entry (`runWorkflowTurn`, `runWorkflow`, `DurableExecutor`). ParallelNode documented as structural + merge strategies; reduce merge tests remain green.
-2. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union (types already `@deprecated`); **retain** `parallel` and reduce merge.
-3. **Do not** remove ParallelNode reduce for “honesty”; parallel is a real structural capability, not a fake leaf runner.
-4. **Validate-before-run** closes the stranding path for tool/human on product and executor entry points. Launch-time fail-closed (`Unsupported…`) remains a residual safety net if `launchResolvedNode` is called directly.
+2. **C-frontend (done):** DagEditor palette exports only agent/gate/parallel (`DAG_PALETTE_NODE_TYPES`); tool/human are not palette items (still projectable via cards).
+3. **C-shrink (after deprecate window):** MAY hard-delete `tool` + `human` from the protocol union (types already `@deprecated`); **retain** `parallel` and reduce merge.
+4. **Do not** remove ParallelNode reduce for “honesty”; parallel is a real structural capability, not a fake leaf runner.
+5. **Validate-before-run** closes the stranding path for tool/human on product and executor entry points. Launch-time fail-closed (`Unsupported…`) remains a residual safety net if `launchResolvedNode` is called directly.
 
 ---
 

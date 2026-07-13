@@ -15,6 +15,23 @@ export interface SkillEntry {
   enabled: boolean
 }
 
+/**
+ * Agent-loop tuning under hip.toml `[agentLoop]`.
+ * All fields optional — omitted values keep loop-control.ts defaults.
+ */
+export interface AgentLoopConfig {
+  /** Generic child / task worker step budget. Default: 25. */
+  childMaxSteps?: number
+  /** Explore fixed-agent step budget. Default: 40. */
+  exploreChildMaxSteps?: number
+  /**
+   * Sub-agent HITL strategy placeholder.
+   * Only `inline_partial` is accepted for now (partial tool result + parent pause).
+   * `escalate` remains backlog.
+   */
+  subagentHitl?: 'inline_partial'
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -27,6 +44,8 @@ export interface HipConfig {
   fixedAgents?: Record<string, boolean>
   /** Agent teams defined in hip.toml under `[[teams]]`. */
   teams?: import('./team-types.js').TeamConfig[]
+  /** Optional agent-loop budgets / HITL strategy (see {@link AgentLoopConfig}). */
+  agentLoop?: AgentLoopConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type {
   HipConfig,
+  AgentLoopConfig,
   ProviderEntry,
   SkillEntry,
   SkillScope,
@@ -55,6 +56,7 @@ describe('protocol: HipConfig (Todo 1)', () => {
     expect(cfg.mcpServers).toBeUndefined()
     expect(cfg.skills).toBeUndefined()
     expect(cfg.agents).toBeUndefined()
+    expect(cfg.agentLoop).toBeUndefined()
   })
 
   it('round-trips HipConfig through JSON', () => {
@@ -67,6 +69,39 @@ describe('protocol: HipConfig (Todo 1)', () => {
     expect(round.version).toBe(1)
     expect(round.providers![0].id).toBe('deepseek')
     expect(round.activeModel?.providerID).toBe('deepseek')
+  })
+})
+
+describe('protocol: AgentLoopConfig', () => {
+  it('models optional step budgets and inline_partial HITL', () => {
+    const loop: AgentLoopConfig = {
+      childMaxSteps: 25,
+      exploreChildMaxSteps: 40,
+      subagentHitl: 'inline_partial',
+    }
+    expect(loop.childMaxSteps).toBe(25)
+    expect(loop.exploreChildMaxSteps).toBe(40)
+    expect(loop.subagentHitl).toBe('inline_partial')
+  })
+
+  it('allows all agentLoop fields to be absent', () => {
+    const loop: AgentLoopConfig = {}
+    expect(loop.childMaxSteps).toBeUndefined()
+    expect(loop.exploreChildMaxSteps).toBeUndefined()
+    expect(loop.subagentHitl).toBeUndefined()
+  })
+
+  it('round-trips agentLoop on HipConfig through JSON', () => {
+    const cfg: HipConfig = {
+      version: 1,
+      agentLoop: { childMaxSteps: 10, exploreChildMaxSteps: 15, subagentHitl: 'inline_partial' },
+    }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.agentLoop).toEqual({
+      childMaxSteps: 10,
+      exploreChildMaxSteps: 15,
+      subagentHitl: 'inline_partial',
+    })
   })
 })
 

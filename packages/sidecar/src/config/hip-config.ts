@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import toml from '@iarna/toml'
 import type {
   HipConfig,
+  AgentLoopConfig,
   McpServerConfig,
   AgentConfig,
   ProviderEntry,
@@ -133,6 +134,34 @@ function normalizeTeamEntry(raw: Record<string, unknown>): TeamConfig {
   return raw as unknown as TeamConfig
 }
 
+function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
+  if (raw.child_max_steps !== undefined && raw.childMaxSteps === undefined) {
+    raw.childMaxSteps = raw.child_max_steps
+  }
+  if (raw.explore_child_max_steps !== undefined && raw.exploreChildMaxSteps === undefined) {
+    raw.exploreChildMaxSteps = raw.explore_child_max_steps
+  }
+  if (raw.subagent_hitl !== undefined && raw.subagentHitl === undefined) {
+    raw.subagentHitl = raw.subagent_hitl
+  }
+  delete raw.child_max_steps
+  delete raw.explore_child_max_steps
+  delete raw.subagent_hitl
+
+  const out: AgentLoopConfig = {}
+  if (typeof raw.childMaxSteps === 'number') {
+    out.childMaxSteps = raw.childMaxSteps
+  }
+  if (typeof raw.exploreChildMaxSteps === 'number') {
+    out.exploreChildMaxSteps = raw.exploreChildMaxSteps
+  }
+  // Placeholder: only inline_partial is accepted for now.
+  if (raw.subagentHitl === 'inline_partial') {
+    out.subagentHitl = 'inline_partial'
+  }
+  return out
+}
+
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
   if (!parsed || typeof parsed !== 'object') {
@@ -181,6 +210,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const fixedAgents = obj.fixedAgents ?? obj.fixed_agents
   if (fixedAgents && typeof fixedAgents === 'object' && !Array.isArray(fixedAgents)) {
     config.fixedAgents = fixedAgents as Record<string, boolean>
+  }
+
+  const agentLoop = obj.agentLoop ?? obj.agent_loop
+  if (agentLoop && typeof agentLoop === 'object' && !Array.isArray(agentLoop)) {
+    config.agentLoop = normalizeAgentLoop(agentLoop as Record<string, unknown>)
   }
 
   return config
@@ -243,6 +277,10 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   }
   if (project.fixedAgents !== undefined) {
     merged.fixedAgents = project.fixedAgents
+  }
+  if (project.agentLoop !== undefined) {
+    // Project section replaces global entirely (same as activeModel / fixedAgents).
+    merged.agentLoop = project.agentLoop
   }
 
   return merged

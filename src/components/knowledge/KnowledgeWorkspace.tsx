@@ -510,7 +510,7 @@ export function KnowledgeWorkspace() {
               data-testid="knowledge-rename-space-confirm"
               disabled={!spaceNameTrimmed || spaceNameTaken || busy || !activeSpaceId}
               onClick={() => {
-                if (!activeSpaceId) return
+                if (!activeSpaceId || !spaceNameTrimmed || spaceNameTaken) return
                 void renameSpace(activeSpaceId, spaceNameTrimmed).then((ok) => {
                   if (ok) setRenameSpaceOpen(false)
                 })
@@ -536,6 +536,13 @@ export function KnowledgeWorkspace() {
                   : undefined
               }
               autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || !activeSpaceId || !spaceNameTrimmed || spaceNameTaken) return
+                e.preventDefault()
+                void renameSpace(activeSpaceId, spaceNameTrimmed).then((ok) => {
+                  if (ok) setRenameSpaceOpen(false)
+                })
+              }}
             />
           </label>
           {spaceNameTaken && (
@@ -553,7 +560,9 @@ export function KnowledgeWorkspace() {
       <Modal
         open={deleteSpaceOpen}
         onOpenChange={setDeleteSpaceOpen}
-        title={t('knowledge.space.deleteConfirm')}
+        title={t('knowledge.space.deleteTitle', {
+          name: space?.name ?? '',
+        })}
         className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
@@ -580,15 +589,18 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
-          {t('knowledge.space.deleteConfirm')}
-        </p>
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.space.deleteBody')}
+          </p>
+        </div>
       </Modal>
 
       <Modal
         open={nodeEdit != null}
         onOpenChange={(o) => !o && setNodeEdit(null)}
         title={t('knowledge.tree.rename')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -602,27 +614,43 @@ export function KnowledgeWorkspace() {
               data-testid="knowledge-rename-node-confirm"
               disabled={!nodeTitle.trim() || busy}
               onClick={() => {
-                if (nodeEdit) void renameNode(nodeEdit.id, nodeTitle.trim())
+                if (nodeEdit && nodeTitle.trim()) {
+                  void renameNode(nodeEdit.id, nodeTitle.trim())
+                }
                 setNodeEdit(null)
               }}
             >
-              {t('common.close')}
+              {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
         }
       >
-        <Input
-          data-testid="knowledge-rename-node-name"
-          value={nodeTitle}
-          onChange={(e) => setNodeTitle(e.target.value)}
-          autoFocus
-        />
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">{t('knowledge.tree.nameLabel')}</span>
+            <Input
+              data-testid="knowledge-rename-node-name"
+              value={nodeTitle}
+              onChange={(e) => setNodeTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || !nodeTitle.trim() || !nodeEdit) return
+                e.preventDefault()
+                void renameNode(nodeEdit.id, nodeTitle.trim())
+                setNodeEdit(null)
+              }}
+            />
+          </label>
+        </div>
       </Modal>
 
       <Modal
         open={nodeDelete != null}
         onOpenChange={(o) => !o && setNodeDelete(null)}
-        title={t('knowledge.tree.delete')}
+        title={t('knowledge.tree.deleteTitle', {
+          title: nodeDelete?.title ?? '',
+        })}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -646,7 +674,13 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <p className="text-body text-ink-secondary">{nodeDelete?.title}</p>
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {nodeDelete?.kind === 'folder'
+              ? t('knowledge.tree.deleteFolderBody')
+              : t('knowledge.tree.deleteDocBody')}
+          </p>
+        </div>
       </Modal>
     </div>
   )

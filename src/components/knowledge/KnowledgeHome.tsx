@@ -464,7 +464,9 @@ export function KnowledgeHome() {
       <Modal
         open={deleteId != null}
         onOpenChange={(o) => !o && setDeleteId(null)}
-        title={t('knowledge.space.deleteConfirm')}
+        title={t('knowledge.space.deleteTitle', {
+          name: spaces.find((s) => s.id === deleteId)?.name ?? '',
+        })}
         className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
@@ -486,9 +488,11 @@ export function KnowledgeHome() {
           </div>
         }
       >
-        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
-          {t('knowledge.space.deleteConfirm')}
-        </p>
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.space.deleteBody')}
+          </p>
+        </div>
       </Modal>
     </div>
   )

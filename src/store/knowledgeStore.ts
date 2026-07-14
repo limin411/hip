@@ -116,7 +116,12 @@ interface KnowledgeState {
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
   openDoc: (id: string) => Promise<void>
   setEditing: (v: boolean) => Promise<void>
-  setDraftBody: (v: string) => void
+  /**
+   * Update draft body. Default persist mode: 'auto' while editing (schedule
+   * autosave), 'none' otherwise. Pass `persist: 'now'` for immediate flush
+   * (e.g. preview task write-back).
+   */
+  setDraftBody: (v: string, opts?: { persist?: 'auto' | 'now' | 'none' }) => void
   /** Returns false if a write was attempted and failed. */
   flushSave: () => Promise<boolean>
   setSearchQuery: (q: string) => void
@@ -353,7 +358,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openSpace: async (id, opts) => {
-    await get().flushSave()
+    const ok = await get().flushSave()
+    if (!ok) return // stay on current space/doc; saveState error + retry chrome
     set({ error: null })
     try {
       const tree = await knowledgeGetTree(id)
@@ -380,7 +386,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openHome: async () => {
-    await get().flushSave()
+    const ok = await get().flushSave()
+    if (!ok) return // stay in workspace; saveState error + retry chrome
     set({
       mode: 'home',
       activeDocId: null,
@@ -575,7 +582,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   openDoc: async (id) => {
-    await get().flushSave()
+    const ok = await get().flushSave()
+    if (!ok) return // stay on current activeDocId; saveState error + retry chrome
     const spaceId = get().activeSpaceId
     const node = get().nodes.find((n) => n.id === id && n.kind === 'doc')
     if (!node || !spaceId) {
@@ -618,9 +626,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  setDraftBody: (v) => {
+  setDraftBody: (v, opts) => {
     set({ draftBody: v })
-    if (get().editing) scheduleSave(get)
+    // Until editorMode lands: derive default from editing (source autosave vs preview none).
+    const editing = get().editing
+    const persist = opts?.persist ?? (editing ? 'auto' : 'none')
+    if (persist === 'auto') scheduleSave(get)
+    if (persist === 'now') void get().flushSave()
   },
 
   flushSave: () => {

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const knowledgeReadDoc = vi.fn()
 const knowledgeWriteDoc = vi.fn()
@@ -244,6 +244,205 @@ describe('knowledgeStore space name uniqueness', () => {
       name: '产品',
       icon: undefined,
     })
+  })
+})
+
+describe('knowledgeStore flush-abort navigation', () => {
+  const docA = {
+    id: 'doc_a',
+    parentId: null,
+    kind: 'doc' as const,
+    title: 'A',
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+  const docB = {
+    id: 'doc_b',
+    parentId: null,
+    kind: 'doc' as const,
+    title: 'B',
+    order: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  }
+
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    vi.mocked(toast.error).mockClear()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [
+        { id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'T', createdAt: 1, updatedAt: 1 },
+      ],
+      activeSpaceId: 'spc_1',
+      nodes: [docA, docB],
+      activeDocId: 'doc_a',
+      docBody: 'saved-a',
+      draftBody: 'dirty-a',
+      editing: true,
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 2, spc_2: 0 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('openDoc aborts when flushSave fails and keeps activeDocId', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('disk full'))
+    knowledgeReadDoc.mockResolvedValue('# b')
+
+    await useKnowledgeStore.getState().openDoc('doc_b')
+
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('doc_a')
+    expect(s.draftBody).toBe('dirty-a')
+    expect(s.docBody).toBe('saved-a')
+    expect(s.saveState).toBe('error')
+    expect(knowledgeReadDoc).not.toHaveBeenCalled()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_a', 'dirty-a')
+  })
+
+  it('openDoc switches after successful flush', async () => {
+    knowledgeWriteDoc.mockResolvedValueOnce(undefined)
+    knowledgeReadDoc.mockResolvedValueOnce('# b')
+
+    await useKnowledgeStore.getState().openDoc('doc_b')
+
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBe('doc_b')
+    expect(s.docBody).toBe('# b')
+    expect(s.draftBody).toBe('# b')
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_a', 'dirty-a')
+    expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_b')
+  })
+
+  it('openSpace aborts when flush fails and leaves prior space', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('write failed'))
+    knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [] })
+
+    await useKnowledgeStore.getState().openSpace('spc_2')
+
+    const s = useKnowledgeStore.getState()
+    expect(s.activeSpaceId).toBe('spc_1')
+    expect(s.activeDocId).toBe('doc_a')
+    expect(s.mode).toBe('workspace')
+    expect(s.draftBody).toBe('dirty-a')
+    expect(s.saveState).toBe('error')
+    expect(knowledgeGetTree).not.toHaveBeenCalled()
+  })
+
+  it('openHome aborts when flush fails and stays in workspace', async () => {
+    knowledgeWriteDoc.mockRejectedValueOnce(new Error('write failed'))
+
+    await useKnowledgeStore.getState().openHome()
+
+    const s = useKnowledgeStore.getState()
+    expect(s.mode).toBe('workspace')
+    expect(s.activeSpaceId).toBe('spc_1')
+    expect(s.activeDocId).toBe('doc_a')
+    expect(s.draftBody).toBe('dirty-a')
+    expect(s.saveState).toBe('error')
+  })
+
+  it('openHome leaves workspace after successful flush', async () => {
+    knowledgeWriteDoc.mockResolvedValueOnce(undefined)
+
+    await useKnowledgeStore.getState().openHome()
+
+    const s = useKnowledgeStore.getState()
+    expect(s.mode).toBe('home')
+    expect(s.activeSpaceId).toBeNull()
+    expect(s.activeDocId).toBeNull()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_a', 'dirty-a')
+  })
+})
+
+describe('knowledgeStore setDraftBody persist modes', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    vi.useFakeTimers()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      docBody: 'saved',
+      draftBody: 'saved',
+      editing: false,
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('defaults to none when not editing (no autosave schedule)', async () => {
+    useKnowledgeStore.getState().setDraftBody('preview-dirty')
+    expect(useKnowledgeStore.getState().draftBody).toBe('preview-dirty')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().docBody).toBe('saved')
+  })
+
+  it('defaults to auto when editing (schedules flush)', async () => {
+    useKnowledgeStore.setState({ editing: true })
+    useKnowledgeStore.getState().setDraftBody('edited')
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'edited')
+    expect(useKnowledgeStore.getState().docBody).toBe('edited')
+    expect(useKnowledgeStore.getState().saveState).toBe('saved')
+  })
+
+  it('persist now flushes immediately even when not editing', async () => {
+    useKnowledgeStore.getState().setDraftBody('- [x] task', { persist: 'now' })
+    // flushSave is async; drain microtasks
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', '- [x] task')
+    expect(useKnowledgeStore.getState().docBody).toBe('- [x] task')
+    expect(useKnowledgeStore.getState().draftBody).toBe('- [x] task')
+  })
+
+  it('persist none skips schedule even when editing', async () => {
+    useKnowledgeStore.setState({ editing: true })
+    useKnowledgeStore.getState().setDraftBody('no-save', { persist: 'none' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().draftBody).toBe('no-save')
+    expect(useKnowledgeStore.getState().docBody).toBe('saved')
   })
 })
 

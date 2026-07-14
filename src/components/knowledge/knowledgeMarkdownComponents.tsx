@@ -1,19 +1,21 @@
 import type { Components } from 'react-markdown'
 import type { ReactNode } from 'react'
 import { open } from '@tauri-apps/plugin-shell'
-import {
-  createHeadingIdAssigner,
-  scrollToKnowledgeHeading,
-} from '@/domain/knowledge/mdPreview'
+import { scrollToKnowledgeHeading, slugifyHeading } from '@/domain/knowledge/mdPreview'
 
 export interface KnowledgeMarkdownOptions {
   /** Called with 0-based GFM task index (document order). */
   onTaskToggle?: (taskIndex: number) => void
   /** Optional scope for in-doc #anchor scroll (DocReader root). */
   getScrollRoot?: () => ParentNode | null | undefined
+  /**
+   * Precomputed ATX heading ids by 1-based source line (from `headingIdsBySourceLine`).
+   * Looked up via hast/mdast `node.position.start.line` — no render-time counters.
+   */
+  headingIdsByLine?: ReadonlyMap<number, string>
 }
 
-/** Flatten react-markdown children to plain text for heading ids. */
+/** Flatten react-markdown children to plain text (fallback heading id only). */
 export function textFromChildren(children: ReactNode): string {
   if (children == null || typeof children === 'boolean') return ''
   if (typeof children === 'string' || typeof children === 'number') return String(children)
@@ -25,28 +27,47 @@ export function textFromChildren(children: ReactNode): string {
   return ''
 }
 
+function sourceLine(node: unknown): number | undefined {
+  if (!node || typeof node !== 'object' || !('position' in node)) return undefined
+  const line = (node as { position?: { start?: { line?: number } } }).position?.start?.line
+  return typeof line === 'number' ? line : undefined
+}
+
+/**
+ * Resolve checkbox index from live DOM order inside the reader root.
+ * Safe under StrictMode (no render-time `taskIndex++`).
+ */
+export function taskIndexFromDom(
+  el: Element,
+  root?: ParentNode | null,
+): number {
+  const scope: ParentNode = root ?? el.ownerDocument ?? document
+  const boxes = scope.querySelectorAll(
+    'input[type="checkbox"][data-testid="knowledge-task-checkbox"]',
+  )
+  return Array.prototype.indexOf.call(boxes, el)
+}
+
 type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
 /**
  * Knowledge-only MarkdownBody component overrides:
  * interactive GFM task checkboxes + heading ids + in-doc #anchors.
  *
- * **Call once per React render pass** (do not memoize across renders).
- * Counters live in this factory closure and must start at 0 for every
- * ReactMarkdown walk; reusing a prior return value makes indices/ids drift.
+ * Indices/ids are **not** assigned via mutable render counters (StrictMode-safe):
+ * - Tasks: DOM order at click time via `taskIndexFromDom`
+ * - Headings: pure precompute `headingIdsByLine` + `node.position.start.line`
  *
  * Chat / other MarkdownBody callers stay on defaults.
  */
 export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {}): Components {
-  // Fresh for this render pass only — never share across re-renders.
-  let taskIndex = 0
-  const assignId = createHeadingIdAssigner()
-
   const heading =
     (Tag: HeadingTag): NonNullable<Components[HeadingTag]> =>
-    ({ node: _node, children, ...props }) => {
-      void _node
-      const id = assignId(textFromChildren(children))
+    ({ node, children, ...props }) => {
+      const line = sourceLine(node)
+      const id =
+        (line != null ? opts.headingIdsByLine?.get(line) : undefined) ??
+        slugifyHeading(textFromChildren(children))
       return (
         <Tag id={id} {...props}>
           {children}
@@ -68,16 +89,17 @@ export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {})
       if (type !== 'checkbox') {
         return <input type={type} checked={checked} {...props} />
       }
-      const index = taskIndex++
       return (
         <input
           {...props}
           type="checkbox"
           checked={Boolean(checked)}
           data-testid="knowledge-task-checkbox"
-          data-task-index={index}
           className="mr-1.5 cursor-pointer align-middle"
-          onChange={() => opts.onTaskToggle?.(index)}
+          onChange={(e) => {
+            const index = taskIndexFromDom(e.currentTarget, opts.getScrollRoot?.() ?? null)
+            if (index >= 0) opts.onTaskToggle?.(index)
+          }}
         />
       )
     },

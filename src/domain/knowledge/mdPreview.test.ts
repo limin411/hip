@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   createHeadingIdAssigner,
+  headingIdsBySourceLine,
   normalizeHeadingHash,
   slugifyHeading,
 } from './mdPreview'
@@ -41,5 +42,28 @@ describe('normalizeHeadingHash', () => {
     expect(normalizeHeadingHash('#hello-world')).toBe('hello-world')
     expect(normalizeHeadingHash('hello-world')).toBe('hello-world')
     expect(normalizeHeadingHash('#caf%C3%A9')).toBe('café')
+  })
+})
+
+describe('headingIdsBySourceLine', () => {
+  it('maps 1-based ATX lines to unique ids', () => {
+    const md = '## Intro\n\n## Intro\n\n# Other\n'
+    const map = headingIdsBySourceLine(md)
+    expect(map.get(1)).toBe('intro')
+    expect(map.get(3)).toBe('intro-1')
+    expect(map.get(5)).toBe('other')
+    expect(map.size).toBe(3)
+  })
+
+  it('skips headings inside fenced code', () => {
+    const md = '## Real\n```\n## Fake\n```\n## After\n'
+    const map = headingIdsBySourceLine(md)
+    expect([...map.values()]).toEqual(['real', 'after'])
+    expect(map.get(1)).toBe('real')
+    expect(map.get(5)).toBe('after')
+  })
+
+  it('keeps CJK heading text', () => {
+    expect(headingIdsBySourceLine('## 中文标题\n').get(1)).toBe('中文标题')
   })
 })

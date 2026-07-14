@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
+import React from 'react'
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 
@@ -47,12 +48,6 @@ beforeEach(() => {
   })
 })
 
-function taskIndices(): number[] {
-  return (screen.getAllByTestId('knowledge-task-checkbox') as HTMLInputElement[]).map((el) =>
-    Number(el.getAttribute('data-task-index')),
-  )
-}
-
 describe('DocReader preview tasks + anchors', () => {
   it('renders interactive task checkboxes and write-backs via setDraftBody persist now', () => {
     const md = '- [ ] first\n- [x] second\n'
@@ -64,7 +59,6 @@ describe('DocReader preview tasks + anchors', () => {
     expect(boxes).toHaveLength(2)
     expect(boxes[0]).not.toBeChecked()
     expect(boxes[1]).toBeChecked()
-    expect(taskIndices()).toEqual([0, 1])
 
     fireEvent.click(boxes[0])
     expect(setDraftBody).toHaveBeenCalledWith('- [x] first\n- [x] second\n', {
@@ -72,22 +66,19 @@ describe('DocReader preview tasks + anchors', () => {
     })
   })
 
-  it('keeps stable task indices after re-render with same content', () => {
+  it('keeps correct task toggle after re-render with same content', () => {
     const md = '- [ ] a\n- [ ] b\n'
     getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
 
     const { rerender } = render(<DocReader content={md} />)
-    expect(taskIndices()).toEqual([0, 1])
-
     rerender(<DocReader content={md} />)
-    expect(taskIndices()).toEqual([0, 1])
 
-    // Second pass must still write the correct task (index 1), not drift to 3+.
+    // Second checkbox must still map to index 1 (DOM order), not drift.
     fireEvent.click(screen.getAllByTestId('knowledge-task-checkbox')[1])
     expect(setDraftBody).toHaveBeenCalledWith('- [ ] a\n- [x] b\n', { persist: 'now' })
   })
 
-  it('keeps stable task indices after content updates (post-toggle / flush)', () => {
+  it('keeps correct task toggle after content updates (post-toggle / flush)', () => {
     const md0 = '- [ ] a\n- [ ] b\n'
     const md1 = '- [x] a\n- [ ] b\n'
     getState.mockReturnValue({ draftBody: md0, docBody: md0, setDraftBody })
@@ -99,12 +90,10 @@ describe('DocReader preview tasks + anchors', () => {
     getState.mockReturnValue({ draftBody: md1, docBody: md1, setDraftBody })
     rerender(<DocReader content={md1} />)
 
-    expect(taskIndices()).toEqual([0, 1])
     const boxes = screen.getAllByTestId('knowledge-task-checkbox') as HTMLInputElement[]
     expect(boxes[0]).toBeChecked()
     expect(boxes[1]).not.toBeChecked()
 
-    // Second click toggles the other task with stable index 1.
     fireEvent.click(boxes[1])
     expect(setDraftBody).toHaveBeenLastCalledWith('- [x] a\n- [x] b\n', { persist: 'now' })
   })
@@ -123,7 +112,6 @@ describe('DocReader preview tasks + anchors', () => {
       expect(document.getElementById('intro-1')).toBeTruthy()
 
       rerender(<DocReader content={md} />)
-      // Must not drift to intro-2 / intro-3 after re-render.
       expect(document.getElementById('intro')).toBeTruthy()
       expect(document.getElementById('intro-1')).toBeTruthy()
       expect(document.getElementById('intro-2')).toBeNull()
@@ -141,7 +129,6 @@ describe('DocReader preview tasks + anchors', () => {
     const md = '## Scoped\n\n[go](#scoped)\n'
     getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
 
-    // Poison document-level id outside the reader.
     const poison = document.createElement('h2')
     poison.id = 'scoped'
     document.body.appendChild(poison)
@@ -166,11 +153,35 @@ describe('DocReader preview tasks + anchors', () => {
   })
 
   it('optimistic content prop reflects draft before flush (checked state)', () => {
-    // Parent passes draftBody after toggle; checkbox must show checked immediately.
     const after = '- [x] only\n'
     getState.mockReturnValue({ draftBody: after, docBody: '- [ ] only\n', setDraftBody })
     render(<DocReader content={after} />)
     expect(screen.getByTestId('knowledge-task-checkbox')).toBeChecked()
+  })
+
+  it('StrictMode: task indices and heading ids stay correct', () => {
+    const md = '## Intro\n\n## Intro\n\n- [ ] a\n- [ ] b\n'
+    getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
+
+    render(
+      <React.StrictMode>
+        <DocReader content={md} />
+      </React.StrictMode>,
+    )
+
+    // Must not drift to intro-2 / intro-3 under double-invoke.
+    expect(document.getElementById('intro')).toBeTruthy()
+    expect(document.getElementById('intro-1')).toBeTruthy()
+    expect(document.getElementById('intro-2')).toBeNull()
+
+    const boxes = screen.getAllByTestId('knowledge-task-checkbox')
+    expect(boxes).toHaveLength(2)
+
+    // Click second task — DOM order must resolve index 1 (not StrictMode-inflated).
+    fireEvent.click(boxes[1])
+    expect(setDraftBody).toHaveBeenCalledWith('## Intro\n\n## Intro\n\n- [ ] a\n- [x] b\n', {
+      persist: 'now',
+    })
   })
 
   it('shows empty state when content is blank', () => {

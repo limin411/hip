@@ -30,6 +30,51 @@ export function createHeadingIdAssigner(): (text: string) => string {
   }
 }
 
+/**
+ * Precompute stable ATX heading ids keyed by 1-based source line (mdast `position.start.line`).
+ * Pure — no React render counters — so ids stay correct under StrictMode double-invoke.
+ * Skips fenced code; setext headings are not assigned (preview anchors are ATX-first).
+ */
+export function headingIdsBySourceLine(md: string): Map<number, string> {
+  const map = new Map<number, string>()
+  const assignId = createHeadingIdAssigner()
+  const lines = md.split('\n')
+  let inFence = false
+  let fenceMarker: string | null = null
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const lineNo = i + 1
+
+    const fence = line.match(/^(\s*)(`{3,}|~{3,})(.*)$/)
+    if (fence) {
+      const ticks = fence[2]
+      if (!inFence) {
+        inFence = true
+        fenceMarker = ticks
+      } else if (
+        fenceMarker &&
+        ticks[0] === fenceMarker[0] &&
+        ticks.length >= fenceMarker.length &&
+        !fence[3].trim()
+      ) {
+        inFence = false
+        fenceMarker = null
+      }
+      continue
+    }
+    if (inFence) continue
+
+    // CommonMark ATX: ≤3 spaces, 1–6 #, then space + text (or bare closing).
+    const atx = line.match(/^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/)
+    if (!atx) continue
+    const text = (atx[2] ?? '').replace(/[ \t]+#+\s*$/, '').trim()
+    map.set(lineNo, assignId(text))
+  }
+
+  return map
+}
+
 /** Decode a hash fragment / id for lookup (best-effort). */
 export function normalizeHeadingHash(idOrHash: string): string {
   const raw = idOrHash.startsWith('#') ? idOrHash.slice(1) : idOrHash

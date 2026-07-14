@@ -1,8 +1,9 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText } from 'lucide-react'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { headingIdsBySourceLine } from '@/domain/knowledge/mdPreview'
 import { toggleTaskAt } from '@/domain/knowledge/mdTasks'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { knowledgeMarkdownComponents } from './knowledgeMarkdownComponents'
@@ -35,12 +36,18 @@ export function DocReader({ content, onStartEdit }: DocReaderProps) {
     [setDraftBody],
   )
 
-  // Rebuild components every render so taskIndex / heading-id assigner reset.
-  // Memoizing this object across re-renders causes index/id drift (#1, #2).
-  const components = knowledgeMarkdownComponents({
-    onTaskToggle,
-    getScrollRoot: () => rootRef.current,
-  })
+  // Pure precompute from content — stable under StrictMode (no render counters).
+  const headingIdsByLine = useMemo(() => headingIdsBySourceLine(content), [content])
+
+  const components = useMemo(
+    () =>
+      knowledgeMarkdownComponents({
+        onTaskToggle,
+        getScrollRoot: () => rootRef.current,
+        headingIdsByLine,
+      }),
+    [onTaskToggle, headingIdsByLine],
+  )
 
   if (!content.trim()) {
     return (

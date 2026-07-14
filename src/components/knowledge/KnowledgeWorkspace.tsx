@@ -14,8 +14,9 @@ import {
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { setExpandPersistSuspended, useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
+import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   isKnowledgeLiveEnabled,
@@ -61,6 +62,7 @@ import { BacklinksPanel } from './BacklinksPanel'
 const DocLiveEditor = lazy(() =>
   import('./DocLiveEditor').then((m) => ({ default: m.DocLiveEditor })),
 )
+import { TemplatePickerModal } from './TemplatePickerModal'
 
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
@@ -68,6 +70,7 @@ export function KnowledgeWorkspace() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
+  const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const docBody = useKnowledgeStore((s) => s.docBody)
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editorMode = useKnowledgeStore((s) => s.editorMode)
@@ -75,7 +78,7 @@ export function KnowledgeWorkspace() {
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
-  const createDoc = useKnowledgeStore((s) => s.createDoc)
+  const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
@@ -86,6 +89,7 @@ export function KnowledgeWorkspace() {
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
@@ -109,6 +113,7 @@ export function KnowledgeWorkspace() {
   )
 
   // Expand ancestors when filter query changes; restore snapshot on clear.
+  // Suspend expand LS writes while filter inflates expand (avoid polluting persist).
   useEffect(() => {
     const q = treeFilter.trim()
     if (!q) {
@@ -117,8 +122,10 @@ export function KnowledgeWorkspace() {
         useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
         setFilterExpandSnapshot(null)
       }
+      setExpandPersistSuspended(false)
       return
     }
+    setExpandPersistSuspended(true)
     if (lastFilterExpandQuery.current === q || !visibleIds) return
     lastFilterExpandQuery.current = q
     if (!filterExpandSnapshot) {
@@ -198,6 +205,8 @@ export function KnowledgeWorkspace() {
       if (timeoutId != null) clearTimeout(timeoutId)
     }
   }, [activeDocId, activeSpaceId, editorMode, docBody])
+    return () => setExpandPersistSuspended(false)
+  }, [])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
@@ -216,6 +225,13 @@ export function KnowledgeWorkspace() {
   // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
   // Wiki create-on-confirm uses the same parent (resolveParentForNew = parentForNew).
   const parentForNew: string | null = activeNode?.parentId ?? null
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  // Toolbar create: focused folder / sibling of focused|active doc / root.
+  const parentForNew = resolveParentForNew({ treeFocusId, activeDocId, nodes })
+  const newDoc = (parentId: string | null) => {
+    void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
+  }
 
   // Live option only when flag on; parse failures force Source for the session.
   const liveEnabled = isKnowledgeLiveEnabled()
@@ -404,7 +420,7 @@ export function KnowledgeWorkspace() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   data-testid="knowledge-new-doc"
-                  onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
+                  onClick={() => newDoc(parentForNew)}
                 >
                   <FilePlus size={14} />
                   {t('knowledge.tree.newDoc')}
@@ -481,9 +497,7 @@ export function KnowledgeWorkspace() {
               setNodeTitle(node.title)
             }}
             onDelete={(node) => setNodeDelete(node)}
-            onNewDoc={(parentId) =>
-              void createDoc(parentId, t('knowledge.doc.untitled'))
-            }
+            onNewDoc={(parentId) => newDoc(parentId)}
             onNewFolder={(parentId) =>
               void createFolder(parentId, t('knowledge.folder.untitled'))
             }
@@ -596,6 +610,16 @@ export function KnowledgeWorkspace() {
                     <Download size={14} />
                     {t('knowledge.export.doc')}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-save-as-template"
+                    onClick={() => {
+                      setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
+                      setSaveTemplateOpen(true)
+                    }}
+                  >
+                    <FilePlus size={14} />
+                    {t('knowledge.template.saveAs')}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
@@ -610,7 +634,7 @@ export function KnowledgeWorkspace() {
               className="w-full max-w-md border-0 py-16"
               action={{
                 label: t('knowledge.tree.newDoc'),
-                onClick: () => void createDoc(null, t('knowledge.doc.untitled')),
+                onClick: () => newDoc(null),
               }}
             />
           </div>
@@ -933,6 +957,58 @@ export function KnowledgeWorkspace() {
           void createDoc(parentForNew, title)
         }}
       />
+      <Modal
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        title={t('knowledge.template.saveAsTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-save-template-cancel"
+              onClick={() => setSaveTemplateOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-save-template-confirm"
+              disabled={!templateName.trim() || busy}
+              onClick={() => {
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            >
+              {t('common.confirm', { defaultValue: 'OK' })}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">
+              {t('knowledge.template.nameLabel')}
+            </span>
+            <Input
+              data-testid="knowledge-save-template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder={t('knowledge.template.namePlaceholder')}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || !templateName.trim()) return
+                e.preventDefault()
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <TemplatePickerModal />
     </div>
   )
 }

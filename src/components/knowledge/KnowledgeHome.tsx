@@ -4,6 +4,7 @@ import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { groupSearchHitsBySpace } from '@/domain/knowledge/search'
+import { scheduleActiveExpandPersist, useKnowledgeStore } from '@/store/knowledgeStore'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -128,6 +129,7 @@ export function KnowledgeHome() {
         if (n.kind === 'folder') expand[n.id] = true
       }
       useKnowledgeStore.setState({ expandedFolderIds: expand })
+      scheduleActiveExpandPersist()
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
     }

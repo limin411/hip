@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import i18n from '@/i18n'
-import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
+import type {
+  KnowledgeNode,
+  KnowledgeRecentItem,
+  KnowledgeSpace,
+  KnowledgeTemplate,
+} from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
 import {
   collectDocIdsInSubtree,
@@ -50,11 +55,14 @@ import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
   knowledgeDeleteSpace,
+  knowledgeDeleteTemplate,
   knowledgeEnsureRoot,
   knowledgeErrorMessage,
   knowledgeGetTree,
   knowledgeListSpaces,
+  knowledgeListTemplates,
   knowledgeReadDoc,
+  knowledgeSaveTemplate,
   knowledgeSaveTree,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
@@ -85,6 +93,8 @@ function mapSpaceNameError(raw: string, name: string): string {
 const RECENT_KEY = 'hip-knowledge-recent'
 /** Cap for “最近打开” on the knowledge home page (and localStorage). */
 const RECENT_CAP = 8
+/** Per-space folder expand map: `Record<spaceId, Record<folderId, true>>`. */
+const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
 
 function loadRecent(): KnowledgeRecentItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -107,6 +117,136 @@ function persistRecent(recent: KnowledgeRecentItem[]) {
   }
 }
 
+function compactExpand(expanded: Record<string, boolean>): Record<string, true> {
+  const out: Record<string, true> = {}
+  for (const [id, on] of Object.entries(expanded)) {
+    if (on) out[id] = true
+  }
+  return out
+}
+
+function loadExpandedForSpace(spaceId: string): Record<string, boolean> {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(EXPANDED_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>
+    const forSpace = parsed?.[spaceId]
+    if (!forSpace || typeof forSpace !== 'object') return {}
+    const out: Record<string, boolean> = {}
+    for (const [id, on] of Object.entries(forSpace)) {
+      if (on) out[id] = true
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function persistExpandedForSpace(spaceId: string, expanded: Record<string, boolean>) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    let all: Record<string, Record<string, true>> = {}
+    const raw = localStorage.getItem(EXPANDED_KEY)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          all = parsed as Record<string, Record<string, true>>
+        }
+      } catch {
+        // replace corrupt blob
+      }
+    }
+    all[spaceId] = compactExpand(expanded)
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(all))
+  } catch {
+    // ignore quota
+  }
+}
+
+function dropExpandedForSpace(spaceId: string) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const raw = localStorage.getItem(EXPANDED_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+    const all = { ...(parsed as Record<string, Record<string, true>>) }
+    delete all[spaceId]
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(all))
+  } catch {
+    // ignore
+  }
+}
+
+/** Keep only expand keys that still exist as folders in the tree. */
+function pruneExpandedToFolders(
+  expanded: Record<string, boolean>,
+  nodes: KnowledgeNode[],
+): Record<string, boolean> {
+  const folderIds = new Set(nodes.filter((n) => n.kind === 'folder').map((n) => n.id))
+  const out: Record<string, boolean> = {}
+  for (const [id, on] of Object.entries(expanded)) {
+    if (on && folderIds.has(id)) out[id] = true
+  }
+  return out
+}
+
+/** Ensure every ancestor folder of nodeId is expanded so the row is mountable. */
+function expandAncestorsOf(
+  nodes: KnowledgeNode[],
+  nodeId: string,
+  expanded: Record<string, boolean>,
+): Record<string, boolean> {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const next = { ...expanded }
+  let cur = byId.get(nodeId)
+  while (cur?.parentId) {
+    next[cur.parentId] = true
+    cur = byId.get(cur.parentId)
+  }
+  return next
+}
+
+let expandPersistTimer: ReturnType<typeof setTimeout> | null = null
+/** When true, skip LS writes (tree filter temporarily inflates expand). */
+let expandPersistSuspended = false
+
+/**
+ * Suspend expand localStorage writes while the workspace filter temporarily
+ * expands ancestors. Cancels any pending timer without writing.
+ */
+export function setExpandPersistSuspended(suspended: boolean) {
+  expandPersistSuspended = suspended
+  if (suspended && expandPersistTimer) {
+    clearTimeout(expandPersistTimer)
+    expandPersistTimer = null
+  }
+}
+
+/** Flush pending expand write for the current space before switching spaces. */
+function flushPendingExpandPersist(get: () => KnowledgeState) {
+  if (!expandPersistTimer) return
+  clearTimeout(expandPersistTimer)
+  expandPersistTimer = null
+  if (expandPersistSuspended) return
+  const spaceId = get().activeSpaceId
+  if (spaceId) persistExpandedForSpace(spaceId, get().expandedFolderIds)
+}
+
+function schedulePersistExpand(spaceId: string, get: () => KnowledgeState) {
+  if (expandPersistSuspended) return
+  if (expandPersistTimer) clearTimeout(expandPersistTimer)
+  expandPersistTimer = setTimeout(() => {
+    expandPersistTimer = null
+    if (expandPersistSuspended) return
+    // Guard: never write another space’s map under this spaceId after a switch.
+    if (get().activeSpaceId !== spaceId) return
+    persistExpandedForSpace(spaceId, get().expandedFolderIds)
+  }, 100)
+}
+
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
@@ -126,6 +266,12 @@ export type KnowledgePendingReveal = {
 /** Yield so React can paint index progress (and avoid long freezes). */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
+/** Pending new-doc flow: modal open only after templates exist; no node until confirm. */
+export interface TemplatePickerState {
+  /** Space the templates were listed for; ignore confirm if activeSpaceId diverges. */
+  parentId: string | null
+  defaultTitle: string
+  templates: KnowledgeTemplate[]
 }
 
 interface KnowledgeState {
@@ -156,6 +302,10 @@ interface KnowledgeState {
   filterStatus: string | null
   recent: KnowledgeRecentItem[]
   expandedFolderIds: Record<string, boolean>
+  /** Keyboard / roving focus in the space tree (separate from activeDocId). */
+  treeFocusId: string | null
+  /** Template pick modal; set by `requestCreateDoc` when space has templates. */
+  templatePicker: TemplatePickerState | null
   busy: boolean
   error: string | null
   saveState: SaveState
@@ -174,7 +324,26 @@ interface KnowledgeState {
   clearPendingReveal: () => void
   openHome: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
-  createDoc: (parentId: string | null, title: string) => Promise<void>
+  /**
+   * Create a doc node and open it. Prefer `requestCreateDoc` from UI so templates
+   * can be chosen before any node is written.
+   */
+  createDoc: (
+    parentId: string | null,
+    title: string,
+    opts?: { body?: string },
+  ) => Promise<void>
+  /**
+   * If the space has templates, open the picker (no node yet). Otherwise create empty.
+   * Cancel on the picker leaves no orphan empty doc.
+   */
+  requestCreateDoc: (parentId: string | null, defaultTitle: string) => Promise<void>
+  /** Confirm picker: `null` templateId → empty body; cancel via `cancelTemplateCreate`. */
+  confirmTemplateCreate: (templateId: string | null) => Promise<void>
+  cancelTemplateCreate: () => void
+  /** Save current doc draft body as a new space template. */
+  saveDocAsTemplate: (name: string) => Promise<boolean>
+  deleteTemplate: (id: string) => Promise<void>
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
@@ -193,6 +362,7 @@ interface KnowledgeState {
   setFilterTag: (tag: string | null) => void
   setFilterStatus: (status: string | null) => void
   toggleFolder: (id: string) => void
+  setTreeFocusId: (id: string | null) => void
   dropRecent: (spaceId: string | null, docId: string) => void
 }
 
@@ -344,6 +514,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   filterStatus: null,
   recent: [],
   expandedFolderIds: {},
+  treeFocusId: null,
+  templatePicker: null,
   busy: false,
   error: null,
   saveState: 'idle',
@@ -557,19 +729,28 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           clearTimeout(saveTimer)
           saveTimer = null
         }
+        // Cancel pending expand write (space is going away).
+        if (expandPersistTimer) {
+          clearTimeout(expandPersistTimer)
+          expandPersistTimer = null
+        }
         set({
           mode: 'home',
           activeSpaceId: null,
           activeDocId: null,
+          treeFocusId: null,
           docBody: '',
           draftBody: '',
           editorMode: 'preview',
           nodes: [],
+          expandedFolderIds: {},
+          templatePicker: null,
           saveState: 'idle',
           pendingReveal: null,
         })
       }
       await knowledgeDeleteSpace(id)
+      dropExpandedForSpace(id)
       // Drop all index entries for this space (best-effort full rebuild also fine).
       for (const hit of get().searchHits) {
         if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId), kbMeta)
@@ -600,14 +781,22 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   openSpace: async (id, opts) => {
     const ok = await get().flushSave()
     if (!ok) return // stay on current space/doc; saveState error + retry chrome
+    await get().flushSave()
+    // Write current space expand before replacing the in-memory map.
+    flushPendingExpandPersist(get)
     set({ error: null })
     try {
       const tree = await knowledgeGetTree(id)
+      const nodes = tree.nodes ?? []
+      const expanded = pruneExpandedToFolders(loadExpandedForSpace(id), nodes)
       set({
         activeSpaceId: id,
-        nodes: tree.nodes ?? [],
+        nodes,
         mode: 'workspace',
-        expandedFolderIds: {},
+        expandedFolderIds: expanded,
+        treeFocusId: opts?.selectDocId ?? null,
+        // Drop stale picker: confirm must not write into a different space.
+        templatePicker: null,
       })
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
@@ -652,9 +841,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   openHome: async () => {
     const ok = await get().flushSave()
     if (!ok) return // stay in workspace; saveState error + retry chrome
+    await get().flushSave()
+    flushPendingExpandPersist(get)
     set({
       mode: 'home',
       activeDocId: null,
+      treeFocusId: null,
       docBody: '',
       draftBody: '',
       editorMode: 'preview',
@@ -664,6 +856,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       pendingReveal: null,
       filterTag: null,
       filterStatus: null,
+      expandedFolderIds: {},
+      templatePicker: null,
     })
     get().runSearch(get().searchQuery)
   },
@@ -688,6 +882,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       set({ nodes, busy: false })
       if (parentId) {
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+        schedulePersistExpand(spaceId, get)
       }
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -696,17 +891,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  createDoc: async (parentId, title) => {
+  createDoc: async (parentId, title, opts) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
     // Flush-gate before creating so a failed dirty save cannot orphan a new empty doc.
     const flushed = await get().flushSave()
     if (!flushed) return
+    const body = opts?.body ?? ''
     set({ busy: true })
     try {
       const now = Date.now()
       const id = newDocId()
-      await knowledgeWriteDoc(spaceId, id, '')
+      await knowledgeWriteDoc(spaceId, id, body)
       const node = {
         id,
         parentId,
@@ -723,6 +919,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes, {
         reresolveSpace: true,
       })
+      indexCurrentDoc(spaceId, id, node.title, body, spaceName, nodes)
       set((s) => ({
         nodes,
         busy: false,
@@ -734,6 +931,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       syncFacetsToState(set)
       if (parentId) {
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+        schedulePersistExpand(spaceId, get)
       }
       get().runSearch(get().searchQuery)
       // openDoc defaults to preferred writable mode (source, or live when flag on)
@@ -742,6 +940,84 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
       toast.error(msg)
+    }
+  },
+
+  requestCreateDoc: async (parentId, defaultTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    try {
+      const templates = await knowledgeListTemplates(spaceId)
+      if (templates.length === 0) {
+        await get().createDoc(parentId, defaultTitle)
+        return
+      }
+      // Modal first — no tree node / doc file until confirm.
+      set({ templatePicker: { spaceId, parentId, defaultTitle, templates } })
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      toast.error(msg)
+      // List failure should not block creation of a blank doc.
+      await get().createDoc(parentId, defaultTitle)
+    }
+  },
+
+  confirmTemplateCreate: async (templateId) => {
+    const picker = get().templatePicker
+    if (!picker) return
+    set({ templatePicker: null })
+    // Space switched (or picker was stale) — do not create under the wrong space.
+    if (get().activeSpaceId !== picker.spaceId) return
+    if (templateId == null) {
+      await get().createDoc(picker.parentId, picker.defaultTitle)
+      return
+    }
+    const tpl = picker.templates.find((t) => t.id === templateId)
+    if (!tpl) {
+      await get().createDoc(picker.parentId, picker.defaultTitle)
+      return
+    }
+    await get().createDoc(picker.parentId, picker.defaultTitle, { body: tpl.body })
+  },
+
+  cancelTemplateCreate: () => {
+    set({ templatePicker: null })
+  },
+
+  saveDocAsTemplate: async (name) => {
+    const spaceId = get().activeSpaceId
+    const docId = get().activeDocId
+    if (!spaceId || !docId || get().busy) return false
+    const trimmed = name.trim()
+    if (!trimmed) return false
+    set({ busy: true })
+    try {
+      const body = get().draftBody
+      await knowledgeSaveTemplate(spaceId, { name: trimmed, body })
+      set({ busy: false })
+      toast.success(i18n.t('knowledge.template.saved'))
+      return true
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+      return false
+    }
+  },
+
+  deleteTemplate: async (id) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId) return
+    try {
+      await knowledgeDeleteTemplate(spaceId, id)
+      set((s) => {
+        if (!s.templatePicker) return s
+        const templates = s.templatePicker.templates.filter((t) => t.id !== id)
+        // Empty choice remains even when no templates left.
+        return { templatePicker: { ...s.templatePicker, templates } }
+      })
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
     }
   },
 
@@ -794,6 +1070,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       set({ nodes, busy: false })
       if (parentId) {
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
+        schedulePersistExpand(spaceId, get)
       }
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const docIds = collectDocIdsInSubtree(nodes, id)
@@ -848,10 +1125,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           s.pendingReveal != null &&
           s.pendingReveal.spaceId === spaceId &&
           removedDocIds.includes(s.pendingReveal.docId)
+        const expandedFolderIds = pruneExpandedToFolders(s.expandedFolderIds, nodes)
         return {
           nodes,
           busy: false,
           spaceDocCounts: nextCounts,
+          expandedFolderIds,
           recent: s.recent.filter(
             (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
           ),
@@ -866,8 +1145,17 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             : pendingTargetsRemoved
               ? { pendingReveal: null }
               : {}),
+                editing: false,
+            : {}),
+          treeFocusId:
+            s.treeFocusId != null &&
+            (removedDocIds.includes(s.treeFocusId) ||
+              !nodes.some((n) => n.id === s.treeFocusId))
+              ? null
+              : s.treeFocusId,
         }
       })
+      schedulePersistExpand(spaceId, get)
       persistRecent(get().recent)
       syncFacetsToState(set)
       get().runSearch(get().searchQuery)
@@ -893,6 +1181,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         editorMode: 'preview',
         pendingReveal: null,
       })
+      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
       return
     }
     try {
@@ -915,6 +1204,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         saveState: 'idle',
         ...(revealMatches ? {} : { pendingReveal: null }),
       })
+      // Expand ancestors so the focused row is mounted for keyboard/roving tabindex.
+      const expandedFolderIds = expandAncestorsOf(get().nodes, id, get().expandedFolderIds)
+        treeFocusId: id,
+        editing: true,
+        expandedFolderIds,
+      schedulePersistExpand(spaceId, get)
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -940,6 +1235,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         editorMode: 'preview',
         pendingReveal: null,
       })
+      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
     }
   },
 
@@ -1034,9 +1330,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   toggleFolder: (id) =>
+  toggleFolder: (id) => {
     set((s) => ({
       expandedFolderIds: { ...s.expandedFolderIds, [id]: !s.expandedFolderIds[id] },
-    })),
+    }))
+    const spaceId = get().activeSpaceId
+    if (spaceId) schedulePersistExpand(spaceId, get)
+  },
+
+  setTreeFocusId: (id) => set({ treeFocusId: id }),
 
   dropRecent: (spaceId, docId) => {
     if (!spaceId) return
@@ -1088,4 +1390,8 @@ export function getKnowledgeOutbound(spaceId: string, docId: string): LinkEdge[]
 /** Count of broken outbound `[[title]]` targets for the current source doc. */
 export function getKnowledgeBrokenOutboundCount(spaceId: string, docId: string): number {
   return countBrokenOutbound(kbLinkIndex, spaceId, docId)
+/** Debounced persist for the active space’s expand map (e.g. after import expand-all). */
+export function scheduleActiveExpandPersist() {
+  const spaceId = useKnowledgeStore.getState().activeSpaceId
+  if (spaceId) schedulePersistExpand(spaceId, () => useKnowledgeStore.getState())
 }

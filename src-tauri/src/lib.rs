@@ -512,6 +512,9 @@ pub fn run() {
             knowledge::knowledge_read_asset_data,
             knowledge::knowledge_asset_abs_path,
             knowledge::knowledge_reveal_path,
+            knowledge::knowledge_list_templates,
+            knowledge::knowledge_save_template,
+            knowledge::knowledge_delete_template,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

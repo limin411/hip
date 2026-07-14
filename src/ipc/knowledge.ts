@@ -1,5 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KnowledgeSpace, KnowledgeTreeFile } from '@/domain/knowledge/types'
+import type {
+  KnowledgeSpace,
+  KnowledgeTemplate,
+  KnowledgeTreeFile,
+} from '@/domain/knowledge/types'
 
 export function knowledgeErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
@@ -129,4 +133,13 @@ export async function knowledgeAssetAbsPath(
 /** Reveal docs/… or assets/… under space (safe_join). */
 export async function knowledgeRevealPath(spaceId: string, relPath: string): Promise<void> {
   await invoke('knowledge_reveal_path', { args: { spaceId, relPath } })
+export async function knowledgeListTemplates(spaceId: string): Promise<KnowledgeTemplate[]> {
+  return invoke<KnowledgeTemplate[]>('knowledge_list_templates', { args: { spaceId } })
+export async function knowledgeSaveTemplate(
+  args: { id?: string; name: string; body: string },
+): Promise<KnowledgeTemplate> {
+  return invoke<KnowledgeTemplate>('knowledge_save_template', {
+    args: { spaceId, id: args.id, name: args.name, body: args.body },
+export async function knowledgeDeleteTemplate(spaceId: string, id: string): Promise<void> {
+  await invoke('knowledge_delete_template', { args: { spaceId, id } })
 }

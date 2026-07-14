@@ -53,7 +53,7 @@ export type UiPersistedState = {
   openSessionIds: string[]
   chatSessionId: string | null
   codeSessionId: string | null
-  activeView: ActiveView
+  // activeView is intentionally NOT persisted — cold launch always New Conversation (chat).
   theme: Theme
   language: AppLanguage
   settingsPage: SettingsPageId
@@ -67,9 +67,28 @@ export function isEphemeralActiveView(v: ActiveView): boolean {
   return v === 'settings' || v === 'history' || v === 'knowledge'
 }
 
-/** Value written to hip-ui for activeView — never persist special shells. */
-export function persistedActiveView(v: ActiveView): ActiveView {
-  return isEphemeralActiveView(v) ? 'chat' : v
+/** Merge hip-ui storage into runtime state; strip legacy activeView / knowledge flags. */
+export function mergeUiPersistedState<S extends { activeView: ActiveView; knowledgeTabOpen: boolean }>(
+  persistedState: unknown,
+  currentState: S,
+): S {
+  const p = (persistedState ?? {}) as Partial<UiPersistedState> & {
+    activeView?: ActiveView
+    knowledgeTabOpen?: boolean
+  }
+  // Drop legacy fields that used to be written to hip-ui.
+  const {
+    activeView: _legacyView,
+    knowledgeTabOpen: _legacyKb,
+    ...rest
+  } = p
+  return {
+    ...currentState,
+    ...rest,
+    // Always cold-start on chat New Conversation (product rule).
+    activeView: 'chat' as const,
+    knowledgeTabOpen: false,
+  }
 }
 
 interface UiState {
@@ -242,9 +261,8 @@ export const useUiStore = create<UiState>()(
         openSessionIds: s.openSessionIds,
         chatSessionId: s.chatSessionId,
         codeSessionId: s.codeSessionId,
-        // Never write knowledge/settings/history — otherwise cold launch reopens that shell
-        // instead of New Conversation (chat).
-        activeView: persistedActiveView(s.activeView),
+        // Never persist activeView — verified on device that hip-ui still held
+        // activeView:"knowledge" and reopened the KB shell after restart.
         theme: s.theme,
         language: s.language,
         settingsPage: s.settingsPage,
@@ -252,20 +270,32 @@ export const useUiStore = create<UiState>()(
         diffViewMode: s.diffViewMode,
         checkpointMode: s.checkpointMode,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return
-        // Clamp language from older / partial storage (i18n sync is owned by LanguageProvider).
-        const lang = isAppLanguage(state.language) ? state.language : seedLanguage()
-        if (state.language !== lang) {
-          useUiStore.setState({ language: lang })
-        }
-        // Belt-and-suspenders for legacy hip-ui blobs that still stored special views.
-        // Cold launch always lands on New Conversation (chat surface). Title-bar open tabs
-        // are restored separately via openSessionIds; settings/history/knowledge are not.
-        if (isEphemeralActiveView(state.activeView)) {
-          useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
-        }
+      merge: (persistedState, currentState) =>
+        mergeUiPersistedState(persistedState, currentState as UiState),
+      onRehydrateStorage: () => (state, error) => {
+        if (error || !state) return
+        // IMPORTANT: persist rehydrate often completes *synchronously* during
+        // `create()`, while `useUiStore` is still in the temporal dead zone.
+        // Calling useUiStore.setState here throws, aborts the hydrate chain, and
+        // leaves hasHydrated=false — which also breaks session tab restore.
+        // Defer any setState to a microtask (after the export binding exists).
+        const language = state.language
+        queueMicrotask(() => {
+          const lang = isAppLanguage(language) ? language : seedLanguage()
+          if (useUiStore.getState().language !== lang) {
+            useUiStore.setState({ language: lang })
+          }
+          applyColdLaunchShell()
+        })
       },
     },
   ),
 )
+
+/**
+ * Cold launch shell: New Conversation on chat surface, knowledge chip closed.
+ * Safe to call after rehydrate and once from AppLayout.
+ */
+export function applyColdLaunchShell(): void {
+  useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
+}

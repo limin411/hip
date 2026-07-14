@@ -3,8 +3,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   useUiStore,
   normalizeAppLanguage,
-  persistedActiveView,
   isEphemeralActiveView,
+  mergeUiPersistedState,
+  applyColdLaunchShell,
   type UiPersistedState,
 } from './uiStore'
 
@@ -301,7 +302,7 @@ describe('uiStore open sessions', () => {
 })
 
 describe('uiStore persistence partialize', () => {
-  it('includes open tabs, surface pointers, and settings (not ephemeral UI)', () => {
+  it('includes open tabs, surface pointers, and settings (not activeView / ephemeral UI)', () => {
     useUiStore.setState({
       openSessionIds: ['a', 'b'],
       chatSessionId: 'a',
@@ -322,7 +323,6 @@ describe('uiStore persistence partialize', () => {
       openSessionIds: s.openSessionIds,
       chatSessionId: s.chatSessionId,
       codeSessionId: s.codeSessionId,
-      activeView: persistedActiveView(s.activeView),
       theme: s.theme,
       language: s.language,
       settingsPage: s.settingsPage,
@@ -334,7 +334,6 @@ describe('uiStore persistence partialize', () => {
       openSessionIds: ['a', 'b'],
       chatSessionId: 'a',
       codeSessionId: 'c',
-      activeView: 'code',
       theme: 'dark',
       language: 'en',
       settingsPage: 'model',
@@ -344,24 +343,37 @@ describe('uiStore persistence partialize', () => {
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
+    expect(persisted).not.toHaveProperty('activeView')
   })
 
-  it('does not persist knowledge/settings/history as activeView (cold launch stays on chat)', () => {
+  it('merge strips legacy activeView knowledge so cold launch stays on chat', () => {
     expect(isEphemeralActiveView('knowledge')).toBe(true)
-    expect(isEphemeralActiveView('settings')).toBe(true)
-    expect(isEphemeralActiveView('history')).toBe(true)
-    expect(isEphemeralActiveView('chat')).toBe(false)
-    expect(isEphemeralActiveView('code')).toBe(false)
 
-    expect(persistedActiveView('knowledge')).toBe('chat')
-    expect(persistedActiveView('settings')).toBe('chat')
-    expect(persistedActiveView('history')).toBe('chat')
-    expect(persistedActiveView('chat')).toBe('chat')
-    expect(persistedActiveView('code')).toBe('code')
+    const current = {
+      activeView: 'chat' as const,
+      knowledgeTabOpen: false,
+      openSessionIds: [] as string[],
+      theme: 'system' as const,
+    }
+    const merged = mergeUiPersistedState(
+      {
+        openSessionIds: ['s1'],
+        activeView: 'knowledge',
+        knowledgeTabOpen: true,
+        theme: 'dark',
+      },
+      current,
+    )
+    expect(merged.activeView).toBe('chat')
+    expect(merged.knowledgeTabOpen).toBe(false)
+    expect(merged.openSessionIds).toEqual(['s1'])
+    expect(merged.theme).toBe('dark')
+  })
 
-    // Simulate partialize while knowledge is open — storage must record chat.
+  it('applyColdLaunchShell forces chat and closes knowledge chip', () => {
     useUiStore.setState({ activeView: 'knowledge', knowledgeTabOpen: true })
-    const s = useUiStore.getState()
-    expect(persistedActiveView(s.activeView)).toBe('chat')
+    applyColdLaunchShell()
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().knowledgeTabOpen).toBe(false)
   })
 })

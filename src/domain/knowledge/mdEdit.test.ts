@@ -85,14 +85,14 @@ describe('mdEdit', () => {
 
   it('insertWikiLink wraps selection', () => {
     const view = viewWith('Page', 0, 4)
-    expect(insertWikiLink(view)).toBe(true)
+    expect(insertWikiLink(view, '')).toBe(true)
     expect(view.state.doc.toString()).toBe('[[Page]]')
     view.destroy()
   })
 
   it('insertWikiLink inserts empty brackets for empty selection', () => {
     const view = viewWith('ab', 1)
-    expect(insertWikiLink(view)).toBe(true)
+    expect(insertWikiLink(view, '')).toBe(true)
     expect(view.state.doc.toString()).toBe('a[[]]b')
     expect(view.state.selection.main.head).toBe(3)
     view.destroy()

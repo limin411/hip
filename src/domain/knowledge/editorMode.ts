@@ -4,7 +4,11 @@ export type EditorMode = 'live' | 'source' | 'preview'
 /** Writable modes that schedule autosave on draft changes. */
 export type WritableEditorMode = 'live' | 'source'
 
-/** localStorage: Live editor feature flag (default off until quality gate). */
+/**
+ * localStorage: Live editor feature flag.
+ * After PR-17 quality gate: default **on** when key is absent (new users).
+ * Explicit `false` is respected; only the string `"false"` disables.
+ */
 export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 
 /** localStorage: last non-preview mode preference (`live` | `source`). */
@@ -15,13 +19,20 @@ export function shouldAutosave(mode: EditorMode): boolean {
   return mode === 'live' || mode === 'source'
 }
 
-/** Whether Live mode is enabled via localStorage flag. */
+/**
+ * Whether Live mode is enabled via localStorage flag.
+ * - Key absent → true (ship-gate default for new prefs)
+ * - `"false"` → false (user opt-out respected)
+ * - any other stored value → true
+ */
 export function isKnowledgeLiveEnabled(): boolean {
-  if (typeof localStorage === 'undefined') return false
+  if (typeof localStorage === 'undefined') return true
   try {
-    return localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY) === 'true'
+    const v = localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY)
+    if (v === null) return true
+    return v !== 'false'
   } catch {
-    return false
+    return true
   }
 }
 

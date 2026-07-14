@@ -27,7 +27,6 @@ import {
 import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
 import { importAssetFromPath } from '@/domain/knowledge/importAsset'
-import type { KnowledgeNode } from '@/domain/knowledge/types'
 import type { KnowledgeNode, KnowledgeVersionEntry } from '@/domain/knowledge/types'
 import { formatAbsolute } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
@@ -77,7 +76,6 @@ export function KnowledgeWorkspace() {
   const docBody = useKnowledgeStore((s) => s.docBody)
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editorMode = useKnowledgeStore((s) => s.editorMode)
-  const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
@@ -211,6 +209,9 @@ export function KnowledgeWorkspace() {
       if (timeoutId != null) clearTimeout(timeoutId)
     }
   }, [activeDocId, activeSpaceId, editorMode, docBody])
+
+  // Ensure expand-persist is not left suspended if the workspace unmounts mid-filter.
+  useEffect(() => {
     return () => setExpandPersistSuspended(false)
   }, [])
 
@@ -261,12 +262,10 @@ export function KnowledgeWorkspace() {
     }
   }
 
-  // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
-  // Wiki create-on-confirm uses the same parent (resolveParentForNew = parentForNew).
-  const parentForNew: string | null = activeNode?.parentId ?? null
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
   const [templateName, setTemplateName] = useState('')
   // Toolbar create: focused folder / sibling of focused|active doc / root.
+  // Wiki create-on-confirm uses the same parent rule.
   const parentForNew = resolveParentForNew({ treeFocusId, activeDocId, nodes })
   const newDoc = (parentId: string | null) => {
     void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
@@ -374,7 +373,7 @@ export function KnowledgeWorkspace() {
   }
 
   const attachFiles = async () => {
-    if (!activeSpaceId || !activeDocId || !editing) return
+    if (!activeSpaceId || !activeDocId || editorMode === 'preview') return
     const paths = await pickAttachmentFiles()
     if (!paths?.length) return
     const view = editorRef.current?.getView()
@@ -763,7 +762,6 @@ export function KnowledgeWorkspace() {
                 docId={activeDocId}
                 initialValue={draftBody}
                 spaceId={activeSpaceId}
-                initialValue={docBody}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
@@ -784,11 +782,9 @@ export function KnowledgeWorkspace() {
               />
               <DocPropertiesRow body={docBody} />
               <DocReader
-                content={docBody}
-                onStartEdit={() => void setEditorMode(loadEditorModePref())}
                 // Prefer draft so preview task toggles are optimistic before flush.
                 content={draftBody || docBody}
-                onStartEdit={() => void setEditing(true)}
+                onStartEdit={() => void setEditorMode(loadEditorModePref())}
                 nodes={nodes}
                 onWikiNavigate={(docId) => void openDoc(docId)}
                 onWikiBroken={(title) => setWikiCreateTitle(title)}
@@ -1008,13 +1004,11 @@ export function KnowledgeWorkspace() {
           const title = wikiCreateTitle?.trim()
           if (!title) return
           setWikiCreateTitle(null)
-          void createDoc(parentForNew, title)
+          void requestCreateDoc(parentForNew, title)
         }}
       />
+
       <Modal
-        open={saveTemplateOpen}
-        onOpenChange={setSaveTemplateOpen}
-        title={t('knowledge.template.saveAsTitle')}
         open={versionsOpen}
         onOpenChange={setVersionsOpen}
         title={t('knowledge.versions.title')}
@@ -1079,9 +1073,42 @@ export function KnowledgeWorkspace() {
         </div>
       </Modal>
 
+      <Modal
         open={restoreTarget != null}
+        onOpenChange={(o) => {
           if (!o) setRestoreTarget(null)
+        }}
         title={t('knowledge.versions.restoreTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-version-restore-cancel"
+              onClick={() => setRestoreTarget(null)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-version-restore-confirm"
+              onClick={() => void onConfirmRestore()}
+            >
+              {t('knowledge.versions.restoreConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.versions.restoreBody')}
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        title={t('knowledge.template.saveAsTitle')}
         className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
@@ -1089,8 +1116,6 @@ export function KnowledgeWorkspace() {
               variant="secondary"
               data-testid="knowledge-save-template-cancel"
               onClick={() => setSaveTemplateOpen(false)}
-              data-testid="knowledge-version-restore-cancel"
-              onClick={() => setRestoreTarget(null)}
             >
               {t('common.cancel')}
             </Button>
@@ -1104,9 +1129,6 @@ export function KnowledgeWorkspace() {
               }}
             >
               {t('common.confirm', { defaultValue: 'OK' })}
-              data-testid="knowledge-version-restore-confirm"
-              onClick={() => void onConfirmRestore()}
-              {t('knowledge.versions.restoreConfirm')}
             </Button>
           </div>
         }
@@ -1135,10 +1157,7 @@ export function KnowledgeWorkspace() {
       </Modal>
 
       <TemplatePickerModal />
-        <div className="px-5 py-4">
-          <p className="text-body leading-relaxed text-ink-secondary">
-            {t('knowledge.versions.restoreBody')}
-          </p>
     </div>
   )
 }
+

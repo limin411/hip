@@ -9,7 +9,12 @@ import type {
   KnowledgeVersionEntry,
 } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
-import { localDayKey } from '@/domain/knowledge/limits'
+import {
+  KNOWLEDGE_INDEX_YIELD_EVERY,
+  KNOWLEDGE_LARGE_DOC_CHARS,
+  KNOWLEDGE_RECENT_CAP,
+  localDayKey,
+} from '@/domain/knowledge/limits'
 import {
   collectDocIdsInSubtree,
   getPathTitles,
@@ -31,7 +36,6 @@ import {
   type KnowledgeDocMetaEntry,
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
-import { KNOWLEDGE_INDEX_YIELD_EVERY } from '@/domain/knowledge/limits'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   type EditorMode,
@@ -40,7 +44,6 @@ import {
   resolveEditorMode,
   shouldAutosave,
 } from '@/domain/knowledge/editorMode'
-import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import {
   countBrokenOutbound,
   createLinkIndex,
@@ -97,7 +100,7 @@ function mapSpaceNameError(raw: string, name: string): string {
 
 const RECENT_KEY = 'hip-knowledge-recent'
 /** Cap for “最近打开” on the knowledge home page (and localStorage). */
-const RECENT_CAP = 8
+const RECENT_CAP = KNOWLEDGE_RECENT_CAP
 /** Per-space folder expand map: `Record<spaceId, Record<folderId, true>>`. */
 const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
 
@@ -271,9 +274,12 @@ export type KnowledgePendingReveal = {
 /** Yield so React can paint index progress (and avoid long freezes). */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 /** Pending new-doc flow: modal open only after templates exist; no node until confirm. */
 export interface TemplatePickerState {
   /** Space the templates were listed for; ignore confirm if activeSpaceId diverges. */
+  spaceId: string
   parentId: string | null
   defaultTitle: string
   templates: KnowledgeTemplate[]
@@ -795,7 +801,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   openSpace: async (id, opts) => {
     const ok = await get().flushSave()
     if (!ok) return // stay on current space/doc; saveState error + retry chrome
-    await get().flushSave()
     // Write current space expand before replacing the in-memory map.
     flushPendingExpandPersist(get)
     set({ error: null })
@@ -855,7 +860,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   openHome: async () => {
     const ok = await get().flushSave()
     if (!ok) return // stay in workspace; saveState error + retry chrome
-    await get().flushSave()
     flushPendingExpandPersist(get)
     set({
       mode: 'home',
@@ -1159,8 +1163,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             : pendingTargetsRemoved
               ? { pendingReveal: null }
               : {}),
-                editing: false,
-            : {}),
           treeFocusId:
             s.treeFocusId != null &&
             (removedDocIds.includes(s.treeFocusId) ||
@@ -1190,12 +1192,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       get().dropRecent(spaceId, id)
       set({
         activeDocId: null,
+        treeFocusId: null,
         docBody: '',
         draftBody: '',
         editorMode: 'preview',
         pendingReveal: null,
       })
-      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
       return
     }
     try {
@@ -1210,19 +1212,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const pending = get().pendingReveal
       const revealMatches =
         pending != null && pending.spaceId === spaceId && pending.docId === id
+      // Expand ancestors so the focused row is mounted for keyboard/roving tabindex.
+      const expandedFolderIds = expandAncestorsOf(get().nodes, id, get().expandedFolderIds)
       set({
         activeDocId: id,
         docBody: body,
         draftBody: body,
         editorMode,
         saveState: 'idle',
+        treeFocusId: id,
+        expandedFolderIds,
         ...(revealMatches ? {} : { pendingReveal: null }),
       })
-      // Expand ancestors so the focused row is mounted for keyboard/roving tabindex.
-      const expandedFolderIds = expandAncestorsOf(get().nodes, id, get().expandedFolderIds)
-        treeFocusId: id,
-        editing: true,
-        expandedFolderIds,
       schedulePersistExpand(spaceId, get)
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
@@ -1244,12 +1245,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       get().dropRecent(spaceId, id)
       set({
         activeDocId: null,
+        treeFocusId: null,
         docBody: '',
         draftBody: '',
         editorMode: 'preview',
         pendingReveal: null,
       })
-      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
     }
   },
 
@@ -1420,7 +1421,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     get().runSearch(get().searchQuery)
   },
 
-  toggleFolder: (id) =>
   toggleFolder: (id) => {
     set((s) => ({
       expandedFolderIds: { ...s.expandedFolderIds, [id]: !s.expandedFolderIds[id] },
@@ -1481,8 +1481,11 @@ export function getKnowledgeOutbound(spaceId: string, docId: string): LinkEdge[]
 /** Count of broken outbound `[[title]]` targets for the current source doc. */
 export function getKnowledgeBrokenOutboundCount(spaceId: string, docId: string): number {
   return countBrokenOutbound(kbLinkIndex, spaceId, docId)
+}
+
 /** Debounced persist for the active space’s expand map (e.g. after import expand-all). */
 export function scheduleActiveExpandPersist() {
   const spaceId = useKnowledgeStore.getState().activeSpaceId
   if (spaceId) schedulePersistExpand(spaceId, () => useKnowledgeStore.getState())
 }
+

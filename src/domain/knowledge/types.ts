@@ -43,10 +43,15 @@ export interface KnowledgeTemplate {
   body: string
   createdAt: number
   updatedAt: number
+}
+
 export type KnowledgeVersionKind = 'daily' | 'manual'
 
 export interface KnowledgeVersionEntry {
+  /** File stem / id (filesystem-safe ISO timestamp). */
+  id: string
   file: string
+  createdAt: number
   kind: KnowledgeVersionKind | string
   dayKey?: string
   byteLength: number

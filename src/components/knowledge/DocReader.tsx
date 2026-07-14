@@ -1,14 +1,12 @@
-import { useCallback, useMemo, useRef } from 'react'
-import { useMemo } from 'react'
-import type { Components } from 'react-markdown'
+import { createElement, useCallback, useMemo, useRef, type ComponentType } from 'react'
+import type { Components, ExtraProps } from 'react-markdown'
+import type { AnchorHTMLAttributes, ClassAttributes } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText } from 'lucide-react'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { headingIdsBySourceLine } from '@/domain/knowledge/mdPreview'
 import { toggleTaskAt } from '@/domain/knowledge/mdTasks'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { knowledgeMarkdownComponents } from './knowledgeMarkdownComponents'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import {
   listDocsInTreeOrder,
@@ -17,6 +15,8 @@ import {
   titleFromWikiHref,
 } from '@/domain/knowledge/wikiLink'
 import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { knowledgeMarkdownComponents } from './knowledgeMarkdownComponents'
 
 interface DocReaderProps {
   /**
@@ -62,7 +62,7 @@ export function DocReader({
   // Pure precompute from content — stable under StrictMode (no render counters).
   const headingIdsByLine = useMemo(() => headingIdsBySourceLine(content), [content])
 
-  const components = useMemo(
+  const baseComponents = useMemo(
     () =>
       knowledgeMarkdownComponents({
         onTaskToggle,
@@ -78,32 +78,32 @@ export function DocReader({
     [content],
   )
 
-  const components = useMemo((): Components | undefined => {
-    if (!nodes && !onWikiNavigate && !onWikiBroken) return undefined
+  const components = useMemo((): Components => {
+    if (!nodes && !onWikiNavigate && !onWikiBroken) return baseComponents
     const docs = listDocsInTreeOrder(nodes ?? [])
+    const baseA = baseComponents.a
     return {
-      a: ({ href, children, className, node: _node, ...props }) => {
+      ...baseComponents,
+      a: (props) => {
+        const { href, children, className, node: _node, ...rest } = props
         const wikiTitle = titleFromWikiHref(href)
         if (wikiTitle == null) {
-          // Match MarkdownBody default: shell-open external links.
+          // Fall back to knowledge base link handler (anchors / external / #heading).
+          if (baseA && typeof baseA !== 'string') {
+            return createElement(
+              baseA as ComponentType<
+                ClassAttributes<HTMLAnchorElement> &
+                  AnchorHTMLAttributes<HTMLAnchorElement> &
+                  ExtraProps
+              >,
+              props,
+            )
+          }
           return (
             <a
               href={href}
-              className={cn(
-                'cursor-pointer underline hover:opacity-80',
-                className,
-              )}
-              onClick={async (e) => {
-                e.preventDefault()
-                if (!href) return
-                try {
-                  const { open } = await import('@tauri-apps/plugin-shell')
-                  await open(href)
-                } catch {
-                  window.open(href, '_blank', 'noopener,noreferrer')
-                }
-              }}
-              {...props}
+              className={cn('cursor-pointer underline hover:opacity-80', className)}
+              {...rest}
             >
               {children}
             </a>
@@ -115,9 +115,7 @@ export function DocReader({
         return (
           <a
             href={href}
-            data-testid={
-              broken ? 'knowledge-wiki-link-broken' : 'knowledge-wiki-link'
-            }
+            data-testid={broken ? 'knowledge-wiki-link-broken' : 'knowledge-wiki-link'}
             data-wiki-title={wikiTitle}
             data-wiki-doc-id={resolved?.id}
             title={
@@ -141,14 +139,14 @@ export function DocReader({
                 onWikiBroken?.(wikiTitle)
               }
             }}
-            {...props}
+            {...rest}
           >
             {children}
           </a>
         )
       },
     }
-  }, [nodes, onWikiBroken, onWikiNavigate, t])
+  }, [baseComponents, nodes, onWikiBroken, onWikiNavigate, t])
 
   if (!content.trim()) {
     return (
@@ -170,8 +168,6 @@ export function DocReader({
 
   return (
     <div ref={rootRef} data-testid="knowledge-doc-reader">
-      <MarkdownBody content={content} components={components} />
-    <div data-testid="knowledge-doc-reader">
       <MarkdownBody content={previewMd} components={components} />
     </div>
   )

@@ -135,38 +135,66 @@ export async function knowledgeAssetAbsPath(
 /** Reveal docs/… or assets/… under space (safe_join). */
 export async function knowledgeRevealPath(spaceId: string, relPath: string): Promise<void> {
   await invoke('knowledge_reveal_path', { args: { spaceId, relPath } })
+}
+
+// ── Templates (P1.7) ──────────────────────────────────────────────────────
+
 export async function knowledgeListTemplates(spaceId: string): Promise<KnowledgeTemplate[]> {
   return invoke<KnowledgeTemplate[]>('knowledge_list_templates', { args: { spaceId } })
+}
+
 export async function knowledgeSaveTemplate(
+  spaceId: string,
   args: { id?: string; name: string; body: string },
 ): Promise<KnowledgeTemplate> {
   return invoke<KnowledgeTemplate>('knowledge_save_template', {
     args: { spaceId, id: args.id, name: args.name, body: args.body },
+  })
+}
+
 export async function knowledgeDeleteTemplate(spaceId: string, id: string): Promise<void> {
   await invoke('knowledge_delete_template', { args: { spaceId, id } })
+}
+
+// ── Versions (P1.8) ───────────────────────────────────────────────────────
+
 export async function knowledgeSaveVersion(
+  spaceId: string,
   docId: string,
   kind: KnowledgeVersionKind,
   dayKey?: string,
 ): Promise<KnowledgeVersionEntry | null> {
   return invoke<KnowledgeVersionEntry | null>('knowledge_save_version', {
     args: { spaceId, docId, kind, dayKey },
+  })
+}
+
 export async function knowledgeListVersions(
+  spaceId: string,
   docId: string,
 ): Promise<KnowledgeVersionEntry[]> {
   return invoke<KnowledgeVersionEntry[]>('knowledge_list_versions', {
     args: { spaceId, docId },
+  })
+}
+
 export async function knowledgeReadVersion(
+  spaceId: string,
   docId: string,
   versionId: string,
 ): Promise<string> {
   return invoke<string>('knowledge_read_version', {
     args: { spaceId, docId, versionId },
+  })
+}
+
 /** Atomically restores snapshot into the live doc; returns restored body. */
 export async function knowledgeRestoreVersion(
+  spaceId: string,
   docId: string,
   versionId: string,
 ): Promise<string> {
   return invoke<string>('knowledge_restore_version', {
     args: { spaceId, docId, versionId },
+  })
 }

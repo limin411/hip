@@ -29,6 +29,7 @@ import {
   type SlashQueryMatch,
 } from '@/domain/knowledge/slashMenu'
 import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
+import {
   importAssetFromClipboardItems,
   importAssetFromFile,
 } from '@/domain/knowledge/importAsset'
@@ -408,7 +409,6 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       themeCompartment.of(buildProseTheme(false)),
-      blurHandler,
       slashTracker,
       assetHandlers,
       highlightSelectionMatches(),

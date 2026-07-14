@@ -139,6 +139,9 @@ describe('knowledgeStore deleteSpace', () => {
   })
 
   it('leaves workspace before disk delete and does not flush dirty draft', async () => {
+    useKnowledgeStore.setState({
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+    })
     await useKnowledgeStore.getState().deleteSpace('spc_1')
     const s = useKnowledgeStore.getState()
     expect(knowledgeDeleteSpace).toHaveBeenCalledWith('spc_1')
@@ -150,6 +153,7 @@ describe('knowledgeStore deleteSpace', () => {
     expect(s.spaces.map((x) => x.id)).toEqual(['spc_2'])
     expect(s.recent).toEqual([])
     expect(s.busy).toBe(false)
+    expect(s.pendingReveal).toBeNull()
   })
 
   it('deletes non-active space without changing mode', async () => {
@@ -453,6 +457,34 @@ describe('knowledgeStore index progress + openSearchHit', () => {
     await useKnowledgeStore.getState().openDoc('doc_2')
     expect(useKnowledgeStore.getState().activeDocId).toBe('doc_2')
     expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+
+  it('deleteNode of active doc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      docBody: 'saved',
+      draftBody: 'saved',
+      editing: true,
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+      spaceDocCounts: { spc_1: 1 },
+    })
+    await useKnowledgeStore.getState().deleteNode('doc_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.pendingReveal).toBeNull()
   })
 
   it('superseded rebuild does not publish stale kbIndex or final ready from old gen', async () => {

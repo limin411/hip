@@ -375,6 +375,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           editing: false,
           nodes: [],
           saveState: 'idle',
+          pendingReveal: null,
         })
       }
       await knowledgeDeleteSpace(id)
@@ -386,11 +387,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // rebuild keeps consistency after destructive space ops.
       set((s) => {
         const { [id]: _removed, ...restCounts } = s.spaceDocCounts
+        const pendingTargetsDeleted = s.pendingReveal?.spaceId === id
         return {
           spaces: s.spaces.filter((x) => x.id !== id),
           recent: s.recent.filter((r) => r.spaceId !== id),
           spaceDocCounts: restCounts,
           busy: false,
+          ...(pendingTargetsDeleted ? { pendingReveal: null } : {}),
         }
       })
       persistRecent(get().recent)
@@ -628,6 +631,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 ...s.spaceDocCounts,
                 [spaceId]: Math.max(0, prevCount - removedDocIds.length),
               }
+        const pendingTargetsRemoved =
+          s.pendingReveal != null &&
+          s.pendingReveal.spaceId === spaceId &&
+          removedDocIds.includes(s.pendingReveal.docId)
         return {
           nodes,
           busy: false,
@@ -636,8 +643,16 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
           ),
           ...(activeRemoved
-            ? { activeDocId: null, docBody: '', draftBody: '', editing: false }
-            : {}),
+            ? {
+                activeDocId: null,
+                docBody: '',
+                draftBody: '',
+                editing: false,
+                pendingReveal: null,
+              }
+            : pendingTargetsRemoved
+              ? { pendingReveal: null }
+              : {}),
         }
       })
       persistRecent(get().recent)

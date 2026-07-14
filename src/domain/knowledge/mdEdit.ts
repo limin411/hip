@@ -206,6 +206,12 @@ export function applySlashInsert(
   view.dispatch({
     changes: { from, to, insert },
     selection: EditorSelection.cursor(from + cursorOffset),
+/** Insert plain text (or markdown snippet) at the primary selection. */
+export function insertTextAtCursor(view: EditorView, text: string): boolean {
+  if (view.composing || !text) return false
+  const range = view.state.selection.main
+    changes: { from: range.from, to: range.to, insert: text },
+    selection: EditorSelection.cursor(range.from + text.length),
   })
   return true
 }

@@ -28,4 +28,58 @@ describe('knowledge IPC', () => {
     expect(knowledgeErrorMessage(new Error('x'))).toBe('x')
     expect(knowledgeErrorMessage('y')).toBe('y')
   })
+
+  it('asset IPC wrappers pass camelCase args and never echo bytes on import', async () => {
+    const {
+      knowledgeImportAssetFromPath,
+      knowledgeImportAssetBytes,
+      knowledgeReadAssetData,
+      knowledgeAssetAbsPath,
+      knowledgeRevealPath,
+    } = await import('./knowledge.js')
+
+    invoke.mockResolvedValueOnce({
+      relPath: 'assets/ast_x_a.png',
+      mime: 'image/png',
+      byteLength: 12,
+    })
+    const meta = await knowledgeImportAssetFromPath('spc_1', '/tmp/a.png')
+    expect(meta.relPath).toBe('assets/ast_x_a.png')
+    expect(invoke).toHaveBeenCalledWith('knowledge_import_asset_from_path', {
+      args: { spaceId: 'spc_1', sourcePath: '/tmp/a.png' },
+    })
+
+    invoke.mockResolvedValueOnce({
+      relPath: 'assets/ast_y_b.png',
+      mime: 'image/png',
+      byteLength: 4,
+    })
+    await knowledgeImportAssetBytes('spc_1', {
+      base64: 'AAAA',
+      fileName: 'b.png',
+      mime: 'image/png',
+    })
+    expect(invoke).toHaveBeenCalledWith('knowledge_import_asset_bytes', {
+      args: {
+        spaceId: 'spc_1',
+        base64: 'AAAA',
+        fileName: 'b.png',
+        mime: 'image/png',
+      },
+    })
+
+    invoke.mockResolvedValueOnce({ mime: 'image/png', base64: 'xxxx' })
+    await knowledgeReadAssetData('spc_1', 'assets/ast_x_a.png')
+    expect(invoke).toHaveBeenCalledWith('knowledge_read_asset_data', {
+      args: { spaceId: 'spc_1', relPath: 'assets/ast_x_a.png' },
+    })
+
+    invoke.mockResolvedValueOnce({ absolutePath: '/x/assets/a.png' })
+    await knowledgeAssetAbsPath('spc_1', 'assets/a.png')
+    invoke.mockResolvedValueOnce(undefined)
+    await knowledgeRevealPath('spc_1', 'assets/a.png')
+    expect(invoke).toHaveBeenCalledWith('knowledge_reveal_path', {
+      args: { spaceId: 'spc_1', relPath: 'assets/a.png' },
+    })
+  })
 })

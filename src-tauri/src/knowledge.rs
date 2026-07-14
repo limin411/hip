@@ -1,5 +1,7 @@
 //! Local-first knowledge base: spaces, tree.json, docs/*.md under knowledge_dir.
+//! Assets live under `<space>/assets/` (space-root-relative MD links).
 
+use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -9,6 +11,11 @@ use tauri::AppHandle;
 
 use crate::paths;
 use crate::skills::safe_join;
+
+/// Max asset size on disk (path import / file picker).
+const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
+/// Max raw bytes for base64 IPC (`read_asset_data`, `import_asset_bytes`).
+const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 fn is_knowledge_id(id: &str) -> bool {
@@ -70,6 +77,95 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
     let docs = safe_join(&space, "docs").ok_or_else(|| "illegal docs path".to_string())?;
     let file = format!("{doc_id}.md");
     safe_join(&docs, &file).ok_or_else(|| "illegal doc path".to_string())
+}
+
+/// Resolve a space-root-relative path that must stay under `assets/`.
+/// `rel_path` may be `assets/foo.png` or `foo.png` (normalized to under assets/).
+fn asset_path(root: &Path, space_id: &str, rel_path: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    let space = space_dir(root, space_id)?;
+    let trimmed = rel_path.trim().trim_start_matches("./");
+    if trimmed.is_empty() {
+        return Err("empty asset path".into());
+    }
+    let under_assets = if let Some(rest) = trimmed.strip_prefix("assets/") {
+        rest
+    } else if trimmed == "assets" {
+        return Err("asset path must be a file under assets/".into());
+    } else if !trimmed.contains('/') && !trimmed.contains('\\') {
+        trimmed
+    } else {
+        return Err("asset path must be under assets/".into());
+    };
+    if under_assets.is_empty() || under_assets.contains('/') || under_assets.contains('\\') {
+        // Only single-segment filenames under assets/ (no nested dirs in v1).
+        return Err("asset path must be a single file under assets/".into());
+    }
+    let assets = safe_join(&space, "assets").ok_or_else(|| "illegal assets path".to_string())?;
+    safe_join(&assets, under_assets).ok_or_else(|| "illegal asset path".to_string())
+}
+
+fn allowed_asset_mime(mime: &str) -> bool {
+    matches!(
+        mime,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf"
+    )
+}
+
+fn mime_from_ext(path: &Path) -> Option<&'static str> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())?;
+    match ext.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "pdf" => Some("application/pdf"),
+        _ => None,
+    }
+}
+
+fn ext_for_mime(mime: &str) -> Option<&'static str> {
+    match mime {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/gif" => Some("gif"),
+        "image/webp" => Some("webp"),
+        "application/pdf" => Some("pdf"),
+        _ => None,
+    }
+}
+
+/// Sanitize a user-facing file name for use after `ast_<id>_`.
+fn sanitize_asset_filename(name: &str) -> String {
+    let base = Path::new(name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let mut s: String = base
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | ' ' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    s = s.trim().trim_matches('.').to_string();
+    if s.is_empty() {
+        s = "file".into();
+    }
+    if s.chars().count() > 80 {
+        s = s.chars().take(80).collect();
+    }
+    s
+}
+
+fn gen_asset_rel_path(file_name: &str) -> String {
+    let safe = sanitize_asset_filename(file_name);
+    let id = gen_id("ast");
+    format!("assets/{id}_{safe}")
 }
 
 fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
@@ -429,16 +525,6 @@ fn sanitize_filename(name: &str) -> String {
     s
 }
 
-fn unique_name(used: &mut std::collections::HashMap<String, u32>, base: &str) -> String {
-    let n = used.entry(base.to_string()).or_insert(0);
-    *n += 1;
-    if *n == 1 {
-        base.to_string()
-    } else {
-        format!("{base} ({n})")
-    }
-}
-
 /// Reject zip-slip style entries: absolute paths or `..` / empty path components.
 /// Titles like `a..b` are fine after sanitize (they stay a single component).
 fn is_safe_zip_entry(name: &str) -> bool {
@@ -489,9 +575,10 @@ pub struct ExportSpaceZipArgs {
     pub dest_path: String,
 }
 
+/// Portable hip layout (K17): meta.json + tree.json + docs/ + assets/.
+/// Space-root-relative `assets/…` links in MD survive re-import.
 #[tauri::command]
 pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> Result<(), String> {
-    use std::collections::HashMap;
     use std::io::Write as _;
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
@@ -502,48 +589,20 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     if !dir.exists() {
         return Err("space not found".into());
     }
-    let tree: KnowledgeTreeFile = read_json_file(&dir.join("tree.json"))?;
+    let tree: KnowledgeTreeFile = if dir.join("tree.json").exists() {
+        read_json_file(&dir.join("tree.json"))?
+    } else {
+        KnowledgeTreeFile {
+            version: 1,
+            nodes: vec![],
+        }
+    };
     let dest = PathBuf::from(&args.dest_path);
     if !dest.is_absolute() {
         return Err("destPath must be absolute".into());
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    // Build human path map
-    let by_id: HashMap<String, &KnowledgeNode> =
-        tree.nodes.iter().map(|n| (n.id.clone(), n)).collect();
-    let mut path_cache: HashMap<String, String> = HashMap::new();
-    let mut used_at_parent: HashMap<String, HashMap<String, u32>> = HashMap::new();
-
-    fn path_for(
-        id: &str,
-        by_id: &HashMap<String, &KnowledgeNode>,
-        path_cache: &mut HashMap<String, String>,
-        used_at_parent: &mut HashMap<String, HashMap<String, u32>>,
-        visiting: &mut std::collections::HashSet<String>,
-    ) -> Result<String, String> {
-        if let Some(p) = path_cache.get(id) {
-            return Ok(p.clone());
-        }
-        if !visiting.insert(id.to_string()) {
-            return Err(format!("cycle in tree at {id}"));
-        }
-        let node = by_id.get(id).ok_or_else(|| format!("missing node {id}"))?;
-        let base = sanitize_filename(&node.title);
-        let parent_key = node.parent_id.clone().unwrap_or_else(|| "__root__".into());
-        let bucket = used_at_parent.entry(parent_key.clone()).or_default();
-        let unique = unique_name(bucket, &base);
-        let full = if let Some(ref pid) = node.parent_id {
-            let parent_path = path_for(pid, by_id, path_cache, used_at_parent, visiting)?;
-            format!("{parent_path}/{unique}")
-        } else {
-            unique
-        };
-        visiting.remove(id);
-        path_cache.insert(id.to_string(), full.clone());
-        Ok(full)
     }
 
     let mut doc_count = 0usize;
@@ -560,48 +619,294 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     let mut zip = ZipWriter::new(file);
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
+    // meta.json (prefer on-disk; fall back to index entry)
+    let meta_bytes = if dir.join("meta.json").exists() {
+        fs::read(&dir.join("meta.json")).map_err(|e| e.to_string())?
+    } else {
+        let index = load_index(&root)?;
+        let space = index
+            .spaces
+            .iter()
+            .find(|s| s.id == args.space_id)
+            .ok_or_else(|| "space not found in index".to_string())?;
+        serde_json::to_vec_pretty(space).map_err(|e| e.to_string())?
+    };
+    zip.start_file("meta.json", opts)
+        .map_err(|e| e.to_string())?;
+    zip.write_all(&meta_bytes).map_err(|e| e.to_string())?;
+
+    let tree_bytes = serde_json::to_vec_pretty(&tree).map_err(|e| e.to_string())?;
+    zip.start_file("tree.json", opts)
+        .map_err(|e| e.to_string())?;
+    zip.write_all(&tree_bytes).map_err(|e| e.to_string())?;
+
     for n in &tree.nodes {
         if n.kind != "doc" {
             continue;
         }
-        let mut visiting = std::collections::HashSet::new();
-        let rel = path_for(
-            &n.id,
-            &by_id,
-            &mut path_cache,
-            &mut used_at_parent,
-            &mut visiting,
-        )?;
-        let entry_name = format!("{rel}.md");
+        let entry_name = format!("docs/{}.md", n.id);
         if !is_safe_zip_entry(&entry_name) {
             return Err("illegal export path".into());
         }
         let body = {
             let p = doc_path(&root, &args.space_id, &n.id)?;
             if p.exists() {
-                fs::read_to_string(&p).map_err(|e| e.to_string())?
+                fs::read(&p).map_err(|e| e.to_string())?
             } else {
-                String::new()
+                Vec::new()
             }
         };
         zip.start_file(entry_name, opts)
             .map_err(|e| e.to_string())?;
-        zip.write_all(body.as_bytes()).map_err(|e| e.to_string())?;
+        zip.write_all(&body).map_err(|e| e.to_string())?;
     }
 
-    // optional lightweight manifest
-    let manifest = serde_json::json!({
-        "format": "hip-knowledge-export",
-        "version": 1,
-        "spaceId": args.space_id,
-        "exportedAt": now_ms(),
-    });
-    zip.start_file("hip-manifest.json", opts)
-        .map_err(|e| e.to_string())?;
-    zip.write_all(manifest.to_string().as_bytes())
-        .map_err(|e| e.to_string())?;
+    // assets/* (skip symlinks)
+    let assets_dir = dir.join("assets");
+    if assets_dir.is_dir() {
+        let entries = fs::read_dir(&assets_dir).map_err(|e| e.to_string())?;
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let meta = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                continue;
+            }
+            let name = ent.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') {
+                continue;
+            }
+            let entry_name = format!("assets/{name_str}");
+            if !is_safe_zip_entry(&entry_name) {
+                return Err("illegal asset export path".into());
+            }
+            let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+            zip.start_file(entry_name, opts)
+                .map_err(|e| e.to_string())?;
+            zip.write_all(&bytes).map_err(|e| e.to_string())?;
+        }
+    }
+
     zip.finish().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ── Assets (P1.5 / K16) ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetMeta {
+    pub rel_path: String,
+    pub mime: String,
+    pub byte_length: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetFromPathArgs {
+    pub space_id: String,
+    pub source_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_import_asset_from_path(
+    app: AppHandle,
+    args: ImportAssetFromPathArgs,
+) -> Result<AssetMeta, String> {
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let source = PathBuf::from(&args.source_path);
+    if !source.is_absolute() {
+        return Err("sourcePath must be absolute".into());
+    }
+    let meta = fs::symlink_metadata(&source).map_err(|e| e.to_string())?;
+    if meta.file_type().is_symlink() {
+        return Err("source path is a symlink".into());
+    }
+    if !meta.is_file() {
+        return Err("sourcePath must be a file".into());
+    }
+    let byte_length = meta.len();
+    if byte_length > KNOWLEDGE_ASSET_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds max size ({KNOWLEDGE_ASSET_MAX_BYTES} bytes)"
+        ));
+    }
+    let mime = mime_from_ext(&source).ok_or_else(|| "unsupported asset type".to_string())?;
+    if !allowed_asset_mime(mime) {
+        return Err("unsupported asset MIME type".into());
+    }
+    let file_name = source
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let rel_path = gen_asset_rel_path(file_name);
+    let dest = asset_path(&root, &args.space_id, &rel_path)?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::copy(&source, &dest).map_err(|e| e.to_string())?;
+    Ok(AssetMeta {
+        rel_path,
+        mime: mime.to_string(),
+        byte_length,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetBytesArgs {
+    pub space_id: String,
+    pub base64: String,
+    pub file_name: String,
+    pub mime: String,
+}
+
+#[tauri::command]
+pub fn knowledge_import_asset_bytes(
+    app: AppHandle,
+    args: ImportAssetBytesArgs,
+) -> Result<AssetMeta, String> {
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let mime = args.mime.trim().to_ascii_lowercase();
+    if !allowed_asset_mime(&mime) {
+        return Err("unsupported asset MIME type".into());
+    }
+    let bytes = B64
+        .decode(args.base64.trim())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    let byte_length = bytes.len() as u64;
+    if byte_length > KNOWLEDGE_ASSET_INLINE_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds inline max ({KNOWLEDGE_ASSET_INLINE_MAX_BYTES} bytes)"
+        ));
+    }
+    if byte_length == 0 {
+        return Err("empty asset".into());
+    }
+    let mut file_name = args.file_name.trim().to_string();
+    if file_name.is_empty() {
+        let ext = ext_for_mime(&mime).unwrap_or("bin");
+        file_name = format!("paste.{ext}");
+    } else if Path::new(&file_name).extension().is_none() {
+        if let Some(ext) = ext_for_mime(&mime) {
+            file_name = format!("{file_name}.{ext}");
+        }
+    }
+    let rel_path = gen_asset_rel_path(&file_name);
+    let dest = asset_path(&root, &args.space_id, &rel_path)?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write(&dest, &bytes)?;
+    Ok(AssetMeta {
+        rel_path,
+        mime,
+        byte_length,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetRelArgs {
+    pub space_id: String,
+    pub rel_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetData {
+    pub mime: String,
+    pub base64: String,
+}
+
+#[tauri::command]
+pub fn knowledge_read_asset_data(
+    app: AppHandle,
+    args: AssetRelArgs,
+) -> Result<AssetData, String> {
+    let root = knowledge_root(&app)?;
+    let path = asset_path(&root, &args.space_id, &args.rel_path)?;
+    let meta = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+    if meta.file_type().is_symlink() {
+        return Err("asset is a symlink".into());
+    }
+    if !meta.is_file() {
+        return Err("asset not found".into());
+    }
+    if meta.len() > KNOWLEDGE_ASSET_INLINE_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds inline max ({KNOWLEDGE_ASSET_INLINE_MAX_BYTES} bytes)"
+        ));
+    }
+    let mime = mime_from_ext(&path).ok_or_else(|| "unsupported asset type".to_string())?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(AssetData {
+        mime: mime.to_string(),
+        base64: B64.encode(bytes),
+    })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetAbsPath {
+    pub absolute_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_asset_abs_path(
+    app: AppHandle,
+    args: AssetRelArgs,
+) -> Result<AssetAbsPath, String> {
+    let root = knowledge_root(&app)?;
+    let path = asset_path(&root, &args.space_id, &args.rel_path)?;
+    Ok(AssetAbsPath {
+        absolute_path: path.to_string_lossy().to_string(),
+    })
+}
+
+/// Reveal any path under the space root (docs or assets). Shared safe_join with reveal_doc.
+#[tauri::command]
+pub fn knowledge_reveal_path(app: AppHandle, args: AssetRelArgs) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let trimmed = args.rel_path.trim().trim_start_matches("./");
+    if trimmed.is_empty() {
+        return Err("empty path".into());
+    }
+    // Only allow docs/… or assets/… under space.
+    let first = trimmed.split(['/', '\\']).next().unwrap_or("");
+    if first != "docs" && first != "assets" {
+        return Err("path must be under docs/ or assets/".into());
+    }
+    let path = safe_join(&space, trimmed).ok_or_else(|| "illegal path".to_string())?;
+    // Ensure resolved path stays under space (safe_join already rejects ..).
+    let target = if path.is_file() {
+        path.as_path()
+    } else if path.is_dir() {
+        path.as_path()
+    } else if let Some(parent) = path.parent() {
+        parent
+    } else {
+        space.as_path()
+    };
+    app.opener()
+        .reveal_item_in_dir(target)
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -617,6 +922,214 @@ pub struct ImportFolderResult {
     pub imported_docs: u32,
 }
 
+/// Portable hip export/import: `tree.json` + `docs/` at the folder root.
+fn is_hip_portable_layout(source: &Path) -> bool {
+    source.join("tree.json").is_file() && source.join("docs").is_dir()
+}
+
+/// Import a portable hip layout folder (meta/tree/docs/assets) into a new space.
+fn import_hip_portable_folder(
+    app: &AppHandle,
+    source: &Path,
+    source_canon: &Path,
+) -> Result<ImportFolderResult, String> {
+    // Prefer meta.json name when present.
+    let name = if source.join("meta.json").is_file() {
+        read_json_file::<KnowledgeSpace>(&source.join("meta.json"))
+            .ok()
+            .map(|m| m.name)
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| {
+                source
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Imported")
+                    .to_string()
+            })
+    } else {
+        source
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Imported")
+            .to_string()
+    };
+
+    let space = knowledge_create_space(
+        app.clone(),
+        CreateSpaceArgs {
+            name,
+            icon: None,
+        },
+    )?;
+    let root = knowledge_root(app)?;
+    let space_root = space_dir(&root, &space.id)?;
+
+    let tree: KnowledgeTreeFile = match read_json_file(&source.join("tree.json")) {
+        Ok(t) => t,
+        Err(e) => {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e);
+        }
+    };
+
+    let mut imported = 0u32;
+    let docs_src = source.join("docs");
+    for n in &tree.nodes {
+        if n.kind != "doc" {
+            continue;
+        }
+        if imported >= MAX_IMPORT_DOCS {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(format!("import exceeds max documents ({MAX_IMPORT_DOCS})"));
+        }
+        if !n.id.starts_with("doc_") || !is_knowledge_id(&n.id) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(format!("invalid doc id in tree: {}", n.id));
+        }
+        let src_doc = docs_src.join(format!("{}.md", n.id));
+        // Skip symlink escape
+        if src_doc.exists() {
+            let meta = fs::symlink_metadata(&src_doc).map_err(|e| e.to_string());
+            let meta = match meta {
+                Ok(m) => m,
+                Err(e) => {
+                    let _ = knowledge_delete_space(
+                        app.clone(),
+                        DeleteSpaceArgs {
+                            id: space.id.clone(),
+                        },
+                    );
+                    return Err(e);
+                }
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if let Ok(canon) = src_doc.canonicalize() {
+                if !canon.starts_with(source_canon) {
+                    continue;
+                }
+            }
+        }
+        let body = if src_doc.is_file() {
+            fs::read_to_string(&src_doc).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let dest = match doc_path(&root, &space.id, &n.id) {
+            Ok(p) => p,
+            Err(e) => {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(e);
+            }
+        };
+        if let Err(e) = atomic_write_str(&dest, &body) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e);
+        }
+        imported += 1;
+    }
+
+    // Copy assets (flat files only)
+    let assets_src = source.join("assets");
+    if assets_src.is_dir() {
+        let assets_dst = space_root.join("assets");
+        if let Err(e) = fs::create_dir_all(&assets_dst) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e.to_string());
+        }
+        let entries = match fs::read_dir(&assets_src) {
+            Ok(e) => e,
+            Err(e) => {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(e.to_string());
+            }
+        };
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let meta = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                continue;
+            }
+            let name = ent.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') {
+                continue;
+            }
+            if let Ok(canon) = path.canonicalize() {
+                if !canon.starts_with(source_canon) {
+                    continue;
+                }
+            }
+            if meta.len() > KNOWLEDGE_ASSET_MAX_BYTES {
+                continue;
+            }
+            // Only allowlisted extensions
+            if mime_from_ext(&path).is_none() {
+                continue;
+            }
+            let dest = match safe_join(&assets_dst, &name_str) {
+                Some(p) => p,
+                None => continue,
+            };
+            let _ = fs::copy(&path, &dest);
+        }
+    }
+
+    if let Err(e) = write_json_file(&space_root.join("tree.json"), &tree) {
+        let _ = knowledge_delete_space(
+            app.clone(),
+            DeleteSpaceArgs {
+                id: space.id.clone(),
+            },
+        );
+        return Err(e);
+    }
+
+    Ok(ImportFolderResult {
+        space_id: space.id,
+        imported_docs: imported,
+    })
+}
+
 #[tauri::command]
 pub fn knowledge_import_folder(
     app: AppHandle,
@@ -629,6 +1142,11 @@ pub fn knowledge_import_folder(
     let source_canon = source
         .canonicalize()
         .map_err(|e| format!("cannot resolve sourcePath: {e}"))?;
+
+    if is_hip_portable_layout(&source) {
+        return import_hip_portable_folder(&app, &source, &source_canon);
+    }
+
     let name = source
         .file_name()
         .and_then(|s| s.to_str())
@@ -968,5 +1486,170 @@ mod tests {
         assert!(doc_path(root, "bad", "doc_abc123def456").is_err());
         assert!(doc_path(root, "spc_oktoken1", "nod_notadoc1").is_err());
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn asset_path_rejects_traversal_and_nested() {
+        let root = Path::new("/tmp/kb-assets");
+        assert!(asset_path(root, "spc_oktoken1", "assets/../evil.png").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "../evil.png").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "docs/doc_x.md").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "assets/sub/x.png").is_err());
+        assert!(asset_path(root, "bad", "assets/x.png").is_err());
+        let ok = asset_path(root, "spc_oktoken1", "assets/ast_abc123_x.png").unwrap();
+        assert!(ok.ends_with("assets/ast_abc123_x.png") || ok.ends_with("assets\\ast_abc123_x.png"));
+        let bare = asset_path(root, "spc_oktoken1", "ast_abc123_x.png").unwrap();
+        assert!(bare.to_string_lossy().contains("assets"));
+    }
+
+    #[test]
+    fn mime_allowlist_and_ext() {
+        assert!(allowed_asset_mime("image/png"));
+        assert!(allowed_asset_mime("application/pdf"));
+        assert!(!allowed_asset_mime("image/svg+xml"));
+        assert!(!allowed_asset_mime("text/html"));
+        assert_eq!(mime_from_ext(Path::new("a.PNG")), Some("image/png"));
+        assert_eq!(mime_from_ext(Path::new("a.exe")), None);
+        assert_eq!(ext_for_mime("image/jpeg"), Some("jpg"));
+    }
+
+    #[test]
+    fn sanitize_asset_filename_strips_path_and_controls() {
+        assert_eq!(sanitize_asset_filename("../../x.png"), "x.png");
+        assert_eq!(sanitize_asset_filename("a b.png"), "a_b.png");
+        assert!(!sanitize_asset_filename("").is_empty());
+    }
+
+    #[test]
+    fn import_write_read_asset_roundtrip_helpers() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_assettest01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("assets")).unwrap();
+
+            let png_header: &[u8] = &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+            let rel = "assets/ast_test01_pic.png";
+            let dest = asset_path(&root, space_id, rel).unwrap();
+            atomic_write(&dest, png_header).unwrap();
+            assert!(dest.is_file());
+            assert_eq!(fs::metadata(&dest).unwrap().len(), png_header.len() as u64);
+
+            // Inline cap refusal
+            assert!(KNOWLEDGE_ASSET_INLINE_MAX_BYTES < KNOWLEDGE_ASSET_MAX_BYTES);
+            assert_eq!(KNOWLEDGE_ASSET_INLINE_MAX_BYTES, 1_500_000);
+            assert_eq!(KNOWLEDGE_ASSET_MAX_BYTES, 25 * 1024 * 1024);
+        });
+    }
+
+    #[test]
+    fn portable_zip_layout_structure() {
+        with_temp_root(|base| {
+            use std::io::Read;
+            use zip::ZipArchive;
+
+            let root = base.join("knowledge");
+            let space_id = "spc_ziptest01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("assets")).unwrap();
+            let space = KnowledgeSpace {
+                id: space_id.to_string(),
+                name: "ZipTest".into(),
+                icon: None,
+                created_at: 1,
+                updated_at: 1,
+            };
+            write_json_file(&dir.join("meta.json"), &space).unwrap();
+            let doc_id = "doc_ziptest01";
+            let tree = KnowledgeTreeFile {
+                version: 1,
+                nodes: vec![KnowledgeNode {
+                    id: doc_id.into(),
+                    parent_id: None,
+                    kind: "doc".into(),
+                    title: "Hello".into(),
+                    order: 0,
+                    created_at: 1,
+                    updated_at: 1,
+                }],
+            };
+            write_json_file(&dir.join("tree.json"), &tree).unwrap();
+            atomic_write_str(
+                &doc_path(&root, space_id, doc_id).unwrap(),
+                "![x](assets/ast_ziptest01_a.png)\n",
+            )
+            .unwrap();
+            atomic_write(
+                &asset_path(&root, space_id, "assets/ast_ziptest01_a.png").unwrap(),
+                b"fakepng",
+            )
+            .unwrap();
+            save_index(
+                &root,
+                &KnowledgeIndex {
+                    version: 1,
+                    spaces: vec![space],
+                },
+            )
+            .unwrap();
+
+            // Build portable zip without AppHandle (inline the same layout rules).
+            let dest = base.join("out.zip");
+            {
+                use std::io::Write as _;
+                use zip::write::SimpleFileOptions;
+                use zip::ZipWriter;
+                let file = fs::File::create(&dest).unwrap();
+                let mut zip = ZipWriter::new(file);
+                let opts =
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+                let meta_bytes = fs::read(dir.join("meta.json")).unwrap();
+                zip.start_file("meta.json", opts).unwrap();
+                zip.write_all(&meta_bytes).unwrap();
+                let tree_bytes = fs::read(dir.join("tree.json")).unwrap();
+                zip.start_file("tree.json", opts).unwrap();
+                zip.write_all(&tree_bytes).unwrap();
+                zip.start_file(format!("docs/{doc_id}.md"), opts).unwrap();
+                zip.write_all(b"![x](assets/ast_ziptest01_a.png)\n")
+                    .unwrap();
+                zip.start_file("assets/ast_ziptest01_a.png", opts).unwrap();
+                zip.write_all(b"fakepng").unwrap();
+                zip.finish().unwrap();
+            }
+
+            let f = fs::File::open(&dest).unwrap();
+            let mut archive = ZipArchive::new(f).unwrap();
+            let mut names: Vec<String> = (0..archive.len())
+                .map(|i| archive.by_index(i).unwrap().name().to_string())
+                .collect();
+            names.sort();
+            assert!(names.iter().any(|n| n == "meta.json"));
+            assert!(names.iter().any(|n| n == "tree.json"));
+            assert!(names.iter().any(|n| n == &format!("docs/{doc_id}.md")));
+            assert!(names.iter().any(|n| n == "assets/ast_ziptest01_a.png"));
+            // Not the old human-readable title paths
+            assert!(!names.iter().any(|n| n == "Hello.md"));
+
+            let mut body = String::new();
+            archive
+                .by_name(&format!("docs/{doc_id}.md"))
+                .unwrap()
+                .read_to_string(&mut body)
+                .unwrap();
+            assert!(body.contains("assets/ast_ziptest01_a.png"));
+        });
+    }
+
+    #[test]
+    fn is_hip_portable_layout_detects_tree_and_docs() {
+        with_temp_root(|base| {
+            assert!(!is_hip_portable_layout(base));
+            fs::write(base.join("tree.json"), "{}").unwrap();
+            assert!(!is_hip_portable_layout(base));
+            fs::create_dir_all(base.join("docs")).unwrap();
+            assert!(is_hip_portable_layout(base));
+        });
     }
 }

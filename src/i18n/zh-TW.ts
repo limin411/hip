@@ -984,11 +984,21 @@ export const zhTW = {
         doc: '匯出 Markdown…',
         spaceZip: '匯出空間為 ZIP…',
         docDone: '文件已匯出',
-        spaceDone: '空間已匯出',
+        spaceDone: '空間已匯出（可攜佈局，含附件）',
       },
       import: {
         folder: '匯入資料夾…',
         done: '已匯入 {{count}} 篇文件',
+      },
+      asset: {
+        attach: '插入圖片或 PDF',
+        loading: '圖片載入中…',
+        reveal: '在 Finder 中顯示',
+        tooLargePaste: '圖片過大，無法貼上；請先存成檔案再用「插入」（最大 25 MB）。',
+        tooLargeDisk: '檔案超過 25 MB 附件上限。',
+        unsupported: '不支援的檔案類型。請使用 PNG、JPEG、GIF、WebP 或 PDF。',
+        importFailed: '無法新增附件',
+        placeholder: '圖片不可用',
       },
       folder: {
         untitled: '新增資料夾',

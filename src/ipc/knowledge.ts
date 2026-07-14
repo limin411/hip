@@ -75,3 +75,58 @@ export async function knowledgeImportFolder(
 export async function knowledgeRevealDoc(spaceId: string, docId: string): Promise<void> {
   await invoke('knowledge_reveal_doc', { args: { spaceId, docId } })
 }
+
+// ── Assets (P1.5) ─────────────────────────────────────────────────────────
+
+export type KnowledgeAssetMeta = {
+  relPath: string
+  mime: string
+  byteLength: number
+}
+
+export type KnowledgeAssetData = {
+  mime: string
+  base64: string
+}
+
+/** Path import — disk cap 25MB; returns meta only (no file bytes). */
+export async function knowledgeImportAssetFromPath(
+  spaceId: string,
+  sourcePath: string,
+): Promise<KnowledgeAssetMeta> {
+  return invoke<KnowledgeAssetMeta>('knowledge_import_asset_from_path', {
+    args: { spaceId, sourcePath },
+  })
+}
+
+/** Paste/bytes import — raw ≤ 1.5MB; returns meta only (no base64 echo). */
+export async function knowledgeImportAssetBytes(
+  spaceId: string,
+  args: { base64: string; fileName: string; mime: string },
+): Promise<KnowledgeAssetMeta> {
+  return invoke<KnowledgeAssetMeta>('knowledge_import_asset_bytes', {
+    args: { spaceId, base64: args.base64, fileName: args.fileName, mime: args.mime },
+  })
+}
+
+/** Preview data URL path — refuses oversize inline. */
+export async function knowledgeReadAssetData(
+  spaceId: string,
+  relPath: string,
+): Promise<KnowledgeAssetData> {
+  return invoke<KnowledgeAssetData>('knowledge_read_asset_data', {
+    args: { spaceId, relPath },
+  })
+}
+
+export async function knowledgeAssetAbsPath(
+  spaceId: string,
+  relPath: string,
+): Promise<{ absolutePath: string }> {
+  return invoke('knowledge_asset_abs_path', { args: { spaceId, relPath } })
+}
+
+/** Reveal docs/… or assets/… under space (safe_join). */
+export async function knowledgeRevealPath(spaceId: string, relPath: string): Promise<void> {
+  await invoke('knowledge_reveal_path', { args: { spaceId, relPath } })
+}

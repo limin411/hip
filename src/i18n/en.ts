@@ -990,11 +990,22 @@ export const en = {
         doc: 'Export Markdown…',
         spaceZip: 'Export space as ZIP…',
         docDone: 'Document exported',
-        spaceDone: 'Space exported',
+        spaceDone: 'Space exported (portable layout with assets)',
       },
       import: {
         folder: 'Import folder…',
         done: 'Imported {{count}} documents',
+      },
+      asset: {
+        attach: 'Attach image or PDF',
+        loading: 'Loading image…',
+        reveal: 'Reveal in Finder',
+        tooLargePaste:
+          'Image too large to paste; save the file and use Attach (up to 25 MB).',
+        tooLargeDisk: 'File exceeds the 25 MB attachment limit.',
+        unsupported: 'Unsupported file type. Use PNG, JPEG, GIF, WebP, or PDF.',
+        importFailed: 'Could not attach file',
+        placeholder: 'Image unavailable',
       },
       folder: {
         untitled: 'New folder',

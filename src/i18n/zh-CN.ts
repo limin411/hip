@@ -984,11 +984,21 @@ export const zhCN = {
         doc: '导出 Markdown…',
         spaceZip: '导出空间为 ZIP…',
         docDone: '文档已导出',
-        spaceDone: '空间已导出',
+        spaceDone: '空间已导出（便携布局，含附件）',
       },
       import: {
         folder: '导入文件夹…',
         done: '已导入 {{count}} 篇文档',
+      },
+      asset: {
+        attach: '插入图片或 PDF',
+        loading: '图片加载中…',
+        reveal: '在访达中显示',
+        tooLargePaste: '图片过大，无法粘贴；请先保存为文件再用「插入」（最大 25 MB）。',
+        tooLargeDisk: '文件超过 25 MB 附件上限。',
+        unsupported: '不支持的文件类型。请使用 PNG、JPEG、GIF、WebP 或 PDF。',
+        importFailed: '无法添加附件',
+        placeholder: '图片不可用',
       },
       folder: {
         untitled: '新建文件夹',

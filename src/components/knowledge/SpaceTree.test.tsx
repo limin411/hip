@@ -70,7 +70,7 @@ describe('SpaceTree selection visuals', () => {
     cleanup()
   })
 
-  it('marks the active doc row with FileTree selection classes and no inset bar', () => {
+  it('marks the active doc row with soft accent selection and no inset bar', () => {
     render(
       <SpaceTree
         onRename={noop}
@@ -81,15 +81,17 @@ describe('SpaceTree selection visuals', () => {
     )
 
     const active = screen.getByTestId('knowledge-tree-doc-doc_1')
-    expect(active.className).toContain('bg-accent-active')
+    // Scheme A: soft accent wash (not hard gray accent-active slab)
+    expect(active.className).toContain('bg-accent/10')
     expect(active.className).toContain('text-accent-strong')
     expect(active.className).toContain('font-medium')
     expect(active.className).not.toMatch(/inset/)
     expect(active.className).not.toContain('shadow-[inset')
+    expect(active.className).not.toContain('bg-accent-active')
 
     const inactive = screen.getByTestId('knowledge-tree-doc-doc_2')
-    expect(inactive.className).not.toContain('bg-accent-active')
-    expect(inactive.className).toContain('hover:bg-surface-muted')
+    expect(inactive.className).not.toContain('bg-accent/10')
+    expect(inactive.className).toContain('hover:bg-state-hover')
   })
 
   it('does not apply selection classes when no doc is active', () => {
@@ -104,9 +106,9 @@ describe('SpaceTree selection visuals', () => {
     )
 
     const row = screen.getByTestId('knowledge-tree-doc-doc_1')
-    expect(row.className).not.toContain('bg-accent-active')
+    expect(row.className).not.toContain('bg-accent/10')
     expect(row.className).not.toMatch(/inset/)
-    expect(row.className).toContain('hover:bg-surface-muted')
+    expect(row.className).toContain('hover:bg-state-hover')
   })
 })
 

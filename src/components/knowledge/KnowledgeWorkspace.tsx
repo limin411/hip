@@ -424,9 +424,14 @@ export function KnowledgeWorkspace() {
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-surface-subtle">
-        {/* Space identity + actions */}
-        <div className="flex flex-col gap-3 border-b border-border px-3 pb-3 pt-3">
+      {/* Scheme A: same surface as main, soft gradient edge (no gray slab / hard border). */}
+      <aside className="relative flex w-[280px] shrink-0 flex-col bg-surface">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-px bg-gradient-to-b from-transparent via-border/50 to-transparent"
+        />
+        {/* Space identity + actions — no hard header rule */}
+        <div className="flex flex-col gap-3 px-3 pb-2 pt-3">
           <div className="flex items-start gap-1">
             <button
               type="button"
@@ -440,7 +445,7 @@ export function KnowledgeWorkspace() {
             </button>
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-surface shadow-[0_1px_0_rgba(17,17,17,0.04)]">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted">
                   {space?.icon ? (
                     <span className="text-base leading-none">{space.icon}</span>
                   ) : (
@@ -541,14 +546,14 @@ export function KnowledgeWorkspace() {
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 rounded-lg border-border/80 bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary/80"
+              className="h-8 rounded-lg border-transparent bg-surface-muted/70 pl-8 text-meta shadow-none placeholder:text-ink-tertiary/80 focus-visible:border-transparent focus-visible:bg-surface-muted focus-visible:ring-accent/20"
             />
           </div>
         </div>
 
         {/* Tree section */}
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-3">
+          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-2">
             <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">
               {t('knowledge.tree.sectionLabel')}
             </span>

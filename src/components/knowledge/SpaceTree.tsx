@@ -307,13 +307,13 @@ export function SpaceTree({
         className={cn(
           'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none',
           isActiveDoc
-            ? 'bg-accent-active font-medium text-accent-strong'
-            : 'text-ink hover:bg-surface-muted',
-          isFocused && !isActiveDoc && 'bg-surface-muted ring-1 ring-accent/30',
+            ? 'bg-accent/10 font-medium text-accent-strong'
+            : 'text-ink hover:bg-state-hover',
+          isFocused && !isActiveDoc && 'bg-state-hover ring-1 ring-accent/25',
           draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
-            'ring-1 ring-accent/45 bg-state-hover',
+            'ring-1 ring-accent/40 bg-accent/5',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'before' &&
             'border-t-2 border-accent',
@@ -329,7 +329,7 @@ export function SpaceTree({
             <span
               key={i}
               aria-hidden
-              className="pointer-events-none absolute top-0 bottom-0 w-px bg-border/70"
+              className="pointer-events-none absolute top-0 bottom-0 w-px bg-border/40"
               style={{ left: i * DEPTH_STEP + BASE_PAD + 10 }}
             />
           ))}

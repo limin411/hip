@@ -949,7 +949,7 @@ export const en = {
       title: 'Knowledge base',
       home: {
         subtitle: 'Local spaces · folder tree · Markdown',
-        searchPlaceholder: 'Search titles, body, and paths…',
+        searchPlaceholder: 'Search titles, body, tags, and paths…',
         mySpaces: 'My spaces',
         recent: 'Recent',
         docCount_one: '{{count}} document',
@@ -962,6 +962,12 @@ export const en = {
         searchResults: 'Search results',
         searchEmpty: 'No documents match your search.',
         searchIndexing: 'Building search index…',
+        searchIndexingProgress: 'Building search index… {{done}}/{{total}}',
+        searchIndexingProgressSpace:
+          'Building search index… {{done}}/{{total}} · {{space}}',
+        filterTags: 'Tags',
+        filterStatus: 'Status',
+        filterClear: 'Clear filters',
       },
       space: {
         nameLabel: 'Name',
@@ -1047,6 +1053,8 @@ export const en = {
         brokenHint: 'Broken link: “{{title}}” — click to create',
         openHint: 'Open “{{title}}”',
         noMatches: 'No matching documents',
+        propertyStatus: 'Status',
+        propertyTags: 'Tags',
       },
       error: {
         generic: 'Something went wrong',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
   loadEditorModePref,
   type EditorMode,
 } from '@/domain/knowledge/editorMode'
+import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -49,6 +50,11 @@ import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 
+/** Lazy so Source-only sessions pay 0 for Milkdown kit. */
+const DocLiveEditor = lazy(() =>
+  import('./DocLiveEditor').then((m) => ({ default: m.DocLiveEditor })),
+)
+
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
   const spaces = useKnowledgeStore((s) => s.spaces)
@@ -56,6 +62,7 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editorMode = useKnowledgeStore((s) => s.editorMode)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
@@ -139,8 +146,12 @@ export function KnowledgeWorkspace() {
   // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
   const parentForNew: string | null = activeNode?.parentId ?? null
 
-  // Live option only when flag on; no Milkdown host yet — live falls back to Source CM.
+  // Live option only when flag on; parse failures force Source for the session.
   const liveEnabled = isKnowledgeLiveEnabled()
+  /** Doc ids that failed Live parse this session — stay on Source. */
+  const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
+    {},
+  )
   const modeOptions = useMemo(() => {
     if (liveEnabled) {
       return [
@@ -157,8 +168,23 @@ export function KnowledgeWorkspace() {
   }, [liveEnabled, t])
   const toggleMode: EditorMode =
     editorMode === 'live' && !liveEnabled ? 'source' : editorMode
-  // Live has no Milkdown host yet (PR-09): treat live like source → CodeMirror.
-  const showSourceEditor = editorMode !== 'preview'
+  const bodyLen = Math.max(docBody.length, draftBody.length)
+  const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
+  const showLiveEditor =
+    editorMode === 'live' &&
+    liveEnabled &&
+    !liveBlocked &&
+    bodyLen <= KNOWLEDGE_LARGE_DOC_CHARS
+  const showSourceEditor = editorMode !== 'preview' && !showLiveEditor
+  const showPreview = editorMode === 'preview'
+
+  const onLiveParseError = () => {
+    toast.error(t('knowledge.doc.liveParseFailed'))
+    if (activeDocId) {
+      setLiveBlockedDocIds((prev) => ({ ...prev, [activeDocId]: true }))
+    }
+    void setEditorMode('source')
+  }
 
   const exportActiveDoc = async () => {
     if (!activeSpaceId || !activeDocId) return
@@ -471,6 +497,37 @@ export function KnowledgeWorkspace() {
               }}
             />
           </div>
+        ) : showLiveEditor ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <KnowledgeDocCanvas className="min-h-0 flex-1">
+              <InlineDocTitle
+                docId={activeDocId}
+                title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                onCommit={(title) => void renameNode(activeDocId, title)}
+              />
+              <Suspense
+                fallback={
+                  <div
+                    className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
+                    data-testid="knowledge-doc-live-loading"
+                  >
+                    {t('knowledge.doc.liveLoading')}
+                  </div>
+                }
+              >
+                <DocLiveEditor
+                  key={`${activeDocId}-live`}
+                  docId={activeDocId}
+                  initialMarkdown={draftBody}
+                  onDraftChange={setDraftBody}
+                  onBlur={() => void flushSave()}
+                  onSave={() => void flushSave()}
+                  onParseError={onLiveParseError}
+                  placeholder={t('knowledge.doc.placeholder')}
+                />
+              </Suspense>
+            </KnowledgeDocCanvas>
+          </div>
         ) : showSourceEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas className="min-h-0 flex-1">
@@ -487,7 +544,7 @@ export function KnowledgeWorkspace() {
                 ref={editorRef}
                 key={`${activeDocId}-source`}
                 docId={activeDocId}
-                initialValue={docBody}
+                initialValue={draftBody}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
@@ -495,7 +552,7 @@ export function KnowledgeWorkspace() {
               />
             </KnowledgeDocCanvas>
           </div>
-        ) : (
+        ) : showPreview ? (
           <div className="min-h-0 flex-1 overflow-y-auto pb-24">
             <KnowledgeDocCanvas>
               <InlineDocTitle
@@ -510,7 +567,7 @@ export function KnowledgeWorkspace() {
               />
             </KnowledgeDocCanvas>
           </div>
-        )}
+        ) : null}
       </main>
 
       <Modal

@@ -24,7 +24,9 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), message: vi.fn() },
+}))
 
 vi.mock('@/i18n', () => ({
   default: {
@@ -94,6 +96,17 @@ describe('knowledgeStore openDoc editorMode default', () => {
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
+  })
+
+  it('openDoc forces source when live flag on but body is large', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
+    const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
+    const big = 'y'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10)
+    knowledgeReadDoc.mockResolvedValueOnce(big)
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().docBody.length).toBe(big.length)
+    expect(toast.message).toHaveBeenCalled()
   })
 })
 
@@ -587,6 +600,19 @@ describe('knowledgeStore setEditorMode', () => {
     expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty-in-source')
     expect(useKnowledgeStore.getState().docBody).toBe('dirty-in-source')
     vi.useRealTimers()
+  })
+
+  it('setEditorMode live clamps to source when body exceeds large-doc threshold', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
+    const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
+    const big = 'x'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 1)
+    useKnowledgeStore.setState({
+      editorMode: 'source',
+      docBody: big,
+      draftBody: big,
+    })
+    await useKnowledgeStore.getState().setEditorMode('live')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 })
 

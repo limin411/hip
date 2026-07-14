@@ -1034,6 +1034,10 @@ export const en = {
         loadFailed: 'Could not load document',
         saving: 'Saving…',
         saved: 'Saved',
+        liveLoading: 'Loading live editor…',
+        liveParseFailed: 'Live editor could not open this document. Switched to Source.',
+        largeDocForceSource:
+          'Document is too large for Live edit. Switched to Source.',
       },
       error: {
         generic: 'Something went wrong',

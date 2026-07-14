@@ -1028,6 +1028,9 @@ export const zhTW = {
         loadFailed: '無法載入文件',
         saving: '儲存中…',
         saved: '已儲存',
+        liveLoading: '正在載入即時編輯器…',
+        liveParseFailed: '即時編輯器無法開啟此文件，已切換到原始碼模式。',
+        largeDocForceSource: '文件過大，即時編輯不可用，已切換到原始碼模式。',
       },
       error: {
         generic: '出了點問題',

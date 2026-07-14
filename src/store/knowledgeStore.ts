@@ -28,6 +28,7 @@ import {
   resolveEditorMode,
   shouldAutosave,
 } from '@/domain/knowledge/editorMode'
+import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
@@ -616,7 +617,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      const editorMode = resolveEditorMode(loadEditorModePref())
+      let editorMode = resolveEditorMode(loadEditorModePref())
+      // Large docs force Source (Live / Milkdown cost); toast once per open.
+      if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
+        editorMode = 'source'
+        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
+      }
       set({
         activeDocId: id,
         docBody: body,
@@ -647,7 +653,14 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   setEditorMode: async (mode) => {
-    const next = resolveEditorMode(mode)
+    let next = resolveEditorMode(mode)
+    if (next === 'live') {
+      const len = Math.max(get().draftBody.length, get().docBody.length)
+      if (len > KNOWLEDGE_LARGE_DOC_CHARS) {
+        toast.message(i18n.t('knowledge.doc.largeDocForceSource'))
+        next = 'source'
+      }
+    }
     if (next === get().editorMode) return
     if (next === 'preview') {
       await get().flushSave()

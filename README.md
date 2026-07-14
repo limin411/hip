@@ -92,8 +92,42 @@ yarn tauri dev
 | `yarn tauri dev` | Run the full desktop app in dev mode |
 | `yarn sidecar:dev` | Run the sidecar WS server standalone (prints its port) |
 | `yarn sidecar:dev-bin` | (Re)generate the dev sidecar wrapper in `src-tauri/binaries/` |
+| `yarn cli:dev` | Run the headless CLI (`hip version` / `hip doctor` / `hip run`) |
+| `yarn cli:test` | CLI unit tests (settle / isolation / HITL, no paid LLM) |
 | `yarn type-check` | Type-check the frontend |
 | `yarn workspace @hip/sidecar type-check` | Type-check the sidecar |
+
+### Headless CLI (`@hip/cli`)
+
+Thin client over the same Node sidecar (no Tauri). Design: [`docs/superpowers/specs/2026-07-14-hip-cli-design.md`](docs/superpowers/specs/2026-07-14-hip-cli-design.md).
+
+```bash
+# Health: spawn sidecar, handshake, report hasApiKey
+yarn cli:dev doctor
+
+# Auth keys present? (never prints secrets)
+yarn cli:dev config auth-status
+
+# One-shot harness run (isolates HIP_*; writes HipRunResult JSON + optional artifacts)
+yarn cli:dev run --preset harness --stream none \
+  --json --output /tmp/hip-out/result.json \
+  --out-dir /tmp/hip-out \
+  "Reply with exactly: pong"
+
+# Human stream modes: text | tools | all | none
+yarn cli:dev run --stream all "summarize README.md"
+
+# Acceptance demo (exit 0 on ok, or no-key preflight)
+scripts/hip-run-harness-demo.sh
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--preset harness` | full isolation + `permissionMode=full` + `disablePlan` + auto HITL |
+| `--json` / `--output` | Harness ABI result JSON |
+| `--out-dir` | `result.json`, `trace.jsonl`, `patch.diff`, `usage.json` |
+| `--stream` | Human transcript FD rules (JSON still isolated) |
+| `--trace-raw` | Disable secret redaction in `trace.jsonl` |
 
 ## Recommended IDE Setup
 

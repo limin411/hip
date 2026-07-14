@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx src/main.ts",
     "build": "ncc build src/main.ts -o dist",

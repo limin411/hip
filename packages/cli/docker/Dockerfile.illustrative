@@ -1,0 +1,30 @@
+# ILLUSTRATIVE ONLY — not a verified production image (design PR6 spike).
+# Prefer multi-stage: build ncc sidecar + cli on a builder, copy dist only.
+#
+# Expected runtime layout (concept):
+#   /app/packages/cli/dist
+#   /app/packages/sidecar/dist
+#   HIP_SIDECAR_BIN=/app/packages/sidecar/dist/index.js
+#
+# Do NOT copy the full monorepo yarn install (React/Tauri/WDIO).
+
+FROM node:22-bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Placeholder: copy prebuilt artifacts from CI/builder stage
+# COPY packages/cli/dist ./packages/cli/dist
+# COPY packages/sidecar/dist ./packages/sidecar/dist
+# COPY packages/protocol ./packages/protocol
+# COPY packages/cli/package.json packages/cli/
+# RUN npm install --omit=dev ws commander  # or yarn focus
+
+ENV HIP_SIDECAR_BIN=/app/packages/sidecar/dist/index.js
+ENV HIP_DATA_DIR=/hip-data
+ENV HOME=/hip-data
+
+ENTRYPOINT ["node", "/app/packages/cli/dist/bin.js"]
+CMD ["run", "--preset", "harness", "--stream", "none", "--json"]

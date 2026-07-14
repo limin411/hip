@@ -152,8 +152,15 @@ function indexCurrentDoc(
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let saveChain: Promise<boolean> = Promise.resolve(true)
 
+function cancelScheduledSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+}
+
 function scheduleSave(get: () => KnowledgeState) {
-  if (saveTimer) clearTimeout(saveTimer)
+  cancelScheduledSave()
   saveTimer = setTimeout(() => {
     saveTimer = null
     void get().flushSave()
@@ -431,6 +438,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   createDoc: async (parentId, title) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
+    // Flush-gate before creating so a failed dirty save cannot orphan a new empty doc.
+    const flushed = await get().flushSave()
+    if (!flushed) return
     set({ busy: true })
     try {
       const now = Date.now()
@@ -632,14 +642,12 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const editing = get().editing
     const persist = opts?.persist ?? (editing ? 'auto' : 'none')
     if (persist === 'auto') scheduleSave(get)
-    if (persist === 'now') void get().flushSave()
+    else if (persist === 'now') void get().flushSave()
+    else cancelScheduledSave() // 'none': draft only; drop any pending autosave
   },
 
   flushSave: () => {
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
+    cancelScheduledSave()
     const run = async (): Promise<boolean> => {
       const s = get()
       if (!s.activeSpaceId || !s.activeDocId) return true

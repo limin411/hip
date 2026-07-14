@@ -341,6 +341,33 @@ describe('knowledgeStore flush-abort navigation', () => {
     expect(knowledgeGetTree).not.toHaveBeenCalled()
   })
 
+  it('openSpace switches after successful flush', async () => {
+    knowledgeWriteDoc.mockResolvedValueOnce(undefined)
+    knowledgeGetTree.mockResolvedValueOnce({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_t',
+          parentId: null,
+          kind: 'doc',
+          title: 'T',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+
+    await useKnowledgeStore.getState().openSpace('spc_2')
+
+    const s = useKnowledgeStore.getState()
+    expect(s.activeSpaceId).toBe('spc_2')
+    expect(s.mode).toBe('workspace')
+    expect(s.activeDocId).toBeNull()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_a', 'dirty-a')
+    expect(knowledgeGetTree).toHaveBeenCalledWith('spc_2')
+  })
+
   it('openHome aborts when flush fails and stays in workspace', async () => {
     knowledgeWriteDoc.mockRejectedValueOnce(new Error('write failed'))
 
@@ -428,9 +455,8 @@ describe('knowledgeStore setDraftBody persist modes', () => {
 
   it('persist now flushes immediately even when not editing', async () => {
     useKnowledgeStore.getState().setDraftBody('- [x] task', { persist: 'now' })
-    // flushSave is async; drain microtasks
-    await Promise.resolve()
-    await Promise.resolve()
+    // Drain saveChain: setDraftBody fire-and-forgets flushSave; chaining awaits completion.
+    await useKnowledgeStore.getState().flushSave()
     expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', '- [x] task')
     expect(useKnowledgeStore.getState().docBody).toBe('- [x] task')
     expect(useKnowledgeStore.getState().draftBody).toBe('- [x] task')
@@ -442,6 +468,16 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     await vi.advanceTimersByTimeAsync(600)
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(useKnowledgeStore.getState().draftBody).toBe('no-save')
+    expect(useKnowledgeStore.getState().docBody).toBe('saved')
+  })
+
+  it('persist none cancels a pending auto schedule', async () => {
+    useKnowledgeStore.setState({ editing: true })
+    useKnowledgeStore.getState().setDraftBody('a') // schedules autosave
+    useKnowledgeStore.getState().setDraftBody('b', { persist: 'none' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().draftBody).toBe('b')
     expect(useKnowledgeStore.getState().docBody).toBe('saved')
   })
 })

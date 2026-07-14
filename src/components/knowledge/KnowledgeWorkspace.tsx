@@ -753,10 +753,6 @@ export function KnowledgeWorkspace() {
                 </Button>
               </div>
               <DocPropertiesRow body={draftBody} />
-              <MarkdownToolbar
-                getView={() => editorRef.current?.getView() ?? null}
-                onAfterEdit={(text) => setDraftBody(text)}
-              />
               <DocEditor
                 ref={editorRef}
                 key={`${activeDocId}-source`}

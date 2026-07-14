@@ -193,6 +193,29 @@ describe('SessionService', () => {
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
+  it('session:list:result forces knowledge/settings/history back to chat New Conversation', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({
+      openSessionIds: ['keep-chat'],
+      activeView: 'knowledge',
+      knowledgeTabOpen: true,
+      chatSessionId: 'keep-chat',
+    })
+
+    t.push({
+      type: 'session:list:result',
+      sessions: [
+        { id: 'keep-chat', title: 'Chat', preview: '', updatedAt: 2, messageCount: 1, surface: 'chat' },
+      ],
+    })
+
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().knowledgeTabOpen).toBe(false)
+  })
+
   it('session:list:result keeps an already-active session and only prunes missing tabs', () => {
     const t = new FakeTransport()
     new SessionService(t)

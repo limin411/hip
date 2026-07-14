@@ -1,6 +1,12 @@
 // src/store/uiStore.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useUiStore, normalizeAppLanguage, type UiPersistedState } from './uiStore'
+import {
+  useUiStore,
+  normalizeAppLanguage,
+  persistedActiveView,
+  isEphemeralActiveView,
+  type UiPersistedState,
+} from './uiStore'
 
 beforeEach(() => {
   useUiStore.setState({
@@ -316,7 +322,7 @@ describe('uiStore persistence partialize', () => {
       openSessionIds: s.openSessionIds,
       chatSessionId: s.chatSessionId,
       codeSessionId: s.codeSessionId,
-      activeView: s.activeView,
+      activeView: persistedActiveView(s.activeView),
       theme: s.theme,
       language: s.language,
       settingsPage: s.settingsPage,
@@ -338,5 +344,24 @@ describe('uiStore persistence partialize', () => {
     })
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
+  })
+
+  it('does not persist knowledge/settings/history as activeView (cold launch stays on chat)', () => {
+    expect(isEphemeralActiveView('knowledge')).toBe(true)
+    expect(isEphemeralActiveView('settings')).toBe(true)
+    expect(isEphemeralActiveView('history')).toBe(true)
+    expect(isEphemeralActiveView('chat')).toBe(false)
+    expect(isEphemeralActiveView('code')).toBe(false)
+
+    expect(persistedActiveView('knowledge')).toBe('chat')
+    expect(persistedActiveView('settings')).toBe('chat')
+    expect(persistedActiveView('history')).toBe('chat')
+    expect(persistedActiveView('chat')).toBe('chat')
+    expect(persistedActiveView('code')).toBe('code')
+
+    // Simulate partialize while knowledge is open — storage must record chat.
+    useUiStore.setState({ activeView: 'knowledge', knowledgeTabOpen: true })
+    const s = useUiStore.getState()
+    expect(persistedActiveView(s.activeView)).toBe('chat')
   })
 })

@@ -277,6 +277,15 @@ export class SessionService {
     }
 
     // Cold launch / reconnect with no active tab: keep the title-bar tab list, show New Conversation.
+    // Force-clear knowledge/settings/history if a legacy persist left them as activeView.
+    const st = useUiStore.getState()
+    if (
+      st.activeView === 'knowledge' ||
+      st.activeView === 'settings' ||
+      st.activeView === 'history'
+    ) {
+      useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
+    }
     useDomainStore.getState().deselect()
   }
 

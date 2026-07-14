@@ -62,6 +62,16 @@ export type UiPersistedState = {
   checkpointMode: CheckpointMode
 }
 
+/** Settings / history / knowledge are session-ephemeral; cold launch always lands on chat. */
+export function isEphemeralActiveView(v: ActiveView): boolean {
+  return v === 'settings' || v === 'history' || v === 'knowledge'
+}
+
+/** Value written to hip-ui for activeView — never persist special shells. */
+export function persistedActiveView(v: ActiveView): ActiveView {
+  return isEphemeralActiveView(v) ? 'chat' : v
+}
+
 interface UiState {
   settingsNavCollapsed: boolean
   setSettingsNavCollapsed: (v: boolean) => void
@@ -232,7 +242,9 @@ export const useUiStore = create<UiState>()(
         openSessionIds: s.openSessionIds,
         chatSessionId: s.chatSessionId,
         codeSessionId: s.codeSessionId,
-        activeView: s.activeView,
+        // Never write knowledge/settings/history — otherwise cold launch reopens that shell
+        // instead of New Conversation (chat).
+        activeView: persistedActiveView(s.activeView),
         theme: s.theme,
         language: s.language,
         settingsPage: s.settingsPage,
@@ -247,13 +259,10 @@ export const useUiStore = create<UiState>()(
         if (state.language !== lang) {
           useUiStore.setState({ language: lang })
         }
+        // Belt-and-suspenders for legacy hip-ui blobs that still stored special views.
         // Cold launch always lands on New Conversation (chat surface). Title-bar open tabs
         // are restored separately via openSessionIds; settings/history/knowledge are not.
-        if (
-          state.activeView === 'knowledge' ||
-          state.activeView === 'settings' ||
-          state.activeView === 'history'
-        ) {
+        if (isEphemeralActiveView(state.activeView)) {
           useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
         }
       },

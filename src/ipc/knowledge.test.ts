@@ -29,6 +29,24 @@ describe('knowledge IPC', () => {
     expect(knowledgeErrorMessage('y')).toBe('y')
   })
 
+  it('knowledgeWriteDoc honors e2e write-fail seam without invoking tauri', async () => {
+    const { knowledgeWriteDoc } = await import('./knowledge.js')
+    const w = globalThis as unknown as {
+      __hipKnowledgeWriteFail?: boolean | ((s: string, d: string) => boolean)
+    }
+    w.__hipKnowledgeWriteFail = true
+    await expect(knowledgeWriteDoc('spc_1', 'doc_1', 'x')).rejects.toThrow(/e2e knowledge write fail/)
+    expect(invoke).not.toHaveBeenCalled()
+    w.__hipKnowledgeWriteFail = (s, d) => s === 'spc_1' && d === 'doc_a'
+    await expect(knowledgeWriteDoc('spc_1', 'doc_a', 'y')).rejects.toThrow(/e2e knowledge write fail/)
+    invoke.mockResolvedValueOnce(undefined)
+    await knowledgeWriteDoc('spc_1', 'doc_b', 'z')
+    expect(invoke).toHaveBeenCalledWith('knowledge_write_doc', {
+      args: { spaceId: 'spc_1', docId: 'doc_b', body: 'z' },
+    })
+    delete w.__hipKnowledgeWriteFail
+  })
+
   it('asset IPC wrappers pass camelCase args and never echo bytes on import', async () => {
     const {
       knowledgeImportAssetFromPath,

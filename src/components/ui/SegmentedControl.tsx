@@ -40,6 +40,8 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="tab"
             aria-selected={selected}
+            data-mode={opt.value}
+            data-testid={dataTestId ? `${dataTestId}-${opt.value}` : undefined}
             onClick={() => onChange(opt.value)}
             className={cn(
               'rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',

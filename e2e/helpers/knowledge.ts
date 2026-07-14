@@ -935,3 +935,194 @@ export async function exportActiveDocTo(destPath: string): Promise<void> {
     { timeout: 15000, interval: 300, timeoutMsg: `export md not written: ${destPath}` },
   )
 }
+
+// ── Phase 0/1 helpers (Batch A–D) ─────────────────────────────────────────
+
+export type KnowledgeEditorMode = 'live' | 'source' | 'preview'
+
+/**
+ * Force next/all knowledge_write_doc calls to fail (flush-abort tests).
+ * Uses globalThis/window seam in src/ipc/knowledge.ts.
+ */
+export async function installWriteFailSeam(): Promise<void> {
+  await browser.execute(() => {
+    ;(window as unknown as { __hipKnowledgeWriteFail?: boolean }).__hipKnowledgeWriteFail = true
+  })
+}
+
+export async function clearWriteFailSeam(): Promise<void> {
+  await browser.execute(() => {
+    delete (window as unknown as { __hipKnowledgeWriteFail?: unknown }).__hipKnowledgeWriteFail
+  })
+}
+
+/** Select editor mode via SegmentedControl data-testid tabs. */
+export async function setKnowledgeEditorMode(mode: KnowledgeEditorMode): Promise<void> {
+  const tab = await browser.$(`[data-testid="knowledge-edit-toggle-${mode}"]`)
+  // Flag-off UI only has source+preview; live tab may be absent.
+  if (!(await tab.isExisting()) && mode === 'live') {
+    throw new Error('Live mode tab not present (hip-knowledge-live flag off)')
+  }
+  // When flag off, "source" maps to Edit tab testid knowledge-edit-toggle-source
+  const fallback =
+    mode === 'source'
+      ? await browser.$('[data-testid="knowledge-edit-toggle-source"]')
+      : tab
+  const el = (await tab.isExisting()) ? tab : fallback
+  await el.waitForExist({ timeout: 10000 })
+  await browser.execute((node: HTMLElement) => node.click(), el)
+  await browser.pause(150)
+}
+
+export async function ensureKnowledgeSource(): Promise<void> {
+  await setKnowledgeEditorMode('source')
+  await expectKnowledgeEditor()
+}
+
+export async function ensureKnowledgePreview(): Promise<void> {
+  await setKnowledgeEditorMode('preview')
+  await expectNoKnowledgeEditor()
+  await (await browser.$('[data-testid="knowledge-doc-reader"]')).waitForExist({
+    timeout: 10000,
+  })
+}
+
+/** Type MD then wait for autosave to leave "saving". */
+export async function typeMarkdownAndSave(text: string): Promise<void> {
+  await ensureKnowledgeSource()
+  await typeInKnowledgeEditor(text)
+  await waitForSaveStatusSaved(15000)
+}
+
+/**
+ * In-page marker check (avoids shipping multi-MB getText over WebDriver).
+ * Works for Source CM content or Preview reader.
+ */
+export async function knowledgeSurfaceContainsMarker(marker: string): Promise<boolean> {
+  return browser.execute((m: string) => {
+    const editor = document.querySelector(
+      '[data-testid="knowledge-doc-editor"] .cm-content',
+    ) as HTMLElement | null
+    if (editor?.innerText?.includes(m) || editor?.textContent?.includes(m)) return true
+    const reader = document.querySelector(
+      '[data-testid="knowledge-doc-reader"]',
+    ) as HTMLElement | null
+    if (reader?.innerText?.includes(m) || reader?.textContent?.includes(m)) return true
+    return false
+  }, marker)
+}
+
+export async function waitForKnowledgeMarker(
+  marker: string,
+  timeoutMs = 15000,
+): Promise<void> {
+  await browser.waitUntil(async () => await knowledgeSurfaceContainsMarker(marker), {
+    timeout: timeoutMs,
+    interval: 200,
+    timeoutMsg: `knowledge surface missing marker: ${marker}`,
+  })
+}
+
+/** Click first GFM task checkbox in preview. */
+export async function toggleFirstTaskCheckbox(): Promise<void> {
+  await ensureKnowledgePreview()
+  const box = await browser.$('[data-testid="knowledge-task-checkbox"]')
+  await box.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLInputElement) => {
+    el.click()
+  }, box)
+}
+
+/** Open a tree doc by visible title (substring match on row text). */
+export async function openTreeDocByTitle(title: string): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const tid = await browser.execute((t: string) => {
+        const rows = Array.from(
+          document.querySelectorAll('[data-testid^="knowledge-tree-doc-"]'),
+        ) as HTMLElement[]
+        const row = rows.find((r) => (r.textContent ?? '').includes(t))
+        return row?.getAttribute('data-testid') ?? null
+      }, title)
+      if (!tid) return false
+      await browser.execute((id: string) => {
+        const row = document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null
+        // Open handler is on the inner button, not the row shell.
+        const btn = row?.querySelector('button') as HTMLElement | null
+        ;(btn ?? row)?.click()
+      }, tid)
+      return true
+    },
+    { timeout: 15000, interval: 300, timeoutMsg: `tree doc not found: ${title}` },
+  )
+  await browser.pause(200)
+}
+
+/** Title of the active (aria-selected) tree doc, or null. */
+export async function activeTreeDocTitle(): Promise<string | null> {
+  return browser.execute(() => {
+    const row = document.querySelector(
+      '[data-testid^="knowledge-tree-doc-"][aria-selected="true"]',
+    ) as HTMLElement | null
+    return row?.textContent?.trim() ?? null
+  })
+}
+
+export async function expectSearchGroups(min = 1, timeoutMs = 15000): Promise<void> {
+  await browser.waitUntil(
+    async () => {
+      const groups = await browser.$$('[data-testid="knowledge-search-group"]')
+      return groups.length >= min
+    },
+    { timeout: timeoutMs, interval: 300, timeoutMsg: `expected ≥${min} search groups` },
+  )
+}
+
+/** Click preview wiki link by target title (resolved or broken). */
+export async function clickWikiLinkInPreview(title: string, broken = false): Promise<void> {
+  await ensureKnowledgePreview()
+  const testId = broken ? 'knowledge-wiki-link-broken' : 'knowledge-wiki-link'
+  await browser.waitUntil(
+    async () => {
+      const found = await browser.execute(
+        (tid: string, t: string) => {
+          const links = Array.from(
+            document.querySelectorAll(`[data-testid="${tid}"]`),
+          ) as HTMLElement[]
+          const el = links.find((a) => a.getAttribute('data-wiki-title') === t)
+          if (!el) return false
+          el.click()
+          return true
+        },
+        testId,
+        title,
+      )
+      return found
+    },
+    { timeout: 10000, interval: 200, timeoutMsg: `wiki link not found: ${title} broken=${broken}` },
+  )
+  await browser.pause(200)
+}
+
+export async function confirmWikiCreate(): Promise<void> {
+  const confirm = await browser.$('[data-testid="knowledge-wiki-create-confirm"]')
+  await confirm.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), confirm)
+  await browser.pause(300)
+}
+
+export async function cancelWikiCreate(): Promise<void> {
+  const cancel = await browser.$('[data-testid="knowledge-wiki-create-cancel"]')
+  await cancel.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), cancel)
+  await browser.pause(200)
+}
+
+/** Create a second doc via toolbar (always creates even if editor already open). */
+export async function createNewDocFromMenu(): Promise<void> {
+  await clickMenuItem('knowledge-new-menu', 'knowledge-new-doc')
+  await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
+    timeout: 15000,
+  })
+  await browser.pause(200)
+}

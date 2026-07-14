@@ -52,7 +52,19 @@ export async function knowledgeReadDoc(spaceId: string, docId: string): Promise<
   return invoke<string>('knowledge_read_doc', { args: { spaceId, docId } })
 }
 
+/**
+ * Write doc body. E2E can force failures via `globalThis.__hipKnowledgeWriteFail`
+ * (boolean true, or a function that returns true for this write). In the browser
+ * this is the same object as `window`.
+ */
 export async function knowledgeWriteDoc(spaceId: string, docId: string, body: string): Promise<void> {
+  const fail = (globalThis as unknown as {
+    __hipKnowledgeWriteFail?: boolean | ((spaceId: string, docId: string) => boolean)
+  }).__hipKnowledgeWriteFail
+  const shouldFail = typeof fail === 'function' ? fail(spaceId, docId) : fail === true
+  if (shouldFail) {
+    throw new Error('e2e knowledge write fail')
+  }
   await invoke('knowledge_write_doc', { args: { spaceId, docId, body } })
 }
 

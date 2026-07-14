@@ -95,6 +95,11 @@ Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_
 | `knowledge-lifecycle.spec.ts` | KL: create → disk save → search → export md/zip → **delete space** → chip reopen |
 | `knowledge-home.spec.ts` | KH: multi-space, rename, recent, search empty, delete/cancel |
 | `knowledge-tree-crud.spec.ts` | KT: folder/doc rename, delete, context newDoc |
+| `knowledge-preview.spec.ts` | KP1: Preview GFM task checkbox write-back (no edit mode) |
+| `knowledge-nav.spec.ts` | KN1: flush-fail aborts doc switch; KN2: search groups by space |
+| `knowledge-wiki.spec.ts` | KW1–KW3: `[[title]]` navigate, confirm create, cancel create |
+
+Write-fail seam: `window.__hipKnowledgeWriteFail` (see `installWriteFailSeam` / `src/ipc/knowledge.ts`).
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e
@@ -107,6 +112,9 @@ yarn test:e2e --spec e2e/specs/knowledge-lifecycle.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-home.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-tree-crud.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-editor.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-preview.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-nav.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-wiki.spec.ts
 ```
 
 ## Isolation notes

@@ -1057,6 +1057,14 @@ export const zhCN = {
         liveParseFailed: '实时编辑器无法打开此文档，已切换到源码模式。',
         largeDocForceSource: '文档过大，实时编辑不可用，已切换到源码模式。',
       },
+      wiki: {
+        createTitle: '创建文档？',
+        createBody: '当前空间中没有名为「{{title}}」的文档。现在创建吗？',
+        createConfirm: '创建',
+        brokenHint: '失效链接：「{{title}}」— 点击创建',
+        openHint: '打开「{{title}}」',
+        noMatches: '无匹配文档',
+      },
       error: {
         generic: '出了点问题',
       },

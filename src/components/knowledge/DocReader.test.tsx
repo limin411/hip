@@ -36,6 +36,23 @@ vi.mock('@/domain/knowledge/assetUrl', async (importOriginal) => {
       if (rel.includes('missing')) return null
       return { dataUrl: 'data:image/png;base64,aaa', mime: 'image/png' }
     }),
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { DocReader } from './DocReader'
+vi.mock('react-i18next', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-i18next')>()
+    useTranslation: () => ({
+      t: (key: string, opts?: Record<string, string>) => {
+        if (key === 'knowledge.wiki.brokenHint') return `broken:${opts?.title}`
+        if (key === 'knowledge.wiki.openHint') return `open:${opts?.title}`
+        if (key === 'knowledge.doc.emptyTitle') return 'Empty'
+        if (key === 'knowledge.doc.emptyHint') return 'Hint'
+        if (key === 'knowledge.doc.edit') return 'Edit'
+        return key
+      },
+      i18n: { language: 'en' },
+    initReactI18next: actual.initReactI18next ?? {
+      type: '3rdParty',
+      init: () => {},
   }
 })
 
@@ -216,5 +233,62 @@ describe('DocReader preview tasks + anchors', () => {
     getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
     render(<DocReader content={md} />)
     expect(await screen.findByTestId('knowledge-asset-img-placeholder')).toBeInTheDocument()
+// Avoid chat CodeBlock → context-menu → sessionService graph in unit tests.
+vi.mock('@/components/chat/CodeBlock', () => ({
+  CodeBlock: ({ children }: { children?: React.ReactNode }) => (
+    <pre data-testid="mock-code">{children}</pre>
+  ),
+}))
+afterEach(() => cleanup())
+const nodes = [
+  {
+    id: 'doc_alpha',
+    parentId: null,
+    kind: 'doc' as const,
+    title: 'Alpha',
+    order: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  },
+  {
+    id: 'doc_beta',
+    parentId: null,
+    kind: 'doc' as const,
+    title: 'Beta',
+    order: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  },
+]
+describe('DocReader wiki links', () => {
+  it('renders resolved wiki links as clickable and navigates', () => {
+    const onWikiNavigate = vi.fn()
+      <DocReader
+        content="See [[Alpha]] please."
+        nodes={nodes}
+        onWikiNavigate={onWikiNavigate}
+      />,
+    const link = screen.getByTestId('knowledge-wiki-link')
+    expect(link).toHaveTextContent('Alpha')
+    fireEvent.click(link)
+    expect(onWikiNavigate).toHaveBeenCalledWith('doc_alpha')
+  it('renders broken style and requests create', () => {
+    const onWikiBroken = vi.fn()
+      <DocReader
+        content="Missing [[Ghost]]"
+        nodes={nodes}
+        onWikiBroken={onWikiBroken}
+      />,
+    const link = screen.getByTestId('knowledge-wiki-link-broken')
+    expect(link.className).toMatch(/text-danger/)
+    fireEvent.click(link)
+    expect(onWikiBroken).toHaveBeenCalledWith('Ghost')
+  it('uses pipe display text', () => {
+      <DocReader
+        content="[[Alpha|Shown]]"
+        nodes={nodes}
+        onWikiNavigate={() => {}}
+      />,
+    expect(screen.getByTestId('knowledge-wiki-link')).toHaveTextContent('Shown')
   })
 })

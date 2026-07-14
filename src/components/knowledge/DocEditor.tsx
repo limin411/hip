@@ -32,6 +32,8 @@ import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
   importAssetFromClipboardItems,
   importAssetFromFile,
 } from '@/domain/knowledge/importAsset'
+import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -47,6 +49,8 @@ export interface DocEditorProps {
   /** Toast/surface import failures (too large, unsupported). */
   onAssetImportError?: (reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error') => void
   onAssetImported?: () => void
+  /** Current space nodes for `[[` wiki title completion (same space). */
+  wikiNodes?: KnowledgeNode[]
 }
 
 export type DocEditorHandle = {
@@ -206,6 +210,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     spaceId,
     onAssetImportError,
     onAssetImported,
+    wikiNodes,
   },
   ref,
 ) {
@@ -246,12 +251,15 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onAssetImportErrorRef.current = onAssetImportError
   const onAssetImportedRef = useRef(onAssetImported)
   onAssetImportedRef.current = onAssetImported
+  const wikiNodesRef = useRef(wikiNodes ?? [])
+  wikiNodesRef.current = wikiNodes ?? []
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
   }))
 
   // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
+  // Wiki nodes are read via ref so the completion source stays fresh without rebuild.
   const extensions = useMemo(() => {
     const insertMarkdown = (view: EditorView, md: string) => {
       // Prefer surrounding newlines so the image is on its own line when mid-paragraph.
@@ -404,6 +412,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       slashTracker,
       assetHandlers,
       highlightSelectionMatches(),
+      wikiLinkAutocomplete(() => wikiNodesRef.current),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
   }, [themeCompartment, updateSlashMatch])
@@ -524,6 +533,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           highlightActiveLine: false,
           highlightSelectionMatches: false,
           bracketMatching: true,
+          // Wiki picker uses wikiLinkAutocomplete extension; keep default off to avoid double UI.
           autocompletion: false,
         }}
         placeholder={placeholder}

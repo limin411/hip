@@ -52,6 +52,7 @@ import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
+import { WikiCreateModal } from './WikiCreateModal'
 
 /** Lazy so Source-only sessions pay 0 for Milkdown kit. */
 const DocLiveEditor = lazy(() =>
@@ -146,8 +147,11 @@ export function KnowledgeWorkspace() {
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
+  /** Broken wiki link → confirm create (K20). Never silent. */
+  const [wikiCreateTitle, setWikiCreateTitle] = useState<string | null>(null)
 
   // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
+  // Wiki create-on-confirm uses the same parent (resolveParentForNew = parentForNew).
   const parentForNew: string | null = activeNode?.parentId ?? null
 
   // Live option only when flag on; parse failures force Source for the session.
@@ -574,6 +578,7 @@ export function KnowledgeWorkspace() {
                   onSave={() => void flushSave()}
                   onParseError={onLiveParseError}
                   placeholder={t('knowledge.doc.placeholder')}
+                  wikiNodes={nodes}
                 />
               </Suspense>
             </KnowledgeDocCanvas>
@@ -618,6 +623,7 @@ export function KnowledgeWorkspace() {
                 onSave={() => void flushSave()}
                 onAssetImportError={toastAssetError}
                 placeholder={t('knowledge.doc.placeholder')}
+                wikiNodes={nodes}
               />
             </KnowledgeDocCanvas>
           </div>
@@ -636,6 +642,9 @@ export function KnowledgeWorkspace() {
                 // Prefer draft so preview task toggles are optimistic before flush.
                 content={draftBody || docBody}
                 onStartEdit={() => void setEditing(true)}
+                nodes={nodes}
+                onWikiNavigate={(docId) => void openDoc(docId)}
+                onWikiBroken={(title) => setWikiCreateTitle(title)}
               />
             </KnowledgeDocCanvas>
           </div>
@@ -832,6 +841,21 @@ export function KnowledgeWorkspace() {
           </p>
         </div>
       </Modal>
+
+      <WikiCreateModal
+        open={wikiCreateTitle != null}
+        title={wikiCreateTitle ?? ''}
+        busy={busy}
+        onOpenChange={(o) => {
+          if (!o) setWikiCreateTitle(null)
+        }}
+        onConfirm={() => {
+          const title = wikiCreateTitle?.trim()
+          if (!title) return
+          setWikiCreateTitle(null)
+          void createDoc(parentForNew, title)
+        }}
+      />
     </div>
   )
 }

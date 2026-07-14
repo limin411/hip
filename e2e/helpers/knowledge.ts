@@ -240,22 +240,6 @@ export async function closeKnowledgeChipIfOpen(): Promise<void> {
   }
 }
 
-/** Select a layout tab on knowledge-layout-toggle (0=source, 1=split) — index, not i18n label. */
-export async function setKnowledgeLayout(layout: 'source' | 'split'): Promise<void> {
-  const toggle = await browser.$('[data-testid="knowledge-layout-toggle"]')
-  await toggle.waitForExist({ timeout: 10000 })
-  const idx = layout === 'split' ? 1 : 0
-  await browser.execute(
-    (root: HTMLElement, i: number) => {
-      const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
-      tabs[i]?.click()
-    },
-    toggle,
-    idx,
-  )
-  await browser.pause(150)
-}
-
 /** Rename via inline title input. */
 export async function setKnowledgeDocTitle(title: string): Promise<void> {
   const input = await browser.$('[data-testid="knowledge-doc-title"]')

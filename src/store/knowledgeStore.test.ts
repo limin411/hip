@@ -51,7 +51,6 @@ describe('knowledgeStore openDoc editing default', () => {
       docBody: '',
       draftBody: '',
       editing: false,
-      sourceLayout: 'source',
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -74,14 +73,6 @@ describe('knowledgeStore openDoc editing default', () => {
     expect(s.draftBody).toBe('# hello')
     expect(s.editing).toBe(true)
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
-  })
-
-  it('setSourceLayout persists split preference without touching draft', () => {
-    useKnowledgeStore.setState({ draftBody: 'keep', sourceLayout: 'source' })
-    useKnowledgeStore.getState().setSourceLayout('split')
-    expect(useKnowledgeStore.getState().sourceLayout).toBe('split')
-    expect(useKnowledgeStore.getState().draftBody).toBe('keep')
-    expect(localStorage.getItem('hip-knowledge-source-layout')).toBe('split')
   })
 })
 

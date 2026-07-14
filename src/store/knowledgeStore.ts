@@ -40,28 +40,6 @@ let indexBuildGen = 0
 const RECENT_KEY = 'hip-knowledge-recent'
 /** Cap for “最近打开” on the knowledge home page (and localStorage). */
 const RECENT_CAP = 8
-const LAYOUT_KEY = 'hip-knowledge-source-layout'
-
-export type KnowledgeSourceLayout = 'source' | 'split'
-
-function loadSourceLayout(): KnowledgeSourceLayout {
-  if (typeof localStorage === 'undefined') return 'source'
-  try {
-    const v = localStorage.getItem(LAYOUT_KEY)
-    return v === 'split' ? 'split' : 'source'
-  } catch {
-    return 'source'
-  }
-}
-
-function persistSourceLayout(layout: KnowledgeSourceLayout) {
-  if (typeof localStorage === 'undefined') return
-  try {
-    localStorage.setItem(LAYOUT_KEY, layout)
-  } catch {
-    // ignore quota
-  }
-}
 
 function loadRecent(): KnowledgeRecentItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -96,8 +74,6 @@ interface KnowledgeState {
   docBody: string
   draftBody: string
   editing: boolean
-  /** Meaningful when editing; persisted in localStorage. */
-  sourceLayout: KnowledgeSourceLayout
   mode: 'home' | 'workspace'
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
@@ -126,7 +102,6 @@ interface KnowledgeState {
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
   openDoc: (id: string) => Promise<void>
   setEditing: (v: boolean) => Promise<void>
-  setSourceLayout: (layout: KnowledgeSourceLayout) => void
   setDraftBody: (v: string) => void
   /** Returns false if a write was attempted and failed. */
   flushSave: () => Promise<boolean>
@@ -175,7 +150,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   docBody: '',
   draftBody: '',
   editing: false,
-  sourceLayout: loadSourceLayout(),
   mode: 'home',
   searchQuery: '',
   searchHits: [],
@@ -583,13 +557,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await get().flushSave()
       set({ editing: false })
     }
-  },
-
-  setSourceLayout: (layout) => {
-    if (layout !== 'source' && layout !== 'split') return
-    if (get().sourceLayout === layout) return
-    persistSourceLayout(layout)
-    set({ sourceLayout: layout })
   },
 
   setDraftBody: (v) => {

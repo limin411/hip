@@ -719,7 +719,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const nodes = insertNode(get().nodes, node)
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
-      indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
+      // Re-resolve so Wiki-create-from-broken heals outbound broken flags + backlinks.
+      indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes, {
+        reresolveSpace: true,
+      })
       set((s) => ({
         nodes,
         busy: false,

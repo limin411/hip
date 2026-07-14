@@ -1205,4 +1205,31 @@ See [[Beta]] and [[Missing]].
       'doc_a',
     ])
   })
+
+  it('createDoc re-resolves space so Wiki-create heals broken + backlinks', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: useKnowledgeStore.getState().nodes,
+    })
+    knowledgeReadDoc.mockImplementation(async (_s: string, docId: string) => {
+      if (docId === 'doc_a') return 'See [[Missing]].'
+      return ''
+    })
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+
+    expect(getKnowledgeBrokenOutboundCount('spc_1', 'doc_a')).toBe(1)
+    expect(getKnowledgeBacklinks('spc_1', 'doc_b')).toHaveLength(0)
+
+    // After create, openDoc reads the new empty body.
+    knowledgeReadDoc.mockResolvedValue('')
+    await useKnowledgeStore.getState().createDoc(null, 'Missing')
+
+    const created = useKnowledgeStore.getState().nodes.find((n) => n.title === 'Missing')
+    expect(created?.kind).toBe('doc')
+    expect(getKnowledgeBrokenOutboundCount('spc_1', 'doc_a')).toBe(0)
+    expect(
+      getKnowledgeBacklinks('spc_1', created!.id).map((e) => e.fromDocId),
+    ).toEqual(['doc_a'])
+  })
 })

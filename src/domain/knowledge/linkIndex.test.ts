@@ -118,6 +118,18 @@ describe('getBacklinks', () => {
       'doc_x',
     ])
   })
+
+  it('dedupes title+alias edges from the same source to one backlink row', () => {
+    const idx = createLinkIndex()
+    // Beta has alias B1 — two written titles, one target doc.
+    indexDocLinks(idx, 'spc_1', 'doc_a', '[[Beta]] and [[B1]]', [
+      { id: 'doc_b', title: 'Beta', aliases: ['B1'], order: 0 },
+    ])
+    expect(getOutbound(idx, 'spc_1', 'doc_a')).toHaveLength(2)
+    const backs = getBacklinks(idx, 'spc_1', 'doc_b')
+    expect(backs).toHaveLength(1)
+    expect(backs[0]?.fromDocId).toBe('doc_a')
+  })
 })
 
 describe('incremental remove / reindex', () => {

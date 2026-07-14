@@ -232,14 +232,21 @@ export function getBacklinks(
   docId: string,
 ): LinkEdge[] {
   const list = index.byTargetDoc.get(docKey(spaceId, docId)) ?? []
-  // Copy + stable sort for UI.
-  return [...list]
-    .filter((e) => !e.broken && e.toDocId === docId)
-    .sort((a, b) => {
-      const s = a.fromSpaceId.localeCompare(b.fromSpaceId)
-      if (s !== 0) return s
-      return a.fromDocId.localeCompare(b.fromDocId)
-    })
+  // One row per source doc: title+alias links to the same target collapse.
+  const seen = new Set<string>()
+  const unique: LinkEdge[] = []
+  for (const e of list) {
+    if (e.broken || e.toDocId !== docId) continue
+    const k = `${e.fromSpaceId}:${e.fromDocId}`
+    if (seen.has(k)) continue
+    seen.add(k)
+    unique.push(e)
+  }
+  return unique.sort((a, b) => {
+    const s = a.fromSpaceId.localeCompare(b.fromSpaceId)
+    if (s !== 0) return s
+    return a.fromDocId.localeCompare(b.fromDocId)
+  })
 }
 
 /** Outbound broken-link count for a source doc. */

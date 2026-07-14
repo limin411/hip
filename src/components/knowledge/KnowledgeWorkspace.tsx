@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
   BookOpen,
+  ChevronRight,
   Download,
   FilePlus,
   FileText,
@@ -314,23 +315,29 @@ export function KnowledgeWorkspace() {
 
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
-          <div className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 truncate text-meta">
             {pathNodes.length === 0 ? (
-              <span>{space?.name}</span>
+              <span className="truncate text-ink-tertiary">{space?.name}</span>
             ) : (
               pathNodes.map((n, i) => (
-                <span key={n.id}>
-                  {i > 0 && ' / '}
+                <span key={n.id} className="flex min-w-0 items-center gap-0.5">
+                  {i > 0 && (
+                    <ChevronRight
+                      size={12}
+                      className="shrink-0 text-ink-tertiary"
+                      aria-hidden
+                    />
+                  )}
                   {i < pathNodes.length - 1 ? (
                     <button
                       type="button"
-                      className="text-ink-secondary hover:text-ink hover:underline"
+                      className="truncate text-ink-secondary hover:text-ink"
                       onClick={() => onCrumbClick(n)}
                     >
                       {n.title}
                     </button>
                   ) : (
-                    <span className="text-ink">{n.title}</span>
+                    <span className="truncate font-medium text-ink">{n.title}</span>
                   )}
                 </span>
               ))

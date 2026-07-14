@@ -37,6 +37,7 @@ vi.mock('@codemirror/view', () => ({
     lineWrapping: {},
     theme: (_styles?: unknown, _opts?: unknown) => ({}),
     domEventHandlers: () => ({}),
+    updateListener: { of: () => ({}) },
   },
   keymap: { of: () => ({}) },
 }))
@@ -63,6 +64,7 @@ vi.mock('@/domain/knowledge/mdEdit', () => ({
   insertFence: () => true,
   prefixAndDispatch: () => true,
   wrapAndDispatch: () => true,
+  applySlashInsert: () => true,
 }))
 
 afterEach(() => cleanup())

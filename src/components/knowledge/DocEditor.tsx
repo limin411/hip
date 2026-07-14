@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -13,11 +14,18 @@ import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
 import { Compartment, Prec } from '@codemirror/state'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import {
+  applySlashInsert,
   headingAndDispatch,
   insertFence,
   prefixAndDispatch,
   wrapAndDispatch,
 } from '@/domain/knowledge/mdEdit'
+import {
+  extractSlashQueryAt,
+  type KnowledgeSlashItem,
+  type SlashQueryMatch,
+} from '@/domain/knowledge/slashMenu'
+import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -134,12 +142,20 @@ function pushDraft(view: EditorView, onDraftChange: (v: string) => void) {
  * Local-text CodeMirror host.
  * Keep `value` in sync with local state only — never echo store `docBody` while typing.
  */
+function readSlashMatch(view: EditorView): SlashQueryMatch | null {
+  const head = view.state.selection.main.head
+  if (!view.state.selection.main.empty) return null
+  const line = view.state.doc.lineAt(head)
+  return extractSlashQueryAt(line.text, head - line.from, line.from)
+}
+
 export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
   { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
   ref,
 ) {
   const isDark = useIsDark()
   const [text, setText] = useState(initialValue)
+  const [slashMatch, setSlashMatch] = useState<SlashQueryMatch | null>(null)
   const viewRef = useRef<EditorView | null>(null)
   const themeCompartment = useMemo(() => new Compartment(), [])
   const onBlurRef = useRef(onBlur)
@@ -148,6 +164,8 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const setSlashMatchRef = useRef(setSlashMatch)
+  setSlashMatchRef.current = setSlashMatch
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
@@ -157,9 +175,16 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   const extensions = useMemo(() => {
     const blurHandler = EditorView.domEventHandlers({
       blur: () => {
+        // Delay so menu item mousedown can run first.
+        window.setTimeout(() => setSlashMatchRef.current(null), 0)
         onBlurRef.current?.()
         return false
       },
+    })
+
+    const slashTracker = EditorView.updateListener.of((update) => {
+      if (!update.docChanged && !update.selectionSet) return
+      setSlashMatchRef.current(readSlashMatch(update.view))
     })
 
     const run =
@@ -227,6 +252,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       EditorView.lineWrapping,
       themeCompartment.of(buildProseTheme(false)),
       blurHandler,
+      slashTracker,
       highlightSelectionMatches(),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
@@ -240,11 +266,36 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     })
   }, [isDark, themeCompartment])
 
+  const onSlashSelect = useCallback((item: KnowledgeSlashItem) => {
+    const view = viewRef.current
+    const match = slashMatch
+    if (!view || !match) return
+    if (applySlashInsert(view, match.from, match.to, item.insert, item.cursorOffset)) {
+      pushDraft(view, onDraftChangeRef.current)
+      setText(view.state.doc.toString())
+      setSlashMatch(null)
+      view.focus()
+    }
+  }, [slashMatch])
+
+  const onSlashDismiss = useCallback(() => {
+    setSlashMatch(null)
+    viewRef.current?.focus()
+  }, [])
+
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-1 flex-col"
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col"
       data-testid="knowledge-doc-editor"
     >
+      {slashMatch ? (
+        <KnowledgeSlashMenu
+          query={slashMatch.query}
+          onSelect={onSlashSelect}
+          onDismiss={onSlashDismiss}
+          className="absolute left-2 right-2 top-2 sm:left-4 sm:right-auto sm:w-80"
+        />
+      ) : null}
       <CodeMirror
         value={text}
         height="100%"
@@ -265,6 +316,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           view.dispatch({
             effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
           })
+          setSlashMatch(readSlashMatch(view))
         }}
         onChange={(v) => {
           setText(v)

@@ -128,3 +128,84 @@ export function insertFence(view: EditorView): boolean {
   })
   return true
 }
+
+/** Insert horizontal rule on its own line after the current line (or at cursor on empty line). */
+export function insertHr(view: EditorView): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const range = state.selection.main
+  const line = state.doc.lineAt(range.from)
+  const insert = line.text.trim() === '' ? '---\n' : '\n---\n'
+  const from = line.text.trim() === '' ? line.from : line.to
+  view.dispatch({
+    changes: { from, to: from, insert },
+    selection: EditorSelection.cursor(from + insert.length),
+  })
+  return true
+}
+
+/**
+ * Insert a 3×2 table skeleton (header + separator + 2 body rows, 3 columns).
+ * Cursor lands in the first header cell.
+ */
+export function insertTableSkeleton(view: EditorView, skeleton: string): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const range = state.selection.main
+  const line = state.doc.lineAt(range.from)
+  let from = range.from
+  let to = range.to
+  let insert = skeleton
+  if (range.empty && line.text.trim() === '') {
+    from = line.from
+    to = line.to
+  } else if (range.empty) {
+    from = line.to
+    to = line.to
+    insert = `\n${skeleton}`
+  }
+  // First cell content starts after leading `| ` (skip optional leading newline)
+  const pipe = insert.indexOf('| ')
+  const cursorOffset = pipe >= 0 ? pipe + 2 : insert.length
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(from + cursorOffset),
+  })
+  return true
+}
+
+/** Insert wiki-link skeleton `[[]]` with cursor between brackets. */
+export function insertWikiLink(view: EditorView): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const range = state.selection.main
+  const selected = state.sliceDoc(range.from, range.to)
+  const insert = selected ? `[[${selected}]]` : '[[]]'
+  const cursor = selected
+    ? range.from + insert.length
+    : range.from + 2
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert },
+    selection: EditorSelection.cursor(cursor),
+  })
+  return true
+}
+
+/**
+ * Replace a slash token range with a Markdown insert snippet (Source CM path).
+ * Live should apply the same snippet via its own transaction API.
+ */
+export function applySlashInsert(
+  view: EditorView,
+  from: number,
+  to: number,
+  insert: string,
+  cursorOffset: number,
+): boolean {
+  if (view.composing) return false
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(from + cursorOffset),
+  })
+  return true
+}

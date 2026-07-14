@@ -17,6 +17,18 @@ export type ImportAssetResult =
   | { ok: true; meta: KnowledgeAssetMeta; markdown: string }
   | { ok: false; reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error'; message?: string }
 
+/**
+ * Portable absolute FS path detection for Tauri `File.path` / dialog paths.
+ * Unix `/…`, Windows `C:\…` / `C:/…`, UNC `\\server\share…`.
+ */
+export function isAbsoluteFsPath(path: string): boolean {
+  if (!path) return false
+  if (path.startsWith('/')) return true
+  if (path.startsWith('\\\\') || path.startsWith('//')) return true
+  // Drive letter: C:\ or C:/
+  return /^[A-Za-z]:[\\/]/.test(path)
+}
+
 /** Import from OS path (disk cap 25MB). */
 export async function importAssetFromPath(
   spaceId: string,
@@ -53,7 +65,7 @@ export async function importAssetFromFile(
   file: File,
 ): Promise<ImportAssetResult> {
   const path = (file as File & { path?: string }).path
-  if (path && typeof path === 'string' && path.startsWith('/')) {
+  if (path && typeof path === 'string' && isAbsoluteFsPath(path)) {
     return importAssetFromPath(spaceId, path)
   }
 

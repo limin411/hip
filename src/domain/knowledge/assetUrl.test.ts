@@ -26,6 +26,15 @@ describe('normalizeAssetRelPath', () => {
     expect(normalizeAssetRelPath('assets/../evil.png')).toBeNull()
     expect(normalizeAssetRelPath('assets/sub/x.png')).toBeNull()
     expect(normalizeAssetRelPath('docs/x.png')).toBeNull()
+    expect(normalizeAssetRelPath('assets/..')).toBeNull()
+    expect(normalizeAssetRelPath('assets/.')).toBeNull()
+  })
+
+  it('allows filenames containing .. as a substring (not a path component)', () => {
+    expect(normalizeAssetRelPath('assets/foo..bar.png')).toBe('assets/foo..bar.png')
+    expect(normalizeAssetRelPath('assets/ast_x_notes..v2.png')).toBe(
+      'assets/ast_x_notes..v2.png',
+    )
   })
 })
 

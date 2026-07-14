@@ -20,6 +20,7 @@ import {
   upsertSearchDoc,
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
+import { KNOWLEDGE_INDEX_YIELD_EVERY } from '@/domain/knowledge/limits'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   knowledgeCreateSpace,
@@ -78,6 +79,21 @@ function persistRecent(recent: KnowledgeRecentItem[]) {
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
+export type KnowledgeIndexProgress = {
+  done: number
+  total: number
+  spaceName?: string
+}
+
+export type KnowledgePendingReveal = {
+  query: string
+}
+
+/** Yield so React can paint index progress (and avoid long freezes). */
+function yieldToUi(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 interface KnowledgeState {
   loaded: boolean
   spaces: KnowledgeSpace[]
@@ -91,6 +107,10 @@ interface KnowledgeState {
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
   indexStatus: IndexStatus
+  /** n/N progress while `indexStatus === 'building'`; null when idle/ready. */
+  indexProgress: KnowledgeIndexProgress | null
+  /** After opening a search hit, UI scrolls near this query (best-effort). */
+  pendingReveal: KnowledgePendingReveal | null
   /** Doc counts per space, filled when the search index is built. */
   spaceDocCounts: Record<string, number>
   recent: KnowledgeRecentItem[]
@@ -108,6 +128,9 @@ interface KnowledgeState {
   deleteSpace: (id: string) => Promise<void>
   openSpace: (id: string, opts?: { selectDocId?: string }) => Promise<void>
   openRecent: (item: KnowledgeRecentItem) => Promise<void>
+  /** Open a search hit and request scroll-to-match via `pendingReveal`. */
+  openSearchHit: (hit: KnowledgeSearchHit) => Promise<void>
+  clearPendingReveal: () => void
   openHome: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
   createDoc: (parentId: string | null, title: string) => Promise<void>
@@ -168,6 +191,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   searchQuery: '',
   searchHits: [],
   indexStatus: 'idle',
+  indexProgress: null,
+  pendingReveal: null,
   spaceDocCounts: {},
   recent: [],
   expandedFolderIds: {},
@@ -189,15 +214,27 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
   rebuildSearchIndex: async () => {
     const gen = ++indexBuildGen
-    set({ indexStatus: 'building' })
+    set({ indexStatus: 'building', indexProgress: { done: 0, total: 0 } })
     const next = createKnowledgeIndex()
     const counts: Record<string, number> = {}
     try {
       const spaces = get().spaces
+      // Preload trees so we can report accurate n/N progress.
+      const loaded: { space: (typeof spaces)[number]; nodes: KnowledgeNode[] }[] = []
+      let total = 0
       for (const space of spaces) {
         if (gen !== indexBuildGen) return
         const tree = await knowledgeGetTree(space.id)
         const nodes = tree.nodes ?? []
+        total += nodes.reduce((n, node) => n + (node.kind === 'doc' ? 1 : 0), 0)
+        loaded.push({ space, nodes })
+      }
+      if (gen !== indexBuildGen) return
+      set({ indexProgress: { done: 0, total } })
+
+      let done = 0
+      for (const { space, nodes } of loaded) {
+        if (gen !== indexBuildGen) return
         let docs = 0
         for (const node of nodes) {
           if (node.kind !== 'doc') continue
@@ -210,6 +247,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             body = ''
           }
           const path = getPathTitles(nodes, node.id).join(' / ') || node.title
+          // Body is capped inside upsertSearchDoc (KNOWLEDGE_INDEX_BODY_CHARS).
           upsertSearchDoc(next, {
             id: docKey(space.id, node.id),
             spaceId: space.id,
@@ -219,16 +257,23 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             spaceName: space.name,
             path,
           })
+          done += 1
+          if (done % KNOWLEDGE_INDEX_YIELD_EVERY === 0) {
+            set({ indexProgress: { done, total, spaceName: space.name } })
+            await yieldToUi()
+            if (gen !== indexBuildGen) return
+          }
         }
         counts[space.id] = docs
+        set({ indexProgress: { done, total, spaceName: space.name } })
       }
       if (gen !== indexBuildGen) return
       kbIndex = next
-      set({ indexStatus: 'ready', spaceDocCounts: counts })
+      set({ indexStatus: 'ready', spaceDocCounts: counts, indexProgress: null })
       get().runSearch(get().searchQuery)
     } catch {
       if (gen !== indexBuildGen) return
-      set({ indexStatus: 'error' })
+      set({ indexStatus: 'error', indexProgress: null })
     }
   },
 
@@ -378,6 +423,20 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   openRecent: async (item) => {
     await get().openSpace(item.spaceId, { selectDocId: item.docId })
   },
+
+  openSearchHit: async (hit) => {
+    const query = get().searchQuery.trim()
+    set({ pendingReveal: query ? { query } : null })
+    await get().openRecent({
+      spaceId: hit.spaceId,
+      docId: hit.docId,
+      title: hit.title,
+      spaceName: hit.spaceName,
+      at: Date.now(),
+    })
+  },
+
+  clearPendingReveal: () => set({ pendingReveal: null }),
 
   openHome: async () => {
     await get().flushSave()

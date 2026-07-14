@@ -247,3 +247,139 @@ describe('knowledgeStore space name uniqueness', () => {
   })
 })
 
+describe('knowledgeStore index progress + openSearchHit', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [
+        { id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'S2', createdAt: 1, updatedAt: 1 },
+      ],
+      activeSpaceId: null,
+      nodes: [],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editing: false,
+      mode: 'home',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: {},
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('rebuildSearchIndex reports progress n/N then clears', async () => {
+    knowledgeGetTree.mockImplementation(async (spaceId: string) => {
+      if (spaceId === 'spc_1') {
+        return {
+          version: 1,
+          nodes: [
+            {
+              id: 'doc_a',
+              parentId: null,
+              kind: 'doc',
+              title: 'A',
+              order: 0,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+            {
+              id: 'doc_b',
+              parentId: null,
+              kind: 'doc',
+              title: 'B',
+              order: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          ],
+        }
+      }
+      return {
+        version: 1,
+        nodes: [
+          {
+            id: 'doc_c',
+            parentId: null,
+            kind: 'doc',
+            title: 'C',
+            order: 0,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      }
+    })
+    knowledgeReadDoc.mockResolvedValue('body token_xyz')
+
+    const progressSamples: Array<{ done: number; total: number } | null> = []
+    const unsub = useKnowledgeStore.subscribe((s) => {
+      if (s.indexStatus === 'building' && s.indexProgress) {
+        progressSamples.push({ done: s.indexProgress.done, total: s.indexProgress.total })
+      }
+    })
+
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    unsub()
+
+    const s = useKnowledgeStore.getState()
+    expect(s.indexStatus).toBe('ready')
+    expect(s.indexProgress).toBeNull()
+    expect(s.spaceDocCounts).toEqual({ spc_1: 2, spc_2: 1 })
+    // At least one sample with total=3
+    expect(progressSamples.some((p) => p && p.total === 3)).toBe(true)
+    expect(progressSamples.some((p) => p && p.done === 3)).toBe(true)
+  })
+
+  it('openSearchHit sets pendingReveal from searchQuery', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeReadDoc.mockResolvedValue('hello match_token world')
+    useKnowledgeStore.setState({ searchQuery: '  match_token  ' })
+
+    await useKnowledgeStore.getState().openSearchHit({
+      spaceId: 'spc_1',
+      docId: 'doc_1',
+      title: 'Note',
+      spaceName: 'S1',
+      path: 'Note',
+      score: 1,
+    })
+
+    const s = useKnowledgeStore.getState()
+    expect(s.pendingReveal).toEqual({ query: 'match_token' })
+    expect(s.activeDocId).toBe('doc_1')
+    expect(s.mode).toBe('workspace')
+  })
+
+  it('clearPendingReveal clears the flag', () => {
+    useKnowledgeStore.setState({ pendingReveal: { query: 'x' } })
+    useKnowledgeStore.getState().clearPendingReveal()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+})
+

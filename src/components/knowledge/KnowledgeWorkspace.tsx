@@ -37,6 +37,7 @@ import {
   knowledgeExportSpaceZip,
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
+import { revealInCodeMirror, revealInPreviewRoot } from '@/domain/knowledge/searchReveal'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
@@ -118,6 +119,53 @@ export function KnowledgeWorkspace() {
     }
     useKnowledgeStore.setState({ expandedFolderIds: expand })
   }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
+
+  // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
+  useEffect(() => {
+    if (!activeDocId) return
+    const pending = useKnowledgeStore.getState().pendingReveal
+    if (!pending?.query) return
+
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 8
+
+    const tryReveal = () => {
+      if (cancelled) return
+      const still = useKnowledgeStore.getState().pendingReveal
+      if (!still?.query) return
+
+      if (editing) {
+        const view = editorRef.current?.getView()
+        if (view) {
+          revealInCodeMirror(view, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      } else {
+        const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
+        if (root instanceof HTMLElement) {
+          revealInPreviewRoot(root, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      }
+
+      attempts += 1
+      if (attempts < maxAttempts) {
+        window.setTimeout(tryReveal, 40)
+      } else {
+        // Give up without blocking later navigations.
+        useKnowledgeStore.getState().clearPendingReveal()
+      }
+    }
+
+    const t = window.setTimeout(tryReveal, 30)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+  }, [activeDocId, editing, docBody])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')

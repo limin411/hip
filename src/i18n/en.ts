@@ -962,6 +962,7 @@ export const en = {
         searchResults: 'Search results',
         searchEmpty: 'No documents match your search.',
         searchIndexing: 'Building search index…',
+        searchIndexingProgress: 'Building search index… {{done}}/{{total}}',
       },
       space: {
         nameLabel: 'Name',

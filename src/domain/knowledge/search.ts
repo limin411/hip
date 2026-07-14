@@ -1,4 +1,5 @@
 import MiniSearch from 'minisearch'
+import { KNOWLEDGE_INDEX_BODY_CHARS } from './limits'
 
 export type KnowledgeSearchDoc = {
   /** Composite key `spaceId:docId` */
@@ -7,7 +8,7 @@ export type KnowledgeSearchDoc = {
   docId: string
   title: string
   body: string
-  /** Capped body for hit snippets (storeFields); full body still indexed for FTS. */
+  /** Capped body for hit snippets (storeFields); body field is also index-capped. */
   bodyPreview: string
   spaceName: string
   path: string
@@ -24,11 +25,42 @@ export type KnowledgeSearchHit = {
   snippet?: string
 }
 
+/** Hits for one space, in original score order. */
+export type KnowledgeSearchHitGroup = {
+  spaceId: string
+  spaceName: string
+  hits: KnowledgeSearchHit[]
+}
+
 export const BODY_PREVIEW_CAP = 2048
 
 export function capBodyPreview(body: string, cap = BODY_PREVIEW_CAP): string {
   if (body.length <= cap) return body
   return body.slice(0, cap)
+}
+
+/** Cap body length for MiniSearch indexing (large-doc guard). */
+export function capIndexBody(body: string, cap = KNOWLEDGE_INDEX_BODY_CHARS): string {
+  if (body.length <= cap) return body
+  return body.slice(0, cap)
+}
+
+/**
+ * Group flat hits by space, preserving first-seen space order and score order within each group.
+ */
+export function groupSearchHitsBySpace(hits: KnowledgeSearchHit[]): KnowledgeSearchHitGroup[] {
+  const order: string[] = []
+  const map = new Map<string, KnowledgeSearchHitGroup>()
+  for (const hit of hits) {
+    let group = map.get(hit.spaceId)
+    if (!group) {
+      group = { spaceId: hit.spaceId, spaceName: hit.spaceName, hits: [] }
+      map.set(hit.spaceId, group)
+      order.push(hit.spaceId)
+    }
+    group.hits.push(hit)
+  }
+  return order.map((id) => map.get(id)!)
 }
 
 export function docKey(spaceId: string, docId: string): string {
@@ -74,6 +106,7 @@ export function upsertSearchDoc(
 ): void {
   const full: KnowledgeSearchDoc = {
     ...doc,
+    body: capIndexBody(doc.body),
     bodyPreview: doc.bodyPreview ?? capBodyPreview(doc.body),
   }
   if (index.has(full.id)) {

@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
+import { KNOWLEDGE_INDEX_BODY_CHARS } from './limits'
 import {
   BODY_PREVIEW_CAP,
   buildSearchSnippet,
+  capIndexBody,
   createKnowledgeIndex,
   docKey,
+  groupSearchHitsBySpace,
   removeSearchDoc,
   searchKnowledge,
   tokenizeKnowledge,
   upsertSearchDoc,
+  type KnowledgeSearchHit,
 } from './search'
 
 describe('knowledge MiniSearch helper', () => {
@@ -111,8 +115,66 @@ describe('knowledge MiniSearch helper', () => {
       spaceName: 'S',
       path: 'Long',
     })
-    // FTS still works on full body field
+    // FTS still works on body field (capped for index)
     expect(searchKnowledge(index, 'x').length).toBeGreaterThan(0)
+  })
+
+  it('capIndexBody trims to KNOWLEDGE_INDEX_BODY_CHARS', () => {
+    const long = 'a'.repeat(KNOWLEDGE_INDEX_BODY_CHARS + 100)
+    expect(capIndexBody(long).length).toBe(KNOWLEDGE_INDEX_BODY_CHARS)
+    expect(capIndexBody('short')).toBe('short')
+  })
+
+  it('upsertSearchDoc indexes only capped body (deep tail not searchable)', () => {
+    const marker = 'unique_tail_token_xyz'
+    const body = `${'z'.repeat(KNOWLEDGE_INDEX_BODY_CHARS)}${marker}`
+    const index = createKnowledgeIndex()
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Huge',
+      body,
+      spaceName: 'S',
+      path: 'Huge',
+    })
+    expect(searchKnowledge(index, marker)).toHaveLength(0)
+    // Head of body still searchable
+    expect(searchKnowledge(index, 'z').length).toBeGreaterThan(0)
+  })
+
+  it('groupSearchHitsBySpace preserves first-seen space order and hit order', () => {
+    const hits: KnowledgeSearchHit[] = [
+      {
+        spaceId: 'spc_b',
+        docId: 'doc_1',
+        title: 'B1',
+        spaceName: 'Beta',
+        path: 'B1',
+        score: 10,
+      },
+      {
+        spaceId: 'spc_a',
+        docId: 'doc_2',
+        title: 'A1',
+        spaceName: 'Alpha',
+        path: 'A1',
+        score: 9,
+      },
+      {
+        spaceId: 'spc_b',
+        docId: 'doc_3',
+        title: 'B2',
+        spaceName: 'Beta',
+        path: 'B2',
+        score: 8,
+      },
+    ]
+    const groups = groupSearchHitsBySpace(hits)
+    expect(groups.map((g) => g.spaceId)).toEqual(['spc_b', 'spc_a'])
+    expect(groups[0]?.hits.map((h) => h.docId)).toEqual(['doc_1', 'doc_3'])
+    expect(groups[1]?.hits.map((h) => h.docId)).toEqual(['doc_2'])
+    expect(groups[0]?.spaceName).toBe('Beta')
   })
 })
 

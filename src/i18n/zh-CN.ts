@@ -956,6 +956,7 @@ export const zhCN = {
         searchResults: '搜索结果',
         searchEmpty: '没有匹配的文档。',
         searchIndexing: '正在建立搜索索引…',
+        searchIndexingProgress: '正在建立搜索索引… {{done}}/{{total}}',
       },
       space: {
         nameLabel: '名称',

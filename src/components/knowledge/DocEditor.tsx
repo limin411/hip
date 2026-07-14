@@ -18,6 +18,8 @@ import {
   prefixAndDispatch,
   wrapAndDispatch,
 } from '@/domain/knowledge/mdEdit'
+import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -28,6 +30,8 @@ export interface DocEditorProps {
   placeholder?: string
   /** Optional Cmd/Ctrl+S → flush save (Workspace). */
   onSave?: () => void
+  /** Current space nodes for `[[` wiki title completion (same space). */
+  wikiNodes?: KnowledgeNode[]
 }
 
 export type DocEditorHandle = {
@@ -135,7 +139,15 @@ function pushDraft(view: EditorView, onDraftChange: (v: string) => void) {
  * Keep `value` in sync with local state only — never echo store `docBody` while typing.
  */
 export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
-  { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
+  {
+    docId: _docId,
+    initialValue,
+    onDraftChange,
+    onBlur,
+    placeholder,
+    onSave,
+    wikiNodes,
+  },
   ref,
 ) {
   const isDark = useIsDark()
@@ -148,12 +160,15 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const wikiNodesRef = useRef(wikiNodes ?? [])
+  wikiNodesRef.current = wikiNodes ?? []
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
   }))
 
   // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
+  // Wiki nodes are read via ref so the completion source stays fresh without rebuild.
   const extensions = useMemo(() => {
     const blurHandler = EditorView.domEventHandlers({
       blur: () => {
@@ -228,6 +243,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       themeCompartment.of(buildProseTheme(false)),
       blurHandler,
       highlightSelectionMatches(),
+      wikiLinkAutocomplete(() => wikiNodesRef.current),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
   }, [themeCompartment])
@@ -256,6 +272,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           highlightActiveLine: false,
           highlightSelectionMatches: false,
           bracketMatching: true,
+          // Wiki picker uses wikiLinkAutocomplete extension; keep default off to avoid double UI.
           autocompletion: false,
         }}
         placeholder={placeholder}

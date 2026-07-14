@@ -1039,6 +1039,15 @@ export const en = {
         largeDocForceSource:
           'Document is too large for Live edit. Switched to Source.',
       },
+      wiki: {
+        createTitle: 'Create document?',
+        createBody:
+          'No document named “{{title}}” exists in this space. Create it now?',
+        createConfirm: 'Create',
+        brokenHint: 'Broken link: “{{title}}” — click to create',
+        openHint: 'Open “{{title}}”',
+        noMatches: 'No matching documents',
+      },
       error: {
         generic: 'Something went wrong',
       },

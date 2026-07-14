@@ -1032,6 +1032,14 @@ export const zhTW = {
         liveParseFailed: '即時編輯器無法開啟此文件，已切換到原始碼模式。',
         largeDocForceSource: '文件過大，即時編輯不可用，已切換到原始碼模式。',
       },
+      wiki: {
+        createTitle: '建立文件？',
+        createBody: '目前空間中沒有名為「{{title}}」的文件。現在建立嗎？',
+        createConfirm: '建立',
+        brokenHint: '失效連結：「{{title}}」— 點擊建立',
+        openHint: '開啟「{{title}}」',
+        noMatches: '無符合文件',
+      },
       error: {
         generic: '出了點問題',
       },

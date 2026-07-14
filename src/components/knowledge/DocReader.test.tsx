@@ -18,13 +18,26 @@ vi.mock('@/i18n', () => ({
 
 vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: Object.assign(
-    (selector: (s: { setDraftBody: typeof setDraftBody }) => unknown) =>
-      selector({ setDraftBody }),
+    (selector: (s: {
+      setDraftBody: typeof setDraftBody
+      activeSpaceId: string | null
+    }) => unknown) => selector({ setDraftBody, activeSpaceId: 'spc_test01' }),
     {
       getState: () => getState(),
     },
   ),
 }))
+
+vi.mock('@/domain/knowledge/assetUrl', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/domain/knowledge/assetUrl')>()
+  return {
+    ...actual,
+    resolveAssetDataUrl: vi.fn(async (_spaceId: string, rel: string) => {
+      if (rel.includes('missing')) return null
+      return { dataUrl: 'data:image/png;base64,aaa', mime: 'image/png' }
+    }),
+  }
+})
 
 vi.mock('@tauri-apps/plugin-shell', () => ({
   open: vi.fn(),
@@ -187,5 +200,21 @@ describe('DocReader preview tasks + anchors', () => {
   it('shows empty state when content is blank', () => {
     render(<DocReader content="   " />)
     expect(screen.getByTestId('knowledge-doc-empty')).toBeInTheDocument()
+  })
+
+  it('resolves relative assets/ images via data URL component', async () => {
+    const md = '![photo](assets/ast_x_photo.png)\n'
+    getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
+    render(<DocReader content={md} />)
+    const img = await screen.findByTestId('knowledge-asset-img')
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,aaa')
+    expect(img).toHaveAttribute('data-asset-rel', 'assets/ast_x_photo.png')
+  })
+
+  it('shows placeholder for missing local assets', async () => {
+    const md = '![gone](assets/ast_missing_x.png)\n'
+    getState.mockReturnValue({ draftBody: md, docBody: md, setDraftBody })
+    render(<DocReader content={md} />)
+    expect(await screen.findByTestId('knowledge-asset-img-placeholder')).toBeInTheDocument()
   })
 })

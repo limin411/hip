@@ -8,6 +8,7 @@ import {
   FilePlus,
   FileText,
   FolderPlus,
+  ImagePlus,
   MoreHorizontal,
   Plus,
   Search,
@@ -16,6 +17,8 @@ import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
+import { importAssetFromPath } from '@/domain/knowledge/importAsset'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -30,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
-import { pickSavePath } from '@/ipc/dialog'
+import { pickAttachmentFiles, pickSavePath } from '@/ipc/dialog'
 import {
   knowledgeErrorMessage,
   knowledgeExportDoc,
@@ -172,6 +175,43 @@ export function KnowledgeWorkspace() {
       toast.success(t('knowledge.export.spaceDone'))
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  const toastAssetError = (
+    reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error',
+  ) => {
+    if (reason === 'too_large_paste') {
+      toast.error(t('knowledge.asset.tooLargePaste'))
+    } else if (reason === 'too_large_disk') {
+      toast.error(t('knowledge.asset.tooLargeDisk'))
+    } else if (reason === 'unsupported') {
+      toast.error(t('knowledge.asset.unsupported'))
+    } else {
+      toast.error(t('knowledge.asset.importFailed'))
+    }
+  }
+
+  const attachFiles = async () => {
+    if (!activeSpaceId || !activeDocId || !editing) return
+    const paths = await pickAttachmentFiles()
+    if (!paths?.length) return
+    const view = editorRef.current?.getView()
+    if (!view) return
+    for (const sourcePath of paths) {
+      const result = await importAssetFromPath(activeSpaceId, sourcePath)
+      if (!result.ok) {
+        toastAssetError(result.reason)
+        continue
+      }
+      const pos = view.state.selection.main.from
+      const before = pos > 0 ? view.state.sliceDoc(pos - 1, pos) : '\n'
+      let snippet = result.markdown
+      if (before !== '\n') snippet = `\n${snippet}`
+      snippet = `${snippet}\n`
+      if (insertTextAtCursor(view, snippet)) {
+        setDraftBody(view.state.doc.toString())
+      }
     }
   }
 
@@ -459,18 +499,36 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <MarkdownToolbar
-                getView={() => editorRef.current?.getView() ?? null}
-                onAfterEdit={(text) => setDraftBody(text)}
-              />
+              <div className="flex items-center gap-1">
+                <MarkdownToolbar
+                  getView={() => editorRef.current?.getView() ?? null}
+                  onAfterEdit={(text) => setDraftBody(text)}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  title={t('knowledge.asset.attach')}
+                  aria-label={t('knowledge.asset.attach')}
+                  data-testid="knowledge-attach-asset"
+                  disabled={busy || !activeSpaceId}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void attachFiles()}
+                >
+                  <ImagePlus size={14} />
+                </Button>
+              </div>
               <DocEditor
                 ref={editorRef}
                 key={`${activeDocId}-edit`}
                 docId={activeDocId}
+                spaceId={activeSpaceId}
                 initialValue={docBody}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
+                onAssetImportError={toastAssetError}
                 placeholder={t('knowledge.doc.placeholder')}
               />
             </KnowledgeDocCanvas>

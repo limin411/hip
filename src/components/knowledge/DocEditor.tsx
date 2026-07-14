@@ -15,9 +15,14 @@ import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import {
   headingAndDispatch,
   insertFence,
+  insertTextAtCursor,
   prefixAndDispatch,
   wrapAndDispatch,
 } from '@/domain/knowledge/mdEdit'
+import {
+  importAssetFromClipboardItems,
+  importAssetFromFile,
+} from '@/domain/knowledge/importAsset'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -28,6 +33,11 @@ export interface DocEditorProps {
   placeholder?: string
   /** Optional Cmd/Ctrl+S → flush save (Workspace). */
   onSave?: () => void
+  /** Active space for asset paste/drop. */
+  spaceId?: string | null
+  /** Toast/surface import failures (too large, unsupported). */
+  onAssetImportError?: (reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error') => void
+  onAssetImported?: () => void
 }
 
 export type DocEditorHandle = {
@@ -135,7 +145,17 @@ function pushDraft(view: EditorView, onDraftChange: (v: string) => void) {
  * Keep `value` in sync with local state only — never echo store `docBody` while typing.
  */
 export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
-  { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
+  {
+    docId: _docId,
+    initialValue,
+    onDraftChange,
+    onBlur,
+    placeholder,
+    onSave,
+    spaceId,
+    onAssetImportError,
+    onAssetImported,
+  },
   ref,
 ) {
   const isDark = useIsDark()
@@ -148,6 +168,12 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  const spaceIdRef = useRef(spaceId)
+  spaceIdRef.current = spaceId
+  const onAssetImportErrorRef = useRef(onAssetImportError)
+  onAssetImportErrorRef.current = onAssetImportError
+  const onAssetImportedRef = useRef(onAssetImported)
+  onAssetImportedRef.current = onAssetImported
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
@@ -155,10 +181,79 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
 
   // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
   const extensions = useMemo(() => {
-    const blurHandler = EditorView.domEventHandlers({
+    const insertMarkdown = (view: EditorView, md: string) => {
+      // Prefer surrounding newlines so the image is on its own line when mid-paragraph.
+      const pos = view.state.selection.main.from
+      const before = pos > 0 ? view.state.sliceDoc(pos - 1, pos) : '\n'
+      const after = pos < view.state.doc.length ? view.state.sliceDoc(pos, pos + 1) : '\n'
+      let snippet = md
+      if (before !== '\n') snippet = `\n${snippet}`
+      if (after !== '\n') snippet = `${snippet}\n`
+      if (insertTextAtCursor(view, snippet)) {
+        pushDraft(view, onDraftChangeRef.current)
+        setText(view.state.doc.toString())
+        onAssetImportedRef.current?.()
+      }
+    }
+
+    const handleImportResult = (
+      view: EditorView,
+      result: Awaited<ReturnType<typeof importAssetFromFile>>,
+    ) => {
+      if (result.ok) {
+        insertMarkdown(view, result.markdown)
+        return
+      }
+      onAssetImportErrorRef.current?.(result.reason)
+    }
+
+    const assetHandlers = EditorView.domEventHandlers({
       blur: () => {
         onBlurRef.current?.()
         return false
+      },
+      paste: (event, view) => {
+        const space = spaceIdRef.current
+        if (!space || !event.clipboardData) return false
+        const items = event.clipboardData.items
+        if (!items?.length) return false
+        let hasImage = false
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i]
+          if (it.kind === 'file' && it.type.startsWith('image/') && it.type !== 'image/svg+xml') {
+            hasImage = true
+            break
+          }
+        }
+        if (!hasImage) return false
+        event.preventDefault()
+        void importAssetFromClipboardItems(space, items).then((result) => {
+          if (!result) return
+          handleImportResult(view, result)
+        })
+        return true
+      },
+      drop: (event, view) => {
+        const space = spaceIdRef.current
+        if (!space || !event.dataTransfer?.files?.length) return false
+        const files = Array.from(event.dataTransfer.files)
+        const assets = files.filter((f) => {
+          const mime = f.type
+          return (
+            (mime.startsWith('image/') && mime !== 'image/svg+xml') ||
+            mime === 'application/pdf' ||
+            /\.(png|jpe?g|gif|webp|pdf)$/i.test(f.name)
+          )
+        })
+        if (!assets.length) return false
+        event.preventDefault()
+        void (async () => {
+          for (const file of assets) {
+            const result = await importAssetFromFile(space, file)
+            handleImportResult(view, result)
+          }
+        })()
+        return true
       },
     })
 
@@ -226,7 +321,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       themeCompartment.of(buildProseTheme(false)),
-      blurHandler,
+      assetHandlers,
       highlightSelectionMatches(),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]

@@ -21,6 +21,7 @@ interface DocReaderProps {
 export function DocReader({ content, onStartEdit }: DocReaderProps) {
   const { t } = useTranslation()
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
+  const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const rootRef = useRef<HTMLDivElement>(null)
 
   const onTaskToggle = useCallback(
@@ -45,8 +46,9 @@ export function DocReader({ content, onStartEdit }: DocReaderProps) {
         onTaskToggle,
         getScrollRoot: () => rootRef.current,
         headingIdsByLine,
+        spaceId: activeSpaceId,
       }),
-    [onTaskToggle, headingIdsByLine],
+    [onTaskToggle, headingIdsByLine, activeSpaceId],
   )
 
   if (!content.trim()) {

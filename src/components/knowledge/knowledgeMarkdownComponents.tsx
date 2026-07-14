@@ -2,6 +2,7 @@ import type { Components } from 'react-markdown'
 import type { ReactNode } from 'react'
 import { open } from '@tauri-apps/plugin-shell'
 import { scrollToKnowledgeHeading, slugifyHeading } from '@/domain/knowledge/mdPreview'
+import { KnowledgeAssetImage } from './KnowledgeAssetImage'
 
 export interface KnowledgeMarkdownOptions {
   /** Called with 0-based GFM task index (document order). */
@@ -13,6 +14,8 @@ export interface KnowledgeMarkdownOptions {
    * Looked up via hast/mdast `node.position.start.line` — no render-time counters.
    */
   headingIdsByLine?: ReadonlyMap<number, string>
+  /** Active space — required for local `assets/…` image preview via data URLs. */
+  spaceId?: string | null
 }
 
 /** Flatten react-markdown children to plain text (fallback heading id only). */
@@ -128,6 +131,30 @@ export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {})
         >
           {children}
         </a>
+      )
+    },
+
+    img: ({ node: _node, src, alt, ...props }) => {
+      void _node
+      const spaceId = opts.spaceId
+      if (spaceId) {
+        return (
+          <KnowledgeAssetImage
+            spaceId={spaceId}
+            src={typeof src === 'string' ? src : undefined}
+            alt={typeof alt === 'string' ? alt : ''}
+            className="my-2 max-h-[480px] max-w-full rounded-md border border-border"
+          />
+        )
+      }
+      if (!src || typeof src !== 'string') return null
+      return (
+        <img
+          src={src}
+          alt={typeof alt === 'string' ? alt : ''}
+          {...props}
+          className="my-2 max-h-[480px] max-w-full rounded-md border border-border"
+        />
       )
     },
   }

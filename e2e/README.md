@@ -98,15 +98,21 @@ Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_
 | `knowledge-preview.spec.ts` | KP1: Preview GFM task checkbox write-back (no edit mode) |
 | `knowledge-nav.spec.ts` | KN1: flush-fail aborts doc switch; KN2: search groups by space |
 | `knowledge-wiki.spec.ts` | KW1–KW3: `[[title]]` navigate, confirm create, cancel create |
+| `knowledge-phase1.spec.ts` | K1C–G: templates, versions, frontmatter filter, backlinks, assets, portable zip (`@knowledge`, not `@core`) |
+| `knowledge-live.spec.ts` | KF1 slash `/h1`; KF2 Live flag + type + disk (`@knowledge`, not `@core`) |
 
-Write-fail seam: `window.__hipKnowledgeWriteFail` (see `installWriteFailSeam` / `src/ipc/knowledge.ts`).
+Write-fail seam: `window.__hipKnowledgeWriteFail` (see `installWriteFailSeam` / `src/ipc/knowledge.ts`).  
+Attachment seam: `window.__hipPickAttachmentFiles`. Live flag: `localStorage.hip-knowledge-live=true`.
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e
 # or panel-only:
 E2E_GREP='@context-menu @panel' yarn test:e2e --spec e2e/specs/context-menu-panel.spec.ts
 
-# All knowledge business flows
+# Gate: core knowledge paths (includes A–D)
+E2E_GREP='@knowledge @core' yarn test:e2e
+
+# All knowledge business flows (includes Phase1 + Live)
 E2E_GREP=@knowledge yarn test:e2e
 yarn test:e2e --spec e2e/specs/knowledge-lifecycle.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-home.spec.ts
@@ -115,6 +121,8 @@ yarn test:e2e --spec e2e/specs/knowledge-editor.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-preview.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-nav.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-wiki.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-phase1.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-live.spec.ts
 ```
 
 ## Isolation notes

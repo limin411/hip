@@ -1073,15 +1073,6 @@ export const zhCN = {
         propertyStatus: '状态',
         propertyTags: '标签',
       },
-      backlinks: {
-        title: '反向链接',
-        empty: '还没有文档链接到这里。',
-        brokenCount_one: '{{count}} 个失效出站链接',
-        brokenCount_other: '{{count}} 个失效出站链接',
-        brokenCount: '{{count}} 个失效出站链接',
-        brokenHint: '本文档中无法匹配标题或别名的 [[wiki]] 出站链接。',
-        openHint: '打开「{{title}}」',
-      },
       template: {
         pickTitle: '选择模板',
         pickHint: '选择模板或从空白文档开始。取消不会创建文档。',

@@ -1073,15 +1073,6 @@ export const zhTW = {
         propertyStatus: '狀態',
         propertyTags: '標籤',
       },
-      backlinks: {
-        title: '反向連結',
-        empty: '還沒有文件連結到這裡。',
-        brokenCount_one: '{{count}} 個失效出站連結',
-        brokenCount_other: '{{count}} 個失效出站連結',
-        brokenCount: '{{count}} 個失效出站連結',
-        brokenHint: '本文檔中無法匹配標題或別名的 [[wiki]] 出站連結。',
-        openHint: '開啟「{{title}}」',
-      },
       template: {
         pickTitle: '選擇範本',
         pickHint: '選擇範本或從空白文件開始。取消不會建立文件。',

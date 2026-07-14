@@ -1,6 +1,6 @@
 /**
  * Phase 1 knowledge surfaces: templates, versions, frontmatter filter,
- * backlinks, assets, portable zip.
+ * assets, portable zip.
  * Tags: @knowledge (not @core — longer / optional gate)
  */
 import { expect } from 'expect-webdriverio'
@@ -22,7 +22,6 @@ import {
   waitForDocBodyOnDisk,
   ensureKnowledgeSource,
   ensureKnowledgePreview,
-  openTreeDocByTitle,
   countTreeDocs,
   saveDocAsTemplate,
   openNewDocMaybePicker,
@@ -31,7 +30,6 @@ import {
   saveVersionManual,
   restoreNewestVersion,
   waitForKnowledgeMarker,
-  waitForBacklinkContaining,
   goKnowledgeHome,
   setHomeSearchQuery,
   clickFilterTag,
@@ -53,8 +51,6 @@ describe('knowledge phase1 surfaces @knowledge', () => {
   const v1 = `version-one-${stamp}`
   const v2 = `version-two-${stamp}`
   const tagName = `e2etag${stamp}`
-  const pageA = `BackA-${stamp}`
-  const pageB = `BackB-${stamp}`
   let zipPath = ''
 
   before(async () => {
@@ -163,33 +159,6 @@ describe('knowledge phase1 surfaces @knowledge', () => {
       { timeout: 20000, interval: 400, timeoutMsg: 'no hit after tag filter/search' },
     )
     void hitOrCard
-  })
-
-  it('K1B: backlinks panel lists inbound wiki links', async () => {
-    // K1A left us on home; reopen the suite space.
-    if (await (await browser.$('[data-testid="knowledge-home"]')).isExisting()) {
-      const { openSpaceCardByName } = await import('../helpers/knowledge.js')
-      await openSpaceCardByName(spaceName)
-    }
-    await (await browser.$('[data-testid="knowledge-workspace"]')).waitForExist({
-      timeout: 15000,
-    })
-
-    await createNewDocFromMenu()
-    await setKnowledgeDocTitle(pageB)
-    await typeInKnowledgeEditor(`target-b-${stamp}`)
-    await waitForSaveStatusSaved(15000)
-
-    await createNewDocFromMenu()
-    await setKnowledgeDocTitle(pageA)
-    await typeInKnowledgeEditor(`See [[${pageB}]] from A.`)
-    await waitForSaveStatusSaved(15000)
-    await waitForDocBodyOnDisk(`[[${pageB}]]`, 15000)
-
-    await openTreeDocByTitle(pageB)
-    await waitForBacklinkContaining(pageA, 20000)
-    const panel = await browser.$('[data-testid="knowledge-backlinks-panel"]')
-    expect(await panel.isExisting()).toBe(true)
   })
 
   it('K1F: attach image inserts markdown and previews', async () => {

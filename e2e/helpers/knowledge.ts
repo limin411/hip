@@ -1308,23 +1308,6 @@ export async function restoreNewestVersion(): Promise<void> {
   await browser.pause(500)
 }
 
-export async function waitForBacklinkContaining(
-  title: string,
-  timeoutMs = 15000,
-): Promise<void> {
-  await browser.waitUntil(
-    async () => {
-      const items = await browser.$$('[data-testid="knowledge-backlink-item"]')
-      for (const it of items) {
-        const t = await it.getText()
-        if (t.includes(title)) return true
-      }
-      return false
-    },
-    { timeout: timeoutMs, interval: 300, timeoutMsg: `no backlink for: ${title}` },
-  )
-}
-
 export async function clickFilterTag(tag: string): Promise<void> {
   await browser.waitUntil(
     async () => {

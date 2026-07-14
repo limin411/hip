@@ -58,7 +58,6 @@ import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
-import { BacklinksPanel } from './BacklinksPanel'
 
 /** Lazy so Source-only sessions pay 0 for Milkdown kit. */
 const DocLiveEditor = lazy(() =>
@@ -793,14 +792,6 @@ export function KnowledgeWorkspace() {
           </div>
         ) : null}
       </main>
-
-      {activeDocId && activeSpaceId ? (
-        <BacklinksPanel
-          spaceId={activeSpaceId}
-          docId={activeDocId}
-          onOpenDoc={(id) => void openDoc(id)}
-        />
-      ) : null}
 
       <Modal
         open={renameSpaceOpen}

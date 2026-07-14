@@ -64,6 +64,22 @@ function isIllegalDrop(
   return false
 }
 
+/**
+ * Sibling insert index for moveNode (`toIndex` is among siblings *after* the
+ * dragged node is removed from its old position).
+ */
+export function siblingInsertIndex(
+  siblings: KnowledgeNode[],
+  dragId: string,
+  targetId: string,
+  mode: 'before' | 'after',
+): number {
+  const withoutDrag = siblings.filter((s) => s.id !== dragId)
+  const idx = withoutDrag.findIndex((s) => s.id === targetId)
+  if (idx < 0) return withoutDrag.length
+  return mode === 'before' ? idx : idx + 1
+}
+
 /** Depth-first list of currently visible rows (respect expand + filter). */
 export function listVisibleTreeNodes(
   nodes: KnowledgeNode[],
@@ -104,7 +120,14 @@ export function SpaceTree({
 
   const [dropHint, setDropHint] = useState<DropHint>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  // Ref mirrors draggingId so dragover/drop can read it without waiting for re-render.
+  const draggingIdRef = useRef<string | null>(null)
   const treeRef = useRef<HTMLDivElement>(null)
+
+  const setDragging = (id: string | null) => {
+    draggingIdRef.current = id
+    setDraggingId(id)
+  }
 
   const roots = listChildren(nodes, null)
   const visibleRows = listVisibleTreeNodes(nodes, expanded, visibleIds)
@@ -138,7 +161,7 @@ export function SpaceTree({
   const applyDrop = (target: KnowledgeNode, dragId: string, mode: DropMode) => {
     if (busy || isIllegalDrop(nodes, dragId, target, mode)) {
       setDropHint(null)
-      setDraggingId(null)
+      setDragging(null)
       return
     }
     if (mode === 'into' && target.kind === 'folder') {
@@ -146,13 +169,16 @@ export function SpaceTree({
       void moveNode(dragId, target.id, kids.length)
     } else {
       const siblings = listChildren(nodes, target.parentId)
-      const idx = siblings.findIndex((s) => s.id === target.id)
-      const base = idx < 0 ? siblings.length : idx
-      const toIndex = mode === 'before' ? base : base + 1
+      const toIndex = siblingInsertIndex(
+        siblings,
+        dragId,
+        target.id,
+        mode === 'before' ? 'before' : 'after',
+      )
       void moveNode(dragId, target.parentId, toIndex)
     }
     setDropHint(null)
-    setDraggingId(null)
+    setDragging(null)
   }
 
   const focusIndex = treeFocusId
@@ -272,23 +298,27 @@ export function SpaceTree({
             e.preventDefault()
             return
           }
+          // Custom MIME + text/plain (WebKit often requires a known type).
           e.dataTransfer.setData(DRAG_MIME, node.id)
+          e.dataTransfer.setData('text/plain', node.id)
           e.dataTransfer.effectAllowed = 'move'
-          setDraggingId(node.id)
+          setDragging(node.id)
         }}
         onDragEnd={() => {
-          setDraggingId(null)
+          setDragging(null)
           setDropHint(null)
         }}
         onDragOver={(e) => {
-          if (!draggingId || draggingId === node.id) return
+          const dragId = draggingIdRef.current
+          if (!dragId || dragId === node.id) return
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
           const mode = dropModeFor(node, e.clientY, rect)
-          if (isIllegalDrop(nodes, draggingId, node, mode)) {
+          if (isIllegalDrop(nodes, dragId, node, mode)) {
             e.dataTransfer.dropEffect = 'none'
             setDropHint(null)
             return
           }
+          // Required so the browser will fire `drop`.
           e.preventDefault()
           e.dataTransfer.dropEffect = 'move'
           setDropHint({ targetId: node.id, mode })
@@ -298,14 +328,18 @@ export function SpaceTree({
         }}
         onDrop={(e) => {
           e.preventDefault()
-          const id = e.dataTransfer.getData(DRAG_MIME) || draggingId
+          e.stopPropagation()
+          const id =
+            e.dataTransfer.getData(DRAG_MIME) ||
+            e.dataTransfer.getData('text/plain') ||
+            draggingIdRef.current
           if (!id) return
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
           const mode = dropModeFor(node, e.clientY, rect)
           applyDrop(node, id, mode)
         }}
         className={cn(
-          'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none',
+          'group relative flex w-full min-h-[32px] cursor-grab items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none active:cursor-grabbing',
           isActiveDoc
             ? 'bg-accent/10 font-medium text-accent-strong'
             : 'text-ink hover:bg-state-hover',
@@ -336,7 +370,7 @@ export function SpaceTree({
 
         <span
           className={cn(
-            'flex h-5 w-3.5 shrink-0 cursor-grab items-center justify-center text-ink-tertiary/70 transition-opacity active:cursor-grabbing',
+            'flex h-5 w-3.5 shrink-0 items-center justify-center text-ink-tertiary/70 transition-opacity',
             draggingId === node.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
           )}
           aria-hidden
@@ -344,16 +378,23 @@ export function SpaceTree({
           <GripVertical size={11} strokeWidth={2} />
         </span>
 
+        {/*
+          Use non-button hit targets so HTML5 drag can start from the whole row.
+          Nested <button> blocks dragstart in Chromium/WebKit (Tauri). Keyboard is
+          handled by the treeitem roving tabindex + onTreeKeyDown.
+        */}
         {isFolder ? (
-          <button
-            type="button"
-            tabIndex={-1}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          <div
+            role="presentation"
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-1.5 text-left',
+              busy && 'pointer-events-none opacity-60',
+            )}
             onClick={() => {
+              if (busy) return
               setTreeFocusId(node.id)
               toggleFolder(node.id)
             }}
-            disabled={busy}
           >
             <span className="flex h-5 w-4 shrink-0 items-center justify-center text-ink-tertiary">
               {isOpen ? (
@@ -377,17 +418,19 @@ export function SpaceTree({
             <span className="truncate font-medium leading-snug tracking-tight">
               {node.title}
             </span>
-          </button>
+          </div>
         ) : (
-          <button
-            type="button"
-            tabIndex={-1}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          <div
+            role="presentation"
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-1.5 text-left',
+              busy && 'pointer-events-none opacity-60',
+            )}
             onClick={() => {
+              if (busy) return
               setTreeFocusId(node.id)
               void openDoc(node.id)
             }}
-            disabled={busy}
           >
             {/* Align docs with folder titles (chevron column reserved) */}
             <span className="w-4 shrink-0" aria-hidden />
@@ -409,7 +452,7 @@ export function SpaceTree({
             >
               {node.title}
             </span>
-          </button>
+          </div>
         )}
       </div>
     )
@@ -457,16 +500,17 @@ export function SpaceTree({
       className="flex flex-col gap-px"
       onKeyDown={onTreeKeyDown}
       onDragOver={(e) => {
-        if (!draggingId) return
+        if (!draggingIdRef.current) return
         e.preventDefault()
       }}
       onDrop={(e) => {
-        if (!draggingId || busy) return
+        const dragId = draggingIdRef.current
+        if (!dragId || busy) return
         if ((e.target as HTMLElement).closest('[data-testid^="knowledge-tree-"]')) return
         e.preventDefault()
         const kids = listChildren(nodes, null)
-        void moveNode(draggingId, null, kids.length)
-        setDraggingId(null)
+        void moveNode(dragId, null, kids.length)
+        setDragging(null)
         setDropHint(null)
       }}
     >

@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { listVisibleTreeNodes, SpaceTree } from './SpaceTree'
+import { listVisibleTreeNodes, siblingInsertIndex, SpaceTree } from './SpaceTree'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 
@@ -321,5 +321,161 @@ describe('SpaceTree keyboard navigation', () => {
     fireEvent.keyDown(tree, { key: 'Enter' })
     expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(false)
     expect(useKnowledgeStore.getState().treeFocusId).toBe('fld_1')
+  })
+})
+
+describe('siblingInsertIndex', () => {
+  const siblings: KnowledgeNode[] = [
+    {
+      id: 'a',
+      parentId: null,
+      kind: 'doc',
+      title: 'A',
+      order: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'b',
+      parentId: null,
+      kind: 'doc',
+      title: 'B',
+      order: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'c',
+      parentId: null,
+      kind: 'doc',
+      title: 'C',
+      order: 2,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]
+
+  it('computes index after removing the dragged sibling', () => {
+    // Drag A before B → still index 0 among remaining [B,C] then insert before B
+    expect(siblingInsertIndex(siblings, 'a', 'b', 'before')).toBe(0)
+    // Drag A after B → among [B,C], after B → 1
+    expect(siblingInsertIndex(siblings, 'a', 'b', 'after')).toBe(1)
+    // Drag C before A → among [A,B], before A → 0
+    expect(siblingInsertIndex(siblings, 'c', 'a', 'before')).toBe(0)
+    // Drag C after A → 1
+    expect(siblingInsertIndex(siblings, 'c', 'a', 'after')).toBe(1)
+  })
+})
+
+describe('SpaceTree drag and drop', () => {
+  const moveNode = vi.fn(async () => {})
+
+  beforeEach(() => {
+    moveNode.mockClear()
+    seedTree(null, {
+      nodes: [
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'Folder',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note A',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_2',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note B',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      treeFocusId: null,
+      activeDocId: null,
+      moveNode,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  function dnd(source: HTMLElement, target: HTMLElement, clientYRatio = 0.5) {
+    const dt = {
+      data: {} as Record<string, string>,
+      effectAllowed: 'none' as string,
+      dropEffect: 'none' as string,
+      setData(type: string, val: string) {
+        this.data[type] = val
+      },
+      getData(type: string) {
+        return this.data[type] ?? ''
+      },
+    }
+    fireEvent.dragStart(source, { dataTransfer: dt })
+    const rect = { top: 0, height: 40, left: 0, width: 100, bottom: 40, right: 100 }
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(rect as DOMRect)
+    const clientY = rect.top + rect.height * clientYRatio
+    fireEvent.dragOver(target, { dataTransfer: dt, clientY })
+    fireEvent.drop(target, { dataTransfer: dt, clientY })
+    fireEvent.dragEnd(source, { dataTransfer: dt })
+  }
+
+  it('reparents a doc into a folder on drop (center = into)', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const doc = screen.getByTestId('knowledge-tree-doc-doc_1')
+    const folder = screen.getByTestId('knowledge-tree-folder-fld_1')
+    dnd(doc, folder, 0.5)
+    expect(moveNode).toHaveBeenCalledWith('doc_1', 'fld_1', 0)
+  })
+
+  it('reorders a doc after another root doc', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const doc1 = screen.getByTestId('knowledge-tree-doc-doc_1')
+    const doc2 = screen.getByTestId('knowledge-tree-doc-doc_2')
+    // bottom half of doc2 → after
+    dnd(doc1, doc2, 0.8)
+    // siblings without drag: [fld_1, doc_2]; after doc_2 → index 2
+    expect(moveNode).toHaveBeenCalledWith('doc_1', null, 2)
+  })
+
+  it('does not use nested buttons (so native HTML5 drag can start on the row)', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const doc = screen.getByTestId('knowledge-tree-doc-doc_1')
+    expect(doc.querySelector('button')).toBeNull()
+    expect(doc).toHaveAttribute('draggable', 'true')
   })
 })

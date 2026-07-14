@@ -103,6 +103,30 @@ describe('knowledge IPC', () => {
     await knowledgeDeleteTemplate('spc_a', 'tpl_x')
     expect(invoke).toHaveBeenCalledWith('knowledge_delete_template', {
       args: { spaceId: 'spc_a', id: 'tpl_x' },
+  it('knowledgeSaveVersion wraps daily args', async () => {
+    const { knowledgeSaveVersion } = await import('./knowledge.js')
+      id: '2026-07-14T00-00-00-000',
+      file: '2026-07-14T00-00-00-000.md',
+      kind: 'daily',
+      dayKey: '2026-07-14',
+      byteLength: 3,
+    await knowledgeSaveVersion('spc_1', 'doc_1', 'daily', '2026-07-14')
+    expect(invoke).toHaveBeenCalledWith('knowledge_save_version', {
+      args: { spaceId: 'spc_1', docId: 'doc_1', kind: 'daily', dayKey: '2026-07-14' },
+  it('knowledgeListVersions / restore wrap args', async () => {
+    const { knowledgeListVersions, knowledgeRestoreVersion, knowledgeReadVersion } =
+      await import('./knowledge.js')
+    await knowledgeListVersions('spc_1', 'doc_1')
+    expect(invoke).toHaveBeenCalledWith('knowledge_list_versions', {
+      args: { spaceId: 'spc_1', docId: 'doc_1' },
+    invoke.mockResolvedValueOnce('body')
+    await knowledgeRestoreVersion('spc_1', 'doc_1', 'v1')
+    expect(invoke).toHaveBeenCalledWith('knowledge_restore_version', {
+      args: { spaceId: 'spc_1', docId: 'doc_1', versionId: 'v1' },
+    invoke.mockResolvedValueOnce('body')
+    await knowledgeReadVersion('spc_1', 'doc_1', 'v1')
+    expect(invoke).toHaveBeenCalledWith('knowledge_read_version', {
+      args: { spaceId: 'spc_1', docId: 'doc_1', versionId: 'v1' },
     })
   })
 })

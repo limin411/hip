@@ -43,4 +43,11 @@ export interface KnowledgeTemplate {
   body: string
   createdAt: number
   updatedAt: number
+export type KnowledgeVersionKind = 'daily' | 'manual'
+
+export interface KnowledgeVersionEntry {
+  file: string
+  kind: KnowledgeVersionKind | string
+  dayKey?: string
+  byteLength: number
 }

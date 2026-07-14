@@ -13,6 +13,9 @@ const knowledgeSaveTree = vi.fn()
 const knowledgeListTemplates = vi.fn()
 const knowledgeSaveTemplate = vi.fn()
 const knowledgeDeleteTemplate = vi.fn()
+const knowledgeSaveVersion = vi.fn()
+const knowledgeListVersions = vi.fn()
+const knowledgeRestoreVersion = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeEnsureRoot: (...a: unknown[]) => knowledgeEnsureRoot(...a),
@@ -28,6 +31,9 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeListTemplates: (...a: unknown[]) => knowledgeListTemplates(...a),
   knowledgeSaveTemplate: (...a: unknown[]) => knowledgeSaveTemplate(...a),
   knowledgeDeleteTemplate: (...a: unknown[]) => knowledgeDeleteTemplate(...a),
+  knowledgeSaveVersion: (...a: unknown[]) => knowledgeSaveVersion(...a),
+  knowledgeListVersions: (...a: unknown[]) => knowledgeListVersions(...a),
+  knowledgeRestoreVersion: (...a: unknown[]) => knowledgeRestoreVersion(...a),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
@@ -792,6 +798,20 @@ describe('knowledgeStore setEditorMode', () => {
     knowledgeWriteDoc.mockResolvedValue(undefined)
     localStorage.removeItem('hip-knowledge-live')
     localStorage.removeItem('hip-knowledge-editor-mode')
+describe('knowledgeStore version snapshots', () => {
+    knowledgeSaveVersion.mockReset()
+    knowledgeSaveVersion.mockResolvedValue({
+      id: 'v1',
+      file: 'v1.md',
+      createdAt: 1,
+      kind: 'daily',
+      dayKey: '2026-07-14',
+      byteLength: 5,
+    })
+    knowledgeListVersions.mockReset()
+    knowledgeRestoreVersion.mockReset()
+    vi.mocked(toast.success).mockClear()
+    vi.mocked(toast.error).mockClear()
     useKnowledgeStore.setState({
       loaded: true,
       spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
@@ -811,6 +831,7 @@ describe('knowledgeStore setEditorMode', () => {
       docBody: 'saved',
       draftBody: 'dirty',
       editorMode: 'source',
+      editing: true,
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -1561,3 +1582,54 @@ See [[Beta]] and [[Missing]].
     expect(knowledgeSaveTemplate).toHaveBeenCalledWith('spc_1', {
       name: 'Notes',
       body: '## Notes\n',
+  it('flushSave awaits daily snapshot after successful write', async () => {
+    await useKnowledgeStore.getState().flushSave()
+    expect(knowledgeSaveVersion).toHaveBeenCalled()
+    const call = knowledgeSaveVersion.mock.calls[0]
+    expect(call[0]).toBe('spc_1')
+    expect(call[1]).toBe('doc_1')
+    expect(call[2]).toBe('daily')
+    expect(typeof call[3]).toBe('string')
+    expect(call[3]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  it('does not daily-snapshot when write fails', async () => {
+    knowledgeWriteDoc.mockRejectedValue(new Error('disk full'))
+    expect(ok).toBe(false)
+    expect(knowledgeSaveVersion).not.toHaveBeenCalled()
+  it('saveVersionManual flushes then creates manual snapshot on chain', async () => {
+    // Dirty flush may call daily first; then manual is chained.
+    knowledgeSaveVersion.mockImplementation(async (_s, _d, kind: string) => {
+      if (kind === 'manual') {
+          id: 'm1',
+          file: 'm1.md',
+          createdAt: 2,
+          kind: 'manual',
+          byteLength: 5,
+        id: 'd1',
+        file: 'd1.md',
+        kind: 'daily',
+        dayKey: '2026-07-14',
+        byteLength: 5,
+    const entry = await useKnowledgeStore.getState().saveVersionManual()
+    expect(entry?.kind).toBe('manual')
+    expect(knowledgeSaveVersion).toHaveBeenCalledWith('spc_1', 'doc_1', 'manual')
+    // Manual call happens after daily when flush wrote.
+    const kinds = knowledgeSaveVersion.mock.calls.map((c) => c[2])
+    expect(kinds).toContain('daily')
+    expect(kinds[kinds.length - 1]).toBe('manual')
+    expect(toast.success).toHaveBeenCalled()
+  it('restoreVersion writes body into active buffer', async () => {
+    useKnowledgeStore.setState({ draftBody: 'saved', docBody: 'saved' })
+    knowledgeRestoreVersion.mockResolvedValueOnce('# restored')
+    const ok = await useKnowledgeStore.getState().restoreVersion('v1')
+    expect(knowledgeRestoreVersion).toHaveBeenCalledWith('spc_1', 'doc_1', 'v1')
+    expect(s.docBody).toBe('# restored')
+    expect(s.draftBody).toBe('# restored')
+  it('listVersions proxies IPC', async () => {
+    knowledgeListVersions.mockResolvedValueOnce([
+        id: 'v1',
+        file: 'v1.md',
+        kind: 'manual',
+        byteLength: 1,
+    const list = await useKnowledgeStore.getState().listVersions()
+    expect(list).toHaveLength(1)
+    expect(knowledgeListVersions).toHaveBeenCalledWith('spc_1', 'doc_1')

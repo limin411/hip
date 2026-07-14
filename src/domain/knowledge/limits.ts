@@ -36,3 +36,12 @@ export const KNOWLEDGE_VERSION_CAP = 30
 export const KNOWLEDGE_RECENT_CAP = 16
 /** Yield to the event loop every N docs during full index rebuild. */
 export const KNOWLEDGE_INDEX_YIELD_EVERY = 20
+/** Single large-doc threshold used everywhere (edit, index, snapshots). */
+/** Versions retained per doc. */
+/** Local calendar day key `YYYY-MM-DD` for daily snapshots (system local TZ). */
+export function localDayKey(d: Date = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}

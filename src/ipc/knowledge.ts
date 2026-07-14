@@ -3,6 +3,8 @@ import type {
   KnowledgeSpace,
   KnowledgeTemplate,
   KnowledgeTreeFile,
+  KnowledgeVersionEntry,
+  KnowledgeVersionKind,
 } from '@/domain/knowledge/types'
 
 export function knowledgeErrorMessage(err: unknown): string {
@@ -142,4 +144,29 @@ export async function knowledgeSaveTemplate(
     args: { spaceId, id: args.id, name: args.name, body: args.body },
 export async function knowledgeDeleteTemplate(spaceId: string, id: string): Promise<void> {
   await invoke('knowledge_delete_template', { args: { spaceId, id } })
+export async function knowledgeSaveVersion(
+  docId: string,
+  kind: KnowledgeVersionKind,
+  dayKey?: string,
+): Promise<KnowledgeVersionEntry | null> {
+  return invoke<KnowledgeVersionEntry | null>('knowledge_save_version', {
+    args: { spaceId, docId, kind, dayKey },
+export async function knowledgeListVersions(
+  docId: string,
+): Promise<KnowledgeVersionEntry[]> {
+  return invoke<KnowledgeVersionEntry[]>('knowledge_list_versions', {
+    args: { spaceId, docId },
+export async function knowledgeReadVersion(
+  docId: string,
+  versionId: string,
+): Promise<string> {
+  return invoke<string>('knowledge_read_version', {
+    args: { spaceId, docId, versionId },
+/** Atomically restores snapshot into the live doc; returns restored body. */
+export async function knowledgeRestoreVersion(
+  docId: string,
+  versionId: string,
+): Promise<string> {
+  return invoke<string>('knowledge_restore_version', {
+    args: { spaceId, docId, versionId },
 }

@@ -6,8 +6,10 @@ import type {
   KnowledgeRecentItem,
   KnowledgeSpace,
   KnowledgeTemplate,
+  KnowledgeVersionEntry,
 } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
+import { localDayKey } from '@/domain/knowledge/limits'
 import {
   collectDocIdsInSubtree,
   getPathTitles,
@@ -63,7 +65,10 @@ import {
   knowledgeListTemplates,
   knowledgeReadDoc,
   knowledgeSaveTemplate,
+  knowledgeListVersions,
+  knowledgeRestoreVersion,
   knowledgeSaveTree,
+  knowledgeSaveVersion,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
 } from '@/ipc/knowledge'
@@ -356,8 +361,17 @@ interface KnowledgeState {
    * (e.g. preview task write-back).
    */
   setDraftBody: (v: string, opts?: { persist?: 'auto' | 'now' | 'none' }) => void
-  /** Returns false if a write was attempted and failed. */
+  /**
+   * Returns false if a write was attempted and failed.
+   * On successful write, awaits the daily snapshot on the same chain so callers
+   * (delete / manual version) never race an in-flight daily.
+   */
   flushSave: () => Promise<boolean>
+  /** Manual snapshot of the active (or given) doc; flushes first, then serializes on saveChain. */
+  saveVersionManual: (docId?: string) => Promise<KnowledgeVersionEntry | null>
+  listVersions: (docId?: string) => Promise<KnowledgeVersionEntry[]>
+  /** Restore snapshot into live doc + active buffer when that doc is open. */
+  restoreVersion: (versionId: string, docId?: string) => Promise<boolean>
   setSearchQuery: (q: string) => void
   setFilterTag: (tag: string | null) => void
   setFilterStatus: (status: string | null) => void
@@ -1299,6 +1313,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           syncFacetsToState(set)
           get().runSearch(get().searchQuery)
         }
+        // Daily snapshot on the same chain step so await flushSave drains it
+        // (delete/manual must not race an in-flight daily).
+        try {
+          await knowledgeSaveVersion(
+            s.activeSpaceId,
+            s.activeDocId,
+            'daily',
+            localDayKey(),
+          )
+        } catch {
+          // Snapshots must not surface as save failures.
+        }
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
         }, 1500)
@@ -1312,6 +1338,71 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
     saveChain = saveChain.then(run, () => run())
     return saveChain
+  },
+
+  saveVersionManual: async (docId) => {
+    const spaceId = get().activeSpaceId
+    const id = docId ?? get().activeDocId
+    if (!spaceId || !id) return null
+    const ok = await get().flushSave()
+    if (!ok) return null
+    // Serialize on saveChain so manual never RMW-races a concurrent daily.
+    let entry: KnowledgeVersionEntry | null = null
+    let errMsg: string | null = null
+    saveChain = saveChain.then(async (prev) => {
+      if (!prev) return prev
+      try {
+        entry = await knowledgeSaveVersion(spaceId, id, 'manual')
+      } catch (e) {
+        errMsg = knowledgeErrorMessage(e)
+      }
+      return prev
+    })
+    await saveChain
+    if (errMsg) {
+      toast.error(errMsg)
+      return null
+    }
+    if (entry) toast.success(i18n.t('knowledge.versions.saved'))
+    return entry
+  },
+
+  listVersions: async (docId) => {
+    const spaceId = get().activeSpaceId
+    const id = docId ?? get().activeDocId
+    if (!spaceId || !id) return []
+    try {
+      return await knowledgeListVersions(spaceId, id)
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+      return []
+    }
+  },
+
+  restoreVersion: async (versionId, docId) => {
+    const spaceId = get().activeSpaceId
+    const id = docId ?? get().activeDocId
+    if (!spaceId || !id) return false
+    // Flush current dirty buffer first so we don't silently drop it.
+    const ok = await get().flushSave()
+    if (!ok) return false
+    try {
+      const body = await knowledgeRestoreVersion(spaceId, id, versionId)
+      if (get().activeDocId === id) {
+        set({ docBody: body, draftBody: body, saveState: 'idle' })
+      }
+      const node = get().nodes.find((n) => n.id === id)
+      const spaceName = get().spaces.find((sp) => sp.id === spaceId)?.name ?? ''
+      if (node) {
+        indexCurrentDoc(spaceId, id, node.title, body, spaceName, get().nodes)
+        get().runSearch(get().searchQuery)
+      }
+      toast.success(i18n.t('knowledge.versions.restored'))
+      return true
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
+      return false
+    }
   },
 
   setSearchQuery: (q) => {

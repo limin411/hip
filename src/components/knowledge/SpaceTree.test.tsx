@@ -367,7 +367,7 @@ describe('siblingInsertIndex', () => {
   })
 })
 
-describe('SpaceTree drag and drop', () => {
+describe('SpaceTree drag and drop (pointer)', () => {
   const moveNode = vi.fn(async () => {})
 
   beforeEach(() => {
@@ -412,28 +412,71 @@ describe('SpaceTree drag and drop', () => {
     cleanup()
   })
 
-  function dnd(source: HTMLElement, target: HTMLElement, clientYRatio = 0.5) {
-    const dt = {
-      data: {} as Record<string, string>,
-      effectAllowed: 'none' as string,
-      dropEffect: 'none' as string,
-      setData(type: string, val: string) {
-        this.data[type] = val
-      },
-      getData(type: string) {
-        return this.data[type] ?? ''
-      },
-    }
-    fireEvent.dragStart(source, { dataTransfer: dt })
-    const rect = { top: 0, height: 40, left: 0, width: 100, bottom: 40, right: 100 }
-    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(rect as DOMRect)
-    const clientY = rect.top + rect.height * clientYRatio
-    fireEvent.dragOver(target, { dataTransfer: dt, clientY })
-    fireEvent.drop(target, { dataTransfer: dt, clientY })
-    fireEvent.dragEnd(source, { dataTransfer: dt })
+  /** Simulate pointer drag from grip handle onto target row. */
+  function pointerDndFromGrip(
+    dragNodeId: string,
+    target: HTMLElement,
+    clientYRatio = 0.5,
+  ) {
+    const grip = screen.getByTestId(`knowledge-tree-drag-${dragNodeId}`)
+    const srcRect = {
+      top: 100,
+      left: 10,
+      width: 16,
+      height: 24,
+      bottom: 124,
+      right: 26,
+      x: 10,
+      y: 100,
+      toJSON: () => ({}),
+    } as DOMRect
+    const tgtRect = {
+      top: 200,
+      left: 10,
+      width: 200,
+      height: 40,
+      bottom: 240,
+      right: 210,
+      x: 10,
+      y: 200,
+      toJSON: () => ({}),
+    } as DOMRect
+    vi.spyOn(grip, 'getBoundingClientRect').mockReturnValue(srcRect)
+    vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(tgtRect)
+
+    const dropY = tgtRect.top + tgtRect.height * clientYRatio
+    const dropX = tgtRect.left + tgtRect.width / 2
+
+    fireEvent.pointerDown(grip, {
+      button: 0,
+      pointerId: 1,
+      clientX: srcRect.left + 4,
+      clientY: srcRect.top + 10,
+    })
+    // Past DRAG_THRESHOLD_PX (5)
+    fireEvent.pointerMove(document, {
+      pointerId: 1,
+      clientX: srcRect.left + 4,
+      clientY: srcRect.top + 20,
+    })
+    const prev = document.elementFromPoint.bind(document)
+    vi.spyOn(document, 'elementFromPoint').mockImplementation((x, y) => {
+      if (Math.abs(x - dropX) < 5 || Math.abs(y - dropY) < 30) return target
+      return prev(x, y)
+    })
+    fireEvent.pointerMove(document, {
+      pointerId: 1,
+      clientX: dropX,
+      clientY: dropY,
+    })
+    fireEvent.pointerUp(document, {
+      pointerId: 1,
+      clientX: dropX,
+      clientY: dropY,
+    })
   }
 
-  it('reparents a doc into a folder on drop (center = into)', () => {
+  it('reparents a doc into a folder when dragging from grip', () => {
     render(
       <SpaceTree
         onRename={noop}
@@ -442,13 +485,12 @@ describe('SpaceTree drag and drop', () => {
         onNewFolder={noop}
       />,
     )
-    const doc = screen.getByTestId('knowledge-tree-doc-doc_1')
     const folder = screen.getByTestId('knowledge-tree-folder-fld_1')
-    dnd(doc, folder, 0.5)
+    pointerDndFromGrip('doc_1', folder, 0.5)
     expect(moveNode).toHaveBeenCalledWith('doc_1', 'fld_1', 0)
   })
 
-  it('reorders a doc after another root doc', () => {
+  it('reorders a doc after another root doc when dragging from grip', () => {
     render(
       <SpaceTree
         onRename={noop}
@@ -457,15 +499,14 @@ describe('SpaceTree drag and drop', () => {
         onNewFolder={noop}
       />,
     )
-    const doc1 = screen.getByTestId('knowledge-tree-doc-doc_1')
     const doc2 = screen.getByTestId('knowledge-tree-doc-doc_2')
     // bottom half of doc2 → after
-    dnd(doc1, doc2, 0.8)
+    pointerDndFromGrip('doc_1', doc2, 0.8)
     // siblings without drag: [fld_1, doc_2]; after doc_2 → index 2
     expect(moveNode).toHaveBeenCalledWith('doc_1', null, 2)
   })
 
-  it('does not use nested buttons (so native HTML5 drag can start on the row)', () => {
+  it('does not start drag from the title hit target', () => {
     render(
       <SpaceTree
         onRename={noop}
@@ -475,7 +516,38 @@ describe('SpaceTree drag and drop', () => {
       />,
     )
     const doc = screen.getByTestId('knowledge-tree-doc-doc_1')
-    expect(doc.querySelector('button')).toBeNull()
-    expect(doc).toHaveAttribute('draggable', 'true')
+    const title = doc.querySelector('[role="presentation"]') as HTMLElement
+    fireEvent.pointerDown(title, {
+      button: 0,
+      pointerId: 1,
+      clientX: 40,
+      clientY: 20,
+    })
+    fireEvent.pointerMove(document, {
+      pointerId: 1,
+      clientX: 40,
+      clientY: 40,
+    })
+    fireEvent.pointerUp(document, {
+      pointerId: 1,
+      clientX: 40,
+      clientY: 40,
+    })
+    expect(moveNode).not.toHaveBeenCalled()
+    expect(doc.className).not.toContain('opacity-45')
+  })
+
+  it('exposes a dedicated drag handle on each row', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const grip = screen.getByTestId('knowledge-tree-drag-doc_1')
+    expect(grip.tagName).toBe('BUTTON')
+    expect(grip).toHaveAttribute('aria-label', 'knowledge.tree.dragHandle')
   })
 })

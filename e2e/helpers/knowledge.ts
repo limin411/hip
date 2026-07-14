@@ -441,8 +441,8 @@ export async function listKnowledgeDocTestIds(): Promise<string[]> {
 }
 
 /**
- * Synthetic HTML5 DnD: drag source row onto target row (into folder / after doc).
- * Uses the same MIME type as SpaceTree.
+ * Synthetic pointer DnD matching SpaceTree: drag via grip handle only.
+ * Press grip on source row → move past threshold onto target center → release.
  */
 export async function dndKnowledgeTreeNode(
   sourceTestId: string,
@@ -454,40 +454,50 @@ export async function dndKnowledgeTreeNode(
       const target = document.querySelector(`[data-testid="${tgtId}"]`) as HTMLElement | null
       if (!source || !target) throw new Error(`dnd nodes missing: ${srcId} -> ${tgtId}`)
 
-      const dt = new DataTransfer()
-      const mime = 'application/x-hip-knowledge-node'
-      // extract id from knowledge-tree-doc-XXX or knowledge-tree-folder-XXX
+      // knowledge-tree-doc-XXX / knowledge-tree-folder-XXX → node id
       const nodeId = srcId.replace(/^knowledge-tree-(doc|folder)-/, '')
-      dt.setData(mime, nodeId)
-      dt.effectAllowed = 'move'
+      const grip =
+        (document.querySelector(
+          `[data-testid="knowledge-tree-drag-${nodeId}"]`,
+        ) as HTMLElement | null) ||
+        (source.querySelector('[data-tree-drag-handle]') as HTMLElement | null)
+      if (!grip) throw new Error(`dnd grip missing for ${srcId}`)
 
-      source.dispatchEvent(
-        new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      )
-      // Drop into folder center (into) or on doc (after)
-      const rect = target.getBoundingClientRect()
-      const clientY = rect.top + rect.height * 0.5
-      target.dispatchEvent(
-        new DragEvent('dragover', {
-          bubbles: true,
-          cancelable: true,
-          dataTransfer: dt,
-          clientY,
-          clientX: rect.left + rect.width / 2,
-        }),
-      )
-      target.dispatchEvent(
-        new DragEvent('drop', {
-          bubbles: true,
-          cancelable: true,
-          dataTransfer: dt,
-          clientY,
-          clientX: rect.left + rect.width / 2,
-        }),
-      )
-      source.dispatchEvent(
-        new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }),
-      )
+      const srcRect = grip.getBoundingClientRect()
+      const tgtRect = target.getBoundingClientRect()
+      const startX = srcRect.left + srcRect.width / 2
+      const startY = srcRect.top + srcRect.height / 2
+      // Center of target → folder "into" / doc "after" mid-band
+      const endX = tgtRect.left + tgtRect.width / 2
+      const endY = tgtRect.top + tgtRect.height * 0.5
+      const pointerId = 1
+
+      const fire = (
+        type: string,
+        el: EventTarget,
+        clientX: number,
+        clientY: number,
+      ) => {
+        el.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId,
+            pointerType: 'mouse',
+            isPrimary: true,
+            button: 0,
+            buttons: type === 'pointerup' ? 0 : 1,
+            clientX,
+            clientY,
+          }),
+        )
+      }
+
+      fire('pointerdown', grip, startX, startY)
+      // Past SpaceTree DRAG_THRESHOLD_PX (5)
+      fire('pointermove', document, startX, startY + 12)
+      fire('pointermove', document, endX, endY)
+      fire('pointerup', document, endX, endY)
     },
     sourceTestId,
     targetTestId,

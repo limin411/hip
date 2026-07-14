@@ -987,6 +987,7 @@ export const zhTW = {
         reveal: '在 Finder 中顯示',
         sectionLabel: '頁面',
         backHome: '返回空間列表',
+        dragHandle: '拖曳以排序',
       },
       export: {
         doc: '匯出 Markdown…',

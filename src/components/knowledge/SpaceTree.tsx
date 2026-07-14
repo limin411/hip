@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -28,11 +28,12 @@ interface SpaceTreeProps {
 type DropMode = 'before' | 'into' | 'after'
 type DropHint = { targetId: string; mode: DropMode } | null
 
-const DRAG_MIME = 'application/x-hip-knowledge-node'
 /** Horizontal indent per nesting level (px). */
 const DEPTH_STEP = 12
 /** Base left padding so grip + chevron stay aligned. */
 const BASE_PAD = 6
+/** Pointer move distance before a press becomes a drag (px). */
+const DRAG_THRESHOLD_PX = 5
 
 function dropModeFor(node: KnowledgeNode, clientY: number, rect: DOMRect): DropMode {
   const ratio = (clientY - rect.top) / Math.max(rect.height, 1)
@@ -98,6 +99,19 @@ export function listVisibleTreeNodes(
   return out
 }
 
+type DragSession = {
+  id: string
+  startX: number
+  startY: number
+  pointerId: number
+  active: boolean
+}
+
+/**
+ * Pointer-based tree DnD (not HTML5).
+ * Tauri's default native file-drop layer intercepts HTML5 drag events; pointer
+ * drag works regardless of `dragDropEnabled`.
+ */
 export function SpaceTree({
   onRename,
   onDelete,
@@ -120,14 +134,15 @@ export function SpaceTree({
 
   const [dropHint, setDropHint] = useState<DropHint>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  // Ref mirrors draggingId so dragover/drop can read it without waiting for re-render.
-  const draggingIdRef = useRef<string | null>(null)
   const treeRef = useRef<HTMLDivElement>(null)
-
-  const setDragging = (id: string | null) => {
-    draggingIdRef.current = id
-    setDraggingId(id)
-  }
+  const sessionRef = useRef<DragSession | null>(null)
+  // Live snapshots for document-level pointer handlers (avoid stale closures).
+  const nodesRef = useRef(nodes)
+  const busyRef = useRef(busy)
+  const moveNodeRef = useRef(moveNode)
+  nodesRef.current = nodes
+  busyRef.current = busy
+  moveNodeRef.current = moveNode
 
   const roots = listChildren(nodes, null)
   const visibleRows = listVisibleTreeNodes(nodes, expanded, visibleIds)
@@ -141,6 +156,138 @@ export function SpaceTree({
     )
     el?.focus({ preventScroll: false })
   }, [treeFocusId])
+
+  const clearDragUi = () => {
+    sessionRef.current = null
+    setDraggingId(null)
+    setDropHint(null)
+  }
+
+  const applyDrop = (target: KnowledgeNode, dragId: string, mode: DropMode) => {
+    const liveNodes = nodesRef.current
+    if (busyRef.current || isIllegalDrop(liveNodes, dragId, target, mode)) {
+      clearDragUi()
+      return
+    }
+    if (mode === 'into' && target.kind === 'folder') {
+      const kids = listChildren(liveNodes, target.id)
+      void moveNodeRef.current(dragId, target.id, kids.length)
+    } else {
+      const siblings = listChildren(liveNodes, target.parentId)
+      const toIndex = siblingInsertIndex(
+        siblings,
+        dragId,
+        target.id,
+        mode === 'before' ? 'before' : 'after',
+      )
+      void moveNodeRef.current(dragId, target.parentId, toIndex)
+    }
+    clearDragUi()
+  }
+
+  const resolveTargetAtPoint = (
+    clientX: number,
+    clientY: number,
+    dragId: string,
+  ): { target: KnowledgeNode; mode: DropMode } | null => {
+    const el = document.elementFromPoint(clientX, clientY)
+    if (!(el instanceof Element)) return null
+    const row = el.closest('[data-tree-node-id]') as HTMLElement | null
+    if (!row) {
+      // Empty area inside tree → drop as last root sibling.
+      const tree = treeRef.current
+      if (tree && tree.contains(el)) {
+        return null // handled as root append by caller via dropHint null + root flag
+      }
+      return null
+    }
+    const targetId = row.getAttribute('data-tree-node-id')
+    if (!targetId || targetId === dragId) return null
+    const target = nodesRef.current.find((n) => n.id === targetId)
+    if (!target) return null
+    const rect = row.getBoundingClientRect()
+    const mode = dropModeFor(target, clientY, rect)
+    if (isIllegalDrop(nodesRef.current, dragId, target, mode)) return null
+    return { target, mode }
+  }
+
+  // Document-level pointer tracking while a row press is active.
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      const session = sessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+
+      const dx = e.clientX - session.startX
+      const dy = e.clientY - session.startY
+      if (!session.active) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
+        if (busyRef.current) {
+          clearDragUi()
+          return
+        }
+        session.active = true
+        setDraggingId(session.id)
+      }
+
+      e.preventDefault()
+      const hit = resolveTargetAtPoint(e.clientX, e.clientY, session.id)
+      if (hit) {
+        setDropHint({ targetId: hit.target.id, mode: hit.mode })
+      } else {
+        setDropHint(null)
+      }
+    }
+
+    const onPointerUp = (e: PointerEvent) => {
+      const session = sessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+
+      if (session.active) {
+        const hit = resolveTargetAtPoint(e.clientX, e.clientY, session.id)
+        if (hit) {
+          applyDrop(hit.target, session.id, hit.mode)
+          return
+        }
+        // Drop on tree chrome (not a row) → append as last root child.
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const tree = treeRef.current
+        if (tree && el instanceof Element && tree.contains(el) && !busyRef.current) {
+          const kids = listChildren(nodesRef.current, null)
+          void moveNodeRef.current(session.id, null, kids.length)
+        }
+      }
+      clearDragUi()
+    }
+
+    const onPointerCancel = (e: PointerEvent) => {
+      const session = sessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      clearDragUi()
+    }
+
+    document.addEventListener('pointermove', onPointerMove)
+    document.addEventListener('pointerup', onPointerUp)
+    document.addEventListener('pointercancel', onPointerCancel)
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove)
+      document.removeEventListener('pointerup', onPointerUp)
+      document.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [])
+
+  /** Drag starts only from the grip handle — not the title/open hit target. */
+  const onGripPointerDown = (nodeId: string, e: ReactPointerEvent) => {
+    if (busy || e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    sessionRef.current = {
+      id: nodeId,
+      startX: e.clientX,
+      startY: e.clientY,
+      pointerId: e.pointerId,
+      active: false,
+    }
+  }
 
   if (roots.length === 0) {
     return (
@@ -156,29 +303,6 @@ export function SpaceTree({
         </p>
       </div>
     )
-  }
-
-  const applyDrop = (target: KnowledgeNode, dragId: string, mode: DropMode) => {
-    if (busy || isIllegalDrop(nodes, dragId, target, mode)) {
-      setDropHint(null)
-      setDragging(null)
-      return
-    }
-    if (mode === 'into' && target.kind === 'folder') {
-      const kids = listChildren(nodes, target.id)
-      void moveNode(dragId, target.id, kids.length)
-    } else {
-      const siblings = listChildren(nodes, target.parentId)
-      const toIndex = siblingInsertIndex(
-        siblings,
-        dragId,
-        target.id,
-        mode === 'before' ? 'before' : 'after',
-      )
-      void moveNode(dragId, target.parentId, toIndex)
-    }
-    setDropHint(null)
-    setDragging(null)
   }
 
   const focusIndex = treeFocusId
@@ -289,57 +413,11 @@ export function SpaceTree({
         aria-expanded={isFolder ? isOpen : undefined}
         aria-selected={isActiveDoc}
         tabIndex={isRovingTarget ? 0 : -1}
-        draggable={!busy}
         onFocus={() => {
           if (treeFocusId !== node.id) setTreeFocusId(node.id)
         }}
-        onDragStart={(e) => {
-          if (busy) {
-            e.preventDefault()
-            return
-          }
-          // Custom MIME + text/plain (WebKit often requires a known type).
-          e.dataTransfer.setData(DRAG_MIME, node.id)
-          e.dataTransfer.setData('text/plain', node.id)
-          e.dataTransfer.effectAllowed = 'move'
-          setDragging(node.id)
-        }}
-        onDragEnd={() => {
-          setDragging(null)
-          setDropHint(null)
-        }}
-        onDragOver={(e) => {
-          const dragId = draggingIdRef.current
-          if (!dragId || dragId === node.id) return
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-          const mode = dropModeFor(node, e.clientY, rect)
-          if (isIllegalDrop(nodes, dragId, node, mode)) {
-            e.dataTransfer.dropEffect = 'none'
-            setDropHint(null)
-            return
-          }
-          // Required so the browser will fire `drop`.
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          setDropHint({ targetId: node.id, mode })
-        }}
-        onDragLeave={() => {
-          setDropHint((h) => (h?.targetId === node.id ? null : h))
-        }}
-        onDrop={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          const id =
-            e.dataTransfer.getData(DRAG_MIME) ||
-            e.dataTransfer.getData('text/plain') ||
-            draggingIdRef.current
-          if (!id) return
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-          const mode = dropModeFor(node, e.clientY, rect)
-          applyDrop(node, id, mode)
-        }}
         className={cn(
-          'group relative flex w-full min-h-[32px] cursor-grab items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none active:cursor-grabbing',
+          'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none',
           isActiveDoc
             ? 'bg-accent/10 font-medium text-accent-strong'
             : 'text-ink hover:bg-state-hover',
@@ -368,26 +446,33 @@ export function SpaceTree({
             />
           ))}
 
-        <span
+        {/* Drag handle only — title/icon clicks open or toggle, never start a drag. */}
+        <button
+          type="button"
+          tabIndex={-1}
+          data-testid={`knowledge-tree-drag-${node.id}`}
+          data-tree-drag-handle=""
+          disabled={busy}
+          aria-label={t('knowledge.tree.dragHandle')}
+          title={t('knowledge.tree.dragHandle')}
+          onPointerDown={(e) => onGripPointerDown(node.id, e)}
           className={cn(
-            'flex h-5 w-3.5 shrink-0 items-center justify-center text-ink-tertiary/70 transition-opacity',
-            draggingId === node.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+            'flex h-6 w-4 shrink-0 cursor-grab items-center justify-center rounded-md text-ink-tertiary/80 transition-[opacity,background-color,color] touch-none active:cursor-grabbing',
+            'hover:bg-state-hover hover:text-ink-secondary',
+            'disabled:pointer-events-none disabled:opacity-40',
+            draggingId === node.id
+              ? 'opacity-100 text-ink-secondary'
+              : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
           )}
-          aria-hidden
         >
-          <GripVertical size={11} strokeWidth={2} />
-        </span>
+          <GripVertical size={12} strokeWidth={2} />
+        </button>
 
-        {/*
-          Use non-button hit targets so HTML5 drag can start from the whole row.
-          Nested <button> blocks dragstart in Chromium/WebKit (Tauri). Keyboard is
-          handled by the treeitem roving tabindex + onTreeKeyDown.
-        */}
         {isFolder ? (
           <div
             role="presentation"
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-1.5 text-left',
+              'flex min-w-0 flex-1 cursor-default items-center gap-1.5 text-left',
               busy && 'pointer-events-none opacity-60',
             )}
             onClick={() => {
@@ -423,7 +508,7 @@ export function SpaceTree({
           <div
             role="presentation"
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-1.5 text-left',
+              'flex min-w-0 flex-1 cursor-default items-center gap-1.5 text-left',
               busy && 'pointer-events-none opacity-60',
             )}
             onClick={() => {
@@ -499,20 +584,6 @@ export function SpaceTree({
       data-testid="knowledge-tree"
       className="flex flex-col gap-px"
       onKeyDown={onTreeKeyDown}
-      onDragOver={(e) => {
-        if (!draggingIdRef.current) return
-        e.preventDefault()
-      }}
-      onDrop={(e) => {
-        const dragId = draggingIdRef.current
-        if (!dragId || busy) return
-        if ((e.target as HTMLElement).closest('[data-testid^="knowledge-tree-"]')) return
-        e.preventDefault()
-        const kids = listChildren(nodes, null)
-        void moveNode(dragId, null, kids.length)
-        setDragging(null)
-        setDropHint(null)
-      }}
     >
       {roots.map((n) => renderNode(n, 0))}
     </div>

@@ -993,6 +993,7 @@ export const en = {
         reveal: 'Reveal in Finder',
         sectionLabel: 'Pages',
         backHome: 'Back to spaces',
+        dragHandle: 'Drag to reorder',
       },
       export: {
         doc: 'Export Markdown…',

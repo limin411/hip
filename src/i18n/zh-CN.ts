@@ -987,6 +987,7 @@ export const zhCN = {
         reveal: '在访达中显示',
         sectionLabel: '页面',
         backHome: '返回空间列表',
+        dragHandle: '拖动以排序',
       },
       export: {
         doc: '导出 Markdown…',

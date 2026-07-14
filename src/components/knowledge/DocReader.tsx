@@ -24,7 +24,7 @@ export function DocReader({ content }: DocReaderProps) {
   }
 
   return (
-    <div data-testid="knowledge-doc-reader" className="mx-auto w-full max-w-3xl">
+    <div data-testid="knowledge-doc-reader">
       <MarkdownBody content={content} />
     </div>
   )

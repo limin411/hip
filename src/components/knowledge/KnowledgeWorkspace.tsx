@@ -40,6 +40,7 @@ import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
+import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
@@ -398,7 +399,7 @@ export function KnowledgeWorkspace() {
           </div>
         ) : editing ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-8">
+            <KnowledgeDocCanvas className="min-h-0 flex-1">
               <InlineDocTitle
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
@@ -418,11 +419,11 @@ export function KnowledgeWorkspace() {
                 onSave={() => void flushSave()}
                 placeholder={t('knowledge.doc.placeholder')}
               />
-            </div>
+            </KnowledgeDocCanvas>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-8">
-            <div className="mx-auto w-full max-w-3xl">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-24">
+            <KnowledgeDocCanvas>
               <InlineDocTitle
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
@@ -430,7 +431,7 @@ export function KnowledgeWorkspace() {
                 onCommit={() => {}}
               />
               <DocReader content={docBody} />
-            </div>
+            </KnowledgeDocCanvas>
           </div>
         )}
       </main>

@@ -46,11 +46,40 @@ Method: happy-dom Vitest → `Editor.make().use(commonmark).use(gfm)` → `defau
 | 7 | autolink | No (`<https://…>`) | **Yes** | Angle-bracket form is GFM-equivalent |
 | 8 | CJK | **Yes** | Yes | |
 | 9 | empty | **Yes** (`''`) | Yes | |
-| 10 | frontmatter | **Corrupted** | N/A — **must not pass through Live** | Leading `---` becomes thematic break (`***`); YAML body leaks as paragraphs; `[` escaped |
+| 10 | frontmatter | **Corrupted** | N/A — **must not pass through Live** | Full pattern below — both fences + escapes |
 
 ### Frontmatter strategy (required for PR-09 / P1.6)
 
 **Choice: strip before Live, re-prefix on serialize** (allowed by contract).
+
+Observed full corruption for kit@7.21.3 (do not under-estimate damage):
+
+```md
+<!-- IN -->
+---
+tags: [a, b]
+status: draft
+---
+
+# Body
+
+<!-- OUT (getMarkdown) -->
+***
+
+tags: \[a, b]
+status: draft
+-------------
+
+# Body
+```
+
+| IN fragment | OUT | Mechanism |
+|-------------|-----|-----------|
+| Opening `---` | `***` | Parsed as thematic break (HR), not YAML |
+| `tags: [a, b]` | `tags: \[a, b]` | YAML leaks as a paragraph; `[` escaped as MD link syntax |
+| `status: draft` | `status: draft` | Leaks as paragraph (survives textually) |
+| Closing `---` | `-------------` | Also thematic break; serializer lengthens the rule |
+| `# Body` | `# Body` | Survives — only the body region is safe |
 
 ```
 disk.md  →  splitYamlFrontmatter(md)
@@ -62,14 +91,32 @@ disk'    →  fmText ? `${fmText}\n${body'}` : body'
 
 Never feed raw documents with `---` fences into the editor. Unit-test the split/join helpers in PR-09/P1.6, not Milkdown itself.
 
+### Live is a canonicalizing writer (PR-09 product decision)
+
+Raw `getMarkdown()` does **not** preserve author style. If Live `onChange` → `setDraftBody(md)` writes serializer output to disk, users who mix Source and Live will see git churn:
+
+| Style rewrite | Example |
+|---------------|---------|
+| Unordered markers | `-` → `*` |
+| Sibling list spacing | tight list → blank line between items |
+| Table separators | `\| --- \|` → `\| - \|` |
+| Autolinks | bare URL → `<https://…>` |
+
+**Handoff:**
+
+1. Accept Live as a **canonicalizing** writer (product default), **or** make an explicit “re-normalize on serialize” product decision — do not invent a silent save filter without one.
+2. Promote `normalizeMd` only for Source↔Live **comparison** UX / soft-equality tests — **not** as a silent save filter unless product asks.
+3. Keep fixed **raw OUT snapshots** in `mdRoundTrip.spike.test.ts` (`expectedRawOut`) so kit pin upgrades fail CI if serializer style drifts.
+4. Never feed FM into the editor — split/join outside, with unit tests on the split helper.
+
 ### `normalizeMd` (spike)
 
-Implemented in `src/domain/knowledge/mdRoundTrip.spike.test.ts` (export for PR-09 to promote into `domain/knowledge/mdNormalize.ts` if desired):
+Implemented in `src/domain/knowledge/mdRoundTrip.spike.test.ts` (export for PR-09 to promote into `domain/knowledge/mdNormalize.ts` **for comparison only** if desired):
 
 1. CRLF → LF  
 2. `*` / `+` unordered markers → `-`  
 3. `[X]` → `[x]`  
-4. Collapse blank lines between consecutive list items  
+4. Collapse blank lines between consecutive list items of the same kind  
 5. Normalize table separator cells to `---` / ` :--- ` / etc.  
 6. Unwrap `<https://…>` autolinks  
 7. Single trailing `\n`; empty doc stays `''`  

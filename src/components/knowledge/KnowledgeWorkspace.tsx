@@ -417,156 +417,192 @@ export function KnowledgeWorkspace() {
     ]
   }, [pathNodes])
 
+  const docCount = useMemo(
+    () => nodes.reduce((n, node) => n + (node.kind === 'doc' ? 1 : 0), 0),
+    [nodes],
+  )
+
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-subtle">
-        <div className="flex flex-col gap-2 border-b border-border p-2.5">
-          <div className="flex items-center gap-0.5">
+      <aside className="flex w-[280px] shrink-0 flex-col border-r border-border bg-surface-subtle">
+        {/* Space identity + actions */}
+        <div className="flex flex-col gap-3 border-b border-border px-3 pb-3 pt-3">
+          <div className="flex items-start gap-1">
             <button
               type="button"
               data-testid="knowledge-back-home"
-              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-state-hover"
+              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
               onClick={() => void openHome()}
-              title={t('knowledge.home.mySpaces')}
+              title={t('knowledge.tree.backHome')}
+              aria-label={t('knowledge.tree.backHome')}
             >
-              <ArrowLeft size={14} className="shrink-0 text-ink-tertiary" />
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
-                {space?.icon ? (
-                  <span className="text-meta leading-none">{space.icon}</span>
-                ) : (
-                  <BookOpen size={14} className="text-accent-strong" />
-                )}
-              </span>
-              <span className="truncate text-body font-semibold text-ink">
-                {space?.name ?? t('tabs.knowledge')}
-              </span>
+              <ArrowLeft size={15} strokeWidth={2} />
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  disabled={busy}
-                  data-testid="knowledge-new-menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary hover:bg-state-hover hover:text-ink disabled:opacity-50"
-                  title={t('knowledge.tree.newDoc')}
-                  aria-label={t('knowledge.workspace.new')}
-                >
-                  <Plus size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid="knowledge-new-doc"
-                  onClick={() => newDoc(parentForNew)}
-                >
-                  <FilePlus size={14} />
-                  {t('knowledge.tree.newDoc')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="knowledge-new-folder"
-                  onClick={() =>
-                    void createFolder(parentForNew, t('knowledge.folder.untitled'))
-                  }
-                >
-                  <FolderPlus size={14} />
-                  {t('knowledge.tree.newFolder')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {/* modal={false}: modal menu + rename/delete Modal both lock body
-                pointer-events; stacking leaves the app unclickable after close. */}
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  data-testid="knowledge-space-menu"
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary hover:bg-state-hover hover:text-ink"
-                  aria-label={t('knowledge.space.menu')}
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  data-testid="knowledge-space-rename"
-                  onClick={() => {
-                    setSpaceName(space?.name ?? '')
-                    setRenameSpaceOpen(true)
-                  }}
-                >
-                  {t('knowledge.tree.rename')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="knowledge-space-export"
-                  onClick={() => void exportSpaceZip()}
-                >
-                  {t('knowledge.export.spaceZip')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  data-testid="knowledge-space-delete"
-                  onClick={() => setDeleteSpaceOpen(true)}
-                >
-                  {t('knowledge.tree.delete')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-surface shadow-[0_1px_0_rgba(17,17,17,0.04)]">
+                  {space?.icon ? (
+                    <span className="text-base leading-none">{space.icon}</span>
+                  ) : (
+                    <BookOpen size={16} className="text-accent-strong" strokeWidth={1.75} />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-body font-semibold leading-snug tracking-tight text-ink">
+                    {space?.name ?? t('tabs.knowledge')}
+                  </div>
+                  <div className="mt-0.5 truncate text-meta text-ink-tertiary">
+                    {t('knowledge.home.docCount', { count: docCount })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="knowledge-new-menu"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
+                    title={t('knowledge.tree.newDoc')}
+                    aria-label={t('knowledge.workspace.new')}
+                  >
+                    <Plus size={16} strokeWidth={2} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    data-testid="knowledge-new-doc"
+                    onClick={() => newDoc(parentForNew)}
+                  >
+                    <FilePlus size={14} />
+                    {t('knowledge.tree.newDoc')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-new-folder"
+                    onClick={() =>
+                      void createFolder(parentForNew, t('knowledge.folder.untitled'))
+                    }
+                  >
+                    <FolderPlus size={14} />
+                    {t('knowledge.tree.newFolder')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* modal={false}: modal menu + rename/delete Modal both lock body
+                  pointer-events; stacking leaves the app unclickable after close. */}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    data-testid="knowledge-space-menu"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
+                    aria-label={t('knowledge.space.menu')}
+                  >
+                    <MoreHorizontal size={16} strokeWidth={2} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    data-testid="knowledge-space-rename"
+                    onClick={() => {
+                      setSpaceName(space?.name ?? '')
+                      setRenameSpaceOpen(true)
+                    }}
+                  >
+                    {t('knowledge.tree.rename')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-space-export"
+                    onClick={() => void exportSpaceZip()}
+                  >
+                    {t('knowledge.export.spaceZip')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    data-testid="knowledge-space-delete"
+                    onClick={() => setDeleteSpaceOpen(true)}
+                  >
+                    {t('knowledge.tree.delete')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="relative">
             <Search
               size={14}
-              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-tertiary"
+              strokeWidth={2}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
             />
             <Input
               data-testid="knowledge-tree-filter"
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 border-border bg-surface pl-7 text-meta"
+              className="h-8 rounded-lg border-border/80 bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary/80"
             />
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
-          <SpaceTree
-            visibleIds={visibleIds}
-            onRename={(node) => {
-              setNodeEdit(node)
-              setNodeTitle(node.title)
-            }}
-            onDelete={(node) => setNodeDelete(node)}
-            onNewDoc={(parentId) => newDoc(parentId)}
-            onNewFolder={(parentId) =>
-              void createFolder(parentId, t('knowledge.folder.untitled'))
-            }
-            onReveal={(node) => {
-              if (!activeSpaceId || node.kind !== 'doc') return
-              void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
-                toast.error(knowledgeErrorMessage(e))
-              })
-            }}
-          />
-          {visibleIds && visibleIds.size === 0 && (
-            <p className="px-2 py-2 text-meta text-ink-tertiary">
-              {t('knowledge.tree.filterEmpty')}
-            </p>
-          )}
+
+        {/* Tree section */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between px-3.5 pb-1.5 pt-3">
+            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">
+              {t('knowledge.tree.sectionLabel')}
+            </span>
+            {nodes.length > 0 && (
+              <span className="tabular-nums text-[11px] text-ink-tertiary/80">
+                {nodes.length}
+              </span>
+            )}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            <SpaceTree
+              visibleIds={visibleIds}
+              onRename={(node) => {
+                setNodeEdit(node)
+                setNodeTitle(node.title)
+              }}
+              onDelete={(node) => setNodeDelete(node)}
+              onNewDoc={(parentId) => newDoc(parentId)}
+              onNewFolder={(parentId) =>
+                void createFolder(parentId, t('knowledge.folder.untitled'))
+              }
+              onReveal={(node) => {
+                if (!activeSpaceId || node.kind !== 'doc') return
+                void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
+                  toast.error(knowledgeErrorMessage(e))
+                })
+              }}
+            />
+            {visibleIds && visibleIds.size === 0 && (
+              <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
+                <Search size={16} className="text-ink-tertiary/60" strokeWidth={1.75} />
+                <p className="text-meta text-ink-tertiary">
+                  {t('knowledge.tree.filterEmpty')}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 truncate text-meta">
+        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
             {pathNodes.length === 0 ? (
               <span className="truncate text-ink-tertiary">{space?.name}</span>
             ) : (
               crumbItems.map((item, i) => {
                 if (item.kind === 'ellipsis') {
                   return (
-                    <span key="crumb-ellipsis" className="flex min-w-0 items-center gap-0.5">
+                    <span key="crumb-ellipsis" className="flex min-w-0 items-center gap-1">
                       {i > 0 && (
                         <ChevronRight
                           size={12}
-                          className="shrink-0 text-ink-tertiary"
+                          className="shrink-0 text-ink-tertiary/70"
                           aria-hidden
                         />
                       )}
@@ -579,24 +615,24 @@ export function KnowledgeWorkspace() {
                 const n = item.node
                 const isLast = item.index === pathNodes.length - 1
                 return (
-                  <span key={n.id} className="flex min-w-0 items-center gap-0.5">
+                  <span key={n.id} className="flex min-w-0 items-center gap-1">
                     {i > 0 && (
                       <ChevronRight
                         size={12}
-                        className="shrink-0 text-ink-tertiary"
+                        className="shrink-0 text-ink-tertiary/70"
                         aria-hidden
                       />
                     )}
                     {!isLast ? (
                       <button
                         type="button"
-                        className="truncate text-ink-secondary hover:text-ink"
+                        className="truncate rounded-md px-1 py-0.5 text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink"
                         onClick={() => onCrumbClick(n)}
                       >
                         {n.title}
                       </button>
                     ) : (
-                      <span className="truncate font-medium text-ink">{n.title}</span>
+                      <span className="truncate px-1 font-medium text-ink">{n.title}</span>
                     )}
                   </span>
                 )

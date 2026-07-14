@@ -985,6 +985,8 @@ export const zhCN = {
         filterPlaceholder: '过滤目录…',
         filterEmpty: '无匹配项',
         reveal: '在访达中显示',
+        sectionLabel: '页面',
+        backHome: '返回空间列表',
       },
       export: {
         doc: '导出 Markdown…',

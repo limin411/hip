@@ -991,6 +991,8 @@ export const en = {
         filterPlaceholder: 'Filter tree…',
         filterEmpty: 'No matching items',
         reveal: 'Reveal in Finder',
+        sectionLabel: 'Pages',
+        backHome: 'Back to spaces',
       },
       export: {
         doc: 'Export Markdown…',

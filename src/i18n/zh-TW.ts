@@ -985,6 +985,8 @@ export const zhTW = {
         filterPlaceholder: '過濾目錄…',
         filterEmpty: '無符合項目',
         reveal: '在 Finder 中顯示',
+        sectionLabel: '頁面',
+        backHome: '返回空間列表',
       },
       export: {
         doc: '匯出 Markdown…',

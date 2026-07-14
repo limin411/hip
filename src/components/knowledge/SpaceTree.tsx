@@ -7,6 +7,7 @@ import {
   Folder,
   FolderOpen,
   GripVertical,
+  Library,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -28,6 +29,10 @@ type DropMode = 'before' | 'into' | 'after'
 type DropHint = { targetId: string; mode: DropMode } | null
 
 const DRAG_MIME = 'application/x-hip-knowledge-node'
+/** Horizontal indent per nesting level (px). */
+const DEPTH_STEP = 12
+/** Base left padding so grip + chevron stay aligned. */
+const BASE_PAD = 6
 
 function dropModeFor(node: KnowledgeNode, clientY: number, rect: DOMRect): DropMode {
   const ratio = (clientY - rect.top) / Math.max(rect.height, 1)
@@ -116,9 +121,17 @@ export function SpaceTree({
 
   if (roots.length === 0) {
     return (
-      <p className="px-2 py-3 text-meta text-ink-tertiary" data-testid="knowledge-tree-empty">
-        {t('knowledge.tree.empty')}
-      </p>
+      <div
+        className="flex flex-col items-center gap-2.5 px-3 py-10 text-center"
+        data-testid="knowledge-tree-empty"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-muted text-ink-tertiary">
+          <Library size={18} strokeWidth={1.75} />
+        </span>
+        <p className="max-w-[11rem] text-meta leading-relaxed text-ink-tertiary">
+          {t('knowledge.tree.empty')}
+        </p>
+      </div>
     )
   }
 
@@ -236,6 +249,8 @@ export function SpaceTree({
     // Roving target: focused visible row, or first root when focus is missing/hidden.
     const isRovingTarget =
       (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
+    const isFolder = node.kind === 'folder'
+    const isOpen = isFolder && expanded[node.id] === true
 
     const row = (
       <div
@@ -245,7 +260,7 @@ export function SpaceTree({
         }
         data-tree-node-id={node.id}
         role="treeitem"
-        aria-expanded={node.kind === 'folder' ? expanded[node.id] === true : undefined}
+        aria-expanded={isFolder ? isOpen : undefined}
         aria-selected={isActiveDoc}
         tabIndex={isRovingTarget ? 0 : -1}
         draggable={!busy}
@@ -290,15 +305,15 @@ export function SpaceTree({
           applyDrop(node, id, mode)
         }}
         className={cn(
-          'group flex w-full items-center gap-0.5 rounded-md py-1.5 pr-1 text-body transition-colors outline-none',
+          'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none',
           isActiveDoc
             ? 'bg-accent-active font-medium text-accent-strong'
             : 'text-ink hover:bg-surface-muted',
-          isFocused && !isActiveDoc && 'bg-surface-muted ring-1 ring-accent/35',
-          draggingId === node.id && 'opacity-50',
+          isFocused && !isActiveDoc && 'bg-surface-muted ring-1 ring-accent/30',
+          draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
-            'ring-1 ring-accent/40 bg-state-hover',
+            'ring-1 ring-accent/45 bg-state-hover',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'before' &&
             'border-t-2 border-accent',
@@ -306,18 +321,30 @@ export function SpaceTree({
             dropHint.mode === 'after' &&
             'border-b-2 border-accent',
         )}
-        style={{ paddingLeft: depth * 14 + 4 }}
+        style={{ paddingLeft: depth * DEPTH_STEP + BASE_PAD }}
       >
+        {/* Nesting guide — soft vertical rails for depth > 0 */}
+        {depth > 0 &&
+          Array.from({ length: depth }, (_, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="pointer-events-none absolute top-0 bottom-0 w-px bg-border/70"
+              style={{ left: i * DEPTH_STEP + BASE_PAD + 10 }}
+            />
+          ))}
+
         <span
           className={cn(
-            'flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-ink-tertiary transition-opacity active:cursor-grabbing',
-            draggingId === node.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+            'flex h-5 w-3.5 shrink-0 cursor-grab items-center justify-center text-ink-tertiary/70 transition-opacity active:cursor-grabbing',
+            draggingId === node.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
           )}
           aria-hidden
         >
-          <GripVertical size={12} />
+          <GripVertical size={11} strokeWidth={2} />
         </span>
-        {node.kind === 'folder' ? (
+
+        {isFolder ? (
           <button
             type="button"
             tabIndex={-1}
@@ -328,17 +355,28 @@ export function SpaceTree({
             }}
             disabled={busy}
           >
-            {expanded[node.id] ? (
-              <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
-            ) : (
-              <ChevronRight size={14} className="shrink-0 text-ink-tertiary" />
-            )}
-            {expanded[node.id] ? (
-              <FolderOpen size={15} className="shrink-0 text-accent-strong" />
-            ) : (
-              <Folder size={15} className="shrink-0 text-accent-strong" />
-            )}
-            <span className="truncate">{node.title}</span>
+            <span className="flex h-5 w-4 shrink-0 items-center justify-center text-ink-tertiary">
+              {isOpen ? (
+                <ChevronDown size={14} strokeWidth={2} />
+              ) : (
+                <ChevronRight size={14} strokeWidth={2} />
+              )}
+            </span>
+            <span
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
+                isOpen ? 'bg-accent-strong/10 text-accent-strong' : 'text-accent-strong',
+              )}
+            >
+              {isOpen ? (
+                <FolderOpen size={14} strokeWidth={1.75} />
+              ) : (
+                <Folder size={14} strokeWidth={1.75} />
+              )}
+            </span>
+            <span className="truncate font-medium leading-snug tracking-tight">
+              {node.title}
+            </span>
           </button>
         ) : (
           <button
@@ -351,9 +389,26 @@ export function SpaceTree({
             }}
             disabled={busy}
           >
-            <span className="w-3.5 shrink-0" />
-            <FileText size={15} className="shrink-0 text-ink-tertiary" />
-            <span className="truncate">{node.title}</span>
+            {/* Align docs with folder titles (chevron column reserved) */}
+            <span className="w-4 shrink-0" aria-hidden />
+            <span
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-md',
+                isActiveDoc
+                  ? 'bg-accent-strong/12 text-accent-strong'
+                  : 'text-ink-tertiary group-hover:text-ink-secondary',
+              )}
+            >
+              <FileText size={14} strokeWidth={1.75} />
+            </span>
+            <span
+              className={cn(
+                'truncate leading-snug tracking-tight',
+                isActiveDoc ? 'font-medium' : 'font-normal text-ink',
+              )}
+            >
+              {node.title}
+            </span>
           </button>
         )}
       </div>
@@ -380,11 +435,10 @@ export function SpaceTree({
       </DeclarativeContextMenu>
     )
 
-    if (node.kind === 'folder') {
-      const isOpen = expanded[node.id] === true
+    if (isFolder) {
       const kids = listChildren(nodes, node.id)
       return (
-        <div key={node.id} role="group">
+        <div key={node.id} role="group" className="flex flex-col gap-px">
           {wrapped}
           {isOpen && kids.map((c) => renderNode(c, depth + 1))}
         </div>
@@ -400,6 +454,7 @@ export function SpaceTree({
       role="tree"
       tabIndex={-1}
       data-testid="knowledge-tree"
+      className="flex flex-col gap-px"
       onKeyDown={onTreeKeyDown}
       onDragOver={(e) => {
         if (!draggingId) return

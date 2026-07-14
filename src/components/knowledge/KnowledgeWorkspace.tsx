@@ -628,7 +628,9 @@ export function KnowledgeWorkspace() {
                 onChange={onEditorModeChange}
                 options={modeOptions}
               />
-              <DropdownMenu>
+              {/* modal={false}: modal menu + version-history / save-as-template Modal both lock
+                  body pointer-events; stacking leaves the app unclickable after close. */}
+              <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"

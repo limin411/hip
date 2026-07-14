@@ -114,7 +114,7 @@ export function KnowledgeHome() {
         {/* Header */}
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-display font-semibold tracking-tight text-ink">
+            <h1 className="text-stat font-semibold tracking-tight text-ink">
               {t('knowledge.title')}
             </h1>
             <p className="mt-1.5 text-body text-ink-secondary">{t('knowledge.home.subtitle')}</p>
@@ -244,14 +244,14 @@ export function KnowledgeHome() {
                       <div
                         key={space.id}
                         data-testid="knowledge-space-card"
-                        className="group relative flex min-h-[8rem] flex-col rounded-xl border border-border bg-surface transition-colors hover:border-ink/15 hover:bg-state-hover"
+                        className="group relative flex min-h-[8rem] flex-col rounded-lg border border-border bg-surface transition-colors hover:bg-surface-subtle"
                       >
                         <button
                           type="button"
                           className="flex flex-1 flex-col items-start p-4 text-left"
                           onClick={() => void openSpace(space.id)}
                         >
-                          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-state-hover text-ink-secondary">
+                          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted text-ink-secondary">
                             {space.icon ? (
                               <span className="text-lg leading-none">{space.icon}</span>
                             ) : (

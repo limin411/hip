@@ -118,9 +118,22 @@ export async function createSpaceAndOpen(name: string): Promise<void> {
   })
 }
 
+/** Open a Radix menu trigger, then click a menu item by test id. */
+async function clickMenuItem(triggerTestId: string, itemTestId: string): Promise<void> {
+  const trigger = await browser.$(`[data-testid="${triggerTestId}"]`)
+  await trigger.waitForExist({ timeout: 10000 })
+  let item = await browser.$(`[data-testid="${itemTestId}"]`)
+  if (!(await item.isExisting())) {
+    await browser.execute((el: HTMLElement) => el.click(), trigger)
+    item = await browser.$(`[data-testid="${itemTestId}"]`)
+    await item.waitForExist({ timeout: 3000 })
+  }
+  await browser.execute((el: HTMLElement) => el.click(), item)
+}
+
 /** Create a doc and wait for default edit mode (CodeMirror host). */
 export async function createDocAndExpectEditor(): Promise<void> {
-  await clickTestId('knowledge-new-doc')
+  await clickMenuItem('knowledge-new-menu', 'knowledge-new-doc')
   await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
     timeout: 15000,
   })

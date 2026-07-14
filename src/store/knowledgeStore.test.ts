@@ -56,6 +56,7 @@ describe('knowledgeStore openDoc editing default', () => {
       searchQuery: '',
       searchHits: [],
       indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
       recent: [],
       expandedFolderIds: {},
       busy: false,

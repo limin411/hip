@@ -161,10 +161,10 @@ export function SpaceTree({
           applyDrop(node, id, mode)
         }}
         className={cn(
-          'group flex w-full items-center gap-0.5 rounded-md py-1 pr-1 text-body transition-colors',
+          'group flex w-full items-center gap-0.5 rounded-md py-1.5 pr-1 text-body transition-colors',
           node.kind === 'doc' && activeDocId === node.id
-            ? 'bg-accent-active font-medium text-accent-strong'
-            : 'text-ink hover:bg-surface-muted',
+            ? 'bg-state-hover font-medium text-ink shadow-[inset_2px_0_0_0_var(--accent)]'
+            : 'text-ink hover:bg-state-hover',
           draggingId === node.id && 'opacity-50',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
@@ -179,7 +179,10 @@ export function SpaceTree({
         style={{ paddingLeft: depth * 14 + 4 }}
       >
         <span
-          className="flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-ink-tertiary active:cursor-grabbing"
+          className={cn(
+            'flex h-5 w-4 shrink-0 cursor-grab items-center justify-center text-ink-tertiary transition-opacity active:cursor-grabbing',
+            draggingId === node.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          )}
           aria-hidden
         >
           <GripVertical size={12} />

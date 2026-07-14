@@ -952,6 +952,10 @@ export const en = {
         searchPlaceholder: 'Search titles, body, and paths…',
         mySpaces: 'My spaces',
         recent: 'Recent',
+        docCount_one: '{{count}} document',
+        docCount_other: '{{count}} documents',
+        docCount: '{{count}} documents',
+        docCountPending: '…',
         emptyTitle: 'No spaces yet',
         emptyHint: 'Create a space to start organizing documents.',
         createSpace: 'New space',
@@ -1003,6 +1007,7 @@ export const en = {
         fence: 'Code block',
       },
       workspace: {
+        new: 'New',
         noDocTitle: 'No document selected',
         noDocHint: 'Choose a document in the tree, or create a new one.',
       },

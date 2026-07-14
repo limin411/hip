@@ -946,6 +946,10 @@ export const zhCN = {
         searchPlaceholder: '搜索标题、正文与路径…',
         mySpaces: '我的空间',
         recent: '最近打开',
+        docCount_one: '{{count}} 篇',
+        docCount_other: '{{count}} 篇',
+        docCount: '{{count}} 篇',
+        docCountPending: '…',
         emptyTitle: '还没有知识空间',
         emptyHint: '新建一个空间，开始整理文档。',
         createSpace: '新建空间',
@@ -997,6 +1001,7 @@ export const zhCN = {
         fence: '代码块',
       },
       workspace: {
+        new: '新建',
         noDocTitle: '未选择文档',
         noDocHint: '在左侧树中选择文档，或新建一篇。',
       },

@@ -946,6 +946,10 @@ export const zhTW = {
         searchPlaceholder: '搜尋標題、正文與路徑…',
         mySpaces: '我的空間',
         recent: '最近開啟',
+        docCount_one: '{{count}} 篇',
+        docCount_other: '{{count}} 篇',
+        docCount: '{{count}} 篇',
+        docCountPending: '…',
         emptyTitle: '尚無知識空間',
         emptyHint: '建立一個空間，開始整理文件。',
         createSpace: '新增空間',
@@ -997,6 +1001,7 @@ export const zhTW = {
         fence: '程式碼區塊',
       },
       workspace: {
+        new: '新增',
         noDocTitle: '未選擇文件',
         noDocHint: '在左側樹中選擇文件，或新增一篇。',
       },

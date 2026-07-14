@@ -180,6 +180,9 @@ describe('knowledge editor ux @knowledge @core', () => {
     }
     // Allow debounce autosave + ensure flush path
     await browser.pause(700)
+    const menu = await browser.$('[data-testid="knowledge-doc-menu"]')
+    await menu.waitForExist({ timeout: 5000 })
+    await browser.execute((el: HTMLElement) => el.click(), menu)
     const btn = await browser.$('[data-testid="knowledge-export-doc"]')
     await btn.waitForExist({ timeout: 5000 })
     await browser.execute((el: HTMLElement) => el.click(), btn)

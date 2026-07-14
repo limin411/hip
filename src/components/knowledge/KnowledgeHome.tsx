@@ -15,11 +15,14 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { pickDirectory } from '@/ipc/dialog'
 import { knowledgeErrorMessage, knowledgeImportFolder } from '@/ipc/knowledge'
+import { formatRelativeTime } from '@/lib/datetime'
 
 export function KnowledgeHome() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
   const spaces = useKnowledgeStore((s) => s.spaces)
   const recent = useKnowledgeStore((s) => s.recent)
+  const spaceDocCounts = useKnowledgeStore((s) => s.spaceDocCounts)
   const searchQuery = useKnowledgeStore((s) => s.searchQuery)
   const setSearchQuery = useKnowledgeStore((s) => s.setSearchQuery)
   const searchHits = useKnowledgeStore((s) => s.searchHits)
@@ -38,6 +41,8 @@ export function KnowledgeHome() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const q = searchQuery.trim().toLowerCase()
+  const searching = q.length > 0
+
   const filteredSpaces = useMemo(
     () => (q ? spaces.filter((s) => s.name.toLowerCase().includes(q)) : spaces),
     [spaces, q],
@@ -46,6 +51,15 @@ export function KnowledgeHome() {
     () => (q ? recent.filter((r) => r.title.toLowerCase().includes(q)) : recent),
     [recent, q],
   )
+
+  /** Newest recent open per space — for card meta. */
+  const lastOpenBySpace = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of recent) {
+      if (!map.has(r.spaceId)) map.set(r.spaceId, r.at)
+    }
+    return map
+  }, [recent])
 
   const submitCreate = async () => {
     const name = createName.trim()
@@ -81,10 +95,8 @@ export function KnowledgeHome() {
           defaultValue: `Imported ${result.importedDocs} documents`,
         }),
       )
-      // loadSpaces rebuilds the search index once
       await useKnowledgeStore.getState().loadSpaces()
       await openSpace(result.spaceId)
-      // Expand all folders so nested imports are visible immediately
       const st = useKnowledgeStore.getState()
       const expand: Record<string, boolean> = { ...st.expandedFolderIds }
       for (const n of st.nodes) {
@@ -97,21 +109,24 @@ export function KnowledgeHome() {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto" data-testid="knowledge-home">
-      <div className="mx-auto w-full max-w-4xl px-6 py-6">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-display font-semibold text-ink">{t('knowledge.title')}</h1>
-            <p className="mt-1 text-body text-ink-secondary">{t('knowledge.home.subtitle')}</p>
+    <div className="flex flex-1 flex-col overflow-y-auto bg-surface" data-testid="knowledge-home">
+      <div className="mx-auto w-full max-w-6xl px-8 py-10">
+        {/* Header */}
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-display font-semibold tracking-tight text-ink">
+              {t('knowledge.title')}
+            </h1>
+            <p className="mt-1.5 text-body text-ink-secondary">{t('knowledge.home.subtitle')}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
             <Button
               variant="secondary"
               data-testid="knowledge-import-folder"
               onClick={() => void importFolder()}
               disabled={busy}
             >
-              <Upload size={14} className="mr-1" />
+              <Upload size={14} className="mr-1.5" />
               {t('knowledge.import.folder')}
             </Button>
             <Button
@@ -119,13 +134,14 @@ export function KnowledgeHome() {
               onClick={() => setCreateOpen(true)}
               disabled={busy}
             >
-              <Plus size={14} className="mr-1" />
+              <Plus size={14} className="mr-1.5" />
               {t('knowledge.home.createSpace')}
             </Button>
           </div>
         </div>
 
-        <div className="relative mb-6 max-w-md">
+        {/* Search */}
+        <div className="relative mb-10 w-full max-w-xl">
           <Search
             size={16}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary"
@@ -135,159 +151,192 @@ export function KnowledgeHome() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('knowledge.home.searchPlaceholder')}
-            className="pl-9"
+            className="h-10 pl-9"
           />
-          {q && indexStatus === 'building' && (
-            <p className="mt-1 text-meta text-ink-tertiary">{t('knowledge.home.searchIndexing')}</p>
+          {searching && indexStatus === 'building' && (
+            <p className="mt-1.5 text-meta text-ink-tertiary">{t('knowledge.home.searchIndexing')}</p>
           )}
         </div>
 
-        {q && searchHits.length > 0 && (
-          <>
-            <p className="mb-2 text-meta font-medium text-ink-secondary">
-              {t('knowledge.home.searchResults')}
-            </p>
-            <div className="mb-8 flex flex-col gap-2" data-testid="knowledge-search-results">
-              {searchHits.map((hit) => (
-                <button
-                  key={`${hit.spaceId}:${hit.docId}`}
-                  type="button"
-                  data-testid="knowledge-search-hit"
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent hover:bg-surface-subtle"
-                  onClick={() =>
-                    void openRecent({
-                      spaceId: hit.spaceId,
-                      docId: hit.docId,
-                      title: hit.title,
-                      spaceName: hit.spaceName,
-                      at: Date.now(),
-                    })
-                  }
-                >
-                  <FileText size={16} className="shrink-0 text-ink-tertiary" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-body text-ink">{hit.title}</div>
-                    <div className="truncate text-meta text-ink-tertiary">
-                      {hit.spaceName}
-                      {hit.path ? ` · ${hit.path}` : ''}
-                    </div>
-                    {hit.snippet && (
-                      <div
-                        className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
-                        data-testid="knowledge-search-snippet"
-                      >
-                        {hit.snippet}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {q && indexStatus === 'ready' && searchHits.length === 0 && (
-          <p className="mb-6 text-meta text-ink-tertiary" data-testid="knowledge-search-empty">
-            {t('knowledge.home.searchEmpty')}
-          </p>
-        )}
-
-        <p className="mb-2 text-meta font-medium text-ink-secondary">
-          {t('knowledge.home.mySpaces')}
-        </p>
-
-        {filteredSpaces.length === 0 ? (
-          <EmptyState
-            icon={BookOpen}
-            title={t('knowledge.home.emptyTitle')}
-            description={t('knowledge.home.emptyHint')}
-            action={{
-              label: t('knowledge.home.createSpace'),
-              onClick: () => setCreateOpen(true),
-            }}
-            className="mb-8"
-          />
-        ) : (
-          <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredSpaces.map((space) => (
-              <div
-                key={space.id}
-                data-testid="knowledge-space-card"
-                className="relative flex flex-col rounded-lg border border-border bg-surface p-4 transition-colors hover:bg-surface-subtle"
-              >
-                <button
-                  type="button"
-                  className="flex flex-1 flex-col items-start text-left"
-                  onClick={() => void openSpace(space.id)}
-                >
-                  <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-surface-muted text-ink-secondary">
-                    {space.icon ? (
-                      <span className="text-lg leading-none">{space.icon}</span>
-                    ) : (
-                      <BookOpen size={18} className="text-accent-strong" />
-                    )}
-                  </span>
-                  <span className="text-body font-semibold text-ink">{space.name}</span>
-                </button>
-                <div className="absolute right-2 top-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+        {searching ? (
+          <section>
+            {searchHits.length > 0 ? (
+              <>
+                <h2 className="mb-3 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+                  {t('knowledge.home.searchResults')}
+                  <span className="ml-1.5 normal-case tracking-normal">{searchHits.length}</span>
+                </h2>
+                <ul className="-mx-2" data-testid="knowledge-search-results">
+                  {searchHits.map((hit) => (
+                    <li key={`${hit.spaceId}:${hit.docId}`}>
                       <button
                         type="button"
-                        data-testid="knowledge-space-menu"
-                        className="rounded-md p-1 text-ink-tertiary hover:bg-state-hover hover:text-ink"
-                        aria-label={t('knowledge.space.menu')}
+                        data-testid="knowledge-search-hit"
+                        className="flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-state-hover"
+                        onClick={() =>
+                          void openRecent({
+                            spaceId: hit.spaceId,
+                            docId: hit.docId,
+                            title: hit.title,
+                            spaceName: hit.spaceName,
+                            at: Date.now(),
+                          })
+                        }
                       >
-                        <MoreHorizontal size={16} />
+                        <FileText size={16} className="mt-0.5 shrink-0 text-ink-tertiary" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-body text-ink">{hit.title}</div>
+                          <div className="truncate text-meta text-ink-tertiary">
+                            {hit.spaceName}
+                            {hit.path ? ` · ${hit.path}` : ''}
+                          </div>
+                          {hit.snippet && (
+                            <div
+                              className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
+                              data-testid="knowledge-search-snippet"
+                            >
+                              {hit.snippet}
+                            </div>
+                          )}
+                        </div>
                       </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        data-testid="knowledge-space-rename"
-                        onClick={() => {
-                          setRenameId(space.id)
-                          setRenameName(space.name)
-                        }}
-                      >
-                        {t('knowledge.tree.rename')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        data-testid="knowledge-space-delete"
-                        onClick={() => setDeleteId(space.id)}
-                      >
-                        {t('knowledge.tree.delete')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              indexStatus === 'ready' && (
+                <p className="text-meta text-ink-tertiary" data-testid="knowledge-search-empty">
+                  {t('knowledge.home.searchEmpty')}
+                </p>
+              )
+            )}
+          </section>
+        ) : (
+          <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:gap-16">
+            {/* Spaces — primary */}
+            <section className="min-w-0 flex-1">
+              <h2 className="mb-4 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+                {t('knowledge.home.mySpaces')}
+                {spaces.length > 0 && (
+                  <span className="ml-1.5 normal-case tracking-normal">{spaces.length}</span>
+                )}
+              </h2>
 
-        {filteredRecent.length > 0 && (
-          <>
-            <p className="mb-2 text-meta font-medium text-ink-secondary">
-              {t('knowledge.home.recent')}
-            </p>
-            <div className="flex flex-col gap-2">
-              {filteredRecent.map((item) => (
-                <button
-                  key={`${item.spaceId}:${item.docId}`}
-                  type="button"
-                  data-testid="knowledge-recent-item"
-                  className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent hover:bg-surface-subtle"
-                  onClick={() => void openRecent(item)}
-                >
-                  <FileText size={16} className="shrink-0 text-ink-tertiary" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-body text-ink">{item.title}</div>
-                    <div className="truncate text-meta text-ink-tertiary">{item.spaceName}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
+              {filteredSpaces.length === 0 ? (
+                <EmptyState
+                  icon={BookOpen}
+                  title={t('knowledge.home.emptyTitle')}
+                  description={t('knowledge.home.emptyHint')}
+                  action={{
+                    label: t('knowledge.home.createSpace'),
+                    onClick: () => setCreateOpen(true),
+                  }}
+                  className="border-0"
+                />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredSpaces.map((space) => {
+                    const docCount = spaceDocCounts[space.id]
+                    const lastOpen = lastOpenBySpace.get(space.id)
+                    const metaTime = lastOpen ?? space.updatedAt
+                    return (
+                      <div
+                        key={space.id}
+                        data-testid="knowledge-space-card"
+                        className="group relative flex min-h-[8rem] flex-col rounded-xl border border-border bg-surface transition-colors hover:border-ink/15 hover:bg-state-hover"
+                      >
+                        <button
+                          type="button"
+                          className="flex flex-1 flex-col items-start p-4 text-left"
+                          onClick={() => void openSpace(space.id)}
+                        >
+                          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-state-hover text-ink-secondary">
+                            {space.icon ? (
+                              <span className="text-lg leading-none">{space.icon}</span>
+                            ) : (
+                              <BookOpen size={18} className="text-accent-strong" />
+                            )}
+                          </span>
+                          <span className="line-clamp-2 pr-6 text-body font-semibold leading-snug text-ink">
+                            {space.name}
+                          </span>
+                          <span className="mt-auto pt-3 text-meta text-ink-tertiary">
+                            {docCount != null
+                              ? t('knowledge.home.docCount', { count: docCount })
+                              : t('knowledge.home.docCountPending')}
+                            <span className="mx-1.5 opacity-40">·</span>
+                            {formatRelativeTime(metaTime, locale)}
+                          </span>
+                        </button>
+                        <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                data-testid="knowledge-space-menu"
+                                className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface hover:text-ink"
+                                aria-label={t('knowledge.space.menu')}
+                              >
+                                <MoreHorizontal size={16} />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                data-testid="knowledge-space-rename"
+                                onClick={() => {
+                                  setRenameId(space.id)
+                                  setRenameName(space.name)
+                                }}
+                              >
+                                {t('knowledge.tree.rename')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                data-testid="knowledge-space-delete"
+                                onClick={() => setDeleteId(space.id)}
+                              >
+                                {t('knowledge.tree.delete')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* Recent — secondary, no heavy box */}
+            {filteredRecent.length > 0 && (
+              <aside className="w-full shrink-0 lg:w-72">
+                <h2 className="mb-4 text-meta font-medium uppercase tracking-wide text-ink-tertiary">
+                  {t('knowledge.home.recent')}
+                </h2>
+                <ul className="-mx-2">
+                  {filteredRecent.map((item) => (
+                    <li key={`${item.spaceId}:${item.docId}`}>
+                      <button
+                        type="button"
+                        data-testid="knowledge-recent-item"
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-state-hover"
+                        onClick={() => void openRecent(item)}
+                      >
+                        <FileText size={15} className="shrink-0 text-ink-tertiary" />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-body text-ink">{item.title}</div>
+                          <div className="truncate text-meta text-ink-tertiary">{item.spaceName}</div>
+                        </div>
+                        <span className="shrink-0 text-meta tabular-nums text-ink-tertiary">
+                          {formatRelativeTime(item.at, locale)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            )}
+          </div>
         )}
       </div>
 

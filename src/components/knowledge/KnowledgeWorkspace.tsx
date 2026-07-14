@@ -7,6 +7,7 @@ import {
   FileText,
   FolderPlus,
   MoreHorizontal,
+  Plus,
   Search,
 } from 'lucide-react'
 import {
@@ -203,29 +204,59 @@ export function KnowledgeWorkspace() {
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-subtle">
-        <div className="flex flex-col gap-2 border-b border-border p-3">
-          <button
-            type="button"
-            data-testid="knowledge-back-home"
-            className="flex items-center gap-1 text-meta text-ink-secondary hover:text-ink"
-            onClick={() => void openHome()}
-          >
-            <ArrowLeft size={14} />
-            {t('knowledge.home.mySpaces')}
-          </button>
-          <div className="flex items-center gap-1">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-body font-semibold text-ink">
+      <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface">
+        <div className="flex flex-col gap-2 border-b border-border p-2.5">
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              data-testid="knowledge-back-home"
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-state-hover"
+              onClick={() => void openHome()}
+              title={t('knowledge.home.mySpaces')}
+            >
+              <ArrowLeft size={14} className="shrink-0 text-ink-tertiary" />
+              <span className="truncate text-body font-semibold text-ink">
                 {space?.name ?? t('tabs.knowledge')}
-              </div>
-            </div>
+              </span>
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={busy}
+                  data-testid="knowledge-new-menu"
+                  className="rounded-md p-1.5 text-ink-secondary hover:bg-state-hover hover:text-ink disabled:opacity-50"
+                  title={t('knowledge.tree.newDoc')}
+                  aria-label={t('knowledge.workspace.new')}
+                >
+                  <Plus size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  data-testid="knowledge-new-doc"
+                  onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
+                >
+                  <FilePlus size={14} />
+                  {t('knowledge.tree.newDoc')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="knowledge-new-folder"
+                  onClick={() =>
+                    void createFolder(parentForNew, t('knowledge.folder.untitled'))
+                  }
+                >
+                  <FolderPlus size={14} />
+                  {t('knowledge.tree.newFolder')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   data-testid="knowledge-space-menu"
-                  className="rounded-md p-1 text-ink-tertiary hover:bg-state-hover"
+                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
                   aria-label={t('knowledge.space.menu')}
                 >
                   <MoreHorizontal size={16} />
@@ -256,32 +287,6 @@ export function KnowledgeWorkspace() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="secondary"
-              disabled={busy}
-              data-testid="knowledge-new-doc"
-              title={t('knowledge.tree.newDoc')}
-              aria-label={t('knowledge.tree.newDoc')}
-              onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
-            >
-              <FilePlus size={15} />
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              disabled={busy}
-              data-testid="knowledge-new-folder"
-              title={t('knowledge.tree.newFolder')}
-              aria-label={t('knowledge.tree.newFolder')}
-              onClick={() =>
-                void createFolder(parentForNew, t('knowledge.folder.untitled'))
-              }
-            >
-              <FolderPlus size={15} />
-            </Button>
           </div>
           <div className="relative">
             <Search
@@ -329,43 +334,44 @@ export function KnowledgeWorkspace() {
       <main className="flex min-w-0 flex-1 flex-col bg-surface">
         <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
           <div className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">
-            {space?.name}
-            {pathNodes.map((n, i) => (
-              <span key={n.id}>
-                {' / '}
-                {i < pathNodes.length - 1 ? (
-                  <button
-                    type="button"
-                    className="text-ink-secondary hover:text-ink hover:underline"
-                    onClick={() => onCrumbClick(n)}
-                  >
-                    {n.title}
-                  </button>
-                ) : (
-                  <span className="text-ink">{n.title}</span>
-                )}
-              </span>
-            ))}
+            {pathNodes.length === 0 ? (
+              <span>{space?.name}</span>
+            ) : (
+              pathNodes.map((n, i) => (
+                <span key={n.id}>
+                  {i > 0 && ' / '}
+                  {i < pathNodes.length - 1 ? (
+                    <button
+                      type="button"
+                      className="text-ink-secondary hover:text-ink hover:underline"
+                      onClick={() => onCrumbClick(n)}
+                    >
+                      {n.title}
+                    </button>
+                  ) : (
+                    <span className="text-ink">{n.title}</span>
+                  )}
+                </span>
+              ))
+            )}
           </div>
-          {saveState === 'saving' && (
-            <span className="text-meta text-ink-tertiary">{t('knowledge.doc.saving')}</span>
-          )}
-          {saveState === 'saved' && (
-            <span className="text-meta text-ink-tertiary">{t('knowledge.doc.saved')}</span>
+          {(saveState === 'saving' || saveState === 'saved') && (
+            <span
+              className="flex shrink-0 items-center gap-1.5 text-meta text-ink-tertiary"
+              data-testid="knowledge-save-status"
+            >
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  saveState === 'saving' ? 'bg-warning animate-pulse' : 'bg-success',
+                )}
+                aria-hidden
+              />
+              {saveState === 'saving' ? t('knowledge.doc.saving') : t('knowledge.doc.saved')}
+            </span>
           )}
           {activeDocId && (
             <>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-7 w-7"
-                title={t('knowledge.export.doc')}
-                aria-label={t('knowledge.export.doc')}
-                data-testid="knowledge-export-doc"
-                onClick={() => void exportActiveDoc()}
-              >
-                <Download size={14} />
-              </Button>
               {editing && (
                 <SegmentedControl
                   data-testid="knowledge-layout-toggle"
@@ -390,6 +396,27 @@ export function KnowledgeWorkspace() {
                   { value: 'preview', label: t('knowledge.doc.preview') },
                 ]}
               />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                    aria-label={t('knowledge.space.menu')}
+                    data-testid="knowledge-doc-menu"
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    data-testid="knowledge-export-doc"
+                    onClick={() => void exportActiveDoc()}
+                  >
+                    <Download size={14} />
+                    {t('knowledge.export.doc')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>

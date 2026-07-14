@@ -35,6 +35,18 @@ import {
 } from '@/domain/knowledge/editorMode'
 import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import {
+  countBrokenOutbound,
+  createLinkIndex,
+  getBacklinks,
+  getOutbound,
+  indexDocLinks,
+  type LinkEdge,
+  type LinkResolveDoc,
+  removeSourceDoc,
+  removeSpaceFromLinkIndex,
+  reresolveSpaceLinks,
+} from '@/domain/knowledge/linkIndex'
+import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
   knowledgeDeleteSpace,
@@ -48,13 +60,15 @@ import {
   knowledgeWriteDoc,
 } from '@/ipc/knowledge'
 
-export type { EditorMode }
+export type { EditorMode, LinkEdge }
 export { shouldAutosave }
 
 /** Module-level index (not serializable; not stored in zustand state). */
 let kbIndex = createKnowledgeIndex()
 /** Structured frontmatter meta parallel to MiniSearch (facets + wiki aliases). */
 let kbMeta = new Map<string, KnowledgeDocMetaEntry>()
+/** Wiki link graph (composite keys). Rebuilt with search index + incremental on save. */
+let kbLinkIndex = createLinkIndex()
 let indexBuildGen = 0
 
 /** Map stable backend name errors to localized copy. */
@@ -182,6 +196,55 @@ interface KnowledgeState {
   dropRecent: (spaceId: string | null, docId: string) => void
 }
 
+/** Wiki resolve list for a space from live meta map (titles + aliases). */
+function wikiDocsForSpace(spaceId: string): LinkResolveDoc[] {
+  const out: LinkResolveDoc[] = []
+  for (const entry of kbMeta.values()) {
+    if (entry.spaceId !== spaceId) continue
+    out.push({
+      id: entry.docId,
+      title: entry.title,
+      aliases: entry.aliases,
+      order: entry.order,
+    })
+  }
+  out.sort((a, b) => {
+    const orderA = a.order ?? Number.MAX_SAFE_INTEGER
+    const orderB = b.order ?? Number.MAX_SAFE_INTEGER
+    if (orderA !== orderB) return orderA - orderB
+    const t = a.title.localeCompare(b.title)
+    if (t !== 0) return t
+    return a.id.localeCompare(b.id)
+  })
+  return out
+}
+
+/**
+ * Wiki resolve list from tree nodes + optional meta aliases (used mid-rebuild
+ * when kbMeta is still the previous generation).
+ */
+function wikiDocsFromNodes(
+  spaceId: string,
+  nodes: KnowledgeNode[],
+  meta?: Map<string, KnowledgeDocMetaEntry>,
+): LinkResolveDoc[] {
+  const out: LinkResolveDoc[] = []
+  for (const n of nodes) {
+    if (n.kind !== 'doc') continue
+    const aliases = meta?.get(docKey(spaceId, n.id))?.aliases ?? []
+    out.push({ id: n.id, title: n.title, aliases, order: n.order })
+  }
+  out.sort((a, b) => {
+    const orderA = a.order ?? Number.MAX_SAFE_INTEGER
+    const orderB = b.order ?? Number.MAX_SAFE_INTEGER
+    if (orderA !== orderB) return orderA - orderB
+    const t = a.title.localeCompare(b.title)
+    if (t !== 0) return t
+    return a.id.localeCompare(b.id)
+  })
+  return out
+}
+
 function indexCurrentDoc(
   spaceId: string,
   docId: string,
@@ -189,6 +252,7 @@ function indexCurrentDoc(
   body: string,
   spaceName: string,
   nodes: KnowledgeNode[],
+  opts?: { reresolveSpace?: boolean },
 ) {
   const path = getPathTitles(nodes, docId).join(' / ') || title
   const order = nodes.find((n) => n.id === docId)?.order ?? Number.MAX_SAFE_INTEGER
@@ -203,6 +267,12 @@ function indexCurrentDoc(
     order,
     metaSink: kbMeta,
   })
+  // Incremental link index for this source (uses updated meta for aliases).
+  indexDocLinks(kbLinkIndex, spaceId, docId, body, wikiDocsForSpace(spaceId))
+  // Title/alias identity changes need other sources re-resolved (rename / FM aliases).
+  if (opts?.reresolveSpace) {
+    reresolveSpaceLinks(kbLinkIndex, spaceId, wikiDocsForSpace(spaceId))
+  }
 }
 
 /**
@@ -295,6 +365,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     set({ indexStatus: 'building', indexProgress: { done: 0, total: 0 } })
     const next = createKnowledgeIndex()
     const nextMeta = new Map<string, KnowledgeDocMetaEntry>()
+    const nextLinks = createLinkIndex()
+    /** Bodies retained for a second pass link index (after all meta/aliases known). */
+    const bodiesBySpace = new Map<string, Map<string, string>>()
     const counts: Record<string, number> = {}
     try {
       const spaces = get().spaces
@@ -315,6 +388,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       for (const { space, nodes } of loaded) {
         if (gen !== indexBuildGen) return
         let docs = 0
+        const bodyMap = new Map<string, string>()
+        bodiesBySpace.set(space.id, bodyMap)
         for (const node of nodes) {
           if (node.kind !== 'doc') continue
           docs += 1
@@ -325,6 +400,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           } catch {
             body = ''
           }
+          bodyMap.set(node.id, body)
           const path = getPathTitles(nodes, node.id).join(' / ') || node.title
           // Body is stripped of frontmatter + capped inside upsertSearchDoc.
           upsertSearchDoc(next, {
@@ -351,8 +427,26 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         set({ indexProgress: { done, total, spaceName: space.name } })
       }
       if (gen !== indexBuildGen) return
+      // Second pass: link index with full meta (aliases) available.
+      for (const { space, nodes } of loaded) {
+        if (gen !== indexBuildGen) return
+        const bodyMap = bodiesBySpace.get(space.id) ?? new Map()
+        const wikiDocs = wikiDocsFromNodes(space.id, nodes, nextMeta)
+        for (const node of nodes) {
+          if (node.kind !== 'doc') continue
+          indexDocLinks(
+            nextLinks,
+            space.id,
+            node.id,
+            bodyMap.get(node.id) ?? '',
+            wikiDocs,
+          )
+        }
+      }
+      if (gen !== indexBuildGen) return
       kbIndex = next
       kbMeta = nextMeta
+      kbLinkIndex = nextLinks
       set({
         indexStatus: 'ready',
         spaceDocCounts: counts,
@@ -480,6 +574,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       for (const hit of get().searchHits) {
         if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId), kbMeta)
       }
+      removeSpaceFromLinkIndex(kbLinkIndex, id)
       // Also discard by scanning stored ids: MiniSearch has no list-all API cheaply —
       // rebuild keeps consistency after destructive space ops.
       set((s) => {
@@ -517,12 +612,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
       } else {
-        set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
         set({
           activeDocId: null,
           docBody: '',
           draftBody: '',
-          editing: false,
+          editorMode: 'preview',
           pendingReveal: null,
         })
       }
@@ -665,7 +759,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         } catch {
           body = get().activeDocId === id ? get().docBody : ''
         }
-        indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes)
+        indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes, {
+          reresolveSpace: true,
+        })
         syncFacetsToState(set)
         get().runSearch(get().searchQuery)
       }
@@ -708,6 +804,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
         indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
       }
+      // Path change only — titles unchanged; still refresh reverse maps once.
+      reresolveSpaceLinks(kbLinkIndex, spaceId, wikiDocsForSpace(spaceId))
       syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch (e) {
@@ -729,7 +827,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       for (const docId of removedDocIds) {
         await knowledgeDeleteDocFile(spaceId, docId)
         removeSearchDoc(kbIndex, docKey(spaceId, docId), kbMeta)
+        removeSourceDoc(kbLinkIndex, spaceId, docId)
       }
+      // Targets may have disappeared → re-resolve remaining edges in this space.
+      reresolveSpaceLinks(kbLinkIndex, spaceId, wikiDocsForSpace(spaceId))
       const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
       set((s) => {
         const prevCount = s.spaceDocCounts[spaceId]
@@ -752,13 +853,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
           ),
           ...(activeRemoved
-            ? { activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' as const }
-            : {}),
             ? {
                 activeDocId: null,
                 docBody: '',
                 draftBody: '',
-                editing: false,
+                editorMode: 'preview' as const,
                 pendingReveal: null,
               }
             : pendingTargetsRemoved
@@ -784,12 +883,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!node || !spaceId) {
       toast.error('Could not load document')
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
       set({
         activeDocId: null,
         docBody: '',
         draftBody: '',
-        editing: false,
+        editorMode: 'preview',
         pendingReveal: null,
       })
       return
@@ -812,7 +910,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         draftBody: body,
         editorMode,
         saveState: 'idle',
-        editing: true,
         ...(revealMatches ? {} : { pendingReveal: null }),
       })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
@@ -833,12 +930,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
       set({
         activeDocId: null,
         docBody: '',
         draftBody: '',
-        editing: false,
+        editorMode: 'preview',
         pendingReveal: null,
       })
     }
@@ -891,6 +987,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         const node = get().nodes.find((n) => n.id === s.activeDocId)
         const spaceName = get().spaces.find((sp) => sp.id === s.activeSpaceId)?.name ?? ''
         if (node && s.activeSpaceId && s.activeDocId) {
+          // Body / frontmatter aliases may change → re-resolve space after upsert.
           indexCurrentDoc(
             s.activeSpaceId,
             s.activeDocId,
@@ -898,6 +995,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             s.draftBody,
             spaceName,
             get().nodes,
+            { reresolveSpace: true },
           )
           syncFacetsToState(set)
           get().runSearch(get().searchQuery)
@@ -966,21 +1064,25 @@ export function listKnowledgeDocsForWiki(spaceId: string): Array<{
   aliases: string[]
   order: number
 }> {
-  const out: Array<{ id: string; title: string; aliases: string[]; order: number }> = []
-  for (const entry of kbMeta.values()) {
-    if (entry.spaceId !== spaceId) continue
-    out.push({
-      id: entry.docId,
-      title: entry.title,
-      aliases: entry.aliases,
-      order: entry.order,
-    })
-  }
-  out.sort((a, b) => {
-    if (a.order !== b.order) return a.order - b.order
-    const titleCmp = a.title.localeCompare(b.title)
-    if (titleCmp !== 0) return titleCmp
-    return a.id.localeCompare(b.id)
-  })
-  return out
+  return wikiDocsForSpace(spaceId).map((d) => ({
+    id: d.id,
+    title: d.title,
+    aliases: [...(d.aliases ?? [])],
+    order: d.order ?? Number.MAX_SAFE_INTEGER,
+  }))
+}
+
+/** Resolved backlinks for a document (same-space sources that link here). */
+export function getKnowledgeBacklinks(spaceId: string, docId: string): LinkEdge[] {
+  return getBacklinks(kbLinkIndex, spaceId, docId)
+}
+
+/** Outbound wiki edges from a document (includes broken). */
+export function getKnowledgeOutbound(spaceId: string, docId: string): LinkEdge[] {
+  return getOutbound(kbLinkIndex, spaceId, docId)
+}
+
+/** Count of broken outbound `[[title]]` targets for the current source doc. */
+export function getKnowledgeBrokenOutboundCount(spaceId: string, docId: string): number {
+  return countBrokenOutbound(kbLinkIndex, spaceId, docId)
 }

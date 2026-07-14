@@ -22,7 +22,7 @@ export function DocPropertiesRow({ body }: { body: string }) {
         <span
           className="rounded-md border border-border bg-surface-muted px-2 py-0.5 text-meta text-ink-secondary"
           data-testid="knowledge-doc-status"
-          title={t('knowledge.doc.propertyStatus')}
+          title={t('knowledge.wiki.propertyStatus')}
         >
           {meta.status}
         </span>

@@ -36,25 +36,38 @@ export function splitYamlFrontmatter(raw: string): FrontmatterSplit {
 export function joinYamlFrontmatter(fmText: string, body: string): string {
   if (!fmText) return body
   return `${fmText}\n${body}`
+}
+
+/**
  * Knowledge-doc YAML frontmatter: tags / status / aliases only.
  * Hand-rolled (no gray-matter) — enough for flat scalars + string lists.
+ *
  * Frontmatter is accepted only when the opening `---`…`---` block contains at
  * least one known key (`tags` / `status` / `aliases`). Bare thematic breaks
  * (`---` as Markdown hr) are left in the body and stay searchable.
+ */
+
 export type KnowledgeDocMeta = {
   tags: string[]
   status: string | null
   aliases: string[]
+}
+
 export type ParsedFrontmatter = {
   meta: KnowledgeDocMeta
   /** Markdown after the closing `---` fence (leading blank line stripped once). */
   bodyWithoutFm: string
   hasFrontmatter: boolean
+}
+
 export const EMPTY_DOC_META: KnowledgeDocMeta = {
   tags: [],
   status: null,
   aliases: [],
+}
+
 const FM_KEYS = new Set(['tags', 'status', 'aliases'])
+
 /** Strip a leading `--- … ---` block and parse known property keys. */
 export function parseFrontmatter(raw: string): ParsedFrontmatter {
   const normalized = raw.replace(/\r\n/g, '\n')
@@ -62,6 +75,7 @@ export function parseFrontmatter(raw: string): ParsedFrontmatter {
   if (lines[0] !== '---') {
     return { meta: { ...EMPTY_DOC_META }, bodyWithoutFm: raw, hasFrontmatter: false }
   }
+
   let end = -1
   for (let i = 1; i < lines.length; i++) {
     if (lines[i] === '---') {
@@ -72,18 +86,26 @@ export function parseFrontmatter(raw: string): ParsedFrontmatter {
   if (end < 0) {
     return { meta: { ...EMPTY_DOC_META }, bodyWithoutFm: raw, hasFrontmatter: false }
   }
+
   const yamlLines = lines.slice(1, end)
   const { meta, foundKnownKey } = parseMetaLines(yamlLines)
+
   // Reject false positives: thematic breaks / unknown-only blocks keep full body.
   if (!foundKnownKey) {
     return { meta: { ...EMPTY_DOC_META }, bodyWithoutFm: raw, hasFrontmatter: false }
   }
+
   let bodyWithoutFm = lines.slice(end + 1).join('\n')
   // Drop a single leading blank line after the fence (common authoring style).
   if (bodyWithoutFm.startsWith('\n')) bodyWithoutFm = bodyWithoutFm.slice(1)
+
   return { meta, bodyWithoutFm, hasFrontmatter: true }
+}
+
+/**
  * String fields for MiniSearch indexing (space-joined; empty → '').
  * Callers index these separately from `bodyWithoutFm`.
+ */
 export function metaToSearchFields(meta: KnowledgeDocMeta): {
   tags: string
   status: string
@@ -94,17 +116,23 @@ export function metaToSearchFields(meta: KnowledgeDocMeta): {
     status: meta.status ?? '',
     aliases: meta.aliases.join(' '),
   }
+}
+
+/**
  * Wiki resolution hook (P1.3 step 2 / PR-14): match by title then aliases.
  * Caller supplies docs in stable tree order; **first** match wins.
+ *
  * 1. Exact title (case-sensitive)
  * 2. Case-insensitive title
  * 3. Case-insensitive alias
+ */
 export function matchDocByTitleOrAlias(
   target: string,
   docs: ReadonlyArray<{ id: string; title: string; aliases?: readonly string[] }>,
 ): { id: string; match: 'title' | 'title-ci' | 'alias' } | null {
   const q = target.trim()
   if (!q) return null
+
   for (const d of docs) {
     if (d.title === q) return { id: d.id, match: 'title' }
   }
@@ -119,8 +147,12 @@ export function matchDocByTitleOrAlias(
     }
   }
   return null
+}
+
+/**
  * Stable wiki sort: `order` asc, then `title`, then `id`.
  * Used by `listKnowledgeDocsForWiki` and available to PR-12 callers.
+ */
 export function compareWikiDocs(
   a: { id: string; title: string; order?: number },
   b: { id: string; title: string; order?: number },
@@ -131,11 +163,16 @@ export function compareWikiDocs(
   const titleCmp = a.title.localeCompare(b.title)
   if (titleCmp !== 0) return titleCmp
   return a.id.localeCompare(b.id)
+}
+
 // ─── internal line parser ───────────────────────────────────────────────────
+
 function normalizeFmKey(raw: string): 'tags' | 'status' | 'aliases' | null {
   const k = raw.toLowerCase()
   if (FM_KEYS.has(k)) return k as 'tags' | 'status' | 'aliases'
   return null
+}
+
 function parseMetaLines(lines: string[]): {
   meta: KnowledgeDocMeta
   foundKnownKey: boolean
@@ -150,6 +187,7 @@ function parseMetaLines(lines: string[]): {
       i += 1
       continue
     }
+
     // Block list: `key:` then indented `- item` lines
     const blockKey = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*$/)
     if (blockKey) {
@@ -171,6 +209,7 @@ function parseMetaLines(lines: string[]): {
         continue
       }
     }
+
     // Inline: `key: value`
     const inline = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/)
     if (inline) {
@@ -187,11 +226,15 @@ function parseMetaLines(lines: string[]): {
         continue
       }
     }
+
     i += 1
   }
+
   meta.tags = uniquePreserve(meta.tags)
   meta.aliases = uniquePreserve(meta.aliases)
   return { meta, foundKnownKey }
+}
+
 function assignListKey(
   meta: KnowledgeDocMeta,
   key: 'tags' | 'status' | 'aliases',
@@ -203,6 +246,8 @@ function assignListKey(
   }
   if (key === 'tags') meta.tags = items
   else meta.aliases = items
+}
+
 /** `[a, b]` / `a, b` / single scalar → string list */
 function parseInlineList(raw: string): string[] {
   if (!raw) return []
@@ -215,6 +260,8 @@ function parseInlineList(raw: string): string[] {
   if (s.includes(',')) return splitCommaList(s)
   const one = unquote(s)
   return one ? [one] : []
+}
+
 function splitCommaList(s: string): string[] {
   const out: string[] = []
   let cur = ''
@@ -241,6 +288,8 @@ function splitCommaList(s: string): string[] {
   const last = unquote(cur.trim())
   if (last) out.push(last)
   return out
+}
+
 function unquote(s: string): string {
   if (
     (s.startsWith('"') && s.endsWith('"') && s.length >= 2) ||
@@ -249,6 +298,8 @@ function unquote(s: string): string {
     return s.slice(1, -1)
   }
   return s
+}
+
 function uniquePreserve(items: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []

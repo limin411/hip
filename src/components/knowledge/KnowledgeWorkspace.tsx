@@ -52,6 +52,7 @@ import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
+import { BacklinksPanel } from './BacklinksPanel'
 
 /** Lazy so Source-only sessions pay 0 for Milkdown kit. */
 const DocLiveEditor = lazy(() =>
@@ -67,7 +68,6 @@ export function KnowledgeWorkspace() {
   const docBody = useKnowledgeStore((s) => s.docBody)
   const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editorMode = useKnowledgeStore((s) => s.editorMode)
-  const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
@@ -162,7 +162,8 @@ export function KnowledgeWorkspace() {
         return
       }
 
-      if (editing) {
+      // Source/Live: CM source editor; Preview: markdown reader.
+      if (editorMode !== 'preview') {
         const view = editorRef.current?.getView()
         if (view) {
           revealInCodeMirror(view, still.query)
@@ -192,7 +193,7 @@ export function KnowledgeWorkspace() {
       cancelled = true
       if (timeoutId != null) clearTimeout(timeoutId)
     }
-  }, [activeDocId, activeSpaceId, editing, docBody])
+  }, [activeDocId, activeSpaceId, editorMode, docBody])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
@@ -651,6 +652,14 @@ export function KnowledgeWorkspace() {
           </div>
         ) : null}
       </main>
+
+      {activeDocId && activeSpaceId ? (
+        <BacklinksPanel
+          spaceId={activeSpaceId}
+          docId={activeDocId}
+          onOpenDoc={(id) => void openDoc(id)}
+        />
+      ) : null}
 
       <Modal
         open={renameSpaceOpen}

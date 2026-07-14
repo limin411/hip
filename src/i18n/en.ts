@@ -1056,6 +1056,16 @@ export const en = {
         propertyStatus: 'Status',
         propertyTags: 'Tags',
       },
+      backlinks: {
+        title: 'Backlinks',
+        empty: 'No documents link here yet.',
+        brokenCount_one: '{{count}} broken outbound link',
+        brokenCount_other: '{{count}} broken outbound links',
+        brokenCount: '{{count}} broken outbound links',
+        brokenHint:
+          'Outbound [[wiki]] links in this document that do not match a title or alias.',
+        openHint: 'Open “{{title}}”',
+      },
       error: {
         generic: 'Something went wrong',
       },

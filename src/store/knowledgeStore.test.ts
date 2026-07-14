@@ -36,7 +36,12 @@ vi.mock('@/i18n', () => ({
 }))
 
 import { toast } from 'sonner'
-import { listKnowledgeDocsForWiki, useKnowledgeStore } from './knowledgeStore'
+import {
+  getKnowledgeBacklinks,
+  getKnowledgeBrokenOutboundCount,
+  listKnowledgeDocsForWiki,
+  useKnowledgeStore,
+} from './knowledgeStore'
 
 describe('knowledgeStore openDoc editorMode default', () => {
   beforeEach(() => {
@@ -315,21 +320,6 @@ describe('knowledgeStore flush-abort navigation', () => {
       searchHits: [],
       indexStatus: 'idle',
       spaceDocCounts: { spc_1: 2, spc_2: 0 },
-describe('knowledgeStore index progress + openSearchHit', () => {
-    knowledgeEnsureRoot.mockReset()
-    knowledgeListSpaces.mockReset()
-        { id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 },
-        { id: 'spc_2', name: 'S2', createdAt: 1, updatedAt: 1 },
-      activeSpaceId: null,
-      nodes: [],
-      activeDocId: null,
-      docBody: '',
-      draftBody: '',
-      editing: false,
-      mode: 'home',
-      indexProgress: null,
-      pendingReveal: null,
-      spaceDocCounts: {},
       recent: [],
       expandedFolderIds: {},
       busy: false,
@@ -392,67 +382,6 @@ describe('knowledgeStore index progress + openSearchHit', () => {
           parentId: null,
           kind: 'doc',
           title: 'T',
-  it('rebuildSearchIndex reports progress n/N then clears', async () => {
-    knowledgeGetTree.mockImplementation(async (spaceId: string) => {
-      if (spaceId === 'spc_1') {
-        return {
-          version: 1,
-          nodes: [
-            {
-              id: 'doc_a',
-              parentId: null,
-              kind: 'doc',
-              title: 'A',
-              order: 0,
-              createdAt: 1,
-              updatedAt: 1,
-            },
-            {
-              id: 'doc_b',
-              parentId: null,
-              kind: 'doc',
-              title: 'B',
-              order: 1,
-              createdAt: 1,
-              updatedAt: 1,
-            },
-          ],
-        }
-      }
-      return {
-        version: 1,
-        nodes: [
-          {
-            id: 'doc_c',
-            parentId: null,
-            kind: 'doc',
-            title: 'C',
-            order: 0,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        ],
-      }
-    })
-    knowledgeReadDoc.mockResolvedValue('body token_xyz')
-    const progressSamples: Array<{ done: number; total: number } | null> = []
-    const unsub = useKnowledgeStore.subscribe((s) => {
-      if (s.indexStatus === 'building' && s.indexProgress) {
-        progressSamples.push({ done: s.indexProgress.done, total: s.indexProgress.total })
-      }
-    })
-    await useKnowledgeStore.getState().rebuildSearchIndex()
-    unsub()
-    expect(s.indexStatus).toBe('ready')
-    expect(s.indexProgress).toBeNull()
-    expect(s.spaceDocCounts).toEqual({ spc_1: 2, spc_2: 1 })
-    // At least one sample with total=3
-    expect(progressSamples.some((p) => p && p.total === 3)).toBe(true)
-    expect(progressSamples.some((p) => p && p.done === 3)).toBe(true)
-  it('openSearchHit sets pendingReveal scoped to space/doc', async () => {
-    knowledgeGetTree.mockResolvedValue({
-          id: 'doc_1',
-          title: 'Note',
           order: 0,
           createdAt: 1,
           updatedAt: 1,
@@ -505,83 +434,6 @@ describe('knowledgeStore setDraftBody persist modes', () => {
       loaded: true,
       spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
       activeSpaceId: 'spc_1',
-    knowledgeReadDoc.mockResolvedValue('hello match_token world')
-    useKnowledgeStore.setState({ searchQuery: '  match_token  ' })
-    await useKnowledgeStore.getState().openSearchHit({
-      spaceId: 'spc_1',
-      docId: 'doc_1',
-      title: 'Note',
-      spaceName: 'S1',
-      path: 'Note',
-      score: 1,
-    })
-    expect(s.pendingReveal).toEqual({
-      query: 'match_token',
-      spaceId: 'spc_1',
-      docId: 'doc_1',
-    })
-    expect(s.activeDocId).toBe('doc_1')
-  it('clearPendingReveal clears the flag', () => {
-      pendingReveal: { query: 'x', spaceId: 'spc_1', docId: 'doc_1' },
-    })
-    useKnowledgeStore.getState().clearPendingReveal()
-    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
-  it('openHome clears pendingReveal', async () => {
-      mode: 'workspace',
-      activeDocId: 'doc_1',
-      pendingReveal: { query: 'old', spaceId: 'spc_1', docId: 'doc_1' },
-    })
-    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
-    expect(useKnowledgeStore.getState().mode).toBe('home')
-  it('failed openDoc clears pendingReveal', async () => {
-      mode: 'workspace',
-      nodes: [
-        {
-          id: 'doc_1',
-          parentId: null,
-          kind: 'doc',
-          title: 'Note',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
-    })
-    knowledgeReadDoc.mockRejectedValueOnce(new Error('missing'))
-    await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
-    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
-  it('openDoc to a different doc clears pendingReveal', async () => {
-      mode: 'workspace',
-      nodes: [
-        {
-          id: 'doc_1',
-          parentId: null,
-          kind: 'doc',
-          title: 'Note',
-          order: 0,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-        {
-          id: 'doc_2',
-          parentId: null,
-          kind: 'doc',
-          title: 'Other',
-          order: 1,
-          createdAt: 1,
-          updatedAt: 1,
-        },
-      ],
-      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
-    })
-    knowledgeReadDoc.mockResolvedValueOnce('other body')
-    await useKnowledgeStore.getState().openDoc('doc_2')
-    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_2')
-    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
-  it('deleteNode of active doc clears pendingReveal', async () => {
-      mode: 'workspace',
       nodes: [
         {
           id: 'doc_1',
@@ -685,17 +537,6 @@ describe('knowledgeStore setEditorMode', () => {
           parentId: null,
           kind: 'doc',
           title: 'Note',
-      editing: true,
-      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
-    await useKnowledgeStore.getState().deleteNode('doc_1')
-    const s = useKnowledgeStore.getState()
-    expect(s.activeDocId).toBeNull()
-    expect(s.pendingReveal).toBeNull()
-  it('superseded rebuild does not publish stale kbIndex or final ready from old gen', async () => {
-    knowledgeGetTree.mockResolvedValue({
-      version: 1,
-          id: 'doc_a',
-          title: 'A',
           order: 0,
           createdAt: 1,
           updatedAt: 1,
@@ -710,65 +551,6 @@ describe('knowledgeStore setEditorMode', () => {
       searchHits: [],
       indexStatus: 'idle',
       spaceDocCounts: { spc_1: 1 },
-    })
-
-    let releaseA: (() => void) | null = null
-    const stallA = new Promise<string>((resolve) => {
-      releaseA = () => resolve('body-from-A')
-    })
-    let readCalls = 0
-    knowledgeReadDoc.mockImplementation(async () => {
-      readCalls += 1
-      if (readCalls === 1) return stallA
-      return 'body-from-B'
-    })
-
-    const pA = useKnowledgeStore.getState().rebuildSearchIndex()
-    // Let A start and hit the stall
-    await Promise.resolve()
-    await Promise.resolve()
-
-    // Start B while A is stalled
-    const pB = useKnowledgeStore.getState().rebuildSearchIndex()
-    await pB
-
-    const afterB = useKnowledgeStore.getState()
-    expect(afterB.indexStatus).toBe('ready')
-    expect(afterB.indexProgress).toBeNull()
-
-    // Release stale A; it must not clobber ready/progress
-    releaseA!()
-    await pA
-
-    const afterA = useKnowledgeStore.getState()
-    expect(afterA.indexStatus).toBe('ready')
-    expect(afterA.indexProgress).toBeNull()
-  })
-})
-
-describe('knowledgeStore frontmatter facets + filters', () => {
-  beforeEach(() => {
-    knowledgeReadDoc.mockReset()
-    knowledgeGetTree.mockReset()
-    knowledgeEnsureRoot.mockReset()
-    knowledgeListSpaces.mockReset()
-    useKnowledgeStore.setState({
-      loaded: true,
-      spaces: [{ id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 }],
-      activeSpaceId: null,
-      nodes: [],
-      activeDocId: null,
-      docBody: '',
-      draftBody: '',
-      editing: false,
-      mode: 'home',
-      indexProgress: null,
-      pendingReveal: null,
-      spaceDocCounts: {},
-      availableTags: [],
-      availableStatuses: [],
-      filterTag: null,
-      filterStatus: null,
       recent: [],
       expandedFolderIds: {},
       busy: false,
@@ -840,6 +622,329 @@ describe('knowledgeStore frontmatter facets + filters', () => {
     })
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
+  })
+})
+
+describe('knowledgeStore index progress + openSearchHit', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [
+        { id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'S2', createdAt: 1, updatedAt: 1 },
+      ],
+      activeSpaceId: null,
+      nodes: [],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'preview',
+      mode: 'home',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: {},
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('rebuildSearchIndex reports progress n/N then clears', async () => {
+    knowledgeGetTree.mockImplementation(async (spaceId: string) => {
+      if (spaceId === 'spc_1') {
+        return {
+          version: 1,
+          nodes: [
+            {
+              id: 'doc_a',
+              parentId: null,
+              kind: 'doc',
+              title: 'A',
+              order: 0,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+            {
+              id: 'doc_b',
+              parentId: null,
+              kind: 'doc',
+              title: 'B',
+              order: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          ],
+        }
+      }
+      return {
+        version: 1,
+        nodes: [
+          {
+            id: 'doc_c',
+            parentId: null,
+            kind: 'doc',
+            title: 'C',
+            order: 0,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      }
+    })
+    knowledgeReadDoc.mockResolvedValue('body token_xyz')
+
+    const progressSamples: Array<{ done: number; total: number } | null> = []
+    const unsub = useKnowledgeStore.subscribe((s) => {
+      if (s.indexStatus === 'building' && s.indexProgress) {
+        progressSamples.push({ done: s.indexProgress.done, total: s.indexProgress.total })
+      }
+    })
+
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    unsub()
+
+    const s = useKnowledgeStore.getState()
+    expect(s.indexStatus).toBe('ready')
+    expect(s.indexProgress).toBeNull()
+    expect(s.spaceDocCounts).toEqual({ spc_1: 2, spc_2: 1 })
+    // At least one sample with total=3
+    expect(progressSamples.some((p) => p && p.total === 3)).toBe(true)
+    expect(progressSamples.some((p) => p && p.done === 3)).toBe(true)
+  })
+
+  it('openSearchHit sets pendingReveal scoped to space/doc', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeReadDoc.mockResolvedValue('hello match_token world')
+    useKnowledgeStore.setState({ searchQuery: '  match_token  ' })
+
+    await useKnowledgeStore.getState().openSearchHit({
+      spaceId: 'spc_1',
+      docId: 'doc_1',
+      title: 'Note',
+      spaceName: 'S1',
+      path: 'Note',
+      score: 1,
+    })
+
+    const s = useKnowledgeStore.getState()
+    expect(s.pendingReveal).toEqual({
+      query: 'match_token',
+      spaceId: 'spc_1',
+      docId: 'doc_1',
+    })
+    expect(s.activeDocId).toBe('doc_1')
+    expect(s.mode).toBe('workspace')
+  })
+
+  it('clearPendingReveal clears the flag', () => {
+    useKnowledgeStore.setState({
+      pendingReveal: { query: 'x', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    useKnowledgeStore.getState().clearPendingReveal()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+
+  it('openHome clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      activeDocId: 'doc_1',
+      pendingReveal: { query: 'old', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    await useKnowledgeStore.getState().openHome()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+    expect(useKnowledgeStore.getState().mode).toBe('home')
+  })
+
+  it('failed openDoc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    knowledgeReadDoc.mockRejectedValueOnce(new Error('missing'))
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+  })
+
+  it('openDoc to a different doc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_2',
+          parentId: null,
+          kind: 'doc',
+          title: 'Other',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    knowledgeReadDoc.mockResolvedValueOnce('other body')
+    await useKnowledgeStore.getState().openDoc('doc_2')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_2')
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+
+  it('deleteNode of active doc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      docBody: 'saved',
+      draftBody: 'saved',
+      editorMode: 'source',
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+      spaceDocCounts: { spc_1: 1 },
+    })
+    await useKnowledgeStore.getState().deleteNode('doc_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.activeDocId).toBeNull()
+    expect(s.pendingReveal).toBeNull()
+  })
+
+  it('superseded rebuild does not publish stale kbIndex or final ready from old gen', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'A',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+
+    let releaseA: (() => void) | null = null
+    const stallA = new Promise<string>((resolve) => {
+      releaseA = () => resolve('body-from-A')
+    })
+    let readCalls = 0
+    knowledgeReadDoc.mockImplementation(async () => {
+      readCalls += 1
+      if (readCalls === 1) return stallA
+      return 'body-from-B'
+    })
+
+    const pA = useKnowledgeStore.getState().rebuildSearchIndex()
+    // Let A start and hit the stall
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Start B while A is stalled
+    const pB = useKnowledgeStore.getState().rebuildSearchIndex()
+    await pB
+
+    const afterB = useKnowledgeStore.getState()
+    expect(afterB.indexStatus).toBe('ready')
+    expect(afterB.indexProgress).toBeNull()
+
+    // Release stale A; it must not clobber ready/progress
+    releaseA!()
+    await pA
+
+    const afterA = useKnowledgeStore.getState()
+    expect(afterA.indexStatus).toBe('ready')
+    expect(afterA.indexProgress).toBeNull()
+  })
+})
+
+describe('knowledgeStore frontmatter facets + filters', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: null,
+      nodes: [],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'preview',
+      mode: 'home',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: {},
+      availableTags: [],
+      availableStatuses: [],
+      filterTag: null,
+      filterStatus: null,
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
   it('rebuild populates availableTags and filterTag lists matching docs', async () => {
     knowledgeGetTree.mockResolvedValue({
       version: 1,
@@ -863,6 +968,7 @@ describe('knowledgeStore frontmatter facets + filters', () => {
           updatedAt: 1,
         },
       ],
+    })
     knowledgeReadDoc.mockImplementation(async (_spaceId: string, docId: string) => {
       if (docId === 'doc_a') {
         return `---
@@ -878,15 +984,20 @@ tags: [ops]
 ---
 ops body
 `
+    })
+
     await useKnowledgeStore.getState().rebuildSearchIndex()
     const s = useKnowledgeStore.getState()
     expect(s.indexStatus).toBe('ready')
     expect(s.availableTags).toEqual(expect.arrayContaining(['design', 'ops']))
     expect(s.availableStatuses).toContain('draft')
+
     useKnowledgeStore.getState().setFilterTag('design')
     const filtered = useKnowledgeStore.getState()
     expect(filtered.filterTag).toBe('design')
     expect(filtered.searchHits.map((h) => h.docId)).toEqual(['doc_a'])
+  })
+
   it('clears stale filterTag when facets no longer include it', async () => {
     knowledgeGetTree.mockResolvedValue({
       version: 1,
@@ -901,15 +1012,18 @@ ops body
           updatedAt: 1,
         },
       ],
+    })
     knowledgeReadDoc.mockResolvedValue(`---
 tags: [design]
 ---
 body
 `)
+
     await useKnowledgeStore.getState().rebuildSearchIndex()
     useKnowledgeStore.getState().setFilterTag('design')
     expect(useKnowledgeStore.getState().filterTag).toBe('design')
     expect(useKnowledgeStore.getState().searchHits).toHaveLength(1)
+
     // Rebuild with no frontmatter → facets empty → filter cleared
     knowledgeReadDoc.mockResolvedValue('plain body only')
     await useKnowledgeStore.getState().rebuildSearchIndex()
@@ -917,6 +1031,8 @@ body
     expect(s.availableTags).toEqual([])
     expect(s.filterTag).toBeNull()
     expect(s.searchHits).toEqual([])
+  })
+
   it('listKnowledgeDocsForWiki sorts by order then title then id', async () => {
     knowledgeGetTree.mockResolvedValue({
       version: 1,
@@ -949,6 +1065,7 @@ body
           updatedAt: 1,
         },
       ],
+    })
     knowledgeReadDoc.mockImplementation(async (_s: string, docId: string) => {
       if (docId === 'doc_a') {
         return `---
@@ -958,16 +1075,22 @@ x
 `
       }
       return 'plain'
+    })
+
     await useKnowledgeStore.getState().rebuildSearchIndex()
     const wiki = listKnowledgeDocsForWiki('spc_1')
     expect(wiki.map((d) => d.id)).toEqual(['doc_a', 'doc_b', 'doc_z'])
     expect(wiki[0]?.aliases).toEqual(['A1'])
+  })
+
   it('openHome clears active meta filters', async () => {
+    useKnowledgeStore.setState({
       mode: 'workspace',
       activeSpaceId: 'spc_1',
       filterTag: 'design',
       filterStatus: 'draft',
       searchHits: [{ spaceId: 'spc_1', docId: 'x', title: 't', spaceName: 'S', path: 't', score: 0 }],
+    })
     await useKnowledgeStore.getState().openHome()
     const s = useKnowledgeStore.getState()
     expect(s.mode).toBe('home')
@@ -977,3 +1100,109 @@ x
   })
 })
 
+describe('knowledgeStore link index (backlinks)', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'Alpha',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_b',
+          parentId: null,
+          kind: 'doc',
+          title: 'Beta',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'preview',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: { spc_1: 2 },
+      availableTags: [],
+      availableStatuses: [],
+      filterTag: null,
+      filterStatus: null,
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('rebuild indexes backlinks and broken outbound (title + alias)', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: useKnowledgeStore.getState().nodes,
+    })
+    knowledgeReadDoc.mockImplementation(async (_s: string, docId: string) => {
+      if (docId === 'doc_a') {
+        return `---
+aliases: [A1]
+---
+See [[Beta]] and [[Missing]].
+`
+      }
+      if (docId === 'doc_b') return 'Mentions [[A1]] only.'
+      return ''
+    })
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    expect(useKnowledgeStore.getState().indexStatus).toBe('ready')
+
+    const backsToB = getKnowledgeBacklinks('spc_1', 'doc_b')
+    expect(backsToB.map((e) => e.fromDocId)).toEqual(['doc_a'])
+
+    // Alias resolution: doc_b links to Alpha via A1
+    const backsToA = getKnowledgeBacklinks('spc_1', 'doc_a')
+    expect(backsToA.map((e) => e.fromDocId)).toEqual(['doc_b'])
+
+    expect(getKnowledgeBrokenOutboundCount('spc_1', 'doc_a')).toBe(1)
+    expect(getKnowledgeBrokenOutboundCount('spc_1', 'doc_b')).toBe(0)
+  })
+
+  it('flushSave reindexes outbound of active doc', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: useKnowledgeStore.getState().nodes,
+    })
+    knowledgeReadDoc.mockResolvedValue('plain')
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_a',
+      docBody: 'plain',
+      draftBody: 'Now [[Beta]]',
+      editorMode: 'source',
+    })
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(true)
+    expect(getKnowledgeBacklinks('spc_1', 'doc_b').map((e) => e.fromDocId)).toEqual([
+      'doc_a',
+    ])
+  })
+})

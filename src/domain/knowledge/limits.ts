@@ -1,5 +1,3 @@
-/** Single large-doc threshold used everywhere (edit, index, snapshots). */
-export const KNOWLEDGE_LARGE_DOC_CHARS = 512_000
 /**
  * Shared knowledge-base size / UX limits.
  * Single source of truth for large-doc, index, and related caps.
@@ -10,6 +8,7 @@ export const KNOWLEDGE_LARGE_DOC_CHARS = 512_000
  * Not yet consumed by edit paths in this PR — reserved so later PRs share one value.
  * MiniSearch body indexing uses `KNOWLEDGE_INDEX_BODY_CHARS` instead.
  */
+export const KNOWLEDGE_LARGE_DOC_CHARS = 512_000
 
 /** MiniSearch indexes at most this many body chars (after frontmatter strip). */
 export const KNOWLEDGE_INDEX_BODY_CHARS = 512_000

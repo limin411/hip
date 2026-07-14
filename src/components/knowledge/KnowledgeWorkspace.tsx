@@ -51,6 +51,7 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
@@ -484,7 +485,8 @@ export function KnowledgeWorkspace() {
                 onCommit={() => {}}
               />
               <DocReader
-                content={docBody}
+                // Prefer draft so preview task toggles are optimistic before flush.
+                content={draftBody || docBody}
                 onStartEdit={() => void setEditing(true)}
               />
             </KnowledgeDocCanvas>

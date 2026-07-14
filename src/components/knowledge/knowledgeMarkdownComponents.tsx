@@ -9,6 +9,8 @@ import {
 export interface KnowledgeMarkdownOptions {
   /** Called with 0-based GFM task index (document order). */
   onTaskToggle?: (taskIndex: number) => void
+  /** Optional scope for in-doc #anchor scroll (DocReader root). */
+  getScrollRoot?: () => ParentNode | null | undefined
 }
 
 /** Flatten react-markdown children to plain text for heading ids. */
@@ -28,16 +30,22 @@ type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 /**
  * Knowledge-only MarkdownBody component overrides:
  * interactive GFM task checkboxes + heading ids + in-doc #anchors.
+ *
+ * **Call once per React render pass** (do not memoize across renders).
+ * Counters live in this factory closure and must start at 0 for every
+ * ReactMarkdown walk; reusing a prior return value makes indices/ids drift.
+ *
  * Chat / other MarkdownBody callers stay on defaults.
  */
 export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {}): Components {
+  // Fresh for this render pass only — never share across re-renders.
   let taskIndex = 0
   const assignId = createHeadingIdAssigner()
 
   const heading =
     (Tag: HeadingTag): NonNullable<Components[HeadingTag]> =>
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- node from react-markdown
     ({ node: _node, children, ...props }) => {
+      void _node
       const id = assignId(textFromChildren(children))
       return (
         <Tag id={id} {...props}>
@@ -54,8 +62,9 @@ export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {})
     h5: heading('h5'),
     h6: heading('h6'),
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     input: ({ node: _node, type, checked, disabled: _disabled, ...props }) => {
+      void _node
+      void _disabled
       if (type !== 'checkbox') {
         return <input type={type} checked={checked} {...props} />
       }
@@ -73,13 +82,13 @@ export function knowledgeMarkdownComponents(opts: KnowledgeMarkdownOptions = {})
       )
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     a: ({ node: _node, href, children, ...props }) => {
+      void _node
       const handleClick = async (e: React.MouseEvent) => {
         e.preventDefault()
         if (!href) return
         if (href.startsWith('#')) {
-          scrollToKnowledgeHeading(href)
+          scrollToKnowledgeHeading(href, opts.getScrollRoot?.() ?? null)
           return
         }
         try {

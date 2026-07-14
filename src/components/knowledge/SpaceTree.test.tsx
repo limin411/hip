@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
-import { SpaceTree } from './SpaceTree'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { listVisibleTreeNodes, SpaceTree } from './SpaceTree'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -16,7 +17,7 @@ vi.mock('@/components/context-menu', () => ({
 
 const noop = () => {}
 
-function seedTree(activeDocId: string | null) {
+function seedTree(activeDocId: string | null, extra?: Partial<ReturnType<typeof useKnowledgeStore.getState>>) {
   useKnowledgeStore.setState({
     loaded: true,
     spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
@@ -42,6 +43,7 @@ function seedTree(activeDocId: string | null) {
       },
     ],
     activeDocId,
+    treeFocusId: activeDocId,
     docBody: '',
     draftBody: '',
     editing: false,
@@ -55,6 +57,7 @@ function seedTree(activeDocId: string | null) {
     busy: false,
     error: null,
     saveState: 'idle',
+    ...extra,
   })
 }
 
@@ -104,5 +107,138 @@ describe('SpaceTree selection visuals', () => {
     expect(row.className).not.toContain('bg-accent-active')
     expect(row.className).not.toMatch(/inset/)
     expect(row.className).toContain('hover:bg-surface-muted')
+  })
+})
+
+describe('listVisibleTreeNodes', () => {
+  const nodes: KnowledgeNode[] = [
+    {
+      id: 'fld_1',
+      parentId: null,
+      kind: 'folder',
+      title: 'F',
+      order: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'doc_a',
+      parentId: 'fld_1',
+      kind: 'doc',
+      title: 'A',
+      order: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: 'doc_b',
+      parentId: null,
+      kind: 'doc',
+      title: 'B',
+      order: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]
+
+  it('hides children of collapsed folders', () => {
+    expect(listVisibleTreeNodes(nodes, {}).map((n) => n.id)).toEqual(['fld_1', 'doc_b'])
+  })
+
+  it('includes children when folder expanded', () => {
+    expect(listVisibleTreeNodes(nodes, { fld_1: true }).map((n) => n.id)).toEqual([
+      'fld_1',
+      'doc_a',
+      'doc_b',
+    ])
+  })
+})
+
+describe('SpaceTree keyboard navigation', () => {
+  beforeEach(() => {
+    seedTree('doc_1', {
+      nodes: [
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'Folder',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_inner',
+          parentId: 'fld_1',
+          kind: 'doc',
+          title: 'Inner',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      expandedFolderIds: {},
+      treeFocusId: 'fld_1',
+      activeDocId: null,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('ArrowDown / ArrowUp move treeFocusId', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const tree = screen.getByTestId('knowledge-tree')
+    fireEvent.keyDown(tree, { key: 'ArrowDown' })
+    expect(useKnowledgeStore.getState().treeFocusId).toBe('doc_1')
+    fireEvent.keyDown(tree, { key: 'ArrowUp' })
+    expect(useKnowledgeStore.getState().treeFocusId).toBe('fld_1')
+  })
+
+  it('ArrowRight expands folder; ArrowLeft collapses', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const tree = screen.getByTestId('knowledge-tree')
+    fireEvent.keyDown(tree, { key: 'ArrowRight' })
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(true)
+    fireEvent.keyDown(tree, { key: 'ArrowLeft' })
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(false)
+  })
+
+  it('Enter toggles focused folder', () => {
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const tree = screen.getByTestId('knowledge-tree')
+    fireEvent.keyDown(tree, { key: 'Enter' })
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(true)
   })
 })

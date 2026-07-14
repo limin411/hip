@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
+import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,7 @@ export function KnowledgeWorkspace() {
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
+  const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const docBody = useKnowledgeStore((s) => s.docBody)
   const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
@@ -131,8 +133,8 @@ export function KnowledgeWorkspace() {
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
 
-  // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
-  const parentForNew: string | null = activeNode?.parentId ?? null
+  // Toolbar create: focused folder / sibling of focused|active doc / root.
+  const parentForNew = resolveParentForNew({ treeFocusId, activeDocId, nodes })
 
   const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
 

@@ -53,6 +53,8 @@ function mapSpaceNameError(raw: string, name: string): string {
 const RECENT_KEY = 'hip-knowledge-recent'
 /** Cap for “最近打开” on the knowledge home page (and localStorage). */
 const RECENT_CAP = 8
+/** Per-space folder expand map: `Record<spaceId, Record<folderId, true>>`. */
+const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
 
 function loadRecent(): KnowledgeRecentItem[] {
   if (typeof localStorage === 'undefined') return []
@@ -75,6 +77,64 @@ function persistRecent(recent: KnowledgeRecentItem[]) {
   }
 }
 
+function compactExpand(expanded: Record<string, boolean>): Record<string, true> {
+  const out: Record<string, true> = {}
+  for (const [id, on] of Object.entries(expanded)) {
+    if (on) out[id] = true
+  }
+  return out
+}
+
+function loadExpandedForSpace(spaceId: string): Record<string, boolean> {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(EXPANDED_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, Record<string, unknown>>
+    const forSpace = parsed?.[spaceId]
+    if (!forSpace || typeof forSpace !== 'object') return {}
+    const out: Record<string, boolean> = {}
+    for (const [id, on] of Object.entries(forSpace)) {
+      if (on) out[id] = true
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function persistExpandedForSpace(spaceId: string, expanded: Record<string, boolean>) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    let all: Record<string, Record<string, true>> = {}
+    const raw = localStorage.getItem(EXPANDED_KEY)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          all = parsed as Record<string, Record<string, true>>
+        }
+      } catch {
+        // replace corrupt blob
+      }
+    }
+    all[spaceId] = compactExpand(expanded)
+    localStorage.setItem(EXPANDED_KEY, JSON.stringify(all))
+  } catch {
+    // ignore quota
+  }
+}
+
+let expandPersistTimer: ReturnType<typeof setTimeout> | null = null
+
+function schedulePersistExpand(spaceId: string, get: () => KnowledgeState) {
+  if (expandPersistTimer) clearTimeout(expandPersistTimer)
+  expandPersistTimer = setTimeout(() => {
+    expandPersistTimer = null
+    persistExpandedForSpace(spaceId, get().expandedFolderIds)
+  }, 100)
+}
+
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
@@ -95,6 +155,8 @@ interface KnowledgeState {
   spaceDocCounts: Record<string, number>
   recent: KnowledgeRecentItem[]
   expandedFolderIds: Record<string, boolean>
+  /** Keyboard / roving focus in the space tree (separate from activeDocId). */
+  treeFocusId: string | null
   busy: boolean
   error: string | null
   saveState: SaveState
@@ -121,6 +183,7 @@ interface KnowledgeState {
   flushSave: () => Promise<boolean>
   setSearchQuery: (q: string) => void
   toggleFolder: (id: string) => void
+  setTreeFocusId: (id: string | null) => void
   dropRecent: (spaceId: string | null, docId: string) => void
 }
 
@@ -171,6 +234,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   spaceDocCounts: {},
   recent: [],
   expandedFolderIds: {},
+  treeFocusId: null,
   busy: false,
   error: null,
   saveState: 'idle',
@@ -320,6 +384,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           mode: 'home',
           activeSpaceId: null,
           activeDocId: null,
+          treeFocusId: null,
           docBody: '',
           draftBody: '',
           editing: false,
@@ -361,7 +426,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         activeSpaceId: id,
         nodes: tree.nodes ?? [],
         mode: 'workspace',
-        expandedFolderIds: {},
+        expandedFolderIds: loadExpandedForSpace(id),
+        treeFocusId: opts?.selectDocId ?? null,
       })
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
@@ -384,6 +450,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     set({
       mode: 'home',
       activeDocId: null,
+      treeFocusId: null,
       docBody: '',
       draftBody: '',
       editing: false,
@@ -561,8 +628,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
           ),
           ...(activeRemoved
-            ? { activeDocId: null, docBody: '', draftBody: '', editing: false }
+            ? {
+                activeDocId: null,
+                docBody: '',
+                draftBody: '',
+                editing: false,
+              }
             : {}),
+          treeFocusId:
+            s.treeFocusId != null &&
+            (removedDocIds.includes(s.treeFocusId) ||
+              !nodes.some((n) => n.id === s.treeFocusId))
+              ? null
+              : s.treeFocusId,
         }
       })
       persistRecent(get().recent)
@@ -581,12 +659,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!node || !spaceId) {
       toast.error('Could not load document')
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
       return
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      set({ activeDocId: id, docBody: body, draftBody: body, editing: true, saveState: 'idle' })
+      set({
+        activeDocId: id,
+        treeFocusId: id,
+        docBody: body,
+        draftBody: body,
+        editing: true,
+        saveState: 'idle',
+      })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -605,7 +690,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({ activeDocId: null, treeFocusId: null, docBody: '', draftBody: '', editing: false })
     }
   },
 
@@ -669,10 +754,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     get().runSearch(q)
   },
 
-  toggleFolder: (id) =>
+  toggleFolder: (id) => {
     set((s) => ({
       expandedFolderIds: { ...s.expandedFolderIds, [id]: !s.expandedFolderIds[id] },
-    })),
+    }))
+    const spaceId = get().activeSpaceId
+    if (spaceId) schedulePersistExpand(spaceId, get)
+  },
+
+  setTreeFocusId: (id) => set({ treeFocusId: id }),
 
   dropRecent: (spaceId, docId) => {
     if (!spaceId) return

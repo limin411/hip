@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const knowledgeReadDoc = vi.fn()
 const knowledgeWriteDoc = vi.fn()
@@ -36,6 +36,8 @@ vi.mock('@/i18n', () => ({
 import { toast } from 'sonner'
 import { useKnowledgeStore } from './knowledgeStore'
 
+const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
+
 describe('knowledgeStore openDoc editing default', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
@@ -60,6 +62,7 @@ describe('knowledgeStore openDoc editing default', () => {
         },
       ],
       activeDocId: null,
+      treeFocusId: null,
       docBody: '',
       draftBody: '',
       editing: false,
@@ -81,10 +84,106 @@ describe('knowledgeStore openDoc editing default', () => {
     await useKnowledgeStore.getState().openDoc('doc_1')
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe('doc_1')
+    expect(s.treeFocusId).toBe('doc_1')
     expect(s.docBody).toBe('# hello')
     expect(s.draftBody).toBe('# hello')
     expect(s.editing).toBe(true)
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
+  })
+})
+
+describe('knowledgeStore expand persist + treeFocusId', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.useFakeTimers()
+    knowledgeGetTree.mockReset()
+    knowledgeWriteDoc.mockReset()
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'F',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'F',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: null,
+      treeFocusId: null,
+      docBody: '',
+      draftBody: '',
+      editing: false,
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 0 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  it('toggleFolder persists expanded map per space (debounced)', () => {
+    useKnowledgeStore.getState().toggleFolder('fld_1')
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(true)
+    expect(localStorage.getItem(EXPANDED_KEY)).toBeNull()
+    vi.advanceTimersByTime(100)
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY)!)
+    expect(stored).toEqual({ spc_1: { fld_1: true } })
+  })
+
+  it('openSpace restores expanded folders from localStorage', async () => {
+    localStorage.setItem(
+      EXPANDED_KEY,
+      JSON.stringify({ spc_1: { fld_1: true, fld_gone: true } }),
+    )
+    await useKnowledgeStore.getState().openSpace('spc_1')
+    const s = useKnowledgeStore.getState()
+    expect(s.expandedFolderIds.fld_1).toBe(true)
+    expect(s.expandedFolderIds.fld_gone).toBe(true)
+    expect(s.mode).toBe('workspace')
+  })
+
+  it('openSpace does not wipe expand to empty when nothing stored', async () => {
+    useKnowledgeStore.setState({ expandedFolderIds: { fld_1: true } })
+    await useKnowledgeStore.getState().openSpace('spc_1')
+    // no stored map → {}
+    expect(useKnowledgeStore.getState().expandedFolderIds).toEqual({})
+  })
+
+  it('setTreeFocusId updates focus without changing activeDocId', () => {
+    useKnowledgeStore.setState({ activeDocId: 'doc_1', treeFocusId: null })
+    useKnowledgeStore.getState().setTreeFocusId('fld_1')
+    expect(useKnowledgeStore.getState().treeFocusId).toBe('fld_1')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_1')
   })
 })
 
@@ -132,6 +231,7 @@ describe('knowledgeStore deleteSpace', () => {
         },
       ],
       expandedFolderIds: {},
+      treeFocusId: 'doc_1',
       busy: false,
       error: null,
       saveState: 'idle',
@@ -192,6 +292,7 @@ describe('knowledgeStore space name uniqueness', () => {
       spaceDocCounts: { spc_1: 0, spc_2: 0 },
       recent: [],
       expandedFolderIds: {},
+      treeFocusId: null,
       busy: false,
       error: null,
       saveState: 'idle',

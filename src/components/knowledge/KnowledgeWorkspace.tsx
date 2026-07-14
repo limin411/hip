@@ -546,7 +546,7 @@ export function KnowledgeWorkspace() {
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 rounded-lg border-transparent bg-surface-muted/70 pl-8 text-meta shadow-none placeholder:text-ink-tertiary/80 focus-visible:border-transparent focus-visible:bg-surface-muted focus-visible:ring-accent/20"
+              className="h-8 rounded-lg border border-border bg-surface pl-8 text-meta shadow-none placeholder:text-ink-tertiary focus-visible:border-accent/50 focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-accent/25"
             />
           </div>
         </div>

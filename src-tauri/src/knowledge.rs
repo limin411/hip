@@ -548,11 +548,11 @@ fn save_version_inner(
         return Err(format!("invalid version kind: {kind}"));
     }
     let doc = doc_path(root, space_id, doc_id)?;
-    let body = if doc.exists() {
-        fs::read_to_string(&doc).map_err(|e| e.to_string())?
-    } else {
-        String::new()
-    };
+    // Doc gone (delete in flight / already cleaned) — do not recreate versions/.
+    if !doc.exists() {
+        return Ok(None);
+    }
+    let body = fs::read_to_string(&doc).map_err(|e| e.to_string())?;
     let vdir = versions_dir(root, space_id, doc_id)?;
     fs::create_dir_all(&vdir).map_err(|e| e.to_string())?;
     let mut manifest = load_version_manifest(&vdir)?;
@@ -1396,6 +1396,26 @@ mod tests {
             if vdir.exists() {
                 fs::remove_dir_all(&vdir).unwrap();
             }
+            assert!(!vdir.exists());
+        });
+    }
+
+    #[test]
+    fn version_skip_when_doc_missing_does_not_create_dir() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            // No doc file written.
+            let skipped = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skipped.is_none());
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            assert!(!vdir.exists());
+            let skipped_manual = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
+            assert!(skipped_manual.is_none());
             assert!(!vdir.exists());
         });
     }

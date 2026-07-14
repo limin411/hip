@@ -131,9 +131,13 @@ interface KnowledgeState {
    * (e.g. preview task write-back).
    */
   setDraftBody: (v: string, opts?: { persist?: 'auto' | 'now' | 'none' }) => void
-  /** Returns false if a write was attempted and failed. */
+  /**
+   * Returns false if a write was attempted and failed.
+   * On successful write, awaits the daily snapshot on the same chain so callers
+   * (delete / manual version) never race an in-flight daily.
+   */
   flushSave: () => Promise<boolean>
-  /** Manual snapshot of the active (or given) doc; flushes first. */
+  /** Manual snapshot of the active (or given) doc; flushes first, then serializes on saveChain. */
   saveVersionManual: (docId?: string) => Promise<KnowledgeVersionEntry | null>
   listVersions: (docId?: string) => Promise<KnowledgeVersionEntry[]>
   /** Restore snapshot into live doc + active buffer when that doc is open. */
@@ -141,19 +145,6 @@ interface KnowledgeState {
   setSearchQuery: (q: string) => void
   toggleFolder: (id: string) => void
   dropRecent: (spaceId: string | null, docId: string) => void
-}
-
-/** Best-effort daily snapshot after a successful write (never blocks save UI). */
-function enqueueDailySnapshot(spaceId: string, docId: string) {
-  saveChain = saveChain.then(async (ok) => {
-    if (!ok) return ok
-    try {
-      await knowledgeSaveVersion(spaceId, docId, 'daily', localDayKey())
-    } catch {
-      // Snapshots must not surface as save failures.
-    }
-    return ok
-  })
 }
 
 function indexCurrentDoc(
@@ -696,8 +687,18 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           )
           get().runSearch(get().searchQuery)
         }
-        // Chain daily snapshot after this successful write (no parallel race).
-        enqueueDailySnapshot(s.activeSpaceId, s.activeDocId)
+        // Daily snapshot on the same chain step so await flushSave drains it
+        // (delete/manual must not race an in-flight daily).
+        try {
+          await knowledgeSaveVersion(
+            s.activeSpaceId,
+            s.activeDocId,
+            'daily',
+            localDayKey(),
+          )
+        } catch {
+          // Snapshots must not surface as save failures.
+        }
         setTimeout(() => {
           if (get().saveState === 'saved') set({ saveState: 'idle' })
         }, 1500)
@@ -719,14 +720,25 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!spaceId || !id) return null
     const ok = await get().flushSave()
     if (!ok) return null
-    try {
-      const entry = await knowledgeSaveVersion(spaceId, id, 'manual')
-      if (entry) toast.success(i18n.t('knowledge.versions.saved'))
-      return entry
-    } catch (e) {
-      toast.error(knowledgeErrorMessage(e))
+    // Serialize on saveChain so manual never RMW-races a concurrent daily.
+    let entry: KnowledgeVersionEntry | null = null
+    let errMsg: string | null = null
+    saveChain = saveChain.then(async (prev) => {
+      if (!prev) return prev
+      try {
+        entry = await knowledgeSaveVersion(spaceId, id, 'manual')
+      } catch (e) {
+        errMsg = knowledgeErrorMessage(e)
+      }
+      return prev
+    })
+    await saveChain
+    if (errMsg) {
+      toast.error(errMsg)
       return null
     }
+    if (entry) toast.success(i18n.t('knowledge.versions.saved'))
+    return entry
   },
 
   listVersions: async (docId) => {

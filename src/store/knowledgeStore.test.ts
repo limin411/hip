@@ -537,9 +537,7 @@ describe('knowledgeStore version snapshots', () => {
     })
   })
 
-  it('flushSave enqueues daily snapshot after successful write', async () => {
-    await useKnowledgeStore.getState().flushSave()
-    // Daily snapshot is chained after the write on saveChain — drain it.
+  it('flushSave awaits daily snapshot after successful write', async () => {
     await useKnowledgeStore.getState().flushSave()
     expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
     expect(knowledgeSaveVersion).toHaveBeenCalled()
@@ -555,24 +553,38 @@ describe('knowledgeStore version snapshots', () => {
     knowledgeWriteDoc.mockRejectedValue(new Error('disk full'))
     const ok = await useKnowledgeStore.getState().flushSave()
     expect(ok).toBe(false)
-    // Allow any chained microtasks from saveChain to settle.
-    await Promise.resolve()
-    await Promise.resolve()
     expect(knowledgeSaveVersion).not.toHaveBeenCalled()
   })
 
-  it('saveVersionManual flushes then creates manual snapshot', async () => {
-    knowledgeSaveVersion.mockResolvedValueOnce({
-      id: 'm1',
-      file: 'm1.md',
-      createdAt: 2,
-      kind: 'manual',
-      byteLength: 5,
+  it('saveVersionManual flushes then creates manual snapshot on chain', async () => {
+    // Dirty flush may call daily first; then manual is chained.
+    knowledgeSaveVersion.mockImplementation(async (_s, _d, kind: string) => {
+      if (kind === 'manual') {
+        return {
+          id: 'm1',
+          file: 'm1.md',
+          createdAt: 2,
+          kind: 'manual',
+          byteLength: 5,
+        }
+      }
+      return {
+        id: 'd1',
+        file: 'd1.md',
+        createdAt: 1,
+        kind: 'daily',
+        dayKey: '2026-07-14',
+        byteLength: 5,
+      }
     })
     const entry = await useKnowledgeStore.getState().saveVersionManual()
     expect(entry?.kind).toBe('manual')
     expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
     expect(knowledgeSaveVersion).toHaveBeenCalledWith('spc_1', 'doc_1', 'manual')
+    // Manual call happens after daily when flush wrote.
+    const kinds = knowledgeSaveVersion.mock.calls.map((c) => c[2])
+    expect(kinds).toContain('daily')
+    expect(kinds[kinds.length - 1]).toBe('manual')
     expect(toast.success).toHaveBeenCalled()
   })
 

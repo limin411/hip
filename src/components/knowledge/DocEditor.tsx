@@ -203,10 +203,20 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
-  /** Skip one onChange draft notify after we already pushed (I2). */
-  const suppressDraftNotifyRef = useRef(false)
+  /**
+   * Last draft string we already pushed (I2 / R1).
+   * Prefer equality over a sticky boolean: if onChange never echoes, the next
+   * real edit still notifies (value ≠ lastPushed). Cleared when onChange matches.
+   */
+  const lastPushedDraftRef = useRef<string | null>(null)
   const slashMatchRef = useRef<SlashQueryMatch | null>(null)
   slashMatchRef.current = slashMatch
+
+  const pushDraftOnce = useCallback((next: string) => {
+    lastPushedDraftRef.current = next
+    setText(next)
+    onDraftChangeRef.current(next)
+  }, [])
 
   const updateSlashMatch = useCallback((next: SlashQueryMatch | null) => {
     setSlashMatch((prev) => (sameSlashMatch(prev, next) ? prev : next))
@@ -311,7 +321,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     })
   }, [isDark, themeCompartment])
 
-  // M2: caret-relative menu position (clamped to editor box).
+  // M2 + R2: caret-relative menu; refresh on scroll/resize while open.
   useEffect(() => {
     if (!slashMatch) {
       setMenuPos(null)
@@ -327,32 +337,51 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       })
       return
     }
+
+    // Synchronous first paint so the menu is not delayed one frame (tests + open).
     setMenuPos(computeMenuPos(view, slashMatch))
+
+    let raf = 0
+    const onScrollOrResize = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        setMenuPos(computeMenuPos(view, slashMatch))
+      })
+    }
+
+    const scrollDOM = view.scrollDOM
+    scrollDOM.addEventListener('scroll', onScrollOrResize, { passive: true })
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      cancelAnimationFrame(raf)
+      scrollDOM.removeEventListener('scroll', onScrollOrResize)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
   }, [slashMatch])
 
-  const onSlashSelect = useCallback((item: KnowledgeSlashItem) => {
-    const view = viewRef.current
-    const match = slashMatchRef.current
-    if (!view || !match || view.composing) return
-    const prepared = prepareSlashInsert(view.state.doc.toString(), match.from, item)
-    if (
-      applySlashInsert(
-        view,
-        match.from,
-        match.to,
-        prepared.insert,
-        prepared.cursorOffset,
-      )
-    ) {
-      // I2: single draft notify; suppress the onChange echo from this dispatch.
-      suppressDraftNotifyRef.current = true
-      const next = view.state.doc.toString()
-      setText(next)
-      onDraftChangeRef.current(next)
-      updateSlashMatch(null)
-      view.focus()
-    }
-  }, [updateSlashMatch])
+  const onSlashSelect = useCallback(
+    (item: KnowledgeSlashItem) => {
+      const view = viewRef.current
+      const match = slashMatchRef.current
+      if (!view || !match || view.composing) return
+      const prepared = prepareSlashInsert(view.state.doc.toString(), match.from, item)
+      if (
+        applySlashInsert(
+          view,
+          match.from,
+          match.to,
+          prepared.insert,
+          prepared.cursorOffset,
+        )
+      ) {
+        // I2/R1: push draft once via equality-based suppress of onChange echo.
+        pushDraftOnce(view.state.doc.toString())
+        updateSlashMatch(null)
+        view.focus()
+      }
+    },
+    [pushDraftOnce, updateSlashMatch],
+  )
 
   /** L2: Escape strips `/query` (align with chat dismiss), then hide menu. */
   const onSlashDismiss = useCallback(() => {
@@ -363,14 +392,11 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         changes: { from: match.from, to: match.to, insert: '' },
         selection: EditorSelection.cursor(match.from),
       })
-      suppressDraftNotifyRef.current = true
-      const next = view.state.doc.toString()
-      setText(next)
-      onDraftChangeRef.current(next)
+      pushDraftOnce(view.state.doc.toString())
     }
     updateSlashMatch(null)
     view?.focus()
-  }, [updateSlashMatch])
+  }, [pushDraftOnce, updateSlashMatch])
 
   return (
     <div
@@ -416,10 +442,12 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         }}
         onChange={(v) => {
           setText(v)
-          if (suppressDraftNotifyRef.current) {
-            suppressDraftNotifyRef.current = false
+          // R1: skip only the echo of a value we already pushed; never sticky-drop.
+          if (lastPushedDraftRef.current === v) {
+            lastPushedDraftRef.current = null
             return
           }
+          lastPushedDraftRef.current = null
           onDraftChangeRef.current(v)
         }}
         className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"

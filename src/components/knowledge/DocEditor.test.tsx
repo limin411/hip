@@ -49,10 +49,12 @@ vi.mock('@uiw/react-codemirror', () => ({
 }))
 
 function makeFakeView(doc: string, head = doc.length) {
+  const scrollDOM = document.createElement('div')
   return {
     composing: false,
     focus: vi.fn(),
     coordsAtPos: () => ({ top: 40, bottom: 56, left: 24, right: 40 }),
+    scrollDOM,
     dom: {
       closest: () => {
         const el = document.querySelector(

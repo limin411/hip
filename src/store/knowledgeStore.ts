@@ -13,11 +13,15 @@ import {
   renameNode,
 } from '@/domain/knowledge/tree'
 import {
+  collectSearchFacets,
   createKnowledgeIndex,
   docKey,
+  filterHitsByMeta,
+  listDocsByMeta,
   removeSearchDoc,
   searchKnowledge,
   upsertSearchDoc,
+  type KnowledgeDocMetaEntry,
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
 import { KNOWLEDGE_INDEX_YIELD_EVERY } from '@/domain/knowledge/limits'
@@ -38,6 +42,8 @@ import {
 
 /** Module-level index (not serializable; not stored in zustand state). */
 let kbIndex = createKnowledgeIndex()
+/** Structured frontmatter meta parallel to MiniSearch (facets + wiki aliases). */
+let kbMeta = new Map<string, KnowledgeDocMetaEntry>()
 let indexBuildGen = 0
 
 /** Map stable backend name errors to localized copy. */
@@ -116,6 +122,12 @@ interface KnowledgeState {
   pendingReveal: KnowledgePendingReveal | null
   /** Doc counts per space, filled when the search index is built. */
   spaceDocCounts: Record<string, number>
+  /** Facet values from indexed frontmatter (sorted). */
+  availableTags: string[]
+  availableStatuses: string[]
+  /** Home filter chips (null = no filter). */
+  filterTag: string | null
+  filterStatus: string | null
   recent: KnowledgeRecentItem[]
   expandedFolderIds: Record<string, boolean>
   busy: boolean
@@ -146,6 +158,8 @@ interface KnowledgeState {
   /** Returns false if a write was attempted and failed. */
   flushSave: () => Promise<boolean>
   setSearchQuery: (q: string) => void
+  setFilterTag: (tag: string | null) => void
+  setFilterStatus: (status: string | null) => void
   toggleFolder: (id: string) => void
   dropRecent: (spaceId: string | null, docId: string) => void
 }
@@ -167,7 +181,18 @@ function indexCurrentDoc(
     body,
     spaceName,
     path,
+    metaSink: kbMeta,
   })
+}
+
+function syncFacetsToState(set: (partial: Partial<KnowledgeState>) => void) {
+  const facets = collectSearchFacets(kbMeta)
+  set({ availableTags: facets.tags, availableStatuses: facets.statuses })
+}
+
+function applySearchFilters(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
+  const { filterTag, filterStatus } = useKnowledgeStore.getState()
+  return filterHitsByMeta(hits, { tag: filterTag, status: filterStatus })
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -197,6 +222,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   indexProgress: null,
   pendingReveal: null,
   spaceDocCounts: {},
+  availableTags: [],
+  availableStatuses: [],
+  filterTag: null,
+  filterStatus: null,
   recent: [],
   expandedFolderIds: {},
   busy: false,
@@ -219,6 +248,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const gen = ++indexBuildGen
     set({ indexStatus: 'building', indexProgress: { done: 0, total: 0 } })
     const next = createKnowledgeIndex()
+    const nextMeta = new Map<string, KnowledgeDocMetaEntry>()
     const counts: Record<string, number> = {}
     try {
       const spaces = get().spaces
@@ -250,7 +280,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             body = ''
           }
           const path = getPathTitles(nodes, node.id).join(' / ') || node.title
-          // Body is capped inside upsertSearchDoc (KNOWLEDGE_INDEX_BODY_CHARS).
+          // Body is stripped of frontmatter + capped inside upsertSearchDoc.
           upsertSearchDoc(next, {
             id: docKey(space.id, node.id),
             spaceId: space.id,
@@ -259,6 +289,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             body,
             spaceName: space.name,
             path,
+            metaSink: nextMeta,
           })
           done += 1
           if (done % KNOWLEDGE_INDEX_YIELD_EVERY === 0) {
@@ -274,7 +305,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }
       if (gen !== indexBuildGen) return
       kbIndex = next
-      set({ indexStatus: 'ready', spaceDocCounts: counts, indexProgress: null })
+      kbMeta = nextMeta
+      const facets = collectSearchFacets(kbMeta)
+      set({
+        indexStatus: 'ready',
+        spaceDocCounts: counts,
+        indexProgress: null,
+        availableTags: facets.tags,
+        availableStatuses: facets.statuses,
+      })
       get().runSearch(get().searchQuery)
     } catch {
       if (gen !== indexBuildGen) return
@@ -283,12 +322,24 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   runSearch: (q) => {
-    const query = q.trim()
-    if (!query || get().indexStatus !== 'ready') {
+    if (get().indexStatus !== 'ready') {
       set({ searchHits: [] })
       return
     }
-    set({ searchHits: searchKnowledge(kbIndex, query) })
+    const query = q.trim()
+    const { filterTag, filterStatus } = get()
+    if (!query) {
+      // Tag/status-only browse: list matching docs from meta map.
+      if (filterTag || filterStatus) {
+        set({
+          searchHits: listDocsByMeta(kbMeta, { tag: filterTag, status: filterStatus }),
+        })
+        return
+      }
+      set({ searchHits: [] })
+      return
+    }
+    set({ searchHits: applySearchFilters(searchKnowledge(kbIndex, query)) })
   },
 
   createSpace: async (name, icon) => {
@@ -381,7 +432,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeDeleteSpace(id)
       // Drop all index entries for this space (best-effort full rebuild also fine).
       for (const hit of get().searchHits) {
-        if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId))
+        if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId), kbMeta)
       }
       // Also discard by scanning stored ids: MiniSearch has no list-all API cheaply —
       // rebuild keeps consistency after destructive space ops.
@@ -520,6 +571,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
+      const facets = collectSearchFacets(kbMeta)
       set((s) => ({
         nodes,
         busy: false,
@@ -527,6 +579,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           ...s.spaceDocCounts,
           [spaceId]: (s.spaceDocCounts[spaceId] ?? 0) + 1,
         },
+        availableTags: facets.tags,
+        availableStatuses: facets.statuses,
       }))
       if (parentId) {
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
@@ -559,6 +613,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           body = get().activeDocId === id ? get().docBody : ''
         }
         indexCurrentDoc(spaceId, id, renamed.title, body, spaceName, nodes)
+        syncFacetsToState(set)
         get().runSearch(get().searchQuery)
       }
       // update recent title if needed
@@ -600,6 +655,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
         indexCurrentDoc(spaceId, docId, title, body, spaceName, nodes)
       }
+      syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -619,7 +675,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       for (const docId of removedDocIds) {
         await knowledgeDeleteDocFile(spaceId, docId)
-        removeSearchDoc(kbIndex, docKey(spaceId, docId))
+        removeSearchDoc(kbIndex, docKey(spaceId, docId), kbMeta)
       }
       const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
       set((s) => {
@@ -656,6 +712,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         }
       })
       persistRecent(get().recent)
+      syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -760,6 +817,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             spaceName,
             get().nodes,
           )
+          syncFacetsToState(set)
           get().runSearch(get().searchQuery)
         }
         setTimeout(() => {
@@ -780,6 +838,16 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   setSearchQuery: (q) => {
     set({ searchQuery: q })
     get().runSearch(q)
+  },
+
+  setFilterTag: (tag) => {
+    set({ filterTag: tag })
+    get().runSearch(get().searchQuery)
+  },
+
+  setFilterStatus: (status) => {
+    set({ filterStatus: status })
+    get().runSearch(get().searchQuery)
   },
 
   toggleFolder: (id) =>
@@ -804,4 +872,21 @@ export function searchKnowledgeDocs(q: string, limit = 20): KnowledgeSearchHit[]
 
 export function isKnowledgeIndexReady(): boolean {
   return useKnowledgeStore.getState().indexStatus === 'ready'
+}
+
+/**
+ * Docs in a space with titles + aliases for wiki resolution (PR-12 step 2 / PR-14).
+ * Order follows meta map insertion (index rebuild order ≈ tree scan order).
+ */
+export function listKnowledgeDocsForWiki(spaceId: string): Array<{
+  id: string
+  title: string
+  aliases: string[]
+}> {
+  const out: Array<{ id: string; title: string; aliases: string[] }> = []
+  for (const entry of kbMeta.values()) {
+    if (entry.spaceId !== spaceId) continue
+    out.push({ id: entry.docId, title: entry.title, aliases: entry.aliases })
+  }
+  return out
 }

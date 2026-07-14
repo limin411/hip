@@ -943,7 +943,7 @@ export const zhTW = {
       title: '知識庫',
       home: {
         subtitle: '本地優先 · 多空間 · 目錄樹 + Markdown',
-        searchPlaceholder: '搜尋標題、正文與路徑…',
+        searchPlaceholder: '搜尋標題、正文、標籤與路徑…',
         mySpaces: '我的空間',
         recent: '最近開啟',
         docCount_one: '{{count}} 篇',
@@ -959,6 +959,9 @@ export const zhTW = {
         searchIndexingProgress: '正在建立搜尋索引… {{done}}/{{total}}',
         searchIndexingProgressSpace:
           '正在建立搜尋索引… {{done}}/{{total}} · {{space}}',
+        filterTags: '標籤',
+        filterStatus: '狀態',
+        filterClear: '清除篩選',
       },
       space: {
         nameLabel: '名稱',
@@ -1029,6 +1032,8 @@ export const zhTW = {
         loadFailed: '無法載入文件',
         saving: '儲存中…',
         saved: '已儲存',
+        propertyStatus: '狀態',
+        propertyTags: '標籤',
       },
       error: {
         generic: '出了點問題',

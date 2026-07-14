@@ -4,13 +4,18 @@ import {
   BODY_PREVIEW_CAP,
   buildSearchSnippet,
   capIndexBody,
+  collectSearchFacets,
   createKnowledgeIndex,
   docKey,
+  filterHitsByMeta,
   groupSearchHitsBySpace,
+  listDocsByMeta,
+  prepareSearchContent,
   removeSearchDoc,
   searchKnowledge,
   tokenizeKnowledge,
   upsertSearchDoc,
+  type KnowledgeDocMetaEntry,
   type KnowledgeSearchHit,
 } from './search'
 
@@ -175,6 +180,107 @@ describe('knowledge MiniSearch helper', () => {
     expect(groups[0]?.hits.map((h) => h.docId)).toEqual(['doc_1', 'doc_3'])
     expect(groups[1]?.hits.map((h) => h.docId)).toEqual(['doc_2'])
     expect(groups[0]?.spaceName).toBe('Beta')
+  })
+
+  it('indexes bodyWithoutFm only — FM keys do not pollute body tokens', () => {
+    const index = createKnowledgeIndex()
+    const fmOnlyNoise = 'unique_fm_status_token_zzz'
+    const bodyToken = 'unique_body_token_aaa'
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Note',
+      body: `---
+tags: [design]
+status: ${fmOnlyNoise}
+aliases: [Other]
+---
+
+${bodyToken} visible prose
+`,
+      spaceName: 'S',
+      path: 'Note',
+    })
+    // Body token still hits
+    expect(searchKnowledge(index, bodyToken).some((h) => h.docId === 'doc_1')).toBe(true)
+    // Status is indexed via status field, not as body pollution concern —
+    // but tags/status/aliases fields remain searchable:
+    expect(searchKnowledge(index, 'design').some((h) => h.docId === 'doc_1')).toBe(true)
+    expect(searchKnowledge(index, fmOnlyNoise).some((h) => h.docId === 'doc_1')).toBe(true)
+    expect(searchKnowledge(index, 'Other').some((h) => h.docId === 'doc_1')).toBe(true)
+
+    const prepared = prepareSearchContent(`---
+status: ${fmOnlyNoise}
+---
+
+${bodyToken}
+`)
+    expect(prepared.bodyWithoutFm).toBe(`${bodyToken}\n`)
+    expect(prepared.body).not.toContain(fmOnlyNoise)
+    expect(prepared.bodyPreview).not.toContain('status:')
+  })
+
+  it('FM-only change does not leave YAML keys in bodyPreview', () => {
+    const prepared = prepareSearchContent(`---
+tags: [secret_yaml_key_should_not_be_body]
+status: draft
+---
+
+plain body here
+`)
+    expect(prepared.bodyPreview).toContain('plain body')
+    expect(prepared.bodyPreview).not.toContain('secret_yaml_key_should_not_be_body')
+    expect(prepared.bodyPreview).not.toContain('tags:')
+  })
+
+  it('hit includes tagList and filterHitsByMeta / listDocsByMeta work', () => {
+    const index = createKnowledgeIndex()
+    const meta = new Map<string, KnowledgeDocMetaEntry>()
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Tagged',
+      body: `---
+tags: [design, hip]
+status: draft
+---
+needle_token
+`,
+      spaceName: 'S',
+      path: 'Tagged',
+      metaSink: meta,
+    })
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_2'),
+      spaceId: 'spc_a',
+      docId: 'doc_2',
+      title: 'Other',
+      body: `---
+tags: [ops]
+status: published
+---
+needle_token
+`,
+      spaceName: 'S',
+      path: 'Other',
+      metaSink: meta,
+    })
+
+    const hits = searchKnowledge(index, 'needle_token')
+    expect(hits).toHaveLength(2)
+    const designOnly = filterHitsByMeta(hits, { tag: 'design' })
+    expect(designOnly.map((h) => h.docId)).toEqual(['doc_1'])
+    expect(designOnly[0]?.tags).toContain('design')
+    expect(designOnly[0]?.status).toBe('draft')
+
+    const byStatus = listDocsByMeta(meta, { status: 'published' })
+    expect(byStatus.map((h) => h.docId)).toEqual(['doc_2'])
+
+    const facets = collectSearchFacets(meta)
+    expect(facets.tags).toEqual(expect.arrayContaining(['design', 'hip', 'ops']))
+    expect(facets.statuses).toEqual(expect.arrayContaining(['draft', 'published']))
   })
 })
 

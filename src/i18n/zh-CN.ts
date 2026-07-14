@@ -943,7 +943,7 @@ export const zhCN = {
       title: '知识库',
       home: {
         subtitle: '本地优先 · 多空间 · 目录树 + Markdown',
-        searchPlaceholder: '搜索标题、正文与路径…',
+        searchPlaceholder: '搜索标题、正文、标签与路径…',
         mySpaces: '我的空间',
         recent: '最近打开',
         docCount_one: '{{count}} 篇',
@@ -959,6 +959,9 @@ export const zhCN = {
         searchIndexingProgress: '正在建立搜索索引… {{done}}/{{total}}',
         searchIndexingProgressSpace:
           '正在建立搜索索引… {{done}}/{{total}} · {{space}}',
+        filterTags: '标签',
+        filterStatus: '状态',
+        filterClear: '清除筛选',
       },
       space: {
         nameLabel: '名称',
@@ -1029,6 +1032,8 @@ export const zhCN = {
         loadFailed: '无法加载文档',
         saving: '保存中…',
         saved: '已保存',
+        propertyStatus: '状态',
+        propertyTags: '标签',
       },
       error: {
         generic: '出了点问题',

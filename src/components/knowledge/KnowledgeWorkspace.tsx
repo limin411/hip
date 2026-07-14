@@ -42,6 +42,7 @@ import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
+import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 
@@ -52,6 +53,7 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
   const editing = useKnowledgeStore((s) => s.editing)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
@@ -518,6 +520,7 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
+              <DocPropertiesRow body={draftBody || docBody} />
               <MarkdownToolbar
                 getView={() => editorRef.current?.getView() ?? null}
                 onAfterEdit={(text) => setDraftBody(text)}
@@ -543,6 +546,7 @@ export function KnowledgeWorkspace() {
                 readOnly
                 onCommit={() => {}}
               />
+              <DocPropertiesRow body={docBody} />
               <DocReader
                 content={docBody}
                 onStartEdit={() => void setEditing(true)}

@@ -30,6 +30,12 @@ export function KnowledgeHome() {
   const searchHits = useKnowledgeStore((s) => s.searchHits)
   const indexStatus = useKnowledgeStore((s) => s.indexStatus)
   const indexProgress = useKnowledgeStore((s) => s.indexProgress)
+  const availableTags = useKnowledgeStore((s) => s.availableTags)
+  const availableStatuses = useKnowledgeStore((s) => s.availableStatuses)
+  const filterTag = useKnowledgeStore((s) => s.filterTag)
+  const filterStatus = useKnowledgeStore((s) => s.filterStatus)
+  const setFilterTag = useKnowledgeStore((s) => s.setFilterTag)
+  const setFilterStatus = useKnowledgeStore((s) => s.setFilterStatus)
   const createSpace = useKnowledgeStore((s) => s.createSpace)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
@@ -45,7 +51,9 @@ export function KnowledgeHome() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const q = searchQuery.trim().toLowerCase()
-  const searching = q.length > 0
+  const hasMetaFilter = Boolean(filterTag || filterStatus)
+  /** Text query or frontmatter facet filter → show results panel. */
+  const searching = q.length > 0 || hasMetaFilter
 
   const filteredSpaces = useMemo(
     () => (q ? spaces.filter((s) => s.name.toLowerCase().includes(q)) : spaces),
@@ -188,6 +196,78 @@ export function KnowledgeHome() {
                     })
                 : t('knowledge.home.searchIndexing')}
             </p>
+          )}
+          {(availableTags.length > 0 || availableStatuses.length > 0) && (
+            <div
+              className="mt-3 flex flex-col gap-2"
+              data-testid="knowledge-home-filters"
+            >
+              {availableTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-meta text-ink-tertiary">
+                    {t('knowledge.home.filterTags')}
+                  </span>
+                  {availableTags.map((tag) => {
+                    const active = filterTag?.toLowerCase() === tag.toLowerCase()
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        data-testid="knowledge-filter-tag"
+                        data-active={active || undefined}
+                        className={
+                          active
+                            ? 'rounded-full bg-accent-strong/15 px-2.5 py-0.5 text-meta font-medium text-accent-strong'
+                            : 'rounded-full bg-surface-muted px-2.5 py-0.5 text-meta text-ink-secondary hover:bg-state-hover'
+                        }
+                        onClick={() => setFilterTag(active ? null : tag)}
+                      >
+                        {tag}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {availableStatuses.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-meta text-ink-tertiary">
+                    {t('knowledge.home.filterStatus')}
+                  </span>
+                  {availableStatuses.map((st) => {
+                    const active = filterStatus?.toLowerCase() === st.toLowerCase()
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        data-testid="knowledge-filter-status"
+                        data-active={active || undefined}
+                        className={
+                          active
+                            ? 'rounded-full bg-accent-strong/15 px-2.5 py-0.5 text-meta font-medium text-accent-strong'
+                            : 'rounded-full bg-surface-muted px-2.5 py-0.5 text-meta text-ink-secondary hover:bg-state-hover'
+                        }
+                        onClick={() => setFilterStatus(active ? null : st)}
+                      >
+                        {st}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {hasMetaFilter && (
+                <button
+                  type="button"
+                  data-testid="knowledge-filter-clear"
+                  className="self-start text-meta text-ink-tertiary underline-offset-2 hover:text-ink hover:underline"
+                  onClick={() => {
+                    setFilterTag(null)
+                    setFilterStatus(null)
+                  }}
+                >
+                  {t('knowledge.home.filterClear')}
+                </button>
+              )}
+            </div>
           )}
         </div>
 

@@ -10,7 +10,7 @@
  */
 export const KNOWLEDGE_LARGE_DOC_CHARS = 512_000
 
-/** MiniSearch indexes at most this many body chars (after frontmatter strip later). */
+/** MiniSearch indexes at most this many body chars (after frontmatter strip). */
 export const KNOWLEDGE_INDEX_BODY_CHARS = 512_000
 
 /**

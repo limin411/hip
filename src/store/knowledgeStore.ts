@@ -266,8 +266,26 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (get().busy) return
     set({ busy: true, error: null })
     try {
-      await knowledgeDeleteSpace(id)
       const wasActive = get().activeSpaceId === id
+      // Leave workspace *before* disk delete: avoid flushSave rewriting into a wiped
+      // tree, and unmount workspace dialogs cleanly while the space still exists in UI.
+      if (wasActive) {
+        if (saveTimer) {
+          clearTimeout(saveTimer)
+          saveTimer = null
+        }
+        set({
+          mode: 'home',
+          activeSpaceId: null,
+          activeDocId: null,
+          docBody: '',
+          draftBody: '',
+          editing: false,
+          nodes: [],
+          saveState: 'idle',
+        })
+      }
+      await knowledgeDeleteSpace(id)
       // Drop all index entries for this space (best-effort full rebuild also fine).
       for (const hit of get().searchHits) {
         if (hit.spaceId === id) removeSearchDoc(kbIndex, docKey(id, hit.docId))
@@ -285,7 +303,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       })
       persistRecent(get().recent)
       void get().rebuildSearchIndex()
-      if (wasActive) await get().openHome()
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })

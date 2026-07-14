@@ -80,8 +80,10 @@ export function KnowledgeHome() {
 
   const submitDelete = async () => {
     if (!deleteId) return
-    await deleteSpace(deleteId)
+    // Close modal first so body pointer-events unlock before/while delete runs.
+    const id = deleteId
     setDeleteId(null)
+    await deleteSpace(id)
   }
 
   const importFolder = async () => {
@@ -272,7 +274,9 @@ export function KnowledgeHome() {
                           </span>
                         </button>
                         <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">
-                          <DropdownMenu>
+                          {/* modal={false}: modal menu + delete/rename Modal both lock body
+                              pointer-events; stacking leaves the app unclickable after close. */}
+                          <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
                               <button
                                 type="button"

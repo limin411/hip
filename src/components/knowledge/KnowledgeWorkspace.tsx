@@ -247,7 +247,9 @@ export function KnowledgeWorkspace() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
+            {/* modal={false}: modal menu + rename/delete Modal both lock body
+                pointer-events; stacking leaves the app unclickable after close. */}
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -536,8 +538,10 @@ export function KnowledgeWorkspace() {
               data-testid="knowledge-delete-space-confirm"
               disabled={busy || !activeSpaceId}
               onClick={() => {
-                if (activeSpaceId) void deleteSpace(activeSpaceId)
+                // Close first so RemoveScroll unlocks body before workspace unmounts.
+                const id = activeSpaceId
                 setDeleteSpaceOpen(false)
+                if (id) void deleteSpace(id)
               }}
             >
               {t('knowledge.tree.delete')}

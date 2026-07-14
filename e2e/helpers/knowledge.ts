@@ -258,14 +258,31 @@ export async function typeInKnowledgeEditor(text: string): Promise<void> {
   )
 }
 
-/** Toggle Edit ↔ Preview via SegmentedControl (clicks the inactive tab). */
+/**
+ * Toggle Source (edit) ↔ Preview via SegmentedControl (clicks the inactive tab).
+ * When Live is enabled (3-way control), prefers toggling between source and preview
+ * so e2e stays on CodeMirror rather than Live.
+ */
 export async function toggleKnowledgePreviewOrEdit(): Promise<void> {
   const toggle = await browser.$('[data-testid="knowledge-edit-toggle"]')
   await toggle.waitForExist({ timeout: 10000 })
   await browser.execute((root: HTMLElement) => {
     const tabs = Array.from(root.querySelectorAll('[role="tab"]')) as HTMLElement[]
-    const inactive = tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
-    inactive?.click()
+    if (tabs.length <= 2) {
+      const inactive = tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
+      inactive?.click()
+      return
+    }
+    // 3-way (Live | Source | Preview): click Source if in Preview, else Preview.
+    const selected = tabs.find((t) => t.getAttribute('aria-selected') === 'true')
+    const selectedLabel = (selected?.textContent ?? '').trim().toLowerCase()
+    const targetLabel = selectedLabel.includes('preview') || selectedLabel.includes('预览') || selectedLabel.includes('預覽')
+      ? /source|edit|源码|原始碼|编辑|編輯/i
+      : /preview|预览|預覽/i
+    const target =
+      tabs.find((t) => targetLabel.test((t.textContent ?? '').trim())) ??
+      tabs.find((t) => t.getAttribute('aria-selected') !== 'true')
+    target?.click()
   }, toggle)
 }
 

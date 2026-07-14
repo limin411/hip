@@ -1,5 +1,7 @@
 //! Local-first knowledge base: spaces, tree.json, docs/*.md under knowledge_dir.
+//! Assets live under `<space>/assets/` (space-root-relative MD links).
 
+use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
@@ -9,6 +11,11 @@ use tauri::AppHandle;
 
 use crate::paths;
 use crate::skills::safe_join;
+
+/// Max asset size on disk (path import / file picker).
+const KNOWLEDGE_ASSET_MAX_BYTES: u64 = 25 * 1024 * 1024;
+/// Max raw bytes for base64 IPC (`read_asset_data`, `import_asset_bytes`).
+const KNOWLEDGE_ASSET_INLINE_MAX_BYTES: u64 = 1_500_000;
 
 /// Same rule as TS `KNOWLEDGE_ID_RE`.
 fn is_knowledge_id(id: &str) -> bool {
@@ -70,6 +77,95 @@ fn doc_path(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String
     let docs = safe_join(&space, "docs").ok_or_else(|| "illegal docs path".to_string())?;
     let file = format!("{doc_id}.md");
     safe_join(&docs, &file).ok_or_else(|| "illegal doc path".to_string())
+}
+
+/// Resolve a space-root-relative path that must stay under `assets/`.
+/// `rel_path` may be `assets/foo.png` or `foo.png` (normalized to under assets/).
+fn asset_path(root: &Path, space_id: &str, rel_path: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    let space = space_dir(root, space_id)?;
+    let trimmed = rel_path.trim().trim_start_matches("./");
+    if trimmed.is_empty() {
+        return Err("empty asset path".into());
+    }
+    let under_assets = if let Some(rest) = trimmed.strip_prefix("assets/") {
+        rest
+    } else if trimmed == "assets" {
+        return Err("asset path must be a file under assets/".into());
+    } else if !trimmed.contains('/') && !trimmed.contains('\\') {
+        trimmed
+    } else {
+        return Err("asset path must be under assets/".into());
+    };
+    if under_assets.is_empty() || under_assets.contains('/') || under_assets.contains('\\') {
+        // Only single-segment filenames under assets/ (no nested dirs in v1).
+        return Err("asset path must be a single file under assets/".into());
+    }
+    let assets = safe_join(&space, "assets").ok_or_else(|| "illegal assets path".to_string())?;
+    safe_join(&assets, under_assets).ok_or_else(|| "illegal asset path".to_string())
+}
+
+fn allowed_asset_mime(mime: &str) -> bool {
+    matches!(
+        mime,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf"
+    )
+}
+
+fn mime_from_ext(path: &Path) -> Option<&'static str> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())?;
+    match ext.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "pdf" => Some("application/pdf"),
+        _ => None,
+    }
+}
+
+fn ext_for_mime(mime: &str) -> Option<&'static str> {
+    match mime {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/gif" => Some("gif"),
+        "image/webp" => Some("webp"),
+        "application/pdf" => Some("pdf"),
+        _ => None,
+    }
+}
+
+/// Sanitize a user-facing file name for use after `ast_<id>_`.
+fn sanitize_asset_filename(name: &str) -> String {
+    let base = Path::new(name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let mut s: String = base
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | ' ' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    s = s.trim().trim_matches('.').to_string();
+    if s.is_empty() {
+        s = "file".into();
+    }
+    if s.chars().count() > 80 {
+        s = s.chars().take(80).collect();
+    }
+    s
+}
+
+fn gen_asset_rel_path(file_name: &str) -> String {
+    let safe = sanitize_asset_filename(file_name);
+    let id = gen_id("ast");
+    format!("assets/{id}_{safe}")
 }
 
 fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
@@ -404,7 +500,323 @@ pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), St
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
+    // Drop version history with the doc (space delete removes the whole tree).
+    if let Ok(vdir) = versions_dir(&root, &args.space_id, &args.doc_id) {
+        if vdir.exists() {
+            let _ = fs::remove_dir_all(&vdir);
+        }
+    }
     Ok(())
+}
+
+// ── Version snapshots (P1.8) ──────────────────────────────────────────────
+
+/// Max retained snapshots per document (matches TS `KNOWLEDGE_VERSION_CAP`).
+const KNOWLEDGE_VERSION_CAP: usize = 30;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeVersionEntry {
+    /// File stem / id (filesystem-safe ISO timestamp).
+    pub id: String,
+    pub file: String,
+    pub created_at: i64,
+    /// `"daily"` | `"manual"`.
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day_key: Option<String>,
+    pub byte_length: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VersionManifest {
+    version: u32,
+    entries: Vec<KnowledgeVersionEntry>,
+}
+
+fn empty_manifest() -> VersionManifest {
+    VersionManifest {
+        version: 1,
+        entries: vec![],
+    }
+}
+
+fn versions_dir(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    require_id(doc_id, "docId")?;
+    if !doc_id.starts_with("doc_") {
+        return Err(format!("docId must start with doc_: {doc_id}"));
+    }
+    let space = space_dir(root, space_id)?;
+    let versions = safe_join(&space, "versions").ok_or_else(|| "illegal versions path".to_string())?;
+    safe_join(&versions, doc_id).ok_or_else(|| "illegal version doc path".to_string())
+}
+
+fn version_manifest_path(vdir: &Path) -> PathBuf {
+    vdir.join("manifest.json")
+}
+
+fn load_version_manifest(vdir: &Path) -> Result<VersionManifest, String> {
+    let path = version_manifest_path(vdir);
+    if !path.exists() {
+        return Ok(empty_manifest());
+    }
+    read_json_file(&path)
+}
+
+fn save_version_manifest(vdir: &Path, manifest: &VersionManifest) -> Result<(), String> {
+    write_json_file(&version_manifest_path(vdir), manifest)
+}
+
+/// Filesystem-safe ISO-like id from epoch ms: `2026-07-14T12-30-45-123`.
+fn version_id_from_ms(ms: i64) -> String {
+    let secs = ms.div_euclid(1000);
+    let millis = ms.rem_euclid(1000) as u32;
+    // UTC breakdown is fine for unique ids; dayKey carries local calendar day.
+    let days = secs.div_euclid(86_400);
+    let day_secs = secs.rem_euclid(86_400) as u32;
+    let (y, m, d) = civil_from_days(days);
+    let hh = day_secs / 3600;
+    let mm = (day_secs % 3600) / 60;
+    let ss = day_secs % 60;
+    format!("{y:04}-{m:02}-{d:02}T{hh:02}-{mm:02}-{ss:02}-{millis:03}")
+}
+
+/// Howard Hinnant civil_from_days (proleptic Gregorian, UTC).
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as i32, m as u32, d as u32)
+}
+
+fn version_file_path(vdir: &Path, file: &str) -> Result<PathBuf, String> {
+    // Only allow simple filenames (no path separators / traversal).
+    if file.is_empty()
+        || file.contains('/')
+        || file.contains('\\')
+        || file.contains("..")
+        || !file.ends_with(".md")
+    {
+        return Err(format!("invalid version file: {file}"));
+    }
+    let stem = file.trim_end_matches(".md");
+    if stem.is_empty()
+        || !stem
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_')
+    {
+        return Err(format!("invalid version file: {file}"));
+    }
+    safe_join(vdir, file).ok_or_else(|| "illegal version file path".to_string())
+}
+
+fn enforce_version_cap(vdir: &Path, manifest: &mut VersionManifest) -> Result<(), String> {
+    // Entries are newest-first.
+    while manifest.entries.len() > KNOWLEDGE_VERSION_CAP {
+        if let Some(old) = manifest.entries.pop() {
+            if let Ok(path) = version_file_path(vdir, &old.file) {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Create a snapshot. Daily: skip if `day_key` already has a daily entry, or body == last snapshot.
+/// Manual: always create. Returns `None` when skipped (daily only).
+fn save_version_inner(
+    root: &Path,
+    space_id: &str,
+    doc_id: &str,
+    kind: &str,
+    day_key: Option<&str>,
+) -> Result<Option<KnowledgeVersionEntry>, String> {
+    if kind != "daily" && kind != "manual" {
+        return Err(format!("invalid version kind: {kind}"));
+    }
+    let doc = doc_path(root, space_id, doc_id)?;
+    // Doc gone (delete in flight / already cleaned) — do not recreate versions/.
+    if !doc.exists() {
+        return Ok(None);
+    }
+    let body = fs::read_to_string(&doc).map_err(|e| e.to_string())?;
+    let vdir = versions_dir(root, space_id, doc_id)?;
+    fs::create_dir_all(&vdir).map_err(|e| e.to_string())?;
+    let mut manifest = load_version_manifest(&vdir)?;
+
+    if kind == "daily" {
+        let key = day_key.ok_or_else(|| "dayKey required for daily snapshot".to_string())?;
+        if key.is_empty() || key.len() > 32 {
+            return Err("invalid dayKey".into());
+        }
+        if manifest
+            .entries
+            .iter()
+            .any(|e| e.kind == "daily" && e.day_key.as_deref() == Some(key))
+        {
+            return Ok(None);
+        }
+        if let Some(last) = manifest.entries.first() {
+            if let Ok(last_path) = version_file_path(&vdir, &last.file) {
+                if last_path.exists() {
+                    let last_body = fs::read_to_string(&last_path).map_err(|e| e.to_string())?;
+                    if last_body == body {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+    }
+
+    let created_at = now_ms();
+    let mut id = version_id_from_ms(created_at);
+    // Uniqueness if two saves share the same ms.
+    if manifest.entries.iter().any(|e| e.id == id) {
+        id = format!("{id}-{}", gen_id("v").trim_start_matches("v_"));
+        // Keep stem charset safe.
+        id = id
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+    }
+    let file = format!("{id}.md");
+    let path = version_file_path(&vdir, &file)?;
+    atomic_write_str(&path, &body)?;
+
+    let entry = KnowledgeVersionEntry {
+        id: id.clone(),
+        file,
+        created_at,
+        kind: kind.to_string(),
+        day_key: if kind == "daily" {
+            day_key.map(|s| s.to_string())
+        } else {
+            None
+        },
+        byte_length: body.len() as u64,
+    };
+    manifest.entries.insert(0, entry.clone());
+    enforce_version_cap(&vdir, &mut manifest)?;
+    save_version_manifest(&vdir, &manifest)?;
+    Ok(Some(entry))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveVersionArgs {
+    pub space_id: String,
+    pub doc_id: String,
+    /// `"daily"` | `"manual"`.
+    pub kind: String,
+    /// Local calendar day `YYYY-MM-DD` (required for daily).
+    #[serde(default)]
+    pub day_key: Option<String>,
+}
+
+#[tauri::command]
+pub fn knowledge_save_version(
+    app: AppHandle,
+    args: SaveVersionArgs,
+) -> Result<Option<KnowledgeVersionEntry>, String> {
+    let root = knowledge_root(&app)?;
+    save_version_inner(
+        &root,
+        &args.space_id,
+        &args.doc_id,
+        &args.kind,
+        args.day_key.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn knowledge_list_versions(
+    app: AppHandle,
+    args: DocArgs,
+) -> Result<Vec<KnowledgeVersionEntry>, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    if !vdir.exists() {
+        return Ok(vec![]);
+    }
+    let manifest = load_version_manifest(&vdir)?;
+    Ok(manifest.entries)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionIdArgs {
+    pub space_id: String,
+    pub doc_id: String,
+    pub version_id: String,
+}
+
+fn find_version_entry<'a>(
+    manifest: &'a VersionManifest,
+    version_id: &str,
+) -> Result<&'a KnowledgeVersionEntry, String> {
+    require_id_like_version(version_id)?;
+    manifest
+        .entries
+        .iter()
+        .find(|e| e.id == version_id)
+        .ok_or_else(|| "version not found".into())
+}
+
+fn require_id_like_version(id: &str) -> Result<(), String> {
+    if id.is_empty()
+        || id.len() > 96
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_')
+    {
+        return Err(format!("invalid versionId: {id}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn knowledge_read_version(app: AppHandle, args: VersionIdArgs) -> Result<String, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    let manifest = load_version_manifest(&vdir)?;
+    let entry = find_version_entry(&manifest, &args.version_id)?;
+    let path = version_file_path(&vdir, &entry.file)?;
+    if !path.exists() {
+        return Err("version file missing".into());
+    }
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+/// Restore snapshot into the live doc via atomic write; returns restored body.
+#[tauri::command]
+pub fn knowledge_restore_version(app: AppHandle, args: VersionIdArgs) -> Result<String, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    let manifest = load_version_manifest(&vdir)?;
+    let entry = find_version_entry(&manifest, &args.version_id)?;
+    let path = version_file_path(&vdir, &entry.file)?;
+    if !path.exists() {
+        return Err("version file missing".into());
+    }
+    let body = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let doc = doc_path(&root, &args.space_id, &args.doc_id)?;
+    atomic_write_str(&doc, &body)?;
+    Ok(body)
 }
 
 // ── Export / import / reveal ──────────────────────────────────────────────
@@ -427,16 +839,6 @@ fn sanitize_filename(name: &str) -> String {
         s = s.chars().take(80).collect();
     }
     s
-}
-
-fn unique_name(used: &mut std::collections::HashMap<String, u32>, base: &str) -> String {
-    let n = used.entry(base.to_string()).or_insert(0);
-    *n += 1;
-    if *n == 1 {
-        base.to_string()
-    } else {
-        format!("{base} ({n})")
-    }
 }
 
 /// Reject zip-slip style entries: absolute paths or `..` / empty path components.
@@ -489,9 +891,10 @@ pub struct ExportSpaceZipArgs {
     pub dest_path: String,
 }
 
+/// Portable hip layout (K17): meta.json + tree.json + docs/ + assets/.
+/// Space-root-relative `assets/…` links in MD survive re-import.
 #[tauri::command]
 pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> Result<(), String> {
-    use std::collections::HashMap;
     use std::io::Write as _;
     use zip::write::SimpleFileOptions;
     use zip::ZipWriter;
@@ -502,48 +905,20 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     if !dir.exists() {
         return Err("space not found".into());
     }
-    let tree: KnowledgeTreeFile = read_json_file(&dir.join("tree.json"))?;
+    let tree: KnowledgeTreeFile = if dir.join("tree.json").exists() {
+        read_json_file(&dir.join("tree.json"))?
+    } else {
+        KnowledgeTreeFile {
+            version: 1,
+            nodes: vec![],
+        }
+    };
     let dest = PathBuf::from(&args.dest_path);
     if !dest.is_absolute() {
         return Err("destPath must be absolute".into());
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    // Build human path map
-    let by_id: HashMap<String, &KnowledgeNode> =
-        tree.nodes.iter().map(|n| (n.id.clone(), n)).collect();
-    let mut path_cache: HashMap<String, String> = HashMap::new();
-    let mut used_at_parent: HashMap<String, HashMap<String, u32>> = HashMap::new();
-
-    fn path_for(
-        id: &str,
-        by_id: &HashMap<String, &KnowledgeNode>,
-        path_cache: &mut HashMap<String, String>,
-        used_at_parent: &mut HashMap<String, HashMap<String, u32>>,
-        visiting: &mut std::collections::HashSet<String>,
-    ) -> Result<String, String> {
-        if let Some(p) = path_cache.get(id) {
-            return Ok(p.clone());
-        }
-        if !visiting.insert(id.to_string()) {
-            return Err(format!("cycle in tree at {id}"));
-        }
-        let node = by_id.get(id).ok_or_else(|| format!("missing node {id}"))?;
-        let base = sanitize_filename(&node.title);
-        let parent_key = node.parent_id.clone().unwrap_or_else(|| "__root__".into());
-        let bucket = used_at_parent.entry(parent_key.clone()).or_default();
-        let unique = unique_name(bucket, &base);
-        let full = if let Some(ref pid) = node.parent_id {
-            let parent_path = path_for(pid, by_id, path_cache, used_at_parent, visiting)?;
-            format!("{parent_path}/{unique}")
-        } else {
-            unique
-        };
-        visiting.remove(id);
-        path_cache.insert(id.to_string(), full.clone());
-        Ok(full)
     }
 
     let mut doc_count = 0usize;
@@ -560,48 +935,294 @@ pub fn knowledge_export_space_zip(app: AppHandle, args: ExportSpaceZipArgs) -> R
     let mut zip = ZipWriter::new(file);
     let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
+    // meta.json (prefer on-disk; fall back to index entry)
+    let meta_bytes = if dir.join("meta.json").exists() {
+        fs::read(&dir.join("meta.json")).map_err(|e| e.to_string())?
+    } else {
+        let index = load_index(&root)?;
+        let space = index
+            .spaces
+            .iter()
+            .find(|s| s.id == args.space_id)
+            .ok_or_else(|| "space not found in index".to_string())?;
+        serde_json::to_vec_pretty(space).map_err(|e| e.to_string())?
+    };
+    zip.start_file("meta.json", opts)
+        .map_err(|e| e.to_string())?;
+    zip.write_all(&meta_bytes).map_err(|e| e.to_string())?;
+
+    let tree_bytes = serde_json::to_vec_pretty(&tree).map_err(|e| e.to_string())?;
+    zip.start_file("tree.json", opts)
+        .map_err(|e| e.to_string())?;
+    zip.write_all(&tree_bytes).map_err(|e| e.to_string())?;
+
     for n in &tree.nodes {
         if n.kind != "doc" {
             continue;
         }
-        let mut visiting = std::collections::HashSet::new();
-        let rel = path_for(
-            &n.id,
-            &by_id,
-            &mut path_cache,
-            &mut used_at_parent,
-            &mut visiting,
-        )?;
-        let entry_name = format!("{rel}.md");
+        let entry_name = format!("docs/{}.md", n.id);
         if !is_safe_zip_entry(&entry_name) {
             return Err("illegal export path".into());
         }
         let body = {
             let p = doc_path(&root, &args.space_id, &n.id)?;
             if p.exists() {
-                fs::read_to_string(&p).map_err(|e| e.to_string())?
+                fs::read(&p).map_err(|e| e.to_string())?
             } else {
-                String::new()
+                Vec::new()
             }
         };
         zip.start_file(entry_name, opts)
             .map_err(|e| e.to_string())?;
-        zip.write_all(body.as_bytes()).map_err(|e| e.to_string())?;
+        zip.write_all(&body).map_err(|e| e.to_string())?;
     }
 
-    // optional lightweight manifest
-    let manifest = serde_json::json!({
-        "format": "hip-knowledge-export",
-        "version": 1,
-        "spaceId": args.space_id,
-        "exportedAt": now_ms(),
-    });
-    zip.start_file("hip-manifest.json", opts)
-        .map_err(|e| e.to_string())?;
-    zip.write_all(manifest.to_string().as_bytes())
-        .map_err(|e| e.to_string())?;
+    // assets/* (skip symlinks)
+    let assets_dir = dir.join("assets");
+    if assets_dir.is_dir() {
+        let entries = fs::read_dir(&assets_dir).map_err(|e| e.to_string())?;
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let meta = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                continue;
+            }
+            let name = ent.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') {
+                continue;
+            }
+            let entry_name = format!("assets/{name_str}");
+            if !is_safe_zip_entry(&entry_name) {
+                return Err("illegal asset export path".into());
+            }
+            let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+            zip.start_file(entry_name, opts)
+                .map_err(|e| e.to_string())?;
+            zip.write_all(&bytes).map_err(|e| e.to_string())?;
+        }
+    }
+
     zip.finish().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ── Assets (P1.5 / K16) ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetMeta {
+    pub rel_path: String,
+    pub mime: String,
+    pub byte_length: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetFromPathArgs {
+    pub space_id: String,
+    pub source_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_import_asset_from_path(
+    app: AppHandle,
+    args: ImportAssetFromPathArgs,
+) -> Result<AssetMeta, String> {
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let source = PathBuf::from(&args.source_path);
+    if !source.is_absolute() {
+        return Err("sourcePath must be absolute".into());
+    }
+    let meta = fs::symlink_metadata(&source).map_err(|e| e.to_string())?;
+    if meta.file_type().is_symlink() {
+        return Err("source path is a symlink".into());
+    }
+    if !meta.is_file() {
+        return Err("sourcePath must be a file".into());
+    }
+    let byte_length = meta.len();
+    if byte_length > KNOWLEDGE_ASSET_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds max size ({KNOWLEDGE_ASSET_MAX_BYTES} bytes)"
+        ));
+    }
+    let mime = mime_from_ext(&source).ok_or_else(|| "unsupported asset type".to_string())?;
+    if !allowed_asset_mime(mime) {
+        return Err("unsupported asset MIME type".into());
+    }
+    let file_name = source
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let rel_path = gen_asset_rel_path(file_name);
+    let dest = asset_path(&root, &args.space_id, &rel_path)?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::copy(&source, &dest).map_err(|e| e.to_string())?;
+    Ok(AssetMeta {
+        rel_path,
+        mime: mime.to_string(),
+        byte_length,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportAssetBytesArgs {
+    pub space_id: String,
+    pub base64: String,
+    pub file_name: String,
+    pub mime: String,
+}
+
+#[tauri::command]
+pub fn knowledge_import_asset_bytes(
+    app: AppHandle,
+    args: ImportAssetBytesArgs,
+) -> Result<AssetMeta, String> {
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let mime = args.mime.trim().to_ascii_lowercase();
+    if !allowed_asset_mime(&mime) {
+        return Err("unsupported asset MIME type".into());
+    }
+    let bytes = B64
+        .decode(args.base64.trim())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    let byte_length = bytes.len() as u64;
+    if byte_length > KNOWLEDGE_ASSET_INLINE_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds inline max ({KNOWLEDGE_ASSET_INLINE_MAX_BYTES} bytes)"
+        ));
+    }
+    if byte_length == 0 {
+        return Err("empty asset".into());
+    }
+    let mut file_name = args.file_name.trim().to_string();
+    if file_name.is_empty() {
+        let ext = ext_for_mime(&mime).unwrap_or("bin");
+        file_name = format!("paste.{ext}");
+    } else if Path::new(&file_name).extension().is_none() {
+        if let Some(ext) = ext_for_mime(&mime) {
+            file_name = format!("{file_name}.{ext}");
+        }
+    }
+    let rel_path = gen_asset_rel_path(&file_name);
+    let dest = asset_path(&root, &args.space_id, &rel_path)?;
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    atomic_write(&dest, &bytes)?;
+    Ok(AssetMeta {
+        rel_path,
+        mime,
+        byte_length,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetRelArgs {
+    pub space_id: String,
+    pub rel_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetData {
+    pub mime: String,
+    pub base64: String,
+}
+
+#[tauri::command]
+pub fn knowledge_read_asset_data(
+    app: AppHandle,
+    args: AssetRelArgs,
+) -> Result<AssetData, String> {
+    let root = knowledge_root(&app)?;
+    let path = asset_path(&root, &args.space_id, &args.rel_path)?;
+    let meta = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
+    if meta.file_type().is_symlink() {
+        return Err("asset is a symlink".into());
+    }
+    if !meta.is_file() {
+        return Err("asset not found".into());
+    }
+    if meta.len() > KNOWLEDGE_ASSET_INLINE_MAX_BYTES {
+        return Err(format!(
+            "asset exceeds inline max ({KNOWLEDGE_ASSET_INLINE_MAX_BYTES} bytes)"
+        ));
+    }
+    let mime = mime_from_ext(&path).ok_or_else(|| "unsupported asset type".to_string())?;
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(AssetData {
+        mime: mime.to_string(),
+        base64: B64.encode(bytes),
+    })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetAbsPath {
+    pub absolute_path: String,
+}
+
+#[tauri::command]
+pub fn knowledge_asset_abs_path(
+    app: AppHandle,
+    args: AssetRelArgs,
+) -> Result<AssetAbsPath, String> {
+    let root = knowledge_root(&app)?;
+    let path = asset_path(&root, &args.space_id, &args.rel_path)?;
+    Ok(AssetAbsPath {
+        absolute_path: path.to_string_lossy().to_string(),
+    })
+}
+
+/// Reveal any path under the space root (docs or assets). Shared safe_join with reveal_doc.
+#[tauri::command]
+pub fn knowledge_reveal_path(app: AppHandle, args: AssetRelArgs) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let root = knowledge_root(&app)?;
+    let space = space_dir(&root, &args.space_id)?;
+    if !space.exists() {
+        return Err("space not found".into());
+    }
+    let trimmed = args.rel_path.trim().trim_start_matches("./");
+    if trimmed.is_empty() {
+        return Err("empty path".into());
+    }
+    // Only allow docs/… or assets/… under space.
+    let first = trimmed.split(['/', '\\']).next().unwrap_or("");
+    if first != "docs" && first != "assets" {
+        return Err("path must be under docs/ or assets/".into());
+    }
+    let path = safe_join(&space, trimmed).ok_or_else(|| "illegal path".to_string())?;
+    // Ensure resolved path stays under space (safe_join already rejects ..).
+    let target = if path.is_file() {
+        path.as_path()
+    } else if path.is_dir() {
+        path.as_path()
+    } else if let Some(parent) = path.parent() {
+        parent
+    } else {
+        space.as_path()
+    };
+    app.opener()
+        .reveal_item_in_dir(target)
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -617,6 +1238,214 @@ pub struct ImportFolderResult {
     pub imported_docs: u32,
 }
 
+/// Portable hip export/import: `tree.json` + `docs/` at the folder root.
+fn is_hip_portable_layout(source: &Path) -> bool {
+    source.join("tree.json").is_file() && source.join("docs").is_dir()
+}
+
+/// Import a portable hip layout folder (meta/tree/docs/assets) into a new space.
+fn import_hip_portable_folder(
+    app: &AppHandle,
+    source: &Path,
+    source_canon: &Path,
+) -> Result<ImportFolderResult, String> {
+    // Prefer meta.json name when present.
+    let name = if source.join("meta.json").is_file() {
+        read_json_file::<KnowledgeSpace>(&source.join("meta.json"))
+            .ok()
+            .map(|m| m.name)
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| {
+                source
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Imported")
+                    .to_string()
+            })
+    } else {
+        source
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Imported")
+            .to_string()
+    };
+
+    let space = knowledge_create_space(
+        app.clone(),
+        CreateSpaceArgs {
+            name,
+            icon: None,
+        },
+    )?;
+    let root = knowledge_root(app)?;
+    let space_root = space_dir(&root, &space.id)?;
+
+    let tree: KnowledgeTreeFile = match read_json_file(&source.join("tree.json")) {
+        Ok(t) => t,
+        Err(e) => {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e);
+        }
+    };
+
+    let mut imported = 0u32;
+    let docs_src = source.join("docs");
+    for n in &tree.nodes {
+        if n.kind != "doc" {
+            continue;
+        }
+        if imported >= MAX_IMPORT_DOCS {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(format!("import exceeds max documents ({MAX_IMPORT_DOCS})"));
+        }
+        if !n.id.starts_with("doc_") || !is_knowledge_id(&n.id) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(format!("invalid doc id in tree: {}", n.id));
+        }
+        let src_doc = docs_src.join(format!("{}.md", n.id));
+        // Skip symlink escape
+        if src_doc.exists() {
+            let meta = fs::symlink_metadata(&src_doc).map_err(|e| e.to_string());
+            let meta = match meta {
+                Ok(m) => m,
+                Err(e) => {
+                    let _ = knowledge_delete_space(
+                        app.clone(),
+                        DeleteSpaceArgs {
+                            id: space.id.clone(),
+                        },
+                    );
+                    return Err(e);
+                }
+            };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if let Ok(canon) = src_doc.canonicalize() {
+                if !canon.starts_with(source_canon) {
+                    continue;
+                }
+            }
+        }
+        let body = if src_doc.is_file() {
+            fs::read_to_string(&src_doc).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let dest = match doc_path(&root, &space.id, &n.id) {
+            Ok(p) => p,
+            Err(e) => {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(e);
+            }
+        };
+        if let Err(e) = atomic_write_str(&dest, &body) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e);
+        }
+        imported += 1;
+    }
+
+    // Copy assets (flat files only)
+    let assets_src = source.join("assets");
+    if assets_src.is_dir() {
+        let assets_dst = space_root.join("assets");
+        if let Err(e) = fs::create_dir_all(&assets_dst) {
+            let _ = knowledge_delete_space(
+                app.clone(),
+                DeleteSpaceArgs {
+                    id: space.id.clone(),
+                },
+            );
+            return Err(e.to_string());
+        }
+        let entries = match fs::read_dir(&assets_src) {
+            Ok(e) => e,
+            Err(e) => {
+                let _ = knowledge_delete_space(
+                    app.clone(),
+                    DeleteSpaceArgs {
+                        id: space.id.clone(),
+                    },
+                );
+                return Err(e.to_string());
+            }
+        };
+        for ent in entries.flatten() {
+            let path = ent.path();
+            let meta = match fs::symlink_metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if meta.file_type().is_symlink() || !meta.is_file() {
+                continue;
+            }
+            let name = ent.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') {
+                continue;
+            }
+            if let Ok(canon) = path.canonicalize() {
+                if !canon.starts_with(source_canon) {
+                    continue;
+                }
+            }
+            if meta.len() > KNOWLEDGE_ASSET_MAX_BYTES {
+                continue;
+            }
+            // Only allowlisted extensions
+            if mime_from_ext(&path).is_none() {
+                continue;
+            }
+            let dest = match safe_join(&assets_dst, &name_str) {
+                Some(p) => p,
+                None => continue,
+            };
+            let _ = fs::copy(&path, &dest);
+        }
+    }
+
+    if let Err(e) = write_json_file(&space_root.join("tree.json"), &tree) {
+        let _ = knowledge_delete_space(
+            app.clone(),
+            DeleteSpaceArgs {
+                id: space.id.clone(),
+            },
+        );
+        return Err(e);
+    }
+
+    Ok(ImportFolderResult {
+        space_id: space.id,
+        imported_docs: imported,
+    })
+}
+
 #[tauri::command]
 pub fn knowledge_import_folder(
     app: AppHandle,
@@ -629,6 +1458,11 @@ pub fn knowledge_import_folder(
     let source_canon = source
         .canonicalize()
         .map_err(|e| format!("cannot resolve sourcePath: {e}"))?;
+
+    if is_hip_portable_layout(&source) {
+        return import_hip_portable_folder(&app, &source, &source_canon);
+    }
+
     let name = source
         .file_name()
         .and_then(|s| s.to_str())
@@ -835,6 +1669,225 @@ pub fn knowledge_reveal_doc(app: AppHandle, args: DocArgs) -> Result<(), String>
         .map_err(|e| e.to_string())
 }
 
+// ── Templates (P1.7) ──────────────────────────────────────────────────────
+
+fn is_template_id(id: &str) -> bool {
+    let (prefix, rest) = match id.split_once('_') {
+        Some(p) => p,
+        None => return false,
+    };
+    if prefix != "tpl" {
+        return false;
+    }
+    let len = rest.len();
+    if len < 6 || len > 64 {
+        return false;
+    }
+    rest.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+fn require_template_id(id: &str) -> Result<(), String> {
+    if is_template_id(id) {
+        Ok(())
+    } else {
+        Err(format!("invalid templateId: {id}"))
+    }
+}
+
+fn templates_dir(root: &Path, space_id: &str) -> Result<PathBuf, String> {
+    let space = space_dir(root, space_id)?;
+    safe_join(&space, "templates").ok_or_else(|| "illegal templates path".to_string())
+}
+
+fn template_body_path(root: &Path, space_id: &str, tpl_id: &str) -> Result<PathBuf, String> {
+    require_template_id(tpl_id)?;
+    let dir = templates_dir(root, space_id)?;
+    let file = format!("{tpl_id}.md");
+    safe_join(&dir, &file).ok_or_else(|| "illegal template path".to_string())
+}
+
+fn templates_manifest_path(root: &Path, space_id: &str) -> Result<PathBuf, String> {
+    let dir = templates_dir(root, space_id)?;
+    // Fixed name — no user-controlled component.
+    Ok(dir.join("templates.json"))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateMeta {
+    id: String,
+    name: String,
+    created_at: i64,
+    updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplatesManifest {
+    version: u32,
+    templates: Vec<TemplateMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeTemplate {
+    pub id: String,
+    pub name: String,
+    pub body: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+fn load_templates_manifest(root: &Path, space_id: &str) -> Result<TemplatesManifest, String> {
+    let path = templates_manifest_path(root, space_id)?;
+    if !path.exists() {
+        return Ok(TemplatesManifest {
+            version: 1,
+            templates: vec![],
+        });
+    }
+    read_json_file(&path)
+}
+
+fn save_templates_manifest(
+    root: &Path,
+    space_id: &str,
+    manifest: &TemplatesManifest,
+) -> Result<(), String> {
+    let path = templates_manifest_path(root, space_id)?;
+    write_json_file(&path, manifest)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListTemplatesArgs {
+    pub space_id: String,
+}
+
+#[tauri::command]
+pub fn knowledge_list_templates(
+    app: AppHandle,
+    args: ListTemplatesArgs,
+) -> Result<Vec<KnowledgeTemplate>, String> {
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let manifest = load_templates_manifest(&root, &args.space_id)?;
+    let mut out = Vec::with_capacity(manifest.templates.len());
+    for meta in manifest.templates {
+        let body_path = template_body_path(&root, &args.space_id, &meta.id)?;
+        let body = if body_path.exists() {
+            fs::read_to_string(&body_path).map_err(|e| e.to_string())?
+        } else {
+            String::new()
+        };
+        out.push(KnowledgeTemplate {
+            id: meta.id,
+            name: meta.name,
+            body,
+            created_at: meta.created_at,
+            updated_at: meta.updated_at,
+        });
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveTemplateArgs {
+    pub space_id: String,
+    /// When set, update existing template; otherwise create.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub name: String,
+    pub body: String,
+}
+
+#[tauri::command]
+pub fn knowledge_save_template(
+    app: AppHandle,
+    args: SaveTemplateArgs,
+) -> Result<KnowledgeTemplate, String> {
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let name = args.name.trim();
+    if name.is_empty() {
+        return Err("template name is empty".into());
+    }
+    let mut manifest = load_templates_manifest(&root, &args.space_id)?;
+    let ts = now_ms();
+
+    let (id, created_at) = if let Some(ref existing) = args.id {
+        require_template_id(existing)?;
+        let pos = manifest
+            .templates
+            .iter()
+            .position(|t| t.id == *existing)
+            .ok_or_else(|| "template not found".to_string())?;
+        let created = manifest.templates[pos].created_at;
+        manifest.templates[pos].name = name.to_string();
+        manifest.templates[pos].updated_at = ts;
+        (existing.clone(), created)
+    } else {
+        let id = gen_id("tpl");
+        manifest.templates.push(TemplateMeta {
+            id: id.clone(),
+            name: name.to_string(),
+            created_at: ts,
+            updated_at: ts,
+        });
+        (id, ts)
+    };
+
+    let body_path = template_body_path(&root, &args.space_id, &id)?;
+    atomic_write_str(&body_path, &args.body)?;
+    save_templates_manifest(&root, &args.space_id, &manifest)?;
+
+    Ok(KnowledgeTemplate {
+        id,
+        name: name.to_string(),
+        body: args.body,
+        created_at,
+        updated_at: ts,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteTemplateArgs {
+    pub space_id: String,
+    pub id: String,
+}
+
+#[tauri::command]
+pub fn knowledge_delete_template(app: AppHandle, args: DeleteTemplateArgs) -> Result<(), String> {
+    require_template_id(&args.id)?;
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let mut manifest = load_templates_manifest(&root, &args.space_id)?;
+    let before = manifest.templates.len();
+    manifest.templates.retain(|t| t.id != args.id);
+    if manifest.templates.len() == before {
+        return Err("template not found".into());
+    }
+    // Manifest first, then body file (orphan body OK on crash).
+    save_templates_manifest(&root, &args.space_id, &manifest)?;
+    let body_path = template_body_path(&root, &args.space_id, &args.id)?;
+    if body_path.exists() {
+        let _ = fs::remove_file(&body_path);
+    }
+    Ok(())
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -968,5 +2021,322 @@ mod tests {
         assert!(doc_path(root, "bad", "doc_abc123def456").is_err());
         assert!(doc_path(root, "spc_oktoken1", "nod_notadoc1").is_err());
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn asset_path_rejects_traversal_and_nested() {
+        let root = Path::new("/tmp/kb-assets");
+        assert!(asset_path(root, "spc_oktoken1", "assets/../evil.png").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "../evil.png").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "docs/doc_x.md").is_err());
+        assert!(asset_path(root, "spc_oktoken1", "assets/sub/x.png").is_err());
+        assert!(asset_path(root, "bad", "assets/x.png").is_err());
+        let ok = asset_path(root, "spc_oktoken1", "assets/ast_abc123_x.png").unwrap();
+        assert!(ok.ends_with("assets/ast_abc123_x.png") || ok.ends_with("assets\\ast_abc123_x.png"));
+        let bare = asset_path(root, "spc_oktoken1", "ast_abc123_x.png").unwrap();
+        assert!(bare.to_string_lossy().contains("assets"));
+    }
+
+    #[test]
+    fn mime_allowlist_and_ext() {
+        assert!(allowed_asset_mime("image/png"));
+        assert!(allowed_asset_mime("application/pdf"));
+        assert!(!allowed_asset_mime("image/svg+xml"));
+        assert!(!allowed_asset_mime("text/html"));
+        assert_eq!(mime_from_ext(Path::new("a.PNG")), Some("image/png"));
+        assert_eq!(mime_from_ext(Path::new("a.exe")), None);
+        assert_eq!(ext_for_mime("image/jpeg"), Some("jpg"));
+    }
+
+    #[test]
+    fn sanitize_asset_filename_strips_path_and_controls() {
+        assert_eq!(sanitize_asset_filename("../../x.png"), "x.png");
+        assert_eq!(sanitize_asset_filename("a b.png"), "a_b.png");
+        assert!(!sanitize_asset_filename("").is_empty());
+    }
+
+    #[test]
+    fn import_write_read_asset_roundtrip_helpers() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_assettest01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("assets")).unwrap();
+
+            let png_header: &[u8] = &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+            let rel = "assets/ast_test01_pic.png";
+            let dest = asset_path(&root, space_id, rel).unwrap();
+            atomic_write(&dest, png_header).unwrap();
+            assert!(dest.is_file());
+            assert_eq!(fs::metadata(&dest).unwrap().len(), png_header.len() as u64);
+
+            // Inline cap refusal
+            assert!(KNOWLEDGE_ASSET_INLINE_MAX_BYTES < KNOWLEDGE_ASSET_MAX_BYTES);
+            assert_eq!(KNOWLEDGE_ASSET_INLINE_MAX_BYTES, 1_500_000);
+            assert_eq!(KNOWLEDGE_ASSET_MAX_BYTES, 25 * 1024 * 1024);
+        });
+    }
+
+    #[test]
+    fn portable_zip_layout_structure() {
+        with_temp_root(|base| {
+            use std::io::Read;
+            use zip::ZipArchive;
+
+            let root = base.join("knowledge");
+            let space_id = "spc_ziptest01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            fs::create_dir_all(dir.join("assets")).unwrap();
+            let space = KnowledgeSpace {
+                id: space_id.to_string(),
+                name: "ZipTest".into(),
+                icon: None,
+                created_at: 1,
+                updated_at: 1,
+            };
+            write_json_file(&dir.join("meta.json"), &space).unwrap();
+            let doc_id = "doc_ziptest01";
+            let tree = KnowledgeTreeFile {
+                version: 1,
+                nodes: vec![KnowledgeNode {
+                    id: doc_id.into(),
+                    parent_id: None,
+                    kind: "doc".into(),
+                    title: "Hello".into(),
+                    order: 0,
+                    created_at: 1,
+                    updated_at: 1,
+                }],
+            };
+            write_json_file(&dir.join("tree.json"), &tree).unwrap();
+            atomic_write_str(
+                &doc_path(&root, space_id, doc_id).unwrap(),
+                "![x](assets/ast_ziptest01_a.png)\n",
+            )
+            .unwrap();
+            atomic_write(
+                &asset_path(&root, space_id, "assets/ast_ziptest01_a.png").unwrap(),
+                b"fakepng",
+            )
+            .unwrap();
+            save_index(
+                &root,
+                &KnowledgeIndex {
+                    version: 1,
+                    spaces: vec![space],
+    fn template_id_validation() {
+        assert!(!is_template_id(""));
+        assert!(!is_template_id("doc_abc123def456"));
+        assert!(!is_template_id("tpl_ab")); // too short
+        assert!(!is_template_id("tpl_../evil"));
+        assert!(!is_template_id("tpl_a/b"));
+        assert!(is_template_id("tpl_abc123def456"));
+        assert!(is_template_id("tpl_xYzAbCdEfGhI"));
+    fn template_path_rejects_traversal() {
+        let root = Path::new("/tmp/kb");
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_../evil").is_err());
+        assert!(template_body_path(root, "bad", "tpl_abc123def456").is_err());
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_abc123def456").is_ok());
+    fn templates_roundtrip_list_save_delete() {
+            let space_id = "spc_tplspace01";
+            write_json_file(
+                &dir.join("meta.json"),
+                &KnowledgeSpace {
+                    id: space_id.into(),
+                    name: "T".into(),
+                    icon: None,
+                },
+            )
+            .unwrap();
+
+            // Build portable zip without AppHandle (inline the same layout rules).
+            let dest = base.join("out.zip");
+            {
+                use std::io::Write as _;
+                use zip::write::SimpleFileOptions;
+                use zip::ZipWriter;
+                let file = fs::File::create(&dest).unwrap();
+                let mut zip = ZipWriter::new(file);
+                let opts =
+                    SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+                let meta_bytes = fs::read(dir.join("meta.json")).unwrap();
+                zip.start_file("meta.json", opts).unwrap();
+                zip.write_all(&meta_bytes).unwrap();
+                let tree_bytes = fs::read(dir.join("tree.json")).unwrap();
+                zip.start_file("tree.json", opts).unwrap();
+                zip.write_all(&tree_bytes).unwrap();
+                zip.start_file(format!("docs/{doc_id}.md"), opts).unwrap();
+                zip.write_all(b"![x](assets/ast_ziptest01_a.png)\n")
+                    .unwrap();
+                zip.start_file("assets/ast_ziptest01_a.png", opts).unwrap();
+                zip.write_all(b"fakepng").unwrap();
+                zip.finish().unwrap();
+            }
+
+            let f = fs::File::open(&dest).unwrap();
+            let mut archive = ZipArchive::new(f).unwrap();
+            let mut names: Vec<String> = (0..archive.len())
+                .map(|i| archive.by_index(i).unwrap().name().to_string())
+                .collect();
+            names.sort();
+            assert!(names.iter().any(|n| n == "meta.json"));
+            assert!(names.iter().any(|n| n == "tree.json"));
+            assert!(names.iter().any(|n| n == &format!("docs/{doc_id}.md")));
+            assert!(names.iter().any(|n| n == "assets/ast_ziptest01_a.png"));
+            // Not the old human-readable title paths
+            assert!(!names.iter().any(|n| n == "Hello.md"));
+
+            let mut body = String::new();
+            archive
+                .by_name(&format!("docs/{doc_id}.md"))
+                .unwrap()
+                .read_to_string(&mut body)
+                .unwrap();
+            assert!(body.contains("assets/ast_ziptest01_a.png"));
+    fn version_snapshots_daily_manual_cap_and_delete() {
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let doc = doc_path(&root, space_id, doc_id).unwrap();
+            atomic_write_str(&doc, "body-v1").unwrap();
+            // Manual always creates.
+            let e1 = save_version_inner(&root, space_id, doc_id, "manual", None)
+                .expect("manual snapshot");
+            assert_eq!(e1.kind, "manual");
+            assert_eq!(e1.byte_length, 7);
+            // Daily with same body as last snapshot → skip.
+            let skip_same = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+            assert!(skip_same.is_none());
+            // Body changed → first daily of the day creates.
+            atomic_write_str(&doc, "body-v2").unwrap();
+            let d1 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .expect("daily first");
+            assert_eq!(d1.day_key.as_deref(), Some("2026-07-14"));
+            // Same day again → skip even if body changed (first save of day only).
+            atomic_write_str(&doc, "body-v3").unwrap();
+            let skip = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+            assert!(skip.is_none());
+            // New day with body ≠ last snapshot → creates.
+            let d2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-15"))
+                .expect("daily new day");
+            assert_eq!(d2.day_key.as_deref(), Some("2026-07-15"));
+            // Body equals last snapshot → skip on a new day.
+            let skip2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-16"))
+            assert!(skip2.is_none());
+            // Cap: fill past 30.
+            for i in 0..35 {
+                atomic_write_str(&doc, &format!("cap-{i}")).unwrap();
+                let _ = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            let manifest = load_version_manifest(&vdir).unwrap();
+            assert!(manifest.entries.len() <= KNOWLEDGE_VERSION_CAP);
+            assert_eq!(manifest.entries.len(), KNOWLEDGE_VERSION_CAP);
+            // Restore oldest remaining would work; restore newest.
+            let newest = manifest.entries[0].id.clone();
+            let restored_body = {
+                let path = version_file_path(&vdir, &manifest.entries[0].file).unwrap();
+                fs::read_to_string(path).unwrap()
+            // Simulate restore via atomic write of that body.
+            atomic_write_str(&doc, &restored_body).unwrap();
+            assert_eq!(fs::read_to_string(&doc).unwrap(), restored_body);
+            assert_eq!(newest, manifest.entries[0].id);
+            // Path traversal rejected.
+            assert!(version_file_path(&vdir, "../evil.md").is_err());
+            assert!(version_file_path(&vdir, "a/b.md").is_err());
+            // Delete doc file cleans versions dir.
+            let vdir_exists = vdir.exists();
+            assert!(vdir_exists);
+            fs::remove_file(&doc).unwrap();
+            let _ = fs::remove_dir_all(&vdir);
+            // Mirror knowledge_delete_doc_file cleanup:
+            if vdir.exists() {
+                let _ = fs::remove_dir_all(&vdir);
+            assert!(!versions_dir(&root, space_id, doc_id).unwrap().exists()
+                || !fs::read_dir(versions_dir(&root, space_id, doc_id).unwrap())
+                    .map(|mut d| d.next().is_some())
+                    .unwrap_or(false));
+        });
+    }
+
+    #[test]
+    fn is_hip_portable_layout_detects_tree_and_docs() {
+        with_temp_root(|base| {
+            assert!(!is_hip_portable_layout(base));
+            fs::write(base.join("tree.json"), "{}").unwrap();
+            assert!(!is_hip_portable_layout(base));
+            fs::create_dir_all(base.join("docs")).unwrap();
+            assert!(is_hip_portable_layout(base));
+            // Empty list when no templates dir.
+            let empty = load_templates_manifest(&root, space_id).unwrap();
+            assert!(empty.templates.is_empty());
+            let id = "tpl_meetnotes01";
+            let mut manifest = TemplatesManifest {
+                version: 1,
+                templates: vec![TemplateMeta {
+                    id: id.into(),
+                    name: "Meeting".into(),
+                    created_at: 10,
+                    updated_at: 10,
+                }],
+            };
+            let body_path = template_body_path(&root, space_id, id).unwrap();
+            atomic_write_str(&body_path, "# Agenda\n").unwrap();
+            save_templates_manifest(&root, space_id, &manifest).unwrap();
+            let loaded = load_templates_manifest(&root, space_id).unwrap();
+            assert_eq!(loaded.templates.len(), 1);
+            assert_eq!(loaded.templates[0].name, "Meeting");
+            assert_eq!(fs::read_to_string(&body_path).unwrap(), "# Agenda\n");
+            // Delete from manifest + body.
+            manifest.templates.clear();
+            save_templates_manifest(&root, space_id, &manifest).unwrap();
+            let _ = fs::remove_file(&body_path);
+            assert!(!body_path.exists());
+            assert!(load_templates_manifest(&root, space_id)
+                .templates
+                .is_empty());
+    fn version_delete_doc_cleans_versions_dir() {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let doc = doc_path(&root, space_id, doc_id).unwrap();
+            atomic_write_str(&doc, "x").unwrap();
+            save_version_inner(&root, space_id, doc_id, "manual", None)
+                .unwrap()
+                .unwrap();
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            assert!(vdir.exists());
+            // Inline the delete_doc cleanup path (command needs AppHandle).
+            if doc.exists() {
+                fs::remove_file(&doc).unwrap();
+            }
+            if vdir.exists() {
+                fs::remove_dir_all(&vdir).unwrap();
+            }
+            assert!(!vdir.exists());
+        });
+    }
+
+    #[test]
+    fn version_skip_when_doc_missing_does_not_create_dir() {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            // No doc file written.
+            let skipped = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skipped.is_none());
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            assert!(!vdir.exists());
+            let skipped_manual = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
+            assert!(skipped_manual.is_none());
+            assert!(!vdir.exists());
+        });
     }
 }

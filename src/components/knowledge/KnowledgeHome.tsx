@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide-react'
 import { toast } from 'sonner'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { groupSearchHitsBySpace } from '@/domain/knowledge/search'
+import { scheduleActiveExpandPersist, useKnowledgeStore } from '@/store/knowledgeStore'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
@@ -28,11 +29,19 @@ export function KnowledgeHome() {
   const setSearchQuery = useKnowledgeStore((s) => s.setSearchQuery)
   const searchHits = useKnowledgeStore((s) => s.searchHits)
   const indexStatus = useKnowledgeStore((s) => s.indexStatus)
+  const indexProgress = useKnowledgeStore((s) => s.indexProgress)
+  const availableTags = useKnowledgeStore((s) => s.availableTags)
+  const availableStatuses = useKnowledgeStore((s) => s.availableStatuses)
+  const filterTag = useKnowledgeStore((s) => s.filterTag)
+  const filterStatus = useKnowledgeStore((s) => s.filterStatus)
+  const setFilterTag = useKnowledgeStore((s) => s.setFilterTag)
+  const setFilterStatus = useKnowledgeStore((s) => s.setFilterStatus)
   const createSpace = useKnowledgeStore((s) => s.createSpace)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
   const openSpace = useKnowledgeStore((s) => s.openSpace)
   const openRecent = useKnowledgeStore((s) => s.openRecent)
+  const openSearchHit = useKnowledgeStore((s) => s.openSearchHit)
   const busy = useKnowledgeStore((s) => s.busy)
 
   const [createOpen, setCreateOpen] = useState(false)
@@ -42,7 +51,9 @@ export function KnowledgeHome() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const q = searchQuery.trim().toLowerCase()
-  const searching = q.length > 0
+  const hasMetaFilter = Boolean(filterTag || filterStatus)
+  /** Text query or frontmatter facet filter → show results panel. */
+  const searching = q.length > 0 || hasMetaFilter
 
   const filteredSpaces = useMemo(
     () => (q ? spaces.filter((s) => s.name.toLowerCase().includes(q)) : spaces),
@@ -52,6 +63,7 @@ export function KnowledgeHome() {
     () => (q ? recent.filter((r) => r.title.toLowerCase().includes(q)) : recent),
     [recent, q],
   )
+  const groupedHits = useMemo(() => groupSearchHitsBySpace(searchHits), [searchHits])
 
   /** Newest recent open per space — for card meta. */
   const lastOpenBySpace = useMemo(() => {
@@ -116,6 +128,7 @@ export function KnowledgeHome() {
         if (n.kind === 'folder') expand[n.id] = true
       }
       useKnowledgeStore.setState({ expandedFolderIds: expand })
+      scheduleActiveExpandPersist()
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
     }
@@ -167,7 +180,98 @@ export function KnowledgeHome() {
             className="h-10 pl-9"
           />
           {searching && indexStatus === 'building' && (
-            <p className="mt-1.5 text-meta text-ink-tertiary">{t('knowledge.home.searchIndexing')}</p>
+            <p
+              className="mt-1.5 text-meta text-ink-tertiary"
+              data-testid="knowledge-search-indexing"
+            >
+              {indexProgress && indexProgress.total > 0
+                ? indexProgress.spaceName
+                  ? t('knowledge.home.searchIndexingProgressSpace', {
+                      done: indexProgress.done,
+                      total: indexProgress.total,
+                      space: indexProgress.spaceName,
+                    })
+                  : t('knowledge.home.searchIndexingProgress', {
+                      done: indexProgress.done,
+                      total: indexProgress.total,
+                    })
+                : t('knowledge.home.searchIndexing')}
+            </p>
+          )}
+          {(availableTags.length > 0 ||
+            availableStatuses.length > 0 ||
+            hasMetaFilter) && (
+            <div
+              className="mt-3 flex flex-col gap-2"
+              data-testid="knowledge-home-filters"
+            >
+              {availableTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-meta text-ink-tertiary">
+                    {t('knowledge.home.filterTags')}
+                  </span>
+                  {availableTags.map((tag) => {
+                    const active = filterTag?.toLowerCase() === tag.toLowerCase()
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        data-testid="knowledge-filter-tag"
+                        data-active={active || undefined}
+                        className={
+                          active
+                            ? 'rounded-full bg-accent-strong/15 px-2.5 py-0.5 text-meta font-medium text-accent-strong'
+                            : 'rounded-full bg-surface-muted px-2.5 py-0.5 text-meta text-ink-secondary hover:bg-state-hover'
+                        }
+                        onClick={() => setFilterTag(active ? null : tag)}
+                      >
+                        {tag}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {availableStatuses.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-meta text-ink-tertiary">
+                    {t('knowledge.home.filterStatus')}
+                  </span>
+                  {availableStatuses.map((st) => {
+                    const active = filterStatus?.toLowerCase() === st.toLowerCase()
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        data-testid="knowledge-filter-status"
+                        data-active={active || undefined}
+                        className={
+                          active
+                            ? 'rounded-full bg-accent-strong/15 px-2.5 py-0.5 text-meta font-medium text-accent-strong'
+                            : 'rounded-full bg-surface-muted px-2.5 py-0.5 text-meta text-ink-secondary hover:bg-state-hover'
+                        }
+                        onClick={() => setFilterStatus(active ? null : st)}
+                      >
+                        {st}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {/* Always show Clear when a filter is active — even if facets emptied. */}
+              {hasMetaFilter && (
+                <button
+                  type="button"
+                  data-testid="knowledge-filter-clear"
+                  className="self-start text-meta text-ink-tertiary underline-offset-2 hover:text-ink hover:underline"
+                  onClick={() => {
+                    setFilterTag(null)
+                    setFilterStatus(null)
+                  }}
+                >
+                  {t('knowledge.home.filterClear')}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -179,43 +283,52 @@ export function KnowledgeHome() {
                   {t('knowledge.home.searchResults')}
                   <span className="ml-1.5 normal-case tracking-normal">{searchHits.length}</span>
                 </h2>
-                <ul className="-mx-2" data-testid="knowledge-search-results">
-                  {searchHits.map((hit) => (
-                    <li key={`${hit.spaceId}:${hit.docId}`}>
-                      <button
-                        type="button"
-                        data-testid="knowledge-search-hit"
-                        className="flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-state-hover"
-                        onClick={() =>
-                          void openRecent({
-                            spaceId: hit.spaceId,
-                            docId: hit.docId,
-                            title: hit.title,
-                            spaceName: hit.spaceName,
-                            at: Date.now(),
-                          })
-                        }
+                <div className="flex flex-col gap-6" data-testid="knowledge-search-results">
+                  {groupedHits.map((group) => (
+                    <div key={group.spaceId} data-testid="knowledge-search-group">
+                      <h3
+                        className="mb-1.5 px-2 text-meta font-medium text-ink-secondary"
+                        data-testid="knowledge-search-group-title"
                       >
-                        <FileText size={16} className="mt-0.5 shrink-0 text-ink-tertiary" />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-body text-ink">{hit.title}</div>
-                          <div className="truncate text-meta text-ink-tertiary">
-                            {hit.spaceName}
-                            {hit.path ? ` · ${hit.path}` : ''}
-                          </div>
-                          {hit.snippet && (
-                            <div
-                              className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
-                              data-testid="knowledge-search-snippet"
+                        {group.spaceName}
+                        <span className="ml-1.5 font-normal text-ink-tertiary">
+                          {group.hits.length}
+                        </span>
+                      </h3>
+                      <ul className="-mx-2">
+                        {group.hits.map((hit) => (
+                          <li key={`${hit.spaceId}:${hit.docId}`}>
+                            <button
+                              type="button"
+                              data-testid="knowledge-search-hit"
+                              className="flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-state-hover"
+                              onClick={() => void openSearchHit(hit)}
                             >
-                              {hit.snippet}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    </li>
+                              <FileText
+                                size={16}
+                                className="mt-0.5 shrink-0 text-ink-tertiary"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-body text-ink">{hit.title}</div>
+                                <div className="truncate text-meta text-ink-tertiary">
+                                  {hit.path || hit.title}
+                                </div>
+                                {hit.snippet && (
+                                  <div
+                                    className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
+                                    data-testid="knowledge-search-snippet"
+                                  >
+                                    {hit.snippet}
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </>
             ) : (
               indexStatus === 'ready' && (

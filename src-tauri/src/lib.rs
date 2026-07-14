@@ -503,10 +503,22 @@ pub fn run() {
             knowledge::knowledge_read_doc,
             knowledge::knowledge_write_doc,
             knowledge::knowledge_delete_doc_file,
+            knowledge::knowledge_save_version,
+            knowledge::knowledge_list_versions,
+            knowledge::knowledge_read_version,
+            knowledge::knowledge_restore_version,
             knowledge::knowledge_export_doc,
             knowledge::knowledge_export_space_zip,
             knowledge::knowledge_import_folder,
             knowledge::knowledge_reveal_doc,
+            knowledge::knowledge_import_asset_from_path,
+            knowledge::knowledge_import_asset_bytes,
+            knowledge::knowledge_read_asset_data,
+            knowledge::knowledge_asset_abs_path,
+            knowledge::knowledge_reveal_path,
+            knowledge::knowledge_list_templates,
+            knowledge::knowledge_save_template,
+            knowledge::knowledge_delete_template,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");

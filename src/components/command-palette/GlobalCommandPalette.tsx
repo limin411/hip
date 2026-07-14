@@ -12,6 +12,7 @@ import {
   searchKnowledgeDocs,
   useKnowledgeStore,
 } from '@/store/knowledgeStore'
+import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -174,7 +175,12 @@ export function GlobalCommandPalette() {
           toast.message(t('commandPalette.knowledgeNeedSpace'))
           return
         }
-        void st.createDoc(null, t('knowledge.doc.untitled'))
+        const parentId = resolveParentForNew({
+          treeFocusId: st.treeFocusId,
+          activeDocId: st.activeDocId,
+          nodes: st.nodes,
+        })
+        void st.requestCreateDoc(parentId, t('knowledge.doc.untitled'))
       },
       searchKnowledgeDocs: (q: string) => searchKnowledgeDocs(q),
       knowledgeIndexReady: knowledgeIndexStatus === 'ready' || isKnowledgeIndexReady(),

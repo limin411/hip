@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -59,6 +59,24 @@ function isIllegalDrop(
   return false
 }
 
+/** Depth-first list of currently visible rows (respect expand + filter). */
+export function listVisibleTreeNodes(
+  nodes: KnowledgeNode[],
+  expanded: Record<string, boolean>,
+  visibleIds?: Set<string> | null,
+  parentId: string | null = null,
+): KnowledgeNode[] {
+  const out: KnowledgeNode[] = []
+  for (const n of listChildren(nodes, parentId)) {
+    if (visibleIds && !visibleIds.has(n.id)) continue
+    out.push(n)
+    if (n.kind === 'folder' && expanded[n.id]) {
+      out.push(...listVisibleTreeNodes(nodes, expanded, visibleIds, n.id))
+    }
+  }
+  return out
+}
+
 export function SpaceTree({
   onRename,
   onDelete,
@@ -70,17 +88,31 @@ export function SpaceTree({
   const { t } = useTranslation()
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
+  const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const expanded = useKnowledgeStore((s) => s.expandedFolderIds)
   const busy = useKnowledgeStore((s) => s.busy)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const moveNode = useKnowledgeStore((s) => s.moveNode)
+  const setTreeFocusId = useKnowledgeStore((s) => s.setTreeFocusId)
 
   const [dropHint, setDropHint] = useState<DropHint>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const treeRef = useRef<HTMLDivElement>(null)
 
   const roots = listChildren(nodes, null)
+  const visibleRows = listVisibleTreeNodes(nodes, expanded, visibleIds)
+
+  // Roving focus: move DOM focus onto the focused row when treeFocusId changes.
+  useEffect(() => {
+    if (!treeFocusId || !treeRef.current) return
+    if (!treeRef.current.contains(document.activeElement)) return
+    const el = treeRef.current.querySelector<HTMLElement>(
+      `[data-tree-node-id="${treeFocusId.replace(/"/g, '')}"]`,
+    )
+    el?.focus({ preventScroll: false })
+  }, [treeFocusId])
 
   if (roots.length === 0) {
     return (
@@ -110,11 +142,100 @@ export function SpaceTree({
     setDraggingId(null)
   }
 
+  const focusIndex = treeFocusId
+    ? visibleRows.findIndex((n) => n.id === treeFocusId)
+    : -1
+  const focusInVisible = focusIndex >= 0
+
+  const moveFocus = (delta: number) => {
+    if (visibleRows.length === 0) return
+    let next: number
+    if (focusIndex < 0) {
+      next = delta > 0 ? 0 : visibleRows.length - 1
+    } else {
+      next = Math.max(0, Math.min(visibleRows.length - 1, focusIndex + delta))
+    }
+    setTreeFocusId(visibleRows[next].id)
+  }
+
+  const onTreeKeyDown = (e: KeyboardEvent) => {
+    if (busy) return
+    const key = e.key
+    if (
+      key !== 'ArrowDown' &&
+      key !== 'ArrowUp' &&
+      key !== 'ArrowLeft' &&
+      key !== 'ArrowRight' &&
+      key !== 'Enter'
+    ) {
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (key === 'ArrowDown') {
+      moveFocus(1)
+      return
+    }
+    if (key === 'ArrowUp') {
+      moveFocus(-1)
+      return
+    }
+
+    // Only act on currently visible rows (filter + expand aware).
+    const focused =
+      (focusInVisible ? visibleRows[focusIndex] : null) || visibleRows[0] || null
+    if (!focused) return
+    if (treeFocusId !== focused.id) setTreeFocusId(focused.id)
+
+    if (key === 'Enter') {
+      if (focused.kind === 'folder') toggleFolder(focused.id)
+      else void openDoc(focused.id)
+      return
+    }
+
+    if (key === 'ArrowLeft') {
+      if (focused.kind === 'folder' && expanded[focused.id]) {
+        toggleFolder(focused.id)
+        return
+      }
+      if (
+        focused.parentId &&
+        visibleRows.some((n) => n.id === focused.parentId)
+      ) {
+        setTreeFocusId(focused.parentId)
+      }
+      return
+    }
+
+    if (key === 'ArrowRight') {
+      if (focused.kind === 'folder') {
+        if (!expanded[focused.id]) {
+          toggleFolder(focused.id)
+          return
+        }
+        const kids = listVisibleTreeNodes(
+          nodes,
+          { ...expanded, [focused.id]: true },
+          visibleIds,
+          focused.id,
+        )
+        // First child among visible rows under this folder
+        if (kids[0]) setTreeFocusId(kids[0].id)
+      }
+    }
+  }
+
   const renderNode = (node: KnowledgeNode, depth: number) => {
     if (visibleIds && !visibleIds.has(node.id)) return null
 
     const spaceId = activeSpaceId ?? ''
     const parentForNew = node.kind === 'folder' ? node.id : node.parentId
+    const isActiveDoc = node.kind === 'doc' && activeDocId === node.id
+    const isFocused = treeFocusId === node.id
+    // Roving target: focused visible row, or first root when focus is missing/hidden.
+    const isRovingTarget =
+      (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
 
     const row = (
       <div
@@ -122,7 +243,15 @@ export function SpaceTree({
         data-testid={
           node.kind === 'doc' ? `knowledge-tree-doc-${node.id}` : `knowledge-tree-folder-${node.id}`
         }
+        data-tree-node-id={node.id}
+        role="treeitem"
+        aria-expanded={node.kind === 'folder' ? expanded[node.id] === true : undefined}
+        aria-selected={isActiveDoc}
+        tabIndex={isRovingTarget ? 0 : -1}
         draggable={!busy}
+        onFocus={() => {
+          if (treeFocusId !== node.id) setTreeFocusId(node.id)
+        }}
         onDragStart={(e) => {
           if (busy) {
             e.preventDefault()
@@ -161,10 +290,11 @@ export function SpaceTree({
           applyDrop(node, id, mode)
         }}
         className={cn(
-          'group flex w-full items-center gap-0.5 rounded-md py-1.5 pr-1 text-body transition-colors',
-          node.kind === 'doc' && activeDocId === node.id
+          'group flex w-full items-center gap-0.5 rounded-md py-1.5 pr-1 text-body transition-colors outline-none',
+          isActiveDoc
             ? 'bg-accent-active font-medium text-accent-strong'
             : 'text-ink hover:bg-surface-muted',
+          isFocused && !isActiveDoc && 'bg-surface-muted ring-1 ring-accent/35',
           draggingId === node.id && 'opacity-50',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&
@@ -190,8 +320,12 @@ export function SpaceTree({
         {node.kind === 'folder' ? (
           <button
             type="button"
+            tabIndex={-1}
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-            onClick={() => toggleFolder(node.id)}
+            onClick={() => {
+              setTreeFocusId(node.id)
+              toggleFolder(node.id)
+            }}
             disabled={busy}
           >
             {expanded[node.id] ? (
@@ -209,8 +343,12 @@ export function SpaceTree({
         ) : (
           <button
             type="button"
+            tabIndex={-1}
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-            onClick={() => void openDoc(node.id)}
+            onClick={() => {
+              setTreeFocusId(node.id)
+              void openDoc(node.id)
+            }}
             disabled={busy}
           >
             <span className="w-3.5 shrink-0" />
@@ -246,7 +384,7 @@ export function SpaceTree({
       const isOpen = expanded[node.id] === true
       const kids = listChildren(nodes, node.id)
       return (
-        <div key={node.id}>
+        <div key={node.id} role="group">
           {wrapped}
           {isOpen && kids.map((c) => renderNode(c, depth + 1))}
         </div>
@@ -258,7 +396,11 @@ export function SpaceTree({
 
   return (
     <div
+      ref={treeRef}
+      role="tree"
+      tabIndex={-1}
       data-testid="knowledge-tree"
+      onKeyDown={onTreeKeyDown}
       onDragOver={(e) => {
         if (!draggingId) return
         e.preventDefault()

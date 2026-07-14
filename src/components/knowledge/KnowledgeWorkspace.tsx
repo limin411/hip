@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
@@ -8,15 +8,27 @@ import {
   FilePlus,
   FileText,
   FolderPlus,
+  ImagePlus,
+  History,
   MoreHorizontal,
   Plus,
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { setExpandPersistSuspended, useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
+import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
-import type { KnowledgeNode } from '@/domain/knowledge/types'
+import {
+  isKnowledgeLiveEnabled,
+  loadEditorModePref,
+  type EditorMode,
+} from '@/domain/knowledge/editorMode'
+import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
+import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
+import { importAssetFromPath } from '@/domain/knowledge/importAsset'
+import type { KnowledgeNode, KnowledgeVersionEntry } from '@/domain/knowledge/types'
+import { formatAbsolute } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -30,42 +42,58 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/ui/DropdownMenu'
-import { pickSavePath } from '@/ipc/dialog'
+import { pickAttachmentFiles, pickSavePath } from '@/ipc/dialog'
 import {
   knowledgeErrorMessage,
   knowledgeExportDoc,
   knowledgeExportSpaceZip,
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
+import { revealInCodeMirror, revealInPreviewRoot } from '@/domain/knowledge/searchReveal'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
+import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
+import { WikiCreateModal } from './WikiCreateModal'
+import { BacklinksPanel } from './BacklinksPanel'
+
+/** Lazy so Source-only sessions pay 0 for Milkdown kit. */
+const DocLiveEditor = lazy(() =>
+  import('./DocLiveEditor').then((m) => ({ default: m.DocLiveEditor })),
+)
+import { TemplatePickerModal } from './TemplatePickerModal'
 
 export function KnowledgeWorkspace() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
+  const treeFocusId = useKnowledgeStore((s) => s.treeFocusId)
   const docBody = useKnowledgeStore((s) => s.docBody)
-  const editing = useKnowledgeStore((s) => s.editing)
+  const draftBody = useKnowledgeStore((s) => s.draftBody)
+  const editorMode = useKnowledgeStore((s) => s.editorMode)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
-  const createDoc = useKnowledgeStore((s) => s.createDoc)
+  const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
-  const setEditing = useKnowledgeStore((s) => s.setEditing)
+  const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
+  const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
+  const listVersions = useKnowledgeStore((s) => s.listVersions)
+  const restoreVersion = useKnowledgeStore((s) => s.restoreVersion)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
@@ -89,6 +117,7 @@ export function KnowledgeWorkspace() {
   )
 
   // Expand ancestors when filter query changes; restore snapshot on clear.
+  // Suspend expand LS writes while filter inflates expand (avoid polluting persist).
   useEffect(() => {
     const q = treeFilter.trim()
     if (!q) {
@@ -97,8 +126,10 @@ export function KnowledgeWorkspace() {
         useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
         setFilterExpandSnapshot(null)
       }
+      setExpandPersistSuspended(false)
       return
     }
+    setExpandPersistSuspended(true)
     if (lastFilterExpandQuery.current === q || !visibleIds) return
     lastFilterExpandQuery.current = q
     if (!filterExpandSnapshot) {
@@ -119,6 +150,71 @@ export function KnowledgeWorkspace() {
     useKnowledgeStore.setState({ expandedFolderIds: expand })
   }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
 
+  // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
+  useEffect(() => {
+    if (!activeDocId || !activeSpaceId) return
+    const pending = useKnowledgeStore.getState().pendingReveal
+    if (!pending?.query) return
+    // Only reveal when the pending target is still the active doc.
+    if (pending.spaceId !== activeSpaceId || pending.docId !== activeDocId) return
+
+    let cancelled = false
+    let attempts = 0
+    // Large CM docs can take >350ms to mount; allow ~2s of retries.
+    const maxAttempts = 24
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = (ms: number) => {
+      timeoutId = setTimeout(tryReveal, ms)
+    }
+
+    const tryReveal = () => {
+      if (cancelled) return
+      const still = useKnowledgeStore.getState().pendingReveal
+      if (!still?.query) return
+      if (still.spaceId !== activeSpaceId || still.docId !== activeDocId) {
+        useKnowledgeStore.getState().clearPendingReveal()
+        return
+      }
+
+      // Source/Live: CM source editor; Preview: markdown reader.
+      if (editorMode !== 'preview') {
+        const view = editorRef.current?.getView()
+        if (view) {
+          revealInCodeMirror(view, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      } else {
+        const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
+        if (root instanceof HTMLElement) {
+          revealInPreviewRoot(root, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      }
+
+      attempts += 1
+      if (attempts < maxAttempts) {
+        schedule(80)
+      } else {
+        // Give up without blocking later navigations.
+        useKnowledgeStore.getState().clearPendingReveal()
+      }
+    }
+
+    schedule(30)
+    return () => {
+      cancelled = true
+      if (timeoutId != null) clearTimeout(timeoutId)
+    }
+  }, [activeDocId, activeSpaceId, editorMode, docBody])
+
+  // Ensure expand-persist is not left suspended if the workspace unmounts mid-filter.
+  useEffect(() => {
+    return () => setExpandPersistSuspended(false)
+  }, [])
+
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
   const spaceNameTrimmed = normalizeSpaceName(spaceName)
@@ -130,11 +226,99 @@ export function KnowledgeWorkspace() {
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
+  /** Broken wiki link → confirm create (K20). Never silent. */
+  const [wikiCreateTitle, setWikiCreateTitle] = useState<string | null>(null)
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [versions, setVersions] = useState<KnowledgeVersionEntry[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [restoreTarget, setRestoreTarget] = useState<KnowledgeVersionEntry | null>(null)
 
-  // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
-  const parentForNew: string | null = activeNode?.parentId ?? null
+  const openVersionHistory = async () => {
+    if (!activeDocId) return
+    setVersionsOpen(true)
+    setVersionsLoading(true)
+    try {
+      const list = await listVersions(activeDocId)
+      setVersions(list)
+    } finally {
+      setVersionsLoading(false)
+    }
+  }
 
-  const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
+  const onSaveVersion = async () => {
+    const entry = await saveVersionManual()
+    if (entry && versionsOpen) {
+      const list = await listVersions()
+      setVersions(list)
+    }
+  }
+
+  const onConfirmRestore = async () => {
+    if (!restoreTarget) return
+    const ok = await restoreVersion(restoreTarget.id)
+    if (ok) {
+      setRestoreTarget(null)
+      setVersionsOpen(false)
+    }
+  }
+
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  // Toolbar create: focused folder / sibling of focused|active doc / root.
+  // Wiki create-on-confirm uses the same parent rule.
+  const parentForNew = resolveParentForNew({ treeFocusId, activeDocId, nodes })
+  const newDoc = (parentId: string | null) => {
+    void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
+  }
+
+  // Live option only when flag on; parse failures force Source for the session.
+  const liveEnabled = isKnowledgeLiveEnabled()
+  /** Doc ids that failed Live parse this session — stay on Source. */
+  const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
+    {},
+  )
+  const modeOptions = useMemo(() => {
+    if (liveEnabled) {
+      return [
+        { value: 'live' as const, label: t('knowledge.doc.live') },
+        { value: 'source' as const, label: t('knowledge.doc.source') },
+        { value: 'preview' as const, label: t('knowledge.doc.preview') },
+      ]
+    }
+    // Flag off: keep familiar Edit | Preview labels (source maps to Edit).
+    return [
+      { value: 'source' as const, label: t('knowledge.doc.edit') },
+      { value: 'preview' as const, label: t('knowledge.doc.preview') },
+    ]
+  }, [liveEnabled, t])
+  const bodyLen = Math.max(docBody.length, draftBody.length)
+  const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
+  // Host and control share the same suppressions so the segment never lies.
+  const liveSuppressed =
+    liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
+  const toggleMode: EditorMode =
+    editorMode === 'live' && (!liveEnabled || liveSuppressed) ? 'source' : editorMode
+  const showLiveEditor =
+    editorMode === 'live' && liveEnabled && !liveSuppressed
+  const showSourceEditor = editorMode !== 'preview' && !showLiveEditor
+  const showPreview = editorMode === 'preview'
+
+  const onLiveParseError = () => {
+    toast.error(t('knowledge.doc.liveParseFailed'))
+    if (activeDocId) {
+      setLiveBlockedDocIds((prev) => ({ ...prev, [activeDocId]: true }))
+    }
+    void setEditorMode('source')
+  }
+
+  /** Mode toggle: refuse Live re-entry when session-blocked; large clamp is in store. */
+  const onEditorModeChange = (v: EditorMode) => {
+    if (v === 'live' && liveBlocked) {
+      toast.error(t('knowledge.doc.liveParseFailed'))
+      return
+    }
+    void setEditorMode(v)
+  }
 
   const exportActiveDoc = async () => {
     if (!activeSpaceId || !activeDocId) return
@@ -171,6 +355,43 @@ export function KnowledgeWorkspace() {
       toast.success(t('knowledge.export.spaceDone'))
     } catch (e) {
       toast.error(knowledgeErrorMessage(e))
+    }
+  }
+
+  const toastAssetError = (
+    reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error',
+  ) => {
+    if (reason === 'too_large_paste') {
+      toast.error(t('knowledge.asset.tooLargePaste'))
+    } else if (reason === 'too_large_disk') {
+      toast.error(t('knowledge.asset.tooLargeDisk'))
+    } else if (reason === 'unsupported') {
+      toast.error(t('knowledge.asset.unsupported'))
+    } else {
+      toast.error(t('knowledge.asset.importFailed'))
+    }
+  }
+
+  const attachFiles = async () => {
+    if (!activeSpaceId || !activeDocId || editorMode === 'preview') return
+    const paths = await pickAttachmentFiles()
+    if (!paths?.length) return
+    const view = editorRef.current?.getView()
+    if (!view) return
+    for (const sourcePath of paths) {
+      const result = await importAssetFromPath(activeSpaceId, sourcePath)
+      if (!result.ok) {
+        toastAssetError(result.reason)
+        continue
+      }
+      const pos = view.state.selection.main.from
+      const before = pos > 0 ? view.state.sliceDoc(pos - 1, pos) : '\n'
+      let snippet = result.markdown
+      if (before !== '\n') snippet = `\n${snippet}`
+      snippet = `${snippet}\n`
+      if (insertTextAtCursor(view, snippet)) {
+        setDraftBody(view.state.doc.toString())
+      }
     }
   }
 
@@ -237,7 +458,7 @@ export function KnowledgeWorkspace() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   data-testid="knowledge-new-doc"
-                  onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
+                  onClick={() => newDoc(parentForNew)}
                 >
                   <FilePlus size={14} />
                   {t('knowledge.tree.newDoc')}
@@ -314,9 +535,7 @@ export function KnowledgeWorkspace() {
               setNodeTitle(node.title)
             }}
             onDelete={(node) => setNodeDelete(node)}
-            onNewDoc={(parentId) =>
-              void createDoc(parentId, t('knowledge.doc.untitled'))
-            }
+            onNewDoc={(parentId) => newDoc(parentId)}
             onNewFolder={(parentId) =>
               void createFolder(parentId, t('knowledge.folder.untitled'))
             }
@@ -406,12 +625,9 @@ export function KnowledgeWorkspace() {
                 data-testid="knowledge-edit-toggle"
                 aria-label={t('knowledge.doc.modeLabel')}
                 size="sm"
-                value={mode}
-                onChange={(v) => void setEditing(v === 'edit')}
-                options={[
-                  { value: 'edit', label: t('knowledge.doc.edit') },
-                  { value: 'preview', label: t('knowledge.doc.preview') },
-                ]}
+                value={toggleMode}
+                onChange={onEditorModeChange}
+                options={modeOptions}
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -426,11 +642,36 @@ export function KnowledgeWorkspace() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
+                    data-testid="knowledge-save-version"
+                    onClick={() => void onSaveVersion()}
+                  >
+                    <History size={14} />
+                    {t('knowledge.versions.menuSave')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-version-history"
+                    onClick={() => void openVersionHistory()}
+                  >
+                    <History size={14} />
+                    {t('knowledge.versions.menuHistory')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
                     data-testid="knowledge-export-doc"
                     onClick={() => void exportActiveDoc()}
                   >
                     <Download size={14} />
                     {t('knowledge.export.doc')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-save-as-template"
+                    onClick={() => {
+                      setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
+                      setSaveTemplateOpen(true)
+                    }}
+                  >
+                    <FilePlus size={14} />
+                    {t('knowledge.template.saveAs')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -446,11 +687,11 @@ export function KnowledgeWorkspace() {
               className="w-full max-w-md border-0 py-16"
               action={{
                 label: t('knowledge.tree.newDoc'),
-                onClick: () => void createDoc(null, t('knowledge.doc.untitled')),
+                onClick: () => newDoc(null),
               }}
             />
           </div>
-        ) : editing ? (
+        ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas className="min-h-0 flex-1">
               <InlineDocTitle
@@ -458,23 +699,79 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
+              <Suspense
+                fallback={
+                  <div
+                    className="flex flex-1 items-center justify-center text-meta text-ink-tertiary"
+                    data-testid="knowledge-doc-live-loading"
+                  >
+                    {t('knowledge.doc.liveLoading')}
+                  </div>
+                }
+              >
+                <DocLiveEditor
+                  key={`${activeDocId}-live`}
+                  docId={activeDocId}
+                  initialMarkdown={draftBody}
+                  onDraftChange={setDraftBody}
+                  onBlur={() => void flushSave()}
+                  onSave={() => void flushSave()}
+                  onParseError={onLiveParseError}
+                  placeholder={t('knowledge.doc.placeholder')}
+                  wikiNodes={nodes}
+                />
+              </Suspense>
+            </KnowledgeDocCanvas>
+          </div>
+        ) : showSourceEditor ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <KnowledgeDocCanvas className="min-h-0 flex-1">
+              <InlineDocTitle
+                docId={activeDocId}
+                title={activeNode?.title ?? t('knowledge.doc.untitled')}
+                onCommit={(title) => void renameNode(activeDocId, title)}
+              />
+              <div className="flex items-center gap-1">
+                <MarkdownToolbar
+                  getView={() => editorRef.current?.getView() ?? null}
+                  onAfterEdit={(text) => setDraftBody(text)}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  title={t('knowledge.asset.attach')}
+                  aria-label={t('knowledge.asset.attach')}
+                  data-testid="knowledge-attach-asset"
+                  disabled={busy || !activeSpaceId}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void attachFiles()}
+                >
+                  <ImagePlus size={14} />
+                </Button>
+              </div>
+              <DocPropertiesRow body={draftBody} />
               <MarkdownToolbar
                 getView={() => editorRef.current?.getView() ?? null}
                 onAfterEdit={(text) => setDraftBody(text)}
               />
               <DocEditor
                 ref={editorRef}
-                key={`${activeDocId}-edit`}
+                key={`${activeDocId}-source`}
                 docId={activeDocId}
-                initialValue={docBody}
+                initialValue={draftBody}
+                spaceId={activeSpaceId}
                 onDraftChange={setDraftBody}
                 onBlur={() => void flushSave()}
                 onSave={() => void flushSave()}
+                onAssetImportError={toastAssetError}
                 placeholder={t('knowledge.doc.placeholder')}
+                wikiNodes={nodes}
               />
             </KnowledgeDocCanvas>
           </div>
-        ) : (
+        ) : showPreview ? (
           <div className="min-h-0 flex-1 overflow-y-auto pb-24">
             <KnowledgeDocCanvas>
               <InlineDocTitle
@@ -483,14 +780,27 @@ export function KnowledgeWorkspace() {
                 readOnly
                 onCommit={() => {}}
               />
+              <DocPropertiesRow body={docBody} />
               <DocReader
-                content={docBody}
-                onStartEdit={() => void setEditing(true)}
+                // Prefer draft so preview task toggles are optimistic before flush.
+                content={draftBody || docBody}
+                onStartEdit={() => void setEditorMode(loadEditorModePref())}
+                nodes={nodes}
+                onWikiNavigate={(docId) => void openDoc(docId)}
+                onWikiBroken={(title) => setWikiCreateTitle(title)}
               />
             </KnowledgeDocCanvas>
           </div>
-        )}
+        ) : null}
       </main>
+
+      {activeDocId && activeSpaceId ? (
+        <BacklinksPanel
+          spaceId={activeSpaceId}
+          docId={activeDocId}
+          onOpenDoc={(id) => void openDoc(id)}
+        />
+      ) : null}
 
       <Modal
         open={renameSpaceOpen}
@@ -682,6 +992,172 @@ export function KnowledgeWorkspace() {
           </p>
         </div>
       </Modal>
+
+      <WikiCreateModal
+        open={wikiCreateTitle != null}
+        title={wikiCreateTitle ?? ''}
+        busy={busy}
+        onOpenChange={(o) => {
+          if (!o) setWikiCreateTitle(null)
+        }}
+        onConfirm={() => {
+          const title = wikiCreateTitle?.trim()
+          if (!title) return
+          setWikiCreateTitle(null)
+          void requestCreateDoc(parentForNew, title)
+        }}
+      />
+
+      <Modal
+        open={versionsOpen}
+        onOpenChange={setVersionsOpen}
+        title={t('knowledge.versions.title')}
+        className="max-w-md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-versions-close"
+              onClick={() => setVersionsOpen(false)}
+            >
+              {t('common.close')}
+            </Button>
+            <Button data-testid="knowledge-versions-save" onClick={() => void onSaveVersion()}>
+              {t('knowledge.versions.menuSave')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-2 px-5 py-4" data-testid="knowledge-versions-list">
+          {versionsLoading ? (
+            <p className="text-meta text-ink-tertiary">{t('knowledge.doc.saving')}</p>
+          ) : versions.length === 0 ? (
+            <p className="text-body text-ink-secondary">{t('knowledge.versions.empty')}</p>
+          ) : (
+            versions.map((v) => {
+              const large = v.byteLength > KNOWLEDGE_LARGE_DOC_CHARS
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                  data-testid="knowledge-version-row"
+                  data-version-id={v.id}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-body font-medium text-ink">
+                      {formatAbsolute(v.createdAt, i18n.language)}
+                    </div>
+                    <div className="text-meta text-ink-tertiary">
+                      {v.kind === 'daily'
+                        ? t('knowledge.versions.kindDaily')
+                        : t('knowledge.versions.kindManual')}
+                      {large
+                        ? ` · ${t('knowledge.versions.largeHint', {
+                            kb: Math.round(v.byteLength / 1024),
+                          })}`
+                        : null}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    data-testid="knowledge-version-restore"
+                    onClick={() => setRestoreTarget(v)}
+                  >
+                    {t('knowledge.versions.restore')}
+                  </Button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={restoreTarget != null}
+        onOpenChange={(o) => {
+          if (!o) setRestoreTarget(null)
+        }}
+        title={t('knowledge.versions.restoreTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-version-restore-cancel"
+              onClick={() => setRestoreTarget(null)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-version-restore-confirm"
+              onClick={() => void onConfirmRestore()}
+            >
+              {t('knowledge.versions.restoreConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.versions.restoreBody')}
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        title={t('knowledge.template.saveAsTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-save-template-cancel"
+              onClick={() => setSaveTemplateOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-save-template-confirm"
+              disabled={!templateName.trim() || busy}
+              onClick={() => {
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            >
+              {t('common.confirm', { defaultValue: 'OK' })}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">
+              {t('knowledge.template.nameLabel')}
+            </span>
+            <Input
+              data-testid="knowledge-save-template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder={t('knowledge.template.namePlaceholder')}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || !templateName.trim()) return
+                e.preventDefault()
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <TemplatePickerModal />
     </div>
   )
 }
+

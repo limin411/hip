@@ -35,3 +35,24 @@ export interface KnowledgeRecentItem {
   spaceName: string
   at: number
 }
+
+/** Space-level document template (`templates/tpl_*.md` + `templates.json`). */
+export interface KnowledgeTemplate {
+  id: string
+  name: string
+  body: string
+  createdAt: number
+  updatedAt: number
+}
+
+export type KnowledgeVersionKind = 'daily' | 'manual'
+
+export interface KnowledgeVersionEntry {
+  /** File stem / id (filesystem-safe ISO timestamp). */
+  id: string
+  file: string
+  createdAt: number
+  kind: KnowledgeVersionKind | string
+  dayKey?: string
+  byteLength: number
+}

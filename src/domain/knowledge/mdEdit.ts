@@ -128,3 +128,122 @@ export function insertFence(view: EditorView): boolean {
   })
   return true
 }
+
+/** Insert horizontal rule on its own line after the current line (or at cursor on empty line). */
+export function insertHr(view: EditorView): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const range = state.selection.main
+  const line = state.doc.lineAt(range.from)
+  const insert = line.text.trim() === '' ? '---\n' : '\n---\n'
+  const from = line.text.trim() === '' ? line.from : line.to
+  view.dispatch({
+    changes: { from, to: from, insert },
+    selection: EditorSelection.cursor(from + insert.length),
+  })
+  return true
+}
+
+/**
+ * Insert a 3×2 table skeleton (header + separator + 2 body rows, 3 columns).
+ * Cursor lands in the first header cell.
+ */
+export function insertTableSkeleton(view: EditorView, skeleton: string): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const range = state.selection.main
+  const line = state.doc.lineAt(range.from)
+  let from = range.from
+  let to = range.to
+  let insert = skeleton
+  if (range.empty && line.text.trim() === '') {
+    from = line.from
+    to = line.to
+  } else if (range.empty) {
+    from = line.to
+    to = line.to
+    insert = `\n${skeleton}`
+  }
+  // First cell content starts after leading `| ` (skip optional leading newline)
+  const pipe = insert.indexOf('| ')
+  const cursorOffset = pipe >= 0 ? pipe + 2 : insert.length
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(from + cursorOffset),
+  })
+  return true
+}
+
+
+/**
+ * Insert or complete a wiki link `[[Title]]`.
+ * When `replaceFrom`/`replaceTo` are set (incomplete `[[query`), replace that range.
+ * Otherwise wrap selection as title (or insert `[[`…`]]` around empty selection).
+ */
+export function insertWikiLink(
+  view: EditorView,
+  title: string,
+  opts?: { replaceFrom?: number; replaceTo?: number },
+): boolean {
+  if (view.composing) return false
+  const state = view.state
+  const t = title.trim()
+  const insert = t ? `[[${t}]]` : '[[]]'
+  if (opts?.replaceFrom != null && opts?.replaceTo != null) {
+    const from = opts.replaceFrom
+    const to = opts.replaceTo
+    view.dispatch({
+      changes: { from, to, insert },
+      selection: EditorSelection.cursor(from + insert.length),
+    })
+    return true
+  }
+  const range = state.selection.main
+  if (range.empty && !t) {
+    view.dispatch({
+      changes: { from: range.from, to: range.to, insert: '[[]]' },
+      selection: EditorSelection.cursor(range.from + 2),
+    })
+    return true
+  }
+  const selected = state.sliceDoc(range.from, range.to)
+  const body = t || selected || ''
+  const text = body ? `[[${body}]]` : '[[]]'
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert: text },
+    selection: body
+      ? EditorSelection.cursor(range.from + text.length)
+      : EditorSelection.cursor(range.from + 2),
+  })
+  return true
+}
+
+/**
+ * Replace a slash token range with a Markdown insert snippet (Source CM path).
+ * Live should apply the same snippet via its own transaction API.
+ */
+export function applySlashInsert(
+  view: EditorView,
+  from: number,
+  to: number,
+  insert: string,
+  cursorOffset: number,
+): boolean {
+  if (view.composing) return false
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: EditorSelection.cursor(from + cursorOffset),
+  })
+  return true
+}
+
+/** Insert plain text (or markdown snippet) at the primary selection. */
+export function insertTextAtCursor(view: EditorView, text: string): boolean {
+  if (view.composing || !text) return false
+  const range = view.state.selection.main
+  view.dispatch({
+    changes: { from: range.from, to: range.to, insert: text },
+    selection: EditorSelection.cursor(range.from + text.length),
+  })
+  return true
+}

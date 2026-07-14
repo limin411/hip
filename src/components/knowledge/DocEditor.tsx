@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -10,14 +11,30 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
-import { Compartment, Prec } from '@codemirror/state'
+import { Compartment, EditorSelection, Prec } from '@codemirror/state'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import {
+  applySlashInsert,
   headingAndDispatch,
   insertFence,
+  insertTextAtCursor,
   prefixAndDispatch,
   wrapAndDispatch,
 } from '@/domain/knowledge/mdEdit'
+import {
+  extractSlashQueryAt,
+  prepareSlashInsert,
+  sameSlashMatch,
+  type KnowledgeSlashItem,
+  type SlashQueryMatch,
+} from '@/domain/knowledge/slashMenu'
+import { KnowledgeSlashMenu } from './KnowledgeSlashMenu'
+import {
+  importAssetFromClipboardItems,
+  importAssetFromFile,
+} from '@/domain/knowledge/importAsset'
+import { wikiLinkAutocomplete } from '@/domain/knowledge/wikiCmCompletion'
+import type { KnowledgeNode } from '@/domain/knowledge/types'
 
 export interface DocEditorProps {
   /** Remount key source — parent should also pass key={docId} */
@@ -28,6 +45,13 @@ export interface DocEditorProps {
   placeholder?: string
   /** Optional Cmd/Ctrl+S → flush save (Workspace). */
   onSave?: () => void
+  /** Active space for asset paste/drop. */
+  spaceId?: string | null
+  /** Toast/surface import failures (too large, unsupported). */
+  onAssetImportError?: (reason: 'too_large_paste' | 'too_large_disk' | 'unsupported' | 'error') => void
+  onAssetImported?: () => void
+  /** Current space nodes for `[[` wiki title completion (same space). */
+  wikiNodes?: KnowledgeNode[]
 }
 
 export type DocEditorHandle = {
@@ -134,13 +158,69 @@ function pushDraft(view: EditorView, onDraftChange: (v: string) => void) {
  * Local-text CodeMirror host.
  * Keep `value` in sync with local state only — never echo store `docBody` while typing.
  */
+function readSlashMatch(view: EditorView): SlashQueryMatch | null {
+  const head = view.state.selection.main.head
+  if (!view.state.selection.main.empty) return null
+  const line = view.state.doc.lineAt(head)
+  return extractSlashQueryAt(line.text, head - line.from, line.from)
+}
+
+type MenuPos = { top: number; left: number; width: number; maxHeight: number }
+
+/** Menu width used for clamping caret-relative left. */
+const SLASH_MENU_WIDTH = 320
+const SLASH_MENU_MAX_H = 224
+
+function computeMenuPos(view: EditorView, match: SlashQueryMatch): MenuPos {
+  const fallback: MenuPos = {
+    top: 8,
+    left: 8,
+    width: SLASH_MENU_WIDTH,
+    maxHeight: SLASH_MENU_MAX_H,
+  }
+  const coords = view.coordsAtPos(match.from)
+  const root = view.dom.closest(
+    '[data-testid="knowledge-doc-editor"]',
+  ) as HTMLElement | null
+  if (!coords || !root) return fallback
+  const rootRect = root.getBoundingClientRect()
+  const spaceBelow = rootRect.bottom - coords.bottom
+  const preferAbove = spaceBelow < SLASH_MENU_MAX_H + 12
+  const top = preferAbove
+    ? Math.max(8, coords.top - rootRect.top - SLASH_MENU_MAX_H - 4)
+    : coords.bottom - rootRect.top + 4
+  const rawLeft = coords.left - rootRect.left
+  const left = Math.max(
+    8,
+    Math.min(rawLeft, Math.max(8, rootRect.width - SLASH_MENU_WIDTH - 8)),
+  )
+  const maxHeight = preferAbove
+    ? Math.min(SLASH_MENU_MAX_H, Math.max(80, coords.top - rootRect.top - 8))
+    : Math.min(SLASH_MENU_MAX_H, Math.max(80, rootRect.bottom - coords.bottom - 8))
+  return { top, left, width: SLASH_MENU_WIDTH, maxHeight }
+}
+
 export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
-  { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
+  {
+    docId: _docId,
+    initialValue,
+    onDraftChange,
+    onBlur,
+    placeholder,
+    onSave,
+    spaceId,
+    onAssetImportError,
+    onAssetImported,
+    wikiNodes,
+  },
   ref,
 ) {
   const isDark = useIsDark()
   const [text, setText] = useState(initialValue)
+  const [slashMatch, setSlashMatch] = useState<SlashQueryMatch | null>(null)
+  const [menuPos, setMenuPos] = useState<MenuPos | null>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const themeCompartment = useMemo(() => new Compartment(), [])
   const onBlurRef = useRef(onBlur)
   onBlurRef.current = onBlur
@@ -148,18 +228,121 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
+  /**
+   * Last draft string we already pushed (I2 / R1).
+   * Prefer equality over a sticky boolean: if onChange never echoes, the next
+   * real edit still notifies (value ≠ lastPushed). Cleared when onChange matches.
+   */
+  const lastPushedDraftRef = useRef<string | null>(null)
+  const slashMatchRef = useRef<SlashQueryMatch | null>(null)
+  slashMatchRef.current = slashMatch
+
+  const pushDraftOnce = useCallback((next: string) => {
+    lastPushedDraftRef.current = next
+    setText(next)
+    onDraftChangeRef.current(next)
+  }, [])
+
+  const updateSlashMatch = useCallback((next: SlashQueryMatch | null) => {
+    setSlashMatch((prev) => (sameSlashMatch(prev, next) ? prev : next))
+  }, [])
+  const spaceIdRef = useRef(spaceId)
+  spaceIdRef.current = spaceId
+  const onAssetImportErrorRef = useRef(onAssetImportError)
+  onAssetImportErrorRef.current = onAssetImportError
+  const onAssetImportedRef = useRef(onAssetImported)
+  onAssetImportedRef.current = onAssetImported
+  const wikiNodesRef = useRef(wikiNodes ?? [])
+  wikiNodesRef.current = wikiNodes ?? []
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
   }))
 
   // Stable extensions; theme swaps via Compartment so keymap/state are not rebuilt.
+  // Wiki nodes are read via ref so the completion source stays fresh without rebuild.
   const extensions = useMemo(() => {
-    const blurHandler = EditorView.domEventHandlers({
+    const insertMarkdown = (view: EditorView, md: string) => {
+      // Prefer surrounding newlines so the image is on its own line when mid-paragraph.
+      const pos = view.state.selection.main.from
+      const before = pos > 0 ? view.state.sliceDoc(pos - 1, pos) : '\n'
+      const after = pos < view.state.doc.length ? view.state.sliceDoc(pos, pos + 1) : '\n'
+      let snippet = md
+      if (before !== '\n') snippet = `\n${snippet}`
+      if (after !== '\n') snippet = `${snippet}\n`
+      if (insertTextAtCursor(view, snippet)) {
+        pushDraft(view, onDraftChangeRef.current)
+        setText(view.state.doc.toString())
+        onAssetImportedRef.current?.()
+      }
+    }
+
+    const handleImportResult = (
+      view: EditorView,
+      result: Awaited<ReturnType<typeof importAssetFromFile>>,
+    ) => {
+      if (result.ok) {
+        insertMarkdown(view, result.markdown)
+        return
+      }
+      onAssetImportErrorRef.current?.(result.reason)
+    }
+
+    const assetHandlers = EditorView.domEventHandlers({
       blur: () => {
+        // Delay so menu item mousedown can run first.
+        window.setTimeout(() => updateSlashMatch(null), 0)
         onBlurRef.current?.()
         return false
       },
+      paste: (event, view) => {
+        const space = spaceIdRef.current
+        if (!space || !event.clipboardData) return false
+        const items = event.clipboardData.items
+        if (!items?.length) return false
+        let hasImage = false
+        for (let i = 0; i < items.length; i++) {
+          const it = items[i]
+          if (it.kind === 'file' && it.type.startsWith('image/') && it.type !== 'image/svg+xml') {
+            hasImage = true
+            break
+          }
+        }
+        if (!hasImage) return false
+        event.preventDefault()
+        void importAssetFromClipboardItems(space, items).then((result) => {
+          if (!result) return
+          handleImportResult(view, result)
+        })
+        return true
+      },
+      drop: (event, view) => {
+        const space = spaceIdRef.current
+        if (!space || !event.dataTransfer?.files?.length) return false
+        const files = Array.from(event.dataTransfer.files)
+        const assets = files.filter((f) => {
+          const mime = f.type
+          return (
+            (mime.startsWith('image/') && mime !== 'image/svg+xml') ||
+            mime === 'application/pdf' ||
+            /\.(png|jpe?g|gif|webp|pdf)$/i.test(f.name)
+          )
+        })
+        if (!assets.length) return false
+        event.preventDefault()
+        void (async () => {
+          for (const file of assets) {
+            const result = await importAssetFromFile(space, file)
+            handleImportResult(view, result)
+          }
+        })()
+        return true
+      },
+    })
+
+    const slashTracker = EditorView.updateListener.of((update) => {
+      if (!update.docChanged && !update.selectionSet) return
+      updateSlashMatch(readSlashMatch(update.view))
     })
 
     const run =
@@ -226,11 +409,13 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       EditorView.lineWrapping,
       themeCompartment.of(buildProseTheme(false)),
-      blurHandler,
+      slashTracker,
+      assetHandlers,
       highlightSelectionMatches(),
+      wikiLinkAutocomplete(() => wikiNodesRef.current),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
-  }, [themeCompartment])
+  }, [themeCompartment, updateSlashMatch])
 
   useEffect(() => {
     const view = viewRef.current
@@ -240,11 +425,103 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     })
   }, [isDark, themeCompartment])
 
+  // M2 + R2: caret-relative menu; refresh on scroll/resize while open.
+  useEffect(() => {
+    if (!slashMatch) {
+      setMenuPos(null)
+      return
+    }
+    const view = viewRef.current
+    if (!view) {
+      setMenuPos({
+        top: 8,
+        left: 8,
+        width: SLASH_MENU_WIDTH,
+        maxHeight: SLASH_MENU_MAX_H,
+      })
+      return
+    }
+
+    // Synchronous first paint so the menu is not delayed one frame (tests + open).
+    setMenuPos(computeMenuPos(view, slashMatch))
+
+    let raf = 0
+    const onScrollOrResize = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        setMenuPos(computeMenuPos(view, slashMatch))
+      })
+    }
+
+    const scrollDOM = view.scrollDOM
+    scrollDOM.addEventListener('scroll', onScrollOrResize, { passive: true })
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      cancelAnimationFrame(raf)
+      scrollDOM.removeEventListener('scroll', onScrollOrResize)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
+  }, [slashMatch])
+
+  const onSlashSelect = useCallback(
+    (item: KnowledgeSlashItem) => {
+      const view = viewRef.current
+      const match = slashMatchRef.current
+      if (!view || !match || view.composing) return
+      const prepared = prepareSlashInsert(view.state.doc.toString(), match.from, item)
+      if (
+        applySlashInsert(
+          view,
+          match.from,
+          match.to,
+          prepared.insert,
+          prepared.cursorOffset,
+        )
+      ) {
+        // I2/R1: push draft once via equality-based suppress of onChange echo.
+        pushDraftOnce(view.state.doc.toString())
+        updateSlashMatch(null)
+        view.focus()
+      }
+    },
+    [pushDraftOnce, updateSlashMatch],
+  )
+
+  /** L2: Escape strips `/query` (align with chat dismiss), then hide menu. */
+  const onSlashDismiss = useCallback(() => {
+    const view = viewRef.current
+    const match = slashMatchRef.current
+    if (view && match && !view.composing) {
+      view.dispatch({
+        changes: { from: match.from, to: match.to, insert: '' },
+        selection: EditorSelection.cursor(match.from),
+      })
+      pushDraftOnce(view.state.doc.toString())
+    }
+    updateSlashMatch(null)
+    view?.focus()
+  }, [pushDraftOnce, updateSlashMatch])
+
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-1 flex-col"
+      ref={rootRef}
+      className="relative flex h-full min-h-0 w-full flex-1 flex-col"
       data-testid="knowledge-doc-editor"
     >
+      {slashMatch && menuPos ? (
+        <KnowledgeSlashMenu
+          query={slashMatch.query}
+          onSelect={onSlashSelect}
+          onDismiss={onSlashDismiss}
+          className="absolute"
+          style={{
+            top: menuPos.top,
+            left: menuPos.left,
+            width: menuPos.width,
+            maxHeight: menuPos.maxHeight,
+          }}
+        />
+      ) : null}
       <CodeMirror
         value={text}
         height="100%"
@@ -256,6 +533,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           highlightActiveLine: false,
           highlightSelectionMatches: false,
           bracketMatching: true,
+          // Wiki picker uses wikiLinkAutocomplete extension; keep default off to avoid double UI.
           autocompletion: false,
         }}
         placeholder={placeholder}
@@ -265,9 +543,16 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           view.dispatch({
             effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
           })
+          updateSlashMatch(readSlashMatch(view))
         }}
         onChange={(v) => {
           setText(v)
+          // R1: skip only the echo of a value we already pushed; never sticky-drop.
+          if (lastPushedDraftRef.current === v) {
+            lastPushedDraftRef.current = null
+            return
+          }
+          lastPushedDraftRef.current = null
           onDraftChangeRef.current(v)
         }}
         className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"

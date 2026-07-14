@@ -1,6 +1,10 @@
 /**
  * Knowledge-doc YAML frontmatter: tags / status / aliases only.
  * Hand-rolled (no gray-matter) — enough for flat scalars + string lists.
+ *
+ * Frontmatter is accepted only when the opening `---`…`---` block contains at
+ * least one known key (`tags` / `status` / `aliases`). Bare thematic breaks
+ * (`---` as Markdown hr) are left in the body and stay searchable.
  */
 
 export type KnowledgeDocMeta = {
@@ -44,7 +48,13 @@ export function parseFrontmatter(raw: string): ParsedFrontmatter {
   }
 
   const yamlLines = lines.slice(1, end)
-  const meta = parseMetaLines(yamlLines)
+  const { meta, foundKnownKey } = parseMetaLines(yamlLines)
+
+  // Reject false positives: thematic breaks / unknown-only blocks keep full body.
+  if (!foundKnownKey) {
+    return { meta: { ...EMPTY_DOC_META }, bodyWithoutFm: raw, hasFrontmatter: false }
+  }
+
   let bodyWithoutFm = lines.slice(end + 1).join('\n')
   // Drop a single leading blank line after the fence (common authoring style).
   if (bodyWithoutFm.startsWith('\n')) bodyWithoutFm = bodyWithoutFm.slice(1)
@@ -99,10 +109,36 @@ export function matchDocByTitleOrAlias(
   return null
 }
 
+/**
+ * Stable wiki sort: `order` asc, then `title`, then `id`.
+ * Used by `listKnowledgeDocsForWiki` and available to PR-12 callers.
+ */
+export function compareWikiDocs(
+  a: { id: string; title: string; order?: number },
+  b: { id: string; title: string; order?: number },
+): number {
+  const orderA = a.order ?? Number.MAX_SAFE_INTEGER
+  const orderB = b.order ?? Number.MAX_SAFE_INTEGER
+  if (orderA !== orderB) return orderA - orderB
+  const titleCmp = a.title.localeCompare(b.title)
+  if (titleCmp !== 0) return titleCmp
+  return a.id.localeCompare(b.id)
+}
+
 // ─── internal line parser ───────────────────────────────────────────────────
 
-function parseMetaLines(lines: string[]): KnowledgeDocMeta {
+function normalizeFmKey(raw: string): 'tags' | 'status' | 'aliases' | null {
+  const k = raw.toLowerCase()
+  if (FM_KEYS.has(k)) return k as 'tags' | 'status' | 'aliases'
+  return null
+}
+
+function parseMetaLines(lines: string[]): {
+  meta: KnowledgeDocMeta
+  foundKnownKey: boolean
+} {
   const meta: KnowledgeDocMeta = { tags: [], status: null, aliases: [] }
+  let foundKnownKey = false
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
@@ -114,34 +150,41 @@ function parseMetaLines(lines: string[]): KnowledgeDocMeta {
 
     // Block list: `key:` then indented `- item` lines
     const blockKey = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*$/)
-    if (blockKey && FM_KEYS.has(blockKey[1])) {
-      const key = blockKey[1] as 'tags' | 'status' | 'aliases'
-      const items: string[] = []
-      i += 1
-      while (i < lines.length) {
-        const next = lines[i]
-        const m = next.match(/^\s+-\s+(.*)$/)
-        if (!m) break
-        const v = unquote(m[1].trim())
-        if (v) items.push(v)
+    if (blockKey) {
+      const key = normalizeFmKey(blockKey[1])
+      if (key) {
+        foundKnownKey = true
+        const items: string[] = []
         i += 1
+        while (i < lines.length) {
+          const next = lines[i]
+          // Optional space after `-`; bare `-` is empty item and does not break the list.
+          const m = next.match(/^\s+-\s*(.*)$/)
+          if (!m) break
+          const v = unquote(m[1].trim())
+          if (v) items.push(v)
+          i += 1
+        }
+        assignListKey(meta, key, items)
+        continue
       }
-      assignListKey(meta, key, items)
-      continue
     }
 
     // Inline: `key: value`
     const inline = trimmed.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/)
-    if (inline && FM_KEYS.has(inline[1])) {
-      const key = inline[1] as 'tags' | 'status' | 'aliases'
-      const rawVal = inline[2].trim()
-      if (key === 'status') {
-        meta.status = unquote(rawVal) || null
-      } else {
-        assignListKey(meta, key, parseInlineList(rawVal))
+    if (inline) {
+      const key = normalizeFmKey(inline[1])
+      if (key) {
+        foundKnownKey = true
+        const rawVal = inline[2].trim()
+        if (key === 'status') {
+          meta.status = unquote(rawVal) || null
+        } else {
+          assignListKey(meta, key, parseInlineList(rawVal))
+        }
+        i += 1
+        continue
       }
-      i += 1
-      continue
     }
 
     i += 1
@@ -149,7 +192,7 @@ function parseMetaLines(lines: string[]): KnowledgeDocMeta {
 
   meta.tags = uniquePreserve(meta.tags)
   meta.aliases = uniquePreserve(meta.aliases)
-  return meta
+  return { meta, foundKnownKey }
 }
 
 function assignListKey(

@@ -145,6 +145,8 @@ export type KnowledgeDocMetaEntry = {
   title: string
   spaceName: string
   path: string
+  /** Tree `order` for stable wiki first-wins (order → title → id). */
+  order: number
   tags: string[]
   status: string | null
   aliases: string[]
@@ -198,6 +200,8 @@ export function upsertSearchDoc(
     tagList?: string[]
     statusValue?: string
     aliasList?: string[]
+    /** Tree node order for wiki stable sort (stored in metaSink). */
+    order?: number
     /** When provided, records structured meta for facets / wiki (by doc id). */
     metaSink?: Map<string, KnowledgeDocMetaEntry>
   },
@@ -231,6 +235,7 @@ export function upsertSearchDoc(
       title: full.title,
       spaceName: full.spaceName,
       path: full.path,
+      order: doc.order ?? Number.MAX_SAFE_INTEGER,
       tags: full.tagList,
       status: full.statusValue ? full.statusValue : null,
       aliases: full.aliasList,

@@ -520,7 +520,7 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <DocPropertiesRow body={draftBody || docBody} />
+              <DocPropertiesRow body={draftBody} />
               <MarkdownToolbar
                 getView={() => editorRef.current?.getView() ?? null}
                 onAfterEdit={(text) => setDraftBody(text)}

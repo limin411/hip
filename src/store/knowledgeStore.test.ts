@@ -34,7 +34,7 @@ vi.mock('@/i18n', () => ({
 }))
 
 import { toast } from 'sonner'
-import { useKnowledgeStore } from './knowledgeStore'
+import { listKnowledgeDocsForWiki, useKnowledgeStore } from './knowledgeStore'
 
 describe('knowledgeStore openDoc editing default', () => {
   beforeEach(() => {
@@ -534,6 +534,195 @@ describe('knowledgeStore index progress + openSearchHit', () => {
     const afterA = useKnowledgeStore.getState()
     expect(afterA.indexStatus).toBe('ready')
     expect(afterA.indexProgress).toBeNull()
+  })
+})
+
+describe('knowledgeStore frontmatter facets + filters', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S1', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: null,
+      nodes: [],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editing: false,
+      mode: 'home',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: {},
+      availableTags: [],
+      availableStatuses: [],
+      filterTag: null,
+      filterStatus: null,
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('rebuild populates availableTags and filterTag lists matching docs', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'Design',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_b',
+          parentId: null,
+          kind: 'doc',
+          title: 'Ops',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeReadDoc.mockImplementation(async (_spaceId: string, docId: string) => {
+      if (docId === 'doc_a') {
+        return `---
+tags: [design]
+status: draft
+aliases: [KB]
+---
+design body
+`
+      }
+      return `---
+tags: [ops]
+---
+ops body
+`
+    })
+
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    const s = useKnowledgeStore.getState()
+    expect(s.indexStatus).toBe('ready')
+    expect(s.availableTags).toEqual(expect.arrayContaining(['design', 'ops']))
+    expect(s.availableStatuses).toContain('draft')
+
+    useKnowledgeStore.getState().setFilterTag('design')
+    const filtered = useKnowledgeStore.getState()
+    expect(filtered.filterTag).toBe('design')
+    expect(filtered.searchHits.map((h) => h.docId)).toEqual(['doc_a'])
+  })
+
+  it('clears stale filterTag when facets no longer include it', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'Design',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeReadDoc.mockResolvedValue(`---
+tags: [design]
+---
+body
+`)
+
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    useKnowledgeStore.getState().setFilterTag('design')
+    expect(useKnowledgeStore.getState().filterTag).toBe('design')
+    expect(useKnowledgeStore.getState().searchHits).toHaveLength(1)
+
+    // Rebuild with no frontmatter → facets empty → filter cleared
+    knowledgeReadDoc.mockResolvedValue('plain body only')
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    const s = useKnowledgeStore.getState()
+    expect(s.availableTags).toEqual([])
+    expect(s.filterTag).toBeNull()
+    expect(s.searchHits).toEqual([])
+  })
+
+  it('listKnowledgeDocsForWiki sorts by order then title then id', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_z',
+          parentId: null,
+          kind: 'doc',
+          title: 'Zed',
+          order: 2,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'Alpha',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_b',
+          parentId: null,
+          kind: 'doc',
+          title: 'Beta',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeReadDoc.mockImplementation(async (_s: string, docId: string) => {
+      if (docId === 'doc_a') {
+        return `---
+aliases: [A1]
+---
+x
+`
+      }
+      return 'plain'
+    })
+
+    await useKnowledgeStore.getState().rebuildSearchIndex()
+    const wiki = listKnowledgeDocsForWiki('spc_1')
+    expect(wiki.map((d) => d.id)).toEqual(['doc_a', 'doc_b', 'doc_z'])
+    expect(wiki[0]?.aliases).toEqual(['A1'])
+  })
+
+  it('openHome clears active meta filters', async () => {
+    useKnowledgeStore.setState({
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      filterTag: 'design',
+      filterStatus: 'draft',
+      searchHits: [{ spaceId: 'spc_1', docId: 'x', title: 't', spaceName: 'S', path: 't', score: 0 }],
+    })
+    await useKnowledgeStore.getState().openHome()
+    const s = useKnowledgeStore.getState()
+    expect(s.mode).toBe('home')
+    expect(s.filterTag).toBeNull()
+    expect(s.filterStatus).toBeNull()
+    expect(s.searchHits).toEqual([])
   })
 })
 

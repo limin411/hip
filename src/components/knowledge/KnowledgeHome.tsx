@@ -197,7 +197,9 @@ export function KnowledgeHome() {
                 : t('knowledge.home.searchIndexing')}
             </p>
           )}
-          {(availableTags.length > 0 || availableStatuses.length > 0) && (
+          {(availableTags.length > 0 ||
+            availableStatuses.length > 0 ||
+            hasMetaFilter) && (
             <div
               className="mt-3 flex flex-col gap-2"
               data-testid="knowledge-home-filters"
@@ -254,6 +256,7 @@ export function KnowledgeHome() {
                   })}
                 </div>
               )}
+              {/* Always show Clear when a filter is active — even if facets emptied. */}
               {hasMetaFilter && (
                 <button
                   type="button"

@@ -173,6 +173,7 @@ function indexCurrentDoc(
   nodes: KnowledgeNode[],
 ) {
   const path = getPathTitles(nodes, docId).join(' / ') || title
+  const order = nodes.find((n) => n.id === docId)?.order ?? Number.MAX_SAFE_INTEGER
   upsertSearchDoc(kbIndex, {
     id: docKey(spaceId, docId),
     spaceId,
@@ -181,13 +182,33 @@ function indexCurrentDoc(
     body,
     spaceName,
     path,
+    order,
     metaSink: kbMeta,
   })
 }
 
+/**
+ * Refresh facet lists and drop stale filterTag/filterStatus that no longer exist
+ * (avoids Home empty-results trap when last tagged doc is deleted).
+ */
 function syncFacetsToState(set: (partial: Partial<KnowledgeState>) => void) {
   const facets = collectSearchFacets(kbMeta)
-  set({ availableTags: facets.tags, availableStatuses: facets.statuses })
+  const { filterTag, filterStatus } = useKnowledgeStore.getState()
+  const nextTag =
+    filterTag && facets.tags.some((t) => t.toLowerCase() === filterTag.toLowerCase())
+      ? filterTag
+      : null
+  const nextStatus =
+    filterStatus &&
+    facets.statuses.some((s) => s.toLowerCase() === filterStatus.toLowerCase())
+      ? filterStatus
+      : null
+  set({
+    availableTags: facets.tags,
+    availableStatuses: facets.statuses,
+    filterTag: nextTag,
+    filterStatus: nextStatus,
+  })
 }
 
 function applySearchFilters(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
@@ -289,6 +310,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             body,
             spaceName: space.name,
             path,
+            order: node.order,
             metaSink: nextMeta,
           })
           done += 1
@@ -306,14 +328,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (gen !== indexBuildGen) return
       kbIndex = next
       kbMeta = nextMeta
-      const facets = collectSearchFacets(kbMeta)
       set({
         indexStatus: 'ready',
         spaceDocCounts: counts,
         indexProgress: null,
-        availableTags: facets.tags,
-        availableStatuses: facets.statuses,
       })
+      // Also drops stale filterTag/filterStatus when facets no longer include them.
+      syncFacetsToState(set)
       get().runSearch(get().searchQuery)
     } catch {
       if (gen !== indexBuildGen) return
@@ -519,7 +540,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       activeSpaceId: null,
       nodes: [],
       pendingReveal: null,
+      filterTag: null,
+      filterStatus: null,
     })
+    get().runSearch(get().searchQuery)
   },
 
   createFolder: async (parentId, title) => {
@@ -571,7 +595,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
-      const facets = collectSearchFacets(kbMeta)
       set((s) => ({
         nodes,
         busy: false,
@@ -579,9 +602,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           ...s.spaceDocCounts,
           [spaceId]: (s.spaceDocCounts[spaceId] ?? 0) + 1,
         },
-        availableTags: facets.tags,
-        availableStatuses: facets.statuses,
       }))
+      syncFacetsToState(set)
       if (parentId) {
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
       }
@@ -876,17 +898,29 @@ export function isKnowledgeIndexReady(): boolean {
 
 /**
  * Docs in a space with titles + aliases for wiki resolution (PR-12 step 2 / PR-14).
- * Order follows meta map insertion (index rebuild order ≈ tree scan order).
+ * Sorted stable tree order: `order` asc, then `title`, then `id` (first-wins).
  */
 export function listKnowledgeDocsForWiki(spaceId: string): Array<{
   id: string
   title: string
   aliases: string[]
+  order: number
 }> {
-  const out: Array<{ id: string; title: string; aliases: string[] }> = []
+  const out: Array<{ id: string; title: string; aliases: string[]; order: number }> = []
   for (const entry of kbMeta.values()) {
     if (entry.spaceId !== spaceId) continue
-    out.push({ id: entry.docId, title: entry.title, aliases: entry.aliases })
+    out.push({
+      id: entry.docId,
+      title: entry.title,
+      aliases: entry.aliases,
+      order: entry.order,
+    })
   }
+  out.sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order
+    const titleCmp = a.title.localeCompare(b.title)
+    if (titleCmp !== 0) return titleCmp
+    return a.id.localeCompare(b.id)
+  })
   return out
 }

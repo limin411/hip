@@ -182,6 +182,33 @@ describe('knowledge MiniSearch helper', () => {
     expect(groups[0]?.spaceName).toBe('Beta')
   })
 
+  it('thematic-break hr is not stripped — body remains fully searchable', () => {
+    const index = createKnowledgeIndex()
+    const body = `---
+
+Introduction unique_intro_token
+
+---
+
+Second unique_second_token
+`
+    upsertSearchDoc(index, {
+      id: docKey('spc_a', 'doc_1'),
+      spaceId: 'spc_a',
+      docId: 'doc_1',
+      title: 'Hr',
+      body,
+      spaceName: 'S',
+      path: 'Hr',
+    })
+    expect(searchKnowledge(index, 'unique_intro_token').some((h) => h.docId === 'doc_1')).toBe(
+      true,
+    )
+    expect(searchKnowledge(index, 'unique_second_token').some((h) => h.docId === 'doc_1')).toBe(
+      true,
+    )
+  })
+
   it('indexes bodyWithoutFm only — FM keys do not pollute body tokens', () => {
     const index = createKnowledgeIndex()
     const fmOnlyNoise = 'unique_fm_status_token_zzz'

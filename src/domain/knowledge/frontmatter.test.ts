@@ -102,6 +102,58 @@ x
       aliases: '',
     })
   })
+
+  it('does not treat thematic-break --- pairs as frontmatter', () => {
+    const raw = `---
+
+Introduction paragraph that should be searchable.
+
+---
+
+Second section with unique_token_abc
+`
+    const r = parseFrontmatter(raw)
+    expect(r.hasFrontmatter).toBe(false)
+    expect(r.bodyWithoutFm).toBe(raw)
+    expect(r.bodyWithoutFm).toContain('Introduction paragraph')
+    expect(r.bodyWithoutFm).toContain('unique_token_abc')
+  })
+
+  it('does not strip empty or unknown-only fences', () => {
+    expect(parseFrontmatter('---\n\n---\nbody').hasFrontmatter).toBe(false)
+    expect(parseFrontmatter('---\nfoo: bar\n---\nbody').hasFrontmatter).toBe(false)
+    expect(parseFrontmatter('---\njust text\n---\nbody').hasFrontmatter).toBe(false)
+    expect(parseFrontmatter('---\nfoo: bar\n---\nbody').bodyWithoutFm).toContain('foo: bar')
+  })
+
+  it('accepts capitalized known keys', () => {
+    const raw = `---
+Tags: [design]
+STATUS: draft
+Aliases: [Plan]
+---
+body
+`
+    const r = parseFrontmatter(raw)
+    expect(r.hasFrontmatter).toBe(true)
+    expect(r.meta.tags).toEqual(['design'])
+    expect(r.meta.status).toBe('draft')
+    expect(r.meta.aliases).toEqual(['Plan'])
+  })
+
+  it('bare list item "-" does not drop following siblings', () => {
+    const raw = `---
+tags:
+  -
+  - ok
+  -item
+  - also
+---
+x
+`
+    // `-item` (no space) is still a list item with value "item"
+    expect(parseFrontmatter(raw).meta.tags).toEqual(['ok', 'item', 'also'])
+  })
 })
 
 describe('matchDocByTitleOrAlias', () => {

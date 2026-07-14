@@ -199,6 +199,18 @@ pub struct CreateSpaceArgs {
     pub icon: Option<String>,
 }
 
+/// Case-insensitive display-name uniqueness among spaces (optional exclude for rename).
+fn space_name_taken(spaces: &[KnowledgeSpace], name: &str, exclude_id: Option<&str>) -> bool {
+    let key = name.trim().to_lowercase();
+    if key.is_empty() {
+        return false;
+    }
+    spaces.iter().any(|s| {
+        exclude_id.map(|id| s.id != id).unwrap_or(true)
+            && s.name.trim().to_lowercase() == key
+    })
+}
+
 #[tauri::command]
 pub fn knowledge_create_space(app: AppHandle, args: CreateSpaceArgs) -> Result<KnowledgeSpace, String> {
     let name = args.name.trim();
@@ -207,6 +219,11 @@ pub fn knowledge_create_space(app: AppHandle, args: CreateSpaceArgs) -> Result<K
     }
     let root = knowledge_root(&app)?;
     fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+
+    let mut index = load_index(&root)?;
+    if space_name_taken(&index.spaces, name, None) {
+        return Err("space name already exists".into());
+    }
 
     let id = gen_id("spc");
     let ts = now_ms();
@@ -229,7 +246,6 @@ pub fn knowledge_create_space(app: AppHandle, args: CreateSpaceArgs) -> Result<K
     )?;
     write_json_file(&dir.join("meta.json"), &space)?;
 
-    let mut index = load_index(&root)?;
     index.spaces.push(space.clone());
     save_index(&root, &index)?;
     Ok(space)
@@ -256,15 +272,24 @@ pub fn knowledge_update_space(app: AppHandle, args: UpdateSpaceArgs) -> Result<K
         .position(|s| s.id == args.id)
         .ok_or_else(|| "space not found".to_string())?;
 
+    let next_name = if let Some(name) = args.name.as_ref() {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("space name is empty".into());
+        }
+        if space_name_taken(&index.spaces, name, Some(&args.id)) {
+            return Err("space name already exists".into());
+        }
+        Some(name.to_string())
+    } else {
+        None
+    };
+
     let ts = now_ms();
     {
         let s = &mut index.spaces[pos];
-        if let Some(name) = args.name {
-            let name = name.trim();
-            if name.is_empty() {
-                return Err("space name is empty".into());
-            }
-            s.name = name.to_string();
+        if let Some(name) = next_name {
+            s.name = name;
         }
         if let Some(icon) = args.icon {
             s.icon = if icon.is_empty() { None } else { Some(icon) };
@@ -857,6 +882,21 @@ mod tests {
         assert!(safe_join(dest, "../evil").is_none());
         assert!(safe_join(dest, "a/../../b").is_none());
         assert!(safe_join(dest, "spc_oktoken1").is_some());
+    }
+
+    #[test]
+    fn space_name_taken_is_case_insensitive() {
+        let spaces = vec![KnowledgeSpace {
+            id: "spc_a".into(),
+            name: "Notes".into(),
+            icon: None,
+            created_at: 1,
+            updated_at: 1,
+        }];
+        assert!(space_name_taken(&spaces, "notes", None));
+        assert!(space_name_taken(&spaces, "  NOTES  ", None));
+        assert!(!space_name_taken(&spaces, "notes", Some("spc_a")));
+        assert!(!space_name_taken(&spaces, "Other", None));
     }
 
     #[test]

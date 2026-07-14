@@ -965,6 +965,8 @@ export const en = {
       },
       space: {
         namePlaceholder: 'Space name',
+        nameEmpty: 'Enter a space name',
+        nameDuplicate: 'A space named “{{name}}” already exists',
         deleteConfirm: 'Delete this space and all of its documents?',
         menu: 'Space menu',
       },

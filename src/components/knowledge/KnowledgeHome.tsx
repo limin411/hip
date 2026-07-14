@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -61,21 +62,31 @@ export function KnowledgeHome() {
     return map
   }, [recent])
 
+  const createNameTrimmed = normalizeSpaceName(createName)
+  const createNameTaken =
+    createNameTrimmed.length > 0 && isSpaceNameTaken(spaces, createNameTrimmed)
+  const renameNameTrimmed = normalizeSpaceName(renameName)
+  const renameNameTaken =
+    renameId != null &&
+    renameNameTrimmed.length > 0 &&
+    isSpaceNameTaken(spaces, renameNameTrimmed, renameId)
+
   const submitCreate = async () => {
-    const name = createName.trim()
-    if (!name) return
+    const name = normalizeSpaceName(createName)
+    if (!name || isSpaceNameTaken(spaces, name)) return
     const space = await createSpace(name)
+    if (!space) return
     setCreateOpen(false)
     setCreateName('')
-    if (space) void openSpace(space.id)
+    void openSpace(space.id)
   }
 
   const submitRename = async () => {
     if (!renameId) return
-    const name = renameName.trim()
-    if (!name) return
-    await renameSpace(renameId, name)
-    setRenameId(null)
+    const name = normalizeSpaceName(renameName)
+    if (!name || isSpaceNameTaken(spaces, name, renameId)) return
+    const ok = await renameSpace(renameId, name)
+    if (ok) setRenameId(null)
   }
 
   const submitDelete = async () => {
@@ -358,21 +369,29 @@ export function KnowledgeHome() {
             <Button
               data-testid="knowledge-create-space-confirm"
               onClick={() => void submitCreate()}
-              disabled={!createName.trim() || busy}
+              disabled={!createNameTrimmed || createNameTaken || busy}
             >
               {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
         }
       >
-        <Input
-          autoFocus
-          data-testid="knowledge-create-space-name"
-          value={createName}
-          onChange={(e) => setCreateName(e.target.value)}
-          placeholder={t('knowledge.space.namePlaceholder')}
-          onKeyDown={(e) => e.key === 'Enter' && void submitCreate()}
-        />
+        <div className="space-y-2">
+          <Input
+            autoFocus
+            data-testid="knowledge-create-space-name"
+            value={createName}
+            onChange={(e) => setCreateName(e.target.value)}
+            placeholder={t('knowledge.space.namePlaceholder')}
+            aria-invalid={createNameTaken || undefined}
+            onKeyDown={(e) => e.key === 'Enter' && void submitCreate()}
+          />
+          {createNameTaken && (
+            <p className="text-meta text-danger" data-testid="knowledge-create-space-name-error" role="alert">
+              {t('knowledge.space.nameDuplicate', { name: createNameTrimmed })}
+            </p>
+          )}
+        </div>
       </Modal>
 
       <Modal
@@ -391,20 +410,28 @@ export function KnowledgeHome() {
             <Button
               data-testid="knowledge-rename-space-confirm"
               onClick={() => void submitRename()}
-              disabled={!renameName.trim() || busy}
+              disabled={!renameNameTrimmed || renameNameTaken || busy}
             >
               {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
         }
       >
-        <Input
-          autoFocus
-          data-testid="knowledge-rename-space-name"
-          value={renameName}
-          onChange={(e) => setRenameName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && void submitRename()}
-        />
+        <div className="space-y-2">
+          <Input
+            autoFocus
+            data-testid="knowledge-rename-space-name"
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            aria-invalid={renameNameTaken || undefined}
+            onKeyDown={(e) => e.key === 'Enter' && void submitRename()}
+          />
+          {renameNameTaken && (
+            <p className="text-meta text-danger" data-testid="knowledge-rename-space-name-error" role="alert">
+              {t('knowledge.space.nameDuplicate', { name: renameNameTrimmed })}
+            </p>
+          )}
+        </div>
       </Modal>
 
       <Modal

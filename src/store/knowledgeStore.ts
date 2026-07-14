@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
+import i18n from '@/i18n'
 import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
 import {
@@ -19,6 +20,7 @@ import {
   upsertSearchDoc,
   type KnowledgeSearchHit,
 } from '@/domain/knowledge/search'
+import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
@@ -36,6 +38,17 @@ import {
 /** Module-level index (not serializable; not stored in zustand state). */
 let kbIndex = createKnowledgeIndex()
 let indexBuildGen = 0
+
+/** Map stable backend name errors to localized copy. */
+function mapSpaceNameError(raw: string, name: string): string {
+  if (raw === 'space name already exists') {
+    return i18n.t('knowledge.space.nameDuplicate', { name })
+  }
+  if (raw === 'space name is empty') {
+    return i18n.t('knowledge.space.nameEmpty')
+  }
+  return raw
+}
 
 const RECENT_KEY = 'hip-knowledge-recent'
 /** Cap for “最近打开” on the knowledge home page (and localStorage). */
@@ -90,7 +103,8 @@ interface KnowledgeState {
   rebuildSearchIndex: () => Promise<void>
   runSearch: (q: string) => void
   createSpace: (name: string, icon?: string) => Promise<KnowledgeSpace | null>
-  renameSpace: (id: string, name: string, icon?: string) => Promise<void>
+  /** @returns false when validation or IPC fails (or busy). */
+  renameSpace: (id: string, name: string, icon?: string) => Promise<boolean>
   deleteSpace: (id: string) => Promise<void>
   openSpace: (id: string, opts?: { selectDocId?: string }) => Promise<void>
   openRecent: (item: KnowledgeRecentItem) => Promise<void>
@@ -229,9 +243,22 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
   createSpace: async (name, icon) => {
     if (get().busy) return null
+    const trimmed = normalizeSpaceName(name)
+    if (!trimmed) {
+      const msg = i18n.t('knowledge.space.nameEmpty')
+      set({ error: msg })
+      toast.error(msg)
+      return null
+    }
+    if (isSpaceNameTaken(get().spaces, trimmed)) {
+      const msg = i18n.t('knowledge.space.nameDuplicate', { name: trimmed })
+      set({ error: msg })
+      toast.error(msg)
+      return null
+    }
     set({ busy: true, error: null })
     try {
-      const space = await knowledgeCreateSpace(name, icon)
+      const space = await knowledgeCreateSpace(trimmed, icon)
       set((s) => ({
         spaces: [...s.spaces, space],
         spaceDocCounts: { ...s.spaceDocCounts, [space.id]: 0 },
@@ -239,7 +266,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       }))
       return space
     } catch (e) {
-      const msg = knowledgeErrorMessage(e)
+      const msg = mapSpaceNameError(knowledgeErrorMessage(e), trimmed)
       set({ busy: false, error: msg })
       toast.error(msg)
       return null
@@ -247,18 +274,33 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   renameSpace: async (id, name, icon) => {
-    if (get().busy) return
+    if (get().busy) return false
+    const trimmed = normalizeSpaceName(name)
+    if (!trimmed) {
+      const msg = i18n.t('knowledge.space.nameEmpty')
+      set({ error: msg })
+      toast.error(msg)
+      return false
+    }
+    if (isSpaceNameTaken(get().spaces, trimmed, id)) {
+      const msg = i18n.t('knowledge.space.nameDuplicate', { name: trimmed })
+      set({ error: msg })
+      toast.error(msg)
+      return false
+    }
     set({ busy: true, error: null })
     try {
-      const updated = await knowledgeUpdateSpace(id, { name, icon })
+      const updated = await knowledgeUpdateSpace(id, { name: trimmed, icon })
       set((s) => ({
         spaces: s.spaces.map((x) => (x.id === id ? updated : x)),
         busy: false,
       }))
+      return true
     } catch (e) {
-      const msg = knowledgeErrorMessage(e)
+      const msg = mapSpaceNameError(knowledgeErrorMessage(e), trimmed)
       set({ busy: false, error: msg })
       toast.error(msg)
+      return false
     }
   },
 

@@ -959,6 +959,8 @@ export const zhTW = {
       },
       space: {
         namePlaceholder: '空間名稱',
+        nameEmpty: '請輸入知識庫名稱',
+        nameDuplicate: '已存在同名知識庫「{{name}}」',
         deleteConfirm: '刪除此空間及其全部文件？',
         menu: '空間選單',
       },

@@ -959,6 +959,8 @@ export const zhCN = {
       },
       space: {
         namePlaceholder: '空间名称',
+        nameEmpty: '请输入知识库名称',
+        nameDuplicate: '已存在同名知识库「{{name}}」',
         deleteConfirm: '删除该空间及其全部文档？',
         menu: '空间菜单',
       },

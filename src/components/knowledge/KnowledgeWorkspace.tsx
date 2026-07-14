@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
+import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -120,6 +121,11 @@ export function KnowledgeWorkspace() {
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
+  const spaceNameTrimmed = normalizeSpaceName(spaceName)
+  const spaceNameTaken =
+    activeSpaceId != null &&
+    spaceNameTrimmed.length > 0 &&
+    isSpaceNameTaken(spaces, spaceNameTrimmed, activeSpaceId)
   const [deleteSpaceOpen, setDeleteSpaceOpen] = useState(false)
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
@@ -501,23 +507,37 @@ export function KnowledgeWorkspace() {
             </Button>
             <Button
               data-testid="knowledge-rename-space-confirm"
-              disabled={!spaceName.trim() || busy || !activeSpaceId}
+              disabled={!spaceNameTrimmed || spaceNameTaken || busy || !activeSpaceId}
               onClick={() => {
-                if (activeSpaceId) void renameSpace(activeSpaceId, spaceName.trim())
-                setRenameSpaceOpen(false)
+                if (!activeSpaceId) return
+                void renameSpace(activeSpaceId, spaceNameTrimmed).then((ok) => {
+                  if (ok) setRenameSpaceOpen(false)
+                })
               }}
             >
-              {t('common.close')}
+              {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
         }
       >
-        <Input
-          data-testid="knowledge-rename-space-name"
-          value={spaceName}
-          onChange={(e) => setSpaceName(e.target.value)}
-          autoFocus
-        />
+        <div className="space-y-2">
+          <Input
+            data-testid="knowledge-rename-space-name"
+            value={spaceName}
+            onChange={(e) => setSpaceName(e.target.value)}
+            aria-invalid={spaceNameTaken || undefined}
+            autoFocus
+          />
+          {spaceNameTaken && (
+            <p
+              className="text-meta text-danger"
+              data-testid="knowledge-rename-space-name-error"
+              role="alert"
+            >
+              {t('knowledge.space.nameDuplicate', { name: spaceNameTrimmed })}
+            </p>
+          )}
+        </div>
       </Modal>
 
       <Modal

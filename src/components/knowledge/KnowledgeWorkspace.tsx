@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft,
+  BookOpen,
   Download,
   FilePlus,
   FileText,
@@ -176,17 +177,24 @@ export function KnowledgeWorkspace() {
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface">
+      <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-subtle">
         <div className="flex flex-col gap-2 border-b border-border p-2.5">
           <div className="flex items-center gap-0.5">
             <button
               type="button"
               data-testid="knowledge-back-home"
-              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-state-hover"
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-state-hover"
               onClick={() => void openHome()}
               title={t('knowledge.home.mySpaces')}
             >
               <ArrowLeft size={14} className="shrink-0 text-ink-tertiary" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
+                {space?.icon ? (
+                  <span className="text-meta leading-none">{space.icon}</span>
+                ) : (
+                  <BookOpen size={14} className="text-accent-strong" />
+                )}
+              </span>
               <span className="truncate text-body font-semibold text-ink">
                 {space?.name ?? t('tabs.knowledge')}
               </span>
@@ -197,7 +205,7 @@ export function KnowledgeWorkspace() {
                   type="button"
                   disabled={busy}
                   data-testid="knowledge-new-menu"
-                  className="rounded-md p-1.5 text-ink-secondary hover:bg-state-hover hover:text-ink disabled:opacity-50"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-ink-secondary hover:bg-state-hover hover:text-ink disabled:opacity-50"
                   title={t('knowledge.tree.newDoc')}
                   aria-label={t('knowledge.workspace.new')}
                 >
@@ -228,7 +236,7 @@ export function KnowledgeWorkspace() {
                 <button
                   type="button"
                   data-testid="knowledge-space-menu"
-                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary hover:bg-state-hover hover:text-ink"
                   aria-label={t('knowledge.space.menu')}
                 >
                   <MoreHorizontal size={16} />
@@ -270,11 +278,11 @@ export function KnowledgeWorkspace() {
               value={treeFilter}
               onChange={(e) => setTreeFilter(e.target.value)}
               placeholder={t('knowledge.tree.filterPlaceholder')}
-              className="h-8 pl-7 text-meta"
+              className="h-8 border-border bg-surface pl-7 text-meta"
             />
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
           <SpaceTree
             visibleIds={visibleIds}
             onRename={(node) => {

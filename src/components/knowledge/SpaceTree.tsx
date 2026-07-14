@@ -163,8 +163,8 @@ export function SpaceTree({
         className={cn(
           'group flex w-full items-center gap-0.5 rounded-md py-1.5 pr-1 text-body transition-colors',
           node.kind === 'doc' && activeDocId === node.id
-            ? 'bg-state-hover font-medium text-ink shadow-[inset_2px_0_0_0_var(--accent)]'
-            : 'text-ink hover:bg-state-hover',
+            ? 'bg-accent-active font-medium text-accent-strong'
+            : 'text-ink hover:bg-surface-muted',
           draggingId === node.id && 'opacity-50',
           dropHint?.targetId === node.id &&
             dropHint.mode === 'into' &&

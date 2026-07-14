@@ -177,6 +177,20 @@ export function KnowledgeWorkspace() {
     }
   }
 
+  /** Prefer first + last crumbs when the path is deep (max 4 visible nodes). */
+  const crumbItems = useMemo(() => {
+    if (pathNodes.length <= 4) {
+      return pathNodes.map((node, index) => ({ kind: 'node' as const, node, index }))
+    }
+    const last = pathNodes.length - 1
+    return [
+      { kind: 'node' as const, node: pathNodes[0], index: 0 },
+      { kind: 'ellipsis' as const },
+      { kind: 'node' as const, node: pathNodes[last - 1], index: last - 1 },
+      { kind: 'node' as const, node: pathNodes[last], index: last },
+    ]
+  }, [pathNodes])
+
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-subtle">
@@ -319,28 +333,48 @@ export function KnowledgeWorkspace() {
             {pathNodes.length === 0 ? (
               <span className="truncate text-ink-tertiary">{space?.name}</span>
             ) : (
-              pathNodes.map((n, i) => (
-                <span key={n.id} className="flex min-w-0 items-center gap-0.5">
-                  {i > 0 && (
-                    <ChevronRight
-                      size={12}
-                      className="shrink-0 text-ink-tertiary"
-                      aria-hidden
-                    />
-                  )}
-                  {i < pathNodes.length - 1 ? (
-                    <button
-                      type="button"
-                      className="truncate text-ink-secondary hover:text-ink"
-                      onClick={() => onCrumbClick(n)}
-                    >
-                      {n.title}
-                    </button>
-                  ) : (
-                    <span className="truncate font-medium text-ink">{n.title}</span>
-                  )}
-                </span>
-              ))
+              crumbItems.map((item, i) => {
+                if (item.kind === 'ellipsis') {
+                  return (
+                    <span key="crumb-ellipsis" className="flex min-w-0 items-center gap-0.5">
+                      {i > 0 && (
+                        <ChevronRight
+                          size={12}
+                          className="shrink-0 text-ink-tertiary"
+                          aria-hidden
+                        />
+                      )}
+                      <span className="shrink-0 text-ink-tertiary" aria-hidden>
+                        …
+                      </span>
+                    </span>
+                  )
+                }
+                const n = item.node
+                const isLast = item.index === pathNodes.length - 1
+                return (
+                  <span key={n.id} className="flex min-w-0 items-center gap-0.5">
+                    {i > 0 && (
+                      <ChevronRight
+                        size={12}
+                        className="shrink-0 text-ink-tertiary"
+                        aria-hidden
+                      />
+                    )}
+                    {!isLast ? (
+                      <button
+                        type="button"
+                        className="truncate text-ink-secondary hover:text-ink"
+                        onClick={() => onCrumbClick(n)}
+                      >
+                        {n.title}
+                      </button>
+                    ) : (
+                      <span className="truncate font-medium text-ink">{n.title}</span>
+                    )}
+                  </span>
+                )
+              })
             )}
           </div>
           {(saveState === 'saving' || saveState === 'saved') && (
@@ -401,7 +435,11 @@ export function KnowledgeWorkspace() {
               icon={FileText}
               title={t('knowledge.workspace.noDocTitle')}
               description={t('knowledge.workspace.noDocHint')}
-              className="w-full max-w-md border-0"
+              className="w-full max-w-md border-0 py-16"
+              action={{
+                label: t('knowledge.tree.newDoc'),
+                onClick: () => void createDoc(null, t('knowledge.doc.untitled')),
+              }}
             />
           </div>
         ) : editing ? (
@@ -437,7 +475,10 @@ export function KnowledgeWorkspace() {
                 readOnly
                 onCommit={() => {}}
               />
-              <DocReader content={docBody} />
+              <DocReader
+                content={docBody}
+                onStartEdit={() => void setEditing(true)}
+              />
             </KnowledgeDocCanvas>
           </div>
         )}

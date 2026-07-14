@@ -5,9 +5,11 @@ import { EmptyState } from '@/components/ui/EmptyState'
 
 interface DocReaderProps {
   content: string
+  /** Optional CTA when body is empty (preview → edit). */
+  onStartEdit?: () => void
 }
 
-export function DocReader({ content }: DocReaderProps) {
+export function DocReader({ content, onStartEdit }: DocReaderProps) {
   const { t } = useTranslation()
 
   if (!content.trim()) {
@@ -17,7 +19,12 @@ export function DocReader({ content }: DocReaderProps) {
           icon={FileText}
           title={t('knowledge.doc.emptyTitle')}
           description={t('knowledge.doc.emptyHint')}
-          className="border-0 py-16"
+          className="border-0 py-20"
+          action={
+            onStartEdit
+              ? { label: t('knowledge.doc.edit'), onClick: onStartEdit }
+              : undefined
+          }
         />
       </div>
     )

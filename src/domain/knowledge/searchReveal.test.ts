@@ -1,27 +1,38 @@
 import { describe, it, expect } from 'vitest'
-import { findRevealOffset } from './searchReveal'
+import { findRevealMatch, findRevealOffset } from './searchReveal'
 
-describe('findRevealOffset', () => {
-  it('finds full query case-insensitively', () => {
-    expect(findRevealOffset('Hello UniqueToken world', 'uniquetoken')).toBe(6)
+describe('findRevealMatch', () => {
+  it('finds full query case-insensitively with full length', () => {
+    expect(findRevealMatch('Hello UniqueToken world', 'uniquetoken')).toEqual({
+      offset: 6,
+      length: 'uniquetoken'.length,
+    })
   })
 
-  it('falls back to first token when full query missing', () => {
+  it('token fallback uses token length, not full query length', () => {
     const text = 'alpha beta gamma'
-    // Multi-token query; only "beta" present as contiguous match via tokenize
-    expect(findRevealOffset(text, 'zzz beta')).toBe(6)
+    // Multi-token query; only "beta" present as contiguous match
+    expect(findRevealMatch(text, 'zzz beta')).toEqual({
+      offset: 6,
+      length: 'beta'.length,
+    })
   })
 
   it('returns null when nothing matches', () => {
-    expect(findRevealOffset('hello world', 'nomatch')).toBeNull()
+    expect(findRevealMatch('hello world', 'nomatch')).toBeNull()
   })
 
   it('returns null for empty query or text', () => {
-    expect(findRevealOffset('', 'x')).toBeNull()
-    expect(findRevealOffset('hello', '  ')).toBeNull()
+    expect(findRevealMatch('', 'x')).toBeNull()
+    expect(findRevealMatch('hello', '  ')).toBeNull()
   })
 
-  it('finds CJK character tokens', () => {
-    expect(findRevealOffset('会话级权限', '权限')).toBe(3)
+  it('finds CJK character tokens with correct length', () => {
+    expect(findRevealMatch('会话级权限', '权限')).toEqual({ offset: 3, length: 2 })
+  })
+
+  it('findRevealOffset mirrors match.offset', () => {
+    expect(findRevealOffset('Hello UniqueToken world', 'uniquetoken')).toBe(6)
+    expect(findRevealOffset('hello', 'nomatch')).toBeNull()
   })
 })

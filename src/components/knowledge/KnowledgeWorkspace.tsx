@@ -122,18 +122,30 @@ export function KnowledgeWorkspace() {
 
   // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
   useEffect(() => {
-    if (!activeDocId) return
+    if (!activeDocId || !activeSpaceId) return
     const pending = useKnowledgeStore.getState().pendingReveal
     if (!pending?.query) return
+    // Only reveal when the pending target is still the active doc.
+    if (pending.spaceId !== activeSpaceId || pending.docId !== activeDocId) return
 
     let cancelled = false
     let attempts = 0
-    const maxAttempts = 8
+    // Large CM docs can take >350ms to mount; allow ~2s of retries.
+    const maxAttempts = 24
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = (ms: number) => {
+      timeoutId = setTimeout(tryReveal, ms)
+    }
 
     const tryReveal = () => {
       if (cancelled) return
       const still = useKnowledgeStore.getState().pendingReveal
       if (!still?.query) return
+      if (still.spaceId !== activeSpaceId || still.docId !== activeDocId) {
+        useKnowledgeStore.getState().clearPendingReveal()
+        return
+      }
 
       if (editing) {
         const view = editorRef.current?.getView()
@@ -153,19 +165,19 @@ export function KnowledgeWorkspace() {
 
       attempts += 1
       if (attempts < maxAttempts) {
-        window.setTimeout(tryReveal, 40)
+        schedule(80)
       } else {
         // Give up without blocking later navigations.
         useKnowledgeStore.getState().clearPendingReveal()
       }
     }
 
-    const t = window.setTimeout(tryReveal, 30)
+    schedule(30)
     return () => {
       cancelled = true
-      window.clearTimeout(t)
+      if (timeoutId != null) clearTimeout(timeoutId)
     }
-  }, [activeDocId, editing, docBody])
+  }, [activeDocId, activeSpaceId, editing, docBody])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')

@@ -87,6 +87,9 @@ export type KnowledgeIndexProgress = {
 
 export type KnowledgePendingReveal = {
   query: string
+  /** Only apply reveal when this space/doc is still active. */
+  spaceId: string
+  docId: string
 }
 
 /** Yield so React can paint index progress (and avoid long freezes). */
@@ -259,12 +262,14 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           })
           done += 1
           if (done % KNOWLEDGE_INDEX_YIELD_EVERY === 0) {
+            if (gen !== indexBuildGen) return
             set({ indexProgress: { done, total, spaceName: space.name } })
             await yieldToUi()
             if (gen !== indexBuildGen) return
           }
         }
         counts[space.id] = docs
+        if (gen !== indexBuildGen) return
         set({ indexProgress: { done, total, spaceName: space.name } })
       }
       if (gen !== indexBuildGen) return
@@ -411,11 +416,17 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
       } else {
-        set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+        set({
+          activeDocId: null,
+          docBody: '',
+          draftBody: '',
+          editing: false,
+          pendingReveal: null,
+        })
       }
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
-      set({ error: msg })
+      set({ error: msg, pendingReveal: null })
       toast.error(msg)
     }
   },
@@ -426,7 +437,11 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
 
   openSearchHit: async (hit) => {
     const query = get().searchQuery.trim()
-    set({ pendingReveal: query ? { query } : null })
+    set({
+      pendingReveal: query
+        ? { query, spaceId: hit.spaceId, docId: hit.docId }
+        : null,
+    })
     await get().openRecent({
       spaceId: hit.spaceId,
       docId: hit.docId,
@@ -449,6 +464,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       // keep activeSpaceId for chip? design: clear active doc; can keep space or clear
       activeSpaceId: null,
       nodes: [],
+      pendingReveal: null,
     })
   },
 
@@ -640,12 +656,29 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!node || !spaceId) {
       toast.error('Could not load document')
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({
+        activeDocId: null,
+        docBody: '',
+        draftBody: '',
+        editing: false,
+        pendingReveal: null,
+      })
       return
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      set({ activeDocId: id, docBody: body, draftBody: body, editing: true, saveState: 'idle' })
+      // Drop pending reveal if it targets a different doc (tree/recent nav mid-flight).
+      const pending = get().pendingReveal
+      const revealMatches =
+        pending != null && pending.spaceId === spaceId && pending.docId === id
+      set({
+        activeDocId: id,
+        docBody: body,
+        draftBody: body,
+        editing: true,
+        saveState: 'idle',
+        ...(revealMatches ? {} : { pendingReveal: null }),
+      })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -664,7 +697,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({
+        activeDocId: null,
+        docBody: '',
+        draftBody: '',
+        editing: false,
+        pendingReveal: null,
+      })
     }
   },
 

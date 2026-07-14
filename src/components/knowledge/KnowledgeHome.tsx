@@ -176,10 +176,16 @@ export function KnowledgeHome() {
               data-testid="knowledge-search-indexing"
             >
               {indexProgress && indexProgress.total > 0
-                ? t('knowledge.home.searchIndexingProgress', {
-                    done: indexProgress.done,
-                    total: indexProgress.total,
-                  })
+                ? indexProgress.spaceName
+                  ? t('knowledge.home.searchIndexingProgressSpace', {
+                      done: indexProgress.done,
+                      total: indexProgress.total,
+                      space: indexProgress.spaceName,
+                    })
+                  : t('knowledge.home.searchIndexingProgress', {
+                      done: indexProgress.done,
+                      total: indexProgress.total,
+                    })
                 : t('knowledge.home.searchIndexing')}
             </p>
           )}

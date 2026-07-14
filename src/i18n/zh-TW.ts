@@ -957,6 +957,8 @@ export const zhTW = {
         searchEmpty: '沒有符合的文件。',
         searchIndexing: '正在建立搜尋索引…',
         searchIndexingProgress: '正在建立搜尋索引… {{done}}/{{total}}',
+        searchIndexingProgressSpace:
+          '正在建立搜尋索引… {{done}}/{{total}} · {{space}}',
       },
       space: {
         nameLabel: '名稱',

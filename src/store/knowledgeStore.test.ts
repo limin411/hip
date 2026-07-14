@@ -343,7 +343,7 @@ describe('knowledgeStore index progress + openSearchHit', () => {
     expect(progressSamples.some((p) => p && p.done === 3)).toBe(true)
   })
 
-  it('openSearchHit sets pendingReveal from searchQuery', async () => {
+  it('openSearchHit sets pendingReveal scoped to space/doc', async () => {
     knowledgeGetTree.mockResolvedValue({
       version: 1,
       nodes: [
@@ -371,15 +371,137 @@ describe('knowledgeStore index progress + openSearchHit', () => {
     })
 
     const s = useKnowledgeStore.getState()
-    expect(s.pendingReveal).toEqual({ query: 'match_token' })
+    expect(s.pendingReveal).toEqual({
+      query: 'match_token',
+      spaceId: 'spc_1',
+      docId: 'doc_1',
+    })
     expect(s.activeDocId).toBe('doc_1')
     expect(s.mode).toBe('workspace')
   })
 
   it('clearPendingReveal clears the flag', () => {
-    useKnowledgeStore.setState({ pendingReveal: { query: 'x' } })
+    useKnowledgeStore.setState({
+      pendingReveal: { query: 'x', spaceId: 'spc_1', docId: 'doc_1' },
+    })
     useKnowledgeStore.getState().clearPendingReveal()
     expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+
+  it('openHome clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      mode: 'workspace',
+      activeSpaceId: 'spc_1',
+      activeDocId: 'doc_1',
+      pendingReveal: { query: 'old', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    await useKnowledgeStore.getState().openHome()
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+    expect(useKnowledgeStore.getState().mode).toBe('home')
+  })
+
+  it('failed openDoc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    knowledgeReadDoc.mockRejectedValueOnce(new Error('missing'))
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+  })
+
+  it('openDoc to a different doc clears pendingReveal', async () => {
+    useKnowledgeStore.setState({
+      activeSpaceId: 'spc_1',
+      mode: 'workspace',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_2',
+          parentId: null,
+          kind: 'doc',
+          title: 'Other',
+          order: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
+    })
+    knowledgeReadDoc.mockResolvedValueOnce('other body')
+    await useKnowledgeStore.getState().openDoc('doc_2')
+    expect(useKnowledgeStore.getState().activeDocId).toBe('doc_2')
+    expect(useKnowledgeStore.getState().pendingReveal).toBeNull()
+  })
+
+  it('superseded rebuild does not publish stale kbIndex or final ready from old gen', async () => {
+    knowledgeGetTree.mockResolvedValue({
+      version: 1,
+      nodes: [
+        {
+          id: 'doc_a',
+          parentId: null,
+          kind: 'doc',
+          title: 'A',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+
+    let releaseA: (() => void) | null = null
+    const stallA = new Promise<string>((resolve) => {
+      releaseA = () => resolve('body-from-A')
+    })
+    let readCalls = 0
+    knowledgeReadDoc.mockImplementation(async () => {
+      readCalls += 1
+      if (readCalls === 1) return stallA
+      return 'body-from-B'
+    })
+
+    const pA = useKnowledgeStore.getState().rebuildSearchIndex()
+    // Let A start and hit the stall
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Start B while A is stalled
+    const pB = useKnowledgeStore.getState().rebuildSearchIndex()
+    await pB
+
+    const afterB = useKnowledgeStore.getState()
+    expect(afterB.indexStatus).toBe('ready')
+    expect(afterB.indexProgress).toBeNull()
+
+    // Release stale A; it must not clobber ready/progress
+    releaseA!()
+    await pA
+
+    const afterA = useKnowledgeStore.getState()
+    expect(afterA.indexStatus).toBe('ready')
+    expect(afterA.indexProgress).toBeNull()
   })
 })
 

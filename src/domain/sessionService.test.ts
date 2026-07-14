@@ -701,7 +701,7 @@ describe('workspace diff', () => {
   it('seedAgentInterrupt sets session.interrupt', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
-    const { turnId, question } = svc.seedAgentInterrupt('s1', 'e2e question?')
+    const { turnId } = svc.seedAgentInterrupt('s1', 'e2e question?')
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     expect(sess.interrupt).toEqual({ turnId, question: 'e2e question?', context: undefined })
     expect(svc.getPendingInterrupt('s1')).toEqual({ turnId, question: 'e2e question?' })

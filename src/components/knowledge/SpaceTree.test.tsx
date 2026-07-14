@@ -241,4 +241,83 @@ describe('SpaceTree keyboard navigation', () => {
     fireEvent.keyDown(tree, { key: 'Enter' })
     expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(true)
   })
+
+  it('ArrowRight on expanded folder moves focus to first child', () => {
+    useKnowledgeStore.setState({ expandedFolderIds: { fld_1: true }, treeFocusId: 'fld_1' })
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    const tree = screen.getByTestId('knowledge-tree')
+    fireEvent.keyDown(tree, { key: 'ArrowRight' })
+    expect(useKnowledgeStore.getState().treeFocusId).toBe('doc_inner')
+  })
+
+  it('falls back tabIndex to first root when treeFocusId is not visible', () => {
+    // Focus a nested doc while parent is collapsed → row not mounted
+    useKnowledgeStore.setState({
+      treeFocusId: 'doc_inner',
+      expandedFolderIds: {},
+      activeDocId: null,
+    })
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    expect(screen.queryByTestId('knowledge-tree-doc-doc_inner')).toBeNull()
+    const firstRoot = screen.getByTestId('knowledge-tree-folder-fld_1')
+    expect(firstRoot.tabIndex).toBe(0)
+  })
+
+  it('aria-selected only for active doc, not mere keyboard focus', () => {
+    useKnowledgeStore.setState({
+      treeFocusId: 'fld_1',
+      activeDocId: 'doc_1',
+    })
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+      />,
+    )
+    expect(screen.getByTestId('knowledge-tree-folder-fld_1').getAttribute('aria-selected')).toBe(
+      'false',
+    )
+    expect(screen.getByTestId('knowledge-tree-doc-doc_1').getAttribute('aria-selected')).toBe(
+      'true',
+    )
+  })
+
+  it('keyboard uses visible rows when treeFocusId is filtered out', () => {
+    useKnowledgeStore.setState({
+      expandedFolderIds: { fld_1: true },
+      treeFocusId: 'doc_1', // not in filter set
+      activeDocId: null,
+    })
+    const visibleIds = new Set(['fld_1', 'doc_inner'])
+    render(
+      <SpaceTree
+        onRename={noop}
+        onDelete={noop}
+        onNewDoc={noop}
+        onNewFolder={noop}
+        visibleIds={visibleIds}
+      />,
+    )
+    const tree = screen.getByTestId('knowledge-tree')
+    // Enter should act on first visible (fld_1), not the filtered-out focus
+    fireEvent.keyDown(tree, { key: 'Enter' })
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(false)
+    expect(useKnowledgeStore.getState().treeFocusId).toBe('fld_1')
+  })
 })

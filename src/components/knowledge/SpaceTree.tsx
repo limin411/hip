@@ -145,6 +145,7 @@ export function SpaceTree({
   const focusIndex = treeFocusId
     ? visibleRows.findIndex((n) => n.id === treeFocusId)
     : -1
+  const focusInVisible = focusIndex >= 0
 
   const moveFocus = (delta: number) => {
     if (visibleRows.length === 0) return
@@ -181,13 +182,11 @@ export function SpaceTree({
       return
     }
 
+    // Only act on currently visible rows (filter + expand aware).
     const focused =
-      (treeFocusId && nodes.find((n) => n.id === treeFocusId)) ||
-      (focusIndex >= 0 ? visibleRows[focusIndex] : null) ||
-      visibleRows[0] ||
-      null
+      (focusInVisible ? visibleRows[focusIndex] : null) || visibleRows[0] || null
     if (!focused) return
-    if (!treeFocusId) setTreeFocusId(focused.id)
+    if (treeFocusId !== focused.id) setTreeFocusId(focused.id)
 
     if (key === 'Enter') {
       if (focused.kind === 'folder') toggleFolder(focused.id)
@@ -200,7 +199,10 @@ export function SpaceTree({
         toggleFolder(focused.id)
         return
       }
-      if (focused.parentId) {
+      if (
+        focused.parentId &&
+        visibleRows.some((n) => n.id === focused.parentId)
+      ) {
         setTreeFocusId(focused.parentId)
       }
       return
@@ -212,8 +214,13 @@ export function SpaceTree({
           toggleFolder(focused.id)
           return
         }
-        const kids = listVisibleTreeNodes(nodes, { ...expanded, [focused.id]: true }, visibleIds, focused.id)
-        // First child among visible rows under this folder (listVisible returns descendants only when parentId set)
+        const kids = listVisibleTreeNodes(
+          nodes,
+          { ...expanded, [focused.id]: true },
+          visibleIds,
+          focused.id,
+        )
+        // First child among visible rows under this folder
         if (kids[0]) setTreeFocusId(kids[0].id)
       }
     }
@@ -226,6 +233,9 @@ export function SpaceTree({
     const parentForNew = node.kind === 'folder' ? node.id : node.parentId
     const isActiveDoc = node.kind === 'doc' && activeDocId === node.id
     const isFocused = treeFocusId === node.id
+    // Roving target: focused visible row, or first root when focus is missing/hidden.
+    const isRovingTarget =
+      (focusInVisible && isFocused) || (!focusInVisible && node === roots[0])
 
     const row = (
       <div
@@ -236,8 +246,8 @@ export function SpaceTree({
         data-tree-node-id={node.id}
         role="treeitem"
         aria-expanded={node.kind === 'folder' ? expanded[node.id] === true : undefined}
-        aria-selected={isFocused || isActiveDoc}
-        tabIndex={isFocused || (treeFocusId == null && depth === 0 && node === roots[0]) ? 0 : -1}
+        aria-selected={isActiveDoc}
+        tabIndex={isRovingTarget ? 0 : -1}
         draggable={!busy}
         onFocus={() => {
           if (treeFocusId !== node.id) setTreeFocusId(node.id)
@@ -388,7 +398,7 @@ export function SpaceTree({
     <div
       ref={treeRef}
       role="tree"
-      tabIndex={treeFocusId == null ? 0 : -1}
+      tabIndex={-1}
       data-testid="knowledge-tree"
       onKeyDown={onTreeKeyDown}
       onDragOver={(e) => {

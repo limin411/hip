@@ -13,7 +13,7 @@ import {
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { setExpandPersistSuspended, useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
@@ -91,6 +91,7 @@ export function KnowledgeWorkspace() {
   )
 
   // Expand ancestors when filter query changes; restore snapshot on clear.
+  // Suspend expand LS writes while filter inflates expand (avoid polluting persist).
   useEffect(() => {
     const q = treeFilter.trim()
     if (!q) {
@@ -99,8 +100,10 @@ export function KnowledgeWorkspace() {
         useKnowledgeStore.setState({ expandedFolderIds: filterExpandSnapshot })
         setFilterExpandSnapshot(null)
       }
+      setExpandPersistSuspended(false)
       return
     }
+    setExpandPersistSuspended(true)
     if (lastFilterExpandQuery.current === q || !visibleIds) return
     lastFilterExpandQuery.current = q
     if (!filterExpandSnapshot) {
@@ -120,6 +123,10 @@ export function KnowledgeWorkspace() {
     }
     useKnowledgeStore.setState({ expandedFolderIds: expand })
   }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
+
+  useEffect(() => {
+    return () => setExpandPersistSuspended(false)
+  }, [])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')

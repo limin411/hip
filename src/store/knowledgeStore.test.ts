@@ -9,6 +9,7 @@ const knowledgeListSpaces = vi.fn()
 const knowledgeDeleteSpace = vi.fn()
 const knowledgeCreateSpace = vi.fn()
 const knowledgeUpdateSpace = vi.fn()
+const knowledgeSaveTree = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeEnsureRoot: (...a: unknown[]) => knowledgeEnsureRoot(...a),
@@ -17,7 +18,7 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeUpdateSpace: (...a: unknown[]) => knowledgeUpdateSpace(...a),
   knowledgeDeleteSpace: (...a: unknown[]) => knowledgeDeleteSpace(...a),
   knowledgeGetTree: (...a: unknown[]) => knowledgeGetTree(...a),
-  knowledgeSaveTree: vi.fn(),
+  knowledgeSaveTree: (...a: unknown[]) => knowledgeSaveTree(...a),
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
   knowledgeDeleteDocFile: vi.fn(),
@@ -34,7 +35,10 @@ vi.mock('@/i18n', () => ({
 }))
 
 import { toast } from 'sonner'
-import { useKnowledgeStore } from './knowledgeStore'
+import {
+  setExpandPersistSuspended,
+  useKnowledgeStore,
+} from './knowledgeStore'
 
 const EXPANDED_KEY = 'hip-knowledge-expanded-v1'
 
@@ -147,6 +151,7 @@ describe('knowledgeStore expand persist + treeFocusId', () => {
   })
 
   afterEach(() => {
+    setExpandPersistSuspended(false)
     vi.useRealTimers()
     localStorage.clear()
   })
@@ -160,7 +165,7 @@ describe('knowledgeStore expand persist + treeFocusId', () => {
     expect(stored).toEqual({ spc_1: { fld_1: true } })
   })
 
-  it('openSpace restores expanded folders from localStorage', async () => {
+  it('openSpace restores expanded folders from localStorage and prunes stale ids', async () => {
     localStorage.setItem(
       EXPANDED_KEY,
       JSON.stringify({ spc_1: { fld_1: true, fld_gone: true } }),
@@ -168,7 +173,7 @@ describe('knowledgeStore expand persist + treeFocusId', () => {
     await useKnowledgeStore.getState().openSpace('spc_1')
     const s = useKnowledgeStore.getState()
     expect(s.expandedFolderIds.fld_1).toBe(true)
-    expect(s.expandedFolderIds.fld_gone).toBe(true)
+    expect(s.expandedFolderIds.fld_gone).toBeUndefined()
     expect(s.mode).toBe('workspace')
   })
 
@@ -184,6 +189,76 @@ describe('knowledgeStore expand persist + treeFocusId', () => {
     useKnowledgeStore.getState().setTreeFocusId('fld_1')
     expect(useKnowledgeStore.getState().treeFocusId).toBe('fld_1')
     expect(useKnowledgeStore.getState().activeDocId).toBe('doc_1')
+  })
+
+  it('does not write another space map when switching before debounce fires', async () => {
+    useKnowledgeStore.getState().toggleFolder('fld_1')
+    knowledgeGetTree.mockResolvedValueOnce({ version: 1, nodes: [] })
+    useKnowledgeStore.setState({
+      spaces: [
+        { id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'T', createdAt: 1, updatedAt: 1 },
+      ],
+    })
+    await useKnowledgeStore.getState().openSpace('spc_2')
+    // flush on switch should have written spc_1 with fld_1
+    const afterSwitch = JSON.parse(localStorage.getItem(EXPANDED_KEY)!)
+    expect(afterSwitch.spc_1).toEqual({ fld_1: true })
+    // advance leftover timer: must not overwrite spc_1 with spc_2's empty map
+    vi.advanceTimersByTime(100)
+    const later = JSON.parse(localStorage.getItem(EXPANDED_KEY)!)
+    expect(later.spc_1).toEqual({ fld_1: true })
+  })
+
+  it('openDoc expands ancestor folders for treeFocusId', async () => {
+    useKnowledgeStore.setState({
+      nodes: [
+        {
+          id: 'fld_1',
+          parentId: null,
+          kind: 'folder',
+          title: 'F',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'doc_nested',
+          parentId: 'fld_1',
+          kind: 'doc',
+          title: 'Nested',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      expandedFolderIds: {},
+    })
+    knowledgeReadDoc.mockResolvedValueOnce('body')
+    await useKnowledgeStore.getState().openDoc('doc_nested')
+    const s = useKnowledgeStore.getState()
+    expect(s.treeFocusId).toBe('doc_nested')
+    expect(s.expandedFolderIds.fld_1).toBe(true)
+  })
+
+  it('suspended expand persist skips LS writes (filter mode)', () => {
+    setExpandPersistSuspended(true)
+    useKnowledgeStore.setState({
+      expandedFolderIds: { fld_1: true, fld_filter_only: true },
+    })
+    useKnowledgeStore.getState().toggleFolder('fld_1')
+    vi.advanceTimersByTime(100)
+    expect(localStorage.getItem(EXPANDED_KEY)).toBeNull()
+    setExpandPersistSuspended(false)
+  })
+
+  it('createFolder under parent persists expand', async () => {
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    await useKnowledgeStore.getState().createFolder('fld_1', 'Child')
+    expect(useKnowledgeStore.getState().expandedFolderIds.fld_1).toBe(true)
+    vi.advanceTimersByTime(100)
+    const stored = JSON.parse(localStorage.getItem(EXPANDED_KEY)!)
+    expect(stored.spc_1.fld_1).toBe(true)
   })
 })
 

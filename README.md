@@ -119,15 +119,25 @@ yarn cli:dev run --stream all "summarize README.md"
 
 # Acceptance demo (exit 0 on ok, or no-key preflight)
 scripts/hip-run-harness-demo.sh
+
+# Sessions (default: user ~/.hip/db — close the desktop app if DB is locked)
+yarn cli:dev session list
+yarn cli:dev session show <id-prefix> --limit 20
+yarn cli:dev session delete <id> --yes
+
+# Interactive multi-turn REPL (TTY)
+yarn cli:dev repl --cwd .
 ```
 
-| Flag | Meaning |
-|------|---------|
+| Flag / command | Meaning |
+|----------------|---------|
 | `--preset harness` | full isolation + `permissionMode=full` + `disablePlan` + auto HITL |
 | `--json` / `--output` | Harness ABI result JSON |
 | `--out-dir` | `result.json`, `trace.jsonl`, `patch.diff`, `usage.json` |
 | `--stream` | Human transcript FD rules (JSON still isolated) |
 | `--trace-raw` | Disable secret redaction in `trace.jsonl` |
+| `session *` | List/show/delete persisted sessions |
+| `repl` | Multi-turn interactive chat |
 
 ## Recommended IDE Setup
 

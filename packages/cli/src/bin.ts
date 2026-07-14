@@ -4,6 +4,8 @@ import { printVersion } from './commands/version.js'
 import { runDoctor } from './commands/doctor.js'
 import { runCommand } from './commands/run.js'
 import { printAuthStatus } from './commands/config.js'
+import { sessionDelete, sessionList, sessionShow } from './commands/session.js'
+import { runRepl } from './commands/repl.js'
 import type { HipRunOptions, HitlMode, PermissionModeCli, PresetName, SidecarMode, StreamMode } from './types.js'
 import { CLI_VERSION } from './version.js'
 
@@ -35,6 +37,103 @@ async function main(): Promise<void> {
     .description('Show which API keys are configured (values never printed)')
     .action(() => {
       process.exitCode = printAuthStatus()
+    })
+
+  const session = program
+    .command('session')
+    .description('List / show / delete sessions (uses ~/.hip db by default)')
+  session
+    .command('list')
+    .description('List persisted sessions')
+    .option('--json', 'Emit JSON array')
+    .option('--isolate', 'Use temp isolation DB instead of user ~/.hip')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await sessionList({
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+  session
+    .command('show')
+    .description('Show session messages (id or unique prefix)')
+    .argument('<id>', 'Session id or unique prefix')
+    .option('--json', 'Emit full JSON')
+    .option('--limit <n>', 'Show only last N messages', (v) => Number(v))
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (id: string, flags: Record<string, unknown>) => {
+      process.exitCode = await sessionShow(id, {
+        json: flags.json === true,
+        limit: flags.limit as number | undefined,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+  session
+    .command('delete')
+    .description('Delete a session (requires --yes)')
+    .argument('<id>', 'Session id or unique prefix')
+    .option('--yes', 'Confirm deletion')
+    .option('--delete-derived-memories', 'Also delete memories derived from the session')
+    .option('--json', 'Emit JSON result')
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (id: string, flags: Record<string, unknown>) => {
+      process.exitCode = await sessionDelete(id, {
+        yes: flags.yes === true,
+        deleteDerivedMemories: flags.deleteDerivedMemories === true,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+
+  program
+    .command('repl')
+    .description('Interactive multi-turn chat (TTY; uses ~/.hip by default)')
+    .option('-c, --cwd <path>', 'Working directory')
+    .option('--provider <id>', 'LLM provider', 'deepseek')
+    .option('--model <id>', 'Model id', 'deepseek-chat')
+    .option('--base-url <url>', 'Provider base URL')
+    .option('--permission-mode <mode>', 'chat|edit|full', 'edit')
+    .option('--disable-plan', 'Disable plan heuristics')
+    .option('--hitl <mode>', 'auto|fail|prompt', 'prompt')
+    .option('--stream <mode>', 'text|tools|all|none', 'all')
+    .option('--isolate', 'Temp isolation instead of user ~/.hip')
+    .option('--system <text>', 'System prompt')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await runRepl({
+        cwd: flags.cwd as string | undefined,
+        provider: flags.provider as string | undefined,
+        model: flags.model as string | undefined,
+        baseURL: flags.baseUrl as string | undefined,
+        permissionMode: flags.permissionMode as PermissionModeCli | undefined,
+        disablePlan: flags.disablePlan === true,
+        hitl: flags.hitl as HitlMode | undefined,
+        stream: flags.stream as StreamMode | undefined,
+        useUserHip: flags.isolate !== true,
+        systemPrompt: flags.system as string | undefined,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
     })
 
   program

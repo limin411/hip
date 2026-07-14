@@ -486,6 +486,7 @@ describe('knowledgeStore templates create flow (no orphans)', () => {
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(knowledgeSaveTree).not.toHaveBeenCalled()
     const picker = useKnowledgeStore.getState().templatePicker
+    expect(picker?.spaceId).toBe('spc_1')
     expect(picker?.parentId).toBe('nod_parent01')
     expect(picker?.templates).toHaveLength(1)
   })
@@ -502,6 +503,57 @@ describe('knowledgeStore templates create flow (no orphans)', () => {
     ])
     await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
     useKnowledgeStore.getState().cancelTemplateCreate()
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().nodes).toHaveLength(0)
+    expect(useKnowledgeStore.getState().spaceDocCounts.spc_1).toBe(0)
+    expect(useKnowledgeStore.getState().activeDocId).toBeNull()
+  })
+
+  it('openSpace clears templatePicker so confirm cannot write into another space', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([
+      {
+        id: 'tpl_meetnotes01',
+        name: 'Meeting',
+        body: '# Agenda\n',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ])
+    await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
+    expect(useKnowledgeStore.getState().templatePicker).not.toBeNull()
+
+    knowledgeGetTree.mockResolvedValueOnce({ version: 1, nodes: [] })
+    useKnowledgeStore.setState({
+      spaces: [
+        { id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 },
+        { id: 'spc_2', name: 'T', createdAt: 1, updatedAt: 1 },
+      ],
+    })
+    await useKnowledgeStore.getState().openSpace('spc_2')
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(useKnowledgeStore.getState().activeSpaceId).toBe('spc_2')
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+  })
+
+  it('confirmTemplateCreate no-ops when picker spaceId ≠ activeSpaceId', async () => {
+    useKnowledgeStore.setState({
+      templatePicker: {
+        spaceId: 'spc_oldspace01',
+        parentId: null,
+        defaultTitle: 'Untitled',
+        templates: [
+          {
+            id: 'tpl_meetnotes01',
+            name: 'Meeting',
+            body: '# Agenda\n',
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      },
+    })
+    await useKnowledgeStore.getState().confirmTemplateCreate('tpl_meetnotes01')
     expect(useKnowledgeStore.getState().templatePicker).toBeNull()
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(useKnowledgeStore.getState().nodes).toHaveLength(0)

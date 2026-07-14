@@ -220,6 +220,8 @@ type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
 /** Pending new-doc flow: modal open only after templates exist; no node until confirm. */
 export interface TemplatePickerState {
+  /** Space the templates were listed for; ignore confirm if activeSpaceId diverges. */
+  spaceId: string
   parentId: string | null
   defaultTitle: string
   templates: KnowledgeTemplate[]
@@ -549,6 +551,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         mode: 'workspace',
         expandedFolderIds: expanded,
         treeFocusId: opts?.selectDocId ?? null,
+        // Drop stale picker: confirm must not write into a different space.
+        templatePicker: null,
       })
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
@@ -667,7 +671,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         return
       }
       // Modal first — no tree node / doc file until confirm.
-      set({ templatePicker: { parentId, defaultTitle, templates } })
+      set({ templatePicker: { spaceId, parentId, defaultTitle, templates } })
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
@@ -680,6 +684,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const picker = get().templatePicker
     if (!picker) return
     set({ templatePicker: null })
+    // Space switched (or picker was stale) — do not create under the wrong space.
+    if (get().activeSpaceId !== picker.spaceId) return
     if (templateId == null) {
       await get().createDoc(picker.parentId, picker.defaultTitle)
       return

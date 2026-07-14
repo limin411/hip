@@ -490,10 +490,15 @@ export function KnowledgeWorkspace() {
         title={t('knowledge.tree.rename')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setRenameSpaceOpen(false)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-rename-space-cancel"
+              onClick={() => setRenameSpaceOpen(false)}
+            >
               {t('common.cancel')}
             </Button>
             <Button
+              data-testid="knowledge-rename-space-confirm"
               disabled={!spaceName.trim() || busy || !activeSpaceId}
               onClick={() => {
                 if (activeSpaceId) void renameSpace(activeSpaceId, spaceName.trim())
@@ -505,7 +510,12 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <Input value={spaceName} onChange={(e) => setSpaceName(e.target.value)} autoFocus />
+        <Input
+          data-testid="knowledge-rename-space-name"
+          value={spaceName}
+          onChange={(e) => setSpaceName(e.target.value)}
+          autoFocus
+        />
       </Modal>
 
       <Modal
@@ -514,11 +524,16 @@ export function KnowledgeWorkspace() {
         title={t('knowledge.space.deleteConfirm')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteSpaceOpen(false)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-delete-space-cancel"
+              onClick={() => setDeleteSpaceOpen(false)}
+            >
               {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
+              data-testid="knowledge-delete-space-confirm"
               disabled={busy || !activeSpaceId}
               onClick={() => {
                 if (activeSpaceId) void deleteSpace(activeSpaceId)
@@ -539,10 +554,15 @@ export function KnowledgeWorkspace() {
         title={t('knowledge.tree.rename')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setNodeEdit(null)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-rename-node-cancel"
+              onClick={() => setNodeEdit(null)}
+            >
               {t('common.cancel')}
             </Button>
             <Button
+              data-testid="knowledge-rename-node-confirm"
               disabled={!nodeTitle.trim() || busy}
               onClick={() => {
                 if (nodeEdit) void renameNode(nodeEdit.id, nodeTitle.trim())
@@ -554,7 +574,12 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <Input value={nodeTitle} onChange={(e) => setNodeTitle(e.target.value)} autoFocus />
+        <Input
+          data-testid="knowledge-rename-node-name"
+          value={nodeTitle}
+          onChange={(e) => setNodeTitle(e.target.value)}
+          autoFocus
+        />
       </Modal>
 
       <Modal
@@ -563,11 +588,16 @@ export function KnowledgeWorkspace() {
         title={t('knowledge.tree.delete')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setNodeDelete(null)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-delete-node-cancel"
+              onClick={() => setNodeDelete(null)}
+            >
               {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
+              data-testid="knowledge-delete-node-confirm"
               disabled={busy}
               onClick={() => {
                 if (nodeDelete) void deleteNode(nodeDelete.id)

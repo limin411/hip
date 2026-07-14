@@ -15,6 +15,7 @@ import {
   clickKnowledgeBold,
   installSavePathSeam,
   clearSavePathSeam,
+  exportActiveDocTo,
 } from '../helpers/knowledge.js'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -157,7 +158,6 @@ describe('knowledge editor ux @knowledge @core', () => {
 
   it('KE12: export dirty buffer via save seam includes marker', async () => {
     exportPath = path.join(os.tmpdir(), `hip-e2e-export-${Date.now()}.md`)
-    await installSavePathSeam(exportPath)
     await expectKnowledgeEditor()
     const content = await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')
     const before = await content.getText()
@@ -166,16 +166,7 @@ describe('knowledge editor ux @knowledge @core', () => {
     }
     // Allow debounce autosave + ensure flush path
     await browser.pause(700)
-    const menu = await browser.$('[data-testid="knowledge-doc-menu"]')
-    await menu.waitForExist({ timeout: 5000 })
-    await browser.execute((el: HTMLElement) => el.click(), menu)
-    const btn = await browser.$('[data-testid="knowledge-export-doc"]')
-    await btn.waitForExist({ timeout: 5000 })
-    await browser.execute((el: HTMLElement) => el.click(), btn)
-    await browser.waitUntil(
-      async () => fs.existsSync(exportPath) && fs.statSync(exportPath).size > 0,
-      { timeout: 15000, interval: 300, timeoutMsg: 'export file not written' },
-    )
+    await exportActiveDocTo(exportPath)
     const body = fs.readFileSync(exportPath, 'utf8')
     expect(body).toContain(marker)
   })

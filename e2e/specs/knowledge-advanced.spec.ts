@@ -32,6 +32,7 @@ import {
   typeInKnowledgeEditor,
   expandAllKnowledgeFolders,
   createDocAndExpectEditor as createDoc,
+  createFolderFromToolbar,
 } from '../helpers/knowledge.js'
 
 describe('knowledge advanced surfaces @knowledge @core', () => {
@@ -87,16 +88,9 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
       timeout: 15000,
     })
 
-    // Create folder via toolbar
-    await (await browser.$('[data-testid="knowledge-new-folder"]')).click()
-    await browser.pause(500)
-
-    let folderTid = await firstKnowledgeFolderTestId()
-    if (!folderTid) {
-      await (await browser.$('[data-testid="knowledge-new-folder"]')).click()
-      await browser.pause(500)
-      folderTid = await firstKnowledgeFolderTestId()
-    }
+    // Create folder via toolbar (menu open is flaky — use helper retries)
+    await createFolderFromToolbar()
+    const folderTid = await firstKnowledgeFolderTestId()
     expect(folderTid).toBeTruthy()
 
     // Context menu on folder — assert menu items then create doc
@@ -124,8 +118,7 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
 
     let folderTid = await firstKnowledgeFolderTestId()
     if (!folderTid) {
-      await (await browser.$('[data-testid="knowledge-new-folder"]')).click()
-      await browser.pause(400)
+      await createFolderFromToolbar()
       folderTid = await firstKnowledgeFolderTestId()
     }
     expect(folderTid).toBeTruthy()

@@ -82,19 +82,30 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
-| `@knowledge` | Knowledge base surface + doc editor UX | main path also `@core` → in gate |
+| `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 
 Context-menu helpers: `e2e/helpers/context-menu.ts`. Specs: `context-menu-smoke.spec.ts`, `context-menu-core.spec.ts`, `context-menu-panel.spec.ts`.
 
-Knowledge editor helpers: `e2e/helpers/knowledge.ts`. Spec: `knowledge-editor.spec.ts` (KE1–KE8: open → space → default edit → type → preview round-trip → chip). Unpaid; uses isolated `HIP_DATA_DIR` (no `@live`).
+Knowledge helpers: `e2e/helpers/knowledge.ts`. Specs (all unpaid, isolated `HIP_DATA_DIR`, no `@live`):
+
+| Spec | Cases |
+|------|--------|
+| `knowledge-editor.spec.ts` | KE: open → space → edit/preview → title → bold → export md → tree filter |
+| `knowledge-advanced.spec.ts` | KA: palette nav/search, context newDoc, DnD, import folder |
+| `knowledge-lifecycle.spec.ts` | KL: create → disk save → search → export md/zip → **delete space** → chip reopen |
+| `knowledge-home.spec.ts` | KH: multi-space, rename, recent, search empty, delete/cancel |
+| `knowledge-tree-crud.spec.ts` | KT: folder/doc rename, delete, context newDoc |
 
 ```bash
 E2E_GREP=@context-menu yarn test:e2e
 # or panel-only:
 E2E_GREP='@context-menu @panel' yarn test:e2e --spec e2e/specs/context-menu-panel.spec.ts
 
-# Knowledge editor UX
+# All knowledge business flows
 E2E_GREP=@knowledge yarn test:e2e
+yarn test:e2e --spec e2e/specs/knowledge-lifecycle.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-home.spec.ts
+yarn test:e2e --spec e2e/specs/knowledge-tree-crud.spec.ts
 yarn test:e2e --spec e2e/specs/knowledge-editor.spec.ts
 ```
 

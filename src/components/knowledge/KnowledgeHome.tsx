@@ -244,6 +244,8 @@ export function KnowledgeHome() {
                       <div
                         key={space.id}
                         data-testid="knowledge-space-card"
+                        data-space-id={space.id}
+                        data-space-name={space.name}
                         className="group relative flex min-h-[8rem] flex-col rounded-lg border border-border bg-surface transition-colors hover:bg-surface-subtle"
                       >
                         <button
@@ -375,10 +377,18 @@ export function KnowledgeHome() {
         title={t('knowledge.tree.rename')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setRenameId(null)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-rename-space-cancel"
+              onClick={() => setRenameId(null)}
+            >
               {t('common.cancel')}
             </Button>
-            <Button onClick={() => void submitRename()} disabled={!renameName.trim() || busy}>
+            <Button
+              data-testid="knowledge-rename-space-confirm"
+              onClick={() => void submitRename()}
+              disabled={!renameName.trim() || busy}
+            >
               {t('common.confirm', { defaultValue: 'OK' })}
             </Button>
           </div>
@@ -386,6 +396,7 @@ export function KnowledgeHome() {
       >
         <Input
           autoFocus
+          data-testid="knowledge-rename-space-name"
           value={renameName}
           onChange={(e) => setRenameName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void submitRename()}
@@ -398,10 +409,19 @@ export function KnowledgeHome() {
         title={t('knowledge.space.deleteConfirm')}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setDeleteId(null)}>
+            <Button
+              variant="secondary"
+              data-testid="knowledge-delete-space-cancel"
+              onClick={() => setDeleteId(null)}
+            >
               {t('common.cancel')}
             </Button>
-            <Button variant="danger" onClick={() => void submitDelete()} disabled={busy}>
+            <Button
+              variant="danger"
+              data-testid="knowledge-delete-space-confirm"
+              onClick={() => void submitDelete()}
+              disabled={busy}
+            >
               {t('knowledge.tree.delete')}
             </Button>
           </div>

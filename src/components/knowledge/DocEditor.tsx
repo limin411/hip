@@ -11,7 +11,7 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { keymap, EditorView, type KeyBinding } from '@codemirror/view'
-import { Compartment, Prec } from '@codemirror/state'
+import { Compartment, EditorSelection, Prec } from '@codemirror/state'
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search'
 import {
   applySlashInsert,
@@ -22,6 +22,8 @@ import {
 } from '@/domain/knowledge/mdEdit'
 import {
   extractSlashQueryAt,
+  prepareSlashInsert,
+  sameSlashMatch,
   type KnowledgeSlashItem,
   type SlashQueryMatch,
 } from '@/domain/knowledge/slashMenu'
@@ -149,6 +151,41 @@ function readSlashMatch(view: EditorView): SlashQueryMatch | null {
   return extractSlashQueryAt(line.text, head - line.from, line.from)
 }
 
+type MenuPos = { top: number; left: number; width: number; maxHeight: number }
+
+/** Menu width used for clamping caret-relative left. */
+const SLASH_MENU_WIDTH = 320
+const SLASH_MENU_MAX_H = 224
+
+function computeMenuPos(view: EditorView, match: SlashQueryMatch): MenuPos {
+  const fallback: MenuPos = {
+    top: 8,
+    left: 8,
+    width: SLASH_MENU_WIDTH,
+    maxHeight: SLASH_MENU_MAX_H,
+  }
+  const coords = view.coordsAtPos(match.from)
+  const root = view.dom.closest(
+    '[data-testid="knowledge-doc-editor"]',
+  ) as HTMLElement | null
+  if (!coords || !root) return fallback
+  const rootRect = root.getBoundingClientRect()
+  const spaceBelow = rootRect.bottom - coords.bottom
+  const preferAbove = spaceBelow < SLASH_MENU_MAX_H + 12
+  const top = preferAbove
+    ? Math.max(8, coords.top - rootRect.top - SLASH_MENU_MAX_H - 4)
+    : coords.bottom - rootRect.top + 4
+  const rawLeft = coords.left - rootRect.left
+  const left = Math.max(
+    8,
+    Math.min(rawLeft, Math.max(8, rootRect.width - SLASH_MENU_WIDTH - 8)),
+  )
+  const maxHeight = preferAbove
+    ? Math.min(SLASH_MENU_MAX_H, Math.max(80, coords.top - rootRect.top - 8))
+    : Math.min(SLASH_MENU_MAX_H, Math.max(80, rootRect.bottom - coords.bottom - 8))
+  return { top, left, width: SLASH_MENU_WIDTH, maxHeight }
+}
+
 export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function DocEditor(
   { docId: _docId, initialValue, onDraftChange, onBlur, placeholder, onSave },
   ref,
@@ -156,7 +193,9 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   const isDark = useIsDark()
   const [text, setText] = useState(initialValue)
   const [slashMatch, setSlashMatch] = useState<SlashQueryMatch | null>(null)
+  const [menuPos, setMenuPos] = useState<MenuPos | null>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
   const themeCompartment = useMemo(() => new Compartment(), [])
   const onBlurRef = useRef(onBlur)
   onBlurRef.current = onBlur
@@ -164,8 +203,14 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
   onDraftChangeRef.current = onDraftChange
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
-  const setSlashMatchRef = useRef(setSlashMatch)
-  setSlashMatchRef.current = setSlashMatch
+  /** Skip one onChange draft notify after we already pushed (I2). */
+  const suppressDraftNotifyRef = useRef(false)
+  const slashMatchRef = useRef<SlashQueryMatch | null>(null)
+  slashMatchRef.current = slashMatch
+
+  const updateSlashMatch = useCallback((next: SlashQueryMatch | null) => {
+    setSlashMatch((prev) => (sameSlashMatch(prev, next) ? prev : next))
+  }, [])
 
   useImperativeHandle(ref, () => ({
     getView: () => viewRef.current,
@@ -176,7 +221,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     const blurHandler = EditorView.domEventHandlers({
       blur: () => {
         // Delay so menu item mousedown can run first.
-        window.setTimeout(() => setSlashMatchRef.current(null), 0)
+        window.setTimeout(() => updateSlashMatch(null), 0)
         onBlurRef.current?.()
         return false
       },
@@ -184,7 +229,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
 
     const slashTracker = EditorView.updateListener.of((update) => {
       if (!update.docChanged && !update.selectionSet) return
-      setSlashMatchRef.current(readSlashMatch(update.view))
+      updateSlashMatch(readSlashMatch(update.view))
     })
 
     const run =
@@ -256,7 +301,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
       highlightSelectionMatches(),
       Prec.highest(keymap.of([...knowledgeKeys, ...searchKeymap])),
     ]
-  }, [themeCompartment])
+  }, [themeCompartment, updateSlashMatch])
 
   useEffect(() => {
     const view = viewRef.current
@@ -266,34 +311,85 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
     })
   }, [isDark, themeCompartment])
 
-  const onSlashSelect = useCallback((item: KnowledgeSlashItem) => {
-    const view = viewRef.current
-    const match = slashMatch
-    if (!view || !match) return
-    if (applySlashInsert(view, match.from, match.to, item.insert, item.cursorOffset)) {
-      pushDraft(view, onDraftChangeRef.current)
-      setText(view.state.doc.toString())
-      setSlashMatch(null)
-      view.focus()
+  // M2: caret-relative menu position (clamped to editor box).
+  useEffect(() => {
+    if (!slashMatch) {
+      setMenuPos(null)
+      return
     }
+    const view = viewRef.current
+    if (!view) {
+      setMenuPos({
+        top: 8,
+        left: 8,
+        width: SLASH_MENU_WIDTH,
+        maxHeight: SLASH_MENU_MAX_H,
+      })
+      return
+    }
+    setMenuPos(computeMenuPos(view, slashMatch))
   }, [slashMatch])
 
+  const onSlashSelect = useCallback((item: KnowledgeSlashItem) => {
+    const view = viewRef.current
+    const match = slashMatchRef.current
+    if (!view || !match || view.composing) return
+    const prepared = prepareSlashInsert(view.state.doc.toString(), match.from, item)
+    if (
+      applySlashInsert(
+        view,
+        match.from,
+        match.to,
+        prepared.insert,
+        prepared.cursorOffset,
+      )
+    ) {
+      // I2: single draft notify; suppress the onChange echo from this dispatch.
+      suppressDraftNotifyRef.current = true
+      const next = view.state.doc.toString()
+      setText(next)
+      onDraftChangeRef.current(next)
+      updateSlashMatch(null)
+      view.focus()
+    }
+  }, [updateSlashMatch])
+
+  /** L2: Escape strips `/query` (align with chat dismiss), then hide menu. */
   const onSlashDismiss = useCallback(() => {
-    setSlashMatch(null)
-    viewRef.current?.focus()
-  }, [])
+    const view = viewRef.current
+    const match = slashMatchRef.current
+    if (view && match && !view.composing) {
+      view.dispatch({
+        changes: { from: match.from, to: match.to, insert: '' },
+        selection: EditorSelection.cursor(match.from),
+      })
+      suppressDraftNotifyRef.current = true
+      const next = view.state.doc.toString()
+      setText(next)
+      onDraftChangeRef.current(next)
+    }
+    updateSlashMatch(null)
+    view?.focus()
+  }, [updateSlashMatch])
 
   return (
     <div
+      ref={rootRef}
       className="relative flex h-full min-h-0 w-full flex-1 flex-col"
       data-testid="knowledge-doc-editor"
     >
-      {slashMatch ? (
+      {slashMatch && menuPos ? (
         <KnowledgeSlashMenu
           query={slashMatch.query}
           onSelect={onSlashSelect}
           onDismiss={onSlashDismiss}
-          className="absolute left-2 right-2 top-2 sm:left-4 sm:right-auto sm:w-80"
+          className="absolute"
+          style={{
+            top: menuPos.top,
+            left: menuPos.left,
+            width: menuPos.width,
+            maxHeight: menuPos.maxHeight,
+          }}
         />
       ) : null}
       <CodeMirror
@@ -316,10 +412,14 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
           view.dispatch({
             effects: themeCompartment.reconfigure(buildProseTheme(isDark)),
           })
-          setSlashMatch(readSlashMatch(view))
+          updateSlashMatch(readSlashMatch(view))
         }}
         onChange={(v) => {
           setText(v)
+          if (suppressDraftNotifyRef.current) {
+            suppressDraftNotifyRef.current = false
+            return
+          }
           onDraftChangeRef.current(v)
         }}
         className="flex min-h-0 flex-1 flex-col overflow-hidden text-prose [&_.cm-editor]:h-full"

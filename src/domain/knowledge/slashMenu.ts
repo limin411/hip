@@ -3,6 +3,7 @@
  *
  * Shared by Source (CodeMirror) and Live (Milkdown host when present).
  * Inserts are Markdown snippets — Live serializes via its own pipeline.
+ * Live host should import these symbols (do not fork a Crepe slash plugin).
  */
 
 export type KnowledgeSlashId =
@@ -43,6 +44,24 @@ export function slashItemLabelKey(id: KnowledgeSlashId | string): string {
  */
 export const TABLE_SKELETON_3X2 =
   '|   |   |   |\n| --- | --- | --- |\n|   |   |   |\n|   |   |   |\n'
+
+/**
+ * Slash ids that must form a Markdown block.
+ * Mid-line apply prepends `\n` so ATX/lists/tables/etc. stay valid.
+ * `wiki` stays inline.
+ */
+export const BLOCK_SLASH_IDS: ReadonlySet<KnowledgeSlashId> = new Set([
+  'h1',
+  'h2',
+  'h3',
+  'bullet',
+  'ordered',
+  'task',
+  'fence',
+  'quote',
+  'hr',
+  'table',
+])
 
 /** Live/Source slash insert config — single source of truth. */
 export const KNOWLEDGE_SLASH_ITEMS: KnowledgeSlashItem[] = [
@@ -146,6 +165,16 @@ export type SlashQueryMatch = {
   to: number
 }
 
+/** True when both matches point at the same token (for cheap setState). */
+export function sameSlashMatch(
+  a: SlashQueryMatch | null,
+  b: SlashQueryMatch | null,
+): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.query === b.query && a.from === b.from && a.to === b.to
+}
+
 /**
  * Detect a slash insert query immediately before `cursor` in `lineText`.
  * Trigger: `/` at line start or after whitespace; token has no spaces or `/`.
@@ -164,9 +193,6 @@ export function extractSlashQueryAt(
   if (!m) return null
   const tokenWithSlash = `/${m[1]}`
   const fromInLine = before.length - tokenWithSlash.length
-  // Require the char before `/` to be start or whitespace (already in regex),
-  // and reject mid-word like `foo/bar`.
-  if (fromInLine > 0 && !/\s/.test(before[fromInLine - 1]!)) return null
   return {
     query: m[1],
     from: lineFrom + fromInLine,
@@ -203,13 +229,36 @@ export function filterSlashItems(
     .map((s) => s.item)
 }
 
-/** Pure string replace of a slash token with an insert snippet. */
+/**
+ * Normalize insert for block items: if `/` is mid-line after non-whitespace,
+ * prepend `\n` so the snippet starts a new block line.
+ */
+export function prepareSlashInsert(
+  doc: string,
+  from: number,
+  item: Pick<KnowledgeSlashItem, 'id' | 'insert' | 'cursorOffset'>,
+): { insert: string; cursorOffset: number } {
+  let insert = item.insert
+  let cursorOffset = item.cursorOffset
+  if (BLOCK_SLASH_IDS.has(item.id)) {
+    const lineStart = from === 0 ? 0 : doc.lastIndexOf('\n', from - 1) + 1
+    const prefix = doc.slice(lineStart, from)
+    if (prefix.trim().length > 0) {
+      insert = `\n${insert}`
+      cursorOffset += 1
+    }
+  }
+  return { insert, cursorOffset }
+}
+
+/** Pure string replace of a slash token with a (possibly block-normalized) insert. */
 export function applySlashInsertText(
   doc: string,
   from: number,
   to: number,
-  item: Pick<KnowledgeSlashItem, 'insert' | 'cursorOffset'>,
+  item: Pick<KnowledgeSlashItem, 'id' | 'insert' | 'cursorOffset'>,
 ): { text: string; cursor: number } {
-  const text = doc.slice(0, from) + item.insert + doc.slice(to)
-  return { text, cursor: from + item.cursorOffset }
+  const prepared = prepareSlashInsert(doc, from, item)
+  const text = doc.slice(0, from) + prepared.insert + doc.slice(to)
+  return { text, cursor: from + prepared.cursorOffset }
 }

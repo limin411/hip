@@ -65,4 +65,47 @@ describe('KnowledgeSlashMenu', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onDismiss).toHaveBeenCalled()
   })
+
+  it('ArrowDown moves highlight; Enter selects second item', () => {
+    const onSelect = vi.fn()
+    render(
+      <KnowledgeSlashMenu query="h" onSelect={onSelect} onDismiss={() => {}} />,
+    )
+    // h → h1, h2, h3, hr — start on h1
+    fireEvent.keyDown(document, { key: 'ArrowDown' })
+    fireEvent.keyDown(document, { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'h2' }))
+  })
+
+  it('ArrowUp at top dismisses', () => {
+    const onDismiss = vi.fn()
+    render(
+      <KnowledgeSlashMenu query="h1" onSelect={() => {}} onDismiss={onDismiss} />,
+    )
+    fireEvent.keyDown(document, { key: 'ArrowUp' })
+    expect(onDismiss).toHaveBeenCalled()
+  })
+
+  it('ignores keys while IME is composing (M1)', () => {
+    const onSelect = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <KnowledgeSlashMenu query="h1" onSelect={onSelect} onDismiss={onDismiss} />,
+    )
+    fireEvent.keyDown(document, { key: 'Enter', isComposing: true })
+    fireEvent.keyDown(document, { key: 'Process' })
+    fireEvent.keyDown(document, { key: 'Escape', isComposing: true })
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it('sets aria-activedescendant on the listbox', () => {
+    render(
+      <KnowledgeSlashMenu query="h1" onSelect={() => {}} onDismiss={() => {}} />,
+    )
+    expect(screen.getByTestId('knowledge-slash-menu')).toHaveAttribute(
+      'aria-activedescendant',
+      'knowledge-slash-opt-h1',
+    )
+  })
 })

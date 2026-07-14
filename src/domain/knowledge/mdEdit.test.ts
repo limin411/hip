@@ -4,6 +4,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import {
   applySlashInsert,
+  insertHr,
   insertTableSkeleton,
   insertWikiLink,
   setAtxHeading,
@@ -94,6 +95,20 @@ describe('mdEdit', () => {
     expect(insertWikiLink(view)).toBe(true)
     expect(view.state.doc.toString()).toBe('a[[]]b')
     expect(view.state.selection.main.head).toBe(3)
+    view.destroy()
+  })
+
+  it('insertHr fills empty line', () => {
+    const view = viewWith('', 0)
+    expect(insertHr(view)).toBe(true)
+    expect(view.state.doc.toString()).toBe('---\n')
+    view.destroy()
+  })
+
+  it('insertHr appends after non-empty line', () => {
+    const view = viewWith('hello', 5)
+    expect(insertHr(view)).toBe(true)
+    expect(view.state.doc.toString()).toBe('hello\n---\n')
     view.destroy()
   })
 })

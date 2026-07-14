@@ -5,6 +5,8 @@ import {
   applySlashInsertText,
   extractSlashQueryAt,
   filterSlashItems,
+  prepareSlashInsert,
+  sameSlashMatch,
   slashItemLabelKey,
 } from './slashMenu'
 
@@ -71,7 +73,6 @@ describe('slashMenu', () => {
     })
 
     it('returns null when cursor is not at end of slash token', () => {
-      // cursor in middle of "hello" — no trailing slash query
       expect(extractSlashQueryAt('hello', 3, 0)).toBeNull()
     })
 
@@ -87,7 +88,7 @@ describe('slashMenu', () => {
       )
     })
 
-    it('prefix-matches name (h → h1,h2,h3)', () => {
+    it('prefix-matches name (h → h1,h2,h3,hr)', () => {
       const names = filterSlashItems(KNOWLEDGE_SLASH_ITEMS, 'h').map((i) => i.name)
       expect(names).toEqual(['h1', 'h2', 'h3', 'hr'])
     })
@@ -103,23 +104,73 @@ describe('slashMenu', () => {
     })
   })
 
-  describe('applySlashInsertText', () => {
-    it('replaces /query with heading snippet and sets cursor', () => {
+  describe('sameSlashMatch', () => {
+    it('compares by fields', () => {
+      expect(sameSlashMatch(null, null)).toBe(true)
+      expect(sameSlashMatch({ query: 'a', from: 0, to: 2 }, null)).toBe(false)
+      expect(
+        sameSlashMatch(
+          { query: 'a', from: 0, to: 2 },
+          { query: 'a', from: 0, to: 2 },
+        ),
+      ).toBe(true)
+      expect(
+        sameSlashMatch(
+          { query: 'a', from: 0, to: 2 },
+          { query: 'b', from: 0, to: 2 },
+        ),
+      ).toBe(false)
+    })
+  })
+
+  describe('prepareSlashInsert / applySlashInsertText (M3)', () => {
+    it('line-start h1 leaves snippet as-is', () => {
       const h1 = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'h1')!
+      const prepared = prepareSlashInsert('/h1', 0, h1)
+      expect(prepared.insert).toBe('# ')
+      expect(prepared.cursorOffset).toBe(2)
       const result = applySlashInsertText('/h1', 0, 3, h1)
       expect(result.text).toBe('# ')
       expect(result.cursor).toBe(2)
     })
 
-    it('preserves surrounding text', () => {
+    it('mid-line block h1 prepends newline', () => {
+      const h1 = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'h1')!
+      const doc = 'para /h1'
+      const from = 5
+      const to = 8
+      const result = applySlashInsertText(doc, from, to, h1)
+      expect(result.text).toBe('para \n# ')
+      expect(result.cursor).toBe(from + 1 + h1.cursorOffset)
+    })
+
+    it('mid-line hr becomes thematic break on new line', () => {
+      const hr = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'hr')!
+      const result = applySlashInsertText('para /hr', 5, 8, hr)
+      expect(result.text).toBe('para \n---\n')
+    })
+
+    it('mid-line table starts on new line', () => {
+      const table = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'table')!
+      const result = applySlashInsertText('x /table', 2, 8, table)
+      expect(result.text.startsWith('x \n|   |   |   |')).toBe(true)
+    })
+
+    it('wiki stays inline mid-line', () => {
+      const wiki = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'wiki')!
+      const result = applySlashInsertText('see /wiki', 4, 9, wiki)
+      expect(result.text).toBe('see [[]]')
+      expect(result.cursor).toBe(4 + 2)
+    })
+
+    it('preserves surrounding text for task at line start', () => {
       const task = KNOWLEDGE_SLASH_ITEMS.find((i) => i.id === 'task')!
-      // "note /task more" — replace from index of / to end of token
-      const doc = 'note /task more'
+      const doc = 'note\n/task more'
+      // /task starts at index 5
       const from = 5
       const to = 10
       const result = applySlashInsertText(doc, from, to, task)
-      expect(result.text).toBe('note - [ ]  more')
-      expect(result.cursor).toBe(from + task.cursorOffset)
+      expect(result.text).toBe('note\n- [ ]  more')
     })
 
     it('inserts wiki link skeleton with cursor inside brackets', () => {

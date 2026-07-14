@@ -15,17 +15,21 @@ export interface KnowledgeSlashMenuProps {
   onDismiss: () => void
   /** Optional class for positioning (caller places absolute/fixed). */
   className?: string
+  /** Optional inline style (caret-relative top/left from host). */
+  style?: React.CSSProperties
 }
 
 /**
  * Slash insert palette for knowledge Live/Source editors.
  * Keyboard: ↑↓, Enter select, Escape dismiss (capture phase).
+ * IME: ignores composition keydowns (`isComposing` / `Process`).
  */
 export function KnowledgeSlashMenu({
   query,
   onSelect,
   onDismiss,
   className,
+  style,
 }: KnowledgeSlashMenuProps) {
   const { t } = useTranslation()
   const filtered = useMemo(
@@ -47,6 +51,10 @@ export function KnowledgeSlashMenu({
 
   const safeIndex =
     filtered.length === 0 ? 0 : Math.min(activeIndex, filtered.length - 1)
+  const activeOptionId =
+    filtered[safeIndex] != null
+      ? `knowledge-slash-opt-${filtered[safeIndex].id}`
+      : undefined
 
   useEffect(() => {
     if (filtered.length === 0) return
@@ -55,6 +63,9 @@ export function KnowledgeSlashMenu({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // M1: do not steal IME commit / composition keys (zh locales).
+      if (e.isComposing || e.key === 'Process') return
+
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         e.stopImmediatePropagation()
@@ -96,7 +107,9 @@ export function KnowledgeSlashMenu({
     <div
       role="listbox"
       aria-label={t('knowledge.slash.listLabel')}
+      aria-activedescendant={activeOptionId}
       data-testid="knowledge-slash-menu"
+      style={style}
       className={cn(
         'z-50 max-h-56 overflow-y-auto rounded-lg border border-border bg-surface shadow-overlay',
         className,

@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import i18n from '@/i18n'
-import type { KnowledgeNode, KnowledgeRecentItem, KnowledgeSpace } from '@/domain/knowledge/types'
+import type {
+  KnowledgeNode,
+  KnowledgeRecentItem,
+  KnowledgeSpace,
+  KnowledgeTemplate,
+} from '@/domain/knowledge/types'
 import { newDocId, newFolderId } from '@/domain/knowledge/ids'
 import {
   collectDocIdsInSubtree,
@@ -25,11 +30,14 @@ import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
   knowledgeDeleteSpace,
+  knowledgeDeleteTemplate,
   knowledgeEnsureRoot,
   knowledgeErrorMessage,
   knowledgeGetTree,
   knowledgeListSpaces,
+  knowledgeListTemplates,
   knowledgeReadDoc,
+  knowledgeSaveTemplate,
   knowledgeSaveTree,
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
@@ -210,6 +218,13 @@ function schedulePersistExpand(spaceId: string, get: () => KnowledgeState) {
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 type IndexStatus = 'idle' | 'building' | 'ready' | 'error'
 
+/** Pending new-doc flow: modal open only after templates exist; no node until confirm. */
+export interface TemplatePickerState {
+  parentId: string | null
+  defaultTitle: string
+  templates: KnowledgeTemplate[]
+}
+
 interface KnowledgeState {
   loaded: boolean
   spaces: KnowledgeSpace[]
@@ -229,6 +244,8 @@ interface KnowledgeState {
   expandedFolderIds: Record<string, boolean>
   /** Keyboard / roving focus in the space tree (separate from activeDocId). */
   treeFocusId: string | null
+  /** Template pick modal; set by `requestCreateDoc` when space has templates. */
+  templatePicker: TemplatePickerState | null
   busy: boolean
   error: string | null
   saveState: SaveState
@@ -244,7 +261,26 @@ interface KnowledgeState {
   openRecent: (item: KnowledgeRecentItem) => Promise<void>
   openHome: () => Promise<void>
   createFolder: (parentId: string | null, title: string) => Promise<void>
-  createDoc: (parentId: string | null, title: string) => Promise<void>
+  /**
+   * Create a doc node and open it. Prefer `requestCreateDoc` from UI so templates
+   * can be chosen before any node is written.
+   */
+  createDoc: (
+    parentId: string | null,
+    title: string,
+    opts?: { body?: string },
+  ) => Promise<void>
+  /**
+   * If the space has templates, open the picker (no node yet). Otherwise create empty.
+   * Cancel on the picker leaves no orphan empty doc.
+   */
+  requestCreateDoc: (parentId: string | null, defaultTitle: string) => Promise<void>
+  /** Confirm picker: `null` templateId → empty body; cancel via `cancelTemplateCreate`. */
+  confirmTemplateCreate: (templateId: string | null) => Promise<void>
+  cancelTemplateCreate: () => void
+  /** Save current doc draft body as a new space template. */
+  saveDocAsTemplate: (name: string) => Promise<boolean>
+  deleteTemplate: (id: string) => Promise<void>
   renameNode: (id: string, title: string) => Promise<void>
   deleteNode: (id: string) => Promise<void>
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
@@ -307,6 +343,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   recent: [],
   expandedFolderIds: {},
   treeFocusId: null,
+  templatePicker: null,
   busy: false,
   error: null,
   saveState: 'idle',
@@ -467,6 +504,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           editing: false,
           nodes: [],
           expandedFolderIds: {},
+          templatePicker: null,
           saveState: 'idle',
         })
       }
@@ -542,6 +580,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       activeSpaceId: null,
       nodes: [],
       expandedFolderIds: {},
+      templatePicker: null,
     })
   },
 
@@ -574,14 +613,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  createDoc: async (parentId, title) => {
+  createDoc: async (parentId, title, opts) => {
     const spaceId = get().activeSpaceId
     if (!spaceId || get().busy) return
+    const body = opts?.body ?? ''
     set({ busy: true })
     try {
       const now = Date.now()
       const id = newDocId()
-      await knowledgeWriteDoc(spaceId, id, '')
+      await knowledgeWriteDoc(spaceId, id, body)
       const node = {
         id,
         parentId,
@@ -594,7 +634,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const nodes = insertNode(get().nodes, node)
       await knowledgeSaveTree(spaceId, { version: 1, nodes })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
-      indexCurrentDoc(spaceId, id, node.title, '', spaceName, nodes)
+      indexCurrentDoc(spaceId, id, node.title, body, spaceName, nodes)
       set((s) => ({
         nodes,
         busy: false,
@@ -614,6 +654,82 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
       toast.error(msg)
+    }
+  },
+
+  requestCreateDoc: async (parentId, defaultTitle) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId || get().busy) return
+    try {
+      const templates = await knowledgeListTemplates(spaceId)
+      if (templates.length === 0) {
+        await get().createDoc(parentId, defaultTitle)
+        return
+      }
+      // Modal first — no tree node / doc file until confirm.
+      set({ templatePicker: { parentId, defaultTitle, templates } })
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      toast.error(msg)
+      // List failure should not block creation of a blank doc.
+      await get().createDoc(parentId, defaultTitle)
+    }
+  },
+
+  confirmTemplateCreate: async (templateId) => {
+    const picker = get().templatePicker
+    if (!picker) return
+    set({ templatePicker: null })
+    if (templateId == null) {
+      await get().createDoc(picker.parentId, picker.defaultTitle)
+      return
+    }
+    const tpl = picker.templates.find((t) => t.id === templateId)
+    if (!tpl) {
+      await get().createDoc(picker.parentId, picker.defaultTitle)
+      return
+    }
+    await get().createDoc(picker.parentId, picker.defaultTitle, { body: tpl.body })
+  },
+
+  cancelTemplateCreate: () => {
+    set({ templatePicker: null })
+  },
+
+  saveDocAsTemplate: async (name) => {
+    const spaceId = get().activeSpaceId
+    const docId = get().activeDocId
+    if (!spaceId || !docId || get().busy) return false
+    const trimmed = name.trim()
+    if (!trimmed) return false
+    set({ busy: true })
+    try {
+      const body = get().draftBody
+      await knowledgeSaveTemplate(spaceId, { name: trimmed, body })
+      set({ busy: false })
+      toast.success(i18n.t('knowledge.template.saved'))
+      return true
+    } catch (e) {
+      const msg = knowledgeErrorMessage(e)
+      set({ busy: false, error: msg })
+      toast.error(msg)
+      return false
+    }
+  },
+
+  deleteTemplate: async (id) => {
+    const spaceId = get().activeSpaceId
+    if (!spaceId) return
+    try {
+      await knowledgeDeleteTemplate(spaceId, id)
+      set((s) => {
+        if (!s.templatePicker) return s
+        const templates = s.templatePicker.templates.filter((t) => t.id !== id)
+        // Empty choice remains even when no templates left.
+        return { templatePicker: { ...s.templatePicker, templates } }
+      })
+    } catch (e) {
+      toast.error(knowledgeErrorMessage(e))
     }
   },
 

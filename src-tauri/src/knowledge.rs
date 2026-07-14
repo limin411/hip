@@ -835,6 +835,225 @@ pub fn knowledge_reveal_doc(app: AppHandle, args: DocArgs) -> Result<(), String>
         .map_err(|e| e.to_string())
 }
 
+// ── Templates (P1.7) ──────────────────────────────────────────────────────
+
+fn is_template_id(id: &str) -> bool {
+    let (prefix, rest) = match id.split_once('_') {
+        Some(p) => p,
+        None => return false,
+    };
+    if prefix != "tpl" {
+        return false;
+    }
+    let len = rest.len();
+    if len < 6 || len > 64 {
+        return false;
+    }
+    rest.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+fn require_template_id(id: &str) -> Result<(), String> {
+    if is_template_id(id) {
+        Ok(())
+    } else {
+        Err(format!("invalid templateId: {id}"))
+    }
+}
+
+fn templates_dir(root: &Path, space_id: &str) -> Result<PathBuf, String> {
+    let space = space_dir(root, space_id)?;
+    safe_join(&space, "templates").ok_or_else(|| "illegal templates path".to_string())
+}
+
+fn template_body_path(root: &Path, space_id: &str, tpl_id: &str) -> Result<PathBuf, String> {
+    require_template_id(tpl_id)?;
+    let dir = templates_dir(root, space_id)?;
+    let file = format!("{tpl_id}.md");
+    safe_join(&dir, &file).ok_or_else(|| "illegal template path".to_string())
+}
+
+fn templates_manifest_path(root: &Path, space_id: &str) -> Result<PathBuf, String> {
+    let dir = templates_dir(root, space_id)?;
+    // Fixed name — no user-controlled component.
+    Ok(dir.join("templates.json"))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateMeta {
+    id: String,
+    name: String,
+    created_at: i64,
+    updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplatesManifest {
+    version: u32,
+    templates: Vec<TemplateMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeTemplate {
+    pub id: String,
+    pub name: String,
+    pub body: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+fn load_templates_manifest(root: &Path, space_id: &str) -> Result<TemplatesManifest, String> {
+    let path = templates_manifest_path(root, space_id)?;
+    if !path.exists() {
+        return Ok(TemplatesManifest {
+            version: 1,
+            templates: vec![],
+        });
+    }
+    read_json_file(&path)
+}
+
+fn save_templates_manifest(
+    root: &Path,
+    space_id: &str,
+    manifest: &TemplatesManifest,
+) -> Result<(), String> {
+    let path = templates_manifest_path(root, space_id)?;
+    write_json_file(&path, manifest)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListTemplatesArgs {
+    pub space_id: String,
+}
+
+#[tauri::command]
+pub fn knowledge_list_templates(
+    app: AppHandle,
+    args: ListTemplatesArgs,
+) -> Result<Vec<KnowledgeTemplate>, String> {
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let manifest = load_templates_manifest(&root, &args.space_id)?;
+    let mut out = Vec::with_capacity(manifest.templates.len());
+    for meta in manifest.templates {
+        let body_path = template_body_path(&root, &args.space_id, &meta.id)?;
+        let body = if body_path.exists() {
+            fs::read_to_string(&body_path).map_err(|e| e.to_string())?
+        } else {
+            String::new()
+        };
+        out.push(KnowledgeTemplate {
+            id: meta.id,
+            name: meta.name,
+            body,
+            created_at: meta.created_at,
+            updated_at: meta.updated_at,
+        });
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveTemplateArgs {
+    pub space_id: String,
+    /// When set, update existing template; otherwise create.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub name: String,
+    pub body: String,
+}
+
+#[tauri::command]
+pub fn knowledge_save_template(
+    app: AppHandle,
+    args: SaveTemplateArgs,
+) -> Result<KnowledgeTemplate, String> {
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let name = args.name.trim();
+    if name.is_empty() {
+        return Err("template name is empty".into());
+    }
+    let mut manifest = load_templates_manifest(&root, &args.space_id)?;
+    let ts = now_ms();
+
+    let (id, created_at) = if let Some(ref existing) = args.id {
+        require_template_id(existing)?;
+        let pos = manifest
+            .templates
+            .iter()
+            .position(|t| t.id == *existing)
+            .ok_or_else(|| "template not found".to_string())?;
+        let created = manifest.templates[pos].created_at;
+        manifest.templates[pos].name = name.to_string();
+        manifest.templates[pos].updated_at = ts;
+        (existing.clone(), created)
+    } else {
+        let id = gen_id("tpl");
+        manifest.templates.push(TemplateMeta {
+            id: id.clone(),
+            name: name.to_string(),
+            created_at: ts,
+            updated_at: ts,
+        });
+        (id, ts)
+    };
+
+    let body_path = template_body_path(&root, &args.space_id, &id)?;
+    atomic_write_str(&body_path, &args.body)?;
+    save_templates_manifest(&root, &args.space_id, &manifest)?;
+
+    Ok(KnowledgeTemplate {
+        id,
+        name: name.to_string(),
+        body: args.body,
+        created_at,
+        updated_at: ts,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteTemplateArgs {
+    pub space_id: String,
+    pub id: String,
+}
+
+#[tauri::command]
+pub fn knowledge_delete_template(app: AppHandle, args: DeleteTemplateArgs) -> Result<(), String> {
+    require_template_id(&args.id)?;
+    let root = knowledge_root(&app)?;
+    let dir = space_dir(&root, &args.space_id)?;
+    if !dir.exists() {
+        return Err("space not found".into());
+    }
+    let mut manifest = load_templates_manifest(&root, &args.space_id)?;
+    let before = manifest.templates.len();
+    manifest.templates.retain(|t| t.id != args.id);
+    if manifest.templates.len() == before {
+        return Err("template not found".into());
+    }
+    // Manifest first, then body file (orphan body OK on crash).
+    save_templates_manifest(&root, &args.space_id, &manifest)?;
+    let body_path = template_body_path(&root, &args.space_id, &args.id)?;
+    if body_path.exists() {
+        let _ = fs::remove_file(&body_path);
+    }
+    Ok(())
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -968,5 +1187,78 @@ mod tests {
         assert!(doc_path(root, "bad", "doc_abc123def456").is_err());
         assert!(doc_path(root, "spc_oktoken1", "nod_notadoc1").is_err());
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn template_id_validation() {
+        assert!(!is_template_id(""));
+        assert!(!is_template_id("doc_abc123def456"));
+        assert!(!is_template_id("tpl_ab")); // too short
+        assert!(!is_template_id("tpl_../evil"));
+        assert!(!is_template_id("tpl_a/b"));
+        assert!(is_template_id("tpl_abc123def456"));
+        assert!(is_template_id("tpl_xYzAbCdEfGhI"));
+    }
+
+    #[test]
+    fn template_path_rejects_traversal() {
+        let root = Path::new("/tmp/kb");
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_../evil").is_err());
+        assert!(template_body_path(root, "bad", "tpl_abc123def456").is_err());
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn templates_roundtrip_list_save_delete() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_tplspace01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            write_json_file(
+                &dir.join("meta.json"),
+                &KnowledgeSpace {
+                    id: space_id.into(),
+                    name: "T".into(),
+                    icon: None,
+                    created_at: 1,
+                    updated_at: 1,
+                },
+            )
+            .unwrap();
+
+            // Empty list when no templates dir.
+            let empty = load_templates_manifest(&root, space_id).unwrap();
+            assert!(empty.templates.is_empty());
+
+            let id = "tpl_meetnotes01";
+            let mut manifest = TemplatesManifest {
+                version: 1,
+                templates: vec![TemplateMeta {
+                    id: id.into(),
+                    name: "Meeting".into(),
+                    created_at: 10,
+                    updated_at: 10,
+                }],
+            };
+            let body_path = template_body_path(&root, space_id, id).unwrap();
+            atomic_write_str(&body_path, "# Agenda\n").unwrap();
+            save_templates_manifest(&root, space_id, &manifest).unwrap();
+
+            let loaded = load_templates_manifest(&root, space_id).unwrap();
+            assert_eq!(loaded.templates.len(), 1);
+            assert_eq!(loaded.templates[0].name, "Meeting");
+            assert_eq!(fs::read_to_string(&body_path).unwrap(), "# Agenda\n");
+
+            // Delete from manifest + body.
+            manifest.templates.clear();
+            save_templates_manifest(&root, space_id, &manifest).unwrap();
+            let _ = fs::remove_file(&body_path);
+            assert!(!body_path.exists());
+            assert!(load_templates_manifest(&root, space_id)
+                .unwrap()
+                .templates
+                .is_empty());
+        });
     }
 }

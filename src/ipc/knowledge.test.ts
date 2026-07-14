@@ -28,4 +28,37 @@ describe('knowledge IPC', () => {
     expect(knowledgeErrorMessage(new Error('x'))).toBe('x')
     expect(knowledgeErrorMessage('y')).toBe('y')
   })
+
+  it('knowledgeListTemplates wraps spaceId', async () => {
+    const { knowledgeListTemplates } = await import('./knowledge.js')
+    invoke.mockResolvedValueOnce([])
+    await knowledgeListTemplates('spc_a')
+    expect(invoke).toHaveBeenCalledWith('knowledge_list_templates', {
+      args: { spaceId: 'spc_a' },
+    })
+  })
+
+  it('knowledgeSaveTemplate wraps create args', async () => {
+    const { knowledgeSaveTemplate } = await import('./knowledge.js')
+    invoke.mockResolvedValueOnce({
+      id: 'tpl_x',
+      name: 'M',
+      body: '# hi',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    await knowledgeSaveTemplate('spc_a', { name: 'M', body: '# hi' })
+    expect(invoke).toHaveBeenCalledWith('knowledge_save_template', {
+      args: { spaceId: 'spc_a', id: undefined, name: 'M', body: '# hi' },
+    })
+  })
+
+  it('knowledgeDeleteTemplate wraps ids', async () => {
+    const { knowledgeDeleteTemplate } = await import('./knowledge.js')
+    invoke.mockResolvedValueOnce(undefined)
+    await knowledgeDeleteTemplate('spc_a', 'tpl_x')
+    expect(invoke).toHaveBeenCalledWith('knowledge_delete_template', {
+      args: { spaceId: 'spc_a', id: 'tpl_x' },
+    })
+  })
 })

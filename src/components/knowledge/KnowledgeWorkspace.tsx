@@ -44,6 +44,7 @@ import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
+import { TemplatePickerModal } from './TemplatePickerModal'
 
 export function KnowledgeWorkspace() {
   const { t } = useTranslation()
@@ -57,7 +58,7 @@ export function KnowledgeWorkspace() {
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
-  const createDoc = useKnowledgeStore((s) => s.createDoc)
+  const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
   const renameSpace = useKnowledgeStore((s) => s.renameSpace)
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
@@ -68,6 +69,7 @@ export function KnowledgeWorkspace() {
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const saveDocAsTemplate = useKnowledgeStore((s) => s.saveDocAsTemplate)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
@@ -139,9 +141,15 @@ export function KnowledgeWorkspace() {
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false)
+  const [templateName, setTemplateName] = useState('')
 
   // Toolbar create: focused folder / sibling of focused|active doc / root.
   const parentForNew = resolveParentForNew({ treeFocusId, activeDocId, nodes })
+
+  const newDoc = (parentId: string | null) => {
+    void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
+  }
 
   const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
 
@@ -246,7 +254,7 @@ export function KnowledgeWorkspace() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   data-testid="knowledge-new-doc"
-                  onClick={() => void createDoc(parentForNew, t('knowledge.doc.untitled'))}
+                  onClick={() => newDoc(parentForNew)}
                 >
                   <FilePlus size={14} />
                   {t('knowledge.tree.newDoc')}
@@ -323,9 +331,7 @@ export function KnowledgeWorkspace() {
               setNodeTitle(node.title)
             }}
             onDelete={(node) => setNodeDelete(node)}
-            onNewDoc={(parentId) =>
-              void createDoc(parentId, t('knowledge.doc.untitled'))
-            }
+            onNewDoc={(parentId) => newDoc(parentId)}
             onNewFolder={(parentId) =>
               void createFolder(parentId, t('knowledge.folder.untitled'))
             }
@@ -441,6 +447,16 @@ export function KnowledgeWorkspace() {
                     <Download size={14} />
                     {t('knowledge.export.doc')}
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-save-as-template"
+                    onClick={() => {
+                      setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
+                      setSaveTemplateOpen(true)
+                    }}
+                  >
+                    <FilePlus size={14} />
+                    {t('knowledge.template.saveAs')}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
@@ -455,7 +471,7 @@ export function KnowledgeWorkspace() {
               className="w-full max-w-md border-0 py-16"
               action={{
                 label: t('knowledge.tree.newDoc'),
-                onClick: () => void createDoc(null, t('knowledge.doc.untitled')),
+                onClick: () => newDoc(null),
               }}
             />
           </div>
@@ -691,6 +707,59 @@ export function KnowledgeWorkspace() {
           </p>
         </div>
       </Modal>
+
+      <Modal
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        title={t('knowledge.template.saveAsTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-save-template-cancel"
+              onClick={() => setSaveTemplateOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-save-template-confirm"
+              disabled={!templateName.trim() || busy}
+              onClick={() => {
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            >
+              {t('common.confirm', { defaultValue: 'OK' })}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">
+              {t('knowledge.template.nameLabel')}
+            </span>
+            <Input
+              data-testid="knowledge-save-template-name"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder={t('knowledge.template.namePlaceholder')}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' || !templateName.trim()) return
+                e.preventDefault()
+                void saveDocAsTemplate(templateName).then((ok) => {
+                  if (ok) setSaveTemplateOpen(false)
+                })
+              }}
+            />
+          </label>
+        </div>
+      </Modal>
+
+      <TemplatePickerModal />
     </div>
   )
 }

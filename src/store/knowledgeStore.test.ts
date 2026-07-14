@@ -10,6 +10,9 @@ const knowledgeDeleteSpace = vi.fn()
 const knowledgeCreateSpace = vi.fn()
 const knowledgeUpdateSpace = vi.fn()
 const knowledgeSaveTree = vi.fn()
+const knowledgeListTemplates = vi.fn()
+const knowledgeSaveTemplate = vi.fn()
+const knowledgeDeleteTemplate = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeEnsureRoot: (...a: unknown[]) => knowledgeEnsureRoot(...a),
@@ -22,6 +25,9 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
   knowledgeDeleteDocFile: vi.fn(),
+  knowledgeListTemplates: (...a: unknown[]) => knowledgeListTemplates(...a),
+  knowledgeSaveTemplate: (...a: unknown[]) => knowledgeSaveTemplate(...a),
+  knowledgeDeleteTemplate: (...a: unknown[]) => knowledgeDeleteTemplate(...a),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
@@ -419,6 +425,157 @@ describe('knowledgeStore space name uniqueness', () => {
     expect(knowledgeUpdateSpace).toHaveBeenCalledWith('spc_1', {
       name: '产品',
       icon: undefined,
+    })
+  })
+})
+
+describe('knowledgeStore templates create flow (no orphans)', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeSaveTree.mockReset()
+    knowledgeReadDoc.mockReset()
+    knowledgeListTemplates.mockReset()
+    knowledgeSaveTemplate.mockReset()
+    knowledgeDeleteTemplate.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeSaveTree.mockResolvedValue(undefined)
+    knowledgeReadDoc.mockResolvedValue('')
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [],
+      activeDocId: null,
+      treeFocusId: null,
+      docBody: '',
+      draftBody: '',
+      editing: false,
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 0 },
+      recent: [],
+      expandedFolderIds: {},
+      templatePicker: null,
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('requestCreateDoc creates immediately when space has no templates', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([])
+    await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
+    expect(knowledgeWriteDoc).toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(useKnowledgeStore.getState().nodes).toHaveLength(1)
+  })
+
+  it('requestCreateDoc opens picker without writing when templates exist', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([
+      {
+        id: 'tpl_meetnotes01',
+        name: 'Meeting',
+        body: '# Agenda\n',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ])
+    await useKnowledgeStore.getState().requestCreateDoc('nod_parent01', 'Untitled')
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(knowledgeSaveTree).not.toHaveBeenCalled()
+    const picker = useKnowledgeStore.getState().templatePicker
+    expect(picker?.parentId).toBe('nod_parent01')
+    expect(picker?.templates).toHaveLength(1)
+  })
+
+  it('cancelTemplateCreate leaves no doc', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([
+      {
+        id: 'tpl_meetnotes01',
+        name: 'Meeting',
+        body: '# Agenda\n',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ])
+    await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
+    useKnowledgeStore.getState().cancelTemplateCreate()
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(knowledgeWriteDoc).not.toHaveBeenCalled()
+    expect(useKnowledgeStore.getState().nodes).toHaveLength(0)
+  })
+
+  it('confirmTemplateCreate with template writes body then opens', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([
+      {
+        id: 'tpl_meetnotes01',
+        name: 'Meeting',
+        body: '# Agenda\n',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ])
+    knowledgeReadDoc.mockResolvedValueOnce('# Agenda\n')
+    await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
+    await useKnowledgeStore.getState().confirmTemplateCreate('tpl_meetnotes01')
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith(
+      'spc_1',
+      expect.stringMatching(/^doc_/),
+      '# Agenda\n',
+    )
+    expect(useKnowledgeStore.getState().templatePicker).toBeNull()
+    expect(useKnowledgeStore.getState().nodes).toHaveLength(1)
+  })
+
+  it('confirmTemplateCreate with null uses empty body', async () => {
+    knowledgeListTemplates.mockResolvedValueOnce([
+      {
+        id: 'tpl_meetnotes01',
+        name: 'Meeting',
+        body: '# Agenda\n',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ])
+    await useKnowledgeStore.getState().requestCreateDoc(null, 'Untitled')
+    await useKnowledgeStore.getState().confirmTemplateCreate(null)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith(
+      'spc_1',
+      expect.stringMatching(/^doc_/),
+      '',
+    )
+  })
+
+  it('saveDocAsTemplate writes current draft', async () => {
+    useKnowledgeStore.setState({
+      activeDocId: 'doc_1',
+      draftBody: '## Notes\n',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    })
+    knowledgeSaveTemplate.mockResolvedValueOnce({
+      id: 'tpl_newtemplate1',
+      name: 'Notes',
+      body: '## Notes\n',
+      createdAt: 2,
+      updatedAt: 2,
+    })
+    const ok = await useKnowledgeStore.getState().saveDocAsTemplate('Notes')
+    expect(ok).toBe(true)
+    expect(knowledgeSaveTemplate).toHaveBeenCalledWith('spc_1', {
+      name: 'Notes',
+      body: '## Notes\n',
     })
   })
 })

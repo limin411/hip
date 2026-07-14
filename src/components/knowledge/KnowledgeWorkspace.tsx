@@ -8,6 +8,7 @@ import {
   FilePlus,
   FileText,
   FolderPlus,
+  History,
   MoreHorizontal,
   Plus,
   Search,
@@ -16,7 +17,9 @@ import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
-import type { KnowledgeNode } from '@/domain/knowledge/types'
+import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
+import type { KnowledgeNode, KnowledgeVersionEntry } from '@/domain/knowledge/types'
+import { formatAbsolute } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -45,7 +48,7 @@ import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 
 export function KnowledgeWorkspace() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const nodes = useKnowledgeStore((s) => s.nodes)
@@ -66,6 +69,9 @@ export function KnowledgeWorkspace() {
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
   const openDoc = useKnowledgeStore((s) => s.openDoc)
+  const saveVersionManual = useKnowledgeStore((s) => s.saveVersionManual)
+  const listVersions = useKnowledgeStore((s) => s.listVersions)
+  const restoreVersion = useKnowledgeStore((s) => s.restoreVersion)
 
   const space = spaces.find((s) => s.id === activeSpaceId)
   const activeNode = nodes.find((n) => n.id === activeDocId)
@@ -130,6 +136,39 @@ export function KnowledgeWorkspace() {
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [versions, setVersions] = useState<KnowledgeVersionEntry[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [restoreTarget, setRestoreTarget] = useState<KnowledgeVersionEntry | null>(null)
+
+  const openVersionHistory = async () => {
+    if (!activeDocId) return
+    setVersionsOpen(true)
+    setVersionsLoading(true)
+    try {
+      const list = await listVersions(activeDocId)
+      setVersions(list)
+    } finally {
+      setVersionsLoading(false)
+    }
+  }
+
+  const onSaveVersion = async () => {
+    const entry = await saveVersionManual()
+    if (entry && versionsOpen) {
+      const list = await listVersions()
+      setVersions(list)
+    }
+  }
+
+  const onConfirmRestore = async () => {
+    if (!restoreTarget) return
+    const ok = await restoreVersion(restoreTarget.id)
+    if (ok) {
+      setRestoreTarget(null)
+      setVersionsOpen(false)
+    }
+  }
 
   // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
   const parentForNew: string | null = activeNode?.parentId ?? null
@@ -426,6 +465,21 @@ export function KnowledgeWorkspace() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
+                    data-testid="knowledge-save-version"
+                    onClick={() => void onSaveVersion()}
+                  >
+                    <History size={14} />
+                    {t('knowledge.versions.menuSave')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="knowledge-version-history"
+                    onClick={() => void openVersionHistory()}
+                  >
+                    <History size={14} />
+                    {t('knowledge.versions.menuHistory')}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
                     data-testid="knowledge-export-doc"
                     onClick={() => void exportActiveDoc()}
                   >
@@ -679,6 +733,103 @@ export function KnowledgeWorkspace() {
             {nodeDelete?.kind === 'folder'
               ? t('knowledge.tree.deleteFolderBody')
               : t('knowledge.tree.deleteDocBody')}
+          </p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={versionsOpen}
+        onOpenChange={setVersionsOpen}
+        title={t('knowledge.versions.title')}
+        className="max-w-md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-versions-close"
+              onClick={() => setVersionsOpen(false)}
+            >
+              {t('common.close')}
+            </Button>
+            <Button data-testid="knowledge-versions-save" onClick={() => void onSaveVersion()}>
+              {t('knowledge.versions.menuSave')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-2 px-5 py-4" data-testid="knowledge-versions-list">
+          {versionsLoading ? (
+            <p className="text-meta text-ink-tertiary">{t('knowledge.doc.saving')}</p>
+          ) : versions.length === 0 ? (
+            <p className="text-body text-ink-secondary">{t('knowledge.versions.empty')}</p>
+          ) : (
+            versions.map((v) => {
+              const large = v.byteLength > KNOWLEDGE_LARGE_DOC_CHARS
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                  data-testid="knowledge-version-row"
+                  data-version-id={v.id}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-body font-medium text-ink">
+                      {formatAbsolute(v.createdAt, i18n.language)}
+                    </div>
+                    <div className="text-meta text-ink-tertiary">
+                      {v.kind === 'daily'
+                        ? t('knowledge.versions.kindDaily')
+                        : t('knowledge.versions.kindManual')}
+                      {large
+                        ? ` · ${t('knowledge.versions.largeHint', {
+                            kb: Math.round(v.byteLength / 1024),
+                          })}`
+                        : null}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    data-testid="knowledge-version-restore"
+                    onClick={() => setRestoreTarget(v)}
+                  >
+                    {t('knowledge.versions.restore')}
+                  </Button>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={restoreTarget != null}
+        onOpenChange={(o) => {
+          if (!o) setRestoreTarget(null)
+        }}
+        title={t('knowledge.versions.restoreTitle')}
+        className="max-w-sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              data-testid="knowledge-version-restore-cancel"
+              onClick={() => setRestoreTarget(null)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              data-testid="knowledge-version-restore-confirm"
+              onClick={() => void onConfirmRestore()}
+            >
+              {t('knowledge.versions.restoreConfirm')}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-5 py-4">
+          <p className="text-body leading-relaxed text-ink-secondary">
+            {t('knowledge.versions.restoreBody')}
           </p>
         </div>
       </Modal>

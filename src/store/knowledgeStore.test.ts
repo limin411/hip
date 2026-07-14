@@ -9,6 +9,9 @@ const knowledgeListSpaces = vi.fn()
 const knowledgeDeleteSpace = vi.fn()
 const knowledgeCreateSpace = vi.fn()
 const knowledgeUpdateSpace = vi.fn()
+const knowledgeSaveVersion = vi.fn()
+const knowledgeListVersions = vi.fn()
+const knowledgeRestoreVersion = vi.fn()
 
 vi.mock('@/ipc/knowledge', () => ({
   knowledgeEnsureRoot: (...a: unknown[]) => knowledgeEnsureRoot(...a),
@@ -21,6 +24,9 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
   knowledgeWriteDoc: (...a: unknown[]) => knowledgeWriteDoc(...a),
   knowledgeDeleteDocFile: vi.fn(),
+  knowledgeSaveVersion: (...a: unknown[]) => knowledgeSaveVersion(...a),
+  knowledgeListVersions: (...a: unknown[]) => knowledgeListVersions(...a),
+  knowledgeRestoreVersion: (...a: unknown[]) => knowledgeRestoreVersion(...a),
   knowledgeErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }))
 
@@ -479,6 +485,121 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(useKnowledgeStore.getState().draftBody).toBe('b')
     expect(useKnowledgeStore.getState().docBody).toBe('saved')
+  })
+})
+
+describe('knowledgeStore version snapshots', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    knowledgeSaveVersion.mockReset()
+    knowledgeSaveVersion.mockResolvedValue({
+      id: 'v1',
+      file: 'v1.md',
+      createdAt: 1,
+      kind: 'daily',
+      dayKey: '2026-07-14',
+      byteLength: 5,
+    })
+    knowledgeListVersions.mockReset()
+    knowledgeRestoreVersion.mockReset()
+    vi.mocked(toast.success).mockClear()
+    vi.mocked(toast.error).mockClear()
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      docBody: 'saved',
+      draftBody: 'dirty',
+      editing: true,
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('flushSave enqueues daily snapshot after successful write', async () => {
+    await useKnowledgeStore.getState().flushSave()
+    // Daily snapshot is chained after the write on saveChain — drain it.
+    await useKnowledgeStore.getState().flushSave()
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
+    expect(knowledgeSaveVersion).toHaveBeenCalled()
+    const call = knowledgeSaveVersion.mock.calls[0]
+    expect(call[0]).toBe('spc_1')
+    expect(call[1]).toBe('doc_1')
+    expect(call[2]).toBe('daily')
+    expect(typeof call[3]).toBe('string')
+    expect(call[3]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('does not daily-snapshot when write fails', async () => {
+    knowledgeWriteDoc.mockRejectedValue(new Error('disk full'))
+    const ok = await useKnowledgeStore.getState().flushSave()
+    expect(ok).toBe(false)
+    // Allow any chained microtasks from saveChain to settle.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(knowledgeSaveVersion).not.toHaveBeenCalled()
+  })
+
+  it('saveVersionManual flushes then creates manual snapshot', async () => {
+    knowledgeSaveVersion.mockResolvedValueOnce({
+      id: 'm1',
+      file: 'm1.md',
+      createdAt: 2,
+      kind: 'manual',
+      byteLength: 5,
+    })
+    const entry = await useKnowledgeStore.getState().saveVersionManual()
+    expect(entry?.kind).toBe('manual')
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
+    expect(knowledgeSaveVersion).toHaveBeenCalledWith('spc_1', 'doc_1', 'manual')
+    expect(toast.success).toHaveBeenCalled()
+  })
+
+  it('restoreVersion writes body into active buffer', async () => {
+    useKnowledgeStore.setState({ draftBody: 'saved', docBody: 'saved' })
+    knowledgeRestoreVersion.mockResolvedValueOnce('# restored')
+    const ok = await useKnowledgeStore.getState().restoreVersion('v1')
+    expect(ok).toBe(true)
+    expect(knowledgeRestoreVersion).toHaveBeenCalledWith('spc_1', 'doc_1', 'v1')
+    const s = useKnowledgeStore.getState()
+    expect(s.docBody).toBe('# restored')
+    expect(s.draftBody).toBe('# restored')
+  })
+
+  it('listVersions proxies IPC', async () => {
+    knowledgeListVersions.mockResolvedValueOnce([
+      {
+        id: 'v1',
+        file: 'v1.md',
+        createdAt: 1,
+        kind: 'manual',
+        byteLength: 1,
+      },
+    ])
+    const list = await useKnowledgeStore.getState().listVersions()
+    expect(list).toHaveLength(1)
+    expect(knowledgeListVersions).toHaveBeenCalledWith('spc_1', 'doc_1')
   })
 })
 

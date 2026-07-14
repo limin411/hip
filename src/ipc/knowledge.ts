@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { KnowledgeSpace, KnowledgeTreeFile } from '@/domain/knowledge/types'
+import type {
+  KnowledgeSpace,
+  KnowledgeTreeFile,
+  KnowledgeVersionEntry,
+  KnowledgeVersionKind,
+} from '@/domain/knowledge/types'
 
 export function knowledgeErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
@@ -74,4 +79,45 @@ export async function knowledgeImportFolder(
 
 export async function knowledgeRevealDoc(spaceId: string, docId: string): Promise<void> {
   await invoke('knowledge_reveal_doc', { args: { spaceId, docId } })
+}
+
+export async function knowledgeSaveVersion(
+  spaceId: string,
+  docId: string,
+  kind: KnowledgeVersionKind,
+  dayKey?: string,
+): Promise<KnowledgeVersionEntry | null> {
+  return invoke<KnowledgeVersionEntry | null>('knowledge_save_version', {
+    args: { spaceId, docId, kind, dayKey },
+  })
+}
+
+export async function knowledgeListVersions(
+  spaceId: string,
+  docId: string,
+): Promise<KnowledgeVersionEntry[]> {
+  return invoke<KnowledgeVersionEntry[]>('knowledge_list_versions', {
+    args: { spaceId, docId },
+  })
+}
+
+export async function knowledgeReadVersion(
+  spaceId: string,
+  docId: string,
+  versionId: string,
+): Promise<string> {
+  return invoke<string>('knowledge_read_version', {
+    args: { spaceId, docId, versionId },
+  })
+}
+
+/** Atomically restores snapshot into the live doc; returns restored body. */
+export async function knowledgeRestoreVersion(
+  spaceId: string,
+  docId: string,
+  versionId: string,
+): Promise<string> {
+  return invoke<string>('knowledge_restore_version', {
+    args: { spaceId, docId, versionId },
+  })
 }

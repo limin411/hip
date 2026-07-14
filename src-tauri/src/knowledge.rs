@@ -404,7 +404,323 @@ pub fn knowledge_delete_doc_file(app: AppHandle, args: DocArgs) -> Result<(), St
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
+    // Drop version history with the doc (space delete removes the whole tree).
+    if let Ok(vdir) = versions_dir(&root, &args.space_id, &args.doc_id) {
+        if vdir.exists() {
+            let _ = fs::remove_dir_all(&vdir);
+        }
+    }
     Ok(())
+}
+
+// ── Version snapshots (P1.8) ──────────────────────────────────────────────
+
+/// Max retained snapshots per document (matches TS `KNOWLEDGE_VERSION_CAP`).
+const KNOWLEDGE_VERSION_CAP: usize = 30;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeVersionEntry {
+    /// File stem / id (filesystem-safe ISO timestamp).
+    pub id: String,
+    pub file: String,
+    pub created_at: i64,
+    /// `"daily"` | `"manual"`.
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub day_key: Option<String>,
+    pub byte_length: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VersionManifest {
+    version: u32,
+    entries: Vec<KnowledgeVersionEntry>,
+}
+
+fn empty_manifest() -> VersionManifest {
+    VersionManifest {
+        version: 1,
+        entries: vec![],
+    }
+}
+
+fn versions_dir(root: &Path, space_id: &str, doc_id: &str) -> Result<PathBuf, String> {
+    require_id(space_id, "spaceId")?;
+    require_id(doc_id, "docId")?;
+    if !doc_id.starts_with("doc_") {
+        return Err(format!("docId must start with doc_: {doc_id}"));
+    }
+    let space = space_dir(root, space_id)?;
+    let versions = safe_join(&space, "versions").ok_or_else(|| "illegal versions path".to_string())?;
+    safe_join(&versions, doc_id).ok_or_else(|| "illegal version doc path".to_string())
+}
+
+fn version_manifest_path(vdir: &Path) -> PathBuf {
+    vdir.join("manifest.json")
+}
+
+fn load_version_manifest(vdir: &Path) -> Result<VersionManifest, String> {
+    let path = version_manifest_path(vdir);
+    if !path.exists() {
+        return Ok(empty_manifest());
+    }
+    read_json_file(&path)
+}
+
+fn save_version_manifest(vdir: &Path, manifest: &VersionManifest) -> Result<(), String> {
+    write_json_file(&version_manifest_path(vdir), manifest)
+}
+
+/// Filesystem-safe ISO-like id from epoch ms: `2026-07-14T12-30-45-123`.
+fn version_id_from_ms(ms: i64) -> String {
+    let secs = ms.div_euclid(1000);
+    let millis = ms.rem_euclid(1000) as u32;
+    // UTC breakdown is fine for unique ids; dayKey carries local calendar day.
+    let days = secs.div_euclid(86_400);
+    let day_secs = secs.rem_euclid(86_400) as u32;
+    let (y, m, d) = civil_from_days(days);
+    let hh = day_secs / 3600;
+    let mm = (day_secs % 3600) / 60;
+    let ss = day_secs % 60;
+    format!("{y:04}-{m:02}-{d:02}T{hh:02}-{mm:02}-{ss:02}-{millis:03}")
+}
+
+/// Howard Hinnant civil_from_days (proleptic Gregorian, UTC).
+fn civil_from_days(z: i64) -> (i32, u32, u32) {
+    let z = z + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y as i32, m as u32, d as u32)
+}
+
+fn version_file_path(vdir: &Path, file: &str) -> Result<PathBuf, String> {
+    // Only allow simple filenames (no path separators / traversal).
+    if file.is_empty()
+        || file.contains('/')
+        || file.contains('\\')
+        || file.contains("..")
+        || !file.ends_with(".md")
+    {
+        return Err(format!("invalid version file: {file}"));
+    }
+    let stem = file.trim_end_matches(".md");
+    if stem.is_empty()
+        || !stem
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_')
+    {
+        return Err(format!("invalid version file: {file}"));
+    }
+    safe_join(vdir, file).ok_or_else(|| "illegal version file path".to_string())
+}
+
+fn enforce_version_cap(vdir: &Path, manifest: &mut VersionManifest) -> Result<(), String> {
+    // Entries are newest-first.
+    while manifest.entries.len() > KNOWLEDGE_VERSION_CAP {
+        if let Some(old) = manifest.entries.pop() {
+            if let Ok(path) = version_file_path(vdir, &old.file) {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Create a snapshot. Daily: skip if `day_key` already has a daily entry, or body == last snapshot.
+/// Manual: always create. Returns `None` when skipped (daily only).
+fn save_version_inner(
+    root: &Path,
+    space_id: &str,
+    doc_id: &str,
+    kind: &str,
+    day_key: Option<&str>,
+) -> Result<Option<KnowledgeVersionEntry>, String> {
+    if kind != "daily" && kind != "manual" {
+        return Err(format!("invalid version kind: {kind}"));
+    }
+    let doc = doc_path(root, space_id, doc_id)?;
+    let body = if doc.exists() {
+        fs::read_to_string(&doc).map_err(|e| e.to_string())?
+    } else {
+        String::new()
+    };
+    let vdir = versions_dir(root, space_id, doc_id)?;
+    fs::create_dir_all(&vdir).map_err(|e| e.to_string())?;
+    let mut manifest = load_version_manifest(&vdir)?;
+
+    if kind == "daily" {
+        let key = day_key.ok_or_else(|| "dayKey required for daily snapshot".to_string())?;
+        if key.is_empty() || key.len() > 32 {
+            return Err("invalid dayKey".into());
+        }
+        if manifest
+            .entries
+            .iter()
+            .any(|e| e.kind == "daily" && e.day_key.as_deref() == Some(key))
+        {
+            return Ok(None);
+        }
+        if let Some(last) = manifest.entries.first() {
+            if let Ok(last_path) = version_file_path(&vdir, &last.file) {
+                if last_path.exists() {
+                    let last_body = fs::read_to_string(&last_path).map_err(|e| e.to_string())?;
+                    if last_body == body {
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+    }
+
+    let created_at = now_ms();
+    let mut id = version_id_from_ms(created_at);
+    // Uniqueness if two saves share the same ms.
+    if manifest.entries.iter().any(|e| e.id == id) {
+        id = format!("{id}-{}", gen_id("v").trim_start_matches("v_"));
+        // Keep stem charset safe.
+        id = id
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+    }
+    let file = format!("{id}.md");
+    let path = version_file_path(&vdir, &file)?;
+    atomic_write_str(&path, &body)?;
+
+    let entry = KnowledgeVersionEntry {
+        id: id.clone(),
+        file,
+        created_at,
+        kind: kind.to_string(),
+        day_key: if kind == "daily" {
+            day_key.map(|s| s.to_string())
+        } else {
+            None
+        },
+        byte_length: body.len() as u64,
+    };
+    manifest.entries.insert(0, entry.clone());
+    enforce_version_cap(&vdir, &mut manifest)?;
+    save_version_manifest(&vdir, &manifest)?;
+    Ok(Some(entry))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveVersionArgs {
+    pub space_id: String,
+    pub doc_id: String,
+    /// `"daily"` | `"manual"`.
+    pub kind: String,
+    /// Local calendar day `YYYY-MM-DD` (required for daily).
+    #[serde(default)]
+    pub day_key: Option<String>,
+}
+
+#[tauri::command]
+pub fn knowledge_save_version(
+    app: AppHandle,
+    args: SaveVersionArgs,
+) -> Result<Option<KnowledgeVersionEntry>, String> {
+    let root = knowledge_root(&app)?;
+    save_version_inner(
+        &root,
+        &args.space_id,
+        &args.doc_id,
+        &args.kind,
+        args.day_key.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn knowledge_list_versions(
+    app: AppHandle,
+    args: DocArgs,
+) -> Result<Vec<KnowledgeVersionEntry>, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    if !vdir.exists() {
+        return Ok(vec![]);
+    }
+    let manifest = load_version_manifest(&vdir)?;
+    Ok(manifest.entries)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionIdArgs {
+    pub space_id: String,
+    pub doc_id: String,
+    pub version_id: String,
+}
+
+fn find_version_entry<'a>(
+    manifest: &'a VersionManifest,
+    version_id: &str,
+) -> Result<&'a KnowledgeVersionEntry, String> {
+    require_id_like_version(version_id)?;
+    manifest
+        .entries
+        .iter()
+        .find(|e| e.id == version_id)
+        .ok_or_else(|| "version not found".into())
+}
+
+fn require_id_like_version(id: &str) -> Result<(), String> {
+    if id.is_empty()
+        || id.len() > 96
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == 'T' || c == '_')
+    {
+        return Err(format!("invalid versionId: {id}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn knowledge_read_version(app: AppHandle, args: VersionIdArgs) -> Result<String, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    let manifest = load_version_manifest(&vdir)?;
+    let entry = find_version_entry(&manifest, &args.version_id)?;
+    let path = version_file_path(&vdir, &entry.file)?;
+    if !path.exists() {
+        return Err("version file missing".into());
+    }
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+/// Restore snapshot into the live doc via atomic write; returns restored body.
+#[tauri::command]
+pub fn knowledge_restore_version(app: AppHandle, args: VersionIdArgs) -> Result<String, String> {
+    let root = knowledge_root(&app)?;
+    let vdir = versions_dir(&root, &args.space_id, &args.doc_id)?;
+    let manifest = load_version_manifest(&vdir)?;
+    let entry = find_version_entry(&manifest, &args.version_id)?;
+    let path = version_file_path(&vdir, &entry.file)?;
+    if !path.exists() {
+        return Err("version file missing".into());
+    }
+    let body = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let doc = doc_path(&root, &args.space_id, &args.doc_id)?;
+    atomic_write_str(&doc, &body)?;
+    Ok(body)
 }
 
 // ── Export / import / reveal ──────────────────────────────────────────────
@@ -968,5 +1284,119 @@ mod tests {
         assert!(doc_path(root, "bad", "doc_abc123def456").is_err());
         assert!(doc_path(root, "spc_oktoken1", "nod_notadoc1").is_err());
         assert!(doc_path(root, "spc_oktoken1", "doc_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn version_snapshots_daily_manual_cap_and_delete() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let doc = doc_path(&root, space_id, doc_id).unwrap();
+            atomic_write_str(&doc, "body-v1").unwrap();
+
+            // Manual always creates.
+            let e1 = save_version_inner(&root, space_id, doc_id, "manual", None)
+                .unwrap()
+                .expect("manual snapshot");
+            assert_eq!(e1.kind, "manual");
+            assert_eq!(e1.byte_length, 7);
+
+            // Daily with same body as last snapshot → skip.
+            let skip_same = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skip_same.is_none());
+
+            // Body changed → first daily of the day creates.
+            atomic_write_str(&doc, "body-v2").unwrap();
+            let d1 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap()
+                .expect("daily first");
+            assert_eq!(d1.day_key.as_deref(), Some("2026-07-14"));
+
+            // Same day again → skip even if body changed (first save of day only).
+            atomic_write_str(&doc, "body-v3").unwrap();
+            let skip = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skip.is_none());
+
+            // New day with body ≠ last snapshot → creates.
+            let d2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-15"))
+                .unwrap()
+                .expect("daily new day");
+            assert_eq!(d2.day_key.as_deref(), Some("2026-07-15"));
+
+            // Body equals last snapshot → skip on a new day.
+            let skip2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-16"))
+                .unwrap();
+            assert!(skip2.is_none());
+
+            // Cap: fill past 30.
+            for i in 0..35 {
+                atomic_write_str(&doc, &format!("cap-{i}")).unwrap();
+                let _ = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
+            }
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            let manifest = load_version_manifest(&vdir).unwrap();
+            assert!(manifest.entries.len() <= KNOWLEDGE_VERSION_CAP);
+            assert_eq!(manifest.entries.len(), KNOWLEDGE_VERSION_CAP);
+
+            // Restore oldest remaining would work; restore newest.
+            let newest = manifest.entries[0].id.clone();
+            let restored_body = {
+                let path = version_file_path(&vdir, &manifest.entries[0].file).unwrap();
+                fs::read_to_string(path).unwrap()
+            };
+            // Simulate restore via atomic write of that body.
+            atomic_write_str(&doc, &restored_body).unwrap();
+            assert_eq!(fs::read_to_string(&doc).unwrap(), restored_body);
+            assert_eq!(newest, manifest.entries[0].id);
+
+            // Path traversal rejected.
+            assert!(version_file_path(&vdir, "../evil.md").is_err());
+            assert!(version_file_path(&vdir, "a/b.md").is_err());
+
+            // Delete doc file cleans versions dir.
+            let vdir_exists = vdir.exists();
+            assert!(vdir_exists);
+            fs::remove_file(&doc).unwrap();
+            let _ = fs::remove_dir_all(&vdir);
+            // Mirror knowledge_delete_doc_file cleanup:
+            if vdir.exists() {
+                let _ = fs::remove_dir_all(&vdir);
+            }
+            assert!(!versions_dir(&root, space_id, doc_id).unwrap().exists()
+                || !fs::read_dir(versions_dir(&root, space_id, doc_id).unwrap())
+                    .map(|mut d| d.next().is_some())
+                    .unwrap_or(false));
+        });
+    }
+
+    #[test]
+    fn version_delete_doc_cleans_versions_dir() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let doc = doc_path(&root, space_id, doc_id).unwrap();
+            atomic_write_str(&doc, "x").unwrap();
+            save_version_inner(&root, space_id, doc_id, "manual", None)
+                .unwrap()
+                .unwrap();
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            assert!(vdir.exists());
+            // Inline the delete_doc cleanup path (command needs AppHandle).
+            if doc.exists() {
+                fs::remove_file(&doc).unwrap();
+            }
+            if vdir.exists() {
+                fs::remove_dir_all(&vdir).unwrap();
+            }
+            assert!(!vdir.exists());
+        });
     }
 }

@@ -35,3 +35,14 @@ export interface KnowledgeRecentItem {
   spaceName: string
   at: number
 }
+
+export type KnowledgeVersionKind = 'daily' | 'manual'
+
+export interface KnowledgeVersionEntry {
+  id: string
+  file: string
+  createdAt: number
+  kind: KnowledgeVersionKind | string
+  dayKey?: string
+  byteLength: number
+}

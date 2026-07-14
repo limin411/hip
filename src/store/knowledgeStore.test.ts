@@ -103,8 +103,7 @@ describe('knowledgeStore openDoc editorMode default', () => {
     })
   })
 
-  it('openDoc sets editorMode source when live flag explicitly off', async () => {
-    localStorage.setItem('hip-knowledge-live', 'false')
+  it('openDoc sets editorMode source with body (live flag off by default)', async () => {
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     const s = useKnowledgeStore.getState()
@@ -115,14 +114,15 @@ describe('knowledgeStore openDoc editorMode default', () => {
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
   })
 
-  it('openDoc sets editorMode live by default (flag on, no pref)', async () => {
-    // PR-17: key absent ⇒ live enabled; no editor-mode pref ⇒ live
+  it('openDoc sets editorMode live when flag on and no pref', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
-  it('openDoc forces source when live on but body is large', async () => {
+  it('openDoc forces source when live flag on but body is large', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'y'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10)
     knowledgeReadDoc.mockResolvedValueOnce(big)
@@ -597,18 +597,19 @@ describe('knowledgeStore setEditorMode', () => {
   })
 
   it('clamps live to source when flag is off', async () => {
-    localStorage.setItem('hip-knowledge-live', 'false')
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
-  it('allows live when flag is on (default)', async () => {
+  it('allows live when flag is on', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
     expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
   })
 
   it('live ↔ source keeps dirty draft (no silent reseed)', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
     vi.useFakeTimers()
     useKnowledgeStore.setState({
       editorMode: 'source',
@@ -629,6 +630,7 @@ describe('knowledgeStore setEditorMode', () => {
   })
 
   it('setEditorMode live clamps to source when body exceeds large-doc threshold', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'x'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 1)
     useKnowledgeStore.setState({

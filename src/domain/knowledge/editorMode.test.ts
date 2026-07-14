@@ -27,46 +27,43 @@ describe('live flag + editor mode pref', () => {
     localStorage.removeItem(KNOWLEDGE_EDITOR_MODE_PREF_KEY)
   })
 
-  it('isKnowledgeLiveEnabled defaults true when key absent (PR-17 ship gate)', () => {
-    expect(isKnowledgeLiveEnabled()).toBe(true)
+  it('isKnowledgeLiveEnabled defaults false when key absent (e2e gate not closed)', () => {
+    expect(isKnowledgeLiveEnabled()).toBe(false)
   })
 
-  it('isKnowledgeLiveEnabled respects explicit false', () => {
+  it('isKnowledgeLiveEnabled true only when flag is exact "true"', () => {
+    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
+    expect(isKnowledgeLiveEnabled()).toBe(true)
+    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, '1')
+    expect(isKnowledgeLiveEnabled()).toBe(false)
     localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'false')
     expect(isKnowledgeLiveEnabled()).toBe(false)
   })
 
-  it('isKnowledgeLiveEnabled true for true and other non-false values', () => {
-    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
-    expect(isKnowledgeLiveEnabled()).toBe(true)
-    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, '1')
-    expect(isKnowledgeLiveEnabled()).toBe(true)
-  })
-
   it('loadEditorModePref is source when flag off', () => {
-    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'false')
     localStorage.setItem(KNOWLEDGE_EDITOR_MODE_PREF_KEY, 'live')
     expect(loadEditorModePref()).toBe('source')
   })
 
   it('loadEditorModePref defaults live when flag on and no pref', () => {
-    // default flag on (key absent)
+    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
     expect(loadEditorModePref()).toBe('live')
   })
 
   it('loadEditorModePref respects stored source when flag on', () => {
+    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
     persistEditorModePref('source')
     expect(loadEditorModePref()).toBe('source')
   })
 
   it('resolveEditorMode clamps live → source when flag off', () => {
-    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'false')
     expect(resolveEditorMode('live')).toBe('source')
     expect(resolveEditorMode('source')).toBe('source')
     expect(resolveEditorMode('preview')).toBe('preview')
   })
 
   it('resolveEditorMode keeps live when flag on', () => {
+    localStorage.setItem(KNOWLEDGE_LIVE_FLAG_KEY, 'true')
     expect(resolveEditorMode('live')).toBe('live')
   })
 })

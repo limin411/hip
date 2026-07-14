@@ -6,8 +6,8 @@ export type WritableEditorMode = 'live' | 'source'
 
 /**
  * localStorage: Live editor feature flag.
- * After PR-17 quality gate: default **on** when key is absent (new users).
- * Explicit `false` is respected; only the string `"false"` disables.
+ * Default **off** until full PR-17 quality gate (unit + e2e Source/Live smoke +
+ * portable zip image round-trip). Opt-in: `localStorage.hip-knowledge-live=true`.
  */
 export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 
@@ -21,18 +21,16 @@ export function shouldAutosave(mode: EditorMode): boolean {
 
 /**
  * Whether Live mode is enabled via localStorage flag.
- * - Key absent → true (ship-gate default for new prefs)
- * - `"false"` → false (user opt-out respected)
- * - any other stored value → true
+ * - Key absent / missing storage → false (default off; e2e gate not closed)
+ * - Exact `"true"` → true (explicit opt-in)
+ * - Any other value (incl. `"false"`) → false
  */
 export function isKnowledgeLiveEnabled(): boolean {
-  if (typeof localStorage === 'undefined') return true
+  if (typeof localStorage === 'undefined') return false
   try {
-    const v = localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY)
-    if (v === null) return true
-    return v !== 'false'
+    return localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY) === 'true'
   } catch {
-    return true
+    return false
   }
 }
 

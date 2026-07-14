@@ -567,5 +567,26 @@ describe('knowledgeStore setEditorMode', () => {
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
     expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
   })
+
+  it('live ↔ source keeps dirty draft (no silent reseed)', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
+    vi.useFakeTimers()
+    useKnowledgeStore.setState({
+      editorMode: 'source',
+      docBody: 'saved',
+      draftBody: 'dirty-in-source',
+    })
+    // Pending autosave window — mode switch must not discard draft.
+    useKnowledgeStore.getState().setDraftBody('dirty-in-source')
+    await useKnowledgeStore.getState().setEditorMode('live')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
+    expect(useKnowledgeStore.getState().draftBody).toBe('dirty-in-source')
+    expect(useKnowledgeStore.getState().docBody).toBe('saved')
+    // Autosave still lands after switch.
+    await vi.advanceTimersByTimeAsync(500)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty-in-source')
+    expect(useKnowledgeStore.getState().docBody).toBe('dirty-in-source')
+    vi.useRealTimers()
+  })
 })
 

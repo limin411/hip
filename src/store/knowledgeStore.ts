@@ -654,8 +654,13 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       set({ editorMode: 'preview' })
       return
     }
-    // Entering live or source: reseed draft from last-saved body (like leaving preview).
-    set({ editorMode: next, draftBody: get().docBody })
+    // Leaving preview: reseed from last-saved body (preview uses docBody; task writes flush first).
+    // live ↔ source: keep dirty draft — do not drop in-flight edits within the autosave window.
+    if (get().editorMode === 'preview') {
+      set({ editorMode: next, draftBody: get().docBody })
+    } else {
+      set({ editorMode: next })
+    }
     persistEditorModePref(next)
   },
 

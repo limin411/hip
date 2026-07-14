@@ -18,6 +18,7 @@ import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   isKnowledgeLiveEnabled,
+  loadEditorModePref,
   type EditorMode,
 } from '@/domain/knowledge/editorMode'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
@@ -505,7 +506,7 @@ export function KnowledgeWorkspace() {
               />
               <DocReader
                 content={docBody}
-                onStartEdit={() => void setEditorMode('source')}
+                onStartEdit={() => void setEditorMode(loadEditorModePref())}
               />
             </KnowledgeDocCanvas>
           </div>

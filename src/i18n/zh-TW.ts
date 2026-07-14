@@ -943,7 +943,7 @@ export const zhTW = {
       title: '知識庫',
       home: {
         subtitle: '本地優先 · 多空間 · 目錄樹 + Markdown',
-        searchPlaceholder: '搜尋標題、正文與路徑…',
+        searchPlaceholder: '搜尋標題、正文、標籤與路徑…',
         mySpaces: '我的空間',
         recent: '最近開啟',
         docCount_one: '{{count}} 篇',
@@ -956,6 +956,12 @@ export const zhTW = {
         searchResults: '搜尋結果',
         searchEmpty: '沒有符合的文件。',
         searchIndexing: '正在建立搜尋索引…',
+        searchIndexingProgress: '正在建立搜尋索引… {{done}}/{{total}}',
+        searchIndexingProgressSpace:
+          '正在建立搜尋索引… {{done}}/{{total}} · {{space}}',
+        filterTags: '標籤',
+        filterStatus: '狀態',
+        filterClear: '清除篩選',
       },
       space: {
         nameLabel: '名稱',
@@ -1064,6 +1070,17 @@ export const zhTW = {
         brokenHint: '失效連結：「{{title}}」— 點擊建立',
         openHint: '開啟「{{title}}」',
         noMatches: '無符合文件',
+        propertyStatus: '狀態',
+        propertyTags: '標籤',
+      },
+      backlinks: {
+        title: '反向連結',
+        empty: '還沒有文件連結到這裡。',
+        brokenCount_one: '{{count}} 個失效出站連結',
+        brokenCount_other: '{{count}} 個失效出站連結',
+        brokenCount: '{{count}} 個失效出站連結',
+        brokenHint: '本文檔中無法匹配標題或別名的 [[wiki]] 出站連結。',
+        openHint: '開啟「{{title}}」',
       },
       error: {
         generic: '出了點問題',

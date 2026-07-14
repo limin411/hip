@@ -46,13 +46,16 @@ import {
   knowledgeExportSpaceZip,
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
+import { revealInCodeMirror, revealInPreviewRoot } from '@/domain/knowledge/searchReveal'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
+import { DocPropertiesRow } from './DocPropertiesRow'
 import { MarkdownToolbar } from './MarkdownToolbar'
 import { KnowledgeDocCanvas } from './KnowledgeDocCanvas'
 import { WikiCreateModal } from './WikiCreateModal'
+import { BacklinksPanel } from './BacklinksPanel'
 
 /** Lazy so Source-only sessions pay 0 for Milkdown kit. */
 const DocLiveEditor = lazy(() =>
@@ -135,6 +138,66 @@ export function KnowledgeWorkspace() {
     }
     useKnowledgeStore.setState({ expandedFolderIds: expand })
   }, [treeFilter, visibleIds, nodes, filterExpandSnapshot])
+
+  // Best-effort scroll-to-match after opening a search hit (`pendingReveal`).
+  useEffect(() => {
+    if (!activeDocId || !activeSpaceId) return
+    const pending = useKnowledgeStore.getState().pendingReveal
+    if (!pending?.query) return
+    // Only reveal when the pending target is still the active doc.
+    if (pending.spaceId !== activeSpaceId || pending.docId !== activeDocId) return
+
+    let cancelled = false
+    let attempts = 0
+    // Large CM docs can take >350ms to mount; allow ~2s of retries.
+    const maxAttempts = 24
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = (ms: number) => {
+      timeoutId = setTimeout(tryReveal, ms)
+    }
+
+    const tryReveal = () => {
+      if (cancelled) return
+      const still = useKnowledgeStore.getState().pendingReveal
+      if (!still?.query) return
+      if (still.spaceId !== activeSpaceId || still.docId !== activeDocId) {
+        useKnowledgeStore.getState().clearPendingReveal()
+        return
+      }
+
+      // Source/Live: CM source editor; Preview: markdown reader.
+      if (editorMode !== 'preview') {
+        const view = editorRef.current?.getView()
+        if (view) {
+          revealInCodeMirror(view, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      } else {
+        const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
+        if (root instanceof HTMLElement) {
+          revealInPreviewRoot(root, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+      }
+
+      attempts += 1
+      if (attempts < maxAttempts) {
+        schedule(80)
+      } else {
+        // Give up without blocking later navigations.
+        useKnowledgeStore.getState().clearPendingReveal()
+      }
+    }
+
+    schedule(30)
+    return () => {
+      cancelled = true
+      if (timeoutId != null) clearTimeout(timeoutId)
+    }
+  }, [activeDocId, activeSpaceId, editorMode, docBody])
 
   const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
   const [spaceName, setSpaceName] = useState('')
@@ -611,6 +674,11 @@ export function KnowledgeWorkspace() {
                   <ImagePlus size={14} />
                 </Button>
               </div>
+              <DocPropertiesRow body={draftBody} />
+              <MarkdownToolbar
+                getView={() => editorRef.current?.getView() ?? null}
+                onAfterEdit={(text) => setDraftBody(text)}
+              />
               <DocEditor
                 ref={editorRef}
                 key={`${activeDocId}-source`}
@@ -636,6 +704,7 @@ export function KnowledgeWorkspace() {
                 readOnly
                 onCommit={() => {}}
               />
+              <DocPropertiesRow body={docBody} />
               <DocReader
                 content={docBody}
                 onStartEdit={() => void setEditorMode(loadEditorModePref())}
@@ -650,6 +719,14 @@ export function KnowledgeWorkspace() {
           </div>
         ) : null}
       </main>
+
+      {activeDocId && activeSpaceId ? (
+        <BacklinksPanel
+          spaceId={activeSpaceId}
+          docId={activeDocId}
+          onOpenDoc={(id) => void openDoc(id)}
+        />
+      ) : null}
 
       <Modal
         open={renameSpaceOpen}

@@ -958,7 +958,8 @@ export const zhCN = {
         searchIndexing: '正在建立搜索索引…',
       },
       space: {
-        namePlaceholder: '空间名称',
+        nameLabel: '名称',
+        namePlaceholder: '例如：产品文档',
         nameEmpty: '请输入知识库名称',
         nameDuplicate: '已存在同名知识库「{{name}}」',
         deleteConfirm: '删除该空间及其全部文档？',

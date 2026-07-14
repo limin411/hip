@@ -964,7 +964,8 @@ export const en = {
         searchIndexing: 'Building search index…',
       },
       space: {
-        namePlaceholder: 'Space name',
+        nameLabel: 'Name',
+        namePlaceholder: 'e.g. Product docs',
         nameEmpty: 'Enter a space name',
         nameDuplicate: 'A space named “{{name}}” already exists',
         deleteConfirm: 'Delete this space and all of its documents?',

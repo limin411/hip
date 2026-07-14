@@ -361,6 +361,7 @@ export function KnowledgeHome() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title={t('knowledge.home.createSpace')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>
@@ -376,18 +377,30 @@ export function KnowledgeHome() {
           </div>
         }
       >
-        <div className="space-y-2">
-          <Input
-            autoFocus
-            data-testid="knowledge-create-space-name"
-            value={createName}
-            onChange={(e) => setCreateName(e.target.value)}
-            placeholder={t('knowledge.space.namePlaceholder')}
-            aria-invalid={createNameTaken || undefined}
-            onKeyDown={(e) => e.key === 'Enter' && void submitCreate()}
-          />
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
+            <Input
+              autoFocus
+              data-testid="knowledge-create-space-name"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              placeholder={t('knowledge.space.namePlaceholder')}
+              aria-invalid={createNameTaken || undefined}
+              className={
+                createNameTaken
+                  ? 'border-danger focus-visible:border-danger focus-visible:ring-danger/10'
+                  : undefined
+              }
+              onKeyDown={(e) => e.key === 'Enter' && void submitCreate()}
+            />
+          </label>
           {createNameTaken && (
-            <p className="text-meta text-danger" data-testid="knowledge-create-space-name-error" role="alert">
+            <p
+              className="rounded-md bg-danger/10 px-3 py-2 text-meta text-danger"
+              data-testid="knowledge-create-space-name-error"
+              role="alert"
+            >
               {t('knowledge.space.nameDuplicate', { name: createNameTrimmed })}
             </p>
           )}
@@ -398,6 +411,7 @@ export function KnowledgeHome() {
         open={renameId != null}
         onOpenChange={(o) => !o && setRenameId(null)}
         title={t('knowledge.tree.rename')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -417,17 +431,30 @@ export function KnowledgeHome() {
           </div>
         }
       >
-        <div className="space-y-2">
-          <Input
-            autoFocus
-            data-testid="knowledge-rename-space-name"
-            value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            aria-invalid={renameNameTaken || undefined}
-            onKeyDown={(e) => e.key === 'Enter' && void submitRename()}
-          />
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
+            <Input
+              autoFocus
+              data-testid="knowledge-rename-space-name"
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              placeholder={t('knowledge.space.namePlaceholder')}
+              aria-invalid={renameNameTaken || undefined}
+              className={
+                renameNameTaken
+                  ? 'border-danger focus-visible:border-danger focus-visible:ring-danger/10'
+                  : undefined
+              }
+              onKeyDown={(e) => e.key === 'Enter' && void submitRename()}
+            />
+          </label>
           {renameNameTaken && (
-            <p className="text-meta text-danger" data-testid="knowledge-rename-space-name-error" role="alert">
+            <p
+              className="rounded-md bg-danger/10 px-3 py-2 text-meta text-danger"
+              data-testid="knowledge-rename-space-name-error"
+              role="alert"
+            >
               {t('knowledge.space.nameDuplicate', { name: renameNameTrimmed })}
             </p>
           )}
@@ -438,6 +465,7 @@ export function KnowledgeHome() {
         open={deleteId != null}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title={t('knowledge.space.deleteConfirm')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -458,7 +486,9 @@ export function KnowledgeHome() {
           </div>
         }
       >
-        <p className="text-body text-ink-secondary">{t('knowledge.space.deleteConfirm')}</p>
+        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
+          {t('knowledge.space.deleteConfirm')}
+        </p>
       </Modal>
     </div>
   )

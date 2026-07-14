@@ -496,6 +496,7 @@ export function KnowledgeWorkspace() {
         open={renameSpaceOpen}
         onOpenChange={setRenameSpaceOpen}
         title={t('knowledge.tree.rename')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -520,17 +521,26 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <div className="space-y-2">
-          <Input
-            data-testid="knowledge-rename-space-name"
-            value={spaceName}
-            onChange={(e) => setSpaceName(e.target.value)}
-            aria-invalid={spaceNameTaken || undefined}
-            autoFocus
-          />
+        <div className="flex flex-col gap-3 px-5 py-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
+            <Input
+              data-testid="knowledge-rename-space-name"
+              value={spaceName}
+              onChange={(e) => setSpaceName(e.target.value)}
+              placeholder={t('knowledge.space.namePlaceholder')}
+              aria-invalid={spaceNameTaken || undefined}
+              className={
+                spaceNameTaken
+                  ? 'border-danger focus-visible:border-danger focus-visible:ring-danger/10'
+                  : undefined
+              }
+              autoFocus
+            />
+          </label>
           {spaceNameTaken && (
             <p
-              className="text-meta text-danger"
+              className="rounded-md bg-danger/10 px-3 py-2 text-meta text-danger"
               data-testid="knowledge-rename-space-name-error"
               role="alert"
             >
@@ -544,6 +554,7 @@ export function KnowledgeWorkspace() {
         open={deleteSpaceOpen}
         onOpenChange={setDeleteSpaceOpen}
         title={t('knowledge.space.deleteConfirm')}
+        className="max-w-sm"
         footer={
           <div className="flex justify-end gap-2">
             <Button
@@ -569,7 +580,9 @@ export function KnowledgeWorkspace() {
           </div>
         }
       >
-        <p className="text-body text-ink-secondary">{t('knowledge.space.deleteConfirm')}</p>
+        <p className="px-5 py-4 text-body leading-relaxed text-ink-secondary">
+          {t('knowledge.space.deleteConfirm')}
+        </p>
       </Modal>
 
       <Modal

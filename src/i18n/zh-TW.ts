@@ -958,7 +958,8 @@ export const zhTW = {
         searchIndexing: '正在建立搜尋索引…',
       },
       space: {
-        namePlaceholder: '空間名稱',
+        nameLabel: '名稱',
+        namePlaceholder: '例如：產品文件',
         nameEmpty: '請輸入知識庫名稱',
         nameDuplicate: '已存在同名知識庫「{{name}}」',
         deleteConfirm: '刪除此空間及其全部文件？',

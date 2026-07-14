@@ -166,7 +166,7 @@ describe('SessionService', () => {
     expect(useUiStore.getState().openSessionIds).toEqual([a])
   })
 
-  it('session:list:result restores open tabs and selects the remembered session', () => {
+  it('session:list:result restores open tabs but stays on New Conversation (no auto-select)', () => {
     const t = new FakeTransport()
     new SessionService(t)
     useDomainStore.setState({ sessions: [], activeSessionId: null })
@@ -186,7 +186,10 @@ describe('SessionService', () => {
     })
 
     expect(useUiStore.getState().openSessionIds).toEqual(['keep-chat', 'keep-code'])
-    expect(useDomainStore.getState().activeSessionId).toBe('keep-chat')
+    // Surface pointers stay for mid-session chat/code switching; active session stays null.
+    expect(useUiStore.getState().chatSessionId).toBe('keep-chat')
+    expect(useUiStore.getState().codeSessionId).toBe('keep-code')
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 

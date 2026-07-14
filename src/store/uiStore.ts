@@ -85,7 +85,7 @@ interface UiState {
   selectedArtifactPath: string | null
   setSelectedArtifactPath: (p: string | null) => void
 
-  // Per-surface open conversation (persisted; restored with openSessionIds on launch).
+  // Per-surface last conversation (persisted for mid-session chat/code switching; not auto-selected on launch).
   chatSessionId: string | null
   setChatSessionId: (id: string | null) => void
   codeSessionId: string | null
@@ -247,8 +247,13 @@ export const useUiStore = create<UiState>()(
         if (state.language !== lang) {
           useUiStore.setState({ language: lang })
         }
-        // Knowledge is not cold-restored as the main surface (half-empty shell risk).
-        if (state.activeView === 'knowledge') {
+        // Cold launch always lands on New Conversation (chat surface). Title-bar open tabs
+        // are restored separately via openSessionIds; settings/history/knowledge are not.
+        if (
+          state.activeView === 'knowledge' ||
+          state.activeView === 'settings' ||
+          state.activeView === 'history'
+        ) {
           useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
         }
       },

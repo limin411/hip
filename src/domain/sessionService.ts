@@ -210,8 +210,8 @@ export class SessionService {
       requestCommitLog: (sessionId) => this.requestCommitLog(sessionId),
       resyncActiveIfRunning: () => this.resyncActiveIfRunning(),
     })
-    // After the session catalog lands (or re-lands on reconnect), re-attach open tabs
-    // from localStorage and re-select the last active conversation when needed.
+    // After the session catalog lands (or re-lands on reconnect), re-attach open title-bar
+    // tabs from localStorage. Cold launch stays on New Conversation; live reconnect keeps selection.
     if (msg.type === 'session:list:result') {
       this.restoreOpenTabsFromPersistence()
     }
@@ -228,7 +228,7 @@ export class SessionService {
   }
 
   /**
-   * Wait for hip-ui rehydration (openSessionIds / surface pointers) then prune + restore.
+   * Wait for hip-ui rehydration (openSessionIds / surface pointers) then prune open tabs.
    * session:list:result can race persist rehydrate on cold start.
    */
   private restoreOpenTabsFromPersistence(): void {
@@ -242,8 +242,10 @@ export class SessionService {
   }
 
   /**
-   * Prune persisted open tabs to sessions that still exist, then select the remembered
-   * active conversation for the current surface (cold launch / reconnect with no active).
+   * Prune persisted open tabs to sessions that still exist.
+   * Title-bar tabs are restored; the active conversation is not — cold launch always
+   * lands on New Conversation. Reconnect while a tab is already live keeps that selection.
+   * chatSessionId / codeSessionId stay for mid-session surface switching only.
    */
   private applyRestoredOpenTabs(): void {
     const sessions = useDomainStore.getState().sessions
@@ -274,30 +276,8 @@ export class SessionService {
       return
     }
 
-    const st = useUiStore.getState()
-    // Settings / history / knowledge: do not yank the user into a session surface.
-    if (st.activeView === 'settings' || st.activeView === 'history' || st.activeView === 'knowledge') {
-      return
-    }
-
-    const surface: Surface = st.activeView === 'code' ? 'code' : 'chat'
-    const matchesSurface = (id: string) =>
-      sessions.some((s) => s.id === id && surfaceOf(s.config) === surface)
-
-    let want = surface === 'chat' ? st.chatSessionId : st.codeSessionId
-    if (want == null || !existing.has(want) || !pruned.includes(want) || !matchesSurface(want)) {
-      want =
-        pruned.find((id) => matchesSurface(id)) ??
-        (pruned.length > 0 ? pruned[0] : null)
-    }
-
-    if (want != null) {
-      this.selectSession(want)
-      // selectSession prepends the id; put the bar back to the persisted order.
-      useUiStore.getState().reorderOpenSessions(pruned)
-    } else {
-      useDomainStore.getState().deselect()
-    }
+    // Cold launch / reconnect with no active tab: keep the title-bar tab list, show New Conversation.
+    useDomainStore.getState().deselect()
   }
 
   /**

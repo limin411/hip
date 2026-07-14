@@ -20,6 +20,7 @@ describe('cn', () => {
     expect(cn('text-white', 'text-body')).toBe('text-white text-body')
     expect(cn('bg-accent text-white', 'h-8 px-3 text-body')).toContain('text-white')
     expect(cn('text-ink', 'text-meta')).toContain('text-ink')
+    expect(cn('text-page', 'text-ink')).toBe('text-page text-ink')
   })
 
   it('still treats two custom font-size tokens as conflicting (last wins)', () => {

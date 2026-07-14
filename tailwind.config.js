@@ -64,6 +64,9 @@ export default {
         title: ['16px', { lineHeight: '1.4' }],
         display: ['20px', { lineHeight: '1.3' }],
         stat: ['24px', { lineHeight: '1.2' }],
+        // page = document/page H1 only (e.g. Knowledge InlineDocTitle).
+        // Not for section headers, cards, stats, or chrome.
+        page: ['28px', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
       },
       borderRadius: {
         none: '0',

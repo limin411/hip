@@ -17,6 +17,16 @@ describe('InlineDocTitle', () => {
     expect(onCommit).toHaveBeenCalledWith('Renamed')
   })
 
+  it('uses text-page for document page H1 scale', () => {
+    render(<InlineDocTitle docId="d1" title="Note" onCommit={() => {}} />)
+    expect(screen.getByTestId('knowledge-doc-title').className).toContain('text-page')
+  })
+
+  it('readOnly title also uses text-page', () => {
+    render(<InlineDocTitle docId="d1" title="Note" readOnly onCommit={() => {}} />)
+    expect(screen.getByTestId('knowledge-doc-title').className).toContain('text-page')
+  })
+
   it('does not commit empty title; restores previous', () => {
     const onCommit = vi.fn()
     render(<InlineDocTitle docId="d1" title="Note" onCommit={onCommit} />)

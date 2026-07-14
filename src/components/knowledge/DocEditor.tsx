@@ -51,7 +51,7 @@ function buildProseTheme(isDark: boolean) {
         height: '100%',
       },
       '.cm-content': {
-        padding: '8px 4px 64px',
+        padding: '4px 2px 96px',
         caretColor: 'var(--text-primary)',
         minHeight: '100%',
         color: 'var(--text-primary)',
@@ -253,7 +253,7 @@ export const DocEditor = forwardRef<DocEditorHandle, DocEditorProps>(function Do
         basicSetup={{
           lineNumbers: false,
           foldGutter: false,
-          highlightActiveLine: true,
+          highlightActiveLine: false,
           highlightSelectionMatches: false,
           bracketMatching: true,
           autocompletion: false,

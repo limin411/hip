@@ -76,7 +76,7 @@ export function MarkdownToolbar({ getView, onAfterEdit, disabled }: MarkdownTool
 
   return (
     <div
-      className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border py-1"
+      className="-mx-1 mb-1 flex shrink-0 flex-wrap items-center gap-0.5 rounded-md px-1 py-0.5 text-ink-secondary opacity-80 transition-opacity hover:opacity-100 focus-within:opacity-100"
       data-testid="knowledge-md-toolbar"
       role="toolbar"
       aria-label={t('knowledge.toolbar.label')}

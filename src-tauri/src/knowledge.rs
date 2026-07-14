@@ -2126,27 +2126,6 @@ mod tests {
                 &KnowledgeIndex {
                     version: 1,
                     spaces: vec![space],
-    fn template_id_validation() {
-        assert!(!is_template_id(""));
-        assert!(!is_template_id("doc_abc123def456"));
-        assert!(!is_template_id("tpl_ab")); // too short
-        assert!(!is_template_id("tpl_../evil"));
-        assert!(!is_template_id("tpl_a/b"));
-        assert!(is_template_id("tpl_abc123def456"));
-        assert!(is_template_id("tpl_xYzAbCdEfGhI"));
-    fn template_path_rejects_traversal() {
-        let root = Path::new("/tmp/kb");
-        assert!(template_body_path(root, "spc_oktoken1", "tpl_../evil").is_err());
-        assert!(template_body_path(root, "bad", "tpl_abc123def456").is_err());
-        assert!(template_body_path(root, "spc_oktoken1", "tpl_abc123def456").is_ok());
-    fn templates_roundtrip_list_save_delete() {
-            let space_id = "spc_tplspace01";
-            write_json_file(
-                &dir.join("meta.json"),
-                &KnowledgeSpace {
-                    id: space_id.into(),
-                    name: "T".into(),
-                    icon: None,
                 },
             )
             .unwrap();
@@ -2195,69 +2174,6 @@ mod tests {
                 .read_to_string(&mut body)
                 .unwrap();
             assert!(body.contains("assets/ast_ziptest01_a.png"));
-    fn version_snapshots_daily_manual_cap_and_delete() {
-            let space_id = "spc_oktoken1";
-            let doc_id = "doc_abc123def456";
-            let space = space_dir(&root, space_id).unwrap();
-            fs::create_dir_all(space.join("docs")).unwrap();
-            let doc = doc_path(&root, space_id, doc_id).unwrap();
-            atomic_write_str(&doc, "body-v1").unwrap();
-            // Manual always creates.
-            let e1 = save_version_inner(&root, space_id, doc_id, "manual", None)
-                .expect("manual snapshot");
-            assert_eq!(e1.kind, "manual");
-            assert_eq!(e1.byte_length, 7);
-            // Daily with same body as last snapshot → skip.
-            let skip_same = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
-            assert!(skip_same.is_none());
-            // Body changed → first daily of the day creates.
-            atomic_write_str(&doc, "body-v2").unwrap();
-            let d1 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
-                .expect("daily first");
-            assert_eq!(d1.day_key.as_deref(), Some("2026-07-14"));
-            // Same day again → skip even if body changed (first save of day only).
-            atomic_write_str(&doc, "body-v3").unwrap();
-            let skip = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
-            assert!(skip.is_none());
-            // New day with body ≠ last snapshot → creates.
-            let d2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-15"))
-                .expect("daily new day");
-            assert_eq!(d2.day_key.as_deref(), Some("2026-07-15"));
-            // Body equals last snapshot → skip on a new day.
-            let skip2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-16"))
-            assert!(skip2.is_none());
-            // Cap: fill past 30.
-            for i in 0..35 {
-                atomic_write_str(&doc, &format!("cap-{i}")).unwrap();
-                let _ = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
-            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
-            let manifest = load_version_manifest(&vdir).unwrap();
-            assert!(manifest.entries.len() <= KNOWLEDGE_VERSION_CAP);
-            assert_eq!(manifest.entries.len(), KNOWLEDGE_VERSION_CAP);
-            // Restore oldest remaining would work; restore newest.
-            let newest = manifest.entries[0].id.clone();
-            let restored_body = {
-                let path = version_file_path(&vdir, &manifest.entries[0].file).unwrap();
-                fs::read_to_string(path).unwrap()
-            // Simulate restore via atomic write of that body.
-            atomic_write_str(&doc, &restored_body).unwrap();
-            assert_eq!(fs::read_to_string(&doc).unwrap(), restored_body);
-            assert_eq!(newest, manifest.entries[0].id);
-            // Path traversal rejected.
-            assert!(version_file_path(&vdir, "../evil.md").is_err());
-            assert!(version_file_path(&vdir, "a/b.md").is_err());
-            // Delete doc file cleans versions dir.
-            let vdir_exists = vdir.exists();
-            assert!(vdir_exists);
-            fs::remove_file(&doc).unwrap();
-            let _ = fs::remove_dir_all(&vdir);
-            // Mirror knowledge_delete_doc_file cleanup:
-            if vdir.exists() {
-                let _ = fs::remove_dir_all(&vdir);
-            assert!(!versions_dir(&root, space_id, doc_id).unwrap().exists()
-                || !fs::read_dir(versions_dir(&root, space_id, doc_id).unwrap())
-                    .map(|mut d| d.next().is_some())
-                    .unwrap_or(false));
         });
     }
 
@@ -2269,9 +2185,51 @@ mod tests {
             assert!(!is_hip_portable_layout(base));
             fs::create_dir_all(base.join("docs")).unwrap();
             assert!(is_hip_portable_layout(base));
+        });
+    }
+
+    #[test]
+    fn template_id_validation() {
+        assert!(!is_template_id(""));
+        assert!(!is_template_id("doc_abc123def456"));
+        assert!(!is_template_id("tpl_ab")); // too short
+        assert!(!is_template_id("tpl_../evil"));
+        assert!(!is_template_id("tpl_a/b"));
+        assert!(is_template_id("tpl_abc123def456"));
+        assert!(is_template_id("tpl_xYzAbCdEfGhI"));
+    }
+
+    #[test]
+    fn template_path_rejects_traversal() {
+        let root = Path::new("/tmp/kb");
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_../evil").is_err());
+        assert!(template_body_path(root, "bad", "tpl_abc123def456").is_err());
+        assert!(template_body_path(root, "spc_oktoken1", "tpl_abc123def456").is_ok());
+    }
+
+    #[test]
+    fn templates_roundtrip_list_save_delete() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_tplspace01";
+            let dir = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(dir.join("docs")).unwrap();
+            write_json_file(
+                &dir.join("meta.json"),
+                &KnowledgeSpace {
+                    id: space_id.into(),
+                    name: "T".into(),
+                    icon: None,
+                    created_at: 1,
+                    updated_at: 1,
+                },
+            )
+            .unwrap();
+
             // Empty list when no templates dir.
             let empty = load_templates_manifest(&root, space_id).unwrap();
             assert!(empty.templates.is_empty());
+
             let id = "tpl_meetnotes01";
             let mut manifest = TemplatesManifest {
                 version: 1,
@@ -2285,19 +2243,115 @@ mod tests {
             let body_path = template_body_path(&root, space_id, id).unwrap();
             atomic_write_str(&body_path, "# Agenda\n").unwrap();
             save_templates_manifest(&root, space_id, &manifest).unwrap();
+
             let loaded = load_templates_manifest(&root, space_id).unwrap();
             assert_eq!(loaded.templates.len(), 1);
             assert_eq!(loaded.templates[0].name, "Meeting");
             assert_eq!(fs::read_to_string(&body_path).unwrap(), "# Agenda\n");
+
             // Delete from manifest + body.
             manifest.templates.clear();
             save_templates_manifest(&root, space_id, &manifest).unwrap();
             let _ = fs::remove_file(&body_path);
             assert!(!body_path.exists());
             assert!(load_templates_manifest(&root, space_id)
+                .unwrap()
                 .templates
                 .is_empty());
+        });
+    }
+
+    #[test]
+    fn version_snapshots_daily_manual_cap_and_delete() {
+        with_temp_root(|base| {
+            let root = base.join("knowledge");
+            let space_id = "spc_oktoken1";
+            let doc_id = "doc_abc123def456";
+            let space = space_dir(&root, space_id).unwrap();
+            fs::create_dir_all(space.join("docs")).unwrap();
+            let doc = doc_path(&root, space_id, doc_id).unwrap();
+            atomic_write_str(&doc, "body-v1").unwrap();
+
+            // Manual always creates.
+            let e1 = save_version_inner(&root, space_id, doc_id, "manual", None)
+                .unwrap()
+                .expect("manual snapshot");
+            assert_eq!(e1.kind, "manual");
+            assert_eq!(e1.byte_length, 7);
+
+            // Daily with same body as last snapshot → skip.
+            let skip_same = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skip_same.is_none());
+
+            // Body changed → first daily of the day creates.
+            atomic_write_str(&doc, "body-v2").unwrap();
+            let d1 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap()
+                .expect("daily first");
+            assert_eq!(d1.day_key.as_deref(), Some("2026-07-14"));
+
+            // Same day again → skip even if body changed (first save of day only).
+            atomic_write_str(&doc, "body-v3").unwrap();
+            let skip = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-14"))
+                .unwrap();
+            assert!(skip.is_none());
+
+            // New day with body ≠ last snapshot → creates.
+            let d2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-15"))
+                .unwrap()
+                .expect("daily new day");
+            assert_eq!(d2.day_key.as_deref(), Some("2026-07-15"));
+
+            // Body equals last snapshot → skip on a new day.
+            let skip2 = save_version_inner(&root, space_id, doc_id, "daily", Some("2026-07-16"))
+                .unwrap();
+            assert!(skip2.is_none());
+
+            // Cap: fill past 30.
+            for i in 0..35 {
+                atomic_write_str(&doc, &format!("cap-{i}")).unwrap();
+                let _ = save_version_inner(&root, space_id, doc_id, "manual", None).unwrap();
+            }
+            let vdir = versions_dir(&root, space_id, doc_id).unwrap();
+            let manifest = load_version_manifest(&vdir).unwrap();
+            assert!(manifest.entries.len() <= KNOWLEDGE_VERSION_CAP);
+            assert_eq!(manifest.entries.len(), KNOWLEDGE_VERSION_CAP);
+
+            // Restore oldest remaining would work; restore newest.
+            let newest = manifest.entries[0].id.clone();
+            let restored_body = {
+                let path = version_file_path(&vdir, &manifest.entries[0].file).unwrap();
+                fs::read_to_string(path).unwrap()
+            };
+            // Simulate restore via atomic write of that body.
+            atomic_write_str(&doc, &restored_body).unwrap();
+            assert_eq!(fs::read_to_string(&doc).unwrap(), restored_body);
+            assert_eq!(newest, manifest.entries[0].id);
+
+            // Path traversal rejected.
+            assert!(version_file_path(&vdir, "../evil.md").is_err());
+            assert!(version_file_path(&vdir, "a/b.md").is_err());
+
+            // Delete doc file cleans versions dir.
+            let vdir_exists = vdir.exists();
+            assert!(vdir_exists);
+            fs::remove_file(&doc).unwrap();
+            let _ = fs::remove_dir_all(&vdir);
+            // Mirror knowledge_delete_doc_file cleanup:
+            if vdir.exists() {
+                let _ = fs::remove_dir_all(&vdir);
+            }
+            assert!(!versions_dir(&root, space_id, doc_id).unwrap().exists()
+                || !fs::read_dir(versions_dir(&root, space_id, doc_id).unwrap())
+                    .map(|mut d| d.next().is_some())
+                    .unwrap_or(false));
+        });
+    }
+
+    #[test]
     fn version_delete_doc_cleans_versions_dir() {
+        with_temp_root(|base| {
             let root = base.join("knowledge");
             let space_id = "spc_oktoken1";
             let doc_id = "doc_abc123def456";
@@ -2323,6 +2377,7 @@ mod tests {
 
     #[test]
     fn version_skip_when_doc_missing_does_not_create_dir() {
+        with_temp_root(|base| {
             let root = base.join("knowledge");
             let space_id = "spc_oktoken1";
             let doc_id = "doc_abc123def456";

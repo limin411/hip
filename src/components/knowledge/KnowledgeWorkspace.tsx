@@ -166,15 +166,15 @@ export function KnowledgeWorkspace() {
       { value: 'preview' as const, label: t('knowledge.doc.preview') },
     ]
   }, [liveEnabled, t])
-  const toggleMode: EditorMode =
-    editorMode === 'live' && !liveEnabled ? 'source' : editorMode
   const bodyLen = Math.max(docBody.length, draftBody.length)
   const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
+  // Host and control share the same suppressions so the segment never lies.
+  const liveSuppressed =
+    liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
+  const toggleMode: EditorMode =
+    editorMode === 'live' && (!liveEnabled || liveSuppressed) ? 'source' : editorMode
   const showLiveEditor =
-    editorMode === 'live' &&
-    liveEnabled &&
-    !liveBlocked &&
-    bodyLen <= KNOWLEDGE_LARGE_DOC_CHARS
+    editorMode === 'live' && liveEnabled && !liveSuppressed
   const showSourceEditor = editorMode !== 'preview' && !showLiveEditor
   const showPreview = editorMode === 'preview'
 
@@ -184,6 +184,15 @@ export function KnowledgeWorkspace() {
       setLiveBlockedDocIds((prev) => ({ ...prev, [activeDocId]: true }))
     }
     void setEditorMode('source')
+  }
+
+  /** Mode toggle: refuse Live re-entry when session-blocked; large clamp is in store. */
+  const onEditorModeChange = (v: EditorMode) => {
+    if (v === 'live' && liveBlocked) {
+      toast.error(t('knowledge.doc.liveParseFailed'))
+      return
+    }
+    void setEditorMode(v)
   }
 
   const exportActiveDoc = async () => {
@@ -457,7 +466,7 @@ export function KnowledgeWorkspace() {
                 aria-label={t('knowledge.doc.modeLabel')}
                 size="sm"
                 value={toggleMode}
-                onChange={(v) => void setEditorMode(v)}
+                onChange={onEditorModeChange}
                 options={modeOptions}
               />
               <DropdownMenu>

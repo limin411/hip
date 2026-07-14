@@ -28,7 +28,7 @@ describe('DocLiveEditor', () => {
     )
   }, 20_000)
 
-  it('strips frontmatter from editable region and re-prefixes on change', async () => {
+  it('strips frontmatter from editable region (YAML not in ProseMirror)', async () => {
     const onDraftChange = vi.fn()
     const md = '---\ntags: [a]\n---\n\n# Body\n'
     render(

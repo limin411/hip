@@ -22,6 +22,13 @@ import {
 } from '@/domain/knowledge/search'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
+  type EditorMode,
+  loadEditorModePref,
+  persistEditorModePref,
+  resolveEditorMode,
+  shouldAutosave,
+} from '@/domain/knowledge/editorMode'
+import {
   knowledgeCreateSpace,
   knowledgeDeleteDocFile,
   knowledgeDeleteSpace,
@@ -34,6 +41,9 @@ import {
   knowledgeUpdateSpace,
   knowledgeWriteDoc,
 } from '@/ipc/knowledge'
+
+export type { EditorMode }
+export { shouldAutosave }
 
 /** Module-level index (not serializable; not stored in zustand state). */
 let kbIndex = createKnowledgeIndex()
@@ -86,7 +96,8 @@ interface KnowledgeState {
   activeDocId: string | null
   docBody: string
   draftBody: string
-  editing: boolean
+  /** live | source | preview — Live UI gated by hip-knowledge-live flag. */
+  editorMode: EditorMode
   mode: 'home' | 'workspace'
   searchQuery: string
   searchHits: KnowledgeSearchHit[]
@@ -115,10 +126,11 @@ interface KnowledgeState {
   deleteNode: (id: string) => Promise<void>
   moveNode: (id: string, parentId: string | null, toIndex?: number) => Promise<void>
   openDoc: (id: string) => Promise<void>
-  setEditing: (v: boolean) => Promise<void>
+  /** Switch Live / Source / Preview. Live without flag clamps to Source. */
+  setEditorMode: (mode: EditorMode) => Promise<void>
   /**
-   * Update draft body. Default persist mode: 'auto' while editing (schedule
-   * autosave), 'none' otherwise. Pass `persist: 'now'` for immediate flush
+   * Update draft body. Default persist mode: 'auto' when shouldAutosave(mode)
+   * (live|source), 'none' in preview. Pass `persist: 'now'` for immediate flush
    * (e.g. preview task write-back).
    */
   setDraftBody: (v: string, opts?: { persist?: 'auto' | 'now' | 'none' }) => void
@@ -175,7 +187,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   activeDocId: null,
   docBody: '',
   draftBody: '',
-  editing: false,
+  editorMode: 'preview',
   mode: 'home',
   searchQuery: '',
   searchHits: [],
@@ -334,7 +346,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           activeDocId: null,
           docBody: '',
           draftBody: '',
-          editing: false,
+          editorMode: 'preview',
           nodes: [],
           saveState: 'idle',
         })
@@ -379,7 +391,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       if (opts?.selectDocId) {
         await get().openDoc(opts.selectDocId)
       } else {
-        set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+        set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
       }
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -400,7 +412,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       activeDocId: null,
       docBody: '',
       draftBody: '',
-      editing: false,
+      editorMode: 'preview',
       // keep activeSpaceId for chip? design: clear active doc; can keep space or clear
       activeSpaceId: null,
       nodes: [],
@@ -471,7 +483,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         set((s) => ({ expandedFolderIds: { ...s.expandedFolderIds, [parentId]: true } }))
       }
       get().runSearch(get().searchQuery)
-      // openDoc defaults to editing: true
+      // openDoc defaults to preferred writable mode (source, or live when flag on)
       await get().openDoc(id)
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
@@ -578,7 +590,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             (r) => !(r.spaceId === spaceId && removedDocIds.includes(r.docId)),
           ),
           ...(activeRemoved
-            ? { activeDocId: null, docBody: '', draftBody: '', editing: false }
+            ? { activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' as const }
             : {}),
         }
       })
@@ -599,12 +611,19 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     if (!node || !spaceId) {
       toast.error('Could not load document')
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
       return
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      set({ activeDocId: id, docBody: body, draftBody: body, editing: true, saveState: 'idle' })
+      const editorMode = resolveEditorMode(loadEditorModePref())
+      set({
+        activeDocId: id,
+        docBody: body,
+        draftBody: body,
+        editorMode,
+        saveState: 'idle',
+      })
       const spaceName = get().spaces.find((s) => s.id === spaceId)?.name ?? ''
       const item: KnowledgeRecentItem = {
         spaceId,
@@ -623,24 +642,27 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       const msg = knowledgeErrorMessage(e)
       toast.error(msg)
       get().dropRecent(spaceId, id)
-      set({ activeDocId: null, docBody: '', draftBody: '', editing: false })
+      set({ activeDocId: null, docBody: '', draftBody: '', editorMode: 'preview' })
     }
   },
 
-  setEditing: async (v) => {
-    if (v) {
-      set({ editing: true, draftBody: get().docBody })
-    } else {
+  setEditorMode: async (mode) => {
+    const next = resolveEditorMode(mode)
+    if (next === get().editorMode) return
+    if (next === 'preview') {
       await get().flushSave()
-      set({ editing: false })
+      set({ editorMode: 'preview' })
+      return
     }
+    // Entering live or source: reseed draft from last-saved body (like leaving preview).
+    set({ editorMode: next, draftBody: get().docBody })
+    persistEditorModePref(next)
   },
 
   setDraftBody: (v, opts) => {
     set({ draftBody: v })
-    // Until editorMode lands: derive default from editing (source autosave vs preview none).
-    const editing = get().editing
-    const persist = opts?.persist ?? (editing ? 'auto' : 'none')
+    const persist =
+      opts?.persist ?? (shouldAutosave(get().editorMode) ? 'auto' : 'none')
     if (persist === 'auto') scheduleSave(get)
     else if (persist === 'now') void get().flushSave()
     else cancelScheduledSave() // 'none': draft only; drop any pending autosave

@@ -1015,6 +1015,8 @@ export const zhTW = {
       },
       doc: {
         edit: '編輯',
+        source: '原始碼',
+        live: '即時',
         preview: '預覽',
         modeLabel: '文件模式',
         done: '完成',

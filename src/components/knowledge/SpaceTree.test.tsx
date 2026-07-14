@@ -44,7 +44,7 @@ function seedTree(activeDocId: string | null) {
     activeDocId,
     docBody: '',
     draftBody: '',
-    editing: false,
+    editorMode: 'preview',
     mode: 'workspace',
     searchQuery: '',
     searchHits: [],

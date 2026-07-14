@@ -1021,6 +1021,8 @@ export const en = {
       },
       doc: {
         edit: 'Edit',
+        source: 'Source',
+        live: 'Live',
         preview: 'Preview',
         modeLabel: 'Document mode',
         done: 'Done',

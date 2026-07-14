@@ -1015,6 +1015,8 @@ export const zhCN = {
       },
       doc: {
         edit: '编辑',
+        source: '源码',
+        live: '实时',
         preview: '预览',
         modeLabel: '文档模式',
         done: '完成',

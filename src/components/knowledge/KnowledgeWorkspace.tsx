@@ -16,6 +16,10 @@ import { toast } from 'sonner'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import {
+  isKnowledgeLiveEnabled,
+  type EditorMode,
+} from '@/domain/knowledge/editorMode'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
@@ -51,7 +55,7 @@ export function KnowledgeWorkspace() {
   const nodes = useKnowledgeStore((s) => s.nodes)
   const activeDocId = useKnowledgeStore((s) => s.activeDocId)
   const docBody = useKnowledgeStore((s) => s.docBody)
-  const editing = useKnowledgeStore((s) => s.editing)
+  const editorMode = useKnowledgeStore((s) => s.editorMode)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
   const openHome = useKnowledgeStore((s) => s.openHome)
@@ -61,7 +65,7 @@ export function KnowledgeWorkspace() {
   const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
-  const setEditing = useKnowledgeStore((s) => s.setEditing)
+  const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
   const setDraftBody = useKnowledgeStore((s) => s.setDraftBody)
   const flushSave = useKnowledgeStore((s) => s.flushSave)
   const toggleFolder = useKnowledgeStore((s) => s.toggleFolder)
@@ -134,7 +138,26 @@ export function KnowledgeWorkspace() {
   // Toolbar create: siblings of open doc (or root). Context menu creates under folders.
   const parentForNew: string | null = activeNode?.parentId ?? null
 
-  const mode: 'edit' | 'preview' = editing ? 'edit' : 'preview'
+  // Live option only when flag on; no Milkdown host yet — live falls back to Source CM.
+  const liveEnabled = isKnowledgeLiveEnabled()
+  const modeOptions = useMemo(() => {
+    if (liveEnabled) {
+      return [
+        { value: 'live' as const, label: t('knowledge.doc.live') },
+        { value: 'source' as const, label: t('knowledge.doc.source') },
+        { value: 'preview' as const, label: t('knowledge.doc.preview') },
+      ]
+    }
+    // Flag off: keep familiar Edit | Preview labels (source maps to Edit).
+    return [
+      { value: 'source' as const, label: t('knowledge.doc.edit') },
+      { value: 'preview' as const, label: t('knowledge.doc.preview') },
+    ]
+  }, [liveEnabled, t])
+  const toggleMode: EditorMode =
+    editorMode === 'live' && !liveEnabled ? 'source' : editorMode
+  // Live has no Milkdown host yet (PR-09): treat live like source → CodeMirror.
+  const showSourceEditor = editorMode !== 'preview'
 
   const exportActiveDoc = async () => {
     if (!activeSpaceId || !activeDocId) return
@@ -406,12 +429,9 @@ export function KnowledgeWorkspace() {
                 data-testid="knowledge-edit-toggle"
                 aria-label={t('knowledge.doc.modeLabel')}
                 size="sm"
-                value={mode}
-                onChange={(v) => void setEditing(v === 'edit')}
-                options={[
-                  { value: 'edit', label: t('knowledge.doc.edit') },
-                  { value: 'preview', label: t('knowledge.doc.preview') },
-                ]}
+                value={toggleMode}
+                onChange={(v) => void setEditorMode(v)}
+                options={modeOptions}
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -450,7 +470,7 @@ export function KnowledgeWorkspace() {
               }}
             />
           </div>
-        ) : editing ? (
+        ) : showSourceEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas className="min-h-0 flex-1">
               <InlineDocTitle
@@ -464,7 +484,7 @@ export function KnowledgeWorkspace() {
               />
               <DocEditor
                 ref={editorRef}
-                key={`${activeDocId}-edit`}
+                key={`${activeDocId}-source`}
                 docId={activeDocId}
                 initialValue={docBody}
                 onDraftChange={setDraftBody}
@@ -485,7 +505,7 @@ export function KnowledgeWorkspace() {
               />
               <DocReader
                 content={docBody}
-                onStartEdit={() => void setEditing(true)}
+                onStartEdit={() => void setEditorMode('source')}
               />
             </KnowledgeDocCanvas>
           </div>

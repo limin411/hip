@@ -36,7 +36,7 @@ vi.mock('@/i18n', () => ({
 import { toast } from 'sonner'
 import { useKnowledgeStore } from './knowledgeStore'
 
-describe('knowledgeStore openDoc editing default', () => {
+describe('knowledgeStore openDoc editorMode default', () => {
   beforeEach(() => {
     knowledgeReadDoc.mockReset()
     knowledgeWriteDoc.mockReset()
@@ -44,6 +44,8 @@ describe('knowledgeStore openDoc editing default', () => {
     knowledgeEnsureRoot.mockReset()
     knowledgeListSpaces.mockReset()
     knowledgeDeleteSpace.mockReset()
+    localStorage.removeItem('hip-knowledge-live')
+    localStorage.removeItem('hip-knowledge-editor-mode')
     useKnowledgeStore.setState({
       loaded: true,
       spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
@@ -62,7 +64,7 @@ describe('knowledgeStore openDoc editing default', () => {
       activeDocId: null,
       docBody: '',
       draftBody: '',
-      editing: false,
+      editorMode: 'preview',
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -76,15 +78,22 @@ describe('knowledgeStore openDoc editing default', () => {
     })
   })
 
-  it('openDoc sets editing true with body', async () => {
+  it('openDoc sets editorMode source with body (live flag off)', async () => {
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe('doc_1')
     expect(s.docBody).toBe('# hello')
     expect(s.draftBody).toBe('# hello')
-    expect(s.editing).toBe(true)
+    expect(s.editorMode).toBe('source')
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
+  })
+
+  it('openDoc sets editorMode live when flag on and no pref', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
+    knowledgeReadDoc.mockResolvedValueOnce('# hello')
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 })
 
@@ -116,7 +125,7 @@ describe('knowledgeStore deleteSpace', () => {
       activeDocId: 'doc_1',
       docBody: 'saved',
       draftBody: 'dirty-unsaved',
-      editing: true,
+      editorMode: 'source',
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -184,7 +193,7 @@ describe('knowledgeStore space name uniqueness', () => {
       activeDocId: null,
       docBody: '',
       draftBody: '',
-      editing: false,
+      editorMode: 'preview',
       mode: 'home',
       searchQuery: '',
       searchHits: [],
@@ -283,7 +292,7 @@ describe('knowledgeStore flush-abort navigation', () => {
       activeDocId: 'doc_a',
       docBody: 'saved-a',
       draftBody: 'dirty-a',
-      editing: true,
+      editorMode: 'source',
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -417,7 +426,7 @@ describe('knowledgeStore setDraftBody persist modes', () => {
       activeDocId: 'doc_1',
       docBody: 'saved',
       draftBody: 'saved',
-      editing: false,
+      editorMode: 'preview',
       mode: 'workspace',
       searchQuery: '',
       searchHits: [],
@@ -435,7 +444,7 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     vi.useRealTimers()
   })
 
-  it('defaults to none when not editing (no autosave schedule)', async () => {
+  it('defaults to none in preview (no autosave schedule)', async () => {
     useKnowledgeStore.getState().setDraftBody('preview-dirty')
     expect(useKnowledgeStore.getState().draftBody).toBe('preview-dirty')
     await vi.advanceTimersByTimeAsync(600)
@@ -443,8 +452,8 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     expect(useKnowledgeStore.getState().docBody).toBe('saved')
   })
 
-  it('defaults to auto when editing (schedules flush)', async () => {
-    useKnowledgeStore.setState({ editing: true })
+  it('defaults to auto in source mode (schedules flush)', async () => {
+    useKnowledgeStore.setState({ editorMode: 'source' })
     useKnowledgeStore.getState().setDraftBody('edited')
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(500)
@@ -453,7 +462,15 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     expect(useKnowledgeStore.getState().saveState).toBe('saved')
   })
 
-  it('persist now flushes immediately even when not editing', async () => {
+  it('defaults to auto in live mode (schedules flush)', async () => {
+    useKnowledgeStore.setState({ editorMode: 'live' })
+    useKnowledgeStore.getState().setDraftBody('live-edit')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'live-edit')
+    expect(useKnowledgeStore.getState().docBody).toBe('live-edit')
+  })
+
+  it('persist now flushes immediately even in preview', async () => {
     useKnowledgeStore.getState().setDraftBody('- [x] task', { persist: 'now' })
     // Drain saveChain: setDraftBody fire-and-forgets flushSave; chaining awaits completion.
     await useKnowledgeStore.getState().flushSave()
@@ -462,8 +479,8 @@ describe('knowledgeStore setDraftBody persist modes', () => {
     expect(useKnowledgeStore.getState().draftBody).toBe('- [x] task')
   })
 
-  it('persist none skips schedule even when editing', async () => {
-    useKnowledgeStore.setState({ editing: true })
+  it('persist none skips schedule even in source mode', async () => {
+    useKnowledgeStore.setState({ editorMode: 'source' })
     useKnowledgeStore.getState().setDraftBody('no-save', { persist: 'none' })
     await vi.advanceTimersByTimeAsync(600)
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
@@ -472,13 +489,83 @@ describe('knowledgeStore setDraftBody persist modes', () => {
   })
 
   it('persist none cancels a pending auto schedule', async () => {
-    useKnowledgeStore.setState({ editing: true })
+    useKnowledgeStore.setState({ editorMode: 'source' })
     useKnowledgeStore.getState().setDraftBody('a') // schedules autosave
     useKnowledgeStore.getState().setDraftBody('b', { persist: 'none' })
     await vi.advanceTimersByTimeAsync(600)
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(useKnowledgeStore.getState().draftBody).toBe('b')
     expect(useKnowledgeStore.getState().docBody).toBe('saved')
+  })
+})
+
+describe('knowledgeStore setEditorMode', () => {
+  beforeEach(() => {
+    knowledgeWriteDoc.mockReset()
+    knowledgeWriteDoc.mockResolvedValue(undefined)
+    localStorage.removeItem('hip-knowledge-live')
+    localStorage.removeItem('hip-knowledge-editor-mode')
+    useKnowledgeStore.setState({
+      loaded: true,
+      spaces: [{ id: 'spc_1', name: 'S', createdAt: 1, updatedAt: 1 }],
+      activeSpaceId: 'spc_1',
+      nodes: [
+        {
+          id: 'doc_1',
+          parentId: null,
+          kind: 'doc',
+          title: 'Note',
+          order: 0,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+      activeDocId: 'doc_1',
+      docBody: 'saved',
+      draftBody: 'dirty',
+      editorMode: 'source',
+      mode: 'workspace',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      spaceDocCounts: { spc_1: 1 },
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('entering preview flushes dirty draft', async () => {
+    await useKnowledgeStore.getState().setEditorMode('preview')
+    expect(knowledgeWriteDoc).toHaveBeenCalledWith('spc_1', 'doc_1', 'dirty')
+    expect(useKnowledgeStore.getState().editorMode).toBe('preview')
+    expect(useKnowledgeStore.getState().docBody).toBe('dirty')
+  })
+
+  it('leaving preview reseeds draft from docBody', async () => {
+    useKnowledgeStore.setState({
+      editorMode: 'preview',
+      docBody: 'on-disk',
+      draftBody: 'stale-preview',
+    })
+    await useKnowledgeStore.getState().setEditorMode('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().draftBody).toBe('on-disk')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('source')
+  })
+
+  it('clamps live to source when flag is off', async () => {
+    await useKnowledgeStore.getState().setEditorMode('live')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+  })
+
+  it('allows live when flag is on', async () => {
+    localStorage.setItem('hip-knowledge-live', 'true')
+    await useKnowledgeStore.getState().setEditorMode('live')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
+    expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
   })
 })
 

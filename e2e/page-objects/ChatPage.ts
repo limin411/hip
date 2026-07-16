@@ -18,7 +18,7 @@ export class ChatPage {
   get jumpToLatest() { return browser.$('[data-testid="jump-to-latest"]') }
   get chatError() { return browser.$('[data-testid="chat-error"]') }
   get chatErrorRetry() { return browser.$('[data-testid="chat-error-retry"]') }
-  get chatCopyDebug() { return browser.$('[data-testid="chat-copy-debug"]') }
+  get chatExportDebug() { return browser.$('[data-testid="chat-export-debug"]') }
   get chatInterrupt() { return browser.$('[data-testid="chat-interrupt"]') }
   get composerStop() { return browser.$('[data-testid="composer-stop"]') }
   get attachmentButton() { return browser.$('[data-testid="attachment-button"]') }

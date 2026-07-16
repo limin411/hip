@@ -56,7 +56,7 @@ describe('defaultItemsForKind / group baseline', () => {
       'message.quote',
       'message.copy',
       'message.copyId',
-      'session.copyDebugBundle',
+      'session.exportDebugBundle',
     ])
   })
 
@@ -114,7 +114,7 @@ describe('ContextMenuSettings', () => {
       'context-menu-settings-item-message.quote',
       'context-menu-settings-item-message.copy',
       'context-menu-settings-item-message.copyId',
-      'context-menu-settings-item-session.copyDebugBundle',
+      'context-menu-settings-item-session.exportDebugBundle',
     ])
   })
 

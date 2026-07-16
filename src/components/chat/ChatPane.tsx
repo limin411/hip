@@ -5,7 +5,9 @@ import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages
 import { useUiStore } from '@/store/uiStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
+import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
+import { toast } from 'sonner'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
@@ -98,7 +100,7 @@ export function ChatPane() {
 
   const showThinking = status === 'running' && last?.role === 'user'
 
-  const copyDebugInfo = async () => {
+  const exportDebugInfo = async () => {
     if (!session || !activeSessionId) return
     const text = sessionDebugBundleJson({
       sessionId: activeSessionId,
@@ -109,16 +111,11 @@ export function ChatPane() {
         ? [{ code: error.code, message: error.message, at: Date.now() }]
         : undefined,
     })
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      // Fallback for environments without clipboard permission.
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
+    const result = await exportSessionDebugBundle(text, activeSessionId)
+    if (result === 'saved') {
+      toast.success(t('chat.exportDebugDone'))
+    } else if (result === 'failed') {
+      toast.error(t('chat.exportDebugFailed'))
     }
   }
 
@@ -220,11 +217,11 @@ export function ChatPane() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => void copyDebugInfo()}
-                  data-testid="chat-copy-debug"
-                  title={t('chat.copyDebugHint')}
+                  onClick={() => void exportDebugInfo()}
+                  data-testid="chat-export-debug"
+                  title={t('chat.exportDebugHint')}
                 >
-                  {t('chat.copyDebug')}
+                  {t('chat.exportDebug')}
                 </Button>
               </div>
             </div>

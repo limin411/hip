@@ -1,5 +1,5 @@
 // e2e/specs/harness-copy-debug.spec.ts
-// Phase 1 H4: copy-debug visible on error; redacted bundle via __hipE2E.
+// Phase 1 H4: export-debug visible on error; redacted bundle via __hipE2E.
 import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
@@ -14,7 +14,7 @@ import { ChatPage } from '../page-objects/ChatPage.js'
 
 const chat = new ChatPage()
 
-describe('harness copy debug @harness @smoke', () => {
+describe('harness export debug @harness @smoke', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()
@@ -23,7 +23,7 @@ describe('harness copy debug @harness @smoke', () => {
     await switchToChatSurface()
   })
 
-  it('shows copy-debug on error and returns a redacted bundle', async () => {
+  it('shows export-debug on error and returns a redacted bundle', async () => {
     const sessionId = await createChatSessionForE2e()
     expect(sessionId).toBeTruthy()
 
@@ -33,9 +33,10 @@ describe('harness copy debug @harness @smoke', () => {
     await err.waitForExist({ timeout: 15000 })
     expect(await err.isExisting()).toBe(true)
 
-    const copyBtn = await browser.$('[data-testid="chat-copy-debug"]')
-    await copyBtn.waitForExist({ timeout: 10000 })
-    await browser.execute((el: HTMLElement) => el.click(), copyBtn)
+    const exportBtn = await browser.$('[data-testid="chat-export-debug"]')
+    await exportBtn.waitForExist({ timeout: 10000 })
+    // Bundle content is verified via __hipE2E (avoids native save-dialog flake).
+    expect(await exportBtn.isExisting()).toBe(true)
 
     const json = await getSessionDebugBundleJson()
     expect(json).toBeTruthy()

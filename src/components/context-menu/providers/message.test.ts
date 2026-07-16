@@ -7,6 +7,7 @@ import {
   setComposerQuote,
 } from '@/components/command-palette/composerBridge'
 import { sessionService, useDomainStore } from '@/domain'
+import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import {
   formatQuoteForComposer,
   messageCopyText,
@@ -16,6 +17,10 @@ import type { ContextMenuBuildContext } from '../types'
 
 vi.mock('sonner', () => ({
   toast: { message: vi.fn(), error: vi.fn(), success: vi.fn() },
+}))
+
+vi.mock('@/lib/exportSessionDebug', () => ({
+  exportSessionDebugBundle: vi.fn(async () => 'saved' as const),
 }))
 
 function makeMessage(partial: Partial<Message> & Pick<Message, 'id' | 'role' | 'content'>): Message {
@@ -243,7 +248,7 @@ describe('messageProvider', () => {
       },
       makeCtx({ activeSessionId: 's1' }),
     )
-    expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(true)
+    expect(items.some((i) => i.id === 'session.exportDebugBundle')).toBe(true)
     // Visibility must not serialize the full bundle.
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
@@ -262,7 +267,7 @@ describe('messageProvider', () => {
       },
       makeCtx({ activeSessionId: null }),
     )
-    expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(false)
+    expect(items.some((i) => i.id === 'session.exportDebugBundle')).toBe(false)
   })
 
   it('omits debug bundle when payload session differs from active', () => {
@@ -277,6 +282,36 @@ describe('messageProvider', () => {
       },
       makeCtx({ activeSessionId: 's1' }),
     )
-    expect(items.some((i) => i.id === 'session.copyDebugBundle')).toBe(false)
+    expect(items.some((i) => i.id === 'session.exportDebugBundle')).toBe(false)
+  })
+
+  it('export debug bundle writes via exportSessionDebugBundle, not clipboard', async () => {
+    const exportMock = vi.mocked(exportSessionDebugBundle)
+    exportMock.mockClear()
+    exportMock.mockResolvedValue('saved')
+    const jsonSpy = vi
+      .spyOn(sessionService, 'getSessionDebugBundleJson')
+      .mockReturnValue('{"version":1}\n')
+    const copyText = vi.fn(async () => true)
+    const items = messageProvider(
+      {
+        kind: 'message',
+        payload: {
+          message: makeMessage({ id: 'm1', role: 'user', content: 'x' }),
+          isLastAssistant: false,
+          sessionId: 's1',
+        },
+      },
+      makeCtx({ activeSessionId: 's1', copyText }),
+    )
+    const item = items.find((i) => i.id === 'session.exportDebugBundle')
+    expect(item).toBeTruthy()
+    item!.run()
+    await vi.waitFor(() => {
+      expect(exportMock).toHaveBeenCalledWith('{"version":1}\n', 's1')
+    })
+    expect(copyText).not.toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith('chat.exportDebugDone')
+    jsonSpy.mockRestore()
   })
 })

@@ -67,8 +67,10 @@ export const zhCN = {
       errorNoApiKey: '未配置 DeepSeek API Key，请在「设置」中配置后重试。',
       errorGeneric: '出错了：{{message}}',
       openSettings: '前往设置',
-      copyDebug: '复制调试信息',
-      copyDebugHint: '复制脱敏会话快照用于排查（不含 API 密钥）',
+      exportDebug: '导出调试文件',
+      exportDebugHint: '导出脱敏会话快照用于排查（不含 API 密钥）',
+      exportDebugDone: '调试文件已导出',
+      exportDebugFailed: '导出调试文件失败',
       projectGuidanceChip: '已加载 {{name}}',
       projectGuidanceLoaded: '项目说明 {{name}} 已注入智能体上下文',
       projectGuidanceHint: '这些规则会自动应用于当前文件夹。',
@@ -1178,7 +1180,7 @@ export const zhCN = {
         copy: '复制代码',
       },
       session: {
-        copyDebugBundle: '复制调试信息',
+        exportDebugBundle: '导出调试文件',
       },
       copyFailed: '无法复制到剪贴板',
       sessionTab: {

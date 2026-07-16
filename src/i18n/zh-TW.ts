@@ -67,8 +67,10 @@ export const zhTW = {
       errorNoApiKey: '未配置 DeepSeek API Key，請在「設置」中配置後重試。',
       errorGeneric: '出錯了：{{message}}',
       openSettings: '前往設置',
-      copyDebug: '複製偵錯資訊',
-      copyDebugHint: '複製脫敏會話快照以利排查（不含 API 金鑰）',
+      exportDebug: '匯出偵錯檔案',
+      exportDebugHint: '匯出脫敏會話快照以利排查（不含 API 金鑰）',
+      exportDebugDone: '偵錯檔案已匯出',
+      exportDebugFailed: '匯出偵錯檔案失敗',
       projectGuidanceChip: '已載入 {{name}}',
       projectGuidanceLoaded: '專案說明 {{name}} 已注入智慧體上下文',
       projectGuidanceHint: '這些規則會自動套用到目前資料夾。',
@@ -1178,7 +1180,7 @@ export const zhTW = {
         copy: '複製程式碼',
       },
       session: {
-        copyDebugBundle: '複製偵錯資訊',
+        exportDebugBundle: '匯出偵錯檔案',
       },
       copyFailed: '無法複製到剪貼簿',
       sessionTab: {

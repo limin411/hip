@@ -99,7 +99,7 @@ export type BuildDebugBundleInput = {
   now?: () => string
 }
 
-/** Pure builder for the Sprint A "copy debug info" payload. */
+/** Pure builder for the redacted session debug export payload. */
 export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDebugBundle {
   const cfg = sanitizeConfig(input.config)
   const surface = typeof cfg.surface === 'string' ? cfg.surface : undefined

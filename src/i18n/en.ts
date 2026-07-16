@@ -69,8 +69,10 @@ export const en = {
       errorNoApiKey: 'DeepSeek API key not configured. Set it in Settings to continue.',
       errorGeneric: 'Something went wrong: {{message}}',
       openSettings: 'Open Settings',
-      copyDebug: 'Copy debug info',
-      copyDebugHint: 'Copy a redacted session snapshot for troubleshooting (no API keys)',
+      exportDebug: 'Export debug file',
+      exportDebugHint: 'Export a redacted session snapshot for troubleshooting (no API keys)',
+      exportDebugDone: 'Debug file exported',
+      exportDebugFailed: 'Could not export debug file',
       projectGuidanceChip: '{{name}} loaded',
       projectGuidanceLoaded: 'Project instructions from {{name}} are injected into the agent context',
       projectGuidanceHint: 'These rules are applied automatically for this folder.',
@@ -1187,7 +1189,7 @@ export const en = {
         copy: 'Copy code',
       },
       session: {
-        copyDebugBundle: 'Copy debug info',
+        exportDebugBundle: 'Export debug file',
       },
       copyFailed: 'Could not copy to clipboard',
       sessionTab: {

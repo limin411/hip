@@ -2,6 +2,7 @@ import type { Message } from '@hip/protocol'
 import { toast } from 'sonner'
 import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { sessionService } from '@/domain'
+import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import type {
   ContextMenuBuildContext,
@@ -82,12 +83,21 @@ export const messageProvider: ContextProvider = (req, ctx) => {
   // Debug bundle when a session can produce one (active session with loaded data).
   if (canOfferDebugBundle(sessionId, ctx)) {
     items.push({
-      id: 'session.copyDebugBundle',
-      label: ctx.t('contextMenu.session.copyDebugBundle'),
+      id: 'session.exportDebugBundle',
+      label: ctx.t('contextMenu.session.exportDebugBundle'),
       group: 'debug',
       run: () => {
-        const json = sessionService.getSessionDebugBundleJson()
-        if (json) void ctx.copyText(json)
+        void (async () => {
+          const json = sessionService.getSessionDebugBundleJson()
+          if (!json) return
+          const sid = ctx.activeSessionId ?? 'session'
+          const result = await exportSessionDebugBundle(json, sid)
+          if (result === 'saved') {
+            toast.success(ctx.t('chat.exportDebugDone'))
+          } else if (result === 'failed') {
+            toast.error(ctx.t('chat.exportDebugFailed'))
+          }
+        })()
       },
     })
   }

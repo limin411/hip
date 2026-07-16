@@ -420,6 +420,21 @@ async fn fetch_catalog(app: &tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+/// Write UTF-8 text to an absolute path chosen by the user (e.g. save dialog).
+#[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    let dest = std::path::PathBuf::from(&path);
+    if !dest.is_absolute() {
+        return Err("path must be absolute".into());
+    }
+    if let Some(parent) = dest.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+    }
+    std::fs::write(&dest, contents).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
     fetch_catalog(&app).await
@@ -507,6 +522,7 @@ pub fn run() {
             knowledge::knowledge_list_versions,
             knowledge::knowledge_read_version,
             knowledge::knowledge_restore_version,
+            write_text_file,
             knowledge::knowledge_export_doc,
             knowledge::knowledge_export_space_zip,
             knowledge::knowledge_import_folder,

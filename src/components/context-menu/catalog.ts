@@ -26,8 +26,8 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'debug',
   },
   {
-    id: 'session.copyDebugBundle',
-    labelKey: 'contextMenu.session.copyDebugBundle',
+    id: 'session.exportDebugBundle',
+    labelKey: 'contextMenu.session.exportDebugBundle',
     kind: 'message',
     group: 'debug',
   },

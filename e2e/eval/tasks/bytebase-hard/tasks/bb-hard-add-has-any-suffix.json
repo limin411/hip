@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-hard-add-has-any-suffix",
+  "name": "Add HasAnySuffix helper + tests",
+  "level": "L2",
+  "difficulty": "medium",
+  "tags": ["add_feature", "unit-test"],
+  "prompt": "In package backend/common, implement a new helper:\n\n  func HasAnySuffix(src string, suffixes ...string) bool\n\nIt should return true if src has any of the given suffixes (use strings.HasSuffix), otherwise false — mirror the style of HasPrefixes. Add unit tests in util_test.go covering positive and negative cases. Run `go test ./backend/common/ -count=1` until green. Do not break existing tests. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "none" }
+  },
+  "ui": {
+    "timeout_ms": 900000,
+    "expect": {
+      "changes_paths_regex": ["backend/common/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "backend/common/" }
+    ]
+  },
+  "rubric": { "axes": ["add_feature"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": { "new_api": "HasAnySuffix" }
+}

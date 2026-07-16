@@ -1,0 +1,17 @@
+diff --git a/backend/common/util.go b/backend/common/util.go
+index 02dacbd..4e88a78 100644
+--- a/backend/common/util.go
++++ b/backend/common/util.go
+@@ -60,11 +60,7 @@ func RandomString(n int) (string, error) {
+ 
+ // HasPrefixes returns true if the string s has any of the given prefixes.
+ func HasPrefixes(src string, prefixes ...string) bool {
+-	for _, prefix := range prefixes {
+-		if strings.HasPrefix(src, prefix) {
+-			return true
+-		}
+-	}
++	// hip-eval fixture: intentional bug — always false
+ 	return false
+ }
+ 

@@ -1,6 +1,8 @@
-/** Eval task pack types (UI-first capability evaluation). schemaVersion 1. */
+/** Eval task pack types (UI-first capability evaluation). schemaVersion 1 + matrix extensions. */
 
 export type WorkspaceStrategy = 'worktree' | 'copy'
+
+export type EvalLevel = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5'
 
 export type FailureTagV1 =
   | 'pass'
@@ -18,6 +20,7 @@ export type FailureTagV1 =
   | 'primary_tree_mutated'
   | 'awaiting_user'
   | 'cancelled'
+  | 'plan_skipped'
   | 'unknown'
 
 export type SoftCheck =
@@ -25,6 +28,13 @@ export type SoftCheck =
   | { kind: 'paths_touched_regex'; pattern: string }
   | { kind: 'paths_avoid_regex'; pattern: string }
   | { kind: 'assistant_text_regex'; pattern: string }
+  | { kind: 'min_paths'; count: number }
+  | { kind: 'tool_name_seen'; name: string }
+  | { kind: 'plan_approved_required' }
+
+export type PlanMode = 'forbid' | 'allow' | 'prefer' | 'require'
+
+export type PassPolicy = 'verify_all' | 'verify_or_text' | 'safety_only'
 
 export interface TaskSpec {
   schemaVersion: 1
@@ -33,12 +43,11 @@ export interface TaskSpec {
   prompt: string
   language?: string
   difficulty?: 'easy' | 'medium' | 'hard'
+  level?: EvalLevel
   tags?: string[]
   workspace: {
     strategy?: WorkspaceStrategy
-    /** Absolute path override (tests). */
     repo_path?: string
-    /** Env var holding absolute path to primary repo. */
     repo_path_env?: string
     base_sha?: string
     base_ref?: string
@@ -50,9 +59,12 @@ export interface TaskSpec {
   ui: {
     surface?: 'code' | 'chat'
     permission_mode?: 'chat' | 'edit' | 'full'
-    /** Overall UI turn timeout (ms). */
     timeout_ms?: number
     auto_approve_permissions?: boolean
+    /** Max auto-resume messages on chat-interrupt (default 2). */
+    auto_resume_interrupt?: number
+    plan_mode?: PlanMode
+    multi_turn?: Array<{ role: 'user'; content: string; when?: 'start' | 'on_interrupt' }>
     expect?: {
       changes_paths_regex?: string[]
       changes_avoid_regex?: string[]
@@ -65,7 +77,15 @@ export interface TaskSpec {
     soft?: SoftCheck[]
     timeout_sec?: number
   }
-  scoring?: { pass_requires?: 'verify_all'; partial_credit?: boolean }
+  rubric?: {
+    axes: string[]
+    pass_policy?: PassPolicy
+  }
+  scoring?: {
+    pass_requires?: 'verify_all' | 'safety_guard'
+    require_plan_approved?: boolean
+    partial_credit?: boolean
+  }
   metadata?: Record<string, unknown>
 }
 
@@ -78,8 +98,9 @@ export interface PackManifest {
     workspace?: Partial<TaskSpec['workspace']>
     ui?: Partial<TaskSpec['ui']>
     verify?: Partial<NonNullable<TaskSpec['verify']>>
+    scoring?: Partial<NonNullable<TaskSpec['scoring']>>
+    rubric?: Partial<NonNullable<TaskSpec['rubric']>>
   }
-  /** Relative paths to task JSON files from pack root. */
   tasks: string[]
 }
 
@@ -110,12 +131,7 @@ export interface VerifyCommandResult {
 }
 
 export interface ChangeInventory {
-  /** Absolute: worktree still has uncommitted changes. */
   dirtyAfter: boolean
-  /**
-   * Relative to post-setup baseline: agent changed something
-   * (including restoring fixture dirt back to clean HEAD).
-   */
   agentTouched?: boolean
   paths: string[]
   fullPatch: string
@@ -130,6 +146,8 @@ export interface UiTurnOutcome {
   permissionModalStuck: boolean
   awaitingUser: boolean
   errorHints: string[]
+  planApproved?: boolean
+  interruptResumes?: number
 }
 
 export interface ScoreInput {
@@ -145,6 +163,9 @@ export interface ScoreInput {
   primaryMutated: boolean
   expect?: TaskSpec['ui']['expect']
   soft?: SoftCheck[]
+  scoring?: TaskSpec['scoring']
+  rubric?: TaskSpec['rubric']
+  toolNames?: string[]
 }
 
 export interface ScoreResult {
@@ -152,6 +173,9 @@ export interface ScoreResult {
   tags: FailureTagV1[]
   notes: string[]
   verifyPassed: boolean
+  axes?: string[]
+  planApproved?: boolean
+  interruptResumes?: number
 }
 
 export interface RunReport {
@@ -189,4 +213,10 @@ export interface RunReport {
     dir: string
     report: string
   }
+}
+
+export interface AxisCluster {
+  byAxis: Record<string, { total: number; passed: number; failed: number; tags: Record<string, number> }>
+  byTask: Record<string, { passed: boolean; tags: string[]; axes: string[] }>
+  reports: string[]
 }

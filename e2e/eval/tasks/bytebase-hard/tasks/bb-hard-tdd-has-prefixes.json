@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-hard-tdd-has-prefixes",
+  "name": "TDD-style fix for HasPrefixes",
+  "level": "L2",
+  "difficulty": "medium",
+  "tags": ["test_loop", "unit-test"],
+  "prompt": "backend/common unit tests related to HasPrefixes are failing. You MUST first run `go test ./backend/common/ -count=1` (or a focused -run TestHasPrefixes) and observe the failure output, THEN fix the implementation (not the tests), THEN re-run tests until green. Do not commit or push. Do not modify frontend/.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-has-prefixes.patch" }
+  },
+  "ui": {
+    "timeout_ms": 900000,
+    "expect": {
+      "changes_paths_regex": ["backend/common/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "backend/common/" }
+    ]
+  },
+  "rubric": { "axes": ["test_loop", "edit_single"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" }
+}

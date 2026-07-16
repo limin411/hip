@@ -19,6 +19,11 @@ function mergeTask(defaults: PackManifest['defaults'] | undefined, task: TaskSpe
       commands: task.verify?.commands ?? defaults.verify?.commands,
       soft: task.verify?.soft ?? defaults.verify?.soft,
     },
+    scoring: { ...defaults.scoring, ...task.scoring },
+    rubric: {
+      axes: task.rubric?.axes ?? defaults.rubric?.axes ?? [],
+      pass_policy: task.rubric?.pass_policy ?? defaults.rubric?.pass_policy,
+    },
   }
 }
 

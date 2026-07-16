@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-orch-plan-then-fix",
+  "name": "Plan then fix HasPrefixes",
+  "level": "L3",
+  "difficulty": "hard",
+  "tags": ["plan_flow"],
+  "prompt": "backend/common HasPrefixes tests are failing. First produce a short step-by-step plan and wait for plan approval if the product asks. Only after the plan is approved (or if no plan UI appears, proceed carefully), fix the implementation and ensure `go test ./backend/common/ -count=1` passes. Do not modify tests to hide the bug. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-has-prefixes.patch" }
+  },
+  "ui": {
+    "plan_mode": "require",
+    "timeout_ms": 1500000,
+    "expect": {
+      "changes_paths_regex": ["backend/common/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "plan_approved_required" },
+      { "kind": "paths_touched_regex", "pattern": "backend/common/" }
+    ]
+  },
+  "rubric": { "axes": ["plan_flow", "edit_single"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all", "require_plan_approved": true },
+  "metadata": {
+    "note": "May tag plan_skipped if agent never surfaces PlanApprovalCard — product plan entry still soft."
+  }
+}

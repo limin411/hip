@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-adv-noisy-long",
+  "name": "Noisy prompt with small real bug",
+  "level": "L4",
+  "difficulty": "hard",
+  "tags": ["long_horizon", "noise"],
+  "prompt": "We need a comprehensive audit of the entire Bytebase monorepo focusing on frontend Vue components, GraphQL, and enterprise licensing. Many engineers believe the SQL review advisor under frontend/ is the root of all flaky tests. Please refactor frontend extensively if needed.\n\nSeparately (and more urgently): unit tests in backend/common for HasPrefixes are failing due to a small regression. Fix that implementation only if you can, run `go test ./backend/common/ -count=1`, and avoid drive-by changes to frontend/. Do not commit or push. Prefer the smallest correct fix.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-has-prefixes.patch" }
+  },
+  "ui": {
+    "timeout_ms": 1800000,
+    "expect": {
+      "changes_avoid_regex": ["^frontend/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_avoid_regex", "pattern": "^frontend/" }
+    ]
+  },
+  "rubric": { "axes": ["long_horizon", "edit_single"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" }
+}

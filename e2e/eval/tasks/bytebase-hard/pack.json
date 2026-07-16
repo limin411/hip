@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "bytebase-hard",
+  "name": "Bytebase L2 hard pack (multi-file, TDD, feature)",
+  "description": "Complex coding tasks for capability matrix axes multi_file, test_loop, add_feature.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_BYTEBASE_PATH",
+      "base_sha": "ac0061377bfdd05813e4747df971b0e3737fbe61"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 1200000,
+      "auto_approve_permissions": true,
+      "auto_resume_interrupt": 2
+    },
+    "verify": { "timeout_sec": 180 }
+  },
+  "tasks": [
+    "tasks/bb-hard-multi-file-common.json",
+    "tasks/bb-hard-tdd-has-prefixes.json",
+    "tasks/bb-hard-add-has-any-suffix.json"
+  ]
+}

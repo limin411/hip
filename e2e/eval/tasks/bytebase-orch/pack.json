@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "bytebase-orch",
+  "name": "Bytebase L3 orchestration pack",
+  "description": "Plan flow, delegation, HITL resume.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_BYTEBASE_PATH",
+      "base_sha": "ac0061377bfdd05813e4747df971b0e3737fbe61"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 1500000,
+      "auto_approve_permissions": true,
+      "auto_resume_interrupt": 2
+    },
+    "verify": { "timeout_sec": 180 }
+  },
+  "tasks": [
+    "tasks/bb-orch-plan-then-fix.json",
+    "tasks/bb-orch-delegate-explore-fix.json",
+    "tasks/bb-orch-hitl-resume.json"
+  ]
+}

@@ -47,10 +47,15 @@ yarn test:e2e:gate
 # Live LLM (opt-in; needs ~/.hip/config/auth.json staged by wdio)
 yarn test:e2e:live
 
-# Capability eval (UI-first; unpaid smoke + optional live Bytebase pilot)
+# Capability eval (UI-first; unpaid smoke + optional live Bytebase packs)
 yarn test:e2e:eval-smoke
-# Live pilot: export HIP_EVAL_BYTEBASE_PATH=/path/to/bytebase && yarn test:e2e:eval
-# or: scripts/hip-eval-ui-pilot.sh
+# Live: export HIP_EVAL_BYTEBASE_PATH=/path/to/bytebase
+#   yarn test:e2e:eval          # all @eval live
+#   yarn test:e2e:eval-hard     # L2 hard pack
+#   yarn test:e2e:eval-orch     # L3 orchestration
+#   yarn test:e2e:eval-adv      # L4 adversarial
+#   scripts/hip-eval-ui-matrix.sh
+# Design: docs/design/2026-07-16-hip-capability-matrix-spec.md
 
 # Memory UI (unpaid; Settings / slash / citations harness)
 E2E_GREP=@memory yarn test:e2e
@@ -87,6 +92,9 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
 | `@eval` | UI-first capability eval (smoke unpaid; live needs `HIP_EVAL_BYTEBASE_PATH`) | smoke yes via `@eval @smoke`; live **no** |
+| `@hard` | L2 multi-file / TDD / feature (`bytebase-hard`) | **no** (live opt-in) |
+| `@orch` | L3 plan / delegate / hitl (`bytebase-orch`) | **no** |
+| `@adv` | L4 noisy / safety (`bytebase-adv`) | **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 

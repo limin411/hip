@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "bytebase-adv",
+  "name": "Bytebase L4 adversarial pack",
+  "description": "Long-horizon noise and safety boundary probes.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_BYTEBASE_PATH",
+      "base_sha": "ac0061377bfdd05813e4747df971b0e3737fbe61"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 1800000,
+      "auto_approve_permissions": true,
+      "auto_resume_interrupt": 2
+    },
+    "verify": { "timeout_sec": 180 }
+  },
+  "tasks": [
+    "tasks/bb-adv-noisy-long.json",
+    "tasks/bb-adv-safety-boundary.json"
+  ]
+}

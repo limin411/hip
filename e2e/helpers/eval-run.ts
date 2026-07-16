@@ -5,6 +5,7 @@ import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from './app.
 import { skipLoginIfPresent } from './auth.js'
 import { sendEvalPrompt, waitForTurnSettle, getLastAssistantTextReadOnly } from './eval-composer.js'
 import { pumpPermissionsUntil, setPermissionModeUi, permissionModalOpen } from './eval-permissions.js'
+import { pumpPlanApprovals, planApprovalVisible } from './eval-plan.js'
 import { selectPanelTab } from './panel.js'
 import { switchToCodeSurface } from './surface.js'
 import { diffFileTexts } from './git-workspace.js'
@@ -70,9 +71,19 @@ export interface EvalRunResult {
   workspace?: PreparedWorkspace
 }
 
+function interruptResumeMessages(task: TaskSpec): string[] {
+  const fromMulti = (task.ui.multi_turn ?? [])
+    .filter((m) => m.when === 'on_interrupt' || !m.when)
+    .map((m) => m.content)
+  if (fromMulti.length) return fromMulti
+  return [
+    'Please continue and finish the task without asking further questions. Be specific and complete the remaining work.',
+    'Continue. Complete the remaining work now. Do not ask more questions.',
+  ]
+}
+
 /**
  * Full eval run: prepare worktree → UI agent turn → inventory → verify → score → report.
- * For @live @eval specs.
  */
 export async function runEvalTask(opts: {
   task: TaskSpec
@@ -107,6 +118,8 @@ export async function runEvalTask(opts: {
       permissionModalStuck: false,
       awaitingUser: false,
       errorHints: [prepareError ?? 'prepare failed'],
+      planApproved: false,
+      interruptResumes: 0,
     }
     const score = scoreRun({
       prepareOk: false,
@@ -115,6 +128,9 @@ export async function runEvalTask(opts: {
       inventory: { dirtyAfter: false, paths: [], fullPatch: '', trackedPatch: '' },
       verify: { ran: false, results: [] },
       primaryMutated: false,
+      scoring: opts.task.scoring,
+      rubric: opts.task.rubric,
+      soft: opts.task.verify?.soft,
     })
     const report = buildReport({
       runId,
@@ -137,6 +153,9 @@ export async function runEvalTask(opts: {
   const timeoutMs = opts.task.ui.timeout_ms ?? 900_000
   const autoApprove = opts.task.ui.auto_approve_permissions !== false
   const mode = opts.task.ui.permission_mode ?? 'edit'
+  const maxResume = opts.task.ui.auto_resume_interrupt ?? 2
+  const planMode = opts.task.ui.plan_mode ?? 'allow'
+  const resumeMsgs = interruptResumeMessages(opts.task)
 
   await ensureCodeAppReady()
   await bindFolderViaUi(workspace.cwd)
@@ -144,17 +163,24 @@ export async function runEvalTask(opts: {
   try {
     await setPermissionModeUi(mode)
   } catch {
-    // default is edit; continue if chip missing
+    // default is edit
   }
 
-  // Baseline AFTER setup patch (fixture dirt must not count as agent work)
   const baselineInventory = captureInventory(workspace.cwd)
   writeTextArtifact(runId, 'baseline-paths.txt', baselineInventory.paths.join('\n'))
 
+  // Optional opening multi-turn messages (when: start)
+  const startExtras = (opts.task.ui.multi_turn ?? []).filter((m) => m.when === 'start')
   await sendEvalPrompt(opts.task.prompt)
+  for (const m of startExtras) {
+    await browser.pause(500)
+    await sendEvalPrompt(m.content)
+  }
 
   let approved = 0
   let interruptResumes = 0
+  let planClicks = 0
+
   const settle = await waitForTurnSettle({
     timeoutMs,
     userPrompt: opts.task.prompt,
@@ -164,21 +190,21 @@ export async function runEvalTask(opts: {
         const r = await pumpPermissionsUntil(Date.now() + 5_000, true)
         approved += r.approvedCount
       }
-      // Agent interrupt / ask-user pause has no Allow button — resume with a short reply (max 2×)
-      if (autoApprove && interruptResumes < 2) {
+      if (planMode === 'prefer' || planMode === 'require' || planMode === 'allow') {
+        const n = await pumpPlanApprovals(1)
+        planClicks += n
+      }
+      if (autoApprove && interruptResumes < maxResume) {
         const hasInterrupt = await browser.execute(() =>
           Boolean(document.querySelector('[data-testid="chat-interrupt"]')),
         )
         if (hasInterrupt) {
+          const msg = resumeMsgs[Math.min(interruptResumes, resumeMsgs.length - 1)]
           interruptResumes += 1
           try {
-            await sendEvalPrompt(
-              interruptResumes === 1
-                ? 'Please continue and finish the task without asking further questions.'
-                : 'Continue. Complete the remaining work now.',
-            )
+            await sendEvalPrompt(msg)
           } catch {
-            // ignore send failures mid-turn
+            // ignore
           }
           await browser.pause(800)
         }
@@ -186,13 +212,14 @@ export async function runEvalTask(opts: {
     },
   })
 
-  // final permission pump
   const perm = await pumpPermissionsUntil(Date.now() + 2_000, autoApprove)
   approved += perm.approvedCount
+  planClicks += await pumpPlanApprovals(2)
 
   const assistantText = await getLastAssistantTextReadOnly()
   const changesPaths = await captureChangesPaths()
   const stuck = await permissionModalOpen()
+  const planStillOpen = await planApprovalVisible()
 
   const awaitingUser = await browser.execute(() => {
     return Boolean(
@@ -202,11 +229,15 @@ export async function runEvalTask(opts: {
     )
   })
 
+  const planApproved = planClicks > 0 && !planStillOpen
+
   const hints: string[] = []
   if (approved) hints.push(`permissions_approved=${approved}`)
   if (interruptResumes) hints.push(`interrupt_resumes=${interruptResumes}`)
+  if (planClicks) hints.push(`plan_approvals=${planClicks}`)
   if (!settle.sawRunning) hints.push('never_saw_running')
   if (settle.timedOut) hints.push('turn_timeout')
+  if (planMode === 'require' && !planApproved) hints.push('plan_required_missing')
 
   const uiOutcome: UiTurnOutcome = {
     settled: settle.settled && settle.sawRunning && !settle.timedOut,
@@ -216,10 +247,11 @@ export async function runEvalTask(opts: {
     permissionModalStuck: stuck,
     awaitingUser,
     errorHints: hints,
+    planApproved,
+    interruptResumes,
   }
 
   const afterInventory = captureInventory(workspace.cwd)
-  // Score agent delta vs post-setup baseline (fixture-only dirt is not "agent change")
   const inventory = inventoryDelta(baselineInventory, afterInventory)
   writeTextArtifact(runId, 'full-patch.diff', afterInventory.fullPatch)
   writeTextArtifact(runId, 'tracked-patch.diff', afterInventory.trackedPatch)
@@ -231,7 +263,6 @@ export async function runEvalTask(opts: {
   const primaryAfter = snapshotPrimary(workspace.repoPath)
   const mutated = primaryMutated(workspace.primaryGuardBefore, primaryAfter)
 
-  // ui_changes_missing only if *agent* changed disk but Changes UI empty
   const score = scoreRun({
     prepareOk: true,
     ui: uiOutcome,
@@ -244,6 +275,8 @@ export async function runEvalTask(opts: {
     primaryMutated: mutated,
     expect: opts.task.ui.expect,
     soft: opts.task.verify?.soft,
+    scoring: opts.task.scoring,
+    rubric: opts.task.rubric,
   })
 
   const report = buildReport({
@@ -287,7 +320,6 @@ function buildReport(args: {
   score: ScoreResult
   primaryAfter: { porcelain: string; head: string }
   outDir: string
-  ui?: unknown
 }): RunReport {
   const finishedAt = new Date().toISOString()
   const ws = args.workspace
@@ -334,9 +366,21 @@ function buildReport(args: {
   }
 }
 
+export function loadEvalPack(packIdOrDir: string): { pack: PackManifest; packDir: string; tasks: TaskSpec[] } {
+  const candidates = [
+    path.resolve(packIdOrDir),
+    path.resolve('e2e/eval/tasks', packIdOrDir),
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c) && (fs.existsSync(path.join(c, 'pack.json')) || c.endsWith('pack.json'))) {
+      return loadPack(c)
+    }
+  }
+  throw new Error(`pack not found: ${packIdOrDir}`)
+}
+
 export function loadBytebasePilotPack(): { pack: PackManifest; packDir: string; tasks: TaskSpec[] } {
-  const packDir = path.resolve('e2e/eval/tasks/bytebase-pilot')
-  return loadPack(packDir)
+  return loadEvalPack('bytebase-pilot')
 }
 
 export function loadTaskFromPack(packDir: string, taskFile: string): TaskSpec {

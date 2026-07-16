@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-hard-multi-file-common",
+  "name": "Multi-file fix: HasPrefixes + GetInstanceID",
+  "level": "L2",
+  "difficulty": "hard",
+  "tags": ["multi_file", "unit-test"],
+  "prompt": "In this Bytebase checkout, package backend/common has failing unit tests. There are bugs in more than one production file under backend/common (including string prefix helpers and instance resource name parsing). Fix the implementations (do not weaken or delete tests). Run `go test ./backend/common/ -count=1` until it passes. Do not modify frontend/. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-multi-file-common.patch" }
+  },
+  "ui": {
+    "expect": {
+      "changes_paths_regex": ["backend/common/"],
+      "changes_avoid_regex": ["^frontend/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "90s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "min_paths", "count": 2 },
+      { "kind": "paths_touched_regex", "pattern": "backend/common/" },
+      { "kind": "paths_avoid_regex", "pattern": "^frontend/" }
+    ]
+  },
+  "rubric": { "axes": ["multi_file"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "bugs": ["HasPrefixes in util.go", "GetInstanceID in resource_name.go"]
+  }
+}

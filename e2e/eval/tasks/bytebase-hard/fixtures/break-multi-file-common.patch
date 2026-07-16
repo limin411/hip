@@ -1,0 +1,36 @@
+diff --git a/backend/common/resource_name.go b/backend/common/resource_name.go
+index 40d4683..fc85f6e 100644
+--- a/backend/common/resource_name.go
++++ b/backend/common/resource_name.go
+@@ -127,12 +127,8 @@ func GetEnvironmentID(name string) (string, error) {
+ 
+ // GetInstanceID returns the instance ID from a resource name.
+ func GetInstanceID(name string) (string, error) {
+-	// the instance request should be instances/{instance-id}
+-	tokens, err := GetNameParentTokens(name, InstanceNamePrefix)
+-	if err != nil {
+-		return "", err
+-	}
+-	return tokens[0], nil
++	// hip-eval multi-file fixture bug 2
++	return "", errors.New("hip-eval broken GetInstanceID")
+ }
+ 
+ // GetInstanceDatabaseID returns the instance ID and database ID from a resource name.
+diff --git a/backend/common/util.go b/backend/common/util.go
+index 02dacbd..e6c68ec 100644
+--- a/backend/common/util.go
++++ b/backend/common/util.go
+@@ -60,11 +60,7 @@ func RandomString(n int) (string, error) {
+ 
+ // HasPrefixes returns true if the string s has any of the given prefixes.
+ func HasPrefixes(src string, prefixes ...string) bool {
+-	for _, prefix := range prefixes {
+-		if strings.HasPrefix(src, prefix) {
+-			return true
+-		}
+-	}
++	// hip-eval multi-file fixture bug 1
+ 	return false
+ }
+ 

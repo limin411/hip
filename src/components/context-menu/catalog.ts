@@ -63,27 +63,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'session',
   },
   {
-    id: 'sessionTab.deleteOthers',
-    labelKey: 'contextMenu.sessionTab.deleteOthers',
-    kind: 'sessionTab',
-    group: 'danger',
-    danger: true,
-  },
-  {
-    id: 'sessionTab.deleteToRight',
-    labelKey: 'contextMenu.sessionTab.deleteToRight',
-    kind: 'sessionTab',
-    group: 'danger',
-    danger: true,
-  },
-  {
-    id: 'sessionTab.deleteAllOpen',
-    labelKey: 'contextMenu.sessionTab.deleteAllOpen',
-    kind: 'sessionTab',
-    group: 'danger',
-    danger: true,
-  },
-  {
     id: 'sessionHistory.open',
     labelKey: 'contextMenu.sessionHistory.open',
     kind: 'sessionHistory',

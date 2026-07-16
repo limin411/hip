@@ -1,4 +1,4 @@
-// Context menu L2 core: quote, tabs (rename/close/bulk cancel), prefs, history, modal focus.
+// Context menu L2 core: quote, tabs (rename/close only), prefs, history, modal focus.
 import { expect } from 'expect-webdriverio'
 import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
@@ -210,7 +210,7 @@ describe('context menu core @context-menu @core', () => {
     )
   })
 
-  it('CM-C3: session tab close removes the tab (Path A delete)', async () => {
+  it('CM-C3: session tab close removes the tab (soft-close)', async () => {
     await createChatSessionForE2e()
     await createChatSessionForE2e()
     const before = await waitForSessionTabs(2)
@@ -229,32 +229,17 @@ describe('context menu core @context-menu @core', () => {
     )
   })
 
-  it('CM-C4: multi-delete shows confirm and cancel leaves tabs unchanged', async () => {
+  it('CM-C4: session tab menu has close but no permanent-delete actions', async () => {
     await createChatSessionForE2e()
     await createChatSessionForE2e()
-    const before = await waitForSessionTabs(2)
-    expect(before).toBeGreaterThanOrEqual(2)
+    await waitForSessionTabs(2)
 
     const hostSel = contextMenuKindSelector('sessionTab')
     await openContextMenu(hostSel)
-    await clickContextMenuItem('sessionTab.deleteOthers')
-
-    const confirmBtn = await browser.$('[data-testid="confirm-delete-sessions"]')
-    await confirmBtn.waitForExist({ timeout: 10000 })
-    expect(await confirmBtn.isExisting()).toBe(true)
-
-    await browser.keys('Escape')
-    await browser.waitUntil(
-      async () => !(await (await browser.$('[data-testid="confirm-delete-sessions"]')).isExisting()),
-      {
-        timeout: 8000,
-        interval: 100,
-        timeoutMsg: 'confirm-delete-sessions still present after cancel',
-      },
-    )
-
-    const after = await (await browser.$$('[data-testid="session-tab"]')).length
-    expect(after).toBe(before)
+    await expectContextMenuItems(['sessionTab.rename', 'sessionTab.close'])
+    const ids = await listContextMenuItemIds()
+    expect(ids.some((id) => id.startsWith('sessionTab.delete'))).toBe(false)
+    await closeContextMenu()
   })
 
   it('CM-C9: canceling rename modal leaves the shell interactive', async () => {

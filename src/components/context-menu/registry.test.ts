@@ -243,10 +243,11 @@ describe('buildContextMenuItems', () => {
     expect(out.map((i) => i.id)).toEqual(
       expect.arrayContaining([
         'sessionTab.close',
-        'sessionTab.deleteOthers',
         'sessionTab.rename',
       ]),
     )
+    expect(out.some((i) => i.id.startsWith('sessionTab.delete'))).toBe(false)
+
     expect(out[0]?.separatorBefore).toBeFalsy()
   })
 

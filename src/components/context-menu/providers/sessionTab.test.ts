@@ -64,7 +64,7 @@ describe('sessionTabProvider', () => {
     ).toEqual([])
   })
 
-  it('emits Path A items including honest bulk delete labels', () => {
+  it('emits rename / copy / reveal / close only (no permanent delete)', () => {
     const items = sessionTabProvider(
       { kind: 'sessionTab', payload: { sessionId: 's2', title: 'Two', surface: 'chat' } },
       makeCtx(),
@@ -74,12 +74,9 @@ describe('sessionTabProvider', () => {
       'sessionTab.copyId',
       'sessionTab.revealInHistory',
       'sessionTab.close',
-      'sessionTab.deleteOthers',
-      'sessionTab.deleteToRight',
-      'sessionTab.deleteAllOpen',
     ])
     expect(items.find((i) => i.id === 'sessionTab.close')?.label).toBe('tabs.closeTab')
-    expect(items.find((i) => i.id === 'sessionTab.deleteOthers')?.danger).toBe(true)
+    expect(items.some((i) => i.id.startsWith('sessionTab.delete'))).toBe(false)
   })
 
   it('single close calls closeSession with no confirm dialog', () => {
@@ -89,56 +86,6 @@ describe('sessionTabProvider', () => {
     )
     items.find((i) => i.id === 'sessionTab.close')!.run()
     expect(closeSession).toHaveBeenCalledWith('s2')
-    expect(getSessionMenuDialog()).toBeNull()
-  })
-
-  it('deleteOthers opens confirm with other ids and does not close yet', () => {
-    const items = sessionTabProvider(
-      { kind: 'sessionTab', payload: { sessionId: 's2', title: 'Two', surface: 'chat' } },
-      makeCtx(),
-    )
-    items.find((i) => i.id === 'sessionTab.deleteOthers')!.run()
-    expect(closeSession).not.toHaveBeenCalled()
-    expect(getSessionMenuDialog()).toEqual({
-      kind: 'confirmBulkDelete',
-      sessionIds: ['s1', 's3'],
-    })
-  })
-
-  it('deleteToRight uses openSessionIds order after the target', () => {
-    const items = sessionTabProvider(
-      { kind: 'sessionTab', payload: { sessionId: 's1', title: 'One', surface: 'chat' } },
-      makeCtx(),
-    )
-    items.find((i) => i.id === 'sessionTab.deleteToRight')!.run()
-    expect(getSessionMenuDialog()).toEqual({
-      kind: 'confirmBulkDelete',
-      sessionIds: ['s2', 's3'],
-    })
-    expect(closeSession).not.toHaveBeenCalled()
-  })
-
-  it('deleteAllOpen confirms all open ids without closing until accept', () => {
-    const items = sessionTabProvider(
-      { kind: 'sessionTab', payload: { sessionId: 's1', title: 'One', surface: 'chat' } },
-      makeCtx(),
-    )
-    items.find((i) => i.id === 'sessionTab.deleteAllOpen')!.run()
-    expect(closeSession).not.toHaveBeenCalled()
-    expect(getSessionMenuDialog()).toEqual({
-      kind: 'confirmBulkDelete',
-      sessionIds: ['s1', 's2', 's3'],
-    })
-  })
-
-  it('disables deleteOthers and deleteToRight when no targets', () => {
-    const items = sessionTabProvider(
-      { kind: 'sessionTab', payload: { sessionId: 's1', title: 'Only', surface: 'chat' } },
-      makeCtx({ openSessionIds: ['s1'] }),
-    )
-    expect(items.find((i) => i.id === 'sessionTab.deleteOthers')?.disabled).toBe(true)
-    expect(items.find((i) => i.id === 'sessionTab.deleteToRight')?.disabled).toBe(true)
-    items.find((i) => i.id === 'sessionTab.deleteOthers')!.run()
     expect(getSessionMenuDialog()).toBeNull()
   })
 

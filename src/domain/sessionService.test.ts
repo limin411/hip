@@ -118,14 +118,26 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id })
   })
 
-  it('closeSession removes from open tabs and deletes session', () => {
-    const svc = new SessionService(new FakeTransport())
+  it('closeSession removes from open tabs but keeps session in history', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
     const id = svc.createSession()
     expect(useUiStore.getState().openSessionIds).toContain(id)
 
     svc.closeSession(id)
     expect(useUiStore.getState().openSessionIds).not.toContain(id)
+    expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(true)
+    expect(t.sent.some((m) => m.type === 'session:delete')).toBe(false)
+  })
+
+  it('deleteSession permanently removes session and notifies backend', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const id = svc.createSession()
+    svc.deleteSession(id)
+    expect(useUiStore.getState().openSessionIds).not.toContain(id)
     expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:delete', sessionId: id })
   })
 
   it('closing the active tab falls back to the tab at the same index', () => {
@@ -151,7 +163,7 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().activeSessionId).toBe(a)
   })
 
-  it('closing an inactive tab keeps the active tab', () => {
+  it('closing an inactive tab keeps the active tab and history entry', () => {
     const svc = new SessionService(new FakeTransport())
     useDomainStore.setState({ sessions: [], activeSessionId: null })
     useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
@@ -164,6 +176,26 @@ describe('SessionService', () => {
     svc.closeSession(b)
     expect(useDomainStore.getState().activeSessionId).toBe(a)
     expect(useUiStore.getState().openSessionIds).toEqual([a])
+    expect(useDomainStore.getState().sessions.map((s) => s.id).sort()).toEqual([a, b].sort())
+  })
+
+  it('closing the last tab deselects but keeps session for history reopen', () => {
+    const svc = new SessionService(new FakeTransport())
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
+
+    const id = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+
+    svc.closeSession(id)
+    expect(useUiStore.getState().openSessionIds).toEqual([])
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+    expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(true)
+    expect(useUiStore.getState().chatSessionId).toBeNull()
+
+    svc.selectSession(id)
+    expect(useDomainStore.getState().activeSessionId).toBe(id)
+    expect(useUiStore.getState().openSessionIds).toContain(id)
   })
 
   it('session:list:result restores open tabs but stays on New Conversation (no auto-select)', () => {

@@ -836,27 +836,37 @@ export class SessionService {
     }
   }
 
+  /**
+   * Soft-close a title-bar tab: remove from open tabs only.
+   * Session stays in history; permanent delete is deleteSession (History page).
+   */
   closeSession(id: string): void {
     const wasActive = useDomainStore.getState().activeSessionId === id
     const ids = useUiStore.getState().openSessionIds
     const index = ids.indexOf(id)
     useUiStore.getState().removeOpenSession(id)
-    this.deleteSession(id)
     const remaining = useUiStore.getState().openSessionIds
     if (wasActive && remaining.length > 0) {
       const nextIndex = Math.min(index, remaining.length - 1)
       this.selectSession(remaining[nextIndex])
-    } else if (remaining.length === 0) {
+      return
+    }
+    if (remaining.length === 0) {
       useDomainStore.getState().deselect()
       useUiStore.getState().setChatSessionId(null)
       useUiStore.getState().setCodeSessionId(null)
+      return
     }
+    // Inactive tab closed while others remain: drop surface memory if it pointed here.
+    if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
+    if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
   }
 
+  /** Permanently delete a session (History page). Also removes any open tab. */
   deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
     useUiStore.getState().removeOpenSession(id)
     useDomainStore.getState().deleteSession(id)
-    // Terminal: single kill hook (closeSession → deleteSession; do not also kill in close).
+    // Terminal / PTY only die on permanent delete, not soft-close.
     void ptyKill(id).catch(() => {})
     useTerminalStore.getState().clearSession(id)
     if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)

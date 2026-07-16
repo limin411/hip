@@ -20,7 +20,9 @@ describe('listCatalogItems', () => {
 
   it('filters by kind', () => {
     expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
-    expect(listCatalogItems('sessionTab').map((m) => m.id)).toContain('sessionTab.close')
+    const sessionTabIds = listCatalogItems('sessionTab').map((m) => m.id)
+    expect(sessionTabIds).toContain('sessionTab.close')
+    expect(sessionTabIds.some((id) => id.startsWith('sessionTab.delete'))).toBe(false)
     expect(listCatalogItems('agentConfig').map((m) => m.id)).toEqual([
       'agentConfig.edit',
       'agentConfig.delete',

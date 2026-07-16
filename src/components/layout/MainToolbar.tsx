@@ -23,6 +23,8 @@ export function MainToolbar() {
   const kbActiveSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
 
   const isSpecial = activeView === 'settings' || activeView === 'history'
+  // Settings has no toolbar back; leave via sidebar. History keeps back.
+  const showBack = activeView === 'history'
   const showPanelChrome = !isSpecial
 
   let title = ''
@@ -50,7 +52,7 @@ export function MainToolbar() {
       aria-label={t('mainToolbar.aria')}
       className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-3"
     >
-      {isSpecial ? (
+      {showBack ? (
         <button
           type="button"
           data-testid="main-toolbar-back"

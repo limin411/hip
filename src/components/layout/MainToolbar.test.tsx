@@ -64,14 +64,15 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('My Session')
   })
 
-  it('settings: back + title, hides connection and panel', () => {
+  it('settings: no back, shows title, hides connection and panel', () => {
     useUiStore.setState({
       activeView: 'settings',
       previousView: 'chat',
       sidebarSection: 'chats',
     })
     render(<MainToolbar />)
-    expect(screen.getByTestId('main-toolbar-back')).toBeInTheDocument()
+    expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar-title')).toBeInTheDocument()
     expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
@@ -86,9 +87,9 @@ describe('MainToolbar', () => {
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('')
   })
 
-  it('knowledge → settings → back restores knowledge view and section', () => {
+  it('knowledge → history → back restores knowledge view and section', () => {
     useUiStore.setState({
-      activeView: 'settings',
+      activeView: 'history',
       previousView: 'knowledge',
       sidebarSection: 'chats', // as if assignSectionAfterLeavingKnowledge ran
     })

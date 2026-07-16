@@ -159,6 +159,17 @@ export function ChatPane() {
             <div className="rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 text-body text-ink" data-testid="chat-interrupt">
               <p className="flex items-start gap-2"><span aria-hidden>⏸</span><span>{interrupt.question}</span></p>
               <p className="mt-1 text-meta text-ink-secondary">{t('chat.interruptHint')}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  data-testid="chat-interrupt-continue"
+                  onClick={() => sessionService.sendMessage(t('chat.interruptContinueMessage'))}
+                >
+                  {t('chat.interruptContinue')}
+                </Button>
+              </div>
             </div>
           )}
           {showPlanApproval && session?.activeTurnPlan && (

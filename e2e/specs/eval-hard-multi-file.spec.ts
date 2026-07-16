@@ -10,7 +10,7 @@ const BYTEBASE = process.env.HIP_EVAL_BYTEBASE_PATH
 ;(LIVE && BYTEBASE ? describe : describe.skip)(
   'eval hard multi-file @live @eval @hard',
   function (this: Mocha.Suite) {
-    this.timeout(1_500_000)
+    this.timeout(1_800_000)
 
     it('bb-hard-multi-file-common', async () => {
       const packDir = path.resolve('e2e/eval/tasks/bytebase-hard')

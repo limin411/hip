@@ -46,21 +46,17 @@ describe('harness agent interrupt @harness @core', () => {
       { timeout: 10000, interval: 200, timeoutMsg: 'getPendingInterrupt not set' },
     )
 
-    // Resume path: composer send → message:resume (sessionService routes when interrupt pending).
-    const ta = await chat.activeTextarea
-    await ta.waitForExist({ timeout: 10000 })
-    await ta.click()
-    await ta.setValue('Continue with option A for e2e')
-    const send = await browser.$('[data-testid="composer-send"]')
-    await send.waitForExist({ timeout: 5000 })
-    await browser.execute((el: HTMLElement) => el.click(), send)
+    // Prefer product Continue button (message:resume with default continue copy).
+    const cont = await browser.$('[data-testid="chat-interrupt-continue"]')
+    await cont.waitForExist({ timeout: 10000 })
+    await browser.execute((el: HTMLElement) => el.click(), cont)
 
     await browser.waitUntil(
       async () => !(await (await chat.chatInterrupt).isExisting()),
       {
         timeout: 15000,
         interval: 300,
-        timeoutMsg: 'chat-interrupt still visible after resume',
+        timeoutMsg: 'chat-interrupt still visible after Continue',
       },
     )
     await browser.waitUntil(
@@ -68,7 +64,7 @@ describe('harness agent interrupt @harness @core', () => {
       {
         timeout: 10000,
         interval: 200,
-        timeoutMsg: 'pending interrupt not cleared after resume',
+        timeoutMsg: 'pending interrupt not cleared after Continue',
       },
     )
   })

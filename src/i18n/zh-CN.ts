@@ -131,6 +131,8 @@ export const zhCN = {
       reconnecting: '重新连接中…',
       errorInterrupted: '连接中断，回复未完成。',
       interruptHint: '在下方回复，告诉 hip 接下来怎么做。',
+      interruptContinue: '继续',
+      interruptContinueMessage: '请继续完成当前任务，不要再追问。',
       errorTimeout: '响应超时，已停止。',
       jumpToLatest: '回到最新',
       permission: {

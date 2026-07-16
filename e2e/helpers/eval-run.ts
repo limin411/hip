@@ -4,7 +4,12 @@ import { CodePage } from '../page-objects/CodePage.js'
 import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from './app.js'
 import { skipLoginIfPresent } from './auth.js'
 import { sendEvalPrompt, waitForTurnSettle, getLastAssistantTextReadOnly } from './eval-composer.js'
-import { pumpPermissionsUntil, setPermissionModeUi, permissionModalOpen } from './eval-permissions.js'
+import {
+  pumpPermissionsUntil,
+  setPermissionModeUi,
+  permissionModalOpen,
+  continueInterruptIfPresent,
+} from './eval-permissions.js'
 import { pumpPlanApprovals, planApprovalVisible } from './eval-plan.js'
 import { selectPanelTab } from './panel.js'
 import { switchToCodeSurface } from './surface.js'
@@ -195,18 +200,25 @@ export async function runEvalTask(opts: {
         planClicks += n
       }
       if (autoApprove && interruptResumes < maxResume) {
-        const hasInterrupt = await browser.execute(() =>
-          Boolean(document.querySelector('[data-testid="chat-interrupt"]')),
-        )
-        if (hasInterrupt) {
-          const msg = resumeMsgs[Math.min(interruptResumes, resumeMsgs.length - 1)]
+        // Prefer product Continue button when present
+        const clicked = await continueInterruptIfPresent()
+        if (clicked) {
           interruptResumes += 1
-          try {
-            await sendEvalPrompt(msg)
-          } catch {
-            // ignore
-          }
           await browser.pause(800)
+        } else {
+          const hasInterrupt = await browser.execute(() =>
+            Boolean(document.querySelector('[data-testid="chat-interrupt"]')),
+          )
+          if (hasInterrupt) {
+            const msg = resumeMsgs[Math.min(interruptResumes, resumeMsgs.length - 1)]
+            interruptResumes += 1
+            try {
+              await sendEvalPrompt(msg)
+            } catch {
+              // ignore
+            }
+            await browser.pause(800)
+          }
         }
       }
     },

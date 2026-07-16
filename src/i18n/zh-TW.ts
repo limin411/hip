@@ -131,6 +131,8 @@ export const zhTW = {
       reconnecting: '重新連線中…',
       errorInterrupted: '連線中斷，回覆未完成。',
       interruptHint: '在下方回覆，告訴 hip 接下來怎麼做。',
+      interruptContinue: '繼續',
+      interruptContinueMessage: '請繼續完成目前任務，不要再追問。',
       errorTimeout: '回應逾時，已停止。',
       jumpToLatest: '回到最新',
       permission: {

@@ -133,6 +133,8 @@ export const en = {
       reconnecting: 'Reconnecting…',
       errorInterrupted: 'Connection lost — the reply didn\'t finish.',
       interruptHint: 'Reply below to tell hip how to proceed.',
+      interruptContinue: 'Continue',
+      interruptContinueMessage: 'Please continue and finish the current task without asking more questions.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
       permission: {

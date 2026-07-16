@@ -17,6 +17,13 @@
 | prefer | approve if visible; soft note if never seen |
 | require | approve if visible; score `plan_skipped` if never approved |
 
+## Current eval approach (2026-07-16)
+
+- Prompt tasks to call agent tool `enter_plan_mode` so PlanApprovalCard can appear.
+- Runner uses `plan_mode: prefer` + auto-click `plan-approve` when visible.
+- Hard gate remains verify green; `planApproved` is reported for axis portrait.
+
 ## Future
 
-- Product slash / chip to enter plan mode → wire `prefer` to click it before first send.
+- Product slash / chip to enter plan mode without relying on the model tool.
+- Optional `plan_mode: require` once UI entry is reliable.

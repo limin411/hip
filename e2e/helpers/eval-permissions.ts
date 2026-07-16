@@ -3,8 +3,26 @@
  */
 
 export async function permissionModalOpen(): Promise<boolean> {
-  const modal = await browser.$('[data-testid="permission-modal"]')
-  return modal.isExisting()
+  try {
+    const modal = await browser.$('[data-testid="permission-modal"]')
+    return modal.isExisting()
+  } catch {
+    // Session may be torn down mid-poll (ECONNREFUSED) — treat as closed.
+    return false
+  }
+}
+
+/** Click product Continue on chat-interrupt banner if present. */
+export async function continueInterruptIfPresent(): Promise<boolean> {
+  try {
+    const btn = await browser.$('[data-testid="chat-interrupt-continue"]')
+    if (!(await btn.isExisting())) return false
+    await browser.execute((el: HTMLElement) => el.click(), btn)
+    await browser.pause(300)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /** Click first allow-ish option if modal is open. */

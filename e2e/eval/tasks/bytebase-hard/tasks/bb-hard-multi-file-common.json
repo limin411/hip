@@ -10,6 +10,8 @@
     "setup": { "kind": "patch", "path": "fixtures/break-multi-file-common.patch" }
   },
   "ui": {
+    "timeout_ms": 1500000,
+    "auto_resume_interrupt": 4,
     "expect": {
       "changes_paths_regex": ["backend/common/"],
       "changes_avoid_regex": ["^frontend/"],

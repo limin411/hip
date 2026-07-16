@@ -1004,7 +1004,30 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       })
       const initialPlanningMode = base?.planningMode ?? (usePlan || activeProfile.id === 'plan' ? 'plan' : 'fast')
       const stepsBefore = base?.steps ?? 0
-      const forcePlanMessages = host._config.forcePlan ? [new SystemMessage('Plan mode is required for this task. Call EnterPlanMode first, then proceed with planning.')] : []
+      // Product forcePlan: hard-enter PlanMode so write_file/edit outside the plan file is blocked
+      // until ExitPlanMode (prompt-only nudge was ignored by agents in live eval).
+      if (
+        host._config.forcePlan &&
+        !host._config.disablePlan &&
+        planMode &&
+        !planMode.isActive &&
+        (base?.planStatus === undefined || base?.planStatus === 'none' || base?.planStatus === 'generating')
+      ) {
+        try {
+          await planMode.enter(host.id)
+        } catch {
+          // already active or fs error — continue with soft nudge
+        }
+      }
+      const forcePlanMessages = host._config.forcePlan
+        ? [
+            new SystemMessage(
+              'Plan mode is required and already active for this task. ' +
+                'Investigate with read-only tools, write the plan (plan file and/or write_todos), ' +
+                'then call ExitPlanMode so the user can approve before any non-plan file edits.',
+            ),
+          ]
+        : []
       logDebug('session', 'phase:invokeGraph', { sessionId: host.id, elapsedMs: Date.now() - t0, msgCount: effectiveMessages.length })
       finalState = await host.app.invoke(
         {
@@ -1014,7 +1037,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           nudgedSig: undefined,
           status: 'running',
           planningMode: initialPlanningMode,
-          planStatus: base?.planStatus ?? 'none',
+          planStatus: base?.planStatus ?? (host._config.forcePlan && planMode?.isActive ? 'generating' : 'none'),
           plan: base?.plan,
           verifyMemo: undefined,
         },

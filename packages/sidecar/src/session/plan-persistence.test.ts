@@ -19,36 +19,35 @@ beforeAll(() => {
 
 describe('plan persistence', () => {
   let root: string
+  let home: string
   let plansDir: string
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'hip-plan-persist-'))
-    plansDir = join(root, '.hip', 'plans')
+    home = mkdtempSync(join(tmpdir(), 'hip-plan-home-'))
+    plansDir = join(home, '.hip', 'plans')
   })
 
   afterEach(() => {
     rmSync(root, { recursive: true, force: true })
+    rmSync(home, { recursive: true, force: true })
   })
 
-  it('writes .hip/plans/<sessionId>.json atomically on approval', () => {
+  it('writes ~/.hip/plans/<sessionId>.json via persistApprovedPlan (not project cwd)', async () => {
+    const { persistApprovedPlan, approvedPlanJsonPath } = await import('./plan-persistence.js')
     const sessionId = 'test-session-1'
-    const filePath = join(plansDir, `${sessionId}.json`)
-    const tmpFile = `${filePath}.tmp-${Date.now()}`
-
-    mkdirSync(plansDir, { recursive: true })
-    const planPayload = {
+    const filePath = await persistApprovedPlan(
       sessionId,
-      plan: [{ content: 'do thing', status: 'pending' as const }],
-      approvedAt: Date.now(),
-    }
-    writeFileSync(tmpFile, JSON.stringify(planPayload, null, 2), 'utf8')
-    renameSync(tmpFile, filePath)
-
+      [{ content: 'do thing', status: 'pending' }],
+      { home, approvedAt: 42 },
+    )
+    expect(filePath).toBe(approvedPlanJsonPath(sessionId, home))
     expect(existsSync(filePath)).toBe(true)
+    expect(existsSync(join(root, '.hip', 'plans', `${sessionId}.json`))).toBe(false)
     const written = JSON.parse(readFileSync(filePath, 'utf8'))
     expect(written.sessionId).toBe(sessionId)
     expect(written.plan).toEqual([{ content: 'do thing', status: 'pending' }])
-    expect(typeof written.approvedAt).toBe('number')
+    expect(written.approvedAt).toBe(42)
   })
 
   it('writes the actual plan array from a generated plan', async () => {

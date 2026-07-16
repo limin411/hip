@@ -32,6 +32,16 @@ function parsePorcelainPaths(porcelain: string): string[] {
   return paths
 }
 
+/** Paths that are product/runtime noise, not task work (exclude from agent path portrait). */
+export function isNoiseInventoryPath(p: string): boolean {
+  const n = p.replace(/\\/g, '/')
+  if (n === '.hip' || n.startsWith('.hip/')) return true
+  // Agent sometimes writes OS-absolute home paths as relative trees under the worktree
+  if (n === 'Users' || n.startsWith('Users/')) return true
+  if (n === 'home' || n.startsWith('home/')) return true
+  return false
+}
+
 /**
  * Diff post-run inventory vs post-setup baseline.
  * Restoring fixture dirt to clean HEAD counts as agent work (paths = cleaned files).
@@ -47,11 +57,11 @@ export function inventoryDelta(before: ChangeInventory, after: ChangeInventory):
   const rewritten =
     before.fullPatch !== after.fullPatch ? after.paths.filter((p) => beforeSet.has(p)) : []
 
-  const paths = [...new Set([...added, ...cleaned, ...rewritten])].sort()
-  const agentTouched =
-    paths.length > 0 ||
-    before.fullPatch !== after.fullPatch ||
-    Boolean(before.dirtyAfter) !== Boolean(after.dirtyAfter)
+  const paths = [...new Set([...added, ...cleaned, ...rewritten])]
+    .filter((p) => !isNoiseInventoryPath(p))
+    .sort()
+  // Noise-only dirt (.hip/, Users/) must not count as agentTouched for soft scoring
+  const agentTouched = paths.length > 0
 
   return {
     dirtyAfter: after.dirtyAfter,

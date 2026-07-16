@@ -796,6 +796,17 @@ describe('workspace diff', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', sessionId: 's1', action: 'approve' })
   })
 
+  it('respondPlan is idempotent after optimistic dismiss', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    svc.respondPlan('approve')
+    const n = t.sent.length
+    svc.respondPlan('approve')
+    expect(t.sent.length).toBe(n)
+  })
+
   it('respondPlan reject sets status idle optimistically', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

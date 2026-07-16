@@ -1323,8 +1323,11 @@ export class SessionService {
 
   /** Respond to a plan approval interrupt (approve / reject / amend). */
   respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string): void {
-    const { activeSessionId } = useDomainStore.getState()
+    const { activeSessionId, sessions } = useDomainStore.getState()
     if (!activeSessionId) return
+    const sess = sessions.find((s) => s.id === activeSessionId)
+    // Idempotent: ignore double-clicks after optimistic dismiss (eval multi-pump / UI re-entry).
+    if (!sess?.planApprovalPending) return
     // Drop PlanApprovalCard immediately so eval/UI do not keep a disabled shell for the whole execute turn.
     useDomainStore.getState().respondPlanOptimistic(activeSessionId, action)
     this.transport.send({ type: 'plan:respond', sessionId: activeSessionId, action, amendContent })

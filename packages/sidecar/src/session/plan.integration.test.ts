@@ -138,8 +138,9 @@ describe('plan lifecycle integration', () => {
     expect(runner.executed).toBe(true)
     expect(runner.callCount).toBeGreaterThanOrEqual(2)
 
-    // Verify plan file was persisted to .hip/plans/<sessionId>.json
-    const planFile = join(cwd, '.hip', 'plans', 's-plan-lifecycle.json')
+    // Approved plan JSON lives under ~/.hip/plans/ (not project cwd)
+    const { approvedPlanJsonPath } = await import('./plan-persistence.js')
+    const planFile = approvedPlanJsonPath('s-plan-lifecycle')
     expect(existsSync(planFile)).toBe(true)
     const planContent = JSON.parse(readFileSync(planFile, 'utf8')) as {
       sessionId: string
@@ -152,6 +153,8 @@ describe('plan lifecycle integration', () => {
     expect(planContent.plan[0].content).toBe('step 1')
     expect(typeof planContent.approvedAt).toBe('number')
     expect(planContent.approvedAt).toBeGreaterThan(0)
+    // Worktree must not gain a project-local .hip/plans artifact
+    expect(existsSync(join(cwd, '.hip', 'plans', 's-plan-lifecycle.json'))).toBe(false)
   })
 
   // ──────────────────────────────────────────────────────────────────────────────

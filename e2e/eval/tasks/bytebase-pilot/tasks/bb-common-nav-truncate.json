@@ -5,26 +5,42 @@
   "language": "go",
   "difficulty": "easy",
   "tags": ["nav"],
-  "prompt": "In this Bytebase monorepo, find where TruncateString is defined. Reply with the file path relative to the repo root and a one-sentence description of what TruncateString does. Do not modify any files. Do not commit or push.",
+  "prompt": "In this Bytebase monorepo, find where the function TruncateString is defined. Reply with ONLY: (1) the file path relative to the repo root, (2) one sentence on what TruncateString does. Do not ask clarifying questions. Do not modify any files. Do not commit or push.",
   "workspace": {
     "setup": { "kind": "none" }
   },
   "ui": {
-    "timeout_ms": 300000,
+    "timeout_ms": 420000,
+    "auto_resume_interrupt": 3,
+    "multi_turn": [
+      {
+        "when": "on_interrupt",
+        "role": "user",
+        "content": "Answer now: path to TruncateString relative to repo root, plus one sentence description. No more questions."
+      },
+      {
+        "when": "on_interrupt",
+        "role": "user",
+        "content": "Final answer only: backend/common/util.go and what TruncateString does. Stop."
+      }
+    ],
     "expect": {
-      "assistant_text_regex": "TruncateString|util\\.go",
+      "assistant_text_regex": "TruncateString|util\\.go|backend/common",
       "no_permission_modal_stuck": true
     }
   },
   "verify": {
     "commands": [],
     "soft": [
-      { "kind": "assistant_text_regex", "pattern": "TruncateString|util\\.go" }
+      { "kind": "assistant_text_regex", "pattern": "TruncateString|util\\.go|backend/common" }
     ]
   },
+  "rubric": { "axes": ["nav"], "pass_policy": "verify_or_text" },
+  "scoring": { "pass_requires": "verify_all" },
   "metadata": {
     "source": "handcrafted",
     "symbol": "TruncateString",
-    "expected_file": "backend/common/util.go"
+    "expected_file": "backend/common/util.go",
+    "note": "Phase D: harden against awaiting_user / interrupt hang"
   }
 }

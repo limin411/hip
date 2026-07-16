@@ -1,9 +1,8 @@
 /** Resume / regenerate / plan / subagent continuation (Phase 3b). */
 import type { AgentConfig, ContentPart, Attachment, PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
-import { mkdir, writeFile, rename } from 'node:fs/promises'
-import { join, dirname } from 'node:path'
 import type { GraphEmit } from './graph.js'
+import { persistApprovedPlan } from './plan-persistence.js'
 import { selectImageAgent } from './agents/registry.js'
 import { runSubagent } from './subagent.js'
 import { childMaxStepsForAgent } from './loop-control.js'
@@ -165,28 +164,17 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
   switch (action) {
     case 'approve': {
       host.planMode.exit()
-      // Persist the approved plan to .hip/plans/<sessionId>.json atomically
+      // Persist under ~/.hip/plans/ (not project cwd — avoids worktree pollution)
       try {
-        const cwd = host._config.cwd ?? process.cwd()
-        const safeId = host.id.replace(/[^a-zA-Z0-9_-]/g, '_')
-        const filePath = join(cwd, '.hip', 'plans', `${safeId}.json`)
-        const dir = dirname(filePath)
-        await mkdir(dir, { recursive: true })
-        const tmpFile = `${filePath}.tmp-${Date.now()}`
-        const planPayload = {
-          sessionId: host.id,
-          plan: host.paused?.plan ?? [],
-          approvedAt: Date.now(),
-        }
-        await writeFile(tmpFile, JSON.stringify(planPayload, null, 2), 'utf8')
-        await rename(tmpFile, filePath)
+        await persistApprovedPlan(host.id, host.paused?.plan ?? [])
       } catch (err) {
         console.error('Failed to persist approved plan:', err instanceof Error ? err.message : String(err))
         send({ type: 'agent:notification', sessionId: host.id, taskId: 'plan-persist', description: 'Plan was approved but could not be saved to disk.', status: 'failed' })
       }
       const base = {
         messages: host.paused.messages,
-        steps: host.paused.steps,
+        // Fresh execute budget: planning steps must not starve the fix turn.
+        steps: 0,
         planningMode: 'plan' as const,
         planStatus: 'approved' as const,
         plan: host.paused.plan,

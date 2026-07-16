@@ -69,4 +69,16 @@ describe('inventoryDelta', () => {
     expect(inventoryDelta(base, after).paths).toEqual(['foo.go'])
     expect(inventoryDelta(base, after).agentTouched).toBe(true)
   })
+
+  it('ignores .hip/ and Users/ noise paths for agentTouched', () => {
+    const base = inv({ dirtyAfter: false, paths: [] })
+    const after = inv({
+      dirtyAfter: true,
+      paths: ['.hip/plans/x.json', 'Users/me/.hip/plans/y.md'],
+      fullPatch: 'noise',
+    })
+    const d = inventoryDelta(base, after)
+    expect(d.paths).toEqual([])
+    expect(d.agentTouched).toBe(false)
+  })
 })

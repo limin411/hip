@@ -124,8 +124,15 @@ export async function readTurnBusyState(): Promise<{
     const body = document.body.innerText ?? ''
     const thinkingText = /正在思考|思考中/.test(body) && stopVisible
     const permissionOpen = Boolean(document.querySelector('[data-testid="permission-modal"]'))
+    // Only an *actionable* plan approve keeps settle busy. A disabled post-click shell
+    // (or optimistically-dismissed card) must not block idle forever.
+    const planNeedsAction = Boolean(
+      document.querySelector(
+        '[data-testid="plan-approve"]:not([disabled]):not([aria-disabled="true"])',
+      ),
+    )
     const interruptOpen = Boolean(
-      document.querySelector('[data-testid="plan-approval-card"]') ||
+      planNeedsAction ||
         document.querySelector('[data-testid="chat-interrupt"]') ||
         document.querySelector('[data-testid="agent-interrupt"]'),
     )

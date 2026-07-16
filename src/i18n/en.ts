@@ -144,6 +144,7 @@ export const en = {
       plan: {
         chipLabel: 'Plan',
         chipTitle: 'Force plan mode — investigate and get approval before coding',
+        busyTitle: 'Cannot change plan mode while a turn is running',
         forceOnTitle: 'Plan mode on',
         forceOnBody: 'Next turns will plan first. Send a task, or use /plan your task.',
         forceOffTitle: 'Plan mode off',

@@ -142,6 +142,7 @@ export const zhTW = {
       plan: {
         chipLabel: '規劃',
         chipTitle: '強制規劃模式 — 先調研並獲批後再改程式',
+        busyTitle: '回合進行中，暫不能切換規劃模式',
         forceOnTitle: '已開啟規劃模式',
         forceOnBody: '後續回合會先規劃。直接發送任務，或使用 /plan 你的任務。',
         forceOffTitle: '已關閉規劃模式',

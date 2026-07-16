@@ -142,6 +142,7 @@ export const zhCN = {
       plan: {
         chipLabel: '规划',
         chipTitle: '强制规划模式 — 先调研并获批后再改代码',
+        busyTitle: '回合进行中，暂不能切换规划模式',
         forceOnTitle: '已开启规划模式',
         forceOnBody: '后续回合会先规划。直接发送任务，或使用 /plan 你的任务。',
         forceOffTitle: '已关闭规划模式',

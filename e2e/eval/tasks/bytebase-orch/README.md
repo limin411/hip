@@ -2,13 +2,15 @@
 
 Axes: `plan_flow`, `delegate`, `hitl`.
 
-See `SPIKE-plan-entry.md` for plan entry product path and live archive.
+See `SPIKE-plan-entry.md` for plan entry product path.
 
-| Task | Live note (2026-07-16) |
-|------|------------------------|
-| `bb-orch-plan-then-fix` | **pass** + `planApproved=true` (~2m20s) after plan-entry + settle fixes. |
-| `bb-orch-hitl-resume` | not run this phase |
-| `bb-orch-delegate-explore-fix` | not run this phase |
+## Live archive (2026-07-16)
+
+| Task | Result | Notes |
+|------|--------|-------|
+| `bb-orch-plan-then-fix` | **pass** + `planApproved=true` (~2m20s) | forcePlan chip + hard PlanMode + settle fixes |
+| `bb-orch-hitl-resume` | **pass** (~53s) | `interruptResumes=0` (agent fixed without asking); Continue path still product-tested in harness |
+| `bb-orch-delegate-explore-fix` | **pass** (~2m10s) | verify green; delegate not hard-required |
 
 ```bash
 export HIP_EVAL_BYTEBASE_PATH=/path/to/bytebase

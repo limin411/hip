@@ -145,12 +145,12 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
       <nav className="flex shrink-0 flex-col gap-0.5 border-b border-border px-2 pb-2" aria-label={t('sidebar.navAria')}>
         <NavItem
-          section="knowledge"
-          active={sidebarSection === 'knowledge'}
-          label={t('sidebar.nav.knowledge')}
-          icon={<BookOpen size={16} />}
-          count={spaces.length > 0 ? spaces.length : undefined}
-          onClick={() => onNav('knowledge')}
+          section="chats"
+          active={sidebarSection === 'chats'}
+          label={t('sidebar.nav.chats')}
+          icon={<MessageSquare size={16} />}
+          count={chatCount > 0 ? chatCount : undefined}
+          onClick={() => onNav('chats')}
         />
         <NavItem
           section="projects"
@@ -161,12 +161,12 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           onClick={() => onNav('projects')}
         />
         <NavItem
-          section="chats"
-          active={sidebarSection === 'chats'}
-          label={t('sidebar.nav.chats')}
-          icon={<MessageSquare size={16} />}
-          count={chatCount > 0 ? chatCount : undefined}
-          onClick={() => onNav('chats')}
+          section="knowledge"
+          active={sidebarSection === 'knowledge'}
+          label={t('sidebar.nav.knowledge')}
+          icon={<BookOpen size={16} />}
+          count={spaces.length > 0 ? spaces.length : undefined}
+          onClick={() => onNav('knowledge')}
         />
       </nav>
 

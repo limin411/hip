@@ -7,7 +7,7 @@
 | **Date** | 2026-07-16 |
 | **Status** | Draft (**rev 3** — UI-first constraint) |
 | **Audience** | Hip core engineers (frontend / e2e / product) |
-| **Related** | `e2e/` (WDIO + Tauri), `e2e/helpers/*`, `e2e/specs/live-chat.spec.ts`, Code surface + Changes panel, prior rev 2 headless design (superseded for primary path) |
+| **Related** | `e2e/` (WDIO + Tauri), `e2e/helpers/*`, Code surface + Changes panel; **复杂任务扩展：** [`2026-07-16-hip-capability-matrix-spec.md`](./2026-07-16-hip-capability-matrix-spec.md) + [`2026-07-16-hip-capability-matrix-plan.md`](./2026-07-16-hip-capability-matrix-plan.md) |
 
 ---
 

@@ -283,6 +283,16 @@ export function applyServerMessage(
     case 'session:permissionMode':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, permissionMode: msg.permissionMode } }))
 
+    case 'session:forcePlan':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        config: {
+          ...s.config,
+          forcePlan: msg.forcePlan,
+          ...(msg.forcePlan ? { disablePlan: false } : {}),
+        },
+      }))
+
     case 'session:systemPrompt':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, systemPrompt: msg.systemPrompt || undefined } }))
 

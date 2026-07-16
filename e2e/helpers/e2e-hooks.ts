@@ -42,6 +42,7 @@ type HipE2E = {
     generateMemories?: boolean
     incognito?: boolean
   } | null
+  getActiveSessionForcePlan?: () => boolean | null
   getWorkflowSession?: (sessionId: string) => {
     activeWorkflow: { id: string; name: string } | null
     runId: string | null

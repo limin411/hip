@@ -10,6 +10,9 @@ import {
   runDiff,
   runInit,
   extractInitFocus,
+  runPlanOn,
+  runPlanOff,
+  extractPlanTask,
   setIncognito,
   setUseMemories,
   toastMemoryFlagChange,
@@ -118,6 +121,19 @@ export function useSlashCommandHandler(
             const focus = extractInitFocus(value)
             runInit(sessionId, focus)
           }
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'plan') {
+          const task = extractPlanTask(value)
+          runPlanOn(sessionId, task)
+          setText('')
+          focusInput()
+          return
+        }
+        if (cmd.id === 'plan-off') {
+          runPlanOff(sessionId)
           setText('')
           focusInput()
           return

@@ -12,6 +12,8 @@ export interface Draft {
   agentId?: string             // legacy; no longer set by the composer
   modelKey?: string            // 'providerID/modelID' chosen for this chat
   permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
+  /** When true, first committed code session forces plan mode (EnterPlanMode path). */
+  forcePlan?: boolean
 }
 
 interface DraftStore {
@@ -23,6 +25,7 @@ interface DraftStore {
   setAgentId: (agentId: string) => void
   setModelKey: (modelKey: string) => void
   setPermissionMode: (permissionMode: PermissionMode) => void
+  setForcePlan: (forcePlan: boolean) => void
   reset: () => void
 }
 
@@ -78,6 +81,11 @@ export const useDraftStore = create<DraftStore>()(
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
           return { draft: { ...base, permissionMode } }
+        }),
+      setForcePlan: (forcePlan) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          return { draft: { ...base, forcePlan } }
         }),
       reset: () => set({ draft: null }),
     }),

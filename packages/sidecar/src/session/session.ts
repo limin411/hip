@@ -477,6 +477,7 @@ export class Session {
 
   // ── Permission delegation ──
   setPermissionMode(permissionMode: PermissionMode): boolean { return this.configMgr.setPermissionMode(permissionMode) }
+  setForcePlan(forcePlan: boolean): boolean { return this.configMgr.setForcePlan(forcePlan) }
   respondPermission(requestId: string, choice: { optionId: string } | { cancelled: true }): void { this.permissions.respondPermission(requestId, choice) }
 
   // ── Agent provider delegation ──

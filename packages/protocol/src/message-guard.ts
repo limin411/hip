@@ -20,6 +20,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'session:setThinking',
   'session:setSystemPrompt',
   'session:setPermissionMode',
+  'session:setForcePlan',
   'session:setModel',
   'config:setActiveModel',
   'config:testProvider',

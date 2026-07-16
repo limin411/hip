@@ -8,6 +8,7 @@ import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { readSkillFile } from '@/ipc/skills'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
+import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
@@ -178,7 +179,7 @@ export function InputBar() {
                 reconnecting={reconnecting}
                 leftSlot={
                   isCode ? (
-                    <><ModelPicker /><PermissionModePicker /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
+                    <><ModelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
                   ) : (
                     <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                   )

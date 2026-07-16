@@ -5,12 +5,12 @@
   "level": "L3",
   "difficulty": "hard",
   "tags": ["plan_flow"],
-  "prompt": "backend/common HasPrefixes tests are failing. IMPORTANT: call the enter_plan_mode tool first and publish a short plan so the user can approve it in the UI. After plan approval, fix the implementation and ensure `go test ./backend/common/ -count=1` passes. Do not modify tests to hide the bug. Do not commit or push.",
+  "prompt": "backend/common HasPrefixes tests are failing. Produce a short step-by-step plan first (call EnterPlanMode / ExitPlanMode so the user can approve the plan in the UI). After the plan is approved, fix the implementation and ensure `go test ./backend/common/ -count=1` passes. Do not modify tests to hide the bug. Do not commit or push.",
   "workspace": {
     "setup": { "kind": "patch", "path": "fixtures/break-has-prefixes.patch" }
   },
   "ui": {
-    "plan_mode": "prefer",
+    "plan_mode": "require",
     "timeout_ms": 1500000,
     "expect": {
       "changes_paths_regex": ["backend/common/"],
@@ -27,8 +27,8 @@
     ]
   },
   "rubric": { "axes": ["plan_flow", "edit_single"], "pass_policy": "verify_all" },
-  "scoring": { "pass_requires": "verify_all" },
+  "scoring": { "pass_requires": "verify_all", "require_plan_approved": true },
   "metadata": {
-    "note": "plan_mode prefer: report planApproved when PlanApprovalCard is used; hard gate is verify green."
+    "note": "Runner enables product plan-mode-chip (forcePlan) before send; hard gate is verify + planApproved."
   }
 }

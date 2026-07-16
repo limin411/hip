@@ -16,6 +16,7 @@ import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
+import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
@@ -154,7 +155,7 @@ export function NewConversation() {
             inputRef={inputRef}
             leftSlot={
               surface === 'code' ? (
-                <><ModelPicker /><PermissionModePicker /><AttachmentButton onAttach={setAttachments} /></>
+                <><ModelPicker /><PermissionModePicker /><PlanModeChip /><AttachmentButton onAttach={setAttachments} /></>
               ) : (
                 <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
               )

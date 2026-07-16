@@ -331,6 +331,12 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].config.permissionMode).toBe('full')
   })
 
+  it('session:forcePlan writes config.forcePlan', () => {
+    const s0 = { sessions: [baseSession()] }
+    const next = applyServerMessage(s0, { type: 'session:forcePlan', sessionId: 's1', forcePlan: true }, 0)
+    expect(next.sessions[0].config.forcePlan).toBe(true)
+  })
+
   it('session:permissionMode for an unknown session is a no-op (same reference)', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:permissionMode', sessionId: 'nope', permissionMode: 'chat' }, 0)

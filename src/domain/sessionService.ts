@@ -1100,6 +1100,12 @@ export class SessionService {
     this.transport.send({ type: 'session:setPermissionMode', sessionId: id, permissionMode: mode })
   }
 
+  /** Force plan/execute/verify for subsequent turns (product /plan chip and slash). */
+  setForcePlan(id: string, forcePlan: boolean): void {
+    useDomainStore.getState().apply({ type: 'session:forcePlan', sessionId: id, forcePlan }) // optimistic
+    this.transport.send({ type: 'session:setForcePlan', sessionId: id, forcePlan })
+  }
+
   setSystemPrompt(id: string, systemPrompt: string | null): void {
     useDomainStore.getState().apply({ type: 'session:systemPrompt', sessionId: id, systemPrompt }) // optimistic
     this.transport.send({ type: 'session:setSystemPrompt', sessionId: id, systemPrompt })
@@ -1364,10 +1370,14 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
       : { ...DEFAULT_CONFIG, surface }
   const withMode: SessionConfig =
     surface === 'code' && draft?.permissionMode ? { ...base, permissionMode: draft.permissionMode } : base
-  if (!draft?.modelKey) return withMode
+  const withPlan: SessionConfig =
+    surface === 'code' && draft?.forcePlan
+      ? { ...withMode, forcePlan: true, disablePlan: false }
+      : withMode
+  if (!draft?.modelKey) return withPlan
   const { catalog, config } = useProvidersStore.getState()
   const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
-  return { ...withMode, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
+  return { ...withPlan, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */
@@ -1415,6 +1425,7 @@ export type HipE2EHooks = {
     generateMemories?: boolean
     incognito?: boolean
   } | null
+  getActiveSessionForcePlan: () => boolean | null
   /** E2E: read workflow store projection (product path has no dedicated DAG shell). */
   getWorkflowSession: (sessionId: string) => {
     activeWorkflow: { id: string; name: string } | null
@@ -1487,6 +1498,13 @@ function installE2eHooks(svc: SessionService): void {
         generateMemories: sess.config?.generateMemories,
         incognito: sess.config?.incognito,
       }
+    },
+    getActiveSessionForcePlan: () => {
+      const id = useDomainStore.getState().activeSessionId
+      if (!id) return null
+      const sess = useDomainStore.getState().sessions.find((s) => s.id === id)
+      if (!sess) return null
+      return Boolean(sess.config?.forcePlan)
     },
     getWorkflowSession: (sessionId) => svc.getWorkflowSession(sessionId),
     seedSubagentPause: (sessionId) => svc.seedSubagentPause(sessionId),

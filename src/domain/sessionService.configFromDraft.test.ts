@@ -68,8 +68,18 @@ describe('configFromDraft', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', permissionMode: 'full' })
     expect(cfg.permissionMode).toBe('full')
   })
-  it('chat draft ignores permissionMode (sandbox, no picker)', () => {
+  it('chat draft ignores permissionMode override (sandbox, no picker)', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', permissionMode: 'full' })
-    expect(cfg.permissionMode).toBeUndefined()
+    // Must not adopt draft's 'full'; DEFAULT_CONFIG may still set default mode.
+    expect(cfg.permissionMode).not.toBe('full')
+  })
+  it('project draft carries forcePlan and clears disablePlan', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', forcePlan: true })
+    expect(cfg.forcePlan).toBe(true)
+    expect(cfg.disablePlan).toBe(false)
+  })
+  it('chat draft ignores forcePlan', () => {
+    const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', forcePlan: true })
+    expect(cfg.forcePlan).toBeUndefined()
   })
 })

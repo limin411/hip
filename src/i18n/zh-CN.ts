@@ -20,6 +20,8 @@ export const zhCN = {
           diff: '显示工作区变更',
           compact: '摘要对话以节省上下文（可选：/compact 关注点…）',
           init: '分析项目并生成/更新 AGENTS.md',
+          plan: '强制先规划再执行（可选：/plan 任务…）',
+          'plan-off': '关闭本会话的强制规划模式',
           memory: '打开记忆设置',
           'memory-on': '为本会话启用记忆注入',
           'memory-off': '为本会话关闭记忆注入',
@@ -135,6 +137,14 @@ export const zhCN = {
       interruptContinueMessage: '请继续完成当前任务，不要再追问。',
       errorTimeout: '响应超时，已停止。',
       jumpToLatest: '回到最新',
+      plan: {
+        chipLabel: '规划',
+        chipTitle: '强制规划模式 — 先调研并获批后再改代码',
+        forceOnTitle: '已开启规划模式',
+        forceOnBody: '后续回合会先规划。直接发送任务，或使用 /plan 你的任务。',
+        forceOffTitle: '已关闭规划模式',
+        forceOffBody: '回合不再强制先规划。',
+      },
       permission: {
         title: '需要授权',
         intro: '智能体请求执行以下操作：',

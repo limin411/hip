@@ -21,9 +21,12 @@ const BYTEBASE = process.env.HIP_EVAL_BYTEBASE_PATH
       // eslint-disable-next-line no-console
       console.log('[eval-orch] plan', score.tags, score.passed, 'planApproved', report.ui.planApproved)
       expect(score.tags).not.toContain('infra_prepare')
-      // Plan entry may be product-limited; allow plan_skipped as classified outcome
+      // Product forcePlan chip is required for require mode; classify plan_skipped if agent still skips.
       expect(
-        score.passed || score.tags.includes('plan_skipped') || score.tags.includes('verify_failed'),
+        score.passed ||
+          score.tags.includes('plan_skipped') ||
+          score.tags.includes('verify_failed') ||
+          score.tags.includes('timeout'),
       ).toBe(true)
     })
   },

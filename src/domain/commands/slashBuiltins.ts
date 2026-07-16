@@ -64,6 +64,20 @@ export const SLASH_BUILTIN_COMMANDS: SlashBuiltinDef[] = [
     requiresSession: true,
   },
   {
+    id: 'plan',
+    name: 'plan',
+    description: 'Force plan mode for next turns (optional: /plan task…)',
+    kind: 'builtin',
+    availableIn: ['code'],
+  },
+  {
+    id: 'plan-off',
+    name: 'plan-off',
+    description: 'Disable forced plan mode for this session',
+    kind: 'builtin',
+    availableIn: ['code'],
+  },
+  {
     id: 'memory',
     name: 'memory',
     description: 'Open Memory settings',

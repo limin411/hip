@@ -20,6 +20,8 @@ export const en = {
           diff: 'Show workspace changes',
           compact: 'Summarize conversation to save context (optional: /compact focus…)',
           init: 'Create or update AGENTS.md with project guidance',
+          plan: 'Force plan mode for next turns (optional: /plan task…)',
+          'plan-off': 'Disable forced plan mode for this session',
           memory: 'Open Memory settings',
           'memory-on': 'Enable memory injection for this session',
           'memory-off': 'Disable memory injection for this session',
@@ -137,6 +139,14 @@ export const en = {
       interruptContinueMessage: 'Please continue and finish the current task without asking more questions.',
       errorTimeout: 'Response timed out and was stopped.',
       jumpToLatest: 'Jump to latest',
+      plan: {
+        chipLabel: 'Plan',
+        chipTitle: 'Force plan mode — investigate and get approval before coding',
+        forceOnTitle: 'Plan mode on',
+        forceOnBody: 'Next turns will plan first. Send a task, or use /plan your task.',
+        forceOffTitle: 'Plan mode off',
+        forceOffBody: 'Turns no longer require a plan first.',
+      },
       permission: {
         title: 'Permission required',
         intro: 'The agent is requesting to perform this action:',

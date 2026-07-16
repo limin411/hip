@@ -1,5 +1,5 @@
 /**
- * Plan-mode helpers for capability-matrix eval (PlanApprovalCard).
+ * Plan-mode helpers for capability-matrix eval (PlanApprovalCard + product forcePlan entry).
  */
 
 export async function planApprovalVisible(): Promise<boolean> {
@@ -9,6 +9,22 @@ export async function planApprovalVisible(): Promise<boolean> {
     )
   } catch {
     return false
+  }
+}
+
+/** Click product Plan mode chip until active (draft or session forcePlan). */
+export async function enablePlanModeUi(): Promise<void> {
+  const chip = await browser.$('[data-testid="plan-mode-chip"]')
+  await chip.waitForExist({ timeout: 15000 })
+  const pressed = await chip.getAttribute('aria-pressed')
+  if (pressed === 'true') return
+  await browser.execute((el: HTMLElement) => el.click(), chip)
+  await browser.pause(200)
+  // If still off (missed click), try once more
+  const again = await chip.getAttribute('aria-pressed')
+  if (again !== 'true') {
+    await browser.execute((el: HTMLElement) => el.click(), chip)
+    await browser.pause(200)
   }
 }
 
@@ -31,9 +47,7 @@ export async function approvePlanIfPresent(): Promise<boolean> {
 }
 
 /**
- * Best-effort: try to surface plan mode via permission chip / slash is product-dependent.
- * For prefer/require we document that the agent (or seed) must show PlanApprovalCard;
- * this helper only approves when visible.
+ * Auto-click PlanApprovalCard approve while visible.
  */
 export async function pumpPlanApprovals(maxClicks = 3): Promise<number> {
   let n = 0

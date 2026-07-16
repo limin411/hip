@@ -10,7 +10,7 @@ import {
   permissionModalOpen,
   continueInterruptIfPresent,
 } from './eval-permissions.js'
-import { pumpPlanApprovals, planApprovalVisible } from './eval-plan.js'
+import { pumpPlanApprovals, planApprovalVisible, enablePlanModeUi } from './eval-plan.js'
 import { selectPanelTab } from './panel.js'
 import { switchToCodeSurface } from './surface.js'
 import { diffFileTexts } from './git-workspace.js'
@@ -169,6 +169,15 @@ export async function runEvalTask(opts: {
     await setPermissionModeUi(mode)
   } catch {
     // default is edit
+  }
+
+  // Product plan entry: forcePlan chip so agent must EnterPlanMode before coding.
+  if (planMode === 'prefer' || planMode === 'require') {
+    try {
+      await enablePlanModeUi()
+    } catch {
+      // chip missing is a product gap; scoring will capture plan_skipped if require
+    }
   }
 
   const baselineInventory = captureInventory(workspace.cwd)

@@ -343,6 +343,14 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:setSystemPrompt', sessionId: 's1', systemPrompt: null })
   })
 
+  it('setForcePlan optimistically sets config and sends session:setForcePlan', () => {
+    const t = new FakeTransport()
+    useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: '', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null, interrupt: null, activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, codePanelOpen: false, chatPanelOpen: false }], activeSessionId: 's1' } as never)
+    new SessionService(t).setForcePlan('s1', true)
+    expect(useDomainStore.getState().sessions[0].config.forcePlan).toBe(true)
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setForcePlan', sessionId: 's1', forcePlan: true })
+  })
+
   it('setPermissionMode optimistically sets config and sends session:setPermissionMode', () => {
     const t = new FakeTransport()
     new SessionService(t).setPermissionMode('s1', 'full')

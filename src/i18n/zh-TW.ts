@@ -20,6 +20,8 @@ export const zhTW = {
           diff: '顯示工作區變更',
           compact: '摘要對話以節省上下文（可選：/compact 關注點…）',
           init: '分析專案並產生/更新 AGENTS.md',
+          plan: '強制先規劃再執行（可選：/plan 任務…）',
+          'plan-off': '關閉此對話的強制規劃模式',
           memory: '開啟記憶設定',
           'memory-on': '為此對話啟用記憶注入',
           'memory-off': '為此對話關閉記憶注入',
@@ -135,6 +137,14 @@ export const zhTW = {
       interruptContinueMessage: '請繼續完成目前任務，不要再追問。',
       errorTimeout: '回應逾時，已停止。',
       jumpToLatest: '回到最新',
+      plan: {
+        chipLabel: '規劃',
+        chipTitle: '強制規劃模式 — 先調研並獲批後再改程式',
+        forceOnTitle: '已開啟規劃模式',
+        forceOnBody: '後續回合會先規劃。直接發送任務，或使用 /plan 你的任務。',
+        forceOffTitle: '已關閉規劃模式',
+        forceOffBody: '回合不再強制先規劃。',
+      },
       permission: {
         title: '需要授權',
         intro: '智能體請求執行以下操作：',

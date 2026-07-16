@@ -30,6 +30,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setThinking',
   'session:setSystemPrompt',
   'session:setPermissionMode',
+  'session:setForcePlan',
   'session:setModel',
   'config:setActiveModel',
   'config:testProvider',
@@ -208,6 +209,17 @@ export function handleSessionMessage(
         type: 'session:permissionMode',
         sessionId: msg.sessionId,
         permissionMode: s.config.permissionMode ?? 'edit',
+      })
+      return
+    }
+    case 'session:setForcePlan': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      const applied = s.setForcePlan(msg.forcePlan)
+      if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+      send({
+        type: 'session:forcePlan',
+        sessionId: msg.sessionId,
+        forcePlan: Boolean(s.config.forcePlan),
       })
       return
     }

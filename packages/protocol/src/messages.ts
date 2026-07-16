@@ -55,6 +55,7 @@ export type ClientMessage =
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
+  | { type: 'session:setForcePlan'; sessionId: string; forcePlan: boolean }
   | { type: 'session:setModel'; sessionId: string; llmProvider: string; model: string; baseURL?: string }
   | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
   | {
@@ -137,6 +138,7 @@ export type ServerMessage =
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
+  | { type: 'session:forcePlan'; sessionId: string; forcePlan: boolean }
   | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
   /**
    * Echo of stored orchMode (compat). `ignoredForTurnRouting` is optional honesty:

@@ -1,37 +1,33 @@
 # Spike: how to enter plan mode from Code surface
 
-**Status:** best-effort for eval.
+**Status:** product path implemented (2026-07-16).
 
 ## Product facts
 
 - `PlanApprovalCard` has testids: `plan-approval-card`, `plan-approve`, `plan-reject`, `plan-amend`.
-- E2E can seed plan via `__hipE2E.seedPlanApproval` (unpaid harness only — not for live skill scoring of plan *entry*).
-- Live eval for `plan_mode: require` **approves** when the card appears; it does **not** force the agent into plan mode if the product does not surface it.
+- Product entry (not seed):
+  - **Chip** `data-testid="plan-mode-chip"` — toggles `SessionConfig.forcePlan` (draft or session).
+  - **Slash** `/plan` [task…] / `/plan-off` — same flag; optional task starts a turn.
+  - Protocol: `session:setForcePlan` → echo `session:forcePlan`.
+- Sidecar with `forcePlan`: injects system nudge to call `EnterPlanMode`, sets `planningMode: 'plan'`.
+- E2E can still seed plan via `__hipE2E.seedPlanApproval` (unpaid harness only — not for live skill scoring of plan *entry*).
 
 ## Eval policy
 
 | plan_mode | Runner behavior |
 |-----------|-----------------|
-| forbid | never click approve |
+| forbid | never click approve; do not enable chip |
 | allow | approve if visible |
-| prefer | approve if visible; soft note if never seen |
-| require | approve if visible; score `plan_skipped` if never approved |
+| prefer | enable plan chip before send; approve if visible; soft note if never seen |
+| require | enable plan chip before send; approve if visible; score `plan_skipped` if never approved |
 
-## Current eval approach (2026-07-16)
+## Current eval approach
 
-- Prompt tasks to call agent tool `enter_plan_mode` so PlanApprovalCard can appear.
-- Runner uses `plan_mode: prefer` + auto-click `plan-approve` when visible.
-- Hard gate remains verify green; `planApproved` is reported for axis portrait.
+- `eval-run` calls `enablePlanModeUi()` when `plan_mode` is prefer/require **before** first prompt (draft forcePlan → session create).
+- Auto-click `plan-approve` when `PlanApprovalCard` appears.
+- Live task `bb-orch-plan-then-fix` uses `plan_mode: require` + `require_plan_approved`.
 
-## Live result (2026-07-16)
+## Harness
 
-| Task | Score | planApproved | Notes |
-|------|-------|--------------|-------|
-| `bb-orch-plan-then-fix` | **pass** (~41s) | **false** | Agent fixed `HasPrefixes` and verify green without ever showing `PlanApprovalCard`. Prompt + tool request alone is insufficient for plan *entry* scoring. |
-
-Report: `~/.hip/eval-runs/bb-orch-plan-then-fix-2026-07-16T07-28-20-fd50a7`
-
-## Future
-
-- Product slash / chip to enter plan mode without relying on the model tool.
-- Optional `plan_mode: require` once UI entry is reliable.
+- `harness-plan-entry.spec.ts` — chip toggles forcePlan (unpaid).
+- `harness-plan-approval.spec.ts` — seed card + approve (unpaid).

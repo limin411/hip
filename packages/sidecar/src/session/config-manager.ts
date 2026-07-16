@@ -120,6 +120,18 @@ export class ConfigManager {
     return true
   }
 
+  /** Force plan/execute/verify loop for subsequent turns. NO-OP while a turn is running. */
+  setForcePlan(forcePlan: boolean): boolean {
+    if (this.isRunning()) return false
+    this.updateConfig({
+      ...this.getConfig(),
+      forcePlan,
+      // forcePlan wins over a lingering disablePlan from CLI presets
+      ...(forcePlan ? { disablePlan: false } : {}),
+    } as SessionConfig)
+    return true
+  }
+
   /** Rebuild against the current global active model. */
   applyActiveModel(): boolean {
     if (!this.usesEnvModel) return true

@@ -7,6 +7,7 @@ import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 
 const enterKnowledge = vi.fn(async () => {})
+const openKnowledgeHome = vi.fn(async () => {})
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
@@ -14,6 +15,7 @@ const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
+  openKnowledgeHome: () => openKnowledgeHome(),
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
@@ -41,6 +43,7 @@ import { AppSidebar } from './AppSidebar'
 describe('AppSidebar', () => {
   beforeEach(() => {
     enterKnowledge.mockClear()
+    openKnowledgeHome.mockClear()
     enterSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
@@ -107,10 +110,24 @@ describe('AppSidebar', () => {
     expect(enterSection).toHaveBeenCalledWith('projects')
   })
 
-  it('view all opens history chrome helper', () => {
+  it('chats section new chat starts chat conversation', () => {
     render(<AppSidebar onLogout={vi.fn()} />)
-    fireEvent.click(screen.getByTestId('sidebar-view-all'))
-    expect(openHistoryFromChrome).toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('sidebar-new-chat-list'))
+    expect(newConversationFromSidebar).toHaveBeenCalledWith('chat')
+  })
+
+  it('projects section new task starts code conversation', () => {
+    useUiStore.setState({ sidebarSection: 'projects' })
+    render(<AppSidebar onLogout={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('sidebar-new-task'))
+    expect(newConversationFromSidebar).toHaveBeenCalledWith('code')
+  })
+
+  it('manage spaces opens knowledge home', () => {
+    useUiStore.setState({ sidebarSection: 'knowledge' })
+    render(<AppSidebar onLogout={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('sidebar-manage-spaces'))
+    expect(openKnowledgeHome).toHaveBeenCalled()
   })
 
   it('session row calls selectSessionFromSidebar', () => {

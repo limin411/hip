@@ -7,6 +7,7 @@ import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 const flushSave = vi.fn(async () => true)
 const loadSpaces = vi.fn(async () => {})
 const openSpace = vi.fn(async (_id: string) => {})
+const openHome = vi.fn(async () => {})
 const setSurface = vi.fn((_view: 'chat' | 'code') => {})
 const selectSession = vi.fn((_id: string) => {})
 const newConversation = vi.fn((_surface?: 'chat' | 'code') => {})
@@ -17,6 +18,7 @@ vi.mock('@/store/knowledgeStore', () => ({
       flushSave: () => flushSave(),
       loadSpaces: () => loadSpaces(),
       openSpace: (id: string) => openSpace(id),
+      openHome: () => openHome(),
     }),
   },
 }))
@@ -40,6 +42,7 @@ import {
   handleMainToolbarBack,
   leaveKnowledge,
   openHistoryFromChrome,
+  openKnowledgeHome,
   openSettingsFromChrome,
 } from './sidebarActions'
 
@@ -48,6 +51,7 @@ describe('sidebarActions', () => {
     flushSave.mockClear()
     loadSpaces.mockClear()
     openSpace.mockClear()
+    openHome.mockClear()
     setSurface.mockClear()
     selectSession.mockClear()
     newConversation.mockClear()
@@ -80,6 +84,14 @@ describe('sidebarActions', () => {
     expect(useUiStore.getState().activeView).toBe('knowledge')
     expect(useUiStore.getState().sidebarSection).toBe('knowledge')
     expect(loadSpaces).toHaveBeenCalled()
+  })
+
+  it('openKnowledgeHome enters knowledge then openHome', async () => {
+    await openKnowledgeHome()
+    expect(useUiStore.getState().activeView).toBe('knowledge')
+    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
+    expect(loadSpaces).toHaveBeenCalled()
+    expect(openHome).toHaveBeenCalled()
   })
 
   it('enterSection leaves knowledge and setSurface', async () => {

@@ -38,6 +38,12 @@ export async function enterKnowledge(): Promise<void> {
   await useKnowledgeStore.getState().loadSpaces()
 }
 
+/** Open knowledge surface on the home (spaces list) for management. */
+export async function openKnowledgeHome(): Promise<void> {
+  await enterKnowledge()
+  await useKnowledgeStore.getState().openHome()
+}
+
 export async function enterSection(section: 'projects' | 'chats'): Promise<void> {
   // Only await when leaving knowledge so non-knowledge callers stay sync (palette tests / click handlers).
   if (useUiStore.getState().activeView === 'knowledge') {

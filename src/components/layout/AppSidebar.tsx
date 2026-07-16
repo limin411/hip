@@ -15,6 +15,7 @@ import {
   leaveKnowledge,
   newConversationFromSidebar,
   openHistoryFromChrome,
+  openKnowledgeHome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
   selectSessionFromSidebar,
@@ -185,20 +186,30 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
               type="button"
               data-testid="sidebar-manage-spaces"
               data-no-drag
-              onClick={() => void enterKnowledge()}
+              onClick={() => void openKnowledgeHome()}
               className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               {t('sidebar.manageSpaces')}
             </button>
+          ) : sidebarSection === 'projects' ? (
+            <button
+              type="button"
+              data-testid="sidebar-new-task"
+              data-no-drag
+              onClick={() => void newConversationFromSidebar('code')}
+              className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            >
+              {t('sidebar.newTask')}
+            </button>
           ) : (
             <button
               type="button"
-              data-testid="sidebar-view-all"
+              data-testid="sidebar-new-chat-list"
               data-no-drag
-              onClick={() => void openHistoryFromChrome()}
+              onClick={() => void newConversationFromSidebar('chat')}
               className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
-              {t('sidebar.viewAll')}
+              {t('sidebar.newChat')}
             </button>
           )}
         </div>

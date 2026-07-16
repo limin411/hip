@@ -973,6 +973,7 @@ export const zhCN = {
       },
       viewAll: '查看全部',
       manageSpaces: '管理',
+      newTask: '新建任务',
       newProject: '新建项目会话',
       newChat: '新建对话',
       emptySearch: '无匹配项',

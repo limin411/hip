@@ -978,6 +978,7 @@ export const en = {
       },
       viewAll: 'View all',
       manageSpaces: 'Manage',
+      newTask: 'New task',
       newProject: 'New project session',
       newChat: 'New chat',
       emptySearch: 'No matches',

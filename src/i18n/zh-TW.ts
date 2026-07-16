@@ -973,6 +973,7 @@ export const zhTW = {
       },
       viewAll: '檢視全部',
       manageSpaces: '管理',
+      newTask: '新增任務',
       newProject: '新增專案會話',
       newChat: '新增對話',
       emptySearch: '無符合項目',

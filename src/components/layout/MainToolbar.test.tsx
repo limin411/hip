@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
@@ -77,25 +77,15 @@ describe('MainToolbar', () => {
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 
-  it('history: back present, empty toolbar title', () => {
+  it('history: no back, empty toolbar title, hides connection and panel', () => {
     useUiStore.setState({
       activeView: 'history',
       previousView: 'chat',
     })
     render(<MainToolbar />)
-    expect(screen.getByTestId('main-toolbar-back')).toBeInTheDocument()
+    expect(screen.queryByTestId('main-toolbar-back')).not.toBeInTheDocument()
     expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('')
-  })
-
-  it('knowledge → history → back restores knowledge view and section', () => {
-    useUiStore.setState({
-      activeView: 'history',
-      previousView: 'knowledge',
-      sidebarSection: 'chats', // as if assignSectionAfterLeavingKnowledge ran
-    })
-    render(<MainToolbar />)
-    fireEvent.click(screen.getByTestId('main-toolbar-back'))
-    expect(useUiStore.getState().activeView).toBe('knowledge')
-    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
+    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
 })

@@ -56,10 +56,10 @@ describe('global command palette @smoke @core', () => {
     await (await browser.$('[data-testid="session-history"]')).waitForExist({ timeout: 15000 })
     expect(await (await browser.$('[data-testid="session-history"]')).isExisting()).toBe(true)
 
-    // Return to chat so later specs are not stuck on history.
-    const back = await browser.$('[data-testid="titlebar-back"]')
-    if (await back.isExisting()) {
-      await browser.execute((el: HTMLElement) => el.click(), back)
+    // Return to chat so later specs are not stuck on history (toolbar has no back).
+    const nav = await browser.$('[data-testid="sidebar-nav-chats"]')
+    if (await nav.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), nav)
     }
   })
 

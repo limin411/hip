@@ -982,7 +982,7 @@ export const en = {
       newProject: 'New project session',
       newChat: 'New chat',
       emptySearch: 'No matches',
-      emptySessions: 'No sessions yet — click + to start',
+      emptySessions: 'No sessions yet',
       emptySpaces: 'No spaces yet',
     },
     dropdown: {

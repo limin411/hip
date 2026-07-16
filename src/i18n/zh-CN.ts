@@ -977,7 +977,7 @@ export const zhCN = {
       newProject: '新建项目会话',
       newChat: '新建对话',
       emptySearch: '无匹配项',
-      emptySessions: '暂无会话，点击 + 新建',
+      emptySessions: '暂无会话',
       emptySpaces: '暂无知识空间',
     },
     dropdown: {

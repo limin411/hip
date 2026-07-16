@@ -977,7 +977,7 @@ export const zhTW = {
       newProject: '新增專案會話',
       newChat: '新增對話',
       emptySearch: '無符合項目',
-      emptySessions: '尚無會話，點擊 + 新增',
+      emptySessions: '尚無會話',
       emptySpaces: '尚無知識空間',
     },
     dropdown: {

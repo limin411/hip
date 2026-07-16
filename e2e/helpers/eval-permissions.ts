@@ -1,0 +1,81 @@
+/**
+ * Permission modal + permission mode picker helpers for eval e2e.
+ */
+
+export async function permissionModalOpen(): Promise<boolean> {
+  const modal = await browser.$('[data-testid="permission-modal"]')
+  return modal.isExisting()
+}
+
+/** Click first allow-ish option if modal is open. */
+export async function approvePermissionIfPresent(): Promise<boolean> {
+  if (!(await permissionModalOpen())) return false
+
+  // Prefer known allow option ids; fall back to first option button.
+  const candidates = [
+    'permission-option-allow',
+    'permission-option-allow_always',
+    'permission-option-allow-once',
+    'permission-option-yes',
+  ]
+  for (const id of candidates) {
+    const el = await browser.$(`[data-testid="${id}"]`)
+    if (await el.isExisting()) {
+      await browser.execute((node: HTMLElement) => node.click(), el)
+      await browser.pause(200)
+      return true
+    }
+  }
+
+  const anyOpt = await browser.$('[data-testid^="permission-option-"]')
+  if (await anyOpt.isExisting()) {
+    await browser.execute((node: HTMLElement) => node.click(), anyOpt)
+    await browser.pause(200)
+    return true
+  }
+  return false
+}
+
+/**
+ * Poll and auto-approve permission modals until deadline.
+ * Returns true if a modal was still open at the end (stuck).
+ */
+export async function pumpPermissionsUntil(
+  deadlineMs: number,
+  autoApprove: boolean,
+): Promise<{ stuck: boolean; approvedCount: number }> {
+  let approvedCount = 0
+  const start = Date.now()
+  while (Date.now() < deadlineMs) {
+    if (await permissionModalOpen()) {
+      if (!autoApprove) {
+        return { stuck: true, approvedCount }
+      }
+      const ok = await approvePermissionIfPresent()
+      if (ok) approvedCount += 1
+      else {
+        // Modal open but no clickable option yet
+        await browser.pause(300)
+      }
+    } else {
+      await browser.pause(400)
+    }
+    // If nothing pending, brief yield for agent tools
+    if (Date.now() - start > 50 && !(await permissionModalOpen())) {
+      // continue polling until outer settle decides
+    }
+  }
+  return { stuck: await permissionModalOpen(), approvedCount }
+}
+
+/** Set permission mode via product chip + menu (draft or session). */
+export async function setPermissionModeUi(mode: 'chat' | 'edit' | 'full'): Promise<void> {
+  const chip = await browser.$('[data-testid="permission-chip"]')
+  await chip.waitForExist({ timeout: 15000 })
+  await browser.execute((el: HTMLElement) => el.click(), chip)
+
+  const item = await browser.$(`[data-testid="permission-mode-${mode}"]`)
+  await item.waitForExist({ timeout: 10000 })
+  await browser.execute((el: HTMLElement) => el.click(), item)
+  await browser.pause(150)
+}

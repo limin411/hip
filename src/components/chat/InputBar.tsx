@@ -149,7 +149,7 @@ export function InputBar() {
     setAttachments([])
   }
   return (
-    <div className="shrink-0 px-5 pb-5">
+    <div className="shrink-0 px-5 pb-5" data-testid="input-bar">
       <div className="mx-auto max-w-3xl">
         {planApprovalPending ? (
           <div className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-meta text-ink-secondary">

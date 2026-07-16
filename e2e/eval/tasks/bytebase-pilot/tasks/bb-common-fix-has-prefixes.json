@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-common-fix-has-prefixes",
+  "name": "Fix HasPrefixes regression in backend/common",
+  "language": "go",
+  "difficulty": "easy",
+  "tags": ["edit", "unit-test"],
+  "prompt": "In this Bytebase repository, unit tests in package backend/common related to HasPrefixes are failing. Find the bug in the implementation (not the test), fix it, and ensure `go test ./backend/common/ -count=1` passes. Do not modify unrelated packages. Do not commit or push. Do not run network commands.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-has-prefixes.patch" }
+  },
+  "ui": {
+    "expect": {
+      "changes_paths_regex": ["backend/common/"],
+      "changes_avoid_regex": ["^frontend/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./backend/common/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "backend/common/" },
+      { "kind": "paths_avoid_regex", "pattern": "^frontend/" }
+    ]
+  },
+  "scoring": { "pass_requires": "verify_all", "partial_credit": false },
+  "metadata": {
+    "source": "handcrafted",
+    "symbol": "HasPrefixes"
+  }
+}

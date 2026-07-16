@@ -15,6 +15,7 @@ export default defineConfig({
       'packages/sidecar/src/**/*.test.ts',
       'packages/protocol/src/**/*.test.ts',
       'packages/cli/src/**/*.test.ts',
+      'e2e/eval/**/*.test.ts',
     ],
     // Real-LLM suites read HIP_MODEL_<ID>_API_KEY. vitest.setup.ts seeds those from the
     // single source of truth (~/.hip/config/auth.json — the same file the desktop app

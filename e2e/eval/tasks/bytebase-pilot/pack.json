@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "bytebase-pilot",
+  "name": "Bytebase host-mode pilot (UI)",
+  "description": "Three handcrafted coding tasks driven through the hip desktop UI against a local Bytebase checkout.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_BYTEBASE_PATH",
+      "base_sha": "ac0061377bfdd05813e4747df971b0e3737fbe61"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 900000,
+      "auto_approve_permissions": true
+    },
+    "verify": {
+      "timeout_sec": 180
+    }
+  },
+  "tasks": [
+    "tasks/bb-common-fix-has-prefixes.json",
+    "tasks/bb-common-nav-truncate.json",
+    "tasks/bb-stress-timeout.json"
+  ]
+}

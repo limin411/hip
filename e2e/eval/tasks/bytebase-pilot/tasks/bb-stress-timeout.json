@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-stress-timeout",
+  "name": "Short-timeout stress probe",
+  "language": "go",
+  "difficulty": "hard",
+  "tags": ["stress", "timeout"],
+  "prompt": "This is a stressful multi-step coding task: fully review backend/common and backend/plugin/advisor for any style issues, write a comprehensive design, then implement and verify with tests. Prefer thoroughness over speed.",
+  "workspace": {
+    "setup": { "kind": "none" }
+  },
+  "ui": {
+    "timeout_ms": 60000,
+    "expect": {
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": []
+  },
+  "metadata": {
+    "source": "handcrafted",
+    "purpose": "Calibrate timeout / empty_change / awaiting_user tags; often expected to fail"
+  }
+}

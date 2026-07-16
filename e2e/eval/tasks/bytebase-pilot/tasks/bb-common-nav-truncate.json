@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "bb-common-nav-truncate",
+  "name": "Locate TruncateString in backend/common",
+  "language": "go",
+  "difficulty": "easy",
+  "tags": ["nav"],
+  "prompt": "In this Bytebase monorepo, find where TruncateString is defined. Reply with the file path relative to the repo root and a one-sentence description of what TruncateString does. Do not modify any files. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "none" }
+  },
+  "ui": {
+    "timeout_ms": 300000,
+    "expect": {
+      "assistant_text_regex": "TruncateString|util\\.go",
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [],
+    "soft": [
+      { "kind": "assistant_text_regex", "pattern": "TruncateString|util\\.go" }
+    ]
+  },
+  "metadata": {
+    "source": "handcrafted",
+    "symbol": "TruncateString",
+    "expected_file": "backend/common/util.go"
+  }
+}

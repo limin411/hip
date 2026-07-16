@@ -44,7 +44,12 @@ export function PermissionModePicker() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {PERMISSION_MODES.map((mode) => (
-          <DropdownMenuItem key={mode} onSelect={() => choose(mode)} className="flex-col items-start gap-0.5">
+          <DropdownMenuItem
+            key={mode}
+            onSelect={() => choose(mode)}
+            className="flex-col items-start gap-0.5"
+            data-testid={`permission-mode-${mode}`}
+          >
             <div className="flex items-center gap-2">
               <Check size={14} className={cn('shrink-0', current === mode ? 'opacity-100' : 'opacity-0')} />
               <span>{t(`chat.permission.modes.${mode}`)}</span>

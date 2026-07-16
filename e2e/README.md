@@ -47,6 +47,11 @@ yarn test:e2e:gate
 # Live LLM (opt-in; needs ~/.hip/config/auth.json staged by wdio)
 yarn test:e2e:live
 
+# Capability eval (UI-first; unpaid smoke + optional live Bytebase pilot)
+yarn test:e2e:eval-smoke
+# Live pilot: export HIP_EVAL_BYTEBASE_PATH=/path/to/bytebase && yarn test:e2e:eval
+# or: scripts/hip-eval-ui-pilot.sh
+
 # Memory UI (unpaid; Settings / slash / citations harness)
 E2E_GREP=@memory yarn test:e2e
 
@@ -81,6 +86,7 @@ E2E_GREP=@live E2E_INVERT=1 yarn test:e2e
 | `@settings` | Settings smoke, usage chip | optional |
 | `@memory` | Memory settings / slash / citations harness (no paid LLM) | optional (not yet in gate) |
 | `@live` | Real LLM (opt-in only) | **no** |
+| `@eval` | UI-first capability eval (smoke unpaid; live needs `HIP_EVAL_BYTEBASE_PATH`) | smoke yes via `@eval @smoke`; live **no** |
 | `@context-menu` | Right-click menus (see plan) | smoke/core cases also tagged `@smoke`/`@core` → in gate |
 | `@knowledge` | Knowledge base full business flows | main path also `@core` → in gate |
 

@@ -18,7 +18,6 @@ import type { ContextKind, ContextMenuItemMeta, ContextMenuPrefs } from './types
 const KIND_SECTION_ORDER: ContextKind[] = [
   'message',
   'codeBlock',
-  'sessionTab',
   'sessionHistory',
   'fileEntry',
   'filePreview',
@@ -38,7 +37,6 @@ const KIND_SECTION_ORDER: ContextKind[] = [
 const KIND_LABEL_KEY = {
   message: 'settings.contextMenu.kinds.message',
   codeBlock: 'settings.contextMenu.kinds.codeBlock',
-  sessionTab: 'settings.contextMenu.kinds.sessionTab',
   sessionHistory: 'settings.contextMenu.kinds.sessionHistory',
   fileEntry: 'settings.contextMenu.kinds.fileEntry',
   filePreview: 'settings.contextMenu.kinds.filePreview',

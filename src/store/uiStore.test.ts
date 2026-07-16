@@ -15,7 +15,6 @@ beforeEach(() => {
     activeTab: 'agents',
     theme: 'system',
     language: 'zh-CN',
-    openSessionIds: [],
     chatSessionId: null,
     codeSessionId: null,
     activeView: 'chat',
@@ -272,39 +271,9 @@ describe('normalizeAppLanguage', () => {
   })
 })
 
-describe('uiStore open sessions', () => {
-  beforeEach(() => {
-    useUiStore.setState({ openSessionIds: [] })
-  })
-
-  it('adds and removes open session ids', () => {
-    useUiStore.getState().addOpenSession('s1')
-    useUiStore.getState().addOpenSession('s2')
-    expect(useUiStore.getState().openSessionIds).toEqual(['s2', 's1'])
-
-    useUiStore.getState().removeOpenSession('s1')
-    expect(useUiStore.getState().openSessionIds).toEqual(['s2'])
-  })
-
-  it('reorders open session ids', () => {
-    useUiStore.getState().addOpenSession('s1')
-    useUiStore.getState().addOpenSession('s2')
-    useUiStore.getState().reorderOpenSessions(['s2', 's1'])
-    expect(useUiStore.getState().openSessionIds).toEqual(['s2', 's1'])
-  })
-
-  it('moves an existing id to the front when re-added', () => {
-    useUiStore.getState().addOpenSession('s1')
-    useUiStore.getState().addOpenSession('s2')
-    useUiStore.getState().addOpenSession('s1')
-    expect(useUiStore.getState().openSessionIds).toEqual(['s1', 's2'])
-  })
-})
-
 describe('uiStore persistence partialize', () => {
-  it('includes open tabs, surface pointers, and settings (not activeView / ephemeral UI)', () => {
+  it('includes surface pointers and settings (not activeView / open tabs)', () => {
     useUiStore.setState({
-      openSessionIds: ['a', 'b'],
       chatSessionId: 'a',
       codeSessionId: 'c',
       activeView: 'code',
@@ -320,7 +289,6 @@ describe('uiStore persistence partialize', () => {
     })
     const s = useUiStore.getState()
     const persisted: UiPersistedState = {
-      openSessionIds: s.openSessionIds,
       chatSessionId: s.chatSessionId,
       codeSessionId: s.codeSessionId,
       theme: s.theme,
@@ -331,7 +299,6 @@ describe('uiStore persistence partialize', () => {
       checkpointMode: s.checkpointMode,
     }
     expect(persisted).toEqual({
-      openSessionIds: ['a', 'b'],
       chatSessionId: 'a',
       codeSessionId: 'c',
       theme: 'dark',
@@ -344,15 +311,15 @@ describe('uiStore persistence partialize', () => {
     expect(persisted).not.toHaveProperty('activeTab')
     expect(persisted).not.toHaveProperty('scrollTargetMessageId')
     expect(persisted).not.toHaveProperty('activeView')
+    expect(persisted).not.toHaveProperty('openSessionIds')
   })
 
-  it('merge strips legacy activeView knowledge so cold launch stays on chat', () => {
+  it('merge strips legacy activeView / tabs / knowledge so cold launch stays on chat', () => {
     expect(isEphemeralActiveView('knowledge')).toBe(true)
 
     const current = {
       activeView: 'chat' as const,
-      knowledgeTabOpen: false,
-      openSessionIds: [] as string[],
+      sidebarSection: 'chats' as const,
       theme: 'system' as const,
     }
     const merged = mergeUiPersistedState(
@@ -360,20 +327,25 @@ describe('uiStore persistence partialize', () => {
         openSessionIds: ['s1'],
         activeView: 'knowledge',
         knowledgeTabOpen: true,
+        sidebarSection: 'projects',
         theme: 'dark',
       },
       current,
     )
     expect(merged.activeView).toBe('chat')
-    expect(merged.knowledgeTabOpen).toBe(false)
-    expect(merged.openSessionIds).toEqual(['s1'])
+    expect(merged.sidebarSection).toBe('chats')
+    expect(merged).not.toHaveProperty('openSessionIds')
+    expect(merged).not.toHaveProperty('knowledgeTabOpen')
     expect(merged.theme).toBe('dark')
   })
 
-  it('applyColdLaunchShell forces chat and closes knowledge chip', () => {
-    useUiStore.setState({ activeView: 'knowledge', knowledgeTabOpen: true })
+  it('applyColdLaunchShell forces chat section', () => {
+    useUiStore.setState({
+      activeView: 'knowledge',
+      sidebarSection: 'knowledge',
+    })
     applyColdLaunchShell()
     expect(useUiStore.getState().activeView).toBe('chat')
-    expect(useUiStore.getState().knowledgeTabOpen).toBe(false)
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 })

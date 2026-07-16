@@ -13,6 +13,12 @@ import {
   useKnowledgeStore,
 } from '@/store/knowledgeStore'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
+import {
+  enterKnowledge,
+  enterSection,
+  openHistoryFromChrome,
+  openSettingsFromChrome,
+} from '@/components/layout/sidebarActions'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -149,6 +155,10 @@ export function GlobalCommandPalette() {
       search: parsed.needle,
       skills,
       skillsEnabled,
+      enterSection: (section: 'projects' | 'chats') => void enterSection(section),
+      openHistoryFromChrome: () => void openHistoryFromChrome(),
+      openSettingsFromChrome: () => void openSettingsFromChrome(),
+      enterKnowledge: () => void enterKnowledge(),
       openKnowledgeView: () => {
         openKnowledgeView()
         void useKnowledgeStore.getState().loadSpaces()

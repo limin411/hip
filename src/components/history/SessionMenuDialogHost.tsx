@@ -1,15 +1,13 @@
-import { sessionService, useDomainStore } from '@/domain'
+import { sessionService } from '@/domain'
 import { RenameSessionDialog } from './RenameSessionDialog'
 import { DeleteSessionDialog } from './DeleteSessionDialog'
-import { ConfirmDeleteSessionsDialog } from './ConfirmDeleteSessionsDialog'
-import { orderBulkCloseIds } from './orderBulkCloseIds'
 import {
   closeSessionMenuDialog,
   useSessionMenuDialog,
 } from './sessionMenuDialogStore'
 
 /**
- * Global host for session context-menu dialogs (rename, history delete, bulk tab delete).
+ * Global host for session context-menu dialogs (rename, permanent delete).
  * Mount once near app chrome (e.g. AppLayout).
  */
 export function SessionMenuDialogHost() {
@@ -29,30 +27,12 @@ export function SessionMenuDialogHost() {
     )
   }
 
-  if (dialog.kind === 'deleteSession') {
-    return (
-      <DeleteSessionDialog
-        title={dialog.title}
-        onCancel={closeSessionMenuDialog}
-        onConfirm={(opts) => {
-          sessionService.deleteSession(dialog.sessionId, opts)
-          closeSessionMenuDialog()
-        }}
-      />
-    )
-  }
-
-  // confirmBulkDelete — close non-active first to avoid mid-loop select/load thrash
-  const { sessionIds } = dialog
   return (
-    <ConfirmDeleteSessionsDialog
-      count={sessionIds.length}
+    <DeleteSessionDialog
+      title={dialog.title}
       onCancel={closeSessionMenuDialog}
-      onConfirm={() => {
-        const activeId = useDomainStore.getState().activeSessionId
-        for (const id of orderBulkCloseIds(sessionIds, activeId)) {
-          sessionService.closeSession(id)
-        }
+      onConfirm={(opts) => {
+        sessionService.deleteSession(dialog.sessionId, opts)
         closeSessionMenuDialog()
       }}
     />

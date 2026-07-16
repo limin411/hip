@@ -17,6 +17,7 @@ const createMockSessions = () =>
 let mockSessions = createMockSessions()
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => {} },
   useTranslation: () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       if (key === 'history.pageInfo' && params) {

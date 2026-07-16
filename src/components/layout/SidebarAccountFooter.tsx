@@ -1,15 +1,23 @@
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings, History, LogOut } from 'lucide-react'
+import { History, LogOut, Settings } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 
-interface FloatingAvatarButtonProps {
+interface SidebarAccountFooterProps {
   onOpenSettings: () => void
   onOpenHistory: () => void
   onLogout: () => void
 }
 
-export function FloatingAvatarButton({ onOpenSettings, onOpenHistory, onLogout }: FloatingAvatarButtonProps) {
+/**
+ * Account menu in the sidebar footer.
+ * Ports FloatingAvatarButton menu structure + testids; position only changes.
+ */
+export function SidebarAccountFooter({
+  onOpenSettings,
+  onOpenHistory,
+  onLogout,
+}: SidebarAccountFooterProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -26,36 +34,50 @@ export function FloatingAvatarButton({ onOpenSettings, onOpenHistory, onLogout }
   }, [open])
 
   const handleLogout = () => {
-    const confirmed = window.confirm(`${t('common.logoutConfirmTitle')}\n\n${t('common.logoutConfirmDesc')}`)
+    const confirmed = window.confirm(
+      `${t('common.logoutConfirmTitle')}\n\n${t('common.logoutConfirmDesc')}`,
+    )
     if (!confirmed) return
     setOpen(false)
     onLogout()
   }
 
   return (
-    <div ref={ref} className="absolute bottom-4 left-4 z-10">
+    <div
+      ref={ref}
+      className="relative flex shrink-0 items-center gap-2 border-t border-border px-2 py-2"
+      data-testid="sidebar-account-footer"
+    >
       <button
         type="button"
         data-testid="account-menu-button"
+        data-no-drag
         onClick={() => setOpen(!open)}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-subtle text-accent-strong ring-1 ring-transparent transition-all hover:scale-105 hover:ring-border"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-accent-strong ring-1 ring-transparent transition-all hover:ring-border"
         aria-label={t('account.menu')}
         aria-expanded={open}
         aria-haspopup="menu"
       >
         <Avatar name="User" size={32} />
       </button>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-meta font-medium text-ink">{t('account.userLabel')}</div>
+        <div className="truncate text-[11px] text-ink-tertiary">{t('account.menuHint')}</div>
+      </div>
 
       {open && (
         <div
-          className="absolute bottom-11 left-0 w-44 rounded-xl border border-border bg-surface p-1.5 shadow-menu animate-menu-in"
+          className="absolute bottom-12 left-2 z-20 w-44 rounded-xl border border-border bg-surface p-1.5 shadow-menu animate-menu-in"
           role="menu"
           aria-label={t('account.menu')}
         >
           <button
             type="button"
             data-testid="account-history-menu-item"
-            onClick={() => { setOpen(false); onOpenHistory() }}
+            onClick={() => {
+              setOpen(false)
+              onOpenHistory()
+            }}
             className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-ink transition-colors hover:bg-surface-muted"
             role="menuitem"
           >
@@ -66,7 +88,10 @@ export function FloatingAvatarButton({ onOpenSettings, onOpenHistory, onLogout }
           <button
             type="button"
             data-testid="account-settings-menu-item"
-            onClick={() => { setOpen(false); onOpenSettings() }}
+            onClick={() => {
+              setOpen(false)
+              onOpenSettings()
+            }}
             className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-body text-ink transition-colors hover:bg-surface-muted"
             role="menuitem"
           >

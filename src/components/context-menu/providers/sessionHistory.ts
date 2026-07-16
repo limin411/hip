@@ -1,11 +1,11 @@
-import { sessionService } from '@/domain'
 import {
   openDeleteSessionDialog,
   openRenameSessionDialog,
 } from '@/components/history/sessionMenuDialogStore'
+import { selectSessionFromSidebar } from '@/components/layout/sidebarActions'
 import type { ContextMenuItemDef, ContextProvider } from '../types'
 
-/** History row menu: open, rename (modal), delete (DeleteSessionDialog). No background openTab. */
+/** History/sidebar row menu: open, rename (modal), permanent delete. No soft-close. */
 export const sessionHistoryProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'sessionHistory') return []
   const { sessionId, title } = req.payload
@@ -16,7 +16,8 @@ export const sessionHistoryProvider: ContextProvider = (req, ctx) => {
       label: ctx.t('contextMenu.sessionHistory.open'),
       group: 'primary',
       run: () => {
-        sessionService.selectSession(sessionId)
+        // Flush-safe open (leave knowledge if needed) — same path as sidebar click.
+        void selectSessionFromSidebar(sessionId)
       },
     },
     {

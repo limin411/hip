@@ -36,7 +36,6 @@ function makeCtx(): ContextMenuBuildContext {
     activeSessionId: 's1',
     sessionStatus: 'idle',
     sessionInterrupt: false,
-    openSessionIds: ['s1'],
     copyText,
   }
 }

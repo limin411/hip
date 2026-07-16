@@ -7,7 +7,6 @@ describe('createContextMenuBuildContext', () => {
   beforeEach(() => {
     useUiStore.setState({
       activeView: 'code',
-      openSessionIds: ['s1', 's2'],
       chatSessionId: null,
       codeSessionId: 's1',
     })
@@ -50,7 +49,6 @@ describe('createContextMenuBuildContext', () => {
     expect(ctx.activeSessionId).toBe('s1')
     expect(ctx.sessionStatus).toBe('running')
     expect(ctx.sessionInterrupt).toBe(true)
-    expect(ctx.openSessionIds).toEqual(['s1', 's2'])
     expect(typeof ctx.copyText).toBe('function')
   })
 

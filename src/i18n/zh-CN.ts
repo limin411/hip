@@ -915,6 +915,12 @@ export const zhCN = {
     },
     account: {
       menu: '账户菜单',
+      userLabel: '账户',
+      menuHint: '设置 · 历史',
+    },
+    mainToolbar: {
+      newConversation: '新对话',
+      aria: '会话工具栏',
     },
     login: {
       slogan: '没有人比我更懂摸鱼',
@@ -946,6 +952,28 @@ export const zhCN = {
       tabList: '打开的会话',
       knowledge: '知识库',
       closeKnowledge: '关闭知识库',
+    },
+    sidebar: {
+      aria: '导航与历史会话',
+      navAria: '主导航',
+      searchPlaceholder: '搜索会话、知识库…',
+      nav: {
+        knowledge: '知识库',
+        projects: '项目',
+        chats: '对话',
+      },
+      list: {
+        spaces: 'Spaces',
+        projects: '项目会话',
+        chats: '对话历史',
+      },
+      viewAll: '查看全部',
+      manageSpaces: '管理',
+      newProject: '新建项目会话',
+      newChat: '新建对话',
+      emptySearch: '无匹配项',
+      emptySessions: '暂无会话，点击 + 新建',
+      emptySpaces: '暂无知识空间',
     },
     dropdown: {
       newChat: '新建办公对话',

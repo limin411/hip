@@ -64,7 +64,7 @@ beforeEach(() => {
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
   useDiffStore.setState({ bySession: {} })
-  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents', openSessionIds: [] })
+  useUiStore.setState({ scrollTargetMessageId: null, activeTab: 'agents' })
   useProvidersStore.setState({ catalog: multimodalCatalog, config: textActiveConfig, keyConfigured: {}, loaded: true })
   useHipConfigStore.setState({ config: { version: 1, agents: [visionAgent] }, loaded: true, error: null })
 })
@@ -118,94 +118,23 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id })
   })
 
-  it('closeSession removes from open tabs but keeps session in history', () => {
-    const t = new FakeTransport()
-    const svc = new SessionService(t)
-    const id = svc.createSession()
-    expect(useUiStore.getState().openSessionIds).toContain(id)
-
-    svc.closeSession(id)
-    expect(useUiStore.getState().openSessionIds).not.toContain(id)
-    expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(true)
-    expect(t.sent.some((m) => m.type === 'session:delete')).toBe(false)
-  })
-
   it('deleteSession permanently removes session and notifies backend', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     const id = svc.createSession()
     svc.deleteSession(id)
-    expect(useUiStore.getState().openSessionIds).not.toContain(id)
     expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:delete', sessionId: id })
   })
 
-  it('closing the active tab falls back to the tab at the same index', () => {
-    const svc = new SessionService(new FakeTransport())
-    useDomainStore.setState({ sessions: [], activeSessionId: null })
-    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
 
-    const a = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    const b = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    const c = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    // Tab order is newest-first because createSession prepends; click order is a -> b -> c.
-    svc.selectSession(a)
-    svc.selectSession(b)
-    svc.selectSession(c)
-    expect(useUiStore.getState().openSessionIds).toEqual([c, b, a])
-    expect(useDomainStore.getState().activeSessionId).toBe(c)
-
-    svc.closeSession(c)
-    expect(useDomainStore.getState().activeSessionId).toBe(b)
-    expect(useUiStore.getState().openSessionIds).toEqual([b, a])
-
-    svc.closeSession(b)
-    expect(useDomainStore.getState().activeSessionId).toBe(a)
-  })
-
-  it('closing an inactive tab keeps the active tab and history entry', () => {
-    const svc = new SessionService(new FakeTransport())
-    useDomainStore.setState({ sessions: [], activeSessionId: null })
-    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
-
-    const a = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    const b = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    svc.selectSession(a)
-    expect(useDomainStore.getState().activeSessionId).toBe(a)
-
-    svc.closeSession(b)
-    expect(useDomainStore.getState().activeSessionId).toBe(a)
-    expect(useUiStore.getState().openSessionIds).toEqual([a])
-    expect(useDomainStore.getState().sessions.map((s) => s.id).sort()).toEqual([a, b].sort())
-  })
-
-  it('closing the last tab deselects but keeps session for history reopen', () => {
-    const svc = new SessionService(new FakeTransport())
-    useDomainStore.setState({ sessions: [], activeSessionId: null })
-    useUiStore.setState({ openSessionIds: [], activeView: 'chat', chatSessionId: null, codeSessionId: null })
-
-    const id = svc.createSession({ ...DEFAULT_CONFIG, surface: 'chat' })
-    expect(useDomainStore.getState().activeSessionId).toBe(id)
-
-    svc.closeSession(id)
-    expect(useUiStore.getState().openSessionIds).toEqual([])
-    expect(useDomainStore.getState().activeSessionId).toBeNull()
-    expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(true)
-    expect(useUiStore.getState().chatSessionId).toBeNull()
-
-    svc.selectSession(id)
-    expect(useDomainStore.getState().activeSessionId).toBe(id)
-    expect(useUiStore.getState().openSessionIds).toContain(id)
-  })
-
-  it('session:list:result restores open tabs but stays on New Conversation (no auto-select)', () => {
+  it('session:list:result prunes stale surface pointers and stays on New Conversation', () => {
     const t = new FakeTransport()
     new SessionService(t)
     useDomainStore.setState({ sessions: [], activeSessionId: null })
     useUiStore.setState({
-      openSessionIds: ['gone', 'keep-chat', 'keep-code'],
       activeView: 'chat',
-      chatSessionId: 'keep-chat',
+      chatSessionId: 'gone',
       codeSessionId: 'keep-code',
     })
 
@@ -217,38 +146,13 @@ describe('SessionService', () => {
       ],
     })
 
-    expect(useUiStore.getState().openSessionIds).toEqual(['keep-chat', 'keep-code'])
-    // Surface pointers stay for mid-session chat/code switching; active session stays null.
-    expect(useUiStore.getState().chatSessionId).toBe('keep-chat')
+    expect(useUiStore.getState().chatSessionId).toBeNull()
     expect(useUiStore.getState().codeSessionId).toBe('keep-code')
     expect(useDomainStore.getState().activeSessionId).toBeNull()
     expect(useUiStore.getState().activeView).toBe('chat')
   })
 
-  it('session:list:result forces knowledge/settings/history back to chat New Conversation', () => {
-    const t = new FakeTransport()
-    new SessionService(t)
-    useDomainStore.setState({ sessions: [], activeSessionId: null })
-    useUiStore.setState({
-      openSessionIds: ['keep-chat'],
-      activeView: 'knowledge',
-      knowledgeTabOpen: true,
-      chatSessionId: 'keep-chat',
-    })
-
-    t.push({
-      type: 'session:list:result',
-      sessions: [
-        { id: 'keep-chat', title: 'Chat', preview: '', updatedAt: 2, messageCount: 1, surface: 'chat' },
-      ],
-    })
-
-    expect(useDomainStore.getState().activeSessionId).toBeNull()
-    expect(useUiStore.getState().activeView).toBe('chat')
-    expect(useUiStore.getState().knowledgeTabOpen).toBe(false)
-  })
-
-  it('session:list:result keeps an already-active session and only prunes missing tabs', () => {
+  it('session:list:result keeps an already-active session while pruning surface pointers', () => {
     const t = new FakeTransport()
     new SessionService(t)
     useDomainStore.setState({
@@ -266,9 +170,9 @@ describe('SessionService', () => {
       activeSessionId: 'live',
     })
     useUiStore.setState({
-      openSessionIds: ['live', 'stale'],
       activeView: 'chat',
       chatSessionId: 'live',
+      codeSessionId: 'stale',
     })
 
     t.push({
@@ -279,8 +183,30 @@ describe('SessionService', () => {
       ],
     })
 
-    expect(useUiStore.getState().openSessionIds).toEqual(['live'])
     expect(useDomainStore.getState().activeSessionId).toBe('live')
+    expect(useUiStore.getState().chatSessionId).toBe('live')
+    expect(useUiStore.getState().codeSessionId).toBeNull()
+  })
+
+  it('session:list:result forces knowledge/settings/history back to chat New Conversation', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    useDomainStore.setState({ sessions: [], activeSessionId: null })
+    useUiStore.setState({
+      activeView: 'knowledge',
+      chatSessionId: 'keep-chat',
+    })
+
+    t.push({
+      type: 'session:list:result',
+      sessions: [
+        { id: 'keep-chat', title: 'Chat', preview: '', updatedAt: 2, messageCount: 1, surface: 'chat' },
+      ],
+    })
+
+    expect(useDomainStore.getState().activeSessionId).toBeNull()
+    expect(useUiStore.getState().activeView).toBe('chat')
+    expect(useUiStore.getState().sidebarSection).toBe('chats')
   })
 
   it('previewSurface changes activeView without restoring a remembered session', () => {

@@ -11,7 +11,6 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
     activeSessionId: null,
     sessionStatus: 'idle',
     sessionInterrupt: false,
-    openSessionIds: [],
     copyText: vi.fn(async () => true),
     ...overrides,
   }

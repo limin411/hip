@@ -920,6 +920,12 @@ export const en = {
     },
     account: {
       menu: 'Account menu',
+      userLabel: 'Account',
+      menuHint: 'Settings · history',
+    },
+    mainToolbar: {
+      newConversation: 'New conversation',
+      aria: 'Session toolbar',
     },
     login: {
       slogan: 'Nobody knows slacking better than me',
@@ -951,6 +957,28 @@ export const en = {
       tabList: 'Open sessions',
       knowledge: 'Knowledge',
       closeKnowledge: 'Close knowledge base',
+    },
+    sidebar: {
+      aria: 'Navigation and session history',
+      navAria: 'Primary navigation',
+      searchPlaceholder: 'Search sessions, knowledge…',
+      nav: {
+        knowledge: 'Knowledge',
+        projects: 'Projects',
+        chats: 'Chats',
+      },
+      list: {
+        spaces: 'Spaces',
+        projects: 'Project sessions',
+        chats: 'Chat history',
+      },
+      viewAll: 'View all',
+      manageSpaces: 'Manage',
+      newProject: 'New project session',
+      newChat: 'New chat',
+      emptySearch: 'No matches',
+      emptySessions: 'No sessions yet — click + to start',
+      emptySpaces: 'No spaces yet',
     },
     dropdown: {
       newChat: 'New Work Chat',

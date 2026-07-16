@@ -915,6 +915,12 @@ export const zhTW = {
     },
     account: {
       menu: '賬戶選單',
+      userLabel: '賬戶',
+      menuHint: '設定 · 歷史',
+    },
+    mainToolbar: {
+      newConversation: '新對話',
+      aria: '工作階段工具列',
     },
     login: {
       slogan: '沒有人比我更懂摸魚',
@@ -946,6 +952,28 @@ export const zhTW = {
       tabList: '開啟的工作階段',
       knowledge: '知識庫',
       closeKnowledge: '關閉知識庫',
+    },
+    sidebar: {
+      aria: '導航與歷史會話',
+      navAria: '主導航',
+      searchPlaceholder: '搜尋會話、知識庫…',
+      nav: {
+        knowledge: '知識庫',
+        projects: '專案',
+        chats: '對話',
+      },
+      list: {
+        spaces: 'Spaces',
+        projects: '專案會話',
+        chats: '對話歷史',
+      },
+      viewAll: '檢視全部',
+      manageSpaces: '管理',
+      newProject: '新增專案會話',
+      newChat: '新增對話',
+      emptySearch: '無符合項目',
+      emptySessions: '尚無會話，點擊 + 新增',
+      emptySpaces: '尚無知識空間',
     },
     dropdown: {
       newChat: '新增辦公對話',

@@ -103,7 +103,12 @@ export type GlobalCommandContext = {
   skills?: SkillMeta[]
   /** Skill id → enabled; missing key means enabled. */
   skillsEnabled?: Record<string, boolean>
-  /** Open knowledge surface (chip + activeView). */
+  /** Shell helpers (preferred over bare setActiveView for leave-knowledge flush). */
+  enterSection?: (section: 'projects' | 'chats') => void | Promise<void>
+  openHistoryFromChrome?: () => void | Promise<void>
+  openSettingsFromChrome?: () => void | Promise<void>
+  enterKnowledge?: () => void | Promise<void>
+  /** Open knowledge surface (chip + activeView). Fallback when enterKnowledge missing. */
   openKnowledgeView?: () => void
   openKnowledgeDoc?: (item: {
     spaceId: string
@@ -280,7 +285,10 @@ export function buildGlobalCommandGroups(
       icon: 'message-square',
       keywords: ['work', 'office', 'chat', '办公', '辦公'],
       group: 'navigation',
-      run: () => ctx.setActiveView('chat'),
+      run: () => {
+        if (ctx.enterSection) void ctx.enterSection('chats')
+        else ctx.setActiveView('chat')
+      },
     },
     {
       id: 'nav-code',
@@ -288,7 +296,10 @@ export function buildGlobalCommandGroups(
       icon: 'code',
       keywords: ['coding', 'code', 'project', '编码', '編碼'],
       group: 'navigation',
-      run: () => ctx.setActiveView('code'),
+      run: () => {
+        if (ctx.enterSection) void ctx.enterSection('projects')
+        else ctx.setActiveView('code')
+      },
     },
     {
       id: 'nav-history',
@@ -296,7 +307,10 @@ export function buildGlobalCommandGroups(
       icon: 'history',
       keywords: ['sessions', 'past', '历史', '歷史'],
       group: 'navigation',
-      run: () => ctx.setActiveView('history'),
+      run: () => {
+        if (ctx.openHistoryFromChrome) void ctx.openHistoryFromChrome()
+        else ctx.setActiveView('history')
+      },
     },
     {
       id: 'nav-settings',
@@ -304,7 +318,10 @@ export function buildGlobalCommandGroups(
       icon: 'settings',
       keywords: ['prefs', 'preferences', 'config', '设置', '設定'],
       group: 'navigation',
-      run: () => ctx.setActiveView('settings'),
+      run: () => {
+        if (ctx.openSettingsFromChrome) void ctx.openSettingsFromChrome()
+        else ctx.setActiveView('settings')
+      },
     },
     {
       id: 'nav-knowledge',
@@ -313,7 +330,8 @@ export function buildGlobalCommandGroups(
       keywords: ['knowledge', 'notes', 'docs', '知识库', '知識庫', 'markdown'],
       group: 'navigation',
       run: () => {
-        ctx.openKnowledgeView?.()
+        if (ctx.enterKnowledge) void ctx.enterKnowledge()
+        else ctx.openKnowledgeView?.()
       },
     },
     {

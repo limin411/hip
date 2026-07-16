@@ -10,7 +10,7 @@ import { Toaster } from 'sonner'
 
 // Set platform attribute on <html> so CSS can adapt title bar styling
 // (macOS needs traffic-light clearance; Windows/Linux don't).
-// Note: on Windows/Linux we keep OS decorations (see TitleBar); this flag only
+// Note: on Windows/Linux we keep OS decorations (sidebar + MainToolbar drag); this flag only
 // tunes inset/background — not frameless chrome.
 if (typeof document !== 'undefined') {
   const ua = navigator.platform || navigator.userAgent

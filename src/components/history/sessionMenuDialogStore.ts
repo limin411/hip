@@ -7,7 +7,6 @@ import { useSyncExternalStore } from 'react'
 export type SessionMenuDialog =
   | { kind: 'rename'; sessionId: string; title: string }
   | { kind: 'deleteSession'; sessionId: string; title: string }
-  | { kind: 'confirmBulkDelete'; sessionIds: string[] }
 
 let dialog: SessionMenuDialog | null = null
 const listeners = new Set<() => void>()
@@ -34,11 +33,6 @@ export function openRenameSessionDialog(sessionId: string, title: string): void 
 
 export function openDeleteSessionDialog(sessionId: string, title: string): void {
   dialog = { kind: 'deleteSession', sessionId, title }
-  emit()
-}
-
-export function openConfirmDeleteSessionsDialog(sessionIds: string[]): void {
-  dialog = { kind: 'confirmBulkDelete', sessionIds: sessionIds.slice() }
   emit()
 }
 

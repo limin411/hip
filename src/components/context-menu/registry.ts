@@ -21,7 +21,6 @@ import { mcpServerProvider } from './providers/mcpServer'
 import { messageProvider } from './providers/message'
 import { pluginProvider } from './providers/plugin'
 import { sessionHistoryProvider } from './providers/sessionHistory'
-import { sessionTabProvider } from './providers/sessionTab'
 import { skillConfigProvider } from './providers/skillConfig'
 import { knowledgeNodeProvider } from './providers/knowledgeNode'
 import { subAgentProvider } from './providers/subAgent'
@@ -44,7 +43,6 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   messageProvider,
   pluginProvider,
   sessionHistoryProvider,
-  sessionTabProvider,
   skillConfigProvider,
   knowledgeNodeProvider,
   subAgentProvider,

@@ -77,7 +77,7 @@ describe('catalogKinds', () => {
     for (const k of kinds) {
       expect(fromCatalog.has(k)).toBe(true)
     }
-    expect(kinds).toEqual(expect.arrayContaining(['message', 'fileEntry', 'sessionTab']))
+    expect(kinds).toEqual(expect.arrayContaining(['message', 'fileEntry', 'sessionHistory']))
   })
 })
 

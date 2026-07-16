@@ -38,31 +38,6 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     group: 'clipboard',
   },
   {
-    id: 'sessionTab.rename',
-    labelKey: 'contextMenu.sessionTab.rename',
-    kind: 'sessionTab',
-    group: 'edit',
-  },
-  {
-    id: 'sessionTab.copyId',
-    labelKey: 'contextMenu.sessionTab.copyId',
-    kind: 'sessionTab',
-    group: 'clipboard',
-  },
-  {
-    id: 'sessionTab.revealInHistory',
-    labelKey: 'contextMenu.sessionTab.revealInHistory',
-    kind: 'sessionTab',
-    group: 'navigation',
-    icon: 'history',
-  },
-  {
-    id: 'sessionTab.close',
-    labelKey: 'tabs.closeTab',
-    kind: 'sessionTab',
-    group: 'session',
-  },
-  {
     id: 'sessionHistory.open',
     labelKey: 'contextMenu.sessionHistory.open',
     kind: 'sessionHistory',

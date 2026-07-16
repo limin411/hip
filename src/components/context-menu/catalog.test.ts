@@ -10,7 +10,7 @@ describe('listCatalogItems', () => {
     const ids = listCatalogItems().map((m) => m.id)
     for (const id of [
       'message.copy', 'codeBlock.copy',
-      'sessionTab.close', 'sessionHistory.open',
+      'sessionHistory.open', 'sessionHistory.delete',
       'file.copyPath', 'file.openContainingFolder',
       'agentConfig.edit', 'skillConfig.view', 'mcpServer.edit', 'plugin.uninstall',
     ]) {
@@ -20,9 +20,9 @@ describe('listCatalogItems', () => {
 
   it('filters by kind', () => {
     expect(listCatalogItems('codeBlock').map((m) => m.id)).toEqual(['codeBlock.copy'])
-    const sessionTabIds = listCatalogItems('sessionTab').map((m) => m.id)
-    expect(sessionTabIds).toContain('sessionTab.close')
-    expect(sessionTabIds.some((id) => id.startsWith('sessionTab.delete'))).toBe(false)
+    const historyIds = listCatalogItems('sessionHistory').map((m) => m.id)
+    expect(historyIds).toContain('sessionHistory.open')
+    expect(historyIds).toContain('sessionHistory.delete')
     expect(listCatalogItems('agentConfig').map((m) => m.id)).toEqual([
       'agentConfig.edit',
       'agentConfig.delete',

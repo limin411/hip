@@ -33,7 +33,6 @@ export function createContextMenuBuildContext(
     activeSessionId,
     sessionStatus: session?.status ?? 'idle',
     sessionInterrupt: Boolean(session?.interrupt),
-    openSessionIds: ui.openSessionIds.slice(),
     copyText,
   }
 }

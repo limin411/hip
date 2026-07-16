@@ -38,14 +38,14 @@ describe('ControlledContextMenu', () => {
 
   it('opens at point and runs item on select', async () => {
     const run = vi.fn()
-    // Use a kind with no builtin on this branch so the extra provider is the sole source.
+    // Use a kind with no builtin items so the extra provider is the sole source.
     const provider: ContextProvider = (req) => {
-      if (req.kind !== 'codeBlock') return []
+      if (req.kind !== 'chatEmpty') return []
       return [
         {
-          id: 'codeBlock.copy',
-          label: 'Copy code',
-          group: 'clipboard',
+          id: 'test.chatEmpty.action',
+          label: 'Do something',
+          group: 'primary',
           run,
         },
       ]
@@ -54,8 +54,8 @@ describe('ControlledContextMenu', () => {
 
     render(
       <ControlledContextMenu
-        kind="codeBlock"
-        payload={{ code: 'echo hi' }}
+        kind="chatEmpty"
+        payload={{ sessionId: null }}
         open
         onOpenChange={() => {}}
         point={{ x: 120, y: 80 }}
@@ -69,7 +69,7 @@ describe('ControlledContextMenu', () => {
     expect(anchor.style.left).toBe('120px')
     expect(anchor.style.top).toBe('80px')
 
-    fireEvent.click(screen.getByTestId('context-menu-item-codeBlock.copy'))
+    fireEvent.click(screen.getByTestId('context-menu-item-test.chatEmpty.action'))
     expect(run).toHaveBeenCalled()
   })
 })

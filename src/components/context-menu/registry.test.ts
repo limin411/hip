@@ -23,7 +23,6 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
     activeSessionId: null,
     sessionStatus: 'idle',
     sessionInterrupt: false,
-    openSessionIds: [],
     copyText: vi.fn(async () => true),
     ...overrides,
   }
@@ -231,24 +230,18 @@ describe('buildContextMenuItems', () => {
     expect(out.map((i) => i.id)).toEqual(['codeBlock.copy'])
   })
 
-  it('includes builtin sessionTab items', () => {
+  it('includes builtin sessionHistory items', () => {
     const out = buildContextMenuItems(
       {
-        kind: 'sessionTab',
+        kind: 'sessionHistory',
         payload: { sessionId: 's1', title: 'T', surface: 'chat' },
       },
-      makeCtx({ openSessionIds: ['s1', 's2'] }),
+      makeCtx(),
       { version: 1, disabledIds: [] },
     )
     expect(out.map((i) => i.id)).toEqual(
-      expect.arrayContaining([
-        'sessionTab.close',
-        'sessionTab.rename',
-      ]),
+      expect.arrayContaining(['sessionHistory.open', 'sessionHistory.rename', 'sessionHistory.delete']),
     )
-    expect(out.some((i) => i.id.startsWith('sessionTab.delete'))).toBe(false)
-
-    expect(out[0]?.separatorBefore).toBeFalsy()
   })
 
   it('includes builtin filePreview / toolCall / subAgent providers', () => {

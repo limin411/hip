@@ -1,5 +1,14 @@
 # hip design docs
 
+## App shell（界面壳）
+
+| 文档 | 一层一句话 |
+|------|------------|
+| [app-shell-sidebar-spec](./2026-07-16-app-shell-sidebar-spec.md) | 左侧边栏 + 无顶栏 + 右侧贴边抽屉；含 Interaction contracts 与 PR-1…5 |
+| [layout-sidebar-proposal.html](./layout-sidebar-proposal.html) | 用户认可的视觉/IA 交互原型 |
+
+**状态：** spec 评审通过（0 open）。**PR-1…PR-5 均已落地**（抽屉 · 侧栏 · 无 TitleBar · 清 tab 模型 · a11y/右键/grip polish）。
+
 ## Capability evaluation（能力评测）
 
 按**渐进式披露**阅读：

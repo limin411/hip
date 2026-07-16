@@ -7,7 +7,6 @@ import type { ActiveView, Surface } from '@/store/uiStore'
 export type ContextKind =
   | 'message'
   | 'codeBlock'
-  | 'sessionTab'
   | 'sessionHistory'
   | 'fileEntry'
   | 'filePreview'
@@ -49,7 +48,6 @@ export type ContextPayloadMap = {
     sessionId: string | null
   }
   codeBlock: { code: string; language?: string }
-  sessionTab: { sessionId: string; title: string; surface: 'chat' | 'code' }
   sessionHistory: { sessionId: string; title: string; surface: 'chat' | 'code' }
   fileEntry: {
     path: string
@@ -170,7 +168,6 @@ export interface ContextMenuBuildContext {
   sessionStatus: 'idle' | 'running' | 'error' | string
   /** True when active session has interrupt pending (regenerate allowed while running) */
   sessionInterrupt: boolean
-  openSessionIds: string[]
   /** Convenience: wraps ipc/clipboard.copyText */
   copyText: (text: string) => Promise<boolean>
 }

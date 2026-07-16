@@ -228,11 +228,11 @@ export class SessionService {
   }
 
   /**
-   * Wait for hip-ui rehydration (openSessionIds / surface pointers) then prune open tabs.
+   * Wait for hip-ui rehydration (surface pointers) then prune stale ids.
    * session:list:result can race persist rehydrate on cold start.
    */
   private restoreOpenTabsFromPersistence(): void {
-    const run = () => this.applyRestoredOpenTabs()
+    const run = () => this.pruneSurfacePointersFromList()
     const api = useUiStore.persist
     if (api.hasHydrated()) {
       run()
@@ -242,23 +242,14 @@ export class SessionService {
   }
 
   /**
-   * Prune persisted open tabs to sessions that still exist.
-   * Title-bar tabs are restored; the active conversation is not — cold launch always
-   * lands on New Conversation. Reconnect while a tab is already live keeps that selection.
-   * chatSessionId / codeSessionId stay for mid-session surface switching only.
+   * Prune chatSessionId / codeSessionId to sessions that still exist.
+   * Cold launch does not auto-select a conversation; reconnect with a live
+   * activeSessionId keeps that selection. Surface pointers stay for mid-session switching.
    */
-  private applyRestoredOpenTabs(): void {
+  private pruneSurfacePointersFromList(): void {
     const sessions = useDomainStore.getState().sessions
     const existing = new Set(sessions.map((s) => s.id))
     const ui = useUiStore.getState()
-
-    const pruned = ui.openSessionIds.filter((id) => existing.has(id))
-    if (
-      pruned.length !== ui.openSessionIds.length ||
-      pruned.some((id, i) => id !== ui.openSessionIds[i])
-    ) {
-      ui.reorderOpenSessions(pruned)
-    }
 
     if (ui.chatSessionId != null && !existing.has(ui.chatSessionId)) {
       ui.setChatSessionId(null)
@@ -268,15 +259,11 @@ export class SessionService {
     }
 
     const active = useDomainStore.getState().activeSessionId
-    // Reconnect while a tab is already live: keep selection; only ensure it's in the open list.
     if (active != null && existing.has(active)) {
-      if (!useUiStore.getState().openSessionIds.includes(active)) {
-        useUiStore.getState().addOpenSession(active)
-      }
       return
     }
 
-    // Cold launch / reconnect with no active tab: keep the title-bar tab list, show New Conversation.
+    // Cold launch / reconnect with no active session: New Conversation.
     // Force-clear knowledge/settings/history if a legacy persist left them as activeView.
     const st = useUiStore.getState()
     if (
@@ -284,7 +271,7 @@ export class SessionService {
       st.activeView === 'settings' ||
       st.activeView === 'history'
     ) {
-      useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
+      useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
     }
     useDomainStore.getState().deselect()
   }
@@ -772,18 +759,18 @@ export class SessionService {
     const enriched: SessionConfig = normalizeSessionConfig({ ...config, language: currentLanguage() })
     useDomainStore.getState().createSession(id, enriched)
     this.rememberActiveForSurface(id)
-    useUiStore.getState().addOpenSession(id)
     this.transport.send({ type: 'session:create', id, config: enriched })
     return id
   }
 
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
-    useUiStore.getState().addOpenSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)
     const s = useDomainStore.getState().sessions.find((x) => x.id === id)
     if (s) {
-      useUiStore.getState().setActiveView(surfaceOf(s.config))
+      const surface = surfaceOf(s.config)
+      useUiStore.getState().setActiveView(surface)
+      useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
       this.rememberActiveForSurface(id)
     }
     // Lazily fetch history the first time a summary-only session is opened.
@@ -815,6 +802,7 @@ export class SessionService {
     if (cur === 'chat') useUiStore.getState().setChatSessionId(activeId)
     else if (cur === 'code') useUiStore.getState().setCodeSessionId(activeId)
     useUiStore.getState().setActiveView(view)
+    useUiStore.getState().setSidebarSection(view === 'code' ? 'projects' : 'chats')
     if (view === 'chat' && useDraftStore.getState().draft?.mode === 'project') {
       useDraftStore.getState().clearProject()
     }
@@ -836,35 +824,8 @@ export class SessionService {
     }
   }
 
-  /**
-   * Soft-close a title-bar tab: remove from open tabs only.
-   * Session stays in history; permanent delete is deleteSession (History page).
-   */
-  closeSession(id: string): void {
-    const wasActive = useDomainStore.getState().activeSessionId === id
-    const ids = useUiStore.getState().openSessionIds
-    const index = ids.indexOf(id)
-    useUiStore.getState().removeOpenSession(id)
-    const remaining = useUiStore.getState().openSessionIds
-    if (wasActive && remaining.length > 0) {
-      const nextIndex = Math.min(index, remaining.length - 1)
-      this.selectSession(remaining[nextIndex])
-      return
-    }
-    if (remaining.length === 0) {
-      useDomainStore.getState().deselect()
-      useUiStore.getState().setChatSessionId(null)
-      useUiStore.getState().setCodeSessionId(null)
-      return
-    }
-    // Inactive tab closed while others remain: drop surface memory if it pointed here.
-    if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
-    if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
-  }
-
-  /** Permanently delete a session (History page). Also removes any open tab. */
+  /** Permanently delete a session (History page / sidebar). */
   deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
-    useUiStore.getState().removeOpenSession(id)
     useDomainStore.getState().deleteSession(id)
     // Terminal / PTY only die on permanent delete, not soft-close.
     void ptyKill(id).catch(() => {})
@@ -1256,6 +1217,7 @@ export class SessionService {
     this.rememberActiveForSurface(null)
     if (surface) {
       useUiStore.getState().setActiveView(surface)
+      useUiStore.getState().setSidebarSection(surface === 'code' ? 'projects' : 'chats')
     }
   }
 

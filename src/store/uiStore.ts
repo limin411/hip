@@ -11,6 +11,8 @@ export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
+/** Left sidebar primary section (memory-only; cold launch always 'chats'). */
+export type SidebarSection = 'knowledge' | 'projects' | 'chats'
 
 /** Settings panel left-nav page ids (see SettingsPanel PAGES). */
 export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'hooks' | 'memory'
@@ -50,7 +52,6 @@ function seedLanguage(): AppLanguage {
 
 /** Slice of uiStore written to localStorage under `hip-ui`. */
 export type UiPersistedState = {
-  openSessionIds: string[]
   chatSessionId: string | null
   codeSessionId: string | null
   // activeView is intentionally NOT persisted — cold launch always New Conversation (chat).
@@ -67,19 +68,22 @@ export function isEphemeralActiveView(v: ActiveView): boolean {
   return v === 'settings' || v === 'history' || v === 'knowledge'
 }
 
-/** Merge hip-ui storage into runtime state; strip legacy activeView / knowledge flags. */
-export function mergeUiPersistedState<S extends { activeView: ActiveView; knowledgeTabOpen: boolean }>(
-  persistedState: unknown,
-  currentState: S,
-): S {
+/** Merge hip-ui storage into runtime state; strip legacy shell fields. */
+export function mergeUiPersistedState<
+  S extends { activeView: ActiveView; sidebarSection: SidebarSection },
+>(persistedState: unknown, currentState: S): S {
   const p = (persistedState ?? {}) as Partial<UiPersistedState> & {
     activeView?: ActiveView
     knowledgeTabOpen?: boolean
+    sidebarSection?: SidebarSection
+    openSessionIds?: string[]
   }
-  // Drop legacy fields that used to be written to hip-ui.
+  // Drop legacy / non-persisted fields that must not rehydrate into shell state.
   const {
     activeView: _legacyView,
     knowledgeTabOpen: _legacyKb,
+    sidebarSection: _legacySection,
+    openSessionIds: _legacyTabs,
     ...rest
   } = p
   return {
@@ -87,7 +91,7 @@ export function mergeUiPersistedState<S extends { activeView: ActiveView; knowle
     ...rest,
     // Always cold-start on chat New Conversation (product rule).
     activeView: 'chat' as const,
-    knowledgeTabOpen: false,
+    sidebarSection: 'chats' as const,
   }
 }
 
@@ -120,19 +124,14 @@ interface UiState {
   codeSessionId: string | null
   setCodeSessionId: (id: string | null) => void
 
-  // Browser-style session tabs in the title bar (persisted; pruned against session:list on ready).
-  openSessionIds: string[]
-  addOpenSession: (id: string) => void
-  removeOpenSession: (id: string) => void
-  reorderOpenSessions: (ids: string[]) => void
-
   activeView: ActiveView
   setActiveView: (v: ActiveView) => void
   previousView: ActiveView | null
 
-  /** Knowledge base chip is open in the tab bar (independent of session ids). */
-  knowledgeTabOpen: boolean
-  setKnowledgeTabOpen: (v: boolean) => void
+  /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
+  sidebarSection: SidebarSection
+  setSidebarSection: (s: SidebarSection) => void
+
   openKnowledgeView: () => void
   /** Flush knowledge draft then restore chat/code from domain active session. */
   closeKnowledgeView: () => Promise<void>
@@ -193,16 +192,6 @@ export const useUiStore = create<UiState>()(
       codeSessionId: null,
       setCodeSessionId: (id) => set((s) => (s.codeSessionId === id ? s : { codeSessionId: id })),
 
-      openSessionIds: [],
-      addOpenSession: (id) =>
-        set((s) => {
-          const without = s.openSessionIds.filter((x) => x !== id)
-          return { openSessionIds: [id, ...without] }
-        }),
-      removeOpenSession: (id) =>
-        set((s) => ({ openSessionIds: s.openSessionIds.filter((x) => x !== id) })),
-      reorderOpenSessions: (ids) => set({ openSessionIds: ids }),
-
       activeView: 'chat',
       previousView: null,
       setActiveView: (v) =>
@@ -217,11 +206,11 @@ export const useUiStore = create<UiState>()(
           }
         }),
 
-      knowledgeTabOpen: false,
-      setKnowledgeTabOpen: (v) =>
-        set((s) => (s.knowledgeTabOpen === v ? s : { knowledgeTabOpen: v })),
-      openKnowledgeView: () =>
-        set({ knowledgeTabOpen: true, activeView: 'knowledge' }),
+      sidebarSection: 'chats',
+      setSidebarSection: (sec) =>
+        set((s) => (s.sidebarSection === sec ? s : { sidebarSection: sec })),
+
+      openKnowledgeView: () => set({ activeView: 'knowledge' }),
       closeKnowledgeView: async () => {
         // Tier A: await draft flush before leaving.
         try {
@@ -237,8 +226,8 @@ export const useUiStore = create<UiState>()(
         )
         const surface = active ? surfaceOf(active.config) : 'chat'
         set({
-          knowledgeTabOpen: false,
           activeView: surface === 'code' ? 'code' : 'chat',
+          sidebarSection: surface === 'code' ? 'projects' : 'chats',
         })
       },
 
@@ -258,7 +247,6 @@ export const useUiStore = create<UiState>()(
       name: 'hip-ui',
       storage,
       partialize: (s): UiPersistedState => ({
-        openSessionIds: s.openSessionIds,
         chatSessionId: s.chatSessionId,
         codeSessionId: s.codeSessionId,
         // Never persist activeView — verified on device that hip-ui still held
@@ -276,8 +264,7 @@ export const useUiStore = create<UiState>()(
         if (error || !state) return
         // IMPORTANT: persist rehydrate often completes *synchronously* during
         // `create()`, while `useUiStore` is still in the temporal dead zone.
-        // Calling useUiStore.setState here throws, aborts the hydrate chain, and
-        // leaves hasHydrated=false — which also breaks session tab restore.
+        // Calling useUiStore.setState here throws, aborts the hydrate chain.
         // Defer any setState to a microtask (after the export binding exists).
         const language = state.language
         queueMicrotask(() => {
@@ -293,9 +280,9 @@ export const useUiStore = create<UiState>()(
 )
 
 /**
- * Cold launch shell: New Conversation on chat surface, knowledge chip closed.
+ * Cold launch shell: New Conversation on chat surface.
  * Safe to call after rehydrate and once from AppLayout.
  */
 export function applyColdLaunchShell(): void {
-  useUiStore.setState({ activeView: 'chat', knowledgeTabOpen: false })
+  useUiStore.setState({ activeView: 'chat', sidebarSection: 'chats' })
 }

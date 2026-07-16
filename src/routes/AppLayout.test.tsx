@@ -23,9 +23,11 @@ vi.mock('react-resizable-panels', () => ({
   PanelResizeHandle: ({ className }: { className?: string }) => <div className={className} data-testid="resize-handle" />,
 }))
 
-vi.mock('@/components/layout/TitleBar', () => ({ TitleBar: () => <div data-testid="title-bar" /> }))
-vi.mock('@/components/account/FloatingAvatarButton', () => ({
-  FloatingAvatarButton: () => <div data-testid="floating-avatar" />,
+vi.mock('@/components/layout/AppSidebar', () => ({
+  AppSidebar: () => <div data-testid="app-sidebar" />,
+}))
+vi.mock('@/components/layout/MainToolbar', () => ({
+  MainToolbar: () => <div data-testid="main-toolbar" />,
 }))
 vi.mock('@/components/chat/NewConversation', () => ({ NewConversation: () => <div data-testid="new-conversation" /> }))
 vi.mock('@/components/chat/ChatPane', () => ({ ChatPane: () => <div data-testid="chat-pane" /> }))
@@ -34,18 +36,19 @@ vi.mock('@/components/account/SettingsPage', () => ({ SettingsPage: () => <div d
 vi.mock('@/components/knowledge/KnowledgePage', () => ({ KnowledgePage: () => <div data-testid="knowledge-page" /> }))
 
 describe('AppLayout', () => {
-  it('renders without sidebar', () => {
+  it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
     render(<AppLayout />, { wrapper: MemoryRouter })
-    expect(screen.getByTestId('title-bar')).toBeInTheDocument()
-    expect(screen.getByTestId('floating-avatar')).toBeInTheDocument()
-    expect(screen.queryByTestId('sidebar-root')).not.toBeInTheDocument()
+    expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
+    expect(screen.queryByTestId('title-bar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('floating-avatar')).not.toBeInTheDocument()
   })
 
-  it('renders history view below title bar', () => {
+  it('renders history view with main toolbar', () => {
     useUiStore.setState({ activeView: 'history' })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('session-history')).toBeInTheDocument()
-    expect(screen.getByTestId('title-bar')).toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
   it('renders knowledge view', () => {
@@ -54,10 +57,10 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('knowledge-page')).toBeInTheDocument()
   })
 
-  it('renders settings view below title bar', () => {
+  it('renders settings view with main toolbar', () => {
     useUiStore.setState({ activeView: 'settings' })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('settings-page')).toBeInTheDocument()
-    expect(screen.getByTestId('title-bar')).toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 })

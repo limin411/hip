@@ -6,12 +6,10 @@ import {
   resetSessionMenuDialogStore,
 } from '@/components/history/sessionMenuDialogStore'
 
-const selectSession = vi.fn()
+const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 
-vi.mock('@/domain', () => ({
-  sessionService: {
-    selectSession: (...args: unknown[]) => selectSession(...args),
-  },
+vi.mock('@/components/layout/sidebarActions', () => ({
+  selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
 }))
 
 function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuBuildContext {
@@ -23,7 +21,6 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
     activeSessionId: null,
     sessionStatus: 'idle',
     sessionInterrupt: false,
-    openSessionIds: [],
     copyText: vi.fn(async () => true),
     ...overrides,
   }
@@ -31,7 +28,7 @@ function makeCtx(overrides: Partial<ContextMenuBuildContext> = {}): ContextMenuB
 
 describe('sessionHistoryProvider', () => {
   beforeEach(() => {
-    selectSession.mockClear()
+    selectSessionFromSidebar.mockClear()
     resetSessionMenuDialogStore()
   })
 
@@ -42,13 +39,13 @@ describe('sessionHistoryProvider', () => {
   it('returns empty for other kinds', () => {
     expect(
       sessionHistoryProvider(
-        { kind: 'sessionTab', payload: { sessionId: 's1', title: 'T', surface: 'chat' } },
+        { kind: 'codeBlock', payload: { code: 'x' } },
         makeCtx(),
       ),
     ).toEqual([])
   })
 
-  it('emits open, rename, delete (no openTab)', () => {
+  it('emits open, rename, delete (no soft-close)', () => {
     const items = sessionHistoryProvider(
       { kind: 'sessionHistory', payload: { sessionId: 's1', title: 'Alpha', surface: 'code' } },
       makeCtx(),
@@ -58,16 +55,16 @@ describe('sessionHistoryProvider', () => {
       'sessionHistory.rename',
       'sessionHistory.delete',
     ])
-    expect(items.some((i) => i.id.includes('openTab'))).toBe(false)
+    expect(items.some((i) => i.id.includes('close') || i.id.includes('openTab'))).toBe(false)
   })
 
-  it('open calls selectSession', () => {
+  it('open calls selectSessionFromSidebar (flush-safe)', () => {
     const items = sessionHistoryProvider(
       { kind: 'sessionHistory', payload: { sessionId: 's1', title: 'Alpha', surface: 'chat' } },
       makeCtx(),
     )
     items.find((i) => i.id === 'sessionHistory.open')!.run()
-    expect(selectSession).toHaveBeenCalledWith('s1')
+    expect(selectSessionFromSidebar).toHaveBeenCalledWith('s1')
   })
 
   it('rename opens RenameSessionDialog via store', () => {

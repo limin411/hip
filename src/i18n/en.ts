@@ -972,6 +972,10 @@ export const en = {
         projects: 'Project sessions',
         chats: 'Chat history',
       },
+      badge: {
+        chat: 'Chat',
+        code: 'Code',
+      },
       viewAll: 'View all',
       manageSpaces: 'Manage',
       newProject: 'New project session',
@@ -1161,6 +1165,7 @@ export const en = {
       clear: 'Clear',
       cancel: 'Cancel',
       close: 'Close',
+      confirm: 'OK',
       back: 'Back',
       logout: 'Log Out',
       logoutConfirmTitle: 'Log out?',

@@ -963,9 +963,13 @@ export const zhCN = {
         chats: '对话',
       },
       list: {
-        spaces: 'Spaces',
+        spaces: '知识空间',
         projects: '项目会话',
         chats: '对话历史',
+      },
+      badge: {
+        chat: '对话',
+        code: '编码',
       },
       viewAll: '查看全部',
       manageSpaces: '管理',
@@ -1153,6 +1157,7 @@ export const zhCN = {
       clear: '清除',
       cancel: '取消',
       close: '关闭',
+      confirm: '确定',
       back: '返回',
       logout: '退出登录',
       logoutConfirmTitle: '退出登录？',

@@ -12,8 +12,14 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import { cn } from '@/lib/utils'
 
 function basename(p: string): string {
+  if (typeof p !== 'string' || !p) return ''
   const parts = p.replace(/[/\\]+$/, '').split(/[/\\]/)
   return parts[parts.length - 1] || p
+}
+
+/** Only treat a real non-empty string as a bound workspace root. */
+function asRootPath(cwd: unknown): string | undefined {
+  return typeof cwd === 'string' && cwd.length > 0 ? cwd : undefined
 }
 
 function Node({
@@ -89,15 +95,19 @@ function Node({
 export function FileTree() {
   const { t } = useTranslation()
   const { scopeId, cwd, isDraft, chatDraft } = useFsScope()
-  const rootEntries = useFsStore((s) => (scopeId && cwd ? s.bySession[scopeId]?.entriesByDir[cwd] : undefined))
+  // Guard non-string cwd (malformed session config / browser E2E) — never call path ops on it.
+  const rootPath = asRootPath(cwd)
+  const rootEntries = useFsStore((s) =>
+    scopeId && rootPath ? s.bySession[scopeId]?.entriesByDir[rootPath] : undefined,
+  )
 
   // Load the root listing once a workspace is bound and not yet cached.
   useEffect(() => {
-    if (scopeId && cwd && !rootEntries) {
-      if (isDraft) sessionService.lsDraft(scopeId, cwd)
-      else sessionService.lsDir(scopeId, cwd)
+    if (scopeId && rootPath && !rootEntries) {
+      if (isDraft) sessionService.lsDraft(scopeId, rootPath)
+      else sessionService.lsDir(scopeId, rootPath)
     }
-  }, [scopeId, cwd, isDraft, rootEntries])
+  }, [scopeId, rootPath, isDraft, rootEntries])
 
   const choose = async () => {
     const dir = await pickDirectory()
@@ -106,7 +116,7 @@ export function FileTree() {
     else useDraftStore.getState().pickProject(dir)
   }
 
-  if (!cwd) {
+  if (!rootPath) {
     if (chatDraft) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-ink-tertiary" data-testid="file-tree">
@@ -129,9 +139,9 @@ export function FileTree() {
   return (
     <div className="flex h-full flex-col" data-testid="file-tree">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-2">
-        <span className="flex items-center gap-1.5 truncate text-meta font-medium text-ink-secondary" title={cwd}>
+        <span className="flex items-center gap-1.5 truncate text-meta font-medium text-ink-secondary" title={rootPath}>
           <FolderGit2 size={13} className="shrink-0 text-ink-tertiary" />
-          {basename(cwd)}
+          {basename(rootPath)}
         </span>
         <div className="flex items-center gap-0.5">
           {isDraft && (
@@ -148,7 +158,7 @@ export function FileTree() {
           <button
             title={t('artifact.refresh')}
             data-testid="refresh-tree"
-            onClick={() => scopeId && (isDraft ? sessionService.lsDraft(scopeId, cwd) : sessionService.lsDir(scopeId, cwd))}
+            onClick={() => scopeId && (isDraft ? sessionService.lsDraft(scopeId, rootPath) : sessionService.lsDir(scopeId, rootPath))}
             className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
           >
             <RefreshCw size={13} />
@@ -164,7 +174,7 @@ export function FileTree() {
       </div>
       <div className="flex-1 overflow-auto py-1">
         {scopeId && rootEntries?.map((e) => (
-          <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} cwd={cwd ?? null} />
+          <Node key={e.path} entry={e} scopeId={scopeId} isDraft={isDraft} depth={0} cwd={rootPath} />
         ))}
       </div>
     </div>

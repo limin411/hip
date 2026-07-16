@@ -963,9 +963,13 @@ export const zhTW = {
         chats: '對話',
       },
       list: {
-        spaces: 'Spaces',
+        spaces: '知識空間',
         projects: '專案會話',
         chats: '對話歷史',
+      },
+      badge: {
+        chat: '對話',
+        code: '編碼',
       },
       viewAll: '檢視全部',
       manageSpaces: '管理',
@@ -1153,6 +1157,7 @@ export const zhTW = {
       clear: '清除',
       cancel: '取消',
       close: '關閉',
+      confirm: '確定',
       back: '返回',
       logout: '登出',
       logoutConfirmTitle: '登出？',

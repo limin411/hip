@@ -255,7 +255,8 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
               const active =
                 session.id === activeSessionId &&
                 (activeView === 'chat' || activeView === 'code')
-              const surfaceLabel = surface === 'code' ? 'Code' : 'Chat'
+              const surfaceLabel =
+                surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
               return (
                 <li key={session.id}>
                   <DeclarativeContextMenu

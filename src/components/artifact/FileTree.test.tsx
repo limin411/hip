@@ -17,8 +17,11 @@ vi.mock('@/domain', async () => {
   }
 })
 
+const useFsScopeMock = vi.hoisted(() =>
+  vi.fn(() => ({ scopeId: 's1', cwd: '/project' as unknown, isDraft: false, chatDraft: false })),
+)
 vi.mock('@/store/useFsScope', () => ({
-  useFsScope: () => ({ scopeId: 's1', cwd: '/project', isDraft: false, chatDraft: false }),
+  useFsScope: () => useFsScopeMock(),
 }))
 
 vi.mock('@/ipc/dialog', () => ({ pickDirectory: vi.fn() }))
@@ -29,6 +32,24 @@ describe('FileTree', () => {
     useFsStore.setState({ bySession: {} } as any)
     lsDir.mockClear()
     readFile.mockClear()
+    useFsScopeMock.mockReturnValue({
+      scopeId: 's1',
+      cwd: '/project',
+      isDraft: false,
+      chatDraft: false,
+    })
+  })
+
+  it('shows select-folder empty state when cwd is not a string', () => {
+    useFsScopeMock.mockReturnValue({
+      scopeId: 's1',
+      cwd: { bad: true } as unknown as string,
+      isDraft: false,
+      chatDraft: false,
+    })
+    render(<FileTree />)
+    expect(screen.getByTestId('select-folder')).toBeInTheDocument()
+    expect(screen.queryByText('README.md')).not.toBeInTheDocument()
   })
 
   it('renders root entries and expands a directory', () => {

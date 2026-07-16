@@ -185,9 +185,17 @@ a:hover {
 
 
 /* —— 滚动条美化 —— */
+/* width = vertical bar; height = horizontal bar (code blocks with long lines).
+   Without height, WebKit keeps the ~15px system default and covers content below. */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
 
 ::-webkit-scrollbar {
   width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {

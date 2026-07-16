@@ -1,33 +1,44 @@
-# Spike: how to enter plan mode from Code surface
+# Spike: plan mode entry (Code surface)
 
-**Status:** product path implemented (2026-07-16).
+**Status:** product path shipped (2026-07-16); live execute settle still flaky.
 
-## Product facts
+## Product path
 
-- `PlanApprovalCard` has testids: `plan-approval-card`, `plan-approve`, `plan-reject`, `plan-amend`.
-- Product entry (not seed):
-  - **Chip** `data-testid="plan-mode-chip"` — toggles `SessionConfig.forcePlan` (draft or session).
-  - **Slash** `/plan` [task…] / `/plan-off` — same flag; optional task starts a turn.
-  - Protocol: `session:setForcePlan` → echo `session:forcePlan`.
-- Sidecar with `forcePlan`: injects system nudge to call `EnterPlanMode`, sets `planningMode: 'plan'`.
-- E2E can still seed plan via `__hipE2E.seedPlanApproval` (unpaid harness only — not for live skill scoring of plan *entry*).
+| Surface | Behavior |
+|---------|----------|
+| Chip `plan-mode-chip` | Toggles `SessionConfig.forcePlan` (draft → session create, or live session) |
+| Slash `/plan` [task…] | Same flag; optional task starts a turn |
+| Slash `/plan-off` | Clears forcePlan |
+| Protocol | `session:setForcePlan` → echo `session:forcePlan` |
+| Sidecar forcePlan | Auto `planMode.enter()` at turn start (hard block writes outside plan file) + system nudge |
+| After approve/reject | forcePlan cleared (one-shot) so execute turn is not re-gated |
+
+PlanApprovalCard still only appears after real `plan:published` + `plan_approval` interrupt (or unpaid `__hipE2E.seedPlanApproval`).
 
 ## Eval policy
 
-| plan_mode | Runner behavior |
-|-----------|-----------------|
-| forbid | never click approve; do not enable chip |
+| plan_mode | Runner |
+|-----------|--------|
+| forbid | no chip; never approve |
 | allow | approve if visible |
-| prefer | enable plan chip before send; approve if visible; soft note if never seen |
-| require | enable plan chip before send; approve if visible; score `plan_skipped` if never approved |
+| prefer | `enablePlanModeUi()` before send; approve if visible |
+| require | chip + `require_plan_approved`; `plan_skipped` if never approved |
 
-## Current eval approach
+## Live archive (2026-07-16)
 
-- `eval-run` calls `enablePlanModeUi()` when `plan_mode` is prefer/require **before** first prompt (draft forcePlan → session create).
-- Auto-click `plan-approve` when `PlanApprovalCard` appears.
-- Live task `bb-orch-plan-then-fix` uses `plan_mode: require` + `require_plan_approved`.
+| Run | Result | Notes |
+|-----|--------|-------|
+| Soft (prefer, pre-forcePlan product) | pass, `planApproved=false` | Agent fixed without card |
+| require + chip only (soft nudge) | `plan_skipped`, verify green | Agent ignored EnterPlanMode, edited util.go directly |
+| require + hard `planMode.enter` | **partial** | Plan produced, **approved**, steps completed, `HasPrefixes` fixed; then UI stuck `composer-stop` (~22m) until killed. No `run-report.json` (settle never finished). Worktree: `bb-orch-plan-then-fix-2026-07-16T07-52-05-b73f6a` |
 
-## Harness
+### Known gap: post-approve settle hang
 
-- `harness-plan-entry.spec.ts` — chip toggles forcePlan (unpaid).
-- `harness-plan-approval.spec.ts` — seed card + approve (unpaid).
+After plan approve + successful fix, product stayed `status=running` / `stopVisible=true` with no interrupt. Eval `waitForTurnSettle` cannot finish → timeout or manual kill.
+
+**Follow-up:** diagnose why execute turn after `handlePlanResponse(approve)` does not emit terminal complete (or UI never leaves running). forcePlan is now cleared on approve to reduce re-entry risk.
+
+## Harness (unpaid)
+
+- `harness-plan-entry.spec.ts` — chip + slash (pass)
+- `harness-plan-approval.spec.ts` — seed card + approve (pass)

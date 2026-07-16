@@ -146,6 +146,20 @@ export async function regenerate(host: SessionTurnHost, send: SendFn): Promise<v
   await runTurn(host, send)
 }
 
+/** One-shot forcePlan: clear after approve/reject so execution/next turns are not re-forced. */
+function clearForcePlanFlag(host: SessionTurnHost, send: SendFn): void {
+  if (!host._config.forcePlan) return
+  const applied = host.configMgr.setForcePlan(false)
+  if (applied && host.store) {
+    try {
+      host.store.updateConfig(host.id, JSON.stringify(host._config))
+    } catch {
+      // best-effort persist
+    }
+  }
+  send({ type: 'session:forcePlan', sessionId: host.id, forcePlan: false })
+}
+
 export async function handlePlanResponse(host: SessionTurnHost, action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
   if (!host.awaitingResume || !host.paused) return
   switch (action) {
@@ -178,12 +192,15 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         plan: host.paused.plan,
       }
       host.awaitingResume = false; host.paused = null
+      // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
+      clearForcePlanFlag(host, send)
       await runTurn(host, send, base)
       break
     }
     case 'reject': {
       host.planMode.cancel()
       host.awaitingResume = false; host.paused = null
+      clearForcePlanFlag(host, send)
       send({ type: 'error', sessionId: host.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
       break
     }

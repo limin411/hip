@@ -19,6 +19,13 @@ export HIP_EVAL_ROOT="${HIP_EVAL_ROOT:-$HOME/.hip/eval-runs}"
 | Adv | `scripts/hip-eval-ui-adv.sh` |
 | Full matrix + cluster | `scripts/hip-eval-ui-matrix.sh` (long; `|| true` per pack) |
 | Cluster only | `scripts/hip-eval-cluster.sh` |
+| Mini-go (non-Bytebase) | `scripts/hip-eval-ui-mini-go.sh` |
+| k-repeat (one spec × K) | `scripts/hip-eval-k-repeat.sh e2e/specs/….ts 3` |
+| Hang watchdog | `scripts/hip-eval-watchdog.sh /path/to.log 1800 &` |
+
+## Defer registry
+
+See [`capability-matrix-defer.md`](./capability-matrix-defer.md).
 
 ## Policy
 

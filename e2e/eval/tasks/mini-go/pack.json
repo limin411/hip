@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "mini-go",
+  "name": "Mini Go host pack (non-Bytebase)",
+  "description": "Tiny Go module proving the UI eval harness migrates beyond Bytebase. Bootstrap via scripts/hip-eval-bootstrap-mini-go.sh.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_MINI_GO_PATH",
+      "base_sha": "HEAD"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 600000,
+      "auto_approve_permissions": true
+    },
+    "verify": { "timeout_sec": 60 },
+    "rubric": { "pass_policy": "verify_all" }
+  },
+  "tasks": ["tasks/mini-fix-greet.json"]
+}

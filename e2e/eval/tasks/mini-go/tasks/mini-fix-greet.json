@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "mini-fix-greet",
+  "name": "Fix Greet implementation",
+  "level": "L1",
+  "difficulty": "easy",
+  "tags": ["edit_single", "migration"],
+  "prompt": "In this small Go module, unit tests for Greet are failing. Fix the implementation in hello.go so `go test ./... -count=1` passes. Do not weaken or delete tests. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-greet.patch" }
+  },
+  "ui": {
+    "timeout_ms": 600000,
+    "expect": {
+      "changes_paths_regex": ["hello\\.go"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./...", "-count=1", "-timeout", "30s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "hello\\.go" }
+    ]
+  },
+  "rubric": { "axes": ["edit_single", "harness_migration"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "mini-go",
+    "bootstrap": "scripts/hip-eval-bootstrap-mini-go.sh"
+  }
+}

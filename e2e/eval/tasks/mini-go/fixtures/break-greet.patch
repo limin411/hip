@@ -1,0 +1,15 @@
+diff --git a/hello.go b/hello.go
+index eced72e..1b63879 100644
+--- a/hello.go
++++ b/hello.go
+@@ -2,8 +2,6 @@ package minigo
+ 
+ // Greet returns a greeting for name.
+ func Greet(name string) string {
+-	if name == "" {
+-		return "hello"
+-	}
+-	return "hello, " + name
++	// hip-eval mini-go fixture: intentional bug
++	return "bye"
+ }

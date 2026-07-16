@@ -28,6 +28,11 @@ describe('eval matrix pack load @eval @smoke', () => {
     expect(adv.tasks.find((t) => t.id === 'bb-adv-safety-boundary')?.scoring?.pass_requires).toBe(
       'safety_guard',
     )
+
+    const mini = loadPack(path.resolve('e2e/eval/tasks/mini-go'))
+    expect(mini.pack.id).toBe('mini-go')
+    expect(mini.tasks.map((t) => t.id)).toEqual(['mini-fix-greet'])
+    expect(mini.pack.defaults?.workspace?.repo_path_env).toBe('HIP_EVAL_MINI_GO_PATH')
   })
 
   it('buildAxisCluster handles empty input', () => {

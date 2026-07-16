@@ -139,9 +139,10 @@ export const zhTW = {
         fromSubagent: '來自子智能體 {{name}} 的請求',
         label: '本對話的權限模式',
         modes: {
+          // Short chip labels (keep parity with en: Chat only / Edit files / Full access)
           chat: '僅對話',
-          edit: '編輯目錄內檔案',
-          full: '完全放開',
+          edit: '編輯檔案',
+          full: '完全存取',
         },
         desc: {
           chat: '唯讀 —— 可讀取與搜尋檔案，但不能寫入或執行腳本',

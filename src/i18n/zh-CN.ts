@@ -139,9 +139,10 @@ export const zhCN = {
         fromSubagent: '来自子智能体 {{name}} 的请求',
         label: '本对话的权限模式',
         modes: {
+          // Short chip labels (keep parity with en: Chat only / Edit files / Full access)
           chat: '仅对话',
-          edit: '编辑目录内文件',
-          full: '完全放开',
+          edit: '编辑文件',
+          full: '完全访问',
         },
         desc: {
           chat: '只读 —— 可读取与搜索文件，但不能写入或运行脚本',

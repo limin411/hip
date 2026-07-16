@@ -68,14 +68,53 @@ export async function pumpPermissionsUntil(
   return { stuck: await permissionModalOpen(), approvedCount }
 }
 
-/** Set permission mode via product chip + menu (draft or session). */
-export async function setPermissionModeUi(mode: 'chat' | 'edit' | 'full'): Promise<void> {
+/**
+ * Open permission chip menu with pointer synthesis (Radix often ignores bare el.click()).
+ */
+async function openPermissionMenu(): Promise<void> {
   const chip = await browser.$('[data-testid="permission-chip"]')
   await chip.waitForExist({ timeout: 15000 })
-  await browser.execute((el: HTMLElement) => el.click(), chip)
 
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await browser.execute((el: HTMLElement) => {
+      el.focus()
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      const rect = el.getBoundingClientRect()
+      const x = rect.left + rect.width / 2
+      const y = rect.top + rect.height / 2
+      const common = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0 }
+      el.dispatchEvent(new PointerEvent('pointerdown', { ...common, pointerType: 'mouse' }))
+      el.dispatchEvent(new PointerEvent('pointerup', { ...common, pointerType: 'mouse' }))
+      el.dispatchEvent(new MouseEvent('mousedown', common))
+      el.dispatchEvent(new MouseEvent('mouseup', common))
+      el.dispatchEvent(new MouseEvent('click', common))
+      el.click()
+    }, chip)
+
+    // Also try keyboard open (Radix: Enter/Space on focused trigger)
+    if (attempt === 1) {
+      await browser.keys('Enter')
+    }
+    if (attempt === 2) {
+      await browser.keys(' ')
+    }
+
+    const item = await browser.$('[data-testid="permission-mode-edit"]')
+    try {
+      await item.waitForExist({ timeout: 1500 })
+      return
+    } catch {
+      await browser.pause(200)
+    }
+  }
+  throw new Error('permission mode menu did not open after retries')
+}
+
+/** Set permission mode via product chip + menu (draft or session). */
+export async function setPermissionModeUi(mode: 'chat' | 'edit' | 'full'): Promise<void> {
+  await openPermissionMenu()
   const item = await browser.$(`[data-testid="permission-mode-${mode}"]`)
-  await item.waitForExist({ timeout: 10000 })
+  await item.waitForExist({ timeout: 5000 })
   await browser.execute((el: HTMLElement) => el.click(), item)
   await browser.pause(150)
 }

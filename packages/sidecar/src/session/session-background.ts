@@ -4,7 +4,6 @@ import { HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messa
 import { runSubagent } from './subagent.js'
 import { childMaxStepsForAgent } from './loop-control.js'
 import { GuardianReviewer } from './guardian.js'
-import { NetworkPolicy } from './network-policy.js'
 import { safeErrorMessage } from './error.js'
 import type { SessionTurnHost, SendFn } from './session-turn-runner.js'
 import { acquireBackgroundWorktree } from './background-worktree.js'
@@ -51,7 +50,7 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
       requestApproval,
       mode: 'background',
       sessionId: host.id,
-      networkPolicy: new NetworkPolicy(),
+      networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       hooks: host.hooks,

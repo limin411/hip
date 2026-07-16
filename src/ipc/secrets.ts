@@ -2,10 +2,17 @@
 import { invoke } from '@tauri-apps/api/core'
 import { providerKeyEnv } from '@hip/protocol'
 
-export function isProviderKeyConfigured(providerID: string): Promise<boolean> {
-  return invoke<boolean>('has_secret', { key: providerKeyEnv(providerID) })
+/**
+ * Whether a provider has a non-empty key in auth.json.
+ * Uses batch `has_secrets` (Rust registers that name only — not singular `has_secret`).
+ * Pass a **provider id** (e.g. `deepseek`); Rust maps it via `provider_key_env`.
+ */
+export async function isProviderKeyConfigured(providerID: string): Promise<boolean> {
+  const map = await areProviderKeysConfigured([providerID])
+  return map[providerID] === true
 }
 
+/** Batch check; keys are **provider ids**, not env-var names. */
 export function areProviderKeysConfigured(ids: string[]): Promise<Record<string, boolean>> {
   return invoke<Record<string, boolean>>('has_secrets', { keys: ids })
 }

@@ -8,7 +8,6 @@ import { selectImageAgent } from './agents/registry.js'
 import { runSubagent } from './subagent.js'
 import { childMaxStepsForAgent } from './loop-control.js'
 import { GuardianReviewer } from './guardian.js'
-import { NetworkPolicy } from './network-policy.js'
 import { validateAttachments, stageAttachments, buildAttachmentContentParts, type AttachmentPayload } from './attachments.js'
 import { scratchDirFor } from './scratch.js'
 import { isRichContentParts } from './session-message-codec.js'
@@ -255,7 +254,7 @@ export async function retrySubagent(host: SessionTurnHost, agentId: string, send
       permissionMode: mode,
       requestApproval,
       sessionId: host.id,
-      networkPolicy: new NetworkPolicy(),
+      networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       hooks: host.hooks,
@@ -314,6 +313,9 @@ export async function resumeSubagent(host: SessionTurnHost, taskId: string, cont
       permissionMode: mode, requestApproval,
       existingMessages: [...existingMessages, new HumanMessage(content)],
       sessionId: host.id,
+      networkPolicy: host.networkPolicy,
+      toolOutputStore: host.toolOutputStore,
+      guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       hooks: host.hooks,
       turnId,
       agentId: taskId,

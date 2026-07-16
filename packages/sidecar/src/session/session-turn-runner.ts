@@ -490,7 +490,7 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       requestApproval,
       permissionMode: mode,
       sessionId: host.id,
-      networkPolicy: new NetworkPolicy(),
+      networkPolicy: host.networkPolicy,
       toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: host.modelRunner() }) : undefined,
       attachmentParts: agentParts,
@@ -781,7 +781,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
       signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
       permissionMode: mode, requestApproval, sessionId: host.id,
-      networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore,
+      networkPolicy: host.networkPolicy, toolOutputStore: host.toolOutputStore,
       guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
       hooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
       ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}),
@@ -831,7 +831,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     try {
       const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? host.abortController!.signal, hooks, {
         mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: host.id,
-        networkPolicy: new NetworkPolicy(), toolOutputStore: host.toolOutputStore,
+        networkPolicy: host.networkPolicy, toolOutputStore: host.toolOutputStore,
         guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
         pluginHooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
       })

@@ -27,6 +27,6 @@ scripts/hip-eval-ui-hard.sh
 |------|--------|-------|
 | `bb-hard-tdd-has-prefixes` | **pass** (~15m38s) | verify green; single-file fix |
 | `bb-hard-multi-file-common` | **pass** (~1m06s, retry) | First run **timeout** (~20m) with `verifyPassed=true` but turn never settled. Retry after Continue button + longer timeout: `tags: pass`, both common files fixed, verify green (`~/.hip/eval-runs/bb-hard-multi-file-common-2026-07-16T07-25-19-19c040`). |
-| `bb-hard-add-has-any-suffix` | not run | next |
+| `bb-hard-add-has-any-suffix` | **pass** (~1m01s) | After long-prompt composer fix; `~/.hip/eval-runs/bb-hard-add-has-any-suffix-2026-07-16T07-30-37-10828d` |
 
 Reports (local scratch, not in git): search `bb-hard-*-2026-07-16T*` under eval `HIP_EVAL_REPORT_DIR` / goal implementer `m1-hard/reports/`.

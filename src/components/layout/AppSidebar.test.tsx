@@ -90,6 +90,12 @@ describe('AppSidebar', () => {
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
   })
 
+  it('shows session counts on projects and chats nav', () => {
+    render(<AppSidebar onLogout={vi.fn()} />)
+    expect(screen.getByTestId('sidebar-nav-chats')).toHaveTextContent('1')
+    expect(screen.getByTestId('sidebar-nav-projects')).toHaveTextContent('1')
+  })
+
   it('filters sessions by search query', () => {
     render(<AppSidebar onLogout={vi.fn()} />)
     fireEvent.change(screen.getByTestId('sidebar-search'), { target: { value: 'nope' } })
@@ -134,11 +140,5 @@ describe('AppSidebar', () => {
     render(<AppSidebar onLogout={vi.fn()} />)
     fireEvent.click(screen.getByTestId('sidebar-session-chat-1'))
     expect(selectSessionFromSidebar).toHaveBeenCalledWith('chat-1')
-  })
-
-  it('new chat button starts chat conversation', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
-    fireEvent.click(screen.getByTestId('sidebar-new-chats'))
-    expect(newConversationFromSidebar).toHaveBeenCalledWith('chat')
   })
 })

@@ -1,6 +1,6 @@
-import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Code2, MessageSquare, Plus, Search } from 'lucide-react'
+import { BookOpen, Code2, MessageSquare, Search } from 'lucide-react'
 import { useActiveSessionId, useSessions } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
@@ -66,14 +66,18 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     return list
   }, [spaces, sidebarSection, q])
 
+  const projectCount = useMemo(
+    () => sessions.filter((s) => surfaceOf(s.config) === 'code').length,
+    [sessions],
+  )
+  const chatCount = useMemo(
+    () => sessions.filter((s) => surfaceOf(s.config) === 'chat').length,
+    [sessions],
+  )
+
   const onNav = (section: SidebarSection) => {
     if (section === 'knowledge') void enterKnowledge()
     else void enterSection(section)
-  }
-
-  const onNew = (surface: 'chat' | 'code', e: MouseEvent) => {
-    e.stopPropagation()
-    void newConversationFromSidebar(surface)
   }
 
   const listLabel =
@@ -153,18 +157,16 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           active={sidebarSection === 'projects'}
           label={t('sidebar.nav.projects')}
           icon={<Code2 size={16} />}
+          count={projectCount > 0 ? projectCount : undefined}
           onClick={() => onNav('projects')}
-          onNew={(e) => onNew('code', e)}
-          newLabel={t('sidebar.newProject')}
         />
         <NavItem
           section="chats"
           active={sidebarSection === 'chats'}
           label={t('sidebar.nav.chats')}
           icon={<MessageSquare size={16} />}
+          count={chatCount > 0 ? chatCount : undefined}
           onClick={() => onNav('chats')}
-          onNew={(e) => onNew('chat', e)}
-          newLabel={t('sidebar.newChat')}
         />
       </nav>
 
@@ -355,8 +357,6 @@ function NavItem({
   icon,
   count,
   onClick,
-  onNew,
-  newLabel,
 }: {
   section: SidebarSection
   active: boolean
@@ -364,56 +364,29 @@ function NavItem({
   icon: ReactNode
   count?: number
   onClick: () => void
-  onNew?: (e: MouseEvent) => void
-  newLabel?: string
 }) {
-  // Row is a div so "+" is a sibling button (no nested interactive controls).
   return (
-    <div
+    <button
+      type="button"
+      data-testid={`sidebar-nav-${section}`}
+      data-no-drag
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
       className={cn(
-        'group flex h-[34px] w-full items-center gap-0.5 rounded-lg pr-1 text-body font-medium',
-        active ? 'bg-state-active text-ink' : 'text-ink-secondary',
+        'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        active
+          ? 'bg-state-active text-ink'
+          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
-      <button
-        type="button"
-        data-testid={`sidebar-nav-${section}`}
-        data-no-drag
-        aria-current={active ? 'page' : undefined}
-        onClick={onClick}
-        className={cn(
-          'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-          !active && 'hover:bg-state-hover hover:text-ink',
-        )}
-      >
-        <span className={cn('shrink-0', active ? 'text-accent-strong' : 'opacity-85')}>{icon}</span>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        {count != null && !onNew ? (
-          <span className="text-[11px] font-normal text-ink-tertiary" aria-label={String(count)}>
-            {count}
-          </span>
-        ) : null}
-      </button>
-      {onNew ? (
-        <button
-          type="button"
-          data-testid={`sidebar-new-${section}`}
-          data-no-drag
-          title={newLabel}
-          aria-label={newLabel}
-          onClick={onNew}
-          className={cn(
-            'inline-flex size-[22px] shrink-0 items-center justify-center rounded text-ink-tertiary transition-colors',
-            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
-            active && 'opacity-100',
-            'hover:bg-surface hover:text-ink',
-            'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-          )}
-        >
-          <Plus size={14} aria-hidden />
-        </button>
+      <span className={cn('shrink-0', active ? 'text-accent-strong' : 'opacity-85')}>{icon}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {count != null ? (
+        <span className="text-[11px] font-normal text-ink-tertiary" aria-label={String(count)}>
+          {count}
+        </span>
       ) : null}
-    </div>
+    </button>
   )
 }

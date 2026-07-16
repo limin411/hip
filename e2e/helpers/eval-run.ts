@@ -204,7 +204,11 @@ export async function runEvalTask(opts: {
         const r = await pumpPermissionsUntil(Date.now() + 5_000, true)
         approved += r.approvedCount
       }
-      if (planMode === 'prefer' || planMode === 'require' || planMode === 'allow') {
+      // At most one successful plan approve per run (disabled/unmounted card must not re-count).
+      if (
+        planClicks === 0 &&
+        (planMode === 'prefer' || planMode === 'require' || planMode === 'allow')
+      ) {
         const n = await pumpPlanApprovals(1)
         planClicks += n
       }
@@ -235,7 +239,9 @@ export async function runEvalTask(opts: {
 
   const perm = await pumpPermissionsUntil(Date.now() + 2_000, autoApprove)
   approved += perm.approvedCount
-  planClicks += await pumpPlanApprovals(2)
+  if (planClicks === 0) {
+    planClicks += await pumpPlanApprovals(2)
+  }
 
   const assistantText = await getLastAssistantTextReadOnly()
   const changesPaths = await captureChangesPaths()

@@ -115,23 +115,21 @@ export function AppLayout() {
           {renderMainContent()}
         </Panel>
 
+        {/* Overlap neighbors (w-2 -mx-1) so the divider is only a 1px line — no layout gap. */}
         <PanelResizeHandle
-          className="group relative z-10 flex w-1.5 items-stretch justify-center bg-transparent outline-none focus-visible:bg-accent/20"
+          className={
+            rightOpen
+              ? 'group relative z-10 w-2 -mx-1 bg-transparent outline-none focus-visible:ring-1 focus-visible:ring-accent/40'
+              : 'w-0'
+          }
           disabled={!rightOpen}
         >
           {rightOpen ? (
-            <>
-              {/* Full-height hover/drag cue for edge drawer */}
-              <div
-                className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-accent/40 group-data-[resize-handle-state=drag]:bg-accent/70 group-focus-visible:bg-accent/50"
-                aria-hidden
-              />
-              <div
-                className="relative my-auto h-8 w-[3px] rounded-full bg-border transition-colors group-hover:bg-accent/80 group-data-[resize-handle-state=drag]:bg-accent group-focus-visible:bg-accent"
-                aria-hidden
-                data-testid="right-panel-resize-grip"
-              />
-            </>
+            <div
+              className="mx-auto h-full w-px bg-border transition-colors group-hover:bg-accent group-data-[resize-handle-state=drag]:bg-accent group-focus-visible:bg-accent"
+              aria-hidden
+              data-testid="right-panel-resize-grip"
+            />
           ) : null}
         </PanelResizeHandle>
 
@@ -148,7 +146,7 @@ export function AppLayout() {
         >
           {rightOpen ? (
             <div
-              className="flex h-full min-h-0 flex-col border-l border-border bg-surface-subtle"
+              className="flex h-full min-h-0 flex-col bg-surface-subtle"
               data-testid="right-panel-drawer"
             >
               {codeOpen ? <ArtifactPanel /> : <PreviewPanel />}

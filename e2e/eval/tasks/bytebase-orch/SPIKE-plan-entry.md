@@ -1,6 +1,6 @@
 # Spike: plan mode entry (Code surface)
 
-**Status:** product path shipped; settle fixes in progress (2026-07-16).
+**Status:** closed-loop green (2026-07-16).
 
 ## Product path
 
@@ -12,31 +12,29 @@
 | Protocol | `session:setForcePlan` → echo `session:forcePlan` |
 | Sidecar forcePlan | Auto `planMode.enter()` at turn start + system nudge |
 | After approve/reject | forcePlan cleared (one-shot) |
-| **respondPlan optimistic** | Clears `planApprovalPending` immediately (card unmounts); approve/amend → `running` |
-
-PlanApprovalCard still only appears after real `plan:published` + `plan_approval` interrupt (or unpaid seed).
+| `respondPlan` optimistic | Clears `planApprovalPending` immediately; approve/amend → `running` |
 
 ## Eval policy
 
 | plan_mode | Runner |
 |-----------|--------|
 | forbid | no chip; never approve |
-| allow | approve if **enabled** button visible |
-| prefer | `enablePlanModeUi()` before send; approve enabled only |
-| require | chip + `require_plan_approved` |
+| allow / prefer / require | `enablePlanModeUi()` when prefer/require; click **enabled** plan-approve only |
+| require | `require_plan_approved` |
 
-**Fix:** `approvePlanIfPresent` ignores **disabled** approve buttons (previously counted 18 clicks on a disabled shell).
+Settle busy only if plan-approve is **enabled** (disabled shell does not block idle).
 
 ## Live archive (2026-07-16)
 
 | Run | Result | Notes |
 |-----|--------|-------|
 | Soft prefer (pre-product) | pass, `planApproved=false` | Agent fixed without card |
-| require + soft nudge | `plan_skipped`, verify green | Agent skipped EnterPlanMode |
-| require + hard PlanMode | **timeout**, `planApproved=true`, verify green, **`plan_approvals=18`** | Plan+fix OK; settle hung; disabled approve re-clicked. Report `…T07-52-05-b73f6a` |
-| require + optimistic dismiss + disabled guard | (re-run) | See post-plan-settle plan |
+| require + soft nudge | `plan_skipped` | Agent skipped EnterPlanMode |
+| require + hard PlanMode | timeout, `planApproved=true`, `plan_approvals=18` | Disabled re-click hang |
+| require + optimistic dismiss | 56s settled, `planApproved=true`, verify_failed | Max-steps before fix |
+| require + settle busy fix | **pass**, `planApproved=true` (~2m20s) | Report under `~/.hip/eval-runs/bb-orch-plan-then-fix-2026-07-16T08-55-*` |
 
 ## Harness (unpaid)
 
 - `harness-plan-entry.spec.ts` — chip + slash
-- `harness-plan-approval.spec.ts` — seed card → approve → **card unmounts** (optimistic)
+- `harness-plan-approval.spec.ts` — seed → approve → card unmounts

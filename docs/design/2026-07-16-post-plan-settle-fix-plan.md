@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Date** | 2026-07-16 |
-| **Status** | Implementing / verifying |
+| **Status** | Done — live pass with planApproved (2026-07-16) |
 | **Trigger** | Live `bb-orch-plan-then-fix` (hard PlanMode): `planApproved=true`, verify green, score `timeout` (~25m) |
 | **Parent** | N1 plan entry product path (shipped) |
 

@@ -783,6 +783,31 @@ describe('workspace diff', () => {
     expect(sess.interrupt?.question).toContain('Approve')
   })
 
+  it('respondPlan optimistically clears planApprovalPending and sends plan:respond', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    svc.respondPlan('approve')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.interrupt).toBeNull()
+    expect(sess.status).toBe('running')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', sessionId: 's1', action: 'approve' })
+  })
+
+  it('respondPlan reject sets status idle optimistically', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.seedPlanApproval('s1')
+    useDomainStore.setState({ activeSessionId: 's1' })
+    svc.respondPlan('reject')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.status).toBe('idle')
+    expect(t.sent.at(-1)).toMatchObject({ type: 'plan:respond', action: 'reject' })
+  })
+
   it('seedBackgroundTaskKilled appends synthetic killed notification', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

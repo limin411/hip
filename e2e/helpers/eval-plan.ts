@@ -28,14 +28,19 @@ export async function enablePlanModeUi(): Promise<void> {
   }
 }
 
-/** Click plan approve if the card is present. Returns true if clicked. */
+/**
+ * Click plan approve only if the button is present and enabled.
+ * Disabled buttons (post-click local state) must not count as new approvals —
+ * live eval previously recorded plan_approvals=18 by re-clicking a disabled control.
+ */
 export async function approvePlanIfPresent(): Promise<boolean> {
   try {
     const clicked = await browser.execute(() => {
       const btn = document.querySelector(
         '[data-testid="plan-approve"]',
-      ) as HTMLElement | null
+      ) as HTMLButtonElement | null
       if (!btn) return false
+      if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false
       btn.click()
       return true
     })
@@ -47,7 +52,7 @@ export async function approvePlanIfPresent(): Promise<boolean> {
 }
 
 /**
- * Auto-click PlanApprovalCard approve while visible.
+ * Auto-click PlanApprovalCard approve while an enabled approve control is present.
  */
 export async function pumpPlanApprovals(maxClicks = 3): Promise<number> {
   let n = 0

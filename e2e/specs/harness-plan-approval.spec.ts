@@ -22,7 +22,7 @@ describe('harness plan approval @harness @core', () => {
     }
   })
 
-  it('shows plan-approval-card and approve disables actions', async () => {
+  it('shows plan-approval-card and approve dismisses it optimistically', async () => {
     const sessionId = await createChatSessionForE2e()
     expect(sessionId).toBeTruthy()
 
@@ -43,16 +43,13 @@ describe('harness plan approval @harness @core', () => {
     await approve.waitForExist({ timeout: 5000 })
     await browser.execute((el: HTMLElement) => el.click(), approve)
 
-    // Local responded state disables approve (sidecar may not reply in harness).
+    // Product respondPlan clears planApprovalPending immediately — card unmounts.
     await browser.waitUntil(
-      async () => {
-        const disabled = await (await chat.planApprove).getAttribute('disabled')
-        return disabled === 'true' || disabled === ''
-      },
+      async () => !(await (await chat.planApprovalCard).isExisting()),
       {
         timeout: 10000,
         interval: 200,
-        timeoutMsg: 'plan-approve not disabled after click',
+        timeoutMsg: 'plan-approval-card still visible after approve',
       },
     )
   })

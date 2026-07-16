@@ -598,6 +598,49 @@ describe('useDomainStore actions', () => {
     expect(useDomainStore.getState().sessions[0].status).toBe('running')
   })
 
+  it('respondPlanOptimistic approve clears plan card gate and sets running', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1'
+          ? {
+              ...sess,
+              status: 'idle' as const,
+              planApprovalPending: true,
+              interrupt: { turnId: 't1', question: 'Approve?', context: '{"kind":"plan_approval"}' },
+              activeTurnPlan: [{ content: 'step', status: 'pending' as const }],
+            }
+          : sess,
+      ),
+    }))
+    useDomainStore.getState().respondPlanOptimistic('s1', 'approve')
+    const sess = useDomainStore.getState().sessions[0]
+    expect(sess.planApprovalPending).toBe(false)
+    expect(sess.interrupt).toBeNull()
+    expect(sess.status).toBe('running')
+    expect(sess.activeTurnPlan?.[0]?.content).toBe('step')
+  })
+
+  it('respondPlanOptimistic reject sets idle', () => {
+    reset()
+    useDomainStore.getState().createSession('s1', { llmProvider: 'deepseek', model: 'm', tools: [] })
+    useDomainStore.setState((s) => ({
+      sessions: s.sessions.map((sess) =>
+        sess.id === 's1'
+          ? {
+              ...sess,
+              planApprovalPending: true,
+              interrupt: { turnId: 't1', question: 'Approve?' },
+            }
+          : sess,
+      ),
+    }))
+    useDomainStore.getState().respondPlanOptimistic('s1', 'reject')
+    expect(useDomainStore.getState().sessions[0].status).toBe('idle')
+    expect(useDomainStore.getState().sessions[0].planApprovalPending).toBe(false)
+  })
+
   it("apply('ready') updates hasApiKey from the sidecar", () => {
     reset()
     useDomainStore.getState().apply({ type: 'ready', hasApiKey: false })

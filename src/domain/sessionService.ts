@@ -1325,6 +1325,8 @@ export class SessionService {
   respondPlan(action: 'approve' | 'reject' | 'amend', amendContent?: string): void {
     const { activeSessionId } = useDomainStore.getState()
     if (!activeSessionId) return
+    // Drop PlanApprovalCard immediately so eval/UI do not keep a disabled shell for the whole execute turn.
+    useDomainStore.getState().respondPlanOptimistic(activeSessionId, action)
     this.transport.send({ type: 'plan:respond', sessionId: activeSessionId, action, amendContent })
   }
 

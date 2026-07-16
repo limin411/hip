@@ -453,6 +453,11 @@ interface DomainStore {
   renameSession: (id: string, title: string) => void
   appendUserMessage: (sessionId: string, id: string, content: string, attachments?: LocalAttachment[]) => void
   appendMessage: (sessionId: string, message: { id: string; role: 'user' | 'assistant'; content: string; timestamp: number }) => void
+  /**
+   * Optimistic plan HITL response: drop PlanApprovalCard immediately.
+   * approve/amend → running; reject → idle (sidecar may still send PLAN_REJECTED).
+   */
+  respondPlanOptimistic: (sessionId: string, action: 'approve' | 'reject' | 'amend') => void
   regenerateLastTurn: (sessionId: string) => void
   clearPermission: (requestId: string) => void
   setConnection: (c: Connection) => void
@@ -520,6 +525,23 @@ export const useDomainStore = create<DomainStore>((set) => ({
       sessions: s.sessions.map((sess) =>
         sess.id !== sessionId ? sess : { ...sess, messages: [...sess.messages, message], updatedAtMs: Date.now() },
       ),
+    })),
+
+  respondPlanOptimistic: (sessionId, action) =>
+    set((s) => ({
+      sessions: s.sessions.map((sess) => {
+        if (sess.id !== sessionId) return sess
+        const nextStatus = action === 'reject' ? ('idle' as const) : ('running' as const)
+        return {
+          ...sess,
+          status: nextStatus,
+          error: action === 'reject' ? sess.error : null,
+          interrupt: null,
+          planApprovalPending: false,
+          // Keep activeTurnPlan until message:complete for transcript context; card gates on planApprovalPending.
+          updatedAtMs: Date.now(),
+        }
+      }),
     })),
 
   regenerateLastTurn: (sessionId) =>

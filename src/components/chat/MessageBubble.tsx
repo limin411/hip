@@ -70,7 +70,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
         isLastAssistant: !!isLastAssistant,
         sessionId,
       }}
-      className="group flex gap-3"
+      className="flex gap-3"
       data-testid="message-context-menu"
     >
       {isUser ? (

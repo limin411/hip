@@ -18,9 +18,8 @@ export function MessageActions({ message, isLastAssistant }: { message: Message;
     }
   }
 
-  // Hover reveal needs an ancestor with className="group" (MessageBubble's wrapper provides it).
   return (
-    <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+    <div className="mt-1 flex items-center gap-1">
       <button onClick={onCopy} data-testid="msg-copy" title={t('chat.copy')} aria-label={t('chat.copy')} className={BTN}>
         {copied ? <Check size={14} /> : <Copy size={14} />}
       </button>

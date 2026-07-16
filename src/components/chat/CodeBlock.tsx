@@ -21,7 +21,7 @@ function languageOf(children: unknown): string | undefined {
 
 /**
  * Replacement for the markdown `pre` element: keeps the styled <pre> and adds a
- * hover copy button. `node` (react-markdown's hast node) is destructured out so it
+ * copy button. `node` (react-markdown's hast node) is destructured out so it
  * is never spread onto the DOM; the loose props type stays assignable to the
  * `components.pre` slot.
  */
@@ -42,7 +42,7 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
     <DeclarativeContextMenu
       kind="codeBlock"
       payload={{ code, language }}
-      className="group/code relative"
+      className="relative"
       data-testid="code-block-context-menu"
     >
       <pre {...props}>{children}</pre>
@@ -51,7 +51,7 @@ export function CodeBlock({ children, node, ...props }: ComponentPropsWithoutRef
         data-testid="code-copy"
         title={t('chat.copyCode')}
         aria-label={t('chat.copyCode')}
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-surface/80 text-ink-tertiary opacity-0 transition-opacity hover:text-ink-secondary group-hover/code:opacity-100 focus-visible:opacity-100"
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-md bg-surface/80 text-ink-tertiary transition-colors hover:text-ink-secondary"
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>

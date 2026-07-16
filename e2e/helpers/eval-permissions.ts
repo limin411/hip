@@ -4,8 +4,10 @@
 
 export async function permissionModalOpen(): Promise<boolean> {
   try {
-    const modal = await browser.$('[data-testid="permission-modal"]')
-    return modal.isExisting()
+    // execute avoids WDIO findElement spam on the settle hot path
+    return await browser.execute(() =>
+      Boolean(document.querySelector('[data-testid="permission-modal"]')),
+    )
   } catch {
     // Session may be torn down mid-poll (ECONNREFUSED) — treat as closed.
     return false
@@ -15,11 +17,17 @@ export async function permissionModalOpen(): Promise<boolean> {
 /** Click product Continue on chat-interrupt banner if present. */
 export async function continueInterruptIfPresent(): Promise<boolean> {
   try {
-    const btn = await browser.$('[data-testid="chat-interrupt-continue"]')
-    if (!(await btn.isExisting())) return false
-    await browser.execute((el: HTMLElement) => el.click(), btn)
-    await browser.pause(300)
-    return true
+    // Single execute: presence + click (no findElement per settle tick)
+    const clicked = await browser.execute(() => {
+      const btn = document.querySelector(
+        '[data-testid="chat-interrupt-continue"]',
+      ) as HTMLElement | null
+      if (!btn) return false
+      btn.click()
+      return true
+    })
+    if (clicked) await browser.pause(300)
+    return Boolean(clicked)
   } catch {
     return false
   }

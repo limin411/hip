@@ -3,18 +3,31 @@
  */
 
 export async function planApprovalVisible(): Promise<boolean> {
-  const card = await browser.$('[data-testid="plan-approval-card"]')
-  return card.isExisting()
+  try {
+    return await browser.execute(() =>
+      Boolean(document.querySelector('[data-testid="plan-approval-card"]')),
+    )
+  } catch {
+    return false
+  }
 }
 
 /** Click plan approve if the card is present. Returns true if clicked. */
 export async function approvePlanIfPresent(): Promise<boolean> {
-  if (!(await planApprovalVisible())) return false
-  const btn = await browser.$('[data-testid="plan-approve"]')
-  if (!(await btn.isExisting())) return false
-  await browser.execute((el: HTMLElement) => el.click(), btn)
-  await browser.pause(300)
-  return true
+  try {
+    const clicked = await browser.execute(() => {
+      const btn = document.querySelector(
+        '[data-testid="plan-approve"]',
+      ) as HTMLElement | null
+      if (!btn) return false
+      btn.click()
+      return true
+    })
+    if (clicked) await browser.pause(300)
+    return Boolean(clicked)
+  } catch {
+    return false
+  }
 }
 
 /**

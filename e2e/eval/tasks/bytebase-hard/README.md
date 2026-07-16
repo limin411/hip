@@ -26,7 +26,7 @@ scripts/hip-eval-ui-hard.sh
 | Task | Result | Notes |
 |------|--------|-------|
 | `bb-hard-tdd-has-prefixes` | **pass** (~15m38s) | verify green; single-file fix |
-| `bb-hard-multi-file-common` | **timeout** (~20m) | **not** a false verify: `verifyPassed=true`, both `util.go` + `resource_name.go` restored, `go test ./backend/common/` green. Score failed because turn never settled (`turn_timeout`, `interruptResumes=0`). Treat as HITL settle / finish gap; re-run after chat-interrupt **Continue** button. |
+| `bb-hard-multi-file-common` | **pass** (~1m06s, retry) | First run **timeout** (~20m) with `verifyPassed=true` but turn never settled. Retry after Continue button + longer timeout: `tags: pass`, both common files fixed, verify green (`~/.hip/eval-runs/bb-hard-multi-file-common-2026-07-16T07-25-19-19c040`). |
 | `bb-hard-add-has-any-suffix` | not run | next |
 
 Reports (local scratch, not in git): search `bb-hard-*-2026-07-16T*` under eval `HIP_EVAL_REPORT_DIR` / goal implementer `m1-hard/reports/`.

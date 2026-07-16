@@ -5,6 +5,11 @@ export type ComposerHandlers = {
   insert: (text: string) => void
   /** Replace entire composer value (skill handoff). */
   replace: (text: string) => void
+  /**
+   * Set (or clear with null) a pending message quote shown as a chip above the input.
+   * Optional so legacy inserters remain valid.
+   */
+  setQuote?: (text: string | null) => void
 }
 
 type LegacyInserter = (text: string) => void
@@ -39,6 +44,16 @@ export function insertComposerText(text: string): boolean {
 export function replaceComposerText(text: string): boolean {
   if (!handlers) return false
   handlers.replace(text)
+  return true
+}
+
+/**
+ * Set a pending quote chip on the active composer (null clears).
+ * Returns false if no composer is registered or it does not support quotes.
+ */
+export function setComposerQuote(text: string | null): boolean {
+  if (!handlers?.setQuote) return false
+  handlers.setQuote(text)
   return true
 }
 

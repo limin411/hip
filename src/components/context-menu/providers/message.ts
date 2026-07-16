@@ -1,6 +1,6 @@
 import type { Message } from '@hip/protocol'
 import { toast } from 'sonner'
-import { insertComposerText } from '@/components/command-palette/composerBridge'
+import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { sessionService } from '@/domain'
 import { normalizeMessageContent } from '@/lib/normalizeMessageContent'
 import type {
@@ -15,7 +15,7 @@ export function messageCopyText(message: Message): string {
   return message.role === 'user' ? message.content : normalizeMessageContent(message.content)
 }
 
-/** Quote body for composer insert (markdown blockquote + trailing blank line). */
+/** Quote body prepended on send (markdown blockquote + trailing blank line). */
 export function formatQuoteForComposer(text: string): string {
   const lines = text.split('\n')
   const quoted = lines.map((line) => `> ${line}`).join('\n')
@@ -46,7 +46,7 @@ export const messageProvider: ContextProvider = (req, ctx) => {
     label: ctx.t('contextMenu.message.quote'),
     group: 'edit',
     run: () => {
-      const ok = insertComposerText(formatQuoteForComposer(messageCopyText(message)))
+      const ok = setComposerQuote(messageCopyText(message))
       if (!ok) {
         toast.message(ctx.t('contextMenu.message.quoteNoComposer'))
       }

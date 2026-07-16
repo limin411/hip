@@ -179,6 +179,7 @@ export const en = {
       noModelSelected: 'Select a model',
       attach: 'Attach file',
       removeAttachment: 'Remove attachment {{name}}',
+      removeQuote: 'Remove quote',
       todos: {
         plan: 'Plan',
         pending: 'To do',

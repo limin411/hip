@@ -4,6 +4,11 @@ import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
 import type { LocalAttachment } from './attachmentTypes'
 
+/** Collapse whitespace for the one-line quote chip; CSS truncate handles overflow. */
+function quotePreviewLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 export function Composer({
   value,
   onChange,
@@ -16,6 +21,8 @@ export function Composer({
   submitDisabled,
   attachments = [],
   onAttachmentsChange,
+  quoteText,
+  onQuoteClear,
   inputRef,
 }: {
   value: string
@@ -29,11 +36,37 @@ export function Composer({
   submitDisabled?: boolean
   attachments?: LocalAttachment[]
   onAttachmentsChange?: (attachments: LocalAttachment[]) => void
+  /** Pending quote shown as a compact chip above the input (full text used on send). */
+  quoteText?: string | null
+  onQuoteClear?: () => void
   inputRef?: React.RefObject<HTMLTextAreaElement>
 }) {
   const { t } = useTranslation()
+  const hasQuote = !!quoteText?.trim()
   return (
     <div className="rounded-xl border border-border bg-surface p-2 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8 transition-shadow">
+      {hasQuote && (
+        <div
+          className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5"
+          data-testid="composer-quote"
+        >
+          <span
+            className="min-w-0 flex-1 truncate text-meta text-ink-secondary"
+            title={quoteText!}
+          >
+            {quotePreviewLine(quoteText!)}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 text-ink-tertiary hover:text-ink"
+            onClick={() => onQuoteClear?.()}
+            aria-label={t('chat.removeQuote')}
+            data-testid="composer-quote-remove"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1 px-2 pb-2">
           {attachments.map((a) => (

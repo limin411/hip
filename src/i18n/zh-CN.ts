@@ -178,6 +178,7 @@ export const zhCN = {
       noModelSelected: '选择模型',
       attach: '添加附件',
       removeAttachment: '移除附件 {{name}}',
+      removeQuote: '移除引用',
       todos: {
         plan: '计划',
         pending: '待办',

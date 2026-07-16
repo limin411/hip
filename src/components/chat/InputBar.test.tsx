@@ -14,6 +14,7 @@ import {
   insertComposerText,
   replaceComposerText,
   registerComposerHandlers,
+  setComposerQuote,
 } from '@/components/command-palette/composerBridge'
 
 vi.mock('@/store/skillsStore', () => ({
@@ -121,6 +122,55 @@ describe('InputBar', () => {
     await vi.waitFor(() => {
       expect(ta).toHaveValue('/pdf ')
     })
+  })
+
+  it('setComposerQuote shows a chip without dumping text into the textarea', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+    const sendSpy = vi.spyOn(sessionService, 'sendMessage').mockImplementation(() => {})
+
+    render(<InputBar />)
+    const ta = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    ) as HTMLTextAreaElement
+    fireEvent.change(ta, { target: { value: 'my reply' } })
+
+    expect(setComposerQuote('quoted\nmessage body')).toBe(true)
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('composer-quote')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('composer-quote')).toHaveTextContent('quoted message body')
+    expect(ta).toHaveValue('my reply')
+
+    fireEvent.click(screen.getByTestId('composer-send'))
+    expect(sendSpy).toHaveBeenCalledWith('> quoted\n> message body\n\nmy reply', [])
+    expect(screen.queryByTestId('composer-quote')).not.toBeInTheDocument()
+    expect(ta).toHaveValue('')
+  })
+
+  it('composer quote remove clears the chip', async () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    expect(setComposerQuote('keep this short')).toBe(true)
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('composer-quote')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('composer-quote-remove'))
+    expect(screen.queryByTestId('composer-quote')).not.toBeInTheDocument()
   })
 
   it('clears existing attachments when the active session model loses attachment support', async () => {

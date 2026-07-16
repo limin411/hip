@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { Message } from '@hip/protocol'
 import { toast } from 'sonner'
-import { insertComposerText, registerComposerInserter } from '@/components/command-palette/composerBridge'
+import {
+  registerComposerHandlers,
+  registerComposerInserter,
+  setComposerQuote,
+} from '@/components/command-palette/composerBridge'
 import { sessionService, useDomainStore } from '@/domain'
 import {
   formatQuoteForComposer,
@@ -152,25 +156,48 @@ describe('messageProvider', () => {
     expect(copyText).toHaveBeenCalledWith('hello world')
   })
 
-  it('quote inserts via insertComposerText (does not replace via domain)', () => {
+  it('quote sets pending quote chip via setComposerQuote (does not dump into draft)', () => {
+    let quote: string | null = null
     let draft = 'existing draft'
-    registerComposerInserter((text) => {
-      draft = draft + text
+    registerComposerHandlers({
+      insert: (text) => {
+        draft = draft + text
+      },
+      replace: (text) => {
+        draft = text
+      },
+      setQuote: (text) => {
+        quote = text
+      },
     })
+    const msg = makeMessage({ id: 'm1', role: 'user', content: 'quoted body' })
+    const items = messageProvider(
+      { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
+      makeCtx(),
+    )
+    items.find((i) => i.id === 'message.quote')!.run()
+    expect(quote).toBe('quoted body')
+    expect(draft).toBe('existing draft')
+    expect(toast.message).not.toHaveBeenCalled()
+    expect(setComposerQuote(null)).toBe(true)
+    expect(quote).toBe(null)
+  })
+
+  it('toasts when quote has no composer quote handler', () => {
+    registerComposerInserter(null)
     const msg = makeMessage({ id: 'm1', role: 'user', content: 'quoted' })
     const items = messageProvider(
       { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },
       makeCtx(),
     )
     items.find((i) => i.id === 'message.quote')!.run()
-    expect(draft).toBe('existing draft> quoted\n\n')
-    expect(toast.message).not.toHaveBeenCalled()
-    // Sanity: bridge still works
-    expect(insertComposerText('x')).toBe(true)
+    expect(toast.message).toHaveBeenCalledWith('contextMenu.message.quoteNoComposer')
   })
 
-  it('toasts when quote has no composer inserter', () => {
-    registerComposerInserter(null)
+  it('toasts when composer only has insert/replace (no setQuote)', () => {
+    registerComposerInserter((text) => {
+      void text
+    })
     const msg = makeMessage({ id: 'm1', role: 'user', content: 'quoted' })
     const items = messageProvider(
       { kind: 'message', payload: { message: msg, isLastAssistant: false, sessionId: 's1' } },

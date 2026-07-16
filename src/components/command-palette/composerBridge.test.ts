@@ -4,6 +4,7 @@ import {
   registerComposerHandlers,
   insertComposerText,
   replaceComposerText,
+  setComposerQuote,
   insertComposerTextWhenReady,
   replaceComposerTextWhenReady,
   hasComposerInserter,
@@ -40,6 +41,22 @@ describe('composerBridge', () => {
     expect(replace).toHaveBeenCalledWith('b')
     expect(insert).toHaveBeenCalledTimes(1)
     expect(replace).toHaveBeenCalledTimes(1)
+  })
+
+  it('setComposerQuote uses setQuote when registered', () => {
+    const setQuote = vi.fn()
+    registerComposerHandlers({ insert: vi.fn(), replace: vi.fn(), setQuote })
+    expect(setComposerQuote('hello')).toBe(true)
+    expect(setQuote).toHaveBeenCalledWith('hello')
+    expect(setComposerQuote(null)).toBe(true)
+    expect(setQuote).toHaveBeenCalledWith(null)
+  })
+
+  it('setComposerQuote returns false without setQuote handler', () => {
+    registerComposerHandlers({ insert: vi.fn(), replace: vi.fn() })
+    expect(setComposerQuote('x')).toBe(false)
+    registerComposerInserter(vi.fn())
+    expect(setComposerQuote('x')).toBe(false)
   })
 
   it('insertComposerTextWhenReady resolves after inserter appears', async () => {

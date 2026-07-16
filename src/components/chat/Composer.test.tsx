@@ -66,4 +66,27 @@ describe('Composer', () => {
     fireEvent.click(screen.getByTestId('composer-stop'))
     expect(onStop).toHaveBeenCalled()
   })
+
+  it('renders quote chip with one-line preview and clears it', () => {
+    const onQuoteClear = vi.fn()
+    render(
+      <Composer
+        value=""
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+        quoteText={'line one\nline two'}
+        onQuoteClear={onQuoteClear}
+      />,
+    )
+    const chip = screen.getByTestId('composer-quote')
+    expect(chip).toBeInTheDocument()
+    expect(chip).toHaveTextContent('line one line two')
+    fireEvent.click(screen.getByTestId('composer-quote-remove'))
+    expect(onQuoteClear).toHaveBeenCalled()
+  })
+
+  it('hides quote chip when quoteText is empty', () => {
+    render(<Composer value="" onChange={vi.fn()} onSubmit={vi.fn()} quoteText="   " />)
+    expect(screen.queryByTestId('composer-quote')).not.toBeInTheDocument()
+  })
 })

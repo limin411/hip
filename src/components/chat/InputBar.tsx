@@ -22,12 +22,14 @@ import { useDraftStore } from '@/store/draftStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { registerComposerHandlers } from '@/components/command-palette/composerBridge'
+import { formatQuoteForComposer } from '@/components/context-menu/providers/message'
 import type { LocalAttachment } from './attachmentTypes'
 
 export function InputBar() {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
+  const [quoteText, setQuoteText] = useState<string | null>(null)
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
   const activeId = useActiveSessionId()
@@ -59,7 +61,12 @@ export function InputBar() {
   const [skillBody, setSkillBody] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Composer bridge: insert preserves draft (quote / context menus); replace for skill handoff.
+  // Drop pending quote when switching sessions so it doesn't leak across conversations.
+  useEffect(() => {
+    setQuoteText(null)
+  }, [activeId])
+
+  // Composer bridge: insert preserves draft (context menus); replace for skill handoff; setQuote for message quote chip.
   useEffect(() => {
     registerComposerHandlers({
       insert: (text) => {
@@ -87,6 +94,10 @@ export function InputBar() {
       },
       replace: (text) => {
         setValue(text)
+        setTimeout(() => inputRef.current?.focus(), 0)
+      },
+      setQuote: (text) => {
+        setQuoteText(text?.trim() ? text : null)
         setTimeout(() => inputRef.current?.focus(), 0)
       },
     })
@@ -145,9 +156,11 @@ export function InputBar() {
   const submit = () => {
     const text = value.trim()
     if (!text && attachments.length === 0) return
-    sessionService.sendMessage(text, attachments)
+    const content = quoteText ? `${formatQuoteForComposer(quoteText)}${text}` : text
+    sessionService.sendMessage(content, attachments)
     setValue('')
     setAttachments([])
+    setQuoteText(null)
   }
   return (
     <div className="shrink-0 px-5 pb-5" data-testid="input-bar">
@@ -186,6 +199,8 @@ export function InputBar() {
                 }
               attachments={attachments}
               onAttachmentsChange={setAttachments}
+              quoteText={quoteText}
+              onQuoteClear={() => setQuoteText(null)}
             />
             {selectedSkill && (
               <SkillArgInput

@@ -21,6 +21,7 @@ export {
   registerComposerHandlers,
   insertComposerText,
   replaceComposerText,
+  setComposerQuote,
 } from './composerBridge'
 export { parsePaletteQuery, filterGroupsByMode } from './queryPrefix'
 export { toggleFavorite, loadFavorites, isFavorite } from './favoritesStore'

@@ -4,6 +4,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
+import { langSmithModelCallConfig } from '../observability/langsmith.js'
 import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
 
 /** Stable content-block index for the re-projected reasoning block — distinct from text (0)
@@ -44,7 +45,39 @@ export function stripReasoningBlocks(messages: readonly { content: unknown }[]):
  * ChatOpenAI.withConfig rebuilds a plain ChatOpenAI from `this.fields`, which would drop this
  * subclass (deepagents calls withConfig).
  */
+/**
+ * Normalize a stream delta so concat/ChatGenerationChunk.concat can merge tokens.
+ *
+ * Bug: when only the first delta has reasoning_content we used to emit
+ * `[reasoning@7, text@0]`, then later plain-string deltas. concat appends those
+ * strings as separate unindexed `text` blocks → LangSmith shows dozens of
+ * micro-blocks and literal `\\n` fragments.
+ *
+ * Fix: every string delta becomes indexed content blocks (text always index 0)
+ * so consecutive tokens merge into one text field (real newlines stay real).
+ */
+export function projectReasoningStreamContent(
+  content: unknown,
+  reasoningContent: unknown,
+): unknown {
+  if (typeof content !== 'string') return content
+  const rc = typeof reasoningContent === 'string' && reasoningContent.length > 0 ? reasoningContent : ''
+  if (!rc && content.length === 0) return content
+  const blocks: Array<Record<string, unknown>> = []
+  if (rc) blocks.push({ type: 'reasoning', reasoning: rc, index: REASONING_BLOCK_INDEX })
+  if (content.length > 0) blocks.push({ type: 'text', text: content, index: 0 })
+  return blocks.length === 0 ? content : blocks
+}
+
 export class ReasoningChatOpenAI extends ChatOpenAI {
+  /**
+   * LangSmith / serialize id segment. Without this, traces show the class name
+   * `ReasoningChatOpenAI` as the LLM run name when no explicit runName is set.
+   */
+  static lc_name(): string {
+    return 'hip.model'
+  }
+
   async *_streamResponseChunks(
     messages: Parameters<ChatOpenAI['_streamResponseChunks']>[0],
     options: Parameters<ChatOpenAI['_streamResponseChunks']>[1],
@@ -53,12 +86,7 @@ export class ReasoningChatOpenAI extends ChatOpenAI {
     stripReasoningBlocks(messages)
     for await (const chunk of super._streamResponseChunks(messages, options, runManager)) {
       const msg = chunk.message as unknown as { content: unknown; additional_kwargs?: { reasoning_content?: unknown } }
-      const rc = msg.additional_kwargs?.reasoning_content
-      if (typeof rc === 'string' && rc.length > 0 && typeof msg.content === 'string') {
-        const blocks: Array<Record<string, unknown>> = [{ type: 'reasoning', reasoning: rc, index: REASONING_BLOCK_INDEX }]
-        if (msg.content.length > 0) blocks.push({ type: 'text', text: msg.content, index: 0 })
-        msg.content = blocks as unknown as string
-      }
+      msg.content = projectReasoningStreamContent(msg.content, msg.additional_kwargs?.reasoning_content) as typeof msg.content
       yield chunk
     }
   }
@@ -132,17 +160,24 @@ export const SUMMARY_TEMPLATE = `你是一个对话压缩器。你需要从较�
 
 /** Production summarizer: one cheap completion over the middle span. Not used in injected-model tests. */
 class RealSummarizer implements Summarizer {
-  async summarize(messages: BaseMessage[], opts?: { focus?: string }): Promise<string> {
+  async summarize(messages: BaseMessage[], opts?: { focus?: string; sessionId?: string }): Promise<string> {
     const { providerID, modelID, baseURL } = getActiveModel()
     const model = buildChatModel({ providerID, modelID: cheapModelFor(providerID, modelID), baseURL })
     const transcript = messages.map((m) => `${m.getType()}: ${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}`).join('\n')
     const focusNote = opts?.focus?.trim()
       ? `\n\nAdditional focus for this summary (prioritize these topics):\n${opts.focus.trim()}`
       : ''
-    const res = await model.invoke([
-      new SystemMessage(SUMMARY_TEMPLATE + focusNote),
-      new HumanMessage(transcript),
-    ])
+    const res = await model.invoke(
+      [
+        new SystemMessage(SUMMARY_TEMPLATE + focusNote),
+        new HumanMessage(transcript),
+      ],
+      langSmithModelCallConfig({
+        runName: 'hip.summarize',
+        sessionId: opts?.sessionId,
+        kind: 'summarize',
+      }),
+    )
     return typeof res.content === 'string' ? res.content : ''
   }
 }

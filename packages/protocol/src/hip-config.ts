@@ -60,6 +60,33 @@ export interface AgentLoopConfig {
   doomLoopStrategy?: DoomLoopStrategy
 }
 
+/**
+ * Optional `[langsmith]` section in hip.toml.
+ * When `enabled = true`, the sidecar exports traces to LangSmith (LangChain auto-tracing).
+ * All fields optional; env vars (`LANGSMITH_*`) still override when already set.
+ *
+ * ```toml
+ * [langsmith]
+ * enabled = true
+ * api_key = "lsv2_…"
+ * project = "hip"
+ * endpoint = "https://eu.api.smith.langchain.com"
+ * ```
+ */
+export interface LangSmithConfig {
+  /** Master switch. Default false when section/field omitted. */
+  enabled?: boolean
+  /** LangSmith API key (`lsv2_…`). Prefer file mode 0600 on hip.toml. */
+  apiKey?: string
+  /** Project name in LangSmith UI. */
+  project?: string
+  /**
+   * API host. Omit for default US cloud; EU workspaces use
+   * `https://eu.api.smith.langchain.com`.
+   */
+  endpoint?: string
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -74,6 +101,8 @@ export interface HipConfig {
   teams?: import('./team-types.js').TeamConfig[]
   /** Optional agent-loop controls (budgets, HITL placeholder, doom strategy). */
   agentLoop?: AgentLoopConfig
+  /** Optional LangSmith tracing (observability). */
+  langsmith?: LangSmithConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

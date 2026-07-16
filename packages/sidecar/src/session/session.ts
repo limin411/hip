@@ -259,7 +259,11 @@ export class Session {
   private async generateFirstTurnTitle(input: SessionInput, replyText: string, _send: SendFn): Promise<void> {
     if (!this.titleGenerator || !replyText || !this.store) return
     try {
-      const refined = sanitizeTitle(await this.titleGenerator({ firstUserMessage: input.content, firstReply: replyText }))
+      const refined = sanitizeTitle(await this.titleGenerator({
+        firstUserMessage: input.content,
+        firstReply: replyText,
+        sessionId: this.id,
+      }))
       if (refined && this.store.updateTitleIfAuto(this.id, refined) === 1) {
         _send({ type: 'session:title', sessionId: this.id, title: refined })
       }

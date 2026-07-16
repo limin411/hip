@@ -23,6 +23,7 @@ import type { NetworkPolicy } from './network-policy.js'
 import type { ToolOutputStore } from './tool-output-store.js'
 import type { GuardianReviewer } from './guardian.js'
 import type { HookRegistry } from './hooks/registry.js'
+import { tracingInvokeFields } from '../observability/langsmith.js'
 
 export interface RunManagedAgentArgs {
   resolved: ResolvedModel | null      // the agent's bound model; null ⇒ global active model
@@ -43,6 +44,8 @@ export interface RunManagedAgentArgs {
   requestApproval?: ApprovalFn          // HITL closure threaded from the parent session (run_script); presence decides registration
   permissionMode?: PermissionMode       // cascaded from the parent conversation; default 'edit'
   sessionId?: string                    // passed through to GraphCtx; defaults to 'managed-agent' when absent
+  /** Parent conversation title for LangSmith root runName (optional). */
+  title?: string
   networkPolicy?: NetworkPolicy         // parent session's network policy (rate limits, SSRF guard)
   toolOutputStore?: ToolOutputStore     // parent session's tool output store (bound large outputs to files)
   guardianReviewer?: GuardianReviewer   // parent session's guardian reviewer (reads files before write)
@@ -130,7 +133,20 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
       nudgedSig: undefined,
       status: 'running',
     },
-    { configurable: { ctx }, signal, recursionLimit: recursionLimit(childMaxSteps) },
+    {
+      configurable: { ctx },
+      signal,
+      recursionLimit: recursionLimit(childMaxSteps),
+      ...tracingInvokeFields({
+        kind: 'managed-agent',
+        sessionId: args.sessionId,
+        turnId,
+        runId,
+        agentId,
+        parentAgentId,
+        title: args.title,
+      }),
+    },
   )
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {

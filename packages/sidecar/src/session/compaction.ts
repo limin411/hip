@@ -17,7 +17,7 @@ const CHARS_PER_TOKEN = 4
 
 /** Summarizes a span of messages into a short note. Injected so compaction is unit-testable. */
 export interface Summarizer {
-  summarize(messages: BaseMessage[], opts?: { focus?: string }): Promise<string>
+  summarize(messages: BaseMessage[], opts?: { focus?: string; sessionId?: string }): Promise<string>
 }
 
 /** Options for compactMessages. */
@@ -31,6 +31,8 @@ export interface CompactOptions {
   overflowRecovery?: boolean
   /** Optional focus instruction for the summarizer (manual `/compact focus…`). */
   focus?: string
+  /** Session id for LangSmith thread attachment on the summarizer LLM call. */
+  sessionId?: string
 }
 
 /** Detect provider context-length / maximum-token errors so the graph can compact and retry. */
@@ -101,7 +103,10 @@ export async function compactMessages(
   if (middle.length === 0) return null
   const headId = middle[0].id
   if (!headId) return null
-  const text = await opts.summarizer.summarize(middle, opts.focus ? { focus: opts.focus } : undefined)
+  const text = await opts.summarizer.summarize(middle, {
+    ...(opts.focus ? { focus: opts.focus } : {}),
+    ...(opts.sessionId ? { sessionId: opts.sessionId } : {}),
+  })
   const removeIds = middle.slice(1).map((m) => m.id).filter((id): id is string => !!id)
   return {
     summary: new SystemMessage({ id: headId, content: `[对话摘要] ${text}` }),

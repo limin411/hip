@@ -54,6 +54,35 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
 > test suite all read the key from there. **`~/.hip/config/` holds plaintext API
 > keys; do not sync it to cloud drives or dotfile repos.**
 
+### LangSmith tracing (optional)
+
+LangGraph / LangChain runs in the sidecar can export traces to
+[LangSmith](https://smith.langchain.com/). Tracing is **off by default**.
+
+**Preferred:** put settings in `~/.hip/config/hip.toml` (loaded at sidecar start
+via `HIP_CONFIG_PATH`):
+
+```toml
+[langsmith]
+enabled = true
+api_key = "lsv2_…"                                    # from LangSmith settings
+project = "hip"
+endpoint = "https://eu.api.smith.langchain.com"       # EU only; omit for US cloud
+```
+
+Project-level `.hip/hip.toml` can override the global section wholesale (same
+merge rule as `[agentLoop]`).
+
+**Override:** process env still wins when already set (`LANGSMITH_TRACING`,
+`LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_ENDPOINT`, plus legacy
+`LANGCHAIN_*` aliases). Tauri also forwards those into the sidecar.
+
+Each user turn is one root trace; multi-turn runs for the same hip session are
+grouped into one LangSmith **Thread** via `metadata.thread_id` /
+`metadata.session_id` (= session id). Root run **name** is also the session id.
+LLM spans are named `hip.model`. Keep `api_key` out of git; hip.toml lives under
+`~/.hip/config/` (do not sync that directory to public cloud/dotfile repos).
+
 ### Local data layout (`~/.hip/`)
 
 | Path | Purpose |

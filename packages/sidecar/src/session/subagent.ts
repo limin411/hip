@@ -14,6 +14,7 @@ import { resolveDoomLoopStrategy } from './doom-loop.js'
 import { childSystemPrompt } from './system-prompt.js'
 import { formatPausedToolResult } from './subagent-result.js'
 import { linkSubagentParentObservation, type TraceObservation } from './trace-export.js'
+import { tracingInvokeFields } from '../observability/langsmith.js'
 
 const NOOP_EMIT: GraphEmit = {
   token: () => {},
@@ -47,6 +48,8 @@ export interface RunSubagentArgs {
   existingMessages?: BaseMessage[]
   /** Passed through to GraphCtx; defaults to 'subagent' when absent. */
   sessionId?: string
+  /** Parent conversation title for LangSmith root runName (optional). */
+  title?: string
   /** Network policy from the parent session, applied to web_fetch/web_search. */
   networkPolicy?: NetworkPolicy
   /** Tool output store from the parent session for bound output management. */
@@ -106,7 +109,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
   const {
     runner, root, summarizer, emit, signal, description, childMaxSteps,
     permissionMode, requestApproval, existingMessages, mode, sessionId,
-    networkPolicy, toolOutputStore, guardianReviewer, hooks,
+    title, networkPolicy, toolOutputStore, guardianReviewer, hooks,
     turnId, runId, nodeId, agentId, parentAgentId, onObservation,
   } = args
   const currentDepth = args.depth ?? 0
@@ -194,7 +197,20 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
       nudgedSig: undefined,
       status: 'running',
     },
-    { configurable: { ctx }, signal, recursionLimit: recursionLimit(childMaxSteps) },
+    {
+      configurable: { ctx },
+      signal,
+      recursionLimit: recursionLimit(childMaxSteps),
+      ...tracingInvokeFields({
+        kind: 'subagent',
+        sessionId,
+        turnId,
+        runId,
+        agentId: childAgentId,
+        parentAgentId,
+        title,
+      }),
+    },
   )
   const text = lastAiText(final.messages)
   if (final.status === 'awaiting_user') {

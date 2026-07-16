@@ -12,6 +12,7 @@ import type {
   TeamMember,
   TeamPipelineStep,
   AgentLoopConfig,
+  LangSmithConfig,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
@@ -185,6 +186,28 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   return out
 }
 
+function normalizeLangSmith(raw: Record<string, unknown>): LangSmithConfig {
+  if (raw.api_key !== undefined && raw.apiKey === undefined) {
+    raw.apiKey = raw.api_key
+  }
+  delete raw.api_key
+
+  const out: LangSmithConfig = {}
+  if (typeof raw.enabled === 'boolean') {
+    out.enabled = raw.enabled
+  }
+  if (typeof raw.apiKey === 'string' && raw.apiKey.trim()) {
+    out.apiKey = raw.apiKey.trim()
+  }
+  if (typeof raw.project === 'string' && raw.project.trim()) {
+    out.project = raw.project.trim()
+  }
+  if (typeof raw.endpoint === 'string' && raw.endpoint.trim()) {
+    out.endpoint = raw.endpoint.trim()
+  }
+  return out
+}
+
 
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
@@ -239,6 +262,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const agentLoop = obj.agentLoop ?? obj.agent_loop
   if (agentLoop && typeof agentLoop === 'object' && !Array.isArray(agentLoop)) {
     config.agentLoop = normalizeAgentLoop(agentLoop as Record<string, unknown>)
+  }
+
+  const langsmith = obj.langsmith
+  if (langsmith && typeof langsmith === 'object' && !Array.isArray(langsmith)) {
+    config.langsmith = normalizeLangSmith(langsmith as Record<string, unknown>)
   }
 
   return config
@@ -305,6 +333,10 @@ function deepMergeConfig(global: HipConfig, project: HipConfig): HipConfig {
   // Project agentLoop replaces global wholesale (same as activeModel / fixedAgents).
   if (project.agentLoop !== undefined) {
     merged.agentLoop = project.agentLoop
+  }
+  // Project langsmith replaces global wholesale (same as agentLoop).
+  if (project.langsmith !== undefined) {
+    merged.langsmith = project.langsmith
   }
 
   return merged

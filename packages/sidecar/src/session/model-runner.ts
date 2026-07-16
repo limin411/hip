@@ -2,6 +2,7 @@ import { AIMessage, SystemMessage, type AIMessageChunk, type BaseMessage } from 
 import { concat } from '@langchain/core/utils/stream'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { Callbacks } from '@langchain/core/callbacks/manager'
 import { MAX_STEPS_NOTE } from './loop-control.js'
 import { withRetry, isRetryable, MAX_RETRIES } from './retry.js'
 import { logInfo, logDebug } from '../debug-logger.js'
@@ -14,6 +15,14 @@ export interface ModelRunOptions {
   signal?: AbortSignal
   onText: (delta: string) => void
   onReasoning: (delta: string) => void
+  /**
+   * LangChain runnable fragments so LangSmith nests this LLM under the parent
+   * graph/node run (when LANGSMITH_TRACING=true).
+   */
+  callbacks?: Callbacks
+  metadata?: Record<string, unknown>
+  tags?: string[]
+  runName?: string
 }
 
 /** One model turn: stream deltas to the sinks, return the gathered assistant message (with tool_calls). */
@@ -47,6 +56,66 @@ export function reasoningDelta(chunk: AIMessageChunk): string {
   }
   const rc = (chunk.additional_kwargs as { reasoning_content?: unknown } | undefined)?.reasoning_content
   return typeof rc === 'string' ? rc : ''
+}
+
+/**
+ * Collapse streamed array content (many micro text/reasoning blocks) into a
+ * single text string, or [reasoning, text] when chain-of-thought is present.
+ * Keeps LangSmith / message state readable; real newlines stay as real `\n`.
+ */
+export function collapseStreamedAiContent(
+  content: AIMessage['content'],
+): AIMessage['content'] {
+  if (typeof content === 'string' || !Array.isArray(content)) return content
+
+  let text = ''
+  let reasoning = ''
+  let thinking = ''
+  const other: Array<Record<string, unknown>> = []
+
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue
+    const b = block as { type?: string; text?: string; reasoning?: string; thinking?: string }
+    if (b.type === 'text' && typeof b.text === 'string') {
+      text += b.text
+      continue
+    }
+    if (b.type === 'reasoning' && typeof b.reasoning === 'string') {
+      reasoning += b.reasoning
+      continue
+    }
+    if (b.type === 'thinking' && typeof b.thinking === 'string') {
+      thinking += b.thinking
+      continue
+    }
+    other.push(block as Record<string, unknown>)
+  }
+
+  if (other.length === 0 && !reasoning && !thinking) return text
+
+  const blocks: Array<Record<string, unknown>> = []
+  if (reasoning) blocks.push({ type: 'reasoning', reasoning, index: 7 })
+  if (thinking) blocks.push({ type: 'thinking', thinking, index: 7 })
+  if (text) blocks.push({ type: 'text', text, index: 0 })
+  blocks.push(...other)
+
+  if (blocks.length === 1 && blocks[0].type === 'text') return text
+  return blocks as AIMessage['content']
+}
+
+/** Rebuild an AIMessage with collapsed content (preserves tool_calls / metadata). */
+export function collapseStreamedAiMessage(msg: AIMessage): AIMessage {
+  const collapsed = collapseStreamedAiContent(msg.content)
+  if (collapsed === msg.content) return msg
+  return new AIMessage({
+    content: collapsed,
+    tool_calls: msg.tool_calls,
+    invalid_tool_calls: msg.invalid_tool_calls,
+    id: msg.id,
+    additional_kwargs: msg.additional_kwargs,
+    response_metadata: msg.response_metadata,
+    usage_metadata: msg.usage_metadata,
+  })
 }
 
 /**
@@ -109,7 +178,13 @@ export class RealModelRunner implements ModelRunner {
     const attempt = async (): Promise<AIMessage> => {
       const t0 = Date.now()
       logDebug('model', 'stream:start', { model: (bound as any).model ?? (bound as any).modelName ?? 'unknown' })
-      const stream = await bound.stream(input, { signal: opts.signal })
+      const stream = await bound.stream(input, {
+        signal: opts.signal,
+        ...(opts.callbacks !== undefined ? { callbacks: opts.callbacks } : {}),
+        ...(opts.metadata ? { metadata: opts.metadata } : {}),
+        ...(opts.tags ? { tags: opts.tags } : {}),
+        ...(opts.runName ? { runName: opts.runName } : {}),
+      })
       let gathered: AIMessageChunk | undefined
       let firstToken = true
       for await (const chunk of stream) {
@@ -124,7 +199,9 @@ export class RealModelRunner implements ModelRunner {
       }
       logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')
-      return recoverDsmlToolCalls(gathered as AIMessage)
+      // Collapse micro text/reasoning blocks from stream concat before DSML recovery
+      // and before the message enters graph state / LangSmith child spans.
+      return recoverDsmlToolCalls(collapseStreamedAiMessage(gathered as AIMessage))
     }
     // Retry only transient failures thrown BEFORE the first delta — retrying mid-stream would
     // duplicate already-emitted tokens. Once `emitted` is true, shouldRetry returns false → rethrow.

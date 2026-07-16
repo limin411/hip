@@ -44,6 +44,7 @@ import type { CircuitBreaker } from '../orchestrator/circuit-breaker.js'
 import { emitLoopSignal, type LoopEventSink } from './loop-events.js'
 // decideReplan only — do not import planner PlanMode (collides with plan-mode.PlanMode).
 import { decideReplan, TurnReplanGuard, REPLAN_ERROR_THRESHOLD } from './planner.js'
+import { tracingChildMetadata } from '../observability/langsmith.js'
 
 function fullPlanReminder(planFilePath: string): string {
   return `Plan mode is active. You MUST NOT make any edits (with the exception of the current plan file) or otherwise make changes to the system unless a tool request is explicitly approved. Prefer read-only tools. Use Bash only for read operations — do not write/modify files via shell commands. This supersedes any other instructions you have received.
@@ -261,7 +262,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     // This runs BEFORE token-budget summarization to reduce context pressure early.
     const windowResult = applySlidingWindow(state.messages)
     if (windowResult.removed.length > 0) {
-      const summary = await ctx.summarizer.summarize(windowResult.removed)
+      const summary = await ctx.summarizer.summarize(windowResult.removed, { sessionId: ctx.sessionId })
       const summaryMsg = new SystemMessage(`[Earlier conversation summary]\n${summary}`)
       ctx.emit.compaction(`Sliding window: ${windowResult.removed.length} messages summarized`)
       return {
@@ -273,7 +274,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
 
     const overBudget = estimateTokens(state.messages) > compactBudget
     if (!overBudget) return deferredResolved
-    const result = await compactMessages(state.messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer })
+    const result = await compactMessages(state.messages, {
+      keepRecentTurns: KEEP_RECENT_TURNS,
+      summarizer: ctx.summarizer,
+      sessionId: ctx.sessionId,
+    })
     if (!result) return deferredResolved
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
     ctx.emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
@@ -335,6 +340,11 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         tools,
         bindTools: !capped,
         signal: config.signal,
+        // Nest LLM under the LangGraph node run when LangSmith tracing is on.
+        callbacks: config.callbacks,
+        metadata: tracingChildMetadata(ctx, config.metadata as Record<string, unknown> | undefined),
+        tags: config.tags,
+        runName: 'hip.model',
         onText: (d) => emit.token(d),
         onReasoning: (d) => emit.reasoning(d),
       })
@@ -389,7 +399,12 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       }
     } catch (err) {
       if (state.compacted || !isOverflowError(err)) throw err
-      const result = await compactMessages(messages, { keepRecentTurns: KEEP_RECENT_TURNS, summarizer: ctx.summarizer, overflowRecovery: true })
+      const result = await compactMessages(messages, {
+        keepRecentTurns: KEEP_RECENT_TURNS,
+        summarizer: ctx.summarizer,
+        overflowRecovery: true,
+        sessionId: ctx.sessionId,
+      })
       if (!result) throw err
       const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
       emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
@@ -525,6 +540,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         name: call.name,
         callId: id,
         args: (call.args as Record<string, unknown>) ?? {},
+        callbacks: config.callbacks,
       })
     }
 

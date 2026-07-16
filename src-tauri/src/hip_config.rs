@@ -128,6 +128,21 @@ pub(crate) struct AgentLoopConfig {
     pub(crate) doom_loop_strategy: Option<String>,
 }
 
+/// Optional `[langsmith]` section. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so tracing config is not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LangSmithConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) endpoint: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -149,6 +164,9 @@ pub(crate) struct HipConfig {
     /// Optional agent-loop controls (doom strategy, etc.). Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) agent_loop: Option<AgentLoopConfig>,
+    /// Optional LangSmith tracing. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) langsmith: Option<LangSmithConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -301,6 +319,21 @@ pub(crate) struct TomlAgentLoopConfig {
     pub(crate) doom_loop_strategy: Option<String>,
 }
 
+/// TOML mirror for `[langsmith]`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlLangSmithConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) enabled: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "apiKey")]
+    pub(crate) api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) project: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) endpoint: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -322,6 +355,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) permissions: Option<TomlPermissionEntry>,
     #[serde(default, skip_serializing_if = "Option::is_none", alias = "agentLoop")]
     pub(crate) agent_loop: Option<TomlAgentLoopConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) langsmith: Option<TomlLangSmithConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -546,6 +581,28 @@ impl From<TomlAgentLoopConfig> for AgentLoopConfig {
     }
 }
 
+impl From<LangSmithConfig> for TomlLangSmithConfig {
+    fn from(l: LangSmithConfig) -> Self {
+        TomlLangSmithConfig {
+            enabled: l.enabled,
+            api_key: l.api_key,
+            project: l.project,
+            endpoint: l.endpoint,
+        }
+    }
+}
+
+impl From<TomlLangSmithConfig> for LangSmithConfig {
+    fn from(l: TomlLangSmithConfig) -> Self {
+        LangSmithConfig {
+            enabled: l.enabled,
+            api_key: l.api_key,
+            project: l.project,
+            endpoint: l.endpoint,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -558,6 +615,7 @@ impl From<HipConfig> for TomlHipConfig {
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
+            langsmith: cfg.langsmith.map(|x| x.into()),
         }
     }
 }
@@ -574,6 +632,7 @@ impl From<TomlHipConfig> for HipConfig {
             fixed_agents: cfg.fixed_agents,
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
+            langsmith: cfg.langsmith.map(|x| x.into()),
         }
     }
 }

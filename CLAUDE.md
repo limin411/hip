@@ -47,3 +47,4 @@ yarn tauri build
 - `vitest run src …` substring-matches `packages/sidecar/src` and can fire paid real-LLM tests. To guarantee paid-free, temporarily move `~/.hip/config/auth.json` aside before running `yarn test`.
 - System bash is 3.2.57; always brace variables `${var}` before CJK punctuation or when `set -u` is used in UTF-8 locales.
 - Stale `rw.*.dmg` mounts can break `yarn tauri build`; fix by removing `rw.*.dmg` and detaching `/Volumes/hip`.
+- LangSmith tracing is opt-in via `[langsmith]` in `hip.toml` (or `LANGSMITH_*` env override); see README. Never hardcode keys in the repo.

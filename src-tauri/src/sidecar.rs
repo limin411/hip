@@ -77,6 +77,25 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
     // runs. Both the dev wrapper (which `exec`s node, inheriting this env) and the
     // bundled binary go through this same spawn, so both paths are covered.
     cmd = cmd.env("HIP_PARENT_WATCH", "1");
+    // Forward LangSmith tracing env (opt-in). Explicit copy so traces work even
+    // when the shell spawn path does not fully inherit the parent process env.
+    // Never hardcode keys — set LANGSMITH_* in the environment that launches hip.
+    for key in [
+        "LANGSMITH_TRACING",
+        "LANGSMITH_TRACING_V2",
+        "LANGSMITH_API_KEY",
+        "LANGSMITH_ENDPOINT",
+        "LANGSMITH_PROJECT",
+        "LANGCHAIN_TRACING",
+        "LANGCHAIN_TRACING_V2",
+        "LANGCHAIN_API_KEY",
+        "LANGCHAIN_ENDPOINT",
+        "LANGCHAIN_PROJECT",
+    ] {
+        if let Ok(val) = std::env::var(key) {
+            cmd = cmd.env(key, val);
+        }
+    }
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
 
     let state = app.state::<SidecarState>();

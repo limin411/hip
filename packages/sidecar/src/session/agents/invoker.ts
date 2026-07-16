@@ -25,6 +25,8 @@ export interface InvokerExtras {
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
   sessionId?: string
+  /** Conversation title for LangSmith runName (optional). */
+  title?: string
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
@@ -64,6 +66,7 @@ export interface RunInternalArgs {
   requestApproval?: ApprovalFn
   permissionMode?: PermissionMode
   sessionId?: string
+  title?: string
   networkPolicy?: NetworkPolicy
   toolOutputStore?: ToolOutputStore
   guardianReviewer?: GuardianReviewer
@@ -113,7 +116,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       // Prefer explicit budget (from config agent id); fall back if tests omit it.
       childMaxSteps: a.childMaxSteps ?? childMaxStepsForAgent(a.agentId, a.cwd),
       mcpTools: a.mcpTools, skills: a.skills, requestApproval: a.requestApproval, permissionMode: a.permissionMode,
-      sessionId: a.sessionId, networkPolicy: a.networkPolicy,
+      sessionId: a.sessionId, title: a.title, networkPolicy: a.networkPolicy,
       toolOutputStore: a.toolOutputStore, guardianReviewer: a.guardianReviewer,
       attachments: a.attachments,
       attachmentParts: a.attachmentParts,
@@ -149,7 +152,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           task, emit, signal,
           mcpTools: narrowedMcp, skills: narrowedSkills,
           requestApproval: extras?.requestApproval, permissionMode: extras?.permissionMode,
-          sessionId: extras?.sessionId, networkPolicy: extras?.networkPolicy,
+          sessionId: extras?.sessionId, title: extras?.title, networkPolicy: extras?.networkPolicy,
           toolOutputStore: extras?.toolOutputStore, guardianReviewer: extras?.guardianReviewer,
           attachments,
           attachmentParts: extras?.attachmentParts,

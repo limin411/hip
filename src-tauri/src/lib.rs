@@ -14,10 +14,10 @@ mod knowledge;
 use hip_config::{HipConfig, TomlHipConfig, NetworkPolicyConfig};
 #[cfg(test)]
 use hip_config::{
-    ActiveModel, AgentEntry, AgentLoopConfig, BoundModel, McpServerEntry, PermissionEntry,
-    ProviderEntry, SkillEntry, ToolPermissionConfig, TomlActiveModel, TomlAgentEntry,
-    TomlBoundModel, TomlMcpServerEntry, TomlPermissionEntry, TomlProviderEntry, TomlSkillEntry,
-    TomlToolPermissionConfig,
+    ActiveModel, AgentEntry, AgentLoopConfig, BoundModel, LangSmithConfig, McpServerEntry,
+    PermissionEntry, ProviderEntry, SkillEntry, ToolPermissionConfig, TomlActiveModel,
+    TomlAgentEntry, TomlBoundModel, TomlMcpServerEntry, TomlPermissionEntry, TomlProviderEntry,
+    TomlSkillEntry, TomlToolPermissionConfig,
 };
 
 use std::collections::HashMap;
@@ -92,6 +92,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 fixed_agents: None,
                 permissions: None,
                 agent_loop: None,
+                langsmith: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -649,6 +650,7 @@ mod tests {
                 tool_permissions: None,
             }),
             agent_loop: None,
+            langsmith: None,
         }
     }
 
@@ -829,6 +831,7 @@ mod tests {
                 tool_permissions: None,
             }),
             agent_loop: None,
+            langsmith: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -999,6 +1002,7 @@ mod tests {
                 }),
             }),
             agent_loop: None,
+            langsmith: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1112,6 +1116,7 @@ mod tests {
             fixed_agents: None,
             permissions: None,
             agent_loop: None,
+            langsmith: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1124,6 +1129,7 @@ mod tests {
         assert!(from_json.fixed_agents.is_none());
         assert!(from_json.permissions.is_none());
         assert!(from_json.agent_loop.is_none());
+        assert!(from_json.langsmith.is_none());
     }
 
     #[test]
@@ -1146,6 +1152,7 @@ mod tests {
                 subagent_hitl: Some("inline_partial".into()),
                 doom_loop_strategy: Some("pause_immediately".into()),
             }),
+            langsmith: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1200,6 +1207,81 @@ doomLoopStrategy = "auto_continue"
         assert_eq!(camel_loop.child_max_steps, Some(15));
         assert_eq!(camel_loop.explore_child_max_steps, Some(30));
         assert_eq!(camel_loop.max_depth, Some(4));
+    }
+
+    #[test]
+    fn langsmith_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; langsmith must not be stripped.
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: Some(super::LangSmithConfig {
+                enabled: Some(true),
+                api_key: Some("lsv2_test_key".into()),
+                project: Some("hip".into()),
+                endpoint: Some("https://eu.api.smith.langchain.com".into()),
+            }),
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"langsmith\""), "JSON must emit langsmith: {json}");
+        assert!(json.contains("\"apiKey\""), "JSON must emit apiKey: {json}");
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[langsmith]") || toml_str.contains("langsmith"),
+            "TOML should contain langsmith: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("api_key") || toml_str.contains("lsv2_test_key"),
+            "TOML should preserve api_key: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        let ls = back.langsmith.as_ref().expect("langsmith preserved");
+        assert_eq!(ls.enabled, Some(true));
+        assert_eq!(ls.api_key.as_deref(), Some("lsv2_test_key"));
+        assert_eq!(ls.project.as_deref(), Some("hip"));
+        assert_eq!(
+            ls.endpoint.as_deref(),
+            Some("https://eu.api.smith.langchain.com")
+        );
+
+        // snake_case + camelCase apiKey alias
+        let snake = r#"
+version = 1
+[langsmith]
+enabled = true
+api_key = "lsv2_snake"
+project = "hip-snake"
+endpoint = "https://eu.api.smith.langchain.com"
+"#;
+        let from_snake: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let hip: super::HipConfig = from_snake.into();
+        let s = hip.langsmith.as_ref().expect("snake langsmith");
+        assert_eq!(s.api_key.as_deref(), Some("lsv2_snake"));
+        assert_eq!(s.project.as_deref(), Some("hip-snake"));
+
+        let camel = r#"
+version = 1
+[langsmith]
+enabled = true
+apiKey = "lsv2_camel"
+project = "hip-camel"
+"#;
+        let from_camel: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let hip2: super::HipConfig = from_camel.into();
+        let c = hip2.langsmith.as_ref().expect("camel langsmith");
+        assert_eq!(c.api_key.as_deref(), Some("lsv2_camel"));
+        assert_eq!(c.project.as_deref(), Some("hip-camel"));
     }
 
     #[test]

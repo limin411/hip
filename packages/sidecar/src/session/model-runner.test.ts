@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { AIMessageChunk } from '@langchain/core/messages'
-import { textDelta, reasoningDelta, RealModelRunner } from './model-runner.js'
+import { AIMessage, AIMessageChunk } from '@langchain/core/messages'
+import { concat } from '@langchain/core/utils/stream'
+import {
+  textDelta,
+  reasoningDelta,
+  RealModelRunner,
+  collapseStreamedAiContent,
+  collapseStreamedAiMessage,
+} from './model-runner.js'
+import { projectReasoningStreamContent } from './model-factory.js'
 
 describe('delta extractors', () => {
   it('textDelta reads plain-string content', () => {
@@ -59,5 +67,70 @@ describe('RealModelRunner retry', () => {
     }
     await expect(new RealModelRunner(model).run([], opts() as any)).rejects.toThrow()
     expect(calls).toBe(1)
+  })
+
+  it('collapses fragmented stream content into one string with real newlines', async () => {
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          // Mimic the bug path: first chunk array (reasoning+text@0), later plain strings
+          yield new AIMessageChunk({
+            content: projectReasoningStreamContent('真的', '思考') as any,
+          })
+          yield new AIMessageChunk({ content: projectReasoningStreamContent('。\n\n', '') as any })
+          yield new AIMessageChunk({ content: projectReasoningStreamContent('```\n/path\n```', '') as any })
+        })()
+      },
+    }
+    const msg = await new RealModelRunner(model).run([], opts() as any)
+    expect(msg.content).toEqual([
+      { type: 'reasoning', reasoning: '思考', index: 7 },
+      { type: 'text', text: '真的。\n\n```\n/path\n```', index: 0 },
+    ])
+  })
+})
+
+describe('collapseStreamedAiContent', () => {
+  it('joins micro text blocks and preserves real newlines', () => {
+    const collapsed = collapseStreamedAiContent([
+      { type: 'text', text: 'hello' },
+      { type: 'text', text: '\n\n' },
+      { type: 'text', text: 'world' },
+    ] as any)
+    expect(collapsed).toBe('hello\n\nworld')
+  })
+
+  it('keeps a single reasoning + text pair', () => {
+    const collapsed = collapseStreamedAiContent([
+      { type: 'reasoning', reasoning: 'a' },
+      { type: 'reasoning', reasoning: 'b' },
+      { type: 'text', text: 'x' },
+      { type: 'text', text: '\n' },
+      { type: 'text', text: 'y' },
+    ] as any)
+    expect(collapsed).toEqual([
+      { type: 'reasoning', reasoning: 'ab', index: 7 },
+      { type: 'text', text: 'x\ny', index: 0 },
+    ])
+  })
+})
+
+describe('projectReasoningStreamContent + concat', () => {
+  it('merges token deltas into one text block (no micro \\n fragments)', () => {
+    const parts = ['真的', '。', '：\n\n', '```\n', '/path', '\n```']
+    let g: AIMessageChunk | undefined
+    for (let i = 0; i < parts.length; i++) {
+      const content = projectReasoningStreamContent(parts[i], i === 0 ? 'think' : '')
+      const chunk = new AIMessageChunk({ content: content as any })
+      g = g ? (concat(g, chunk) as AIMessageChunk) : chunk
+    }
+    const collapsed = collapseStreamedAiMessage(g as unknown as AIMessage)
+    expect(collapsed.content).toEqual([
+      { type: 'reasoning', reasoning: 'think', index: 7 },
+      { type: 'text', text: '真的。：\n\n```\n/path\n```', index: 0 },
+    ])
+    // No separate micro-blocks for newlines
+    expect(JSON.stringify(collapsed.content).includes('"text":"\\n\\n"')).toBe(false)
   })
 })

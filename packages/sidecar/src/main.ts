@@ -6,12 +6,15 @@ import { WORKFLOW_DDL } from './persistence/schema.js'
 import { watchParentViaStdin } from './parent-watch.js'
 import { loadActiveModelFromEnv } from './config/providers.js'
 import { acpConnections } from './session/agents/acp-connection.js'
+import { initLangSmith } from './observability/langsmith.js'
 
 async function main(): Promise<void> {
   // Persist sessions to the path Tauri injects (app data dir); fall back to an
   // in-memory DB for standalone runs / tests. node:sqlite is loaded indirectly
   // via persistence/sqlite.ts so Vite/vitest never sees the bare specifier.
   const dbPath = process.env.HIP_DB_PATH?.trim() || ':memory:'
+  // Opt-in LangSmith traces (LANGSMITH_TRACING=true + API key). No-op when unset.
+  initLangSmith()
   loadActiveModelFromEnv()
   const { db, ftsEnabled } = openDatabase(dbPath)
 

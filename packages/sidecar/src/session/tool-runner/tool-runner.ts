@@ -1,4 +1,5 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { Callbacks } from '@langchain/core/callbacks/manager'
 import type { PermissionMode } from '@hip/protocol'
 import type { RiskLevel } from './tool-policy.js'
 import type { HookRegistry } from '../hooks/registry.js'
@@ -125,6 +126,8 @@ export class ToolRunner {
     name: string
     callId: string
     args: Record<string, unknown>
+    /** When set (LangGraph node config.callbacks), nests tool spans under the parent run in LangSmith. */
+    callbacks?: Callbacks
   }): Promise<ToolCallResult> {
     const {
       tools,
@@ -261,7 +264,12 @@ export class ToolRunner {
     this.emitStarted(call.name, call.callId, invokeArgs)
     const stopActivity = this.startActivityPulse()
     try {
-      const rawResult = String(await tool.invoke(invokeArgs))
+      const rawResult = String(
+        await tool.invoke(
+          invokeArgs,
+          call.callbacks !== undefined ? { callbacks: call.callbacks } : undefined,
+        ),
+      )
       const bound = this.deps.toolOutputStore
         ? await this.deps.toolOutputStore.bound({
             sessionId,

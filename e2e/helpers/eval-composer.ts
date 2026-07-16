@@ -2,15 +2,38 @@
  * Composer helpers for eval: new-conversation landing and in-session InputBar.
  */
 
+/**
+ * Fill a textarea without WebDriver performActions key-chords.
+ * Long multi-line prompts blow WKWebView `actions` (javascript error) when using browser.keys.
+ */
+async function fillTextarea(ta: WebdriverIO.Element, text: string): Promise<void> {
+  await ta.waitForExist({ timeout: 10000 })
+  await ta.click()
+  const ok = await browser.execute((el: HTMLTextAreaElement, value: string) => {
+    el.focus()
+    // React controlled input: reset value tracker so onChange fires
+    const tracker = (el as unknown as { _valueTracker?: { setValue: (v: string) => void } })
+      ._valueTracker
+    if (tracker) tracker.setValue('')
+    const proto = window.HTMLTextAreaElement.prototype
+    const desc = Object.getOwnPropertyDescriptor(proto, 'value')
+    if (desc?.set) desc.set.call(el, value)
+    else el.value = value
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+    return el.value === value
+  }, ta, text)
+  if (!ok) {
+    // Last resort: setValue (still avoids multi-kb key action chains)
+    await ta.setValue(text)
+  }
+}
+
 export async function sendNewConversationMessage(text: string): Promise<void> {
   const root = await browser.$('[data-testid="new-conversation"]')
   await root.waitForExist({ timeout: 30000 })
   const ta = await root.$('textarea')
-  await ta.waitForExist({ timeout: 10000 })
-  await ta.click()
-  await ta.clearValue()
-  // browser.keys is more reliable than setValue for long Chinese/English prompts in WKWebView
-  await browser.keys(text)
+  await fillTextarea(ta, text)
   const send = await root.$('[data-testid="composer-send"]')
   await send.waitForEnabled({ timeout: 10000 })
   await send.click()
@@ -20,9 +43,7 @@ export async function sendNewConversationMessage(text: string): Promise<void> {
 export async function sendEvalPrompt(text: string): Promise<void> {
   const sessionTa = await browser.$('[data-testid="input-bar"] textarea')
   if (await sessionTa.isExisting()) {
-    await sessionTa.click()
-    await sessionTa.clearValue()
-    await browser.keys(text)
+    await fillTextarea(sessionTa, text)
     const send = await browser.$('[data-testid="input-bar"] [data-testid="composer-send"]')
     if (await send.isExisting()) {
       await send.waitForEnabled({ timeout: 10000 })

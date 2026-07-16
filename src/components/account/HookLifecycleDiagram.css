@@ -1,26 +1,15 @@
 /* Hooks fishbone — vertical lifecycle map */
 
 .hook-fishbone-flow.react-flow {
-  --xy-background-color-default: transparent;
-  --xy-background-pattern-dot-color-default: color-mix(in srgb, var(--border) 70%, transparent);
+  --xy-background-color-default: var(--surface);
+  --xy-background-pattern-dot-color-default: color-mix(in srgb, var(--ink-tertiary) 55%, var(--border));
   border-radius: 0.75rem;
 }
 
 .hook-fishbone-canvas {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(
-      120% 80% at 50% 0%,
-      color-mix(in srgb, var(--accent) 8%, transparent) 0%,
-      transparent 55%
-    ),
-    linear-gradient(
-      180deg,
-      var(--bg-subtle) 0%,
-      var(--surface) 42%,
-      var(--bg-subtle) 100%
-    );
+  background: var(--surface);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border) 55%, transparent);
 }
 

@@ -294,8 +294,8 @@ function FishboneCanvas({
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
-          size={1.1}
-          color="var(--border)"
+          size={1.25}
+          color="color-mix(in srgb, var(--ink-tertiary) 55%, var(--border))"
         />
         <Controls showInteractive={false} />
       </ReactFlow>

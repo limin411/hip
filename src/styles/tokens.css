@@ -40,12 +40,13 @@
   --rail-width: 72px;
   /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
   --titlebar-lights-inset: 90px;
-  /* 毛玻璃效果：仅标题栏使用，半透明背景 + 模糊 */
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.05);
+  /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生 vibrancy 下见 [data-vibrancy=native] */
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-backdrop: blur(24px) saturate(180%);
   /* 标题栏默认背景（非 macOS 平台使用纯色） */
   --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: blur(24px);
+  --titlebar-backdrop: var(--glass-backdrop);
   /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档） */
   --shadow-panel: 0 2px 12px -2px rgba(17, 17, 17, 0.12), 0 1px 3px rgba(17, 17, 17, 0.06);
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
@@ -100,11 +101,12 @@ html[data-platform="linux"] {
   --role-coder: #5dc96c;
   --role-reviewer: #ffab40;
   --role-worker: #2ee6e6;
-  /* 毛玻璃效果：暗色半透明背景 + 浅色描边 */
-  --glass-bg: rgba(20, 20, 20, 0.85);
+  /* 毛玻璃：暗色 CSS 回退；原生 vibrancy 下见 [data-vibrancy=native] */
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
   --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-backdrop: blur(24px) saturate(180%);
   --titlebar-bg: var(--glass-bg);
-  --titlebar-backdrop: blur(24px);
+  --titlebar-backdrop: var(--glass-backdrop);
   --shadow-panel: 0 2px 12px -2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
   /* 公共交互状态 —— 复用暗色令牌 */
   --state-hover: var(--accent-subtle);
@@ -130,6 +132,25 @@ html.dark[data-platform="linux"] {
   --titlebar-backdrop: none;
 }
 
+/* 原生 vibrancy：底层仍是系统材质（壁纸模糊），上层叠半透明 tint，避免「全透」在
+   深色壁纸上发灰、发脏。不重开 CSS blur（会与 NSVisualEffect / Mica 叠糊）。
+   放在平台规则之后，避免 windows/linux 纯色 titlebar 覆盖。 */
+html[data-vibrancy="native"] {
+  /* 亮色：约 70% 侧栏底色 + 30% 透材质 */
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
+  --glass-backdrop: none;
+  --titlebar-bg: var(--glass-bg);
+  --titlebar-backdrop: none;
+}
+
+html.dark[data-vibrancy="native"] {
+  /* 暗色壁纸对比更差，tint 更厚（约 86%），只留一点材质层次 */
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 86%, transparent);
+  --glass-backdrop: none;
+  --titlebar-bg: var(--glass-bg);
+  --titlebar-backdrop: none;
+}
+
 html {
   color-scheme: light;
 }
@@ -142,17 +163,22 @@ html,
 body,
 #root {
   height: 100%;
+  background: transparent;
 }
 
 body {
   margin: 0;
-  background: var(--bg-app);
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 13px;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Browser / Linux: solid page fill. Native vibrancy hosts keep transparent body. */
+html:not([data-vibrancy="native"]) body {
+  background: var(--bg-app);
 }
 
 * {
@@ -219,6 +245,13 @@ a:hover {
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* 毛玻璃材质：半透明底 + 高斯模糊（侧栏等） */
+  .glass-surface {
+    background-color: var(--glass-bg);
+    backdrop-filter: var(--glass-backdrop);
+    -webkit-backdrop-filter: var(--glass-backdrop);
   }
 }
 

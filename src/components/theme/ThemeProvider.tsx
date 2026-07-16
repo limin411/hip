@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useUiStore, type Theme } from '@/store/uiStore'
+import { syncVibrancyWithTheme } from '@/lib/windowVibrancy'
 
 interface ThemeProviderProps {
   children: React.ReactNode
@@ -18,6 +19,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       } else {
         root.classList.toggle('dark', value === 'dark')
       }
+      // Keep NSVisualEffect / Mica appearance aligned with app chrome.
+      void syncVibrancyWithTheme()
     }
 
     applyTheme(theme)
@@ -29,6 +32,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = (event: MediaQueryListEvent) => {
       root.classList.toggle('dark', event.matches)
+      void syncVibrancyWithTheme()
     }
 
     mediaQuery.addEventListener('change', handleChange)

@@ -102,15 +102,17 @@ export function AppLayout() {
 
   return (
     // Final shell: AppSidebar | (MainToolbar + main | edge drawer)
-    <div className="flex h-dvh w-screen flex-row overflow-hidden bg-surface">
+    // Shell is transparent so native vibrancy (macOS Sidebar / Win Mica) shows through
+    // the left sidebar; main column stays opaque for readable content.
+    <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
       <AppSidebar
         onLogout={() => {
           logout()
           navigate('/login')
         }}
       />
-      <PanelGroup direction="horizontal" className="min-w-0 flex-1">
-        <Panel minSize={34} className="flex min-w-0 flex-col">
+      <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
+        <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
           <MainToolbar />
           {renderMainContent()}
         </Panel>

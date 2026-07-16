@@ -11,6 +11,7 @@
   },
   "app": {
     "withGlobalTauri": true,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "hip",
@@ -20,7 +21,12 @@
         "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "backgroundColor": "#ffffff",
+        "transparent": true,
+        "backgroundColor": "#00000000",
+        "windowEffects": {
+          "effects": ["sidebar", "mica", "acrylic"],
+          "state": "followsWindowActiveState"
+        },
         "trafficLightPosition": {
           "x": 19,
           "y": 23

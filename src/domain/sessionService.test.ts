@@ -851,6 +851,14 @@ describe('workspace diff', () => {
     expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
   })
 
+  it('openHistoryPageForE2e sets activeView history', () => {
+    useUiStore.setState({ activeView: 'chat' })
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    svc.openHistoryPageForE2e()
+    expect(useUiStore.getState().activeView).toBe('history')
+  })
+
   it('simulatePluginInstallError sets pluginInstall result failure', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

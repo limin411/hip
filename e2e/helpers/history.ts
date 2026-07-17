@@ -1,11 +1,9 @@
-/** Open Session History via the floating account menu. */
+import { openHistoryPageForE2e, waitForHipE2E } from './e2e-hooks.js'
+
+/** Open Session History via DEV store bridge (sidebar has no account history menu). */
 export async function openHistory(): Promise<void> {
-  const button = await browser.$('[data-testid="account-menu-button"]')
-  await button.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => el.click(), button)
-  const item = await browser.$('[data-testid="account-history-menu-item"]')
-  await item.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => el.click(), item)
+  await waitForHipE2E()
+  await openHistoryPageForE2e()
   await (await browser.$('[data-testid="session-history"]')).waitForExist({ timeout: 15000 })
 }
 

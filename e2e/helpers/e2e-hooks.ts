@@ -28,6 +28,7 @@ type HipE2E = {
   openCommandPaletteForE2e: () => void
   closeCommandPaletteForE2e: () => void
   openSettingsPageForE2e?: (page?: string) => void
+  openHistoryPageForE2e?: () => void
   simulatePluginInstallError: (error?: string) => void
   getMemoryConfig?: () => Promise<Record<string, unknown>>
   setMemoryConfig?: (partial: Record<string, unknown>) => Promise<Record<string, unknown>>
@@ -204,6 +205,15 @@ export async function openSettingsPageForE2e(page = 'general'): Promise<void> {
     if (!hooks?.openSettingsPageForE2e) throw new Error('__hipE2E.openSettingsPageForE2e missing')
     hooks.openSettingsPageForE2e(p)
   }, page)
+}
+
+/** Open Session History via uiStore (DEV bridge). */
+export async function openHistoryPageForE2e(): Promise<void> {
+  await browser.execute(() => {
+    const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+    if (!hooks?.openHistoryPageForE2e) throw new Error('__hipE2E.openHistoryPageForE2e missing')
+    hooks.openHistoryPageForE2e()
+  })
 }
 
 export async function simulatePluginInstallError(error = 'e2e package structure invalid'): Promise<void> {

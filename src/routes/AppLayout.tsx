@@ -1,10 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels'
 import { useProvidersStore } from '@/store/providersStore'
 import { sessionService, useActiveSession, useDomainStore } from '@/domain'
 import { useUiStore } from '@/store/uiStore'
-import { useAuthStore } from '@/store/authStore'
 import { NewConversation } from '@/components/chat/NewConversation'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { InputBar } from '@/components/chat/InputBar'
@@ -25,11 +23,9 @@ import { startPtyBridge } from '@/ipc/pty'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
-  const navigate = useNavigate()
   const activeSession = useActiveSession()
   const activeSessionId = activeSession?.id ?? null
   const activeView = useUiStore((s) => s.activeView)
-  const logout = useAuthStore((s) => s.logout)
 
   useEffect(() => {
     if (!useProvidersStore.getState().loaded) {
@@ -105,12 +101,7 @@ export function AppLayout() {
     // Shell is transparent so native vibrancy (macOS Sidebar / Win Mica) shows through
     // the left sidebar; main column stays opaque for readable content.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
-      <AppSidebar
-        onLogout={() => {
-          logout()
-          navigate('/login')
-        }}
-      />
+      <AppSidebar />
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
           <MainToolbar />

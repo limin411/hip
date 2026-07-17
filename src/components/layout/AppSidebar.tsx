@@ -13,7 +13,6 @@ import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
   enterKnowledge,
   enterSection,
-  leaveKnowledge,
   newConversationFromSidebar,
   openHistoryFromChrome,
   openKnowledgeHome,
@@ -23,11 +22,7 @@ import {
 } from './sidebarActions'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
 
-interface AppSidebarProps {
-  onLogout: () => void
-}
-
-export function AppSidebar({ onLogout }: AppSidebarProps) {
+export function AppSidebar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
   const [query, setQuery] = useState('')
@@ -336,14 +331,11 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       </div>
 
       <SidebarAccountFooter
+        active={
+          activeView === 'settings' ? 'settings' : activeView === 'history' ? 'history' : null
+        }
         onOpenHistory={() => void openHistoryFromChrome()}
         onOpenSettings={() => void openSettingsFromChrome()}
-        onLogout={() => {
-          void (async () => {
-            await leaveKnowledge()
-            onLogout()
-          })()
-        }}
       />
     </aside>
   )

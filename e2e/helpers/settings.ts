@@ -5,7 +5,7 @@ const settings = new SettingsPage()
 
 /**
  * Open Settings → General. Prefer DEV store bridge when available (shared-process residual);
- * fall back to account menu for pure UI path.
+ * fall back to sidebar settings button for pure UI path.
  */
 export async function openSettings(): Promise<void> {
   try {
@@ -14,14 +14,11 @@ export async function openSettings(): Promise<void> {
     await settings.nav('general').waitForExist({ timeout: 10000 })
     return
   } catch {
-    // Fall through to UI menu.
+    // Fall through to UI button.
   }
-  const button = await settings.accountMenuButton
+  const button = await settings.settingsButton
   await button.waitForExist({ timeout: 10000 })
   await button.click()
-  const menuItem = await settings.settingsMenuItem
-  await menuItem.waitForExist({ timeout: 10000 })
-  await menuItem.click()
   await settings.nav('general').waitForExist({ timeout: 10000 })
 }
 

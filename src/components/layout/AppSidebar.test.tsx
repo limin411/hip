@@ -82,7 +82,7 @@ describe('AppSidebar', () => {
   afterEach(() => cleanup())
 
   it('renders search, nav, and chat sessions for chats section', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
@@ -91,13 +91,13 @@ describe('AppSidebar', () => {
   })
 
   it('shows session counts on projects and chats nav', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveTextContent('1')
     expect(screen.getByTestId('sidebar-nav-projects')).toHaveTextContent('1')
   })
 
   it('filters sessions by search query', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.change(screen.getByTestId('sidebar-search'), { target: { value: 'nope' } })
     expect(screen.queryByTestId('sidebar-session-chat-1')).not.toBeInTheDocument()
     fireEvent.change(screen.getByTestId('sidebar-search'), { target: { value: 'Hello' } })
@@ -105,39 +105,39 @@ describe('AppSidebar', () => {
   })
 
   it('nav knowledge calls enterKnowledge', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-knowledge'))
     expect(enterKnowledge).toHaveBeenCalled()
   })
 
   it('nav projects calls enterSection projects', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-nav-projects'))
     expect(enterSection).toHaveBeenCalledWith('projects')
   })
 
   it('chats section new chat starts chat conversation', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-new-chat-list'))
     expect(newConversationFromSidebar).toHaveBeenCalledWith('chat')
   })
 
   it('projects section new task starts code conversation', () => {
     useUiStore.setState({ sidebarSection: 'projects' })
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-new-task'))
     expect(newConversationFromSidebar).toHaveBeenCalledWith('code')
   })
 
   it('manage spaces opens knowledge home', () => {
     useUiStore.setState({ sidebarSection: 'knowledge' })
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-manage-spaces'))
     expect(openKnowledgeHome).toHaveBeenCalled()
   })
 
   it('session row calls selectSessionFromSidebar', () => {
-    render(<AppSidebar onLogout={vi.fn()} />)
+    render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-session-chat-1'))
     expect(selectSessionFromSidebar).toHaveBeenCalledWith('chat-1')
   })

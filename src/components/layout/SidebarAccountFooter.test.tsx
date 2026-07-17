@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
 
 vi.mock('react-i18next', () => ({
@@ -11,67 +11,45 @@ vi.mock('react-i18next', () => ({
 afterEach(() => cleanup())
 
 describe('SidebarAccountFooter', () => {
-  beforeEach(() => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-  })
-
-  it('opens menu and shows settings and logout', () => {
+  it('renders history above settings', () => {
     render(
-      <SidebarAccountFooter onOpenSettings={vi.fn()} onOpenHistory={vi.fn()} onLogout={vi.fn()} />,
+      <SidebarAccountFooter onOpenHistory={vi.fn()} onOpenSettings={vi.fn()} />,
     )
-    fireEvent.click(screen.getByTestId('account-menu-button'))
-    expect(screen.getByTestId('account-settings-menu-item')).toBeInTheDocument()
-    expect(screen.getByTestId('account-logout-menu-item')).toBeInTheDocument()
+    const history = screen.getByTestId('account-history-button')
+    const settings = screen.getByTestId('account-settings-button')
+    expect(history.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText('nav.history')).toBeInTheDocument()
+    expect(screen.getByText('nav.settings')).toBeInTheDocument()
   })
 
-  it('history item calls onOpenHistory', () => {
+  it('calls onOpenHistory on click', () => {
     const onOpenHistory = vi.fn()
     render(
-      <SidebarAccountFooter
-        onOpenHistory={onOpenHistory}
-        onOpenSettings={() => {}}
-        onLogout={() => {}}
-      />,
+      <SidebarAccountFooter onOpenHistory={onOpenHistory} onOpenSettings={vi.fn()} />,
     )
-    fireEvent.click(screen.getByTestId('account-menu-button'))
-    fireEvent.click(screen.getByTestId('account-history-menu-item'))
-    expect(onOpenHistory).toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('account-history-button'))
+    expect(onOpenHistory).toHaveBeenCalledTimes(1)
   })
 
-  it('settings closes menu', () => {
+  it('calls onOpenSettings on click', () => {
     const onOpenSettings = vi.fn()
     render(
-      <SidebarAccountFooter
-        onOpenSettings={onOpenSettings}
-        onOpenHistory={vi.fn()}
-        onLogout={vi.fn()}
-      />,
+      <SidebarAccountFooter onOpenHistory={vi.fn()} onOpenSettings={onOpenSettings} />,
     )
-    fireEvent.click(screen.getByTestId('account-menu-button'))
-    fireEvent.click(screen.getByTestId('account-settings-menu-item'))
+    fireEvent.click(screen.getByTestId('account-settings-button'))
     expect(onOpenSettings).toHaveBeenCalledTimes(1)
-    expect(screen.queryByTestId('account-settings-menu-item')).not.toBeInTheDocument()
   })
 
-  it('logout confirmed calls onLogout', () => {
-    const onLogout = vi.fn()
-    render(
-      <SidebarAccountFooter onOpenSettings={vi.fn()} onOpenHistory={vi.fn()} onLogout={onLogout} />,
+  it('marks active destination', () => {
+    const { rerender } = render(
+      <SidebarAccountFooter onOpenHistory={vi.fn()} onOpenSettings={vi.fn()} active="history" />,
     )
-    fireEvent.click(screen.getByTestId('account-menu-button'))
-    fireEvent.click(screen.getByTestId('account-logout-menu-item'))
-    expect(window.confirm).toHaveBeenCalled()
-    expect(onLogout).toHaveBeenCalledTimes(1)
-  })
+    expect(screen.getByTestId('account-history-button')).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByTestId('account-settings-button')).not.toHaveAttribute('aria-current')
 
-  it('logout cancelled does not call onLogout', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-    const onLogout = vi.fn()
-    render(
-      <SidebarAccountFooter onOpenSettings={vi.fn()} onOpenHistory={vi.fn()} onLogout={onLogout} />,
+    rerender(
+      <SidebarAccountFooter onOpenHistory={vi.fn()} onOpenSettings={vi.fn()} active="settings" />,
     )
-    fireEvent.click(screen.getByTestId('account-menu-button'))
-    fireEvent.click(screen.getByTestId('account-logout-menu-item'))
-    expect(onLogout).not.toHaveBeenCalled()
+    expect(screen.getByTestId('account-settings-button')).toHaveAttribute('aria-current', 'page')
   })
 })

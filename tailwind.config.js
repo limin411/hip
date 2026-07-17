@@ -51,8 +51,30 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['SF Mono', 'JetBrains Mono', 'Menlo', 'monospace'],
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'Segoe UI Variable',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'Microsoft YaHei UI',
+          'Microsoft YaHei',
+          'Noto Sans CJK SC',
+          'Noto Sans SC',
+          'sans-serif',
+        ],
+        mono: [
+          'ui-monospace',
+          'Cascadia Mono',
+          'Cascadia Code',
+          'SF Mono',
+          'JetBrains Mono',
+          'Consolas',
+          'Menlo',
+          'monospace',
+        ],
       },
       // 字号体系：每级自带行高，密集行（caption/meta/body）用更紧凑的 leading，
       // 阅读文本（prose）保留宽松行距。替代散落的 text-[Npx] 硬编码。

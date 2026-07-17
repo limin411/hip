@@ -926,6 +926,13 @@ export const zhCN = {
       newConversation: '新对话',
       aria: '会话工具栏',
     },
+    windowCaption: {
+      aria: '窗口控制',
+      minimize: '最小化',
+      maximize: '最大化',
+      restore: '还原',
+      close: '关闭',
+    },
     login: {
       slogan: '没有人比我更懂摸鱼',
       tagline2: '智能体，始终在你这边',

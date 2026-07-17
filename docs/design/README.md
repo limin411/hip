@@ -6,8 +6,9 @@
 |------|------------|
 | [app-shell-sidebar-spec](./2026-07-16-app-shell-sidebar-spec.md) | 左侧边栏 + 无顶栏 + 右侧贴边抽屉；含 Interaction contracts 与 PR-1…5 |
 | [layout-sidebar-proposal.html](./layout-sidebar-proposal.html) | 用户认可的视觉/IA 交互原型 |
+| [windows-visual-polish-spec](./2026-07-17-windows-visual-polish-spec.md) | Win/Linux 视觉一等公民：字体、vibrancy 模式、侧栏顶、Win 自绘 caption |
 
-**状态：** spec 评审通过（0 open）。**PR-1…PR-5 均已落地**（抽屉 · 侧栏 · 无 TitleBar · 清 tab 模型 · a11y/右键/grip polish）。
+**状态：** shell PR-1…PR-5 已落地。**Windows visual polish** spec 就绪（PR-W1…W3：字体/实色回退 · vibrancy 模式 · 自绘标题按钮）。
 
 ## Capability evaluation（能力评测）
 

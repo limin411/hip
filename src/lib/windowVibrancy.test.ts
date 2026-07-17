@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   detectVibrancyPlatform,
   enableNativeVibrancy,
+  getVibrancyMode,
   markNativeVibrancy,
+  markVibrancyMode,
 } from './windowVibrancy'
 
 describe('windowVibrancy', () => {
@@ -31,21 +33,39 @@ describe('windowVibrancy', () => {
     expect(detectVibrancyPlatform()).toBe('windows')
   })
 
-  it('markNativeVibrancy toggles data-vibrancy', () => {
+  it('markVibrancyMode sets data-vibrancy modes', () => {
+    markVibrancyMode('win-mica')
+    expect(getVibrancyMode()).toBe('win-mica')
+    markVibrancyMode('solid')
+    expect(getVibrancyMode()).toBe('solid')
+    markVibrancyMode(null)
+    expect(getVibrancyMode()).toBeNull()
+  })
+
+  it('markNativeVibrancy legacy helper maps to mac-sidebar / clear', () => {
     markNativeVibrancy(true)
-    expect(document.documentElement.dataset.vibrancy).toBe('native')
+    expect(document.documentElement.dataset.vibrancy).toBe('mac-sidebar')
     markNativeVibrancy(false)
     expect(document.documentElement.dataset.vibrancy).toBeUndefined()
   })
 
-  it('enableNativeVibrancy returns false when not in Tauri / API missing', async () => {
+  it('enableNativeVibrancy marks solid when not in Tauri on mac', async () => {
     vi.stubGlobal('navigator', {
       platform: 'MacIntel',
       userAgent: 'Mozilla/5.0 (Macintosh)',
     })
-    // Dynamic import of @tauri-apps/api/window fails or setEffects throws in unit tests.
     const ok = await enableNativeVibrancy()
     expect(ok).toBe(false)
-    expect(document.documentElement.dataset.vibrancy).toBeUndefined()
+    expect(getVibrancyMode()).toBe('solid')
+  })
+
+  it('enableNativeVibrancy marks solid on linux without Tauri', async () => {
+    vi.stubGlobal('navigator', {
+      platform: 'Linux x86_64',
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
+    })
+    const ok = await enableNativeVibrancy()
+    expect(ok).toBe(false)
+    expect(getVibrancyMode()).toBe('solid')
   })
 })

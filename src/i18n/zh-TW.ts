@@ -926,6 +926,13 @@ export const zhTW = {
       newConversation: '新對話',
       aria: '工作階段工具列',
     },
+    windowCaption: {
+      aria: '視窗控制',
+      minimize: '最小化',
+      maximize: '最大化',
+      restore: '還原',
+      close: '關閉',
+    },
     login: {
       slogan: '沒有人比我更懂摸魚',
       tagline2: '智能體，始終在你這邊',

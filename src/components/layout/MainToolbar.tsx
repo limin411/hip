@@ -7,15 +7,18 @@ import { useUiStore } from '@/store/uiStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PanelToggle } from './PanelToggle'
+import { useCaptionTitleDoubleClick, WindowCaptionButtons } from './WindowCaptionButtons'
 
 /**
  * Main-column context bar (not a window titlebar).
  * Special views hide ConnectionStatus + PanelToggle; leave via sidebar.
  * History keeps page h2 as sole title.
+ * On Windows frameless chrome, hosts WindowCaptionButtons (min/max/close).
  */
 export function MainToolbar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
+  const handleTitleDblClick = useCaptionTitleDoubleClick()
   const activeView = useUiStore((s) => s.activeView)
   const activeSession = useActiveSession()
   const kbMode = useKnowledgeStore((s) => s.mode)
@@ -53,11 +56,12 @@ export function MainToolbar() {
       <div
         data-testid="main-toolbar-title"
         className="min-w-0 flex-1 truncate text-body font-medium text-ink"
+        onDoubleClick={handleTitleDblClick}
       >
         {title}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex h-full shrink-0 items-center gap-1">
         <button
           type="button"
           data-testid="main-toolbar-command-palette"
@@ -77,6 +81,7 @@ export function MainToolbar() {
           </>
         ) : null}
       </div>
+      <WindowCaptionButtons />
     </header>
   )
 }

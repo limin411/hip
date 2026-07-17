@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Mail, Github, Chrome, ArrowRight } from 'lucide-react'
 import { AuthButton } from '@/components/login/AuthButton'
 import { LoginBrandPanel } from '@/components/login/LoginBrandPanel'
+import { WindowCaptionButtons } from '@/components/layout/WindowCaptionButtons'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useAuthStore } from '@/store/authStore'
 
@@ -17,12 +18,19 @@ export function LoginScreen() {
   }
 
   return (
-    // 整页可拖动窗口（无原生标题栏 Overlay 模式下，空白处即拖拽区）；交互卡片单独排除。
+    // 整页可拖动窗口（Overlay / Win frameless）；交互卡片与 caption 排除拖拽。
     <div
       data-tauri-drag-region
       onPointerDown={handlePointerDown}
       className="fixed inset-0 flex overflow-hidden bg-surface"
     >
+      {/* Win frameless: close/min without OS title bar */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex justify-end">
+        <div className="pointer-events-auto">
+          <WindowCaptionButtons />
+        </div>
+      </div>
+
       {/* 左侧品牌宣传区 —— 白底 + 文案 */}
       <LoginBrandPanel />
 

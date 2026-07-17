@@ -931,6 +931,13 @@ export const en = {
       newConversation: 'New conversation',
       aria: 'Session toolbar',
     },
+    windowCaption: {
+      aria: 'Window controls',
+      minimize: 'Minimize',
+      maximize: 'Maximize',
+      restore: 'Restore',
+      close: 'Close',
+    },
     login: {
       slogan: 'Nobody knows slacking better than me',
       tagline2: 'Agents that stay on your machine',

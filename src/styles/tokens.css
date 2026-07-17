@@ -40,7 +40,7 @@
   --rail-width: 72px;
   /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
   --titlebar-lights-inset: 90px;
-  /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生 vibrancy 下见 [data-vibrancy=native] */
+  /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生材质见 data-vibrancy=mac-sidebar|win-mica|… */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
   --glass-border: rgba(0, 0, 0, 0.06);
   --glass-backdrop: blur(24px) saturate(180%);
@@ -66,11 +66,11 @@
   --on-btn-primary: #fafafa;
 }
 
-/* Windows / Linux: no native traffic lights → remove mac-only clearance & glass effect.
-   OS decorations stay enabled (native min/max/close); custom TitleBar is a toolbar row. */
+/* Windows / Linux: no traffic lights. Caption may be custom (Win frameless) or OS chrome.
+   Default titlebar tokens solid; native material modes re-open glass tint below. */
 html[data-platform="windows"],
 html[data-platform="linux"] {
-  --titlebar-lights-inset: 8px;
+  --titlebar-lights-inset: 0px;
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;
 }
@@ -101,7 +101,7 @@ html[data-platform="linux"] {
   --role-coder: #5dc96c;
   --role-reviewer: #ffab40;
   --role-worker: #2ee6e6;
-  /* 毛玻璃：暗色 CSS 回退；原生 vibrancy 下见 [data-vibrancy=native] */
+  /* 毛玻璃：暗色 CSS 回退；原生材质见 data-vibrancy 模式 */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-backdrop: blur(24px) saturate(180%);
@@ -127,25 +127,48 @@ html[data-platform="linux"] {
 
 html.dark[data-platform="windows"],
 html.dark[data-platform="linux"] {
-  --titlebar-lights-inset: 8px;
+  --titlebar-lights-inset: 0px;
   --titlebar-bg: var(--bg-app);
   --titlebar-backdrop: none;
 }
 
-/* 原生 vibrancy：底层仍是系统材质（壁纸模糊），上层叠半透明 tint，避免「全透」在
-   深色壁纸上发灰、发脏。不重开 CSS blur（会与 NSVisualEffect / Mica 叠糊）。
-   放在平台规则之后，避免 windows/linux 纯色 titlebar 覆盖。 */
+/* Explicit solid host (Win material fail, Linux, reduced transparency).
+   Sidebar must be opaque — never half-transparent without native material. */
+html[data-vibrancy="solid"] {
+  --glass-bg: var(--bg-subtle);
+  --glass-backdrop: none;
+  --titlebar-bg: var(--bg-app);
+  --titlebar-backdrop: none;
+}
+
+/* Native material: system backdrop under chrome; tint only — no CSS blur on top.
+   Modes: mac-sidebar | win-mica | win-acrylic (legacy: native → treat like mac-sidebar in JS). */
+html[data-vibrancy="mac-sidebar"],
+html[data-vibrancy="win-mica"],
+html[data-vibrancy="win-acrylic"],
 html[data-vibrancy="native"] {
-  /* 亮色：约 70% 侧栏底色 + 30% 透材质 */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 70%, transparent);
   --glass-backdrop: none;
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: none;
 }
 
+html.dark[data-vibrancy="mac-sidebar"],
+html.dark[data-vibrancy="win-mica"],
 html.dark[data-vibrancy="native"] {
-  /* 暗色壁纸对比更差，tint 更厚（约 86%），只留一点材质层次 */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 86%, transparent);
+  --glass-backdrop: none;
+  --titlebar-bg: var(--glass-bg);
+  --titlebar-backdrop: none;
+}
+
+/* Acrylic needs a thicker tint (often muddier blur under the hood). */
+html[data-vibrancy="win-acrylic"] {
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 82%, transparent);
+}
+
+html.dark[data-vibrancy="win-acrylic"] {
+  --glass-bg: color-mix(in srgb, var(--bg-subtle) 92%, transparent);
   --glass-backdrop: none;
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: none;
@@ -169,16 +192,41 @@ body,
 body {
   margin: 0;
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Segoe UI Variable',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei UI',
+    'Microsoft YaHei',
+    'Noto Sans CJK SC',
+    'Noto Sans SC',
+    sans-serif;
   font-size: 13px;
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Browser / Linux: solid page fill. Native vibrancy hosts keep transparent body. */
-html:not([data-vibrancy="native"]) body {
+/* Windows: prefer ClearType subpixel AA — greyscale antialiased often looks soft. */
+html[data-platform="windows"] body {
+  -webkit-font-smoothing: auto;
+  text-rendering: auto;
+}
+
+/* Solid / browser / pre-init: opaque page. Material hosts keep transparent body. */
+html:not([data-vibrancy="mac-sidebar"]):not([data-vibrancy="win-mica"]):not([data-vibrancy="win-acrylic"]):not([data-vibrancy="native"]) body {
   background: var(--bg-app);
+}
+
+html[data-vibrancy="mac-sidebar"] body,
+html[data-vibrancy="win-mica"] body,
+html[data-vibrancy="win-acrylic"] body,
+html[data-vibrancy="native"] body {
+  background: transparent;
 }
 
 * {

@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BookOpen, Code2, MessageSquare, Search } from 'lucide-react'
 import { useActiveSessionId, useSessions } from '@/domain'
+import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
@@ -22,11 +23,6 @@ import {
 } from './sidebarActions'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
 
-function isMacMod(): boolean {
-  if (typeof navigator === 'undefined') return false
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
-}
-
 interface AppSidebarProps {
   onLogout: () => void
 }
@@ -41,7 +37,8 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   const activeSessionId = useActiveSessionId()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
-  const mod = isMacMod() ? '⌘' : 'Ctrl+'
+  const isMac = isMacPlatform()
+  const mod = isMac ? '⌘' : 'Ctrl+'
 
   const q = query.trim().toLowerCase()
 
@@ -93,18 +90,20 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       data-testid="app-sidebar"
       aria-label={t('sidebar.aria')}
     >
-      {/* Drag region + macOS traffic-light clearance (no fake lights in production) */}
+      {/* mac: traffic-light clearance. Win/Linux: slim drag strip (caption lives on MainToolbar). */}
       <div
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
         onPointerDown={handlePointerDown}
-        className="flex h-10 shrink-0 items-center"
+        className={cn('flex shrink-0 items-center', isMac ? 'h-10' : 'h-3')}
       >
-        <div
-          className="shrink-0"
-          style={{ width: 'var(--titlebar-lights-inset, 90px)' }}
-          aria-hidden
-        />
+        {isMac ? (
+          <div
+            className="shrink-0"
+            style={{ width: 'var(--titlebar-lights-inset, 90px)' }}
+            aria-hidden
+          />
+        ) : null}
       </div>
 
       <div className="shrink-0 px-3 pb-2">

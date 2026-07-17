@@ -7,19 +7,17 @@ import "./styles/tokens.css";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 import { LanguageProvider } from "./components/theme/LanguageProvider";
 import { Toaster } from 'sonner'
+import { applyPlatformDataset } from './lib/platform'
+import { applyPlatformWindowChrome } from './lib/windowChrome'
 import { enableNativeVibrancy } from './lib/windowVibrancy'
 
-// Set platform attribute on <html> so CSS can adapt title bar styling
-// (macOS needs traffic-light clearance; Windows/Linux don't).
-// Note: on Windows/Linux we keep OS decorations (sidebar + MainToolbar drag); this flag only
-// tunes inset/background — not frameless chrome.
+// data-platform → CSS; Win frameless caption; then native material / solid.
 if (typeof document !== 'undefined') {
-  const ua = navigator.platform || navigator.userAgent
-  const isMac = /Mac|iPhone|iPad|iPod/i.test(ua)
-  const isLinux = !isMac && /Linux/i.test(navigator.userAgent)
-  document.documentElement.dataset.platform = isMac ? 'mac' : isLinux ? 'linux' : 'windows'
-  // Native vibrancy (sidebar material / mica): wallpaper shows through transparent chrome.
-  void enableNativeVibrancy()
+  applyPlatformDataset()
+  void (async () => {
+    await applyPlatformWindowChrome()
+    await enableNativeVibrancy()
+  })()
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

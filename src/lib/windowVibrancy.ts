@@ -1,44 +1,68 @@
 /**
- * Native window vibrancy (desktop wallpaper / DWM blur under transparent regions).
+ * Native window vibrancy (desktop wallpaper / DWM material under transparent regions).
  *
- * - macOS: NSVisualEffect Sidebar material
- * - Windows 11: Mica; Windows 10: Acrylic fallback
- * - Linux / browser: no native effect (CSS solid / glass fallback)
+ * Modes written to `html[data-vibrancy]`:
+ * - mac-sidebar — NSVisualEffect Sidebar
+ * - win-mica — Windows 11 Mica
+ * - win-acrylic — Acrylic fallback (thick tint; no CSS blur on top)
+ * - solid — opaque host (Linux, failures, reduced transparency)
  *
- * Requires tauri.conf `transparent` + `macOSPrivateApi`, and opaque main chrome so only
- * the sidebar (and other transparent regions) show the system material.
+ * Never leave semi-transparent `.glass-surface` without a real material underneath.
  */
 
-export type VibrancyPlatform = 'mac' | 'windows' | 'linux' | 'unknown'
+import { detectHipPlatform, type HipPlatform } from './platform'
+
+/** @deprecated Prefer detectHipPlatform — kept for call-site compatibility. */
+export type VibrancyPlatform = HipPlatform
+
+export type VibrancyMode = 'mac-sidebar' | 'win-mica' | 'win-acrylic' | 'solid'
 
 export function detectVibrancyPlatform(): VibrancyPlatform {
-  if (typeof navigator === 'undefined') return 'unknown'
-  const ua = navigator.platform || navigator.userAgent
-  if (/Mac|iPhone|iPad|iPod/i.test(ua)) return 'mac'
-  if (!/Mac|iPhone|iPad|iPod/i.test(ua) && /Linux/i.test(navigator.userAgent)) return 'linux'
-  if (/Win/i.test(ua) || /Windows/i.test(navigator.userAgent)) return 'windows'
-  return 'unknown'
+  return detectHipPlatform()
 }
 
 function isDarkDocument(): boolean {
   return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
 }
 
-/** Mark that native effects are active (CSS keys off `data-vibrancy="native"`). */
-export function markNativeVibrancy(active: boolean): void {
+/** Mark vibrancy mode for CSS. `null` clears the attribute (browser pre-init). */
+export function markVibrancyMode(mode: VibrancyMode | null): void {
   if (typeof document === 'undefined') return
-  if (active) document.documentElement.dataset.vibrancy = 'native'
-  else delete document.documentElement.dataset.vibrancy
+  if (mode == null) delete document.documentElement.dataset.vibrancy
+  else document.documentElement.dataset.vibrancy = mode
+}
+
+/** @deprecated Use markVibrancyMode — maps boolean to solid | null for tests. */
+export function markNativeVibrancy(active: boolean): void {
+  if (active) markVibrancyMode('mac-sidebar')
+  else markVibrancyMode(null)
+}
+
+export function getVibrancyMode(): VibrancyMode | null {
+  if (typeof document === 'undefined') return null
+  const v = document.documentElement.dataset.vibrancy
+  if (
+    v === 'mac-sidebar' ||
+    v === 'win-mica' ||
+    v === 'win-acrylic' ||
+    v === 'solid'
+  ) {
+    return v
+  }
+  // Legacy value from older builds
+  if (v === 'native') return 'mac-sidebar'
+  return null
 }
 
 /**
- * Apply platform window effects. Safe to call outside Tauri (no-ops, returns false).
- * Idempotent enough to re-run when app theme changes (acrylic color / window theme).
+ * Apply platform window effects. Safe outside Tauri (marks solid / clears, returns false).
+ * Idempotent enough to re-run when app theme changes.
  */
 export async function enableNativeVibrancy(): Promise<boolean> {
-  const platform = detectVibrancyPlatform()
+  const platform = detectHipPlatform()
+
   if (platform !== 'mac' && platform !== 'windows') {
-    markNativeVibrancy(false)
+    markVibrancyMode('solid')
     return false
   }
 
@@ -47,7 +71,6 @@ export async function enableNativeVibrancy(): Promise<boolean> {
     const win = getCurrentWindow()
     const dark = isDarkDocument()
 
-    // Keep system material in sync with app theme (macOS appearance + Win tabbed variants).
     await win.setTheme(dark ? 'dark' : 'light').catch(() => {
       /* setTheme not available / denied — effects still useful */
     })
@@ -57,41 +80,35 @@ export async function enableNativeVibrancy(): Promise<boolean> {
         effects: [Effect.Sidebar],
         state: EffectState.FollowsWindowActiveState,
       })
-    } else {
-      // Prefer Mica (Win11). Acrylic works on Win10; Blur as last resort.
-      try {
-        await win.setEffects({ effects: [Effect.Mica] })
-      } catch {
-        try {
-          await win.setEffects({
-            effects: [Effect.Acrylic],
-            // Tint helps acrylic read as sidebar chrome (ignored on some builds).
-            color: dark ? [26, 26, 26, 200] : [245, 245, 245, 200],
-          })
-        } catch {
-          await win.setEffects({
-            effects: [Effect.Blur],
-            color: dark ? [26, 26, 26, 200] : [245, 245, 245, 200],
-          })
-        }
-      }
+      markVibrancyMode('mac-sidebar')
+      return true
     }
 
-    markNativeVibrancy(true)
-    return true
+    // Windows: Mica (Win11) → Acrylic (Win10) → solid (never treat Blur as glass success)
+    try {
+      await win.setEffects({ effects: [Effect.Mica] })
+      markVibrancyMode('win-mica')
+      return true
+    } catch {
+      try {
+        await win.setEffects({
+          effects: [Effect.Acrylic],
+          color: dark ? [26, 26, 26, 220] : [245, 245, 245, 220],
+        })
+        markVibrancyMode('win-acrylic')
+        return true
+      } catch {
+        markVibrancyMode('solid')
+        return false
+      }
+    }
   } catch {
-    markNativeVibrancy(false)
+    markVibrancyMode('solid')
     return false
   }
 }
 
-/** Re-apply after theme toggle (window theme + Win acrylic tint). */
+/** Re-apply after theme toggle (window theme + acrylic tint). */
 export async function syncVibrancyWithTheme(): Promise<void> {
-  if (typeof document === 'undefined') return
-  if (document.documentElement.dataset.vibrancy !== 'native') {
-    // First successful enable, or no-op on unsupported hosts.
-    await enableNativeVibrancy()
-    return
-  }
   await enableNativeVibrancy()
 }

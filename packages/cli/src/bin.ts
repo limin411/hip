@@ -4,7 +4,8 @@ import { printVersion } from './commands/version.js'
 import { runDoctor } from './commands/doctor.js'
 import { runCommand } from './commands/run.js'
 import { printAuthStatus } from './commands/config.js'
-import { sessionDelete, sessionList, sessionShow } from './commands/session.js'
+import { sessionCreate, sessionDelete, sessionList, sessionSend, sessionShow } from './commands/session.js'
+import { worktreeCreate, worktreeList, worktreeRemove } from './commands/worktree.js'
 import { runRepl } from './commands/repl.js'
 import type { HipRunOptions, HitlMode, PermissionModeCli, PresetName, SidecarMode, StreamMode } from './types.js'
 import { CLI_VERSION } from './version.js'
@@ -41,7 +42,59 @@ async function main(): Promise<void> {
 
   const session = program
     .command('session')
-    .description('List / show / delete sessions (uses ~/.hip db by default)')
+    .description('List / show / create / send / delete sessions (uses ~/.hip db by default)')
+  session
+    .command('create')
+    .description('Create a session (code surface when --cwd is set)')
+    .option('-c, --cwd <path>', 'Working directory (absolute after resolve)')
+    .option('--provider <id>', 'LLM provider', 'deepseek')
+    .option('--model <id>', 'Model id', 'deepseek-chat')
+    .option('--base-url <url>', 'Provider base URL')
+    .option('--permission-mode <mode>', 'chat|edit|full')
+    .option('--surface <s>', 'chat|code')
+    .option('--json', 'Emit JSON')
+    .option('--isolate', 'Use temp isolation DB instead of user ~/.hip')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await sessionCreate({
+        cwd: flags.cwd as string | undefined,
+        provider: flags.provider as string | undefined,
+        model: flags.model as string | undefined,
+        baseURL: flags.baseUrl as string | undefined,
+        permissionMode: flags.permissionMode as 'chat' | 'edit' | 'full' | undefined,
+        surface: flags.surface as 'chat' | 'code' | undefined,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+  session
+    .command('send')
+    .description('Send one user message and wait for the turn to settle')
+    .argument('<id>', 'Session id or unique prefix')
+    .argument('<prompt>', 'User prompt')
+    .option('--hitl <mode>', 'auto|fail|prompt', 'auto')
+    .option('--timeout <sec>', 'Overall timeout seconds (0 = none)', (v) => Number(v), 0)
+    .option('--json', 'Emit JSON result')
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (id: string, prompt: string, flags: Record<string, unknown>) => {
+      process.exitCode = await sessionSend(id, prompt, {
+        hitl: flags.hitl as 'auto' | 'fail' | 'prompt' | undefined,
+        timeoutSec: flags.timeout as number | undefined,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
   session
     .command('list')
     .description('List persisted sessions')
@@ -94,6 +147,75 @@ async function main(): Promise<void> {
       process.exitCode = await sessionDelete(id, {
         yes: flags.yes === true,
         deleteDerivedMemories: flags.deleteDerivedMemories === true,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+
+  const worktree = program.command('worktree').description('Git worktree ops (managed under ~/.hip/worktrees)')
+  worktree
+    .command('create')
+    .description('Create a managed worktree from a session cwd')
+    .requiredOption('-s, --session <id>', 'Host session id (must have git cwd)')
+    .requiredOption('-b, --branch <name>', 'Branch name')
+    .option('--create-branch', 'Create branch before worktree add')
+    .option('--base-ref <ref>', 'Start point for --create-branch')
+    .option('--path-key <key>', 'Relative path under managed worktrees dir')
+    .option('--json', 'Emit JSON result')
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await worktreeCreate({
+        sessionId: flags.session as string,
+        branch: flags.branch as string,
+        createBranch: flags.createBranch === true,
+        baseRef: flags.baseRef as string | undefined,
+        pathKey: flags.pathKey as string | undefined,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+  worktree
+    .command('list')
+    .description('List worktrees for the repo bound to a session')
+    .requiredOption('-s, --session <id>', 'Session id with git cwd')
+    .option('--json', 'Emit JSON')
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await worktreeList({
+        sessionId: flags.session as string,
+        json: flags.json === true,
+        useUserHip: flags.isolate !== true,
+        port: flags.port as number | undefined,
+        token: flags.token as string | undefined,
+        sidecarLog: flags.sidecarLog as string | undefined,
+      })
+    })
+  worktree
+    .command('remove')
+    .description('Remove a managed worktree path')
+    .requiredOption('-s, --session <id>', 'Session id with git cwd')
+    .requiredOption('-p, --path <path>', 'Absolute worktree path under managed dir')
+    .option('--json', 'Emit JSON')
+    .option('--isolate', 'Use temp isolation DB')
+    .option('--port <n>', 'Attach port', (v) => Number(v))
+    .option('--token <t>', 'Attach token')
+    .option('--sidecar-log <path>', 'Attach via handshake log')
+    .action(async (flags: Record<string, unknown>) => {
+      process.exitCode = await worktreeRemove({
+        sessionId: flags.session as string,
+        worktreePath: flags.path as string,
         json: flags.json === true,
         useUserHip: flags.isolate !== true,
         port: flags.port as number | undefined,

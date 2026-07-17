@@ -152,6 +152,132 @@ function printMessage(m: Message): void {
   if (m.stopped) process.stdout.write('  (stopped)\n')
 }
 
+export interface SessionCreateOpts extends SessionCmdOpts {
+  cwd?: string
+  provider?: string
+  model?: string
+  baseURL?: string
+  permissionMode?: 'chat' | 'edit' | 'full'
+  surface?: 'chat' | 'code'
+}
+
+export async function sessionCreate(opts: SessionCreateOpts = {}): Promise<number> {
+  const path = await import('node:path')
+  const cwd = opts.cwd ? path.resolve(opts.cwd) : undefined
+  const surface = opts.surface ?? (cwd ? 'code' : 'chat')
+  const conn = await connectSidecar({
+    useUserHip: opts.useUserHip !== false,
+    allowNoKey: true,
+    port: opts.port,
+    token: opts.token,
+    sidecarLog: opts.sidecarLog,
+    sidecar: opts.port || opts.token || opts.sidecarLog ? 'auto' : 'spawn',
+  })
+  try {
+    const id = crypto.randomUUID()
+    const createdP = waitForServerMessage(conn.client, 'session:created', {
+      timeoutMs: 15_000,
+      match: (m) => m.sessionId === id,
+    })
+    conn.client.send({
+      type: 'session:create',
+      id,
+      config: {
+        llmProvider: opts.provider ?? 'deepseek',
+        model: opts.model ?? 'deepseek-chat',
+        ...(opts.baseURL ? { baseURL: opts.baseURL } : {}),
+        tools: [],
+        surface,
+        ...(cwd ? { cwd } : {}),
+        permissionMode: opts.permissionMode ?? (surface === 'code' ? 'edit' : 'chat'),
+      },
+    })
+    await createdP
+    if (opts.json) {
+      process.stdout.write(JSON.stringify({ sessionId: id, cwd: cwd ?? null, surface }) + '\n')
+    } else {
+      process.stdout.write(`${id}\n`)
+    }
+    return 0
+  } catch (err) {
+    process.stderr.write(`[session create] ${err instanceof Error ? err.message : String(err)}\n`)
+    return 1
+  } finally {
+    await conn.close()
+  }
+}
+
+export interface SessionSendOpts extends SessionCmdOpts {
+  hitl?: 'auto' | 'fail' | 'prompt'
+  timeoutSec?: number
+}
+
+export async function sessionSend(
+  idArg: string,
+  prompt: string,
+  opts: SessionSendOpts = {},
+): Promise<number> {
+  const text = prompt.trim()
+  if (!text) {
+    process.stderr.write('empty prompt\n')
+    return 2
+  }
+  const conn = await connectSidecar({
+    useUserHip: opts.useUserHip !== false,
+    allowNoKey: true,
+    port: opts.port,
+    token: opts.token,
+    sidecarLog: opts.sidecarLog,
+    sidecar: opts.port || opts.token || opts.sidecarLog ? 'auto' : 'spawn',
+  })
+  try {
+    const listP = waitForServerMessage(conn.client, 'session:list:result', { timeoutMs: 10_000 })
+    conn.client.send({ type: 'session:list' })
+    const list = await listP
+    const id = resolveSessionId(idArg, list.sessions) ?? idArg
+
+    const { runTurn } = await import('../client/turn-runner.js')
+    const userMessageId = crypto.randomUUID()
+    const hitl = opts.hitl ?? 'auto'
+    const timeoutSec = opts.timeoutSec ?? 0
+    const deadlineAt = timeoutSec > 0 ? Date.now() + timeoutSec * 1000 : null
+
+    const outcome = await runTurn({
+      sessionId: id,
+      userMessageId,
+      prompt: text,
+      hitl,
+      maxPlanApprovals: 1,
+      settleMs: 400,
+      deadlineAt,
+      allowNoKey: true,
+      isTty: Boolean(process.stdin.isTTY),
+      send: (msg) => conn.client.send(msg),
+      subscribe: (handler) => conn.client.onMessage(handler),
+    })
+
+    if (opts.json) {
+      process.stdout.write(
+        JSON.stringify({
+          sessionId: id,
+          status: outcome.status,
+          text: outcome.text,
+          exitCode: outcome.exitCode,
+        }) + '\n',
+      )
+    } else {
+      if (outcome.text) process.stdout.write(outcome.text + (outcome.text.endsWith('\n') ? '' : '\n'))
+      process.stderr.write(`[session send] status=${outcome.status}\n`)
+    }
+    return outcome.exitCode
+  } catch (err) {
+    process.stderr.write(`[session send] ${err instanceof Error ? err.message : String(err)}\n`)
+    return 1
+  } finally {
+    await conn.close()
+  }
+}
+
 export async function sessionDelete(idArg: string, opts: SessionCmdOpts = {}): Promise<number> {
   if (!opts.yes) {
     process.stderr.write('Refusing to delete without --yes\n')

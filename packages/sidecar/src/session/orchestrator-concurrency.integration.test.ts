@@ -59,7 +59,9 @@ class TrackingRunner implements AgentRunner {
       })
       const throwsMsg = this.throwsMap.get(req.nodeId)
       if (throwsMsg) throw new Error(throwsMsg)
-      return { text: req.input.text }
+      // Match FakeAgentRunner: empty input cannot pass node-runner empty-output guard.
+      const text = req.input.text?.trim() ? req.input.text : `fake-output-${req.nodeId}`
+      return { text }
     } finally {
       this.current--
     }

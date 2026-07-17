@@ -37,8 +37,12 @@ export class FakeAgentRunner implements AgentRunner {
       })
     }
     if (s.throws) throw new Error(s.throws)
-    // 默认回显:把输入透传,便于断言数据流
-    return { text: s.text ?? req.input.text, data: s.data }
+    // 默认回显输入;入口节点常无 input.text,但 node-runner 会拒绝 empty output,
+    // 故在双空时回落为可识别的 fake 文本,供未显式 script 的 fan-out 测试使用。
+    const text =
+      s.text ??
+      (req.input.text?.trim() ? req.input.text : `fake-output-${req.nodeId}`)
+    return { text, data: s.data }
   }
 }
 export class InMemoryWorkflowStore implements WorkflowStore {

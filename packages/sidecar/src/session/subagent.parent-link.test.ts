@@ -165,8 +165,9 @@ describe('runSubagent parent observation links (E2)', () => {
       parentAgentId: 'supervisor',
       agentId: 'w1',
     })
-    // Spawn is not a LoopEvent — loopSignal stays idle for spawn path.
-    expect(loopEvents).toEqual([])
+    // Child graph may emit loop.end on completion when loopSignal is wired.
+    // Spawn itself is not a LoopEvent — only lifecycle end is allowed here.
+    expect(loopEvents.every((e) => (e as { type?: string }).type === 'loop.end')).toBe(true)
   })
 
   it('nested task spawns get unique sibling agentIds and parentId = parent agent', async () => {

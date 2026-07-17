@@ -226,6 +226,33 @@ describe('Session idle-timeout watchdog', () => {
     expect(sent.some((m) => m.type === 'error' && (m as Ev).code === 'TIMEOUT')).toBe(false)
     expect(sent.some((m) => m.type === 'message:complete')).toBe(true)
   })
+
+  it('does not TIMEOUT when tool-call stream activity pulses past the idle window', async () => {
+    // Simulates large write_file arg streaming: no text for a while, only onActivity kicks.
+    const idleMs = 40
+    const runner: ModelRunner = {
+      async run(_m: BaseMessage[], opts: ModelRunOptions) {
+        for (let i = 0; i < 6; i++) {
+          opts.onActivity?.()
+          await new Promise((r) => setTimeout(r, 20))
+        }
+        opts.onText('done')
+        return new AIMessage('done')
+      },
+    }
+    const session = new Session(
+      't-tool-activity',
+      { llmProvider: 'deepseek', model: 'deepseek-chat', tools: [] },
+      undefined,
+      undefined,
+      undefined,
+      idleMs,
+      runner,
+    )
+    const events = await collect(session, 'rewrite svg')
+    expect(events.some((e) => e.type === 'error' && e.code === 'TIMEOUT')).toBe(false)
+    expect(events.some((e) => e.type === 'message:complete')).toBe(true)
+  })
 })
 
 describe('Session chat mode ACP auto-allow', () => {

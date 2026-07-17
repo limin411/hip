@@ -26,7 +26,11 @@ describe('diffHunkProvider', () => {
       },
       makeCtx(),
     )
-    expect(items.map((i) => i.id)).toEqual(['diffHunk.copy'])
+    expect(items.map((i) => i.id)).toEqual([
+      'diffHunk.copy',
+      'diffHunk.annotate',
+      'diffHunk.quoteToComposer',
+    ])
     await items[0]!.run()
     expect(copyText).toHaveBeenCalledWith('@@ -1 +1 @@\n-old\n+new')
   })

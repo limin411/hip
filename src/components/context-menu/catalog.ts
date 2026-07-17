@@ -138,6 +138,18 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     icon: 'code',
   },
   {
+    id: 'diffHunk.annotate',
+    labelKey: 'contextMenu.diffHunk.annotate',
+    kind: 'diffHunk',
+    group: 'agent',
+  },
+  {
+    id: 'diffHunk.quoteToComposer',
+    labelKey: 'contextMenu.diffHunk.quoteToComposer',
+    kind: 'diffHunk',
+    group: 'agent',
+  },
+  {
     id: 'checkpoint.copyId',
     labelKey: 'contextMenu.checkpoint.copyId',
     kind: 'checkpoint',
@@ -332,6 +344,12 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     labelKey: 'contextMenu.terminal.copySelection',
     kind: 'terminal',
     group: 'clipboard',
+  },
+  {
+    id: 'terminal.sendSelectionToChat',
+    labelKey: 'contextMenu.terminal.sendSelectionToChat',
+    kind: 'terminal',
+    group: 'agent',
   },
   {
     id: 'terminal.paste',

@@ -6,6 +6,7 @@ import {
   pasteToTerminalCanvas,
   terminalCanvasHasSelection,
 } from '@/components/artifact/terminalCanvasUi'
+import { setComposerQuote } from '@/components/command-palette/composerBridge'
 import { useDomainStore } from '@/domain/sessionStore'
 import { sessionService } from '@/domain/sessionService'
 import { useUiStore } from '@/store/uiStore'
@@ -45,6 +46,18 @@ function canvasItems(
         const text = getTerminalCanvasSelection()
         if (!text) return
         void ctx.copyText(text)
+      },
+    },
+    {
+      id: 'terminal.sendSelectionToChat',
+      label: ctx.t('contextMenu.terminal.sendSelectionToChat'),
+      group: 'agent',
+      disabled: !hasSel,
+      disabledReason: hasSel ? undefined : ctx.t('contextMenu.terminal.copySelectionDisabled'),
+      run: () => {
+        const text = getTerminalCanvasSelection()
+        if (!text) return
+        setComposerQuote(text)
       },
     },
     {

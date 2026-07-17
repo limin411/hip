@@ -117,6 +117,7 @@ describe('terminalProvider', () => {
     )
     expect(items.map((i) => i.id)).toEqual([
       'terminal.copySelection',
+      'terminal.sendSelectionToChat',
       'terminal.paste',
       'terminal.restart',
     ])
@@ -158,10 +159,12 @@ describe('terminalProvider', () => {
       { kind: 'terminal', payload: { sessionId: 's1', status: 'running', target: 'canvas' } },
       makeCtx(),
     )
+    // mergeByGroup orders clipboard then other groups; agent group lands after restart.
     expect(items.map((i) => i.id)).toEqual([
       'terminal.copySelection',
       'terminal.paste',
       'terminal.restart',
+      'terminal.sendSelectionToChat',
     ])
     expect(items[0]!.separatorBefore).toBeFalsy()
     expect(items.find((i) => i.id === 'terminal.restart')!.separatorBefore).toBe(true)

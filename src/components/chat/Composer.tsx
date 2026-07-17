@@ -23,6 +23,8 @@ export function Composer({
   onAttachmentsChange,
   quoteText,
   onQuoteClear,
+  annotationCount = 0,
+  onAnnotationClear,
   inputRef,
 }: {
   value: string
@@ -39,12 +41,35 @@ export function Composer({
   /** Pending quote shown as a compact chip above the input (full text used on send). */
   quoteText?: string | null
   onQuoteClear?: () => void
+  /** Pending diff annotations chip count. */
+  annotationCount?: number
+  onAnnotationClear?: () => void
   inputRef?: React.RefObject<HTMLTextAreaElement>
 }) {
   const { t } = useTranslation()
   const hasQuote = !!quoteText?.trim()
+  const hasAnns = annotationCount > 0
   return (
     <div className="rounded-xl border border-border bg-surface p-2 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8 transition-shadow">
+      {hasAnns && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-md border border-border bg-surface-muted px-2.5 py-1.5"
+          data-testid="composer-diff-annotations"
+        >
+          <span className="min-w-0 flex-1 truncate text-meta text-ink-secondary">
+            {t('chat.diffAnnotations.chip', { count: annotationCount })}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 text-ink-tertiary hover:text-ink"
+            onClick={() => onAnnotationClear?.()}
+            aria-label={t('chat.diffAnnotations.clear')}
+            data-testid="composer-diff-annotations-clear"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {hasQuote && (
         <div
           className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5"

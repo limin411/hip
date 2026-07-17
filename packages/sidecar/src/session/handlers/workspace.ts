@@ -1,5 +1,6 @@
 import type { ClientMessage } from '@hip/protocol'
 import * as workspaceGit from '../workspace-git.js'
+import { createWorktreeService } from '../worktree-service.js'
 import type { SendFn, SessionManagerContext } from './types.js'
 
 export const WORKSPACE_MESSAGE_TYPES = new Set([
@@ -116,6 +117,7 @@ export async function handleWorkspaceMessage(
       const s = ctx.ensureSession(msg.sessionId, send)
       const cwd = s.config.cwd
       if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); return }
+      // createBranch stays in handler (branch must exist before service.create worktree add).
       if (msg.createBranch) {
         const br = await workspaceGit.gitCreateBranch(cwd, msg.branch, 'git', msg.baseRef)
         if (!br.ok) {
@@ -127,8 +129,16 @@ export async function handleWorkspaceMessage(
           }
         }
       }
-      const worktreePath = workspaceGit.resolveManagedWorktreePath(msg.pathKey, msg.branch)
-      const r = await workspaceGit.createWorktree(cwd, msg.branch, worktreePath)
+      const svc = createWorktreeService({
+        notify: (ev) => send({ type: 'worktree:changed', ...ev }),
+      })
+      const r = await svc.create({
+        cwd,
+        branch: msg.branch,
+        pathKey: msg.pathKey,
+        source: 'protocol',
+        hostSessionId: msg.sessionId,
+      })
       send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: r.ok, ...(r.path ? { path: r.path } : {}), ...(r.error ? { error: r.error } : {}) })
       return
     }
@@ -136,15 +146,19 @@ export async function handleWorkspaceMessage(
       const s = ctx.ensureSession(msg.sessionId, send)
       const cwd = s.config.cwd
       if (!cwd) { send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: [] }); return }
-      const r = await workspaceGit.listWorktrees(cwd)
-      send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: r.worktrees ?? [] })
+      const svc = createWorktreeService()
+      const r = await svc.list({ cwd, managedOnly: true })
+      send({ type: 'git:worktree:list:result', sessionId: msg.sessionId, worktrees: r.worktrees })
       return
     }
     case 'git:worktree:remove': {
       const s = ctx.ensureSession(msg.sessionId, send)
       const cwd = s.config.cwd
       if (!cwd) { send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); return }
-      const r = await workspaceGit.removeWorktree(cwd, msg.worktreePath)
+      const svc = createWorktreeService({
+        notify: (ev) => send({ type: 'worktree:changed', ...ev }),
+      })
+      const r = await svc.remove({ cwd, worktreePath: msg.worktreePath, hostSessionId: msg.sessionId })
       send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
       return
     }

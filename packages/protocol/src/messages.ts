@@ -21,6 +21,7 @@ import type {
   CommitLogEntry,
   Branch,
   WorktreeInfo,
+  WorktreeRecord,
   FsEntry,
 } from './workspace-types.js'
 import type { McpServerConfig } from './mcp-config.js'
@@ -212,6 +213,19 @@ export type ServerMessage =
   | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; error?: string }
   | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
   | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
+  /**
+   * Product worktree catalog change on the same WS as the creating client (KD5).
+   * Server-only — not a client RPC; message-guard unchanged.
+   */
+  | {
+      type: 'worktree:changed'
+      sessionId?: string
+      repoKey: string
+      kind: 'created' | 'updated' | 'removed' | 'discovered' | 'imported'
+      worktree: WorktreeRecord
+      /** When true, UI should expand host and scroll to this worktree. */
+      reveal?: boolean
+    }
   /** Agent-driven parallel worktree run started (after user HITL). */
   | {
       type: 'parallel:started'

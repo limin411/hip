@@ -227,6 +227,7 @@ export const zhTW = {
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
         initializing: '準備中…',
+        planProgress: '計畫 {{done}}/{{total}}',
         viewInActivity: '工具明細見上方活動',
         elapsed: '{{time}}',
         groups: {

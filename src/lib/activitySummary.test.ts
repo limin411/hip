@@ -84,6 +84,43 @@ describe('activitySummary', () => {
     }
   })
 
+  it('includes planProgress from supervisor write_todos', () => {
+    const tools = [
+      tc({
+        callId: 'p1',
+        name: 'write_todos',
+        input: JSON.stringify({
+          todos: [
+            { content: 'a', status: 'completed' },
+            { content: 'b', status: 'pending' },
+          ],
+        }),
+        seq: 0,
+      }),
+      tc({ callId: '2', name: 'grep', input: '{"pattern":"x"}', seq: 1 }),
+    ]
+    const { parts } = buildActivitySummary({ toolCalls: tools, hasAssistantContent: true })
+    expect(parts).toContainEqual({ type: 'planProgress', done: 1, total: 2 })
+  })
+
+  it('prefixes planProgress while streaming', () => {
+    const tools = [
+      tc({
+        callId: 'p1',
+        name: 'write_todos',
+        input: JSON.stringify({ todos: [{ content: 'a', status: 'in_progress' }] }),
+        seq: 0,
+      }),
+      tc({ callId: 'c1', name: 'grep', input: '{"pattern":"zuolin"}', status: 'running', seq: 1 }),
+    ]
+    const steps = [
+      { kind: 'tool' as const, stepSeq: 1, agentId: 'supervisor', role: 'supervisor' as const, callId: 'c1' },
+    ]
+    const { parts } = buildActivitySummary({ streaming: true, toolCalls: tools, steps })
+    expect(parts[0]).toEqual({ type: 'planProgress', done: 0, total: 1 })
+    expect(parts[1]).toMatchObject({ type: 'runningTool' })
+  })
+
   it('countToolsByCategory', () => {
     const c = countToolsByCategory([
       tc({ callId: '1', name: 'grep' }),

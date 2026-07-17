@@ -227,6 +227,7 @@ export const zhCN = {
         runningTool: '正在 {{name}}',
         runningReasoning: '正在思考',
         initializing: '准备中…',
+        planProgress: '计划 {{done}}/{{total}}',
         viewInActivity: '工具明细见上方活动',
         elapsed: '{{time}}',
         groups: {

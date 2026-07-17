@@ -1,5 +1,6 @@
 import type { AgentRun, ToolCall, TimelineStep } from '@hip/protocol'
 import { toolCategory, toolTitleHint, TASK_HINT_MAX } from './toolPresentation'
+import { latestTodos, planProgress } from './todos'
 
 export type ActivityUiStatus = 'running' | 'success' | 'success_partial' | 'error' | 'stopped'
 
@@ -14,6 +15,7 @@ export type SummaryPart =
   | { type: 'runningTool'; label: string }
   | { type: 'runningReasoning' }
   | { type: 'initializing' }
+  | { type: 'planProgress'; done: number; total: number }
 
 export interface ActivitySummaryInput {
   streaming?: boolean
@@ -74,6 +76,18 @@ export function resolveActivityStatus(input: ActivitySummaryInput): ActivityUiSt
   return 'success'
 }
 
+function planProgressPart(tools: ToolCall[]): SummaryPart | null {
+  const live = latestTodos(tools)
+  if (!live || live.todos.length === 0) return null
+  const p = planProgress(live.todos)
+  return { type: 'planProgress', done: p.done, total: p.total }
+}
+
+function withPlanProgress(parts: SummaryPart[], tools: ToolCall[]): SummaryPart[] {
+  const plan = planProgressPart(tools)
+  return plan ? [plan, ...parts] : parts
+}
+
 /**
  * Build structured summary parts for the ActivityBar.
  * Guarantees completed turns with tools are not "toolCount-only" when category or task data exists.
@@ -93,30 +107,42 @@ export function buildActivitySummary(input: ActivitySummaryInput): {
     if (last?.kind === 'tool') {
       const tool = tools.find((t) => t.callId === last.callId)
       if (tool) {
-        return { status: 'running', parts: [{ type: 'runningTool', label: toolTitleHint(tool) }] }
+        return {
+          status: 'running',
+          parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(tool) }], tools),
+        }
       }
     }
     if (last?.kind === 'reasoning') {
-      return { status: 'running', parts: [{ type: 'runningReasoning' }] }
+      return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
     }
     // Fallback: last running tool or any tool
     const running = [...tools].reverse().find((t) => t.status === 'running')
     if (running) {
-      return { status: 'running', parts: [{ type: 'runningTool', label: toolTitleHint(running) }] }
+      return {
+        status: 'running',
+        parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(running) }], tools),
+      }
     }
     if (tools.length > 0) {
       const lastTool = tools.reduce((a, b) => (a.seq >= b.seq ? a : b))
-      return { status: 'running', parts: [{ type: 'runningTool', label: toolTitleHint(lastTool) }] }
+      return {
+        status: 'running',
+        parts: withPlanProgress([{ type: 'runningTool', label: toolTitleHint(lastTool) }], tools),
+      }
     }
     if (steps.length === 0 && tools.length === 0 && runs.length === 0) {
       return { status: 'running', parts: [{ type: 'initializing' }] }
     }
-    return { status: 'running', parts: [{ type: 'runningReasoning' }] }
+    return { status: 'running', parts: withPlanProgress([{ type: 'runningReasoning' }], tools) }
   }
 
   const parts: SummaryPart[] = []
   if (status === 'stopped') parts.push({ type: 'stopped' })
   else parts.push({ type: 'completed' })
+
+  const plan = planProgressPart(tools)
+  if (plan) parts.push(plan)
 
   const taskHint = extractTaskHint(tools, runs)
   if (taskHint) parts.push({ type: 'taskHint', text: taskHint })

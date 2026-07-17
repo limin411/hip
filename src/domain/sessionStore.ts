@@ -32,7 +32,7 @@ export interface SessionVM {
   interrupt?: { turnId: string; question: string; context?: string } | null  // pending HITL question; null/absent = none
   configOptions?: AcpConfigOption[]  // agent-advertised model/mode selectors (ACP agents only); absent = none
   pendingPermission?: PendingPermission | null  // pending HITL tool-permission request (ACP agents only); null/absent = none
-  activeTurnPlan?: PlanItem[] | null  // authoritative plan snapshot from plan:published
+  activeTurnPlan?: PlanItem[] | null  // live plan from plan:updated / plan:published; cleared on next user turn
   planDeltaDraft?: Record<string, string>  // incremental plan text keyed by itemId, accumulated from plan:delta
   planApprovalPending?: boolean  // true when agent:interrupt carries a plan_approval context
   agentProfiles?: AgentProfileInfo[]  // list of available agent profiles from agent:profiles message
@@ -240,7 +240,8 @@ export function applyServerMessage(
 
     case 'message:complete': {
       const finalized: Message = { ...msg.message, toolCalls: coerceRunningToolCalls(msg.message.toolCalls) }
-      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', activeTurnPlan: null, planDeltaDraft: {}, planApprovalPending: false, messages: finalizeAssistant(s.messages, finalized) }))
+      // Keep activeTurnPlan for sticky done panel until the next user turn (appendUserMessage clears it).
+      return update(msg.sessionId, (s) => ({ ...s, status: 'idle', planDeltaDraft: {}, planApprovalPending: false, messages: finalizeAssistant(s.messages, finalized) }))
     }
 
     case 'agent:interrupt':
@@ -261,6 +262,9 @@ export function applyServerMessage(
         ...s,
         planDeltaDraft: { ...s.planDeltaDraft, [msg.itemId]: (s.planDeltaDraft?.[msg.itemId] ?? '') + msg.delta },
       }))
+
+    case 'plan:updated':
+      return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
 
     case 'plan:published':
       return update(msg.sessionId, (s) => ({ ...s, activeTurnPlan: msg.plan, planDeltaDraft: {} }))
@@ -538,7 +542,7 @@ export const useDomainStore = create<DomainStore>((set) => ({
           error: action === 'reject' ? sess.error : null,
           interrupt: null,
           planApprovalPending: false,
-          // Keep activeTurnPlan until message:complete for transcript context; card gates on planApprovalPending.
+          // Keep activeTurnPlan through execute / done; cleared on next user turn. Card gates on planApprovalPending.
           updatedAtMs: Date.now(),
         }
       }),

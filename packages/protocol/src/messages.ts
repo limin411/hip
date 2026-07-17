@@ -203,6 +203,9 @@ export type ServerMessage =
   | { type: 'mcp:getPrompt:result'; serverId: string; name: string; messages: McpPromptMessage[]; error?: string }
   | { type: 'mcp:status'; servers: Array<{ id: string; name: string; status: 'connected' | 'connecting' | 'disconnected' | 'error'; toolCount: number; toolNames: string[]; lastError?: string }> }
   | { type: 'plan:delta'; sessionId: string; turnId: string; itemId: string; delta: string }
+  /** Incremental plan checklist update (e.g. after write_todos); may fire many times per turn. */
+  | { type: 'plan:updated'; sessionId: string; turnId: string; plan: PlanItem[] }
+  /** Authoritative plan snapshot at plan-approval boundary (ExitPlanMode / pause). */
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }

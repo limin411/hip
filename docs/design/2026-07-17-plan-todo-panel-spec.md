@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Date** | 2026-07-17 |
-| **Status** | P0 implemented |
+| **Status** | P0 + P1 implemented |
 | **Related** | Plan entry (SPIKE-plan-entry), post-plan settle, `write_todos` / `PlanItem` |
 
 ---

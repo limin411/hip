@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Date** | 2026-07-17 |
-| **Status** | P0 implemented |
+| **Status** | P0 + P1 implemented |
 | **Spec** | [2026-07-17-plan-todo-panel-spec.md](./2026-07-17-plan-todo-panel-spec.md) |
 
 ---
@@ -76,12 +76,12 @@ yarn vitest run src/lib/todos.test.ts \
 
 ---
 
-## §2 P1（follow-up，不在本 PR 必做）
+## §2 P1（已做）
 
-1. Sidecar：`write_todos` 后 `plan:updated`。  
-2. Store：持续更新 `activeTurnPlan`；complete 时保留至下一 user turn。  
-3. ActivityBar 摘要行：`Plan 2/5`。  
-4. Eval 断言 `plan-progress-panel`。
+1. Sidecar：`write_todos` 后 `plan:updated`（`GraphEmit.planUpdated`）。  
+2. Store：`plan:updated` 写入 `activeTurnPlan`；`message:complete` **保留** plan 至 `appendUserMessage`。  
+3. ActivityBar 摘要：`planProgress` → `Plan {{done}}/{{total}}`。  
+4. Eval helper：`planProgressPanelVisible()`。
 
 ---
 

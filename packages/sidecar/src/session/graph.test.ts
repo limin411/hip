@@ -289,6 +289,47 @@ describe('agent loop graph', () => {
     })
   })
 
+  it('write_todos emits planUpdated with structured PlanItems', async () => {
+    await withTmp(async (root) => {
+      const plans: Array<{ content: string; status: string }>[] = []
+      const emit: GraphEmit = {
+        ...noopEmit,
+        planUpdated: (plan) => { plans.push(plan) },
+      }
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({
+          content: '',
+          tool_calls: [{
+            name: 'write_todos',
+            args: {
+              todos: [
+                { content: 'step a', status: 'completed' },
+                { content: 'step b', status: 'in_progress' },
+              ],
+            },
+            id: 'wt1',
+          }],
+        }),
+        new AIMessage('done'),
+      ])
+      await app.invoke(
+        {
+          messages: [new HumanMessage('plan something')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'none',
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit, summarizer: noopSummarizer } } },
+      )
+      expect(plans.length).toBeGreaterThanOrEqual(1)
+      expect(plans[0]).toEqual([
+        { content: 'step a', status: 'completed' },
+        { content: 'step b', status: 'in_progress' },
+      ])
+    })
+  })
+
   it('todoToPlanItem: guards against array items (no "undefined" content)', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()

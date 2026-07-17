@@ -527,11 +527,23 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].planDeltaDraft).toEqual({})
   })
 
-  it('message:complete clears the plan delta draft', () => {
+  it('plan:updated sets activeTurnPlan and clears delta draft', () => {
+    const plan = [{ content: 'step a', status: 'in_progress' as const }]
     let s = { sessions: [baseSession()] }
+    s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'draft' }, 100)
+    const next = applyServerMessage(s, { type: 'plan:updated', sessionId: 's1', turnId: 't1', plan }, 101)
+    expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+    expect(next.sessions[0].planDeltaDraft).toEqual({})
+  })
+
+  it('message:complete clears the plan delta draft but retains activeTurnPlan', () => {
+    const plan = [{ content: 'keep me', status: 'completed' as const }]
+    let s = { sessions: [baseSession({ activeTurnPlan: plan })] }
     s = applyServerMessage(s, { type: 'plan:delta', sessionId: 's1', turnId: 't1', itemId: 'p1', delta: 'draft' }, 100)
     const next = applyServerMessage(s, { type: 'message:complete', sessionId: 's1', message: { id: 'm1', role: 'assistant', content: 'done', timestamp: 101 } }, 102)
     expect(next.sessions[0].planDeltaDraft).toEqual({})
+    expect(next.sessions[0].activeTurnPlan).toEqual(plan)
+    expect(next.sessions[0].planApprovalPending).toBe(false)
   })
 
   it('plan:delta for an unknown session is a no-op', () => {

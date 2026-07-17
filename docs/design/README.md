@@ -17,7 +17,7 @@
 | [plan-todo-panel-spec](./2026-07-17-plan-todo-panel-spec.md) | forcePlan / write_todos / 审批全程 sticky 清单；LivePlanView 派生规则 |
 | [plan-todo-panel-plan](./2026-07-17-plan-todo-panel-plan.md) | P0 纯前端 PlanProgressPanel；P1 plan:updated |
 
-**状态：** P0 已落地（sticky `PlanProgressPanel`）；P1 `plan:updated` 待做。
+**状态：** P0 + P1 已落地（sticky panel + `plan:updated` + ActivityBar 进度）。
 
 ## Capability evaluation（能力评测）
 

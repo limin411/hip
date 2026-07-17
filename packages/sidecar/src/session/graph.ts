@@ -83,6 +83,8 @@ export interface GraphEmit {
   toolFinished(callId: string, status: 'finished' | 'error', output?: string, error?: string): void
   usage(u: TurnUsage): void
   planDelta(itemId: string, delta: string): void
+  /** Optional: emit when write_todos replaces the structured plan (UI sticky checklist). */
+  planUpdated?(plan: PlanItem[]): void
   compaction(summary: string, meta?: { replacedMessageIds?: string[] }): void
   /** Optional: signal that work is still progressing (keeps idle watchdog alive during long tools). */
   activity?(): void
@@ -576,6 +578,15 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     }
 
     const updatedPlan = deriveUpdatedPlan(state.plan, last.tool_calls ?? [])
+    // Notify UI whenever write_todos produced a checklist (may fire multiple times per turn).
+    const fromWriteTodos = planFromWriteTodos(last.tool_calls ?? [])
+    if (fromWriteTodos) {
+      try {
+        ctx.emit.planUpdated?.(fromWriteTodos)
+      } catch {
+        // best-effort; never break the tools node
+      }
+    }
 
     const sig = sigOf(last.tool_calls ?? [])
 
@@ -828,9 +839,8 @@ function todoToPlanItem(item: unknown): PlanItem {
   return { content: String(item), status: 'pending' as const }
 }
 
-/** Update the plan when the agent publishes a new todo list via write_todos.
- *  The tool replaces the whole plan, so we map its todos directly to PlanItems. */
-function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
+/** Extract PlanItems from a write_todos tool call, if present. */
+function planFromWriteTodos(toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
   for (const call of toolCalls ?? []) {
     if (call.name === 'write_todos' && call.args !== null && typeof call.args === 'object' && !Array.isArray(call.args)) {
       const todos = (call.args as Record<string, unknown>).todos
@@ -839,5 +849,11 @@ function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['t
       }
     }
   }
-  return plan
+  return undefined
+}
+
+/** Update the plan when the agent publishes a new todo list via write_todos.
+ *  The tool replaces the whole plan, so we map its todos directly to PlanItems. */
+function deriveUpdatedPlan(plan: PlanItem[] | undefined, toolCalls: AIMessage['tool_calls']): PlanItem[] | undefined {
+  return planFromWriteTodos(toolCalls) ?? plan
 }

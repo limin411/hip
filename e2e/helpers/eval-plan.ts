@@ -12,6 +12,17 @@ export async function planApprovalVisible(): Promise<boolean> {
   }
 }
 
+/** Sticky plan checklist / progress panel (forcePlan, write_todos, or approval). */
+export async function planProgressPanelVisible(): Promise<boolean> {
+  try {
+    return await browser.execute(() =>
+      Boolean(document.querySelector('[data-testid="plan-progress-panel"]')),
+    )
+  } catch {
+    return false
+  }
+}
+
 /** Click product Plan mode chip until active (draft or session forcePlan). */
 export async function enablePlanModeUi(): Promise<void> {
   const chip = await browser.$('[data-testid="plan-mode-chip"]')

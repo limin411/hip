@@ -228,6 +228,7 @@ export const en = {
         runningTool: '{{name}} in progress',
         runningReasoning: 'Thinking',
         initializing: 'Initializing…',
+        planProgress: 'Plan {{done}}/{{total}}',
         viewInActivity: 'Tool details are listed in activity above',
         elapsed: '{{time}}',
         groups: {

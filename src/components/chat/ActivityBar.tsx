@@ -59,6 +59,9 @@ function formatParts(
       case 'initializing':
         bits.push(t('chat.activity.initializing'))
         break
+      case 'planProgress':
+        bits.push(t('chat.activity.planProgress', { done: p.done, total: p.total }))
+        break
     }
   }
   return bits.join(' · ')

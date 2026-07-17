@@ -11,7 +11,6 @@ import {
 
 beforeEach(() => {
   useUiStore.setState({
-    settingsNavCollapsed: false,
     activeTab: 'agents',
     theme: 'system',
     language: 'zh-CN',
@@ -49,32 +48,6 @@ describe('uiStore - diffViewMode', () => {
 
     useUiStore.getState().setDiffViewMode('unified')
     expect(useUiStore.getState().diffViewMode).toBe('unified')
-  })
-})
-
-describe('uiStore - settingsNavCollapsed', () => {
-  it('defaults to expanded (false)', () => {
-    expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
-  })
-
-  it('toggleSettingsNav flips the collapsed flag', () => {
-    useUiStore.getState().toggleSettingsNav()
-    expect(useUiStore.getState().settingsNavCollapsed).toBe(true)
-
-    useUiStore.getState().toggleSettingsNav()
-    expect(useUiStore.getState().settingsNavCollapsed).toBe(false)
-  })
-
-  it('setSettingsNavCollapsed to the same value is a no-op (same reference)', () => {
-    useUiStore.getState().setSettingsNavCollapsed(false)
-    const before = useUiStore.getState()
-    useUiStore.getState().setSettingsNavCollapsed(false)
-    expect(useUiStore.getState()).toBe(before)
-  })
-
-  it('settings nav collapse toggles independently', () => {
-    useUiStore.getState().setSettingsNavCollapsed(true)
-    expect(useUiStore.getState().settingsNavCollapsed).toBe(true)
   })
 })
 
@@ -280,7 +253,6 @@ describe('uiStore persistence partialize', () => {
       theme: 'dark',
       language: 'en',
       settingsPage: 'model',
-      settingsNavCollapsed: true,
       diffViewMode: 'split',
       checkpointMode: 'since-start',
       activeTab: 'terminal',
@@ -294,7 +266,6 @@ describe('uiStore persistence partialize', () => {
       theme: s.theme,
       language: s.language,
       settingsPage: s.settingsPage,
-      settingsNavCollapsed: s.settingsNavCollapsed,
       diffViewMode: s.diffViewMode,
       checkpointMode: s.checkpointMode,
     }
@@ -304,7 +275,6 @@ describe('uiStore persistence partialize', () => {
       theme: 'dark',
       language: 'en',
       settingsPage: 'model',
-      settingsNavCollapsed: true,
       diffViewMode: 'split',
       checkpointMode: 'since-start',
     })

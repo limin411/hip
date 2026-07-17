@@ -7,25 +7,15 @@ import { switchToChatSurface } from '../helpers/surface.js'
 const CHAT_GREETING = '我们来做点什么？'
 
 describe('hip desktop app @smoke', () => {
-  it('should launch and show the login screen', async () => {
+  it('should launch directly into the main app', async () => {
     await waitForAppReady()
+    await waitForMainApp()
 
-    // Tauri WebView localStorage persists across app restarts, so a previous
-    // test run may have left the user already logged in. Reset auth state to
-    // guarantee the login screen is shown.
-    await browser.execute(() => localStorage.removeItem('hip.authed'))
-    await browser.refresh()
-
-    await browser.waitUntil(
-      async () => (await browser.getUrl()).includes('#/login'),
-      { timeout: 30000, interval: 500 }
-    )
-
-    const heading = await browser.$('h1')
-    await heading.waitForDisplayed({ timeout: 10000 })
-
-    const text = await heading.getText()
-    expect(text).toContain('登录到 hip')
+    const sidebar = await browser.$('[data-testid="app-sidebar"]')
+    const toolbar = await browser.$('[data-testid="main-toolbar"]')
+    const hasShell =
+      (await sidebar.isExisting()) || (await toolbar.isExisting())
+    expect(hasShell).toBe(true)
   })
 
   it('should navigate to the main app and render the chat landing', async () => {

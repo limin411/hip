@@ -790,7 +790,6 @@ export class SessionService {
    * Prefer this over account-menu + Radix nav when residual suite state is flaky.
    */
   openSettingsPageForE2e(page = 'general'): void {
-    useUiStore.getState().setSettingsNavCollapsed(false)
     useUiStore.getState().setSettingsPage(page as import('@/store/uiStore').SettingsPageId)
     useUiStore.getState().setActiveView('settings')
   }

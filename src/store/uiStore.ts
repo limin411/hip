@@ -58,7 +58,6 @@ export type UiPersistedState = {
   theme: Theme
   language: AppLanguage
   settingsPage: SettingsPageId
-  settingsNavCollapsed: boolean
   diffViewMode: 'unified' | 'split'
   checkpointMode: CheckpointMode
 }
@@ -77,6 +76,7 @@ export function mergeUiPersistedState<
     knowledgeTabOpen?: boolean
     sidebarSection?: SidebarSection
     openSessionIds?: string[]
+    settingsNavCollapsed?: boolean
   }
   // Drop legacy / non-persisted fields that must not rehydrate into shell state.
   const {
@@ -84,6 +84,7 @@ export function mergeUiPersistedState<
     knowledgeTabOpen: _legacyKb,
     sidebarSection: _legacySection,
     openSessionIds: _legacyTabs,
+    settingsNavCollapsed: _legacySettingsNav,
     ...rest
   } = p
   return {
@@ -96,10 +97,6 @@ export function mergeUiPersistedState<
 }
 
 interface UiState {
-  settingsNavCollapsed: boolean
-  setSettingsNavCollapsed: (v: boolean) => void
-  toggleSettingsNav: () => void
-
   /** Which settings category is selected (also used by /memory slash command). */
   settingsPage: SettingsPageId
   setSettingsPage: (page: SettingsPageId) => void
@@ -166,11 +163,6 @@ const storage = createJSONStorage<UiPersistedState>(() =>
 export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
-      settingsNavCollapsed: false,
-      setSettingsNavCollapsed: (v) =>
-        set((s) => (s.settingsNavCollapsed === v ? s : { settingsNavCollapsed: v })),
-      toggleSettingsNav: () => set((s) => ({ settingsNavCollapsed: !s.settingsNavCollapsed })),
-
       settingsPage: 'general',
       setSettingsPage: (page) =>
         set((s) => (s.settingsPage === page ? s : { settingsPage: page })),
@@ -254,7 +246,6 @@ export const useUiStore = create<UiState>()(
         theme: s.theme,
         language: s.language,
         settingsPage: s.settingsPage,
-        settingsNavCollapsed: s.settingsNavCollapsed,
         diffViewMode: s.diffViewMode,
         checkpointMode: s.checkpointMode,
       }),

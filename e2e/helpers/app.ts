@@ -1,6 +1,6 @@
 export async function waitForAppReady(timeoutMs = 60000): Promise<void> {
   await browser.waitUntil(
-    async () => (await browser.getUrl()).includes('#/login') || (await browser.getUrl()).includes('#/app'),
+    async () => (await browser.getUrl()).includes('#/app'),
     { timeout: timeoutMs, interval: 500 }
   )
   // Wait for the Tauri bridge to be usable.

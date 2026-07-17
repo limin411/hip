@@ -12,7 +12,6 @@ import { toast } from 'sonner'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
-import { PlanProgressPanel } from './PlanProgressPanel'
 import { hasPlanApproval } from './planApproval'
 
 export function ChatPane() {
@@ -185,14 +184,6 @@ export function ChatPane() {
                 </Button>
               </div>
             </div>
-          )}
-          {livePlan && (
-            <PlanProgressPanel
-              view={livePlan}
-              onApprove={() => sessionService.respondPlan('approve')}
-              onReject={() => sessionService.respondPlan('reject')}
-              onAmend={(content) => sessionService.respondPlan('amend', content)}
-            />
           )}
           {error && (
             <div

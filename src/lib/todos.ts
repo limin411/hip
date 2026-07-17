@@ -104,7 +104,9 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   // New turn started: do not stick previous assistant todos.
   if (last?.role === 'user' && status === 'running') {
     if (planItems) {
-      return makeView(planItems, 'executing', 'activeTurnPlan')
+      // forcePlan still on → drafting/resume-plan; cleared after approve → execute.
+      const phase: PlanPhase = forcePlan && !planApprovalPending ? 'planning' : 'executing'
+      return makeView(planItems, phase, 'activeTurnPlan')
     }
     if (forcePlan) {
       return makeView([], 'planning', 'empty')
@@ -124,12 +126,15 @@ export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null 
   const toolItems = toolPlan && toolPlan.todos.length > 0 ? todosToPlanItems(toolPlan.todos) : null
 
   if (toolItems) {
-    const phase: PlanPhase = status === 'running' ? 'executing' : 'done'
+    // forcePlan + running + no approval yet → still drafting (not execute phase).
+    const phase: PlanPhase =
+      status !== 'running' ? 'done' : forcePlan && !planApprovalPending ? 'planning' : 'executing'
     return makeView(toolItems, phase, 'write_todos')
   }
 
   if (planItems) {
-    const phase: PlanPhase = status === 'running' ? 'executing' : 'done'
+    const phase: PlanPhase =
+      status !== 'running' ? 'done' : forcePlan && !planApprovalPending ? 'planning' : 'executing'
     return makeView(planItems, phase, 'activeTurnPlan')
   }
 

@@ -103,7 +103,7 @@ visible ⇔ selectLivePlan(...) !== null
 
 ### 位置
 
-消息列表滚动区底部、与现有 interrupt / `PlanApprovalCard` 同列（`ChatPane` 内 `max-w-3xl` 列），Composer **之上**（随滚动可见；不做 fixed overlay，避免挡输入）。
+Composer（`InputBar`）**正上方** sticky 槽位（`ComposerPlanPanel` / `data-testid="composer-plan-slot"`），与消息滚动区分离，滚动 transcript 时仍可见；不做 fixed overlay 挡输入。
 
 ### PlanProgressPanel
 
@@ -207,7 +207,7 @@ visible ⇔ selectLivePlan(...) !== null
 
 | 决策 | 理由 |
 |------|------|
-| Sticky 在消息列内而非 fixed | 不挡 Composer；与审批卡同构 |
+| Sticky 在 Composer 上方槽位而非消息流内 | 滚动时仍可见；不挡输入；与审批卡同构 |
 | P0 纯前端派生 | 数据已在 tool stream / activeTurnPlan；交付快 |
 | 仅 supervisor todos | 与 `latestTodos` 既有不变量一致 |
 | 审批并入 ProgressPanel | 单一清单源，避免双 UI |

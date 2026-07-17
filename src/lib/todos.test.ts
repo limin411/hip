@@ -147,6 +147,23 @@ describe('selectLivePlan', () => {
     expect(view?.progress).toEqual({ done: 1, total: 2, current: 'step b' })
   })
 
+  it('keeps phase planning when forcePlan drafts todos before approval', () => {
+    const view = selectLivePlan({
+      messages: [
+        user(),
+        assistant({
+          toolCalls: [tc({ input: todosInput, seq: 1 })],
+        }),
+      ],
+      status: 'running',
+      forcePlan: true,
+      planApprovalPending: false,
+    })
+    expect(view?.phase).toBe('planning')
+    expect(view?.source).toBe('write_todos')
+    expect(view?.items).toHaveLength(2)
+  })
+
   it('marks done after idle when last assistant has write_todos', () => {
     const view = selectLivePlan({
       messages: [

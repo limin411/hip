@@ -75,6 +75,18 @@ function reentryPlanReminder(planFilePath: string): string {
 Plan file: ${planFilePath}`
 }
 
+/** Injected when the model tries to finish while planStatus is still generating. */
+const PLAN_EXIT_NUDGE = `Plan mode is still active — you must NOT deliver a final answer yet.
+
+Required next steps:
+1. Write the plan to the plan file (Write/Edit) and/or call write_todos with structured steps.
+2. Call ExitPlanMode so the user can approve before any non-plan work.
+
+Do this now. Do not answer the user request until ExitPlanMode has been called.`
+
+/** Max times we re-prompt before auto-submitting an existing plan (or allowing END). */
+const PLAN_EXIT_NUDGE_MAX = 1
+
 /** Streaming sinks the graph emits through (wired to the WS layer in session.ts). */
 export interface GraphEmit {
   token(delta: string): void
@@ -164,6 +176,8 @@ const LoopState = Annotation.Root({
   compacted: Annotation<boolean>({ reducer: (_prev, next) => next, default: () => false }),
   deferredMessages: Annotation<BaseMessage[]>({ reducer: (prev, next) => [...(Array.isArray(prev) ? prev : []), ...(Array.isArray(next) ? next : [])], default: () => [] }),
   planStepsSinceInjection: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
+  /** How many times we nudged the model to ExitPlanMode while planStatus=generating. */
+  planExitNudgeCount: Annotation<number>({ reducer: (_prev, next) => next, default: () => 0 }),
 })
 
 type State = typeof LoopState.State
@@ -717,12 +731,53 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     return { status: 'awaiting_user', pendingQuestion: question }
   }
 
-  function routeAfterAgent(state: State, config: LangGraphRunnableConfig): 'tools' | typeof END {
+  /**
+   * Re-prompt when the model tries to finish while still drafting a plan.
+   * Prevents forcePlan turns from answering immediately without write_todos / ExitPlanMode.
+   */
+  function planExitNudge(state: State, config: LangGraphRunnableConfig): Partial<State> {
+    const ctx = ctxOf(config)
+    emitLoopSignal(ctx.emit.loopSignal, {
+      type: 'loop.nudge',
+      ...loopIds(ctx),
+      reason: 'plan_exit',
+    })
+    return {
+      messages: [new SystemMessage(PLAN_EXIT_NUDGE)],
+      planExitNudgeCount: (state.planExitNudgeCount ?? 0) + 1,
+    }
+  }
+
+  /**
+   * Agent forgot ExitPlanMode but already produced write_todos — submit for approval.
+   */
+  function planAutoReady(_state: State, _config: LangGraphRunnableConfig): Partial<State> {
+    return { planStatus: 'ready' }
+  }
+
+  function routeAfterAgent(
+    state: State,
+    config: LangGraphRunnableConfig,
+  ): 'tools' | 'planExitNudge' | 'planAutoReady' | typeof END {
     const last = state.messages[state.messages.length - 1] as AIMessage
     const wantsTools = (last.tool_calls?.length ?? 0) > 0
     const ctx = ctxOf(config)
     const stepCap = ctx.maxSteps ?? maxSteps
     if (wantsTools && state.steps < stepCap) return 'tools'
+
+    // Plan drafting: refuse to complete until ExitPlanMode (or auto-submit if todos exist).
+    if (state.planningMode === 'plan' && state.planStatus === 'generating') {
+      const hasPlanItems = (state.plan?.length ?? 0) > 0
+      if (hasPlanItems) {
+        // Agent wrote todos but skipped ExitPlanMode — still gate on user approval.
+        return 'planAutoReady'
+      }
+      if ((state.planExitNudgeCount ?? 0) < PLAN_EXIT_NUDGE_MAX) {
+        return 'planExitNudge'
+      }
+      // After nudge still no plan: allow END to avoid infinite hang (soft fallback).
+    }
+
     // Terminal (not via pause node). Skip if status already terminal — e.g. circuit breaker
     // emitted loop.end at trip time; pause/planPause emit loop.pause and end via their edges.
     if (state.status !== 'awaiting_user') {
@@ -806,10 +861,19 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     .addNode('nudge', nudge)
     .addNode('pause', pause)
     .addNode('planPause', planPause)
+    .addNode('planExitNudge', planExitNudge)
+    .addNode('planAutoReady', planAutoReady)
     .addEdge(START, 'compact')
     .addEdge('compact', 'agent')
     .addEdge('planPause', END)
-    .addConditionalEdges('agent', routeAfterAgent, { tools: 'tools', [END]: END })
+    .addEdge('planExitNudge', 'agent')
+    .addEdge('planAutoReady', 'planPause')
+    .addConditionalEdges('agent', routeAfterAgent, {
+      tools: 'tools',
+      planExitNudge: 'planExitNudge',
+      planAutoReady: 'planAutoReady',
+      [END]: END,
+    })
     .addConditionalEdges('tools', routeAfterTools, {
       replan: 'replan',
       nudge: 'nudge',

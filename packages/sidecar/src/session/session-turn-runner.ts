@@ -1039,8 +1039,10 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         ? [
             new SystemMessage(
               'Plan mode is required and already active for this task. ' +
-                'Investigate with read-only tools, write the plan (plan file and/or write_todos), ' +
-                'then call ExitPlanMode so the user can approve before any non-plan file edits.',
+                'Do NOT answer the user request yet. ' +
+                'Investigate with read-only tools if needed, then write the plan ' +
+                '(plan file and/or write_todos with structured steps), ' +
+                'and call ExitPlanMode so the user can approve before any non-plan work or final answer.',
             ),
           ]
         : []

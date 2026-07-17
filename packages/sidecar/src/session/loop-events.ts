@@ -8,7 +8,7 @@
  * `step_started` by default; LoopEvent focuses on nudge / replan / pause / budget / end.
  */
 
-export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan'
+export type LoopNudgeReason = 'doom' | 'error_streak' | 'path_hit' | 'replan' | 'plan_exit'
 export type LoopPauseKind = 'doom' | 'plan' | 'subagent_pause'
 export type LoopEndReason = 'completed' | 'max_steps' | 'interrupt' | 'abort' | 'circuit_breaker'
 

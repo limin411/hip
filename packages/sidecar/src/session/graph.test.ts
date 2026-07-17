@@ -168,7 +168,22 @@ describe('agent loop graph', () => {
   it('plan amendment continues through agent node (planNode removed)', async () => {
     await withTmp(async (root) => {
       const app = buildGraph()
-      const runner = fakeRunner([new AIMessage('amended plan accepted')])
+      // First answer triggers planExitNudge; then write_todos + finish auto-submits for approval.
+      const runner = fakeRunner([
+        new AIMessage('amended plan accepted'),
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            {
+              name: 'write_todos',
+              args: { todos: [{ content: 'revised step', status: 'pending' }] },
+              id: 'wt1',
+              type: 'tool_call' as const,
+            },
+          ],
+        }),
+        new AIMessage('todos published'),
+      ])
       const out = await app.invoke(
         {
           messages: [new HumanMessage('plan something'), new HumanMessage('add more detail')],
@@ -176,10 +191,75 @@ describe('agent loop graph', () => {
           planningMode: 'plan',
           planStatus: 'generating',
         },
-        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } } },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 40 },
       )
-      expect(out.status).toBe('running')
+      expect(out.status).toBe('awaiting_user')
+      expect(out.planStatus).toBe('ready')
       expect(out.messages.some((m) => m instanceof HumanMessage && m.content === 'add more detail')).toBe(true)
+    })
+  })
+
+  it('blocks final answer while planStatus=generating and nudges toward ExitPlanMode', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage('here is the full analysis without a plan'),
+        // After planExitNudge: still no tools → second END allowed (soft fallback after 1 nudge)
+        new AIMessage('still answering without plan'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('analyze the stack')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'generating',
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 20 },
+      )
+      expect(out.planExitNudgeCount).toBe(1)
+      expect(out.messages.some((m) => m instanceof SystemMessage && String(m.content).includes('ExitPlanMode'))).toBe(true)
+      // Soft fallback: after one nudge with no write_todos, turn may complete.
+      expect(out.status).toBe('running')
+      expect((out.messages[out.messages.length - 1] as AIMessage).content).toBe('still answering without plan')
+    })
+  })
+
+  it('auto-submits for approval when write_todos exists but ExitPlanMode was skipped', async () => {
+    await withTmp(async (root) => {
+      const app = buildGraph()
+      const runner = fakeRunner([
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            {
+              name: 'write_todos',
+              args: {
+                todos: [
+                  { content: 'step a', status: 'pending' },
+                  { content: 'step b', status: 'pending' },
+                ],
+              },
+              id: 'wt-auto',
+              type: 'tool_call' as const,
+            },
+          ],
+        }),
+        // Agent ends with text only — should auto planAutoReady → planPause
+        new AIMessage('plan ready (forgot ExitPlanMode)'),
+      ])
+      const out = await app.invoke(
+        {
+          messages: [new HumanMessage('plan the fix')],
+          steps: 0,
+          planningMode: 'plan',
+          planStatus: 'generating',
+        },
+        { configurable: { ctx: { sessionId: 'test-session', runner, tools: buildTools(root), emit: noopEmit, summarizer: noopSummarizer } }, recursionLimit: 30 },
+      )
+      expect(out.status).toBe('awaiting_user')
+      expect(out.planStatus).toBe('ready')
+      expect(out.plan?.length).toBe(2)
+      expect(out.pendingQuestion?.toLowerCase()).toContain('plan')
     })
   })
 

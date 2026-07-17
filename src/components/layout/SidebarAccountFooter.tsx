@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { History, LogOut, Settings } from 'lucide-react'
+import { ChevronDown, History, LogOut, Settings } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
+import { cn } from '@/lib/utils'
 
 interface SidebarAccountFooterProps {
   onOpenSettings: () => void
@@ -10,8 +11,8 @@ interface SidebarAccountFooterProps {
 }
 
 /**
- * Account menu in the sidebar footer.
- * Ports FloatingAvatarButton menu structure + testids; position only changes.
+ * Account menu in the sidebar footer (Linear-style full-row trigger).
+ * Menu structure + testids match the former FloatingAvatarButton.
  */
 export function SidebarAccountFooter({
   onOpenSettings,
@@ -45,7 +46,7 @@ export function SidebarAccountFooter({
   return (
     <div
       ref={ref}
-      className="relative flex shrink-0 items-center gap-2 border-t border-border px-2 py-2"
+      className="relative shrink-0 border-t border-border px-1.5 pb-2 pt-1.5"
       data-testid="sidebar-account-footer"
     >
       <button
@@ -53,21 +54,38 @@ export function SidebarAccountFooter({
         data-testid="account-menu-button"
         data-no-drag
         onClick={() => setOpen(!open)}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-subtle text-accent-strong ring-1 ring-transparent transition-all hover:ring-border"
+        className={cn(
+          'flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors',
+          'hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+          open && 'bg-state-hover',
+        )}
         aria-label={t('account.menu')}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <Avatar name="User" size={32} />
+        <Avatar name="H" size={28} gradient />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-body font-medium text-ink">
+            {t('account.userLabel')}
+          </span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-ink-tertiary">
+            <span className="size-1.5 shrink-0 rounded-full bg-success" aria-hidden />
+            <span className="truncate">{t('account.statusLocal')}</span>
+          </span>
+        </span>
+        <ChevronDown
+          size={16}
+          className={cn(
+            'shrink-0 text-ink-tertiary transition-transform duration-150',
+            open && 'rotate-180',
+          )}
+          aria-hidden
+        />
       </button>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-meta font-medium text-ink">{t('account.userLabel')}</div>
-        <div className="truncate text-[11px] text-ink-tertiary">{t('account.menuHint')}</div>
-      </div>
 
       {open && (
         <div
-          className="absolute bottom-12 left-2 z-20 w-44 rounded-xl border border-border bg-surface p-1.5 shadow-menu animate-menu-in"
+          className="absolute bottom-full left-1.5 right-1.5 z-20 mb-1.5 rounded-xl border border-border bg-surface p-1.5 shadow-menu animate-menu-in"
           role="menu"
           aria-label={t('account.menu')}
         >

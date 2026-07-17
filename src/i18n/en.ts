@@ -925,7 +925,7 @@ export const en = {
     account: {
       menu: 'Account menu',
       userLabel: 'Account',
-      menuHint: 'Settings · history',
+      statusLocal: 'Local · Signed in',
     },
     mainToolbar: {
       newConversation: 'New conversation',

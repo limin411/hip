@@ -920,7 +920,7 @@ export const zhTW = {
     account: {
       menu: '賬戶選單',
       userLabel: '賬戶',
-      menuHint: '設定 · 歷史',
+      statusLocal: '本地 · 已登入',
     },
     mainToolbar: {
       newConversation: '新對話',

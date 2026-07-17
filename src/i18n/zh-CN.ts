@@ -920,7 +920,7 @@ export const zhCN = {
     account: {
       menu: '账户菜单',
       userLabel: '账户',
-      menuHint: '设置 · 历史',
+      statusLocal: '本地 · 已登录',
     },
     mainToolbar: {
       newConversation: '新对话',

@@ -4,7 +4,7 @@
 |-------|-------|
 | **Title** | Idle timeout hardening: tool-call stream activity + configurable idle + large-file edit strategy |
 | **Date** | 2026-07-17 |
-| **Status** | Spec — implementing |
+| **Status** | Implemented (2026-07-17) |
 | **Trigger** | Debug session `QkJNZbjtgvyJ9WnsZT78i` — SVG rewrite timed out with `Idle timeout after 60000ms with no outbound activity` while model produced ~8k output tokens without finishing a write tool |
 | **Plan** | [`2026-07-17-idle-timeout-hardening-plan.md`](./2026-07-17-idle-timeout-hardening-plan.md) |
 

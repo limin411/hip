@@ -1040,6 +1040,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           slots: payload.slots,
         })
       },
+      onWorktreeChanged: (ev) => {
+        send({
+          type: 'worktree:changed',
+          sessionId: ev.sessionId ?? host.id,
+          repoKey: ev.repoKey,
+          kind: ev.kind,
+          worktree: ev.worktree,
+          ...(ev.reveal !== undefined ? { reveal: ev.reveal } : {}),
+        })
+      },
       allowedTools: activeProfile.allowedTools,
       blockedTools: activeProfile.blockedTools,
       usesEnvModel: host.usesEnvModel,

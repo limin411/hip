@@ -45,6 +45,7 @@ export interface BuildSessionToolingInput {
   /** Background worker forced into a pre-created worktree. */
   spawnInWorktree?: ParallelSlotSpawnFn
   onParallelRunStarted?: import('./tools/helpers.js').BuildToolsOpts['onParallelRunStarted']
+  onWorktreeChanged?: import('./tools/helpers.js').BuildToolsOpts['onWorktreeChanged']
   allowedTools?: string[]
   blockedTools?: string[]
   usesEnvModel: boolean
@@ -89,6 +90,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       requestChoice: input.requestChoice,
       spawnInWorktree: input.spawnInWorktree,
       onParallelRunStarted: input.onParallelRunStarted,
+      onWorktreeChanged: input.onWorktreeChanged,
     },
     input.retrySubagent,
     input.stopBackgroundTask,

@@ -1,12 +1,29 @@
-import * as path from 'node:path'
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import { gitCommit, gitCreateBranch, gitSwitchBranch, createWorktree, listWorktrees, removeWorktree } from '../workspace-git.js'
-import { getWorktreesDir } from '../worktree-config.js'
+import { gitCommit, gitCreateBranch, gitSwitchBranch } from '../workspace-git.js'
+import {
+  createWorktreeService,
+  type WorktreeChangedNotify,
+} from '../worktree-service.js'
 
-export function buildGitTools(cwd: string | undefined): StructuredToolInterface[] {
+export interface BuildGitToolsOpts {
+  /** Session id for meta hostSessionId + worktree:changed correlation. */
+  sessionId?: string
+  /** Emit worktree:changed (mirrors onParallelRunStarted → send). */
+  onWorktreeChanged?: WorktreeChangedNotify
+}
+
+export function buildGitTools(
+  cwd: string | undefined,
+  opts: BuildGitToolsOpts = {},
+): StructuredToolInterface[] {
   if (!cwd) return []
+
+  const svc = () =>
+    createWorktreeService({
+      notify: opts.onWorktreeChanged,
+    })
 
   const gitCommitTool = tool(
     async ({ message }) => {
@@ -47,9 +64,20 @@ export function buildGitTools(cwd: string | undefined): StructuredToolInterface[
   const gitWorktreeCreateTool = tool(
     async ({ branch }) => {
       try {
-        const worktreePath = path.join(getWorktreesDir(), branch)
-        const r = await createWorktree(cwd, branch, worktreePath)
-        return r.ok ? `Worktree created at ${r.path}` : `Error: ${r.error ?? 'create worktree failed'}`
+        const r = await svc().create({
+          cwd,
+          branch,
+          pathKey: branch,
+          source: 'agent_tool',
+          hostSessionId: opts.sessionId,
+          reveal: true,
+        })
+        if (!r.ok) return `Error: ${r.error ?? 'create worktree failed'}`
+        return JSON.stringify({
+          path: r.path,
+          id: r.worktree?.id,
+          branch,
+        })
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }
@@ -59,14 +87,14 @@ export function buildGitTools(cwd: string | undefined): StructuredToolInterface[
       description:
         'Create a linked git worktree at the branch `branch` in the managed worktrees directory. ' +
         'The branch must already exist — create it first with git_create_branch if needed. ' +
-        'Returns the path to the newly created worktree or an error.',
+        'Returns JSON { path, id, branch } or an error.',
       schema: z.object({ branch: z.string() }),
     },
   )
   const gitWorktreeListTool = tool(
     async () => {
       try {
-        const r = await listWorktrees(cwd)
+        const r = await svc().list({ cwd, managedOnly: false, hideEphemeral: false })
         return r.ok ? JSON.stringify(r.worktrees) : `Error: ${r.error ?? 'list worktrees failed'}`
       } catch (err) {
         return `Error: ${(err as Error).message}`
@@ -76,14 +104,19 @@ export function buildGitTools(cwd: string | undefined): StructuredToolInterface[
       name: 'git_worktree_list',
       description:
         'List all linked git worktrees for the current repository. ' +
-        'Returns a JSON array of { path, branch, head } objects.',
+        'Returns a JSON array of worktree info objects (path, branch, head, optional id/managed).',
       schema: z.object({}),
     },
   )
   const gitWorktreeRemoveTool = tool(
-    async ({ worktreePath }) => {
+    async ({ worktreePath, force }) => {
       try {
-        const r = await removeWorktree(cwd, worktreePath)
+        const r = await svc().remove({
+          cwd,
+          worktreePath,
+          force: force === true,
+          hostSessionId: opts.sessionId,
+        })
         return r.ok ? `Removed worktree at ${worktreePath}` : `Error: ${r.error ?? 'remove worktree failed'}`
       } catch (err) {
         return `Error: ${(err as Error).message}`
@@ -93,8 +126,12 @@ export function buildGitTools(cwd: string | undefined): StructuredToolInterface[
       name: 'git_worktree_remove',
       description:
         'Remove a linked git worktree at `worktreePath`. The path must be inside the managed ' +
-        'worktrees directory. Use git_worktree_list to see available worktrees.',
-      schema: z.object({ worktreePath: z.string() }),
+        'worktrees directory. Default is preflight (dirty fails); pass force:true to force-remove. ' +
+        'Use git_worktree_list to see available worktrees.',
+      schema: z.object({
+        worktreePath: z.string(),
+        force: z.boolean().optional(),
+      }),
     },
   )
 

@@ -12,6 +12,7 @@ import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
 import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -358,6 +359,7 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
           index: s.index,
           sessionId: '',
           taskId: s.taskId,
+          worktreeId: s.worktreeId,
           worktreePath: s.path,
           branch: s.branch,
           status: 'ready' as const,
@@ -366,6 +368,26 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       toast.success(
         i18n.t('chat.parallel.started', { count: msg.slots.length }),
       )
+      return
+    }
+
+    case 'worktree:changed': {
+      useWorktreeStore.getState().applyChanged(msg.worktree, msg.kind, msg.reveal)
+      // Same-process only toast (not CLI spawn).
+      if (msg.kind === 'created' && msg.reveal) {
+        toast.success(
+          i18n.t('chat.worktree.created', {
+            defaultValue: 'Worktree ready: {{label}}',
+            label: msg.worktree.label || msg.worktree.branch || msg.worktree.path,
+          }),
+        )
+      }
+      return
+    }
+
+    case 'git:worktree:list:result': {
+      // Hydrate catalog (CLI creates / focus refresh).
+      useWorktreeStore.getState().upsertFromList(msg.worktrees, msg.sessionId)
       return
     }
 

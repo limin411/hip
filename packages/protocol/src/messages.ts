@@ -104,7 +104,7 @@ export type ClientMessage =
       pathKey?: string
     }
   | { type: 'git:worktree:list'; sessionId: string }
-  | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
+  | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string; force?: boolean }
   | { type: 'workflow:run'; sessionId: string; def: WorkflowDef; runInputs?: { text: string; data?: unknown } }
   | { type: 'workflow:getActive'; sessionId: string }
   | { type: 'mcp:listResources'; serverId: string }
@@ -210,7 +210,7 @@ export type ServerMessage =
   /** Emitted by the Guardian hook when a tool invocation exceeds the risk threshold. */
   | { type: 'guardian:risk'; sessionId: string; turnId: string; toolName: string; risk: 'low' | 'medium' | 'high'; category: string; reason: string }
   | { type: 'plugin:list:result'; plugins: PluginManifest[] }
-  | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; error?: string }
+  | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; id?: string; error?: string }
   | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
   | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
   /**
@@ -233,7 +233,7 @@ export type ServerMessage =
       runId: string
       baseCwd: string
       goal: string
-      slots: Array<{ index: number; branch: string; path: string; taskId: string }>
+      slots: Array<{ index: number; branch: string; path: string; taskId: string; worktreeId?: string }>
     }
   | { type: 'mcp:listResources:result'; serverId: string; resources: McpResource[]; resourceTemplates?: McpResourceTemplate[]; error?: string }
   | { type: 'mcp:readResource:result'; serverId: string; uri: string; contents: McpResourceContent[]; error?: string }

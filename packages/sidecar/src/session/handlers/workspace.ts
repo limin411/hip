@@ -139,7 +139,14 @@ export async function handleWorkspaceMessage(
         source: 'protocol',
         hostSessionId: msg.sessionId,
       })
-      send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: r.ok, ...(r.path ? { path: r.path } : {}), ...(r.error ? { error: r.error } : {}) })
+      send({
+        type: 'git:worktree:create:result',
+        sessionId: msg.sessionId,
+        ok: r.ok,
+        ...(r.path ? { path: r.path } : {}),
+        ...(r.worktree?.id ? { id: r.worktree.id } : {}),
+        ...(r.error ? { error: r.error } : {}),
+      })
       return
     }
     case 'git:worktree:list': {
@@ -158,7 +165,12 @@ export async function handleWorkspaceMessage(
       const svc = createWorktreeService({
         notify: (ev) => send({ type: 'worktree:changed', ...ev }),
       })
-      const r = await svc.remove({ cwd, worktreePath: msg.worktreePath, hostSessionId: msg.sessionId })
+      const r = await svc.remove({
+        cwd,
+        worktreePath: msg.worktreePath,
+        force: msg.force === true,
+        hostSessionId: msg.sessionId,
+      })
       send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
       return
     }

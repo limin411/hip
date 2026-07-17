@@ -55,7 +55,8 @@ export async function acquireBackgroundWorktree(
     cleanup: async () => {
       if (cleaned) return
       cleaned = true
-      await removeWorktree(cwd, wt.path!).catch(() => {})
+      // Always force: disposable bg trees may be dirty mid-run (KD8).
+      await removeWorktree(cwd, wt.path!, 'git', true).catch(() => {})
     },
   }
 }

@@ -784,7 +784,7 @@ z.object({
   <pathKey>/           # flat / pathKey layout (current + nest-off)
 ```
 
-**repoKey:** `sha1(realpath(gitCommonDir)).slice(0, 16)` or `sha1(primaryPath)`.
+**repoKey:** `sha256(realpath(gitCommonDir)).slice(0, 16)` or `sha256(primaryPath).slice(0, 16)` (impl uses sha256; either identity input is OK as long as stable for the repo).
 
 **Migration:** On first list after upgrade, scan porcelain managed non-ephemeral paths → meta `source: 'discovered'`. No path moves.
 

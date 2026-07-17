@@ -466,10 +466,31 @@ export async function listWorktrees(cwd: string, gitBin = 'git'): Promise<{ ok: 
 /** Remove a linked worktree via `git worktree remove --force`. Safety gate: only removes
  *  worktrees located inside HIP_WORKTREES_DIR (centralized dir, outside the project).
  *  Never throws → { ok, error? }. */
-export async function removeWorktree(cwd: string, worktreePath: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+/**
+ * Remove a managed worktree.
+ * @param force when false (product default), refuse dirty/untracked trees (`WORKTREE_DIRTY`).
+ *   when true, `git worktree remove --force` (bg cleanup / explicit force).
+ */
+export async function removeWorktree(
+  cwd: string,
+  worktreePath: string,
+  gitBin = 'git',
+  force = true,
+): Promise<{ ok: boolean; error?: string }> {
   const worktreesDir = getWorktreesDir()
-  const resolved = path.resolve(worktreePath)
-  const resolvedDir = path.resolve(worktreesDir)
+  // Prefer realpath so symlink escapes outside managed dir are rejected (PR6).
+  let resolved: string
+  let resolvedDir: string
+  try {
+    resolved = await fs.realpath(worktreePath)
+  } catch {
+    resolved = path.resolve(worktreePath)
+  }
+  try {
+    resolvedDir = await fs.realpath(worktreesDir)
+  } catch {
+    resolvedDir = path.resolve(worktreesDir)
+  }
   if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) {
     return { ok: false, error: 'worktree path outside managed directory' }
   }
@@ -480,8 +501,21 @@ export async function removeWorktree(cwd: string, worktreePath: string, gitBin =
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, error: 'git not found' }
     return { ok: false, error: 'not_a_repo' }
   }
+  if (!force) {
+    try {
+      const status = await runGit(resolved, ['status', '--porcelain', '--untracked-files=all'], gitBin)
+      if (status.stdout.trim().length > 0) {
+        return { ok: false, error: 'WORKTREE_DIRTY: worktree has uncommitted or untracked changes; use force to remove' }
+      }
+    } catch (e) {
+      return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+    }
+  }
   try {
-    await runGit(cwd, ['worktree', 'remove', worktreePath, '--force'], gitBin)
+    const args = force
+      ? ['worktree', 'remove', worktreePath, '--force']
+      : ['worktree', 'remove', worktreePath]
+    await runGit(cwd, args, gitBin)
     return { ok: true }
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()

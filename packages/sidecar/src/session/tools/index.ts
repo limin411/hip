@@ -62,7 +62,12 @@ export function buildAllTools(
   // ── Git tools (only for a real on-disk cwd; dropped in chat — all mutate) ─────
   // chat is read-only: omit commit / branch / worktree tools along with write_file.
   if (mode !== 'chat') {
-    base.push(...buildGitTools(cwd))
+    base.push(
+      ...buildGitTools(cwd, {
+        sessionId: opts.sessionId,
+        onWorktreeChanged: opts.onWorktreeChanged,
+      }),
+    )
   }
 
   // ── Plan-mode tool ─────────────────────────────────────────────────────────────
@@ -116,6 +121,7 @@ export function buildAllTools(
         requestChoice: opts.requestChoice,
         spawnInWorktree: opts.spawnInWorktree,
         onRunStarted: opts.onParallelRunStarted,
+        onWorktreeChanged: opts.onWorktreeChanged,
       }),
     )
   }

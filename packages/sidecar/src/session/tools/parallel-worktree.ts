@@ -3,12 +3,9 @@ import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { PermissionOption } from '@hip/protocol'
-import {
-  gitCreateBranch,
-  createWorktree,
-  resolveManagedWorktreePath,
-  sanitizeRefComponent,
-} from '../workspace-git.js'
+import { gitCreateBranch, sanitizeRefComponent } from '../workspace-git.js'
+import { createWorktreeService } from '../worktree-service.js'
+import type { WorktreeChangedNotify } from '../worktree-service.js'
 
 export type ParallelChoiceFn = (req: {
   title: string
@@ -33,8 +30,10 @@ export interface ParallelWorktreeToolOpts {
     runId: string
     baseCwd: string
     goal: string
-    slots: Array<{ index: number; branch: string; path: string; taskId: string }>
+    slots: Array<{ index: number; branch: string; path: string; taskId: string; worktreeId?: string }>
   }) => void
+  /** Product catalog emit (same send path as git_worktree_create). */
+  onWorktreeChanged?: WorktreeChangedNotify
 }
 
 function clampCount(n: number): number {
@@ -53,7 +52,7 @@ function parseCountOption(optionId: string): number | null {
  * create persistent worktrees and start background workers in each.
  */
 export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): StructuredToolInterface[] {
-  const { cwd, sessionId, requestChoice, spawnInWorktree, onRunStarted } = opts
+  const { cwd, sessionId, requestChoice, spawnInWorktree, onRunStarted, onWorktreeChanged } = opts
 
   const parallelWorktrees = tool(
     async ({ goal, suggested_count, rationale, variants }) => {
@@ -109,8 +108,11 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
         branch: string
         path: string
         taskId: string
+        worktreeId?: string
         spawnResult: string
       }> = []
+
+      const wtSvc = createWorktreeService({ notify: onWorktreeChanged })
 
       for (let i = 1; i <= count; i++) {
         const branch = `hip-p-${runShort}-${i}`
@@ -119,8 +121,16 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
         if (!br.ok && !/already exists/i.test(br.error ?? '')) {
           return `Error: failed to create branch ${branch}: ${br.error ?? 'unknown'}`
         }
-        const wtPath = resolveManagedWorktreePath(pathKey, branch)
-        const wt = await createWorktree(cwd, branch, wtPath)
+        const wt = await wtSvc.create({
+          cwd,
+          branch,
+          pathKey,
+          source: 'parallel',
+          hostSessionId: sessionId,
+          parallelRunId: runId,
+          taskId: `pwt-${sanitizeRefComponent(runShort)}-${i}`,
+          reveal: false,
+        })
         if (!wt.ok || !wt.path) {
           return `Error: failed to create worktree for ${branch}: ${wt.error ?? 'unknown'}`
         }
@@ -140,6 +150,7 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
           branch,
           path: wt.path,
           taskId,
+          worktreeId: wt.worktree?.id,
           spawnResult,
         })
       }
@@ -153,6 +164,7 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
           branch: s.branch,
           path: s.path,
           taskId: s.taskId,
+          worktreeId: s.worktreeId,
         })),
       })
 
@@ -167,6 +179,7 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
             branch: s.branch,
             path: s.path,
             taskId: s.taskId,
+            worktreeId: s.worktreeId,
             spawn: s.spawnResult,
           })),
           next:

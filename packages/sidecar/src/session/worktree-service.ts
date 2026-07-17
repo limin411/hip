@@ -10,6 +10,7 @@ import * as path from 'node:path'
 import type {
   WorktreeChangeKind,
   WorktreeInfo,
+  WorktreeMetaFile,
   WorktreeRecord,
   WorktreeSource,
 } from '@hip/protocol'
@@ -86,8 +87,17 @@ export function isEphemeralWorktree(
   return false
 }
 
+/**
+ * Nest-by-repo for new creates (PR2b): default **on** when env unset.
+ * Escape: HIP_WORKTREES_NEST=0 (or false/off/no).
+ * Explicit on: HIP_WORKTREES_NEST=1 (or true/on/yes).
+ */
 function nestByRepoFromEnv(): boolean {
-  return process.env.HIP_WORKTREES_NEST?.trim() === '1'
+  const v = process.env.HIP_WORKTREES_NEST?.trim().toLowerCase()
+  if (v === undefined || v === '') return true
+  if (v === '0' || v === 'false' || v === 'off' || v === 'no') return false
+  if (v === '1' || v === 'true' || v === 'on' || v === 'yes') return true
+  return true
 }
 
 function resolvePreferReal(p: string): string {
@@ -105,17 +115,55 @@ function isUnderManagedDir(worktreePath: string, worktreesDir: string): boolean 
   return resolved === dir || resolved.startsWith(dir + path.sep)
 }
 
-async function resolveGitToplevel(cwd: string): Promise<string | null> {
+function pathsEqual(a: string, b: string): boolean {
+  return resolvePreferReal(a) === resolvePreferReal(b)
+}
+
+/**
+ * Absolute git common dir for the repo containing `cwd`.
+ * Stable across linked worktrees (unlike --show-toplevel).
+ */
+async function resolveGitCommonDir(cwd: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileP('git', ['rev-parse', '--show-toplevel'], {
+    const { stdout } = await execFileP('git', ['rev-parse', '--git-common-dir'], {
       cwd,
       timeout: 10_000,
       maxBuffer: 1024 * 1024,
     })
-    return stdout.trim() || null
+    const raw = stdout.trim()
+    if (!raw) return null
+    const abs = path.isAbsolute(raw) ? raw : path.resolve(cwd, raw)
+    return resolvePreferReal(abs)
   } catch {
     return null
   }
+}
+
+/**
+ * Stable main worktree + repoKey for any cwd in the repo (including linked worktrees).
+ * - primaryPath: first porcelain entry (git always lists main first), or override
+ * - repoKey: hash of realpath(git-common-dir) when available, else primaryPath
+ *
+ * Pass `primaryPathHint` (e.g. porcelain[0].path) to avoid a second `git worktree list`.
+ */
+export async function resolveRepoBinding(
+  cwd: string,
+  primaryPathHint?: string | null,
+): Promise<{ primaryPath: string; repoKey: string }> {
+  let primaryFromList = primaryPathHint?.trim() || null
+  if (!primaryFromList) {
+    const porcelain = await listWorktrees(cwd)
+    primaryFromList = porcelain.ok && porcelain.worktrees?.[0]?.path
+      ? porcelain.worktrees[0].path
+      : null
+  }
+
+  const commonDir = await resolveGitCommonDir(cwd)
+  const primaryPath = primaryFromList ?? path.resolve(cwd)
+  // Prefer common-dir for stable repoKey across main/linked cwd (design Data Model).
+  const keyBase = commonDir ?? resolvePreferReal(primaryPath)
+  const repoKey = repoKeyFromPrimary(keyBase)
+  return { primaryPath, repoKey }
 }
 
 async function resolveHead(cwd: string): Promise<string> {
@@ -131,8 +179,19 @@ async function resolveHead(cwd: string): Promise<string> {
   }
 }
 
-function pathsEqual(a: string, b: string): boolean {
-  return resolvePreferReal(a) === resolvePreferReal(b)
+/** Prefer id-from-path; fall back to path scan so remove still cleans orphaned keys. */
+function findMetaRecord(
+  meta: WorktreeMetaFile | null,
+  repoKey: string,
+  worktreePath: string,
+): { id: string; rec: Omit<WorktreeRecord, 'branch' | 'head' | 'dirty'> } | null {
+  if (!meta) return null
+  const id = worktreeIdFromPath(repoKey, worktreePath)
+  if (meta.records[id]) return { id, rec: meta.records[id]! }
+  for (const [rid, rec] of Object.entries(meta.records)) {
+    if (pathsEqual(rec.path, worktreePath)) return { id: rid, rec }
+  }
+  return null
 }
 
 export interface WorktreeService {
@@ -150,8 +209,7 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
       const { cwd, branch, pathKey, source } = createOpts
       const nestByRepo = nestOverride ?? nestByRepoFromEnv()
       const worktreesDir = getWorktreesDir()
-      const primaryPath = (await resolveGitToplevel(cwd)) ?? path.resolve(cwd)
-      const repoKey = repoKeyFromPrimary(primaryPath)
+      const { primaryPath, repoKey } = await resolveRepoBinding(cwd)
 
       let worktreePath: string
       try {
@@ -228,8 +286,8 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
         return { ok: false, worktrees: [], error: porcelain.error }
       }
 
-      const primaryPath = (await resolveGitToplevel(cwd)) ?? porcelain.worktrees[0]?.path ?? path.resolve(cwd)
-      const repoKey = repoKeyFromPrimary(primaryPath)
+      // Main = porcelain[0]; repoKey from common-dir (stable for linked cwd).
+      const { primaryPath, repoKey } = await resolveRepoBinding(cwd, porcelain.worktrees[0]?.path)
       const meta = loadMeta(repoKey)
       const metaByPath = new Map<string, Omit<WorktreeRecord, 'branch' | 'head' | 'dirty'>>()
       if (meta) {
@@ -241,12 +299,11 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
       const primaryResolved = resolvePreferReal(primaryPath)
       const out: WorktreeInfo[] = []
 
-      for (let i = 0; i < porcelain.worktrees.length; i++) {
-        const wt = porcelain.worktrees[i]!
+      for (const wt of porcelain.worktrees) {
         const resolved = resolvePreferReal(wt.path)
         const managed = isUnderManagedDir(resolved, worktreesDir)
-        // Primary: matches git toplevel, or first porcelain entry when toplevel unknown
-        const isPrimary = pathsEqual(resolved, primaryResolved) || (i === 0 && !managed)
+        // Single primary: only the main worktree path (not linked cwd toplevel).
+        const isPrimary = pathsEqual(resolved, primaryResolved)
         const metaRec = metaByPath.get(resolved)
         const id = metaRec?.id ?? worktreeIdFromPath(repoKey, resolved)
         const ephemeral =
@@ -279,13 +336,14 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
     async remove(removeOpts) {
       const { cwd, worktreePath } = removeOpts
       // Resolve id/meta while the path still exists (realpath needs it for KD15 stability).
-      const primaryPath = (await resolveGitToplevel(cwd)) ?? path.resolve(cwd)
-      const repoKey = repoKeyFromPrimary(primaryPath)
-      const id = worktreeIdFromPath(repoKey, worktreePath)
+      const { repoKey } = await resolveRepoBinding(cwd)
       const meta = loadMeta(repoKey)
-      const metaRec = meta?.records[id]
+      const found = findMetaRecord(meta, repoKey, worktreePath)
+      const id = found?.id ?? worktreeIdFromPath(repoKey, worktreePath)
+      const metaRec = found?.rec
 
-      const r = await removeWorktree(cwd, worktreePath)
+      // Product default: preflight (force false). Bg / explicit cleanup pass force: true.
+      const r = await removeWorktree(cwd, worktreePath, 'git', removeOpts.force === true)
       if (!r.ok) return { ok: false, error: r.error }
 
       removeMetaRecord(repoKey, id)

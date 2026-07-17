@@ -8,6 +8,8 @@ export interface WorktreeCmdOpts extends SessionCmdOpts {
   baseRef?: string
   pathKey?: string
   worktreePath?: string
+  /** Force-remove dirty worktrees (default false / preflight). */
+  force?: boolean
 }
 
 async function resolveSessionPrefix(
@@ -133,6 +135,7 @@ export async function worktreeRemove(opts: WorktreeCmdOpts): Promise<number> {
       type: 'git:worktree:remove',
       sessionId,
       worktreePath: opts.worktreePath,
+      ...(opts.force ? { force: true } : {}),
     })
     const res = await resultP
     if (opts.json) {

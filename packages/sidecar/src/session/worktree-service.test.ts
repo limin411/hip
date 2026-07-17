@@ -7,8 +7,10 @@ import * as path from 'node:path'
 import {
   createWorktreeService,
   isEphemeralWorktree,
+  resolveRepoBinding,
 } from './worktree-service.js'
-import { loadMeta, worktreeIdFromPath, repoKeyFromPrimary } from './worktree-meta.js'
+import { loadMeta, worktreeIdFromPath } from './worktree-meta.js'
+import { repoSlug } from './worktree-paths.js'
 import type { WorktreeRecord } from '@hip/protocol'
 
 const execFileP = promisify(execFile)
@@ -34,7 +36,8 @@ beforeEach(async () => {
   savedEnv = process.env.HIP_WORKTREES_DIR
   savedNest = process.env.HIP_WORKTREES_NEST
   process.env.HIP_WORKTREES_DIR = worktreesDir
-  delete process.env.HIP_WORKTREES_NEST
+  // Most tests expect flat layout; PR2b product default is nest-on when unset.
+  process.env.HIP_WORKTREES_NEST = '0'
   await makeRepo(root)
 })
 
@@ -94,7 +97,8 @@ describe('WorktreeService create → meta → list', () => {
     expect(events[0]!.worktree.id).toBe(created.worktree!.id)
     expect(events[0]!.reveal).toBe(true)
 
-    const repoKey = repoKeyFromPrimary(root)
+    const { repoKey } = await resolveRepoBinding(root)
+    expect(created.worktree!.repoKey).toBe(repoKey)
     const meta = loadMeta(repoKey)
     expect(meta).toBeTruthy()
     expect(meta!.records[created.worktree!.id]).toBeTruthy()
@@ -112,6 +116,7 @@ describe('WorktreeService create → meta → list', () => {
     const primary = listed.worktrees.find((w) => w.isPrimary)
     expect(primary).toBeTruthy()
     expect(primary!.id).toBeTruthy()
+    expect(listed.worktrees.filter((w) => w.isPrimary)).toHaveLength(1)
   })
 
   it('parallel-shaped path (runId/hip-p-1) is NOT filtered as ephemeral', async () => {
@@ -158,16 +163,17 @@ describe('WorktreeService create → meta → list', () => {
     expect(isEphemeralWorktree(bg!)).toBe(true)
   })
 
-  it('remove deletes meta and notifies removed', async () => {
+  it('remove deletes meta and notifies removed with sessionId/repoKey', async () => {
     await git(root, 'branch', 'to-drop')
-    const events: string[] = []
+    const events: Array<{ kind: string; sessionId?: string; repoKey: string }> = []
     const svc = createWorktreeService({
-      notify: (ev) => events.push(ev.kind),
+      notify: (ev) => events.push({ kind: ev.kind, sessionId: ev.sessionId, repoKey: ev.repoKey }),
     })
     const created = await svc.create({
       cwd: root,
       branch: 'to-drop',
       source: 'protocol',
+      hostSessionId: 'host-create',
     })
     expect(created.ok).toBe(true)
 
@@ -177,10 +183,13 @@ describe('WorktreeService create → meta → list', () => {
       hostSessionId: 's1',
     })
     expect(removed.ok).toBe(true)
-    expect(events).toContain('created')
-    expect(events).toContain('removed')
+    expect(events.map((e) => e.kind)).toContain('created')
+    expect(events.map((e) => e.kind)).toContain('removed')
+    const remEv = events.find((e) => e.kind === 'removed')
+    expect(remEv!.sessionId).toBe('s1')
+    expect(remEv!.repoKey).toBe(created.worktree!.repoKey)
 
-    const repoKey = repoKeyFromPrimary(root)
+    const { repoKey } = await resolveRepoBinding(root)
     const meta = loadMeta(repoKey)
     expect(meta?.records[created.worktree!.id]).toBeUndefined()
   })
@@ -189,5 +198,64 @@ describe('WorktreeService create → meta → list', () => {
     const repoKey = 'abc123'
     const p = path.join(worktreesDir, 'slot-1')
     expect(worktreeIdFromPath(repoKey, p)).toBe(worktreeIdFromPath(repoKey, p))
+  })
+
+  it('HIP_WORKTREES_NEST=1 nests create path under repoSlug', async () => {
+    process.env.HIP_WORKTREES_NEST = '1'
+    await git(root, 'branch', 'nested-feat')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'nested-feat',
+      source: 'protocol',
+    })
+    expect(created.ok).toBe(true)
+    const slug = repoSlug(root)
+    expect(created.path).toContain(path.join(worktreesDir, slug))
+    expect(created.path!.startsWith(path.join(worktreesDir, slug))).toBe(true)
+  })
+
+  it('unset HIP_WORKTREES_NEST nests by default (PR2b)', async () => {
+    delete process.env.HIP_WORKTREES_NEST
+    await git(root, 'branch', 'default-nest')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'default-nest',
+      source: 'protocol',
+    })
+    expect(created.ok).toBe(true)
+    const slug = repoSlug(root)
+    expect(created.path!.startsWith(path.join(worktreesDir, slug))).toBe(true)
+  })
+
+  it('create from main → list from linked cwd shares repoKey, single isPrimary, meta id', async () => {
+    await git(root, 'branch', 'linked-feat')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'linked-feat',
+      source: 'protocol',
+      hostSessionId: 'main-sess',
+    })
+    expect(created.ok).toBe(true)
+    const linkedCwd = created.path!
+    const mainBinding = await resolveRepoBinding(root)
+    const linkedBinding = await resolveRepoBinding(linkedCwd)
+    expect(linkedBinding.repoKey).toBe(mainBinding.repoKey)
+    expect(created.worktree!.repoKey).toBe(mainBinding.repoKey)
+
+    const listed = await svc.list({ cwd: linkedCwd })
+    expect(listed.ok).toBe(true)
+    expect(listed.worktrees.every((w) => w.repoKey === mainBinding.repoKey)).toBe(true)
+    expect(listed.worktrees.filter((w) => w.isPrimary)).toHaveLength(1)
+    const primary = listed.worktrees.find((w) => w.isPrimary)!
+    // Primary is main checkout, not the linked cwd (realpath-safe compare)
+    expect(await fs.realpath(primary.path)).toBe(await fs.realpath(mainBinding.primaryPath))
+    expect(await fs.realpath(primary.path)).not.toBe(await fs.realpath(linkedCwd))
+    const managed = listed.worktrees.find((w) => w.branch === 'linked-feat')
+    expect(managed).toBeTruthy()
+    expect(managed!.id).toBe(created.worktree!.id)
+    expect(managed!.isPrimary).toBe(false)
   })
 })

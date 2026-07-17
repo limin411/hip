@@ -434,8 +434,13 @@ export interface BuildToolsOpts {
     runId: string
     baseCwd: string
     goal: string
-    slots: Array<{ index: number; branch: string; path: string; taskId: string }>
+    slots: Array<{ index: number; branch: string; path: string; taskId: string; worktreeId?: string }>
   }) => void
+  /**
+   * Emit worktree:changed for agent git worktree tools (PR3).
+   * Wire from session-turn-runner like onParallelRunStarted → send.
+   */
+  onWorktreeChanged?: import('../worktree-service.js').WorktreeChangedNotify
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`

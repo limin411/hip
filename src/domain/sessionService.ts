@@ -959,8 +959,15 @@ export class SessionService {
     this.transport.send({ type: 'fs:diffSummary', sessionId: id, base })
     // Pull the checkpoint list (cheap; also tells the panel whether the cwd is a git repo → tab gating).
     this.transport.send({ type: 'git:checkpoint:list', sessionId: id })
+    // Hydrate managed worktree catalog (CLI creates / external; AC2 list hydrate).
+    this.requestWorktreeList(id)
     // Carry a clicked search hit's message into the scroll target; a plain select clears any stale one.
     useUiStore.getState().setScrollTarget(messageId ?? null)
+  }
+
+  /** Request porcelain+meta worktree list for Studio catalog (git:worktree:list → store). */
+  requestWorktreeList(sessionId: string): void {
+    this.transport.send({ type: 'git:worktree:list', sessionId })
   }
 
   /** Remember the currently-open conversation for the active surface (so returning restores it,

@@ -9,6 +9,8 @@ export interface ParallelSlot {
   sessionId: string
   /** Background worker id from parallel_worktrees. */
   taskId?: string
+  /** Catalog id when created via WorktreeService (PR5). */
+  worktreeId?: string
   worktreePath: string
   branch: string
   status: ParallelSlotStatus

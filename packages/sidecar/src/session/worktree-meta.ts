@@ -40,14 +40,18 @@ export function metaPathForRepo(repoKey: string): string {
   return path.join(getWorktreeMetaDir(), `${repoKey}.json`)
 }
 
-/** Stable repo key from the primary checkout path (resolved). KD7 / KD15. */
+/**
+ * Stable repo key from a resolved identity path (git-common-dir preferred, else main path).
+ * Uses sha256(...).slice(0, 16) — design originally said sha1; impl is sha256 (stable once shipped).
+ * KD7 / KD15.
+ */
 export function repoKeyFromPrimary(primaryPath: string): string {
   return createHash('sha256').update(resolvePath(primaryPath), 'utf8').digest('hex').slice(0, HASH_SLICE)
 }
 
 /**
  * Stable worktree id for a path within a repo (KD15).
- * hash(repoKey + realpath) — stable across restarts, not across path moves.
+ * sha256(repoKey + '\\0' + realpath).slice(0, 16) — stable across restarts, not across path moves.
  */
 export function worktreeIdFromPath(repoKey: string, worktreePath: string): WorktreeId {
   const resolved = resolvePath(worktreePath)

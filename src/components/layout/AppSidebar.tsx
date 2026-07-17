@@ -15,6 +15,11 @@ import {
   type ParallelRun,
   type ParallelSlot,
 } from '@/store/parallelStore'
+import {
+  catalogMinusParallelPaths,
+  useWorktreeStore,
+  type CatalogWorktree,
+} from '@/store/worktreeStore'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
@@ -42,10 +47,15 @@ export function AppSidebar() {
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const parallelRuns = useParallelStore((s) => s.runs)
+  const catalogById = useWorktreeStore((s) => s.byId)
   const isMac = isMacPlatform()
   const mod = isMac ? '⌘' : 'Ctrl+'
 
   const q = query.trim().toLowerCase()
+
+  const hydrateWorktrees = (sessionId: string) => {
+    sessionService.requestWorktreeList(sessionId)
+  }
 
   /** Slot-only session ids (legacy multi-session fan-out) — hide from top-level list. */
   const nestedSlotSessionIds = useMemo(() => {
@@ -311,8 +321,14 @@ export function AppSidebar() {
                 surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
               const hostRuns = runsByHost.get(session.id) ?? []
               const slots = slotsForHost(parallelRuns, session.id)
-              const hasWorktrees = slots.length > 0
+              const parallelPaths = new Set(slots.map((s) => s.worktreePath).filter(Boolean))
+              const catalogRows = catalogMinusParallelPaths(
+                useWorktreeStore.getState().catalogForHost(session.id),
+                parallelPaths,
+              ).filter((c) => !c.isPrimary)
+              const hasWorktrees = slots.length > 0 || catalogRows.length > 0
               const expanded = hasWorktrees && isWorktreeExpanded(session.id)
+              void catalogById // subscribe to catalog updates
 
               return (
                 <li key={session.id} data-testid={`sidebar-session-group-${session.id}`}>
@@ -351,7 +367,9 @@ export function AppSidebar() {
                           }
                           onClick={(e) => {
                             e.stopPropagation()
+                            const next = !isWorktreeExpanded(session.id)
                             toggleWorktree(session.id)
+                            if (next) hydrateWorktrees(session.id)
                           }}
                           className={cn(
                             'mt-1.5 ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
@@ -451,6 +469,29 @@ export function AppSidebar() {
                           </ul>
                         </li>
                       ))}
+                      {catalogRows.length > 0 ? (
+                        <li className="m-0 p-0">
+                          {hostRuns.length > 0 ? (
+                            <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                              <GitBranch size={10} aria-hidden />
+                              <span className="truncate">
+                                {t('sidebar.parallel.catalogGroup', {
+                                  defaultValue: 'Worktrees',
+                                })}
+                              </span>
+                            </div>
+                          ) : null}
+                          <ul className="m-0 list-none p-0">
+                            {catalogRows.map((row) => (
+                              <CatalogWorktreeRow
+                                key={row.id}
+                                row={row}
+                                hostSessionId={session.id}
+                              />
+                            ))}
+                          </ul>
+                        </li>
+                      ) : null}
                     </ul>
                   ) : null}
                 </li>
@@ -468,6 +509,43 @@ export function AppSidebar() {
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>
+  )
+}
+
+function CatalogWorktreeRow({
+  row,
+  hostSessionId,
+}: {
+  row: CatalogWorktree
+  hostSessionId: string
+}) {
+  const pathLabel = shortWorktreeLabel(row.path, row.branch)
+  return (
+    <li>
+      <button
+        type="button"
+        data-testid={`sidebar-catalog-wt-${row.id}`}
+        data-no-drag
+        onClick={() => void selectSessionFromSidebar(hostSessionId)}
+        title={row.path}
+        className={cn(
+          'mb-0.5 flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+          'hover:bg-state-hover',
+        )}
+      >
+        <GitBranch size={12} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12px] font-medium text-ink">
+            {row.label || row.branch || pathLabel}
+          </span>
+          <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={row.path}>
+            {pathLabel}
+            {row.source ? ` · ${row.source}` : ''}
+          </span>
+        </span>
+      </button>
+    </li>
   )
 }
 

@@ -207,6 +207,7 @@ async function main(): Promise<void> {
     .description('Remove a managed worktree path')
     .requiredOption('-s, --session <id>', 'Session id with git cwd')
     .requiredOption('-p, --path <path>', 'Absolute worktree path under managed dir')
+    .option('--force', 'Force-remove dirty/untracked worktree')
     .option('--json', 'Emit JSON')
     .option('--isolate', 'Use temp isolation DB')
     .option('--port <n>', 'Attach port', (v) => Number(v))
@@ -216,6 +217,7 @@ async function main(): Promise<void> {
       process.exitCode = await worktreeRemove({
         sessionId: flags.session as string,
         worktreePath: flags.path as string,
+        force: flags.force === true,
         json: flags.json === true,
         useUserHip: flags.isolate !== true,
         port: flags.port as number | undefined,

@@ -249,11 +249,11 @@ Week 10–12 加固 + eval 轴 + dogfood
 
 | 项 | 决议 | 日期 |
 |----|------|------|
-| 主叙事 | _待填_ | |
-| P0 范围 | _待填_ | |
-| 外部 agent 策略 | _待填_ | |
-| 远程形态 | _待填_ | |
-| Mobile | _待填_ | |
-| 人力模型 | _待填_ | |
+| 主叙事 | **A Parallel Studio** | 2026-07-17 |
+| P0 范围 | Worktree Studio + 终端回灌 MVP + 产品 CLI + Diff 批注 | 2026-07-17 |
+| 外部 agent 策略 | ACP worker（P1 体验）；P0 不扩展 | 2026-07-17 |
+| 远程形态 | P1 远程第二 sidecar | 2026-07-17 |
+| Mobile | P2 | 2026-07-17 |
+| 人力模型 | 单人/小团队 | 2026-07-17 |
 
-锁定后，从 [02-schemes](./02-schemes.md) 按 ID 开 design / 实现。
+实现规格：[`docs/design/2026-07-17-p0-parallel-surface-spec.md`](../design/2026-07-17-p0-parallel-surface-spec.md)。

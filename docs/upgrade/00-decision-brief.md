@@ -4,7 +4,7 @@
 |-------|-------|
 | **Title** | hip 相对 Orca 的升级方向 — 决策用一页纸 |
 | **Date** | 2026-07-17 |
-| **Status** | Decision brief — 待产品拍板 |
+| **Status** | **Locked 2026-07-17** — 默认决议生效，P0 执行中 |
 | **对照对象** | `/Users/lijiamin/data/code-repository/github/orca`（Orca，Electron 并行 Agent IDE） |
 | **详读** | [01 路线图](./01-roadmap.md) · [02 方案](./02-schemes.md) · [附录对照表](./appendix-capability-matrix.md) |
 
@@ -61,38 +61,27 @@
 请直接回复选项字母 / 勾选，便于后续写 PR 计划：
 
 1. **主叙事**  
-   - [ ] A Parallel Studio（推荐）  
+   - [x] A Parallel Studio（推荐）  
    - [ ] B Smart Loop First  
    - [ ] C Orchestrator Shell  
-   - [ ] 混合：________
 
-2. **P0 范围**（可多选；推荐全选前四）  
-   - [ ] A1 并行 Worktree Studio  
-   - [ ] A2 终端工作面  
-   - [ ] A3 产品级 CLI  
-   - [ ] A4 Diff 批注回灌  
-   - [ ] 砍掉：________ / 加入：________
+2. **P0 范围**  
+   - [x] A1 并行 Worktree Studio  
+   - [x] A2 终端工作面（MVP：选区回灌）  
+   - [x] A3 产品级 CLI  
+   - [x] A4 Diff 批注回灌  
 
 3. **外部 CLI agent 策略**  
-   - [ ] 仅强化 ACP + 少量 preset（推荐）  
-   - [ ] 对标 Orca 做宽 vendor 适配  
-   - [ ] 暂不做外部 agent，只做 internal
+   - [x] 仅强化 ACP + 少量 preset（推荐）— **P0 不扩展，P1 再做体验**  
 
 4. **远程形态（P1）**  
-   - [ ] 远程第二 sidecar（推荐，与现架构同构）  
-   - [ ] 仅远程 PTY，文件仍本地  
-   - [ ] 完整 relay（类 Orca，成本最高）  
-   - [ ] P1 不做远程
+   - [x] 远程第二 sidecar（推荐，与现架构同构）  
 
 5. **Mobile**  
-   - [ ] P2 再做（推荐）  
-   - [ ] P1 做 Web/PWA 通知  
-   - [ ] 明确不做
+   - [x] P2 再做（推荐）  
 
-6. **资源约束**（影响切 PR 密度）  
-   - [ ] 单人 / 小团队：严格 P0 四项，其余 defer  
-   - [ ] 可并行 2 条线：P0 产品 + eval 质量  
-   - [ ] 其他：________
+6. **资源约束**  
+   - [x] 单人 / 小团队：严格 P0 四项，其余 defer
 
 ---
 

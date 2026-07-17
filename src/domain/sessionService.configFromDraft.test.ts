@@ -91,4 +91,52 @@ describe('configFromDraft', () => {
   it('draft without effort leaves effort undefined', () => {
     expect(configFromDraft({ tempId: 't', mode: 'chat', text: '' }).effort).toBeUndefined()
   })
+  it('drops draft effort when the resolved model is known without effort options', () => {
+    useProvidersStore.setState({
+      catalog: {
+        openai: {
+          id: 'openai',
+          name: 'OpenAI',
+          env: [],
+          api: 'https://api.openai.com/v1',
+          models: {
+            'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o' },
+          },
+        },
+      },
+      config: {
+        providers: { openai: { enabled: true } },
+        activeModel: { providerID: 'openai', modelID: 'gpt-4o' },
+      },
+    })
+    expect(
+      configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o', effort: 'max' }).effort,
+    ).toBeUndefined()
+  })
+  it('clamps draft effort invalid for the target model', () => {
+    useProvidersStore.setState({
+      catalog: {
+        openai: {
+          id: 'openai',
+          name: 'OpenAI',
+          env: [],
+          api: 'https://api.openai.com/v1',
+          models: {
+            'gpt-5.4': {
+              id: 'gpt-5.4',
+              name: 'GPT-5.4',
+              reasoning_options: [{ type: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh'] }],
+            },
+          },
+        },
+      },
+      config: {
+        providers: { openai: { enabled: true } },
+        activeModel: { providerID: 'openai', modelID: 'gpt-5.4' },
+      },
+    })
+    expect(
+      configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-5.4', effort: 'max' }).effort,
+    ).toBe('medium')
+  })
 })

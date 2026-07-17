@@ -6,6 +6,8 @@ export interface CatalogModel {
   id: string
   name: string
   attachment?: boolean
+  reasoning?: boolean
+  reasoning_options?: Array<{ type?: string; values?: string[] }>
 }
 
 export interface CatalogProvider {
@@ -44,4 +46,51 @@ export function readCatalog(): Catalog {
 
 export function isMultimodalModel(providerID: string, modelID: string): boolean {
   return !!readCatalog()[providerID]?.models[modelID]?.attachment
+}
+
+/** Effort values advertised on a catalog model entry, or null when none. */
+export function effortLevelsFromCatalogModel(model: CatalogModel | undefined | null): string[] | null {
+  if (!model) return null
+  const values: string[] = []
+  for (const opt of model.reasoning_options ?? []) {
+    if (opt?.type !== 'effort' || !Array.isArray(opt.values)) continue
+    for (const v of opt.values) {
+      if (typeof v === 'string' && v.trim() && !values.includes(v)) values.push(v)
+    }
+  }
+  return values.length > 0 ? values : null
+}
+
+/**
+ * Filter SessionConfig.effort against a concrete catalog model entry.
+ * - Model unknown (`undefined`) → pass through (custom / catalog not loaded).
+ * - Model known with no effort options → drop.
+ * - Model known with a list → keep only if listed (else drop).
+ */
+export function clampEffortAgainstModel(
+  model: CatalogModel | undefined | null,
+  effort: string | undefined,
+): string | undefined {
+  if (!effort) return undefined
+  if (!model) return effort
+  const levels = effortLevelsFromCatalogModel(model)
+  if (!levels) return undefined
+  return levels.includes(effort) ? effort : undefined
+}
+
+/** Effort values for a provider/model id from the on-disk catalog. */
+export function effortLevelsForModel(providerID: string, modelID: string): string[] | null {
+  return effortLevelsFromCatalogModel(readCatalog()[providerID]?.models?.[modelID])
+}
+
+/**
+ * Filter SessionConfig.effort for the concrete model before building the chat client.
+ * Uses the renderer's cached models.json when available.
+ */
+export function clampEffortForModel(
+  providerID: string,
+  modelID: string,
+  effort: string | undefined,
+): string | undefined {
+  return clampEffortAgainstModel(readCatalog()[providerID]?.models?.[modelID], effort)
 }

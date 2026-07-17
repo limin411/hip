@@ -4,6 +4,7 @@ import {
   effortLevelsForKey,
   defaultEffort,
   resolveEffort,
+  clampEffortForKey,
 } from './modelEffort'
 import type { Catalog, CatalogModel } from '@/ipc/catalog'
 
@@ -101,5 +102,62 @@ describe('defaultEffort / resolveEffort', () => {
     expect(resolveEffort(null, levels)).toBe('medium')
     expect(resolveEffort('high', null)).toBeNull()
     expect(resolveEffort('high', [])).toBeNull()
+  })
+})
+
+describe('clampEffortForKey (persist-safe, cross-model)', () => {
+  const catalog: Catalog = {
+    openai: {
+      id: 'openai',
+      name: 'OpenAI',
+      env: [],
+      models: {
+        'gpt-5.4': {
+          id: 'gpt-5.4',
+          name: 'GPT-5.4',
+          reasoning_options: [{ type: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh'] }],
+        },
+        'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o' },
+      },
+    },
+    anthropic: {
+      id: 'anthropic',
+      name: 'Anthropic',
+      env: [],
+      models: {
+        'claude-opus-4-8': {
+          id: 'claude-opus-4-8',
+          name: 'Opus',
+          reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high', 'xhigh', 'max'] }],
+        },
+      },
+    },
+  }
+
+  it('clears effort when the target model is known but has no effort options', () => {
+    expect(clampEffortForKey(catalog, 'openai/gpt-4o', 'high')).toBeUndefined()
+    expect(clampEffortForKey(catalog, 'openai/gpt-4o', 'max')).toBeUndefined()
+  })
+
+  it('keeps effort that is valid for the target model', () => {
+    expect(clampEffortForKey(catalog, 'openai/gpt-5.4', 'high')).toBe('high')
+    expect(clampEffortForKey(catalog, 'anthropic/claude-opus-4-8', 'max')).toBe('max')
+  })
+
+  it('does not invent effort when unset', () => {
+    expect(clampEffortForKey(catalog, 'openai/gpt-5.4', undefined)).toBeUndefined()
+    expect(clampEffortForKey(catalog, 'openai/gpt-5.4', null)).toBeUndefined()
+  })
+
+  it('passes through when the model is not in the catalog (custom / unloaded)', () => {
+    expect(clampEffortForKey(catalog, 'custom/my-model', 'max')).toBe('max')
+    expect(clampEffortForKey({}, 'openai/gpt-5.4', 'high')).toBe('high')
+  })
+
+  it('remaps provider-specific values when switching models (no max on OpenAI, no none on Anthropic)', () => {
+    // Anthropic max → OpenAI (no max) → default medium
+    expect(clampEffortForKey(catalog, 'openai/gpt-5.4', 'max')).toBe('medium')
+    // OpenAI none → Anthropic (no none) → default medium
+    expect(clampEffortForKey(catalog, 'anthropic/claude-opus-4-8', 'none')).toBe('medium')
   })
 })

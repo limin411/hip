@@ -1,7 +1,7 @@
 // src/store/providersStore.ts
 import { create } from 'zustand'
 import type { ActiveModel, ProviderEntry, ProvidersConfig } from '@hip/protocol'
-import { fetchCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
+import { fetchCatalog, refreshCatalog, isCompatible, type Catalog, type CatalogProvider } from '@/ipc/catalog'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { areProviderKeysConfigured, saveProviderKey, clearProviderKey, restartSidecar } from '@/ipc/secrets'
 import { sessionService } from '@/domain/sessionService'
@@ -14,7 +14,13 @@ interface ProvidersStore {
   config: ProvidersConfig
   keyConfigured: Record<string, boolean>
   loaded: boolean
+  /** True while a background models.dev revalidation is in flight. */
+  catalogRefreshing: boolean
+  /** Epoch ms of the last successful network catalog refresh (0 if never). */
+  catalogRefreshedAt: number
   load: () => Promise<void>
+  /** Force network revalidation; merges into store on success. Safe to call repeatedly. */
+  refreshCatalog: () => Promise<boolean>
   saveKey: (providerID: string, value: string) => Promise<void>
   clearKey: (providerID: string) => Promise<void>
   setBaseURL: (providerID: string, baseURL: string) => Promise<void>
@@ -92,8 +98,11 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   config: { providers: {} },
   keyConfigured: {},
   loaded: false,
+  catalogRefreshing: false,
+  catalogRefreshedAt: 0,
 
   load: async () => {
+    // SWR step 1: local catalog only (disk cache / bundled snapshot) — never wait on network.
     const [catalogRaw] = await Promise.all([fetchCatalog(), useHipConfigStore.getState().load()])
     const hipConfig = useHipConfigStore.getState().config
     const config = withDefaults({
@@ -107,6 +116,36 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     const configured = await areProviderKeysConfigured(ids)
     const flags = ids.map((id) => [id, !!configured[id]] as const)
     set({ catalog, config, keyConfigured: Object.fromEntries(flags), loaded: true })
+
+    // SWR step 2: every app open revalidates models.dev; Effort levels / prices hot-swap on success.
+    void get().refreshCatalog().catch((err) => {
+      console.warn('[providersStore] catalog revalidation failed:', err)
+    })
+  },
+
+  refreshCatalog: async () => {
+    if (get().catalogRefreshing) return false
+    set({ catalogRefreshing: true })
+    try {
+      const catalogRaw = await refreshCatalog()
+      // Keep user config (enabled / baseURL / activeModel); only refresh model metadata.
+      const { config } = get()
+      const catalog = mergeCustom(catalogRaw, config)
+      const ids = Object.keys(catalog).filter((id) => isCompatible(catalog[id]))
+      const configured = await areProviderKeysConfigured(ids)
+      const flags = Object.fromEntries(ids.map((id) => [id, !!configured[id]] as const))
+      set({
+        catalog,
+        keyConfigured: { ...get().keyConfigured, ...flags },
+        catalogRefreshing: false,
+        catalogRefreshedAt: Date.now(),
+      })
+      return true
+    } catch (err) {
+      set({ catalogRefreshing: false })
+      console.warn('[providersStore] refreshCatalog failed:', err)
+      return false
+    }
   },
 
   saveKey: async (providerID, value) => {

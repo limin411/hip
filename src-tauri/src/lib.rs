@@ -23,7 +23,6 @@ use hip_config::{
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Mutex;
-use std::time::{Duration, SystemTime};
 use tauri::Manager;
 use tauri_plugin_shell::process::CommandChild;
 
@@ -176,7 +175,7 @@ fn delete_secret(app: tauri::AppHandle, key: String) -> Result<(), String> {
 }
 
 const MODELS_URL: &str = "https://models.dev/api.json";
-const CATALOG_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+/// Bundled fallback when no on-disk cache exists yet (first launch / wiped cache).
 const SNAPSHOT: &str = include_str!("../resources/models-snapshot.json");
 
 
@@ -391,34 +390,61 @@ fn read_skill_file(app: tauri::AppHandle, id: String, rel: String) -> Result<Str
     std::fs::read_to_string(&target).map_err(|e| e.to_string())
 }
 
-async fn fetch_catalog(app: &tauri::AppHandle) -> Result<String, String> {
-    let cache = paths::cache_dir(app).map(|d| d.join("models.json"));
-    if let Some(ref c) = cache {
-        if let Ok(meta) = std::fs::metadata(c) {
-            if let Ok(modified) = meta.modified() {
-                if SystemTime::now().duration_since(modified).unwrap_or(CATALOG_TTL) < CATALOG_TTL {
-                    if let Ok(body) = std::fs::read_to_string(c) {
-                        return Ok(body);
-                    }
-                }
+fn catalog_cache_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    paths::cache_dir(app).map(|d| d.join("models.json"))
+}
+
+/// Local-only catalog: disk cache if present, else the bundled snapshot.
+/// Never hits the network — keeps app startup / LoadingScreen instant (SWR).
+fn read_local_catalog(app: &tauri::AppHandle) -> String {
+    if let Some(c) = catalog_cache_path(app) {
+        if let Ok(body) = std::fs::read_to_string(&c) {
+            if !body.trim().is_empty() {
+                return body;
             }
         }
     }
-    let url = std::env::var("HIP_MODELS_URL").unwrap_or_else(|_| MODELS_URL.to_string());
-    match reqwest::get(&url).await.and_then(|r| r.error_for_status()) {
-        Ok(resp) => match resp.text().await {
-            Ok(body) => {
-                if let Some(ref c) = cache {
-                    let tmp = c.with_extension("tmp");
-                    std::fs::write(&tmp, &body).map_err(|e| e.to_string())?;
-                    std::fs::rename(&tmp, c).map_err(|e| e.to_string())?;
-                }
-                Ok(body)
-            }
-            Err(_) => fallback_catalog(cache.as_deref()),
-        },
-        Err(_) => fallback_catalog(cache.as_deref()),
+    SNAPSHOT.to_string()
+}
+
+/// Reject non-JSON / non-object bodies so we never poison `models.json` with HTML error pages.
+fn validate_catalog_json(body: &str) -> Result<(), String> {
+    let v: serde_json::Value =
+        serde_json::from_str(body).map_err(|e| format!("invalid catalog json: {e}"))?;
+    if !v.is_object() {
+        return Err("catalog root must be a JSON object".into());
     }
+    Ok(())
+}
+
+fn write_catalog_cache(path: &std::path::Path, body: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, body).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+/// Force-fetch models.dev (or `HIP_MODELS_URL`), validate, write cache, return body.
+/// Used for background revalidation on every app open — does not fall back to cache on failure
+/// (callers already have local catalog); returns Err so the UI can keep the previous catalog.
+async fn download_catalog(app: &tauri::AppHandle) -> Result<String, String> {
+    let url = std::env::var("HIP_MODELS_URL").unwrap_or_else(|_| MODELS_URL.to_string());
+    let resp = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("catalog fetch failed: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("catalog HTTP error: {e}"))?;
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("catalog body read failed: {e}"))?;
+    validate_catalog_json(&body)?;
+    if let Some(c) = catalog_cache_path(app) {
+        write_catalog_cache(&c, &body)?;
+    }
+    Ok(body)
 }
 
 /// Write UTF-8 text to an absolute path chosen by the user (e.g. save dialog).
@@ -436,18 +462,17 @@ fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&dest, contents).map_err(|e| e.to_string())
 }
 
+/// Instant catalog for UI boot: cache or bundled snapshot only (no network).
 #[tauri::command]
-async fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
-    fetch_catalog(&app).await
+fn models_catalog(app: tauri::AppHandle) -> Result<String, String> {
+    Ok(read_local_catalog(&app))
 }
 
-fn fallback_catalog(cache: Option<&std::path::Path>) -> Result<String, String> {
-    if let Some(c) = cache {
-        if let Ok(body) = std::fs::read_to_string(c) {
-            return Ok(body);
-        }
-    }
-    Ok(SNAPSHOT.to_string())
+/// Force network refresh of the models.dev catalog and update on-disk cache.
+/// Intended for every app open (stale-while-revalidate); UI keeps serving local until this returns.
+#[tauri::command]
+async fn models_catalog_refresh(app: tauri::AppHandle) -> Result<String, String> {
+    download_catalog(&app).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -475,9 +500,15 @@ pub fn run() {
                     Err(e) => eprintln!("[tauri] sidecar failed: {e}"),
                 }
             });
+            // Background catalog revalidation (SWR): local cache already serves the UI;
+            // this warms/refreshes ~/.hip/cache/models.json for the next read and for any
+            // concurrent frontend refreshCatalog call.
             let handle2 = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                let _ = fetch_catalog(&handle2).await;
+                match download_catalog(&handle2).await {
+                    Ok(_) => println!("[tauri] models catalog refreshed"),
+                    Err(e) => eprintln!("[tauri] models catalog refresh failed: {e}"),
+                }
             });
             Ok(())
         })
@@ -489,6 +520,7 @@ pub fn run() {
             has_secrets,
             delete_secret,
             models_catalog,
+            models_catalog_refresh,
             get_hip_config,
             set_hip_config,
             get_network_policy,

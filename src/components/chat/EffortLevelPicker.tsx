@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gauge, Check } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/DropdownMenu'
@@ -6,7 +7,7 @@ import { useDraftStore } from '@/store/draftStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useActiveSession, useActiveSessionId, useActiveSessionStatus, sessionService } from '@/domain'
 import { activeModelKey } from '@/lib/modelKey'
-import { effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
+import { clampEffortForKey, effortLevelsForKey, resolveEffort } from '@/lib/modelEffort'
 import { cn } from '@/lib/utils'
 
 /**
@@ -33,9 +34,20 @@ export function EffortLevelPicker() {
       : (draftModelKey ?? activeModelKey(config))
 
   const levels = effortLevelsForKey(catalog, modelKey)
+  const stored = activeId && session ? session.config.effort : draftEffort
+
+  // Keep stored effort aligned with the *current* model (model switch, catalog refresh).
+  // Display-only resolveEffort is not enough — config.effort is what the sidecar sends.
+  useEffect(() => {
+    if (busy) return
+    const next = clampEffortForKey(catalog, modelKey, stored)
+    if (next === (stored || undefined)) return
+    if (activeId && session) sessionService.setEffort(activeId, next ?? null)
+    else setDraftEffort(next)
+  }, [activeId, session, busy, catalog, modelKey, stored, setDraftEffort])
+
   if (!levels) return null
 
-  const stored = activeId && session ? session.config.effort : draftEffort
   const current = resolveEffort(stored, levels) ?? defaultFallback(levels)
 
   const choose = (effort: string) => {

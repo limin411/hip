@@ -3,6 +3,8 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import { nanoid } from 'nanoid'
 import type { PermissionMode } from '@hip/protocol'
 import type { Surface } from './uiStore'
+import { clampEffortForKey } from '@/lib/modelEffort'
+import { useProvidersStore } from '@/store/providersStore'
 
 export interface Draft {
   tempId: string
@@ -78,7 +80,10 @@ export const useDraftStore = create<DraftStore>()(
       setModelKey: (modelKey) =>
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
-          return { draft: { ...base, modelKey } }
+          // Drop or remapped effort so draft does not carry Anthropic `max` onto OpenAI, etc.
+          const catalog = useProvidersStore.getState().catalog
+          const effort = clampEffortForKey(catalog, modelKey, base.effort)
+          return { draft: { ...base, modelKey, effort } }
         }),
       setPermissionMode: (permissionMode) =>
         set((s) => {

@@ -44,7 +44,17 @@ export function isCompatible(p: CatalogProvider): boolean {
   return COMPATIBLE_IDS.has(p.id)
 }
 
+/** Local catalog only (disk cache or bundled snapshot). Never blocks on network. */
 export async function fetchCatalog(): Promise<Catalog> {
   const raw = await invoke<string>('models_catalog')
+  return JSON.parse(raw) as Catalog
+}
+
+/**
+ * Force-fetch models.dev (or HIP_MODELS_URL), rewrite ~/.hip/cache/models.json, return fresh catalog.
+ * Used for stale-while-revalidate after boot; keep serving the previous catalog on failure.
+ */
+export async function refreshCatalog(): Promise<Catalog> {
+  const raw = await invoke<string>('models_catalog_refresh')
   return JSON.parse(raw) as Catalog
 }

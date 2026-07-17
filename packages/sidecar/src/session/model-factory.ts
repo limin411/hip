@@ -3,6 +3,7 @@ import { ChatAnthropic } from '@langchain/anthropic'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { getActiveModel, cheapModelFor } from '../config/providers.js'
+import { clampEffortForModel } from '../config/catalog.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { langSmithModelCallConfig } from '../observability/langsmith.js'
 import { SUMMARY_OUTPUT_TOKENS, type Summarizer } from './compaction.js'
@@ -136,8 +137,10 @@ export function anthropicOutputEffort(effort: string | undefined): string | unde
 
 /** Build the production reasoning chat model for a concrete model choice. */
 export function buildChatModel(choice: BuildChatModelChoice): BaseChatModel {
+  // Drop effort that is invalid for this exact model (catalog-aware) before provider mapping.
+  const catalogEffort = clampEffortForModel(choice.providerID, choice.modelID, choice.effort)
   if (choice.providerID === 'anthropic') {
-    const effort = anthropicOutputEffort(choice.effort)
+    const effort = anthropicOutputEffort(catalogEffort)
     return new ChatAnthropic({
       model: choice.modelID,
       apiKey: activeKey(choice.providerID),
@@ -152,7 +155,7 @@ export function buildChatModel(choice: BuildChatModelChoice): BaseChatModel {
         : {}),
     })
   }
-  const oe = openAiReasoningEffort(choice.effort)
+  const oe = openAiReasoningEffort(catalogEffort)
   return new ReasoningChatOpenAI({
     model: choice.modelID,
     apiKey: activeKey(choice.providerID),

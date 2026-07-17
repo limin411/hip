@@ -26,7 +26,8 @@ import { useDiffStore } from '@/store/diffStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { ptyKill } from '@/ipc/pty'
 import i18n from '@/i18n'
-import { resolveModelConfig } from '@/lib/modelKey'
+import { resolveModelConfig, activeModelKey } from '@/lib/modelKey'
+import { clampEffortForKey } from '@/lib/modelEffort'
 import { useProvidersStore } from '@/store/providersStore'
 import { surfaceOf } from '@/lib/sessions'
 import type { LocalAttachment } from '@/components/chat/attachmentTypes'
@@ -1275,13 +1276,21 @@ export class SessionService {
    *  model / baseURL, sends session:setModel to the sidecar (which also updates the global active
    *  model), and optimistically updates the session's config. */
   setSessionModel(modelKey: string): void {
-    const { activeSessionId } = useDomainStore.getState()
+    const { activeSessionId, sessions } = useDomainStore.getState()
     if (!activeSessionId) return
     const { catalog, config } = useProvidersStore.getState()
     const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, modelKey)
     // Optimistic — the sidecar echoes session:model to confirm.
     useDomainStore.getState().apply({ type: 'session:model', sessionId: activeSessionId, llmProvider, model })
     this.transport.send({ type: 'session:setModel', sessionId: activeSessionId, llmProvider, model, baseURL })
+
+    // Effort is model-specific (OpenAI has none/xhigh; Anthropic has max; many models have none).
+    // Clamp or clear so a leftover `max` is never sent to a model that does not advertise it.
+    const prev = sessions.find((s) => s.id === activeSessionId)?.config.effort
+    const next = clampEffortForKey(catalog, modelKey, prev)
+    if (next !== prev && (next !== undefined || prev !== undefined)) {
+      this.setEffort(activeSessionId, next ?? null)
+    }
   }
 
   /** Switch a live ACP-agent config selector (model/mode); the agent re-advertises via agent:configOptions. */
@@ -1524,10 +1533,12 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
     surface === 'code' && draft?.forcePlan
       ? { ...withMode, forcePlan: true, disablePlan: false }
       : withMode
-  const withEffort: SessionConfig =
-    draft?.effort ? { ...withPlan, effort: draft.effort } : withPlan
-  if (!draft?.modelKey) return withEffort
   const { catalog, config } = useProvidersStore.getState()
+  // Clamp effort to the model that will actually run (draft modelKey or global active).
+  const modelKey = draft?.modelKey ?? activeModelKey(config)
+  const effort = clampEffortForKey(catalog, modelKey, draft?.effort)
+  const withEffort: SessionConfig = effort ? { ...withPlan, effort } : withPlan
+  if (!draft?.modelKey) return withEffort
   const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
   return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }

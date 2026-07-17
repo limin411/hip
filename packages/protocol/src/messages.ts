@@ -210,6 +210,15 @@ export type ServerMessage =
   | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; error?: string }
   | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
   | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
+  /** Agent-driven parallel worktree run started (after user HITL). */
+  | {
+      type: 'parallel:started'
+      sessionId: string
+      runId: string
+      baseCwd: string
+      goal: string
+      slots: Array<{ index: number; branch: string; path: string; taskId: string }>
+    }
   | { type: 'mcp:listResources:result'; serverId: string; resources: McpResource[]; resourceTemplates?: McpResourceTemplate[]; error?: string }
   | { type: 'mcp:readResource:result'; serverId: string; uri: string; contents: McpResourceContent[]; error?: string }
   | { type: 'mcp:listPrompts:result'; serverId: string; prompts: McpPrompt[]; error?: string }

@@ -5,7 +5,10 @@ export type ParallelSlotStatus = 'creating' | 'ready' | 'error'
 
 export interface ParallelSlot {
   index: number
+  /** Multi-session host path (legacy); agent-driven path may leave empty. */
   sessionId: string
+  /** Background worker id from parallel_worktrees. */
+  taskId?: string
   worktreePath: string
   branch: string
   status: ParallelSlotStatus
@@ -16,12 +19,15 @@ export interface ParallelRun {
   id: string
   baseCwd: string
   prompt: string
+  /** Parent chat session that requested the run (agent-driven). */
   hostSessionId: string
   slots: ParallelSlot[]
   selectedSessionId?: string
   createdAt: number
   /** Soft error for the whole run (e.g. host failed). */
   error?: string
+  /** agent = parallel_worktrees tool; host = multi-session fan-out (legacy). */
+  source?: 'agent' | 'host'
 }
 
 interface ParallelState {

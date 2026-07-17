@@ -11,6 +11,7 @@ import { createDebouncedFn, shouldRefreshDiffOnToolFinish } from '@/lib/diffRefr
 import { extractRenderedArtifacts } from '@/lib/renderedArtifacts'
 import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
+import { useParallelStore } from '@/store/parallelStore'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -344,6 +345,29 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     case 'session:deleted':
       useWorkflowStore.getState().clearSession(msg.sessionId)
       return
+
+    case 'parallel:started': {
+      useParallelStore.getState().addRun({
+        id: msg.runId,
+        baseCwd: msg.baseCwd,
+        prompt: msg.goal,
+        hostSessionId: msg.sessionId,
+        source: 'agent',
+        createdAt: Date.now(),
+        slots: msg.slots.map((s) => ({
+          index: s.index,
+          sessionId: '',
+          taskId: s.taskId,
+          worktreePath: s.path,
+          branch: s.branch,
+          status: 'ready' as const,
+        })),
+      })
+      toast.success(
+        i18n.t('chat.parallel.started', { count: msg.slots.length }),
+      )
+      return
+    }
 
     default:
       return

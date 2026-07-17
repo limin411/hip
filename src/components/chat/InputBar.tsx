@@ -11,7 +11,6 @@ import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
-import { ParallelRunChip } from './ParallelRunChip'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { surfaceOf } from '@/lib/sessions'
@@ -206,21 +205,7 @@ export function InputBar() {
                 reconnecting={reconnecting}
                 leftSlot={
                   isCode ? (
-                    <>
-                      <ModelPicker />
-                      <PermissionModePicker />
-                      <PlanModeChip />
-                      <ProjectGuidanceChip />
-                      <ParallelRunChip
-                        prompt={value}
-                        onStarted={() => {
-                          setValue('')
-                          setAttachments([])
-                          setQuoteText(null)
-                        }}
-                      />
-                      <AttachmentButton onAttach={setAttachments} />
-                    </>
+                    <><ModelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
                   ) : (
                     <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                   )

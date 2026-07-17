@@ -213,7 +213,13 @@ export interface SessionTurnHost {
   getFixedAgents(): Record<string, boolean> | undefined
   getActiveProfile(): AgentProfile
   checkSteerPromotion(): void
-  runBackgroundSubagent(taskId: string, description: string, signal: AbortSignal, send: SendFn): Promise<void>
+  runBackgroundSubagent(
+    taskId: string,
+    description: string,
+    signal: AbortSignal,
+    send: SendFn,
+    opts?: import('./session-background.js').BackgroundSubagentOpts,
+  ): Promise<void>
   loadSubagentMessages(taskId: string): BaseMessage[]
   retrySubagent(agentId: string, send: SendFn, emit?: GraphEmit): Promise<string>
   captureCheckpoint(turnId: string, label: string | null, send: SendFn): Promise<void>
@@ -824,6 +830,32 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const enabledAgents = [...readAgentsConfig(cwd).filter((a) => a.enabled && a.id !== 'builtin'), ...pluginAgents.filter((a) => a.enabled && a.id !== 'builtin'), ...enabledFixedAgents]
   const invoker = host.agentProv.invoker(cwd)
   const requestApproval = host.permissions.buildRequestApproval(send, host.id, turnId, nextSeq, mode, host.hooks)
+  const requestChoice = (
+    req: { title: string; kind: string; content: string; options: import('@hip/protocol').PermissionOption[] },
+  ) =>
+    host.permissions.requestChoice(send, host.id, turnId, nextSeq, {
+      title: req.title,
+      kind: req.kind,
+      content: req.content,
+    }, req.options)
+
+  const spawnInWorktree = async (args: {
+    taskId: string
+    description: string
+    root: string
+  }): Promise<string> => {
+    const childId = args.taskId
+    host.spawnedSubagentIds.add(childId)
+    host.subagentInstances.set(childId, { description: args.description })
+    const result = host.backgroundManager.spawn(childId, args.description, async (signal) => {
+      await host.runBackgroundSubagent(childId, args.description, signal, send, {
+        root: args.root,
+        keepWorktree: true,
+      })
+    })
+    if (result !== childId) return result
+    return `Background task started: ${childId}`
+  }
 
   const activeProfile = host.getActiveProfile()
   let tooling: SessionTooling | undefined = undefined
@@ -957,6 +989,18 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       hooks: host.hooks,
       approvalCache: host.approvalCache,
       requestApproval,
+      requestChoice,
+      spawnInWorktree,
+      onParallelRunStarted: (payload) => {
+        send({
+          type: 'parallel:started',
+          sessionId: host.id,
+          runId: payload.runId,
+          baseCwd: payload.baseCwd,
+          goal: payload.goal,
+          slots: payload.slots,
+        })
+      },
       allowedTools: activeProfile.allowedTools,
       blockedTools: activeProfile.blockedTools,
       usesEnvModel: host.usesEnvModel,

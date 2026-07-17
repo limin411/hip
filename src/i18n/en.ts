@@ -8,11 +8,7 @@ export const en = {
       sendMessage: 'Send a message to start the conversation',
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
       parallel: {
-        action: 'Parallel',
-        countLabel: 'Parallel slot count',
-        tooltip: 'Run this prompt in N isolated git worktrees',
-        needCwd: 'Open a project folder before parallel run',
-        started: 'Started {{count}} parallel slots',
+        started: 'Started {{count}} parallel worktree slots',
         failed: 'Parallel run failed',
       },
       diffAnnotations: {
@@ -1020,6 +1016,7 @@ export const en = {
         group: 'Parallel · {{id}}',
         winner: 'selected',
         slotHint: 'Click to open · double-click to mark as selected solution',
+        agentSlotHint: 'Agent-driven slot — opens the host session; workers run in background',
       },
     },
     dropdown: {

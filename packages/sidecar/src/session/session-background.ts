@@ -8,7 +8,21 @@ import { safeErrorMessage } from './error.js'
 import type { SessionTurnHost, SendFn } from './session-turn-runner.js'
 import { acquireBackgroundWorktree } from './background-worktree.js'
 
-export async function runBackgroundSubagent(host: SessionTurnHost, taskId: string, description: string, signal: AbortSignal, send: SendFn): Promise<void> {
+export type BackgroundSubagentOpts = {
+  /** Force root (e.g. a pre-created parallel worktree). Skips acquireBackgroundWorktree. */
+  root?: string
+  /** When true with a forced root, do not remove the worktree after the task ends. */
+  keepWorktree?: boolean
+}
+
+export async function runBackgroundSubagent(
+  host: SessionTurnHost,
+  taskId: string,
+  description: string,
+  signal: AbortSignal,
+  send: SendFn,
+  opts: BackgroundSubagentOpts = {},
+): Promise<void> {
   const cwd = host._config.cwd ?? process.cwd()
   const runner = host.modelRunner()
   const summarizer = host.summarizer()
@@ -25,7 +39,17 @@ export async function runBackgroundSubagent(host: SessionTurnHost, taskId: strin
   let error: string | undefined
 
   // Prefer an isolated git worktree so background agents do not thrash the main tree.
-  const wt = await acquireBackgroundWorktree(cwd, host.id, taskId)
+  // Callers may pass a pre-created root (parallel_worktrees) and keep it after completion.
+  const wt =
+    opts.root
+      ? {
+          root: opts.root,
+          isolated: true,
+          cleanup: async () => {
+            if (opts.keepWorktree) return
+          },
+        }
+      : await acquireBackgroundWorktree(cwd, host.id, taskId)
   if (wt.isolated) {
     send({
       type: 'agent:notification',

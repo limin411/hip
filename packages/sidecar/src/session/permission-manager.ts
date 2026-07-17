@@ -154,5 +154,40 @@ export class PermissionManager {
     return this.buildHitlApproval(send, sessionId, turnId, nextSeqFn, hooks)
   }
 
+  /**
+   * Generic HITL with arbitrary options; resolves the raw optionId (or cancelled).
+   * Used by tools that need multi-way choices (e.g. parallel worktree slot count).
+   */
+  requestChoice(
+    send: SendFn,
+    sessionId: string,
+    turnId: string,
+    nextSeqFn: () => number,
+    tool: { title: string; kind: string; content?: string },
+    options: PermissionOption[],
+  ): Promise<{ optionId: string } | { cancelled: true }> {
+    if (options.length === 0) {
+      return Promise.resolve({ cancelled: true })
+    }
+    return new Promise((resolve) => {
+      const requestId = `choice-${turnId || 't'}-${nextSeqFn()}`
+      this.pendingPermissions.set(requestId, (choice) => {
+        if ('cancelled' in choice) {
+          resolve({ cancelled: true })
+          return
+        }
+        resolve({ optionId: choice.optionId })
+      })
+      send({
+        type: 'permission:request',
+        sessionId,
+        turnId,
+        requestId,
+        tool: { title: tool.title, kind: tool.kind, ...(tool.content ? { content: tool.content } : {}) },
+        options,
+      })
+    })
+  }
+
 }
 

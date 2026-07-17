@@ -3,6 +3,7 @@ import type { PermissionMode, SkillMeta, McpServerConfig, AgentConfig } from '@h
 import { ToolRegistry, createScope } from './tool-registry.js'
 import { mcpManager, DEFAULT_LAZY_THRESHOLD } from './mcp/manager.js'
 import { buildTools, SELF_GATED_TOOLS, type ApprovalFn, type DispatchSpec } from './tools.js'
+import type { ParallelChoiceFn, ParallelSlotSpawnFn } from './tools/parallel-worktree.js'
 import { ToolRunner } from './tool-runner/tool-runner.js'
 import { defaultToolPolicy } from './tool-runner/tool-policy.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -39,6 +40,11 @@ export interface BuildSessionToolingInput {
   hooks: HookRegistry
   approvalCache: SessionApprovalCache
   requestApproval?: ApprovalFn
+  /** Multi-choice HITL (parallel_worktrees). */
+  requestChoice?: ParallelChoiceFn
+  /** Background worker forced into a pre-created worktree. */
+  spawnInWorktree?: ParallelSlotSpawnFn
+  onParallelRunStarted?: import('./tools/helpers.js').BuildToolsOpts['onParallelRunStarted']
   allowedTools?: string[]
   blockedTools?: string[]
   usesEnvModel: boolean
@@ -67,7 +73,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
   const builtInTools = buildTools(
     input.cwd,
     input.spawnSubagent,
-    undefined,
+    input.cwd,
     input.dispatch,
     {
       mcpTools: mcpManager.tools(input.usesEnvModel ? { lazyThreshold: DEFAULT_LAZY_THRESHOLD } : undefined),
@@ -80,6 +86,9 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
       allowedTools: input.allowedTools,
       blockedTools: input.blockedTools,
       networkPolicy: input.networkPolicy,
+      requestChoice: input.requestChoice,
+      spawnInWorktree: input.spawnInWorktree,
+      onParallelRunStarted: input.onParallelRunStarted,
     },
     input.retrySubagent,
     input.stopBackgroundTask,

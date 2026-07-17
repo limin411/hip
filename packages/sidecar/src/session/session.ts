@@ -198,8 +198,14 @@ export class Session {
    * Errors are caught and injected as a failed synthetic message; they never propagate to the
    * caller, so background tasks are fire-and-forget from the parent turn's perspective.
    */
-  async runBackgroundSubagent(taskId: string, description: string, signal: AbortSignal, send: SendFn): Promise<void> {
-    return runBackgroundSubagent(this as unknown as SessionTurnHost, taskId, description, signal, send)
+  async runBackgroundSubagent(
+    taskId: string,
+    description: string,
+    signal: AbortSignal,
+    send: SendFn,
+    opts?: import('./session-background.js').BackgroundSubagentOpts,
+  ): Promise<void> {
+    return runBackgroundSubagent(this as unknown as SessionTurnHost, taskId, description, signal, send, opts)
   }
 
 

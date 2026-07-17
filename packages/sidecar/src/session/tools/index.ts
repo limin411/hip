@@ -10,6 +10,7 @@ import { buildSubagentTools, buildTaskBatchTools } from './subagent.js'
 import { buildScriptTools } from './script.js'
 import { buildPluginInstallTool } from './plugin.js'
 import { buildMediaTools } from './media.js'
+import { buildParallelWorktreeTools } from './parallel-worktree.js'
 import { EnterPlanModeTool } from './enter-plan-mode.js'
 import { ExitPlanModeTool } from './exit-plan-mode.js'
 import { real, realInSkill, resolveFull } from './helpers.js'
@@ -99,6 +100,25 @@ export function buildAllTools(
 
   // Media tools (read_media)
   extras.push(...buildMediaTools({ enabled: opts.mediaEnabled }))
+
+  // parallel_worktrees — agent proposes N isolated worktrees; user confirms count via HITL
+  if (
+    mode !== 'chat' &&
+    cwd &&
+    opts.sessionId &&
+    opts.requestChoice &&
+    opts.spawnInWorktree
+  ) {
+    extras.push(
+      ...buildParallelWorktreeTools({
+        cwd,
+        sessionId: opts.sessionId,
+        requestChoice: opts.requestChoice,
+        spawnInWorktree: opts.spawnInWorktree,
+        onRunStarted: opts.onParallelRunStarted,
+      }),
+    )
+  }
 
   // ── Assemble result ────────────────────────────────────────────────────────────
   const taskBatchTools = buildTaskBatchTools(spawnSubagent)

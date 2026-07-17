@@ -8,11 +8,7 @@ export const zhCN = {
       sendMessage: '发送一条消息开始对话',
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
       parallel: {
-        action: '并行',
-        countLabel: '并行路数',
-        tooltip: '在 N 个隔离 git worktree 中运行此提示',
-        needCwd: '请先打开项目文件夹再并行运行',
-        started: '已启动 {{count}} 路并行',
+        started: '已启动 {{count}} 路并行 worktree',
         failed: '并行运行失败',
       },
       diffAnnotations: {
@@ -1015,6 +1011,7 @@ export const zhCN = {
         group: '并行 · {{id}}',
         winner: '已选用',
         slotHint: '单击打开 · 双击标记为选用方案',
+        agentSlotHint: '智能体并行槽位 — 打开宿主会话；worker 在后台运行',
       },
     },
     dropdown: {

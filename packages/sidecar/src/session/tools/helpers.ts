@@ -419,6 +419,23 @@ export interface BuildToolsOpts {
   mediaEnabled?: boolean
   /** PlanMode instance for Enter/Exit plan-mode tools. */
   planMode?: import('../plan-mode.js').PlanMode
+  /**
+   * HITL multi-choice for tools like parallel_worktrees (resolves raw optionId).
+   * When absent, parallel_worktrees is not registered.
+   */
+  requestChoice?: import('./parallel-worktree.js').ParallelChoiceFn
+  /**
+   * Start a background worker forced into a pre-created worktree root (no auto-delete).
+   * When absent, parallel_worktrees is not registered.
+   */
+  spawnInWorktree?: import('./parallel-worktree.js').ParallelSlotSpawnFn
+  /** Optional UI/protocol hook when parallel slots are created. */
+  onParallelRunStarted?: (payload: {
+    runId: string
+    baseCwd: string
+    goal: string
+    slots: Array<{ index: number; branch: string; path: string; taskId: string }>
+  }) => void
 }
 
 /** True for an allow decision (run_script may execute). Keys off the decision's SEMANTIC `kind`
@@ -432,4 +449,4 @@ export function isApproved(d: ApprovalDecision): boolean {
  *  (via requestApproval), rather than being gated by a pre-execution policy
  *  check. Currently only run_script — the tool fires, asks the user, and
  *  respects the answer. */
-export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script', 'EnterPlanMode'])
+export const SELF_GATED_TOOLS: Set<string> = new Set(['run_script', 'EnterPlanMode', 'parallel_worktrees'])

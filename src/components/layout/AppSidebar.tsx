@@ -72,7 +72,9 @@ export function AppSidebar() {
 
   const visibleParallelRuns = useMemo(() => {
     if (sidebarSection !== 'projects') return []
-    let list = parallelRuns.filter((r) => r.slots.some((s) => s.sessionId))
+    let list = parallelRuns.filter(
+      (r) => r.slots.some((s) => s.sessionId || s.taskId || s.worktreePath),
+    )
     if (q) {
       list = list.filter(
         (r) =>
@@ -297,32 +299,47 @@ export function AppSidebar() {
                   <span className="truncate">{t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}</span>
                 </div>
                 <ul className="m-0 list-none p-0">
-                  {run.slots
-                    .filter((s) => s.sessionId)
-                    .map((slot) => {
-                      const session = sessions.find((s) => s.id === slot.sessionId)
+                  {run.slots.map((slot) => {
+                      const session = slot.sessionId
+                        ? sessions.find((s) => s.id === slot.sessionId)
+                        : undefined
                       const active =
+                        !!slot.sessionId &&
                         slot.sessionId === activeSessionId &&
                         (activeView === 'chat' || activeView === 'code')
-                      const isWinner = run.selectedSessionId === slot.sessionId
+                      const isWinner =
+                        !!slot.sessionId && run.selectedSessionId === slot.sessionId
+                      const key = slot.sessionId || slot.taskId || `${run.id}-${slot.index}`
+                      const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
                       return (
-                        <li key={slot.sessionId}>
+                        <li key={key}>
                           <button
                             type="button"
-                            data-testid={`sidebar-parallel-slot-${slot.sessionId}`}
+                            data-testid={`sidebar-parallel-slot-${key}`}
                             data-no-drag
                             aria-current={active ? 'true' : undefined}
-                            onClick={() => void selectSessionFromSidebar(slot.sessionId)}
-                            onDoubleClick={() =>
-                              sessionService.selectParallelWinner(run.id, slot.sessionId)
+                            disabled={isAgentSlot && !slot.sessionId}
+                            onClick={() => {
+                              if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
+                              else if (run.hostSessionId)
+                                void selectSessionFromSidebar(run.hostSessionId)
+                            }}
+                            onDoubleClick={() => {
+                              if (slot.sessionId)
+                                sessionService.selectParallelWinner(run.id, slot.sessionId)
+                            }}
+                            title={
+                              isAgentSlot
+                                ? t('sidebar.parallel.agentSlotHint')
+                                : t('sidebar.parallel.slotHint')
                             }
-                            title={t('sidebar.parallel.slotHint')}
                             className={cn(
                               'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                               active
                                 ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
                                 : 'hover:bg-state-hover',
+                              isAgentSlot && !slot.sessionId && 'opacity-90',
                             )}
                           >
                             <span
@@ -338,10 +355,13 @@ export function AppSidebar() {
                             />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-body font-medium text-ink">
-                                {session?.title || `P${slot.index} · ${slot.branch}`}
+                                {session?.title ||
+                                  `P${slot.index} · ${slot.branch}`}
                               </span>
                               <span className="mt-0.5 block truncate text-[11px] text-ink-tertiary">
-                                {slot.branch}
+                                {slot.taskId
+                                  ? `${slot.branch} · ${slot.taskId}`
+                                  : slot.branch}
                                 {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
                               </span>
                             </span>

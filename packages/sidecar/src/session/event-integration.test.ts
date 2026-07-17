@@ -58,7 +58,8 @@ describe('Session event integration', () => {
   })
 
   it('sendMessage publishes user_message event and updates both old and projected stores', async () => {
-    const session = new Session('s1', { ...cfg, cwd: root }, undefined, st)
+    // Inject runner so usesEnvModel=false — does not depend on ~/.hip auth.json (full-suite isolation).
+    const session = new Session('s1', { ...cfg, cwd: root }, undefined, st, undefined, undefined, textRunner('ok'))
     await session.sendMessage('hello', () => {}, 'u-1')
 
     const oldMessages = st.loadMessages('s1')
@@ -112,7 +113,8 @@ describe('Session event integration', () => {
   })
 
   it('rolls back legacy write when event append fails', async () => {
-    const session = new Session('s1', { ...cfg, cwd: root }, undefined, st)
+    // Inject runner so we reach emit/append (not NO_API_KEY early-return when auth is absent).
+    const session = new Session('s1', { ...cfg, cwd: root }, undefined, st, undefined, undefined, textRunner('unused'))
     const brokenEventStore = new EventStore(db)
     brokenEventStore.append = () => {
       throw new Error('disk full')

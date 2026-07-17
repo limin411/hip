@@ -229,8 +229,9 @@ describe('agent architecture end-to-end smoke', () => {
     const approveEvents: ServerMessage[] = []
     await session.handlePlanResponse('approve', (m) => approveEvents.push(m))
 
-    // Verify plan file was persisted to .hip/plans/<sessionId>.json
-    const planFile = join(cwd, '.hip', 'plans', `${sessionId}.json`)
+    // Approved plans live under ~/.hip/plans/ (not project cwd — avoids worktree pollution).
+    const { approvedPlanJsonPath } = await import('./plan-persistence.js')
+    const planFile = approvedPlanJsonPath(sessionId)
     expect(existsSync(planFile)).toBe(true)
     const planContent = JSON.parse(readFileSync(planFile, 'utf8')) as {
       sessionId: string

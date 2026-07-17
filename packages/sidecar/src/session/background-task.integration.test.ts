@@ -214,16 +214,22 @@ describe('background subagent integration', () => {
   })
 
   it('multiple background tasks can be spawned in sequence', async () => {
-    // Runner: call 1 = issue task A (background), call 2 = subagent for A,
-    // call 3 = (main continuation, has ToolMessage) issue task B (background),
-    // call 4 = subagent for B, call 5 = main continuation, finish without tool_calls.
-    // sub-agent turns detected by absence of ToolMessages.
+    // Background task tool returns immediately (ToolMessage) while the worker runs
+    // concurrently — so call-order counters (main→worker→main) are racy.
+    // Distinguish: first main call / main with task ToolMessages vs worker (no tools, after main started).
     class MultiBgRunner implements ModelRunner {
-      private call = 0
+      private mainStarted = false
       async run(msgs: BaseMessage[], opts: ModelRunOptions): Promise<AIMessage> {
-        this.call += 1
-        if (this.call === 1) {
-          // Main turn, first agent call: issue task A as background
+        const taskToolCount = msgs.filter(
+          (m) => m instanceof ToolMessage && m.name === 'task',
+        ).length
+        // Worker graphs start fresh (no ToolMessages) after the parent has already begun.
+        if (!hasToolMessages(msgs) && this.mainStarted) {
+          opts.onText?.('bg done')
+          return new AIMessage('bg done')
+        }
+        this.mainStarted = true
+        if (taskToolCount === 0) {
           return new AIMessage({
             content: '',
             tool_calls: [
@@ -231,14 +237,7 @@ describe('background subagent integration', () => {
             ],
           })
         }
-        if (!hasToolMessages(msgs)) {
-          // Sub-agent (fresh graph, no ToolMessages)
-          opts.onText?.('bg done')
-          return new AIMessage('bg done')
-        }
-        // Main turn continuation (has ToolMessages from previous tool results)
-        if (this.call === 3) {
-          // Second main agent call after task A: issue task B as background
+        if (taskToolCount === 1) {
           return new AIMessage({
             content: '',
             tool_calls: [
@@ -246,7 +245,6 @@ describe('background subagent integration', () => {
             ],
           })
         }
-        // Final main turn: complete
         opts.onText?.('all tasks spawned')
         return new AIMessage('all tasks spawned')
       }

@@ -600,18 +600,22 @@ export class Session {
   }
 
   /** Rebuild the in-memory message list for model context.
-   *  Prefer the latest snapshot when present and tool_call pairing is valid
-   *  (authoritative after compaction and turn finalize). Otherwise rebuild from
-   *  the event projection (filtering any replacedMessageIds), then legacy rows.
+   *  Prefer a **current** snapshot (seq covers latest event) when tool_call pairing
+   *  is valid. If events exist after the snapshot (interrupted turn / crash mid-turn),
+   *  rebuild from the full event projection so user_message etc. after the snapshot
+   *  are not dropped. Fall back to legacy message rows when neither source has data.
    *  Invalid snapshots (e.g. pre-fix ToolMessage serialization) fall through. */
   hydrate(messages?: Message[]): void {
     this.messages.length = 0
+    const latestEventSeq = this.eventStore?.latestSeq(this.id) ?? 0
     if (this.snapshotStore) {
       const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
       if (
         snapshot != null &&
         snapshot.messages.length > 0 &&
-        hasValidToolCallPairing(snapshot.messages)
+        hasValidToolCallPairing(snapshot.messages) &&
+        // Snapshot is authoritative only when no events were appended after it.
+        (latestEventSeq === 0 || snapshot.seq >= latestEventSeq)
       ) {
         this.messages.push(...snapshot.messages)
         this.reseedLastCheckpoint()
@@ -621,11 +625,22 @@ export class Session {
     const rebuilt = this.rebuildMessagesFromEvents(this.id)
     if (rebuilt.length > 0) {
       this.messages.push(...rebuilt)
-    } else if (messages && messages.length > 0) {
+    } else if (this.snapshotStore) {
+      // Stale snapshot + empty projection: still better than empty context.
+      const snapshot = loadSessionSnapshot(this.snapshotStore, this.id)
+      if (
+        snapshot != null &&
+        snapshot.messages.length > 0 &&
+        hasValidToolCallPairing(snapshot.messages)
+      ) {
+        this.messages.push(...snapshot.messages)
+      }
+    }
+    if (this.messages.length === 0 && messages && messages.length > 0) {
       for (const m of messages) {
         this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
       }
-    } else if (this.store) {
+    } else if (this.messages.length === 0 && this.store) {
       for (const m of this.store.loadMessages(this.id)) {
         this.messages.push(m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content))
       }

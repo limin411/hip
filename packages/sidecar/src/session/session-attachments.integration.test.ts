@@ -48,7 +48,10 @@ function capturingRunner(captured: BaseMessage[][]): ModelRunner {
 describe('Session image attachments', () => {
   let scratch: string
   beforeEach(async () => { scratch = await fs.mkdtemp(path.join(os.tmpdir(), 'hip-attach-')) })
-  afterEach(async () => { await fs.rm(scratch, { recursive: true, force: true }) })
+  afterEach(async () => {
+    await fs.rm(scratch, { recursive: true, force: true })
+    vi.restoreAllMocks()
+  })
 
   it('preserves image_url content parts through event-sourced runTurn rebuild', async () => {
     const imgPath = path.join(scratch, 'test.png')
@@ -161,7 +164,24 @@ describe('Session image attachments', () => {
       },
     }
 
-    const session = new Session('s-img-persist', { ...baseCfg, cwd }, undefined, store, undefined, 10_000, undefined, undefined, () => invoker, scratch)
+    // Dummy runner keeps usesEnvModel=false so requireApiKey is skipped without auth.json.
+    const dummyRunner: ModelRunner = {
+      async run() {
+        return new AIMessage('unused')
+      },
+    }
+    const session = new Session(
+      's-img-persist',
+      { ...baseCfg, cwd },
+      undefined,
+      store,
+      undefined,
+      10_000,
+      dummyRunner,
+      undefined,
+      () => invoker,
+      scratch,
+    )
     await session.sendMessage('describe this', () => {}, undefined, [{ id: 'a1', name: 'persist.png', mimeType: 'image/png', path: imgPath }])
 
     const rows = loadProjection(db, 's-img-persist')

@@ -6,6 +6,7 @@ import * as os from 'node:os'
 import { createHash } from 'node:crypto'
 import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch, WorktreeInfo } from '@hip/protocol'
 import { getWorktreesDir } from './worktree-config.js'
+import { computeManagedWorktreePath } from './worktree-paths.js'
 
 const execFileP = promisify(execFile)
 
@@ -552,12 +553,18 @@ export async function gitCreateBranch(
   }
 }
 
-/** Build a managed worktree path under getWorktreesDir() from an optional pathKey. */
+/**
+ * Build a managed worktree path under getWorktreesDir() from an optional pathKey.
+ * Always nestByRepo=false (flat / pathKey layout) so live creates are unchanged.
+ * HIP_WORKTREES_NEST is reserved for WorktreeService (PR2+) and is not read here.
+ */
 export function resolveManagedWorktreePath(pathKey: string | undefined, branch: string): string {
-  const key = (pathKey && pathKey.trim()) || branch
-  const parts = key.split(/[/\\]+/).filter(Boolean).map((p) => sanitizeRefComponent(p))
-  if (parts.length === 0) parts.push(sanitizeRefComponent(branch))
-  return path.join(getWorktreesDir(), ...parts)
+  return computeManagedWorktreePath({
+    worktreesDir: getWorktreesDir(),
+    pathKey,
+    branch,
+    nestByRepo: false,
+  })
 }
 
 /** Switch to an existing branch (agent tool path). Thin alias over switchBranch (which guards the

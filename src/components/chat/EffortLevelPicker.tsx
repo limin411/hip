@@ -49,6 +49,8 @@ export function EffortLevelPicker() {
   if (!levels) return null
 
   const current = resolveEffort(stored, levels) ?? defaultFallback(levels)
+  const levelLabel = t(`chat.effort.levels.${current}`, { defaultValue: current })
+  const chipText = t('chat.effort.chip', { level: levelLabel })
 
   const choose = (effort: string) => {
     if (busy) return
@@ -62,16 +64,24 @@ export function EffortLevelPicker() {
         <ComposerChip
           active={current !== 'medium' && current !== 'none'}
           title={busy ? t('chat.effort.busyTitle') : t('chat.effort.label')}
+          aria-label={chipText}
           data-testid="effort-chip"
           disabled={busy}
           aria-disabled={busy}
         >
           <Gauge size={13} className="shrink-0" aria-hidden />
-          <span className="max-w-[120px] truncate">{t(`chat.effort.levels.${current}`, { defaultValue: current })}</span>
+          <span className="max-w-[160px] truncate" data-testid="effort-chip-label">
+            <span className="text-ink-tertiary">{t('chat.effort.chipPrefix')}</span>
+            <span className="mx-0.5 text-ink-tertiary" aria-hidden>
+              ·
+            </span>
+            <span>{levelLabel}</span>
+          </span>
         </ComposerChip>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {levels.map((level) => {
+          const label = t(`chat.effort.levels.${level}`, { defaultValue: level })
           const desc = t(`chat.effort.desc.${level}`, { defaultValue: '' })
           return (
             <DropdownMenuItem
@@ -83,7 +93,7 @@ export function EffortLevelPicker() {
             >
               <div className="flex items-center gap-2">
                 <Check size={14} className={cn('shrink-0', current === level ? 'opacity-100' : 'opacity-0')} />
-                <span>{t(`chat.effort.levels.${level}`, { defaultValue: level })}</span>
+                <span>{label}</span>
               </div>
               {desc ? (
                 <span className="pl-6 text-meta text-ink-tertiary">{desc}</span>

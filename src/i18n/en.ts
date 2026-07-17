@@ -177,6 +177,10 @@ export const en = {
       effort: {
         label: 'Reasoning effort for this conversation',
         busyTitle: 'Cannot change effort while a turn is running',
+        /** Short category word shown on the composer chip before the level. */
+        chipPrefix: 'Effort',
+        /** Full chip aria-label: "Effort · Medium". */
+        chip: 'Effort · {{level}}',
         levels: {
           none: 'None',
           minimal: 'Minimal',

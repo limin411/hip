@@ -6,7 +6,9 @@ import React from 'react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: { defaultValue?: string }) => {
+    t: (key: string, opts?: { defaultValue?: string; level?: string }) => {
+      if (key === 'chat.effort.chipPrefix') return 'Effort'
+      if (key === 'chat.effort.chip') return `Effort · ${opts?.level ?? ''}`
       if (key.startsWith('chat.effort.levels.')) return key.slice('chat.effort.levels.'.length)
       if (key.startsWith('chat.effort.desc.')) return opts?.defaultValue ?? ''
       return key
@@ -118,9 +120,13 @@ describe('EffortLevelPicker', () => {
 
   afterEach(() => cleanup())
 
-  it('renders chip and dynamic effort levels for models that advertise them', () => {
+  it('renders chip with effort prefix + level text, and dynamic levels', () => {
     render(<EffortLevelPicker />)
     expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
+    // Not icon-only: category + current level are visible on the chip.
+    expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/Effort/)
+    expect(screen.getByTestId('effort-chip-label')).toHaveTextContent(/medium/i)
+    expect(screen.getByTestId('effort-chip')).toHaveAttribute('aria-label', expect.stringContaining('Effort'))
     expect(screen.getByTestId('effort-level-none')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-high')).toBeInTheDocument()
     expect(screen.getByTestId('effort-level-xhigh')).toBeInTheDocument()

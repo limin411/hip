@@ -176,6 +176,8 @@ export const zhCN = {
       effort: {
         label: '本对话的思考强度',
         busyTitle: '回合进行中，暂不能切换思考强度',
+        chipPrefix: '思考',
+        chip: '思考 · {{level}}',
         levels: {
           none: '关闭',
           minimal: '极低',

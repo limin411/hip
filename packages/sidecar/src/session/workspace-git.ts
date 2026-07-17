@@ -479,17 +479,24 @@ export async function removeWorktree(
 ): Promise<{ ok: boolean; error?: string }> {
   const worktreesDir = getWorktreesDir()
   // Prefer realpath so symlink escapes outside managed dir are rejected (PR6).
-  let resolved: string
-  let resolvedDir: string
-  try {
-    resolved = await fs.realpath(worktreePath)
-  } catch {
-    resolved = path.resolve(worktreePath)
-  }
+  // On macOS, TMPDIR may be /var/... while realpath is /private/var/... — for
+  // non-existent targets, rewrite under realpath(managedDir) using the same
+  // relative suffix so we do not false-reject paths still under the managed root.
+  const resolvedDirRaw = path.resolve(worktreesDir)
+  let resolvedDir = resolvedDirRaw
   try {
     resolvedDir = await fs.realpath(worktreesDir)
   } catch {
-    resolvedDir = path.resolve(worktreesDir)
+    /* keep resolve */
+  }
+  const resolvedRaw = path.resolve(worktreePath)
+  let resolved = resolvedRaw
+  try {
+    resolved = await fs.realpath(worktreePath)
+  } catch {
+    if (resolvedRaw === resolvedDirRaw || resolvedRaw.startsWith(resolvedDirRaw + path.sep)) {
+      resolved = path.join(resolvedDir, path.relative(resolvedDirRaw, resolvedRaw))
+    }
   }
   if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) {
     return { ok: false, error: 'worktree path outside managed directory' }

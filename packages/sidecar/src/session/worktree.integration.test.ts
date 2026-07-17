@@ -125,8 +125,8 @@ describe('worktree integration — error handling', () => {
     const r = await removeWorktree(root, nonExistentPath)
     expect(r.ok).toBe(false)
     expect(r.error).toBeTruthy()
-    // The error should indicate the worktree wasn't found
-    expect(r.error!.toLowerCase()).toMatch(/not found|not a working tree|no such/)
+    // Missing path under managed dir: not found (or git "no such"); not a managed-dir reject.
+    expect(r.error!.toLowerCase()).toMatch(/not found|not a working tree|no such|does not exist/)
   })
 
   it('createWorktree with an existing path returns ok:false with conflict error', async () => {

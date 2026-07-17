@@ -1,4 +1,5 @@
 /** Resume / regenerate / plan / subagent continuation (Phase 3b). */
+import { join } from 'node:path'
 import type { AgentConfig, AgentRole, ContentPart, Attachment, PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { GraphEmit } from './graph.js'

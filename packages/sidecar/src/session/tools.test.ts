@@ -330,8 +330,11 @@ describe('git tools (cwd-gated)', () => {
       await makeRepo(root)
       await git(root, 'branch', 'feat-wt')
       const out = String(await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'feat-wt' }))
-      expect(out).toMatch(/Worktree created at/)
-      expect(out).toContain('feat-wt')
+      // Product path returns JSON { path, id, branch } (WorktreeService).
+      const parsed = JSON.parse(out) as { path: string; id?: string; branch: string }
+      expect(parsed.branch).toBe('feat-wt')
+      expect(parsed.path).toContain('feat-wt')
+      expect(parsed.path.length).toBeGreaterThan(0)
     })
 
     it('git_worktree_create returns an Error string for a missing branch', async () => {
@@ -355,12 +358,12 @@ describe('git tools (cwd-gated)', () => {
       await makeRepo(root)
       await git(root, 'branch', 'feat-rm')
       const createOut = String(await byNameCwd(root, 'git_worktree_create').invoke({ branch: 'feat-rm' }))
-      expect(createOut).toMatch(/Worktree created at/)
-      // Extract the path from the success message
-      const match = createOut.match(/Worktree created at (.+)/)
-      expect(match).toBeTruthy()
-      const wtPath = match![1]
-      const removeOut = String(await byNameCwd(root, 'git_worktree_remove').invoke({ worktreePath: wtPath }))
+      const created = JSON.parse(createOut) as { path: string; branch: string }
+      expect(created.path).toBeTruthy()
+      // Force: tool default is preflight; clean tree ok either way — use force for determinism.
+      const removeOut = String(
+        await byNameCwd(root, 'git_worktree_remove').invoke({ worktreePath: created.path, force: true }),
+      )
       expect(removeOut).toMatch(/Removed worktree/)
       // Confirm it's gone from list
       const listOut = String(await byNameCwd(root, 'git_worktree_list').invoke({}))

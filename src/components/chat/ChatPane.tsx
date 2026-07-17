@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
@@ -7,11 +7,12 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
+import { selectLivePlan } from '@/lib/todos'
 import { toast } from 'sonner'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { PermissionModal } from './PermissionModal'
-import { PlanApprovalCard } from './PlanApprovalCard'
+import { PlanProgressPanel } from './PlanProgressPanel'
 import { hasPlanApproval } from './planApproval'
 
 export function ChatPane() {
@@ -100,6 +101,21 @@ export function ChatPane() {
 
   const showThinking = status === 'running' && last?.role === 'user'
 
+  const livePlan = useMemo(
+    () =>
+      session
+        ? selectLivePlan({
+            messages,
+            status,
+            forcePlan: Boolean(session.config.forcePlan),
+            planApprovalPending: session.planApprovalPending,
+            activeTurnPlan: session.activeTurnPlan,
+          })
+        : null,
+    [session, messages, status],
+  )
+  const hideBubblePlan = livePlan !== null
+
   const exportDebugInfo = async () => {
     if (!session || !activeSessionId) return
     const text = sessionDebugBundleJson({
@@ -147,6 +163,7 @@ export function ChatPane() {
                   message={m}
                   streaming={status === 'running' && m.role === 'assistant' && isLastMessage}
                   isLastAssistant={m.role === 'assistant' && isLastMessage}
+                  hidePlan={hideBubblePlan && m.role === 'assistant' && isLastMessage}
                 />
               </div>
             )
@@ -169,9 +186,9 @@ export function ChatPane() {
               </div>
             </div>
           )}
-          {showPlanApproval && session?.activeTurnPlan && (
-            <PlanApprovalCard
-              plan={session.activeTurnPlan}
+          {livePlan && (
+            <PlanProgressPanel
+              view={livePlan}
               onApprove={() => sessionService.respondPlan('approve')}
               onReject={() => sessionService.respondPlan('reject')}
               onAmend={(content) => sessionService.respondPlan('amend', content)}

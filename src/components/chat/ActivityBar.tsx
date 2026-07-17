@@ -13,6 +13,8 @@ interface ActivityBarProps {
   streaming?: boolean
   stopped?: boolean
   hasAssistantContent?: boolean
+  /** When true, omit TodoChecklist inside the expanded timeline (live plan is sticky). */
+  hidePlan?: boolean
 }
 
 function formatParts(
@@ -69,6 +71,7 @@ export function ActivityBar({
   streaming,
   stopped,
   hasAssistantContent,
+  hidePlan,
 }: ActivityBarProps) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -156,7 +159,7 @@ export function ActivityBar({
       </button>
       {open && (
         <div className="mt-1.5 rounded-lg border border-border bg-surface-muted/30 px-2 py-1.5">
-          <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} />
+          <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} hidePlan={hidePlan} />
         </div>
       )}
     </div>

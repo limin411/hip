@@ -188,6 +188,14 @@ export const zhTW = {
         in_progress: '進行中',
         completed: '已完成',
       },
+      planPanel: {
+        planning: '規劃中…',
+        awaitingApproval: '等待審批',
+        executing: '執行中',
+        done: '已完成',
+        progress: '{{done}}/{{total}}',
+        emptyPlanning: '正在調研並起草計畫…',
+      },
       planApproval: {
         title: '計畫審批',
         hint: '請審閱以下計畫並選擇操作。',

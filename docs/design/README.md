@@ -10,6 +10,15 @@
 
 **状态：** shell PR-1…PR-5 已落地。**Windows visual polish** spec 就绪（PR-W1…W3：字体/实色回退 · vibrancy 模式 · 自绘标题按钮）。
 
+## Plan todo panel（规划清单与进度）
+
+| 文档 | 一层一句话 |
+|------|------------|
+| [plan-todo-panel-spec](./2026-07-17-plan-todo-panel-spec.md) | forcePlan / write_todos / 审批全程 sticky 清单；LivePlanView 派生规则 |
+| [plan-todo-panel-plan](./2026-07-17-plan-todo-panel-plan.md) | P0 纯前端 PlanProgressPanel；P1 plan:updated |
+
+**状态：** P0 已落地（sticky `PlanProgressPanel`）；P1 `plan:updated` 待做。
+
 ## Capability evaluation（能力评测）
 
 按**渐进式披露**阅读：

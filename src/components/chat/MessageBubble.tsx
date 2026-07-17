@@ -33,9 +33,11 @@ interface MessageBubbleProps {
   message: Message
   streaming?: boolean
   isLastAssistant?: boolean
+  /** Hide in-bubble TodoChecklist when sticky PlanProgressPanel shows the live plan. */
+  hidePlan?: boolean
 }
 
-export function MessageBubble({ message, streaming, isLastAssistant }: MessageBubbleProps) {
+export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }: MessageBubbleProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language ?? 'en'
   const sessionId = useActiveSessionId()
@@ -103,6 +105,7 @@ export function MessageBubble({ message, streaming, isLastAssistant }: MessageBu
                 streaming={streaming}
                 stopped={!!message.stopped}
                 hasAssistantContent={!!displayContent.trim()}
+                hidePlan={hidePlan}
               />
               {nested.map((a) => (
                 <SubAgentCard

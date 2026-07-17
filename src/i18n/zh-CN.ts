@@ -188,6 +188,14 @@ export const zhCN = {
         in_progress: '进行中',
         completed: '已完成',
       },
+      planPanel: {
+        planning: '规划中…',
+        awaitingApproval: '等待审批',
+        executing: '执行中',
+        done: '已完成',
+        progress: '{{done}}/{{total}}',
+        emptyPlanning: '正在调研并起草计划…',
+      },
       planApproval: {
         title: '计划审批',
         hint: '请审阅以下计划并选择操作。',

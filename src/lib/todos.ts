@@ -1,4 +1,4 @@
-import type { ToolCall } from '@hip/protocol'
+import type { Message, PlanItem, ToolCall } from '@hip/protocol'
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed'
 export interface Todo {
@@ -46,4 +46,103 @@ export function latestTodos(toolCalls?: ToolCall[]): LivePlan | null {
   }
   if (!latest) return null
   return { callId: latest.callId, todos: parseTodos(latest.input) }
+}
+
+export type PlanPhase = 'planning' | 'awaiting_approval' | 'executing' | 'done'
+export type LivePlanSource = 'activeTurnPlan' | 'write_todos' | 'empty'
+
+export interface LivePlanView {
+  items: PlanItem[]
+  phase: PlanPhase
+  source: LivePlanSource
+  progress: { done: number; total: number; current?: string }
+}
+
+export function planProgress(items: PlanItem[]): LivePlanView['progress'] {
+  const total = items.length
+  let done = 0
+  let current: string | undefined
+  for (const item of items) {
+    if (item.status === 'completed') done += 1
+    else if (item.status === 'in_progress' && current === undefined) current = item.content
+  }
+  return current !== undefined ? { done, total, current } : { done, total }
+}
+
+function todosToPlanItems(todos: Todo[]): PlanItem[] {
+  return todos.map((t) => ({ content: t.content, status: t.status }))
+}
+
+function makeView(items: PlanItem[], phase: PlanPhase, source: LivePlanSource): LivePlanView {
+  return { items, phase, source, progress: planProgress(items) }
+}
+
+export interface SelectLivePlanInput {
+  messages: Message[]
+  status: 'idle' | 'running' | 'error'
+  forcePlan?: boolean
+  planApprovalPending?: boolean
+  activeTurnPlan?: PlanItem[] | null
+}
+
+/**
+ * Session-level live plan for the sticky PlanProgressPanel.
+ * Returns null when the panel should be hidden.
+ * Priority and turn-context rules: docs/design/2026-07-17-plan-todo-panel-spec.md §3.
+ */
+export function selectLivePlan(input: SelectLivePlanInput): LivePlanView | null {
+  const { messages, status, forcePlan, planApprovalPending, activeTurnPlan } = input
+  const planItems = activeTurnPlan?.length ? activeTurnPlan : null
+
+  if (planApprovalPending && planItems) {
+    return makeView(planItems, 'awaiting_approval', 'activeTurnPlan')
+  }
+
+  const last = messages.length > 0 ? messages[messages.length - 1] : undefined
+  const lastAssistant = findLastAssistant(messages)
+
+  // New turn started: do not stick previous assistant todos.
+  if (last?.role === 'user' && status === 'running') {
+    if (planItems) {
+      return makeView(planItems, 'executing', 'activeTurnPlan')
+    }
+    if (forcePlan) {
+      return makeView([], 'planning', 'empty')
+    }
+    return null
+  }
+
+  // Idle after user message with no pending plan — hide.
+  if (last?.role === 'user' && status !== 'running') {
+    if (planItems) {
+      return makeView(planItems, 'done', 'activeTurnPlan')
+    }
+    return null
+  }
+
+  const toolPlan = lastAssistant ? latestTodos(lastAssistant.toolCalls) : null
+  const toolItems = toolPlan && toolPlan.todos.length > 0 ? todosToPlanItems(toolPlan.todos) : null
+
+  if (toolItems) {
+    const phase: PlanPhase = status === 'running' ? 'executing' : 'done'
+    return makeView(toolItems, phase, 'write_todos')
+  }
+
+  if (planItems) {
+    const phase: PlanPhase = status === 'running' ? 'executing' : 'done'
+    return makeView(planItems, phase, 'activeTurnPlan')
+  }
+
+  if (forcePlan && status === 'running') {
+    return makeView([], 'planning', 'empty')
+  }
+
+  return null
+}
+
+function findLastAssistant(messages: Message[]): Message | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') return messages[i]
+  }
+  return undefined
 }

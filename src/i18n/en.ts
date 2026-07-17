@@ -189,6 +189,14 @@ export const en = {
         in_progress: 'In progress',
         completed: 'Done',
       },
+      planPanel: {
+        planning: 'Planning…',
+        awaitingApproval: 'Awaiting approval',
+        executing: 'Executing',
+        done: 'Done',
+        progress: '{{done}}/{{total}}',
+        emptyPlanning: 'Investigating and drafting a plan…',
+      },
       planApproval: {
         title: 'Plan approval',
         hint: 'Review the plan below and choose an action.',

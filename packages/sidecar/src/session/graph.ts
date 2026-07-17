@@ -363,6 +363,7 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
         runName: 'hip.model',
         onText: (d) => emit.token(d),
         onReasoning: (d) => emit.reasoning(d),
+        onActivity: () => emit.activity?.(),
       })
     }
 

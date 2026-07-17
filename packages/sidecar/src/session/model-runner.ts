@@ -16,6 +16,11 @@ export interface ModelRunOptions {
   onText: (delta: string) => void
   onReasoning: (delta: string) => void
   /**
+   * Optional progress pulse when the model streams tool-call arguments without text.
+   * Keeps idle watchdogs alive during large write_file / edit_file arg generation.
+   */
+  onActivity?: () => void
+  /**
    * LangChain runnable fragments so LangSmith nests this LLM under the parent
    * graph/node run (when LANGSMITH_TRACING=true).
    */
@@ -23,6 +28,19 @@ export interface ModelRunOptions {
   metadata?: Record<string, unknown>
   tags?: string[]
   runName?: string
+}
+
+/**
+ * True when a stream chunk carries tool-call progress (args or completed calls)
+ * even if there is no assistant text. Used to kick idle watchdogs during large
+ * tool-arg generation (e.g. full SVG rewrite via write_file).
+ */
+export function hasToolCallStreamActivity(chunk: AIMessageChunk): boolean {
+  const tcc = (chunk as { tool_call_chunks?: unknown[] }).tool_call_chunks
+  if (Array.isArray(tcc) && tcc.length > 0) return true
+  const tc = chunk.tool_calls
+  if (Array.isArray(tc) && tc.length > 0) return true
+  return false
 }
 
 /** One model turn: stream deltas to the sinks, return the gathered assistant message (with tool_calls). */
@@ -196,6 +214,13 @@ export class RealModelRunner implements ModelRunner {
         }
         const r = reasoningDelta(chunk)
         if (r) { emitted = true; opts.onReasoning(r) }
+        // Tool-call arg streams often have empty content; still count as progress so
+        // the turn idle watchdog does not fire mid write_file / large edit generation.
+        if (hasToolCallStreamActivity(chunk)) {
+          if (firstToken) { firstToken = false; logDebug('model', 'first-token', { latencyMs: Date.now() - t0, kind: 'tool_call' }) }
+          emitted = true
+          opts.onActivity?.()
+        }
       }
       logInfo('model', 'stream:end', { totalMs: Date.now() - t0, contentLen: typeof gathered?.content === 'string' ? gathered.content.length : 0, hadText: emitted })
       if (!gathered) throw new Error('model produced no output')

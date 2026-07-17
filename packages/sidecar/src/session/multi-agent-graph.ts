@@ -129,6 +129,7 @@ function makeAgentNode(profile: AgentProfile) {
       signal: config.signal,
       onText: (d) => ctx.emit.token(d),
       onReasoning: (d) => ctx.emit.reasoning(d),
+      onActivity: () => ctx.emit.activity?.(),
     })
 
     const u = msg.usage_metadata

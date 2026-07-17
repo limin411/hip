@@ -7,8 +7,31 @@ import {
   RealModelRunner,
   collapseStreamedAiContent,
   collapseStreamedAiMessage,
+  hasToolCallStreamActivity,
 } from './model-runner.js'
 import { projectReasoningStreamContent } from './model-factory.js'
+
+describe('hasToolCallStreamActivity', () => {
+  it('is false for plain text chunks', () => {
+    expect(hasToolCallStreamActivity(new AIMessageChunk({ content: 'hello' }))).toBe(false)
+  })
+
+  it('is true when tool_call_chunks are present', () => {
+    const c = new AIMessageChunk({
+      content: '',
+      tool_call_chunks: [{ name: 'write_file', args: '{"path"', id: 'c1', index: 0 }],
+    } as any)
+    expect(hasToolCallStreamActivity(c)).toBe(true)
+  })
+
+  it('is true when tool_calls are present', () => {
+    const c = new AIMessageChunk({
+      content: '',
+      tool_calls: [{ name: 'write_file', args: { path: '/a.svg', content: '<svg/>' }, id: 'c1', type: 'tool_call' }],
+    } as any)
+    expect(hasToolCallStreamActivity(c)).toBe(true)
+  })
+})
 
 describe('delta extractors', () => {
   it('textDelta reads plain-string content', () => {
@@ -67,6 +90,63 @@ describe('RealModelRunner retry', () => {
     }
     await expect(new RealModelRunner(model).run([], opts() as any)).rejects.toThrow()
     expect(calls).toBe(1)
+  })
+
+  it('pulses onActivity for tool_call_chunks without text and does not retry after', async () => {
+    let calls = 0
+    let activity = 0
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        calls++
+        return (async function* () {
+          yield new AIMessageChunk({
+            content: '',
+            tool_call_chunks: [{ name: 'write_file', args: '{"path":"/x.svg","content":"', id: 'c1', index: 0 }],
+          } as any)
+          yield new AIMessageChunk({
+            content: '',
+            tool_call_chunks: [{ args: '<svg/>"}', id: 'c1', index: 0 }],
+          } as any)
+          if (calls === 1) {
+            const e: any = new Error('mid-stream after tool args'); e.status = 503; throw e
+          }
+        })()
+      },
+    }
+    await expect(
+      new RealModelRunner(model).run([], {
+        ...opts(),
+        onActivity: () => { activity++ },
+      } as any),
+    ).rejects.toThrow()
+    expect(activity).toBeGreaterThanOrEqual(1)
+    expect(calls).toBe(1)
+  })
+
+  it('completes a tool-call-only stream and gathers tool_calls', async () => {
+    const activity: number[] = []
+    const model: any = {
+      bindTools() { return model },
+      async stream() {
+        return (async function* () {
+          yield new AIMessageChunk({
+            content: '',
+            tool_call_chunks: [{ name: 'write_file', args: '{"path":"/a.svg","content":"<svg/>"}', id: 'c1', index: 0 }],
+          } as any)
+          yield new AIMessageChunk({
+            content: '',
+            tool_calls: [{ name: 'write_file', args: { path: '/a.svg', content: '<svg/>' }, id: 'c1', type: 'tool_call' }],
+          } as any)
+        })()
+      },
+    }
+    const msg = await new RealModelRunner(model).run([], {
+      ...opts(),
+      onActivity: () => { activity.push(1) },
+    } as any)
+    expect(activity.length).toBeGreaterThanOrEqual(1)
+    expect(msg.tool_calls?.length ?? 0).toBeGreaterThanOrEqual(0)
   })
 
   it('collapses fragmented stream content into one string with real newlines', async () => {

@@ -26,6 +26,10 @@ export class ChatPage {
   get modelChip() { return browser.$('[data-testid="model-chip"]') }
   get permissionChip() { return browser.$('[data-testid="permission-chip"]') }
   get planApprovalCard() { return browser.$('[data-testid="plan-approval-card"]') }
+  get planProgressPanel() { return browser.$('[data-testid="plan-progress-panel"]') }
+  get planProgressCount() { return browser.$('[data-testid="plan-progress-count"]') }
+  get planProgressCurrent() { return browser.$('[data-testid="plan-progress-current"]') }
+  get todoChecklist() { return browser.$('[data-testid="todo-checklist"]') }
   get planApprove() { return browser.$('[data-testid="plan-approve"]') }
   get planAmend() { return browser.$('[data-testid="plan-amend"]') }
   get planReject() { return browser.$('[data-testid="plan-reject"]') }

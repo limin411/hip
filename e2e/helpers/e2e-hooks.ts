@@ -59,6 +59,13 @@ type HipE2E = {
     turnId: string
     planItems: { content: string; status: string }[]
   }
+  seedPlanProgress?: (
+    sessionId: string,
+    opts?: { complete?: boolean },
+  ) => {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  }
   seedBackgroundTaskKilled?: (sessionId: string) => {
     turnId: string
     agentId: string
@@ -257,6 +264,21 @@ export async function seedPlanApproval(
     if (!hooks?.seedPlanApproval) throw new Error('__hipE2E.seedPlanApproval missing')
     return hooks.seedPlanApproval(id)
   }, sessionId)
+}
+
+export async function seedPlanProgress(
+  sessionId: string,
+  opts?: { complete?: boolean },
+): Promise<{ turnId: string; planItems: { content: string; status: string }[] }> {
+  return browser.execute(
+    (id: string, o: { complete?: boolean } | undefined) => {
+      const hooks = (window as unknown as { __hipE2E?: HipE2E }).__hipE2E
+      if (!hooks?.seedPlanProgress) throw new Error('__hipE2E.seedPlanProgress missing')
+      return hooks.seedPlanProgress(id, o)
+    },
+    sessionId,
+    opts,
+  )
 }
 
 export async function seedBackgroundTaskKilled(

@@ -29,6 +29,10 @@ describe('harness plan approval @harness @core', () => {
     const { planItems } = await seedPlanApproval(sessionId)
     expect(planItems.length).toBeGreaterThanOrEqual(2)
 
+    // Sticky plan panel wraps the approval shell (same checklist + actions).
+    const panel = await chat.planProgressPanel
+    await panel.waitForExist({ timeout: 15000 })
+
     const card = await chat.planApprovalCard
     await card.waitForExist({ timeout: 15000 })
     const text = await card.getText()
@@ -54,3 +58,4 @@ describe('harness plan approval @harness @core', () => {
     )
   })
 })
+

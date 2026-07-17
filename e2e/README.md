@@ -171,14 +171,15 @@ Complex harness (safe inject chains, no paid LLM):
 - `harness-workflow-projection.spec.ts` — `workflow:*` messages → store + Agents tab on code; failed / cancelled / stale runId
 - `harness-subagent-pause.spec.ts` — `[hip:subagent_paused]` marker + delegation (not `Error: sub-agent paused`)
 - `harness-agent-interrupt.spec.ts` — `agent:interrupt` banner + resume clears interrupt
-- `harness-plan-approval.spec.ts` — plan approval card + approve
+- `harness-plan-approval.spec.ts` — plan approval card + approve (+ plan-progress-panel)
+- `harness-plan-progress-panel.spec.ts` — sticky plan-progress-panel via `plan:updated` / approve retain
 - `harness-invalid-workflow.spec.ts` — `INVALID_WORKFLOW` error bar; workflow store idle
 - `harness-background-killed.spec.ts` — background task killed notification (`@panel`)
 - `harness-orchmode-compat.spec.ts` — deprecated `session:orchMode` does not break session (optional gate)
 
 Bridge seeds (DEV `__hipE2E`):
 
-- `seedSubagentPause` / `seedAgentInterrupt` / `seedPlanApproval` / `seedBackgroundTaskKilled`
+- `seedSubagentPause` / `seedAgentInterrupt` / `seedPlanApproval` / `seedPlanProgress` / `seedBackgroundTaskKilled`
 - `simulateInvalidWorkflowError` / `getLastAssistantText` / `getPendingInterrupt`
 
 Helpers: `e2e/helpers/e2e-hooks.ts`, `e2e/helpers/memory.ts`, `git-workspace.ts`, `history.ts`.

@@ -605,7 +605,7 @@ export class SessionService {
     return { turnId, question }
   }
 
-  /** E2E: plan:published + plan_approval interrupt → PlanApprovalCard. */
+  /** E2E: plan:published + plan_approval interrupt → PlanApprovalCard / PlanProgressPanel. */
   seedPlanApproval(sessionId: string): {
     turnId: string
     planItems: { content: string; status: string }[]
@@ -636,6 +636,52 @@ export class SessionService {
       question: 'Approve this plan?',
       context: JSON.stringify({ kind: 'plan_approval' }),
     })
+    return { turnId, planItems }
+  }
+
+  /**
+   * E2E: agent:started + plan:updated (no approval) → sticky PlanProgressPanel with progress.
+   * Optional message:complete to assert done-state retention of activeTurnPlan.
+   */
+  seedPlanProgress(
+    sessionId: string,
+    opts?: { complete?: boolean },
+  ): {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const planItems = [
+      { content: 'e2e progress step one', status: 'completed' as const },
+      { content: 'e2e progress step two', status: 'in_progress' as const },
+      { content: 'e2e progress step three', status: 'pending' as const },
+    ]
+    this.receive({
+      type: 'agent:started',
+      sessionId,
+      turnId,
+      agentId: 'supervisor',
+      role: 'supervisor',
+    })
+    this.receive({
+      type: 'plan:updated',
+      sessionId,
+      turnId,
+      plan: planItems,
+    })
+    if (opts?.complete) {
+      this.receive({
+        type: 'message:complete',
+        sessionId,
+        message: {
+          id: turnId,
+          role: 'assistant',
+          content: 'e2e plan progress complete',
+          timestamp: Date.now(),
+          agentId: 'supervisor',
+        },
+      })
+    }
     return { turnId, planItems }
   }
 
@@ -1410,6 +1456,13 @@ export type HipE2EHooks = {
     turnId: string
     planItems: { content: string; status: string }[]
   }
+  seedPlanProgress: (
+    sessionId: string,
+    opts?: { complete?: boolean },
+  ) => {
+    turnId: string
+    planItems: { content: string; status: string }[]
+  }
   seedBackgroundTaskKilled: (sessionId: string) => {
     turnId: string
     agentId: string
@@ -1477,6 +1530,7 @@ function installE2eHooks(svc: SessionService): void {
     seedSubagentPause: (sessionId) => svc.seedSubagentPause(sessionId),
     seedAgentInterrupt: (sessionId, question) => svc.seedAgentInterrupt(sessionId, question),
     seedPlanApproval: (sessionId) => svc.seedPlanApproval(sessionId),
+    seedPlanProgress: (sessionId, opts) => svc.seedPlanProgress(sessionId, opts),
     seedBackgroundTaskKilled: (sessionId) => svc.seedBackgroundTaskKilled(sessionId),
     simulateInvalidWorkflowError: (sessionId, reason) => svc.simulateInvalidWorkflowError(sessionId, reason),
     getLastAssistantText: (sessionId) => svc.getLastAssistantText(sessionId),

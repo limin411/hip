@@ -709,6 +709,28 @@ describe('workspace diff', () => {
     expect(sess.interrupt?.question).toContain('Approve')
   })
 
+  it('seedPlanProgress sets activeTurnPlan without approval', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { planItems } = svc.seedPlanProgress('s1')
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.planApprovalPending).toBeFalsy()
+    expect(sess.activeTurnPlan).toEqual(planItems)
+    expect(sess.status).toBe('running')
+    expect(sess.interrupt).toBeFalsy()
+  })
+
+  it('seedPlanProgress complete retains activeTurnPlan after message:complete', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const { planItems } = svc.seedPlanProgress('s1', { complete: true })
+    const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
+    expect(sess.status).toBe('idle')
+    expect(sess.activeTurnPlan).toEqual(planItems)
+    expect(sess.planApprovalPending).toBe(false)
+  })
+
+
   it('respondPlan optimistically clears planApprovalPending and sends plan:respond', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)

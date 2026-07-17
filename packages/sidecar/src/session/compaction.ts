@@ -1,15 +1,21 @@
-import { SystemMessage, HumanMessage, type BaseMessage } from '@langchain/core/messages'
+import { SystemMessage, HumanMessage, AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 
-/** Compact when the estimated prompt exceeds this. Conservative: the sidecar cannot read the active
- *  model's real context window (config/providers.ts carries none), so assume a ~64k floor and keep
- *  ~16k headroom for the reply. `buildGraph` can override it (tests pass a tiny value). */
+/** Compact when the estimated prompt exceeds this (supervisor / default). */
 export const COMPACT_BUDGET_TOKENS = 48_000
 
-/** Turns kept verbatim at the tail. A turn = a user message and everything up to the next one. */
+/** Tighter budget for task / dispatch / explore child graphs (best practice: subagents bloat faster). */
+export const SUBAGENT_COMPACT_BUDGET_TOKENS = 32_000
+
+/** Turns kept verbatim at the tail (user-turn mode). A turn = a user message and everything up to the next one. */
 export const KEEP_RECENT_TURNS = 3
 
-/** Token budget for the summarizer model output. Kept generous so the 8-section structured
- *  summary has room for full context preservation. */
+/** Tool-rounds kept verbatim at the tail when compacting single-Human ReAct loops. */
+export const KEEP_RECENT_TOOL_ROUNDS = 6
+
+/** Min steps between LLM summary compactions (prune may run every step). */
+export const MIN_STEPS_BETWEEN_LLM_COMPACT = 4
+
+/** Token budget for the summarizer model output. */
 export const SUMMARY_OUTPUT_TOKENS = 4096
 
 /** Industry-standard heuristic for context-budget checks (Codex/OpenCode both use ≈4 chars/byte per token). */
@@ -22,7 +28,7 @@ export interface Summarizer {
 
 /** Options for compactMessages. */
 export interface CompactOptions {
-  /** Turns kept verbatim at the tail (see KEEP_RECENT_TURNS). */
+  /** Turns kept verbatim at the tail (see KEEP_RECENT_TURNS). User-turn mode. */
   keepRecentTurns: number
   /** Summarizer that produces the summary text from the middle span. */
   summarizer: Summarizer
@@ -33,6 +39,11 @@ export interface CompactOptions {
   focus?: string
   /** Session id for LangSmith thread attachment on the summarizer LLM call. */
   sessionId?: string
+  /**
+   * Tool-rounds kept at the tail when falling back to tool-round mode
+   * (single-Human ReAct / explore). Defaults to KEEP_RECENT_TOOL_ROUNDS.
+   */
+  keepRecentToolRounds?: number
 }
 
 /** Detect provider context-length / maximum-token errors so the graph can compact and retry. */
@@ -70,6 +81,8 @@ export interface CompactResult {
   removeIds: string[]
   /** All middle message ids replaced (head + removeIds) — for persistence / rebuild. */
   replacedIds: string[]
+  /** Which split strategy produced this plan. */
+  mode?: 'user-turn' | 'tool-round'
 }
 
 /** Apply a compact plan to an in-memory message list.
@@ -84,22 +97,39 @@ export function applyCompactResult(messages: readonly BaseMessage[], result: Com
   })
 }
 
-/** Plan a compaction: pin system + first user message (the goal) + the recent K turns; summarize the
- *  span between. Cuts only at user-message (turn) boundaries, so an assistant↔tool pair is never
- *  split (no orphan tool messages). Returns null when there is no middle worth compacting. `messages`
- *  must have ids (LangGraph assigns them in state). */
-export async function compactMessages(
-  messages: BaseMessage[],
+/**
+ * Split messages after `fromIdx` into tool-rounds.
+ * A tool-round starts at an AIMessage with tool_calls and includes following ToolMessages
+ * until the next AIMessage (or non-tool message that starts a new segment).
+ * Plain AI text without tools is a single-message "round".
+ */
+export function splitToolRounds(messages: BaseMessage[], fromIdx: number): BaseMessage[][] {
+  const rounds: BaseMessage[][] = []
+  let i = fromIdx
+  while (i < messages.length) {
+    const m = messages[i]
+    if (m instanceof AIMessage && m.tool_calls && m.tool_calls.length > 0) {
+      const round: BaseMessage[] = [m]
+      i++
+      while (i < messages.length && messages[i] instanceof ToolMessage) {
+        round.push(messages[i])
+        i++
+      }
+      rounds.push(round)
+      continue
+    }
+    // Non-tool AI or other — single-message round (skip pure system mid-stream rarely)
+    rounds.push([m])
+    i++
+  }
+  return rounds
+}
+
+async function summarizeMiddle(
+  middle: BaseMessage[],
   opts: CompactOptions,
+  mode: 'user-turn' | 'tool-round',
 ): Promise<CompactResult | null> {
-  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
-  if (firstHumanIdx === -1) return null
-  const humanIdxs: number[] = []
-  messages.forEach((m, i) => { if (m instanceof HumanMessage) humanIdxs.push(i) })
-  const keepRecentTurns = opts.overflowRecovery ? Math.max(1, Math.floor(opts.keepRecentTurns / 2)) : opts.keepRecentTurns
-  if (humanIdxs.length <= keepRecentTurns) return null
-  const recentStart = humanIdxs[humanIdxs.length - keepRecentTurns]
-  const middle = messages.slice(firstHumanIdx + 1, recentStart)
   if (middle.length === 0) return null
   const headId = middle[0].id
   if (!headId) return null
@@ -112,5 +142,69 @@ export async function compactMessages(
     summary: new SystemMessage({ id: headId, content: `[对话摘要] ${text}` }),
     removeIds,
     replacedIds: [headId, ...removeIds],
+    mode,
   }
+}
+
+/**
+ * Tool-round compaction for single-Human ReAct loops (explore / task / dispatch).
+ * Pins system + first human; summarizes middle tool-rounds; keeps recent rounds intact.
+ */
+export async function compactToolRounds(
+  messages: BaseMessage[],
+  opts: CompactOptions,
+): Promise<CompactResult | null> {
+  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
+  if (firstHumanIdx === -1) return null
+
+  const keepRounds = opts.overflowRecovery
+    ? Math.max(2, Math.floor((opts.keepRecentToolRounds ?? KEEP_RECENT_TOOL_ROUNDS) / 2))
+    : (opts.keepRecentToolRounds ?? KEEP_RECENT_TOOL_ROUNDS)
+
+  const afterHuman = firstHumanIdx + 1
+  if (afterHuman >= messages.length) return null
+
+  const rounds = splitToolRounds(messages, afterHuman)
+  if (rounds.length <= keepRounds) return null
+
+  const middleRounds = rounds.slice(0, rounds.length - keepRounds)
+  const middle = middleRounds.flat()
+  if (middle.length === 0) return null
+
+  return summarizeMiddle(middle, opts, 'tool-round')
+}
+
+/**
+ * Plan a compaction:
+ * 1. Prefer user-turn boundaries when there are enough HumanMessages (multi-turn chat).
+ * 2. Else fall back to tool-round boundaries so explore/subagent loops can shrink.
+ *
+ * Never splits an AIMessage from its ToolMessages in tool-round mode.
+ * `messages` must have ids (LangGraph assigns them in state).
+ */
+export async function compactMessages(
+  messages: BaseMessage[],
+  opts: CompactOptions,
+): Promise<CompactResult | null> {
+  const firstHumanIdx = messages.findIndex((m) => m instanceof HumanMessage)
+  if (firstHumanIdx === -1) return null
+
+  const humanIdxs: number[] = []
+  messages.forEach((m, i) => { if (m instanceof HumanMessage) humanIdxs.push(i) })
+  const keepRecentTurns = opts.overflowRecovery
+    ? Math.max(1, Math.floor(opts.keepRecentTurns / 2))
+    : opts.keepRecentTurns
+
+  // User-turn path when enough human turns for a non-empty middle.
+  if (humanIdxs.length > keepRecentTurns) {
+    const recentStart = humanIdxs[humanIdxs.length - keepRecentTurns]
+    const middle = messages.slice(firstHumanIdx + 1, recentStart)
+    if (middle.length > 0) {
+      const result = await summarizeMiddle(middle, opts, 'user-turn')
+      if (result) return result
+    }
+  }
+
+  // Tool-round fallback: single-Human (or too few humans) ReAct / explore.
+  return compactToolRounds(messages, opts)
 }

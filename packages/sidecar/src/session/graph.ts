@@ -35,6 +35,7 @@ import {
   type DoomLoopStrategy,
 } from './doom-loop.js'
 import { estimateTokens, compactMessages, applyCompactResult, COMPACT_BUDGET_TOKENS, KEEP_RECENT_TURNS, isOverflowError, type Summarizer, type CompactResult } from './compaction.js'
+// note: SUBAGENT_COMPACT_BUDGET_TOKENS is applied by callers of buildGraph(maxSteps, budget)
 import { applySlidingWindow } from './context/sliding-window.js'
 import { isMicroCompactionEnabled, MicroCompaction } from './micro-compaction.js'
 import type { HookRegistry } from './hooks/registry.js'
@@ -251,56 +252,77 @@ function applyCompaction(stateMessages: BaseMessage[], result: CompactResult): B
 
 /** Build the agent-loop graph. `maxSteps` and `compactBudget` are injectable for tests. */
 export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number = COMPACT_BUDGET_TOKENS) {
-/** Pre-turn compaction: shrink the middle when over budget (≤ once per invoke). */
+  /**
+   * Pre-model compaction each graph cycle:
+   * 1) Prune old tool bodies (default on) — cheap, runs every step even after LLM compact
+   * 2) Sliding window when message count is high (multi-turn)
+   * 3) LLM summary when over token budget (user-turn or tool-round fallback)
+   */
   async function compactNode(state: State, config: LangGraphRunnableConfig): Promise<Partial<State>> {
     const deferredResolved = resolveDeferred(state)
+    const ctx = ctxOf(config)
+    const out: BaseMessage[] = [...(deferredResolved.messages ?? [])]
+    let working = state.messages
 
-    if (isMicroCompactionEnabled() && !state.compacted) {
+    // 1) Cheap prune of stale tool results (default on; not gated on state.compacted).
+    if (isMicroCompactionEnabled()) {
       const mc = new MicroCompaction()
-      const { messages: mcMessages, truncated } = mc.compact(state.messages)
+      const { messages: mcMessages, truncated } = mc.compact(working)
       if (truncated > 0) {
-        const out: BaseMessage[] = [...(deferredResolved.messages ?? [])]
-        for (let i = 0; i < state.messages.length; i++) {
-          if (mcMessages[i] !== state.messages[i]) {
-            const orig = state.messages[i]
+        for (let i = 0; i < working.length; i++) {
+          if (mcMessages[i] !== working[i]) {
+            const orig = working[i]
             if (orig.id) out.push(new RemoveMessage({ id: orig.id }))
             out.push(mcMessages[i])
           }
         }
-        return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+        working = mcMessages
+        try {
+          ctx.emit.compaction(`Pruned ${truncated} stale tool result(s)`)
+        } catch {
+          // best-effort
+        }
       }
     }
 
-    if (state.compacted) return deferredResolved
-    const ctx = ctxOf(config)
-
-    // Apply sliding window first: when the message count exceeds the threshold,
-    // keep the first task message + last N turns and summarize the middle span.
-    // This runs BEFORE token-budget summarization to reduce context pressure early.
-    const windowResult = applySlidingWindow(state.messages)
+    // 2) Sliding window — multi-Human-turn conversations primarily.
+    const windowResult = applySlidingWindow(working)
     if (windowResult.removed.length > 0) {
       const summary = await ctx.summarizer.summarize(windowResult.removed, { sessionId: ctx.sessionId })
       const summaryMsg = new SystemMessage(`[Earlier conversation summary]\n${summary}`)
       ctx.emit.compaction(`Sliding window: ${windowResult.removed.length} messages summarized`)
       return {
-        messages: [...(deferredResolved.messages ?? []), summaryMsg, ...windowResult.kept],
+        messages: [...out, summaryMsg, ...windowResult.kept],
         compacted: true,
         deferredMessages: deferredResolved.deferredMessages,
       }
     }
 
-    const overBudget = estimateTokens(state.messages) > compactBudget
-    if (!overBudget) return deferredResolved
-    const result = await compactMessages(state.messages, {
+    // 3) Token-budget LLM compact (user-turn or tool-round). Re-runs after more tools accumulate.
+    const overBudget = estimateTokens(working) > compactBudget
+    if (!overBudget) {
+      if (out.length === 0) return deferredResolved
+      return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+    }
+
+    const result = await compactMessages(working, {
       keepRecentTurns: KEEP_RECENT_TURNS,
       summarizer: ctx.summarizer,
       sessionId: ctx.sessionId,
     })
-    if (!result) return deferredResolved
+    if (!result) {
+      if (out.length === 0) return deferredResolved
+      return { messages: out, deferredMessages: deferredResolved.deferredMessages }
+    }
     const summaryText = typeof result.summary.content === 'string' ? result.summary.content : ''
-    ctx.emit.compaction(summaryText, { replacedMessageIds: result.replacedIds })
+    const mode = result.mode ?? 'user-turn'
+    ctx.emit.compaction(`[${mode}] ${summaryText}`, { replacedMessageIds: result.replacedIds })
     return {
-      messages: [...(deferredResolved.messages ?? []), result.summary, ...result.removeIds.map((id) => new RemoveMessage({ id }))],
+      messages: [
+        ...out,
+        result.summary,
+        ...result.removeIds.map((id) => new RemoveMessage({ id })),
+      ],
       compacted: true,
       deferredMessages: deferredResolved.deferredMessages,
     }

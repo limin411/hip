@@ -7,7 +7,7 @@ import {
 } from '@langchain/core/messages'
 import { MicroCompaction, isMicroCompactionEnabled } from './micro-compaction.js'
 
-const STUB = '[Stale tool result cleared]'
+const STUB = '[Old tool result cleared]'
 
 /** Helper: create a ToolMessage with stable id and content. */
 function tm(
@@ -42,25 +42,26 @@ function hu(id: string, content: string): HumanMessage {
 describe('isMicroCompactionEnabled', () => {
   afterEach(() => {
     delete process.env.HIP_EXPERIMENTAL_MICRO_COMPACTION
+    delete process.env.HIP_COMPACTION_PRUNE
   })
 
-  it('returns false when env var is not set', () => {
-    expect(isMicroCompactionEnabled()).toBe(false)
-  })
-
-  it('returns true when env var is "1"', () => {
-    process.env.HIP_EXPERIMENTAL_MICRO_COMPACTION = '1'
+  it('returns true by default (prune on)', () => {
     expect(isMicroCompactionEnabled()).toBe(true)
   })
 
-  it('returns true when env var is "true"', () => {
-    process.env.HIP_EXPERIMENTAL_MICRO_COMPACTION = 'true'
-    expect(isMicroCompactionEnabled()).toBe(true)
+  it('returns false when HIP_COMPACTION_PRUNE=0', () => {
+    process.env.HIP_COMPACTION_PRUNE = '0'
+    expect(isMicroCompactionEnabled()).toBe(false)
   })
 
-  it('returns false for any other value', () => {
-    process.env.HIP_EXPERIMENTAL_MICRO_COMPACTION = 'yes'
+  it('returns false when HIP_COMPACTION_PRUNE=false', () => {
+    process.env.HIP_COMPACTION_PRUNE = 'false'
     expect(isMicroCompactionEnabled()).toBe(false)
+  })
+
+  it('returns true when HIP_COMPACTION_PRUNE is unset', () => {
+    delete process.env.HIP_COMPACTION_PRUNE
+    expect(isMicroCompactionEnabled()).toBe(true)
   })
 })
 
@@ -100,7 +101,7 @@ describe('MicroCompaction', () => {
     // Oldest 5 truncated.
     for (let i = 0; i < 5; i++) {
       const m = result[i] as ToolMessage
-      expect(m.content).toBe(STUB)
+      expect(String(m.content).startsWith(STUB)).toBe(true)
     }
 
     // Preserved stale ToolMessages (6–9).
@@ -149,7 +150,7 @@ describe('MicroCompaction', () => {
     // That's 8 truncated.
     expect(truncated).toBe(8)
     for (let i = 0; i < 8; i++) {
-      expect((result[i] as ToolMessage).content).toBe(STUB)
+      expect(String((result[i] as ToolMessage).content).startsWith(STUB)).toBe(true)
     }
 
     // AIMessage at index 8 unchanged (not a ToolMessage).
@@ -244,7 +245,7 @@ describe('MicroCompaction', () => {
 
     expect(truncated).toBe(1)
     expect((result[0] as ToolMessage).content).toBe('stale result') // preserved
-    expect((result[1] as ToolMessage).content).toBe(STUB) // truncated
+    expect(String((result[1] as ToolMessage).content).startsWith(STUB)).toBe(true) // truncated
   })
 
   it('preserves ToolMessages that are part of a resolved exchange within recent window', () => {

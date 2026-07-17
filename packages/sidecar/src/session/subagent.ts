@@ -1,7 +1,7 @@
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { PermissionMode } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
-import type { Summarizer } from './compaction.js'
+import { SUBAGENT_COMPACT_BUDGET_TOKENS, type Summarizer } from './compaction.js'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import { buildGraph, type GraphEmit, type GraphCtx } from './graph.js'
 import { buildTools, type ApprovalFn } from './tools.js'
@@ -185,7 +185,7 @@ export async function runSubagent(args: RunSubagentArgs): Promise<string> {
     permissionMode,
     doomLoopStrategy,
   }
-  const app = buildGraph(childMaxSteps)
+  const app = buildGraph(childMaxSteps, SUBAGENT_COMPACT_BUDGET_TOKENS)
   const initialMessages: BaseMessage[] = existingMessages && existingMessages.length > 0
     ? [...existingMessages, new HumanMessage(description)]
     : [new SystemMessage(childSystemPrompt(description, root, permissionMode)), new HumanMessage(description)]

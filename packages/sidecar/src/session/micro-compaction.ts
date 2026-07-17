@@ -1,15 +1,28 @@
 import { ToolMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 
-/** Content stub that replaces stale tool results. */
-const STALE_STUB = '[Stale tool result cleared]'
+/** Content stub that replaces stale tool results (model-visible only). */
+export const STALE_TOOL_STUB = '[Old tool result cleared]'
 
-/** Feature gate env var. Micro-compaction only activates when set to '1' or 'true'. */
-const ENV_KEY = 'HIP_EXPERIMENTAL_MICRO_COMPACTION'
+/**
+ * Env to **disable** prune (default is on).
+ * Set `HIP_COMPACTION_PRUNE=0` or `false` to turn off.
+ */
+const PRUNE_OFF_ENV = 'HIP_COMPACTION_PRUNE'
 
-/** Read the feature gate once (sync is fine — env vars don't change at runtime). */
+/**
+ * Whether tool-result prune (micro-compaction) is enabled.
+ * Default **true**. Disable with HIP_COMPACTION_PRUNE=0|false|off.
+ * (Legacy HIP_EXPERIMENTAL_MICRO_COMPACTION is obsolete — prune is on by default.)
+ */
 export function isMicroCompactionEnabled(): boolean {
-  const v = process.env[ENV_KEY]
-  return v === '1' || v === 'true'
+  const off = process.env[PRUNE_OFF_ENV]
+  if (off === '0' || off === 'false' || off === 'off') return false
+  return true
+}
+
+/** @deprecated alias — same as isMicroCompactionEnabled */
+export function isPruneEnabled(): boolean {
+  return isMicroCompactionEnabled()
 }
 
 export interface MicroCompactionResult {
@@ -29,12 +42,15 @@ export interface MicroCompactionResult {
  * at least one result (ToolMessage) inside the recent window, or where a recent
  * AIMessage still references a stale result. Preserving such ranges prevents
  * the LLM from receiving orphaned tool-call context.
+ *
+ * Default keepRecent ≈ 8 tool-rounds of traffic (~24 messages) per compaction spec.
  */
 export class MicroCompaction {
   private readonly keepRecent: number
 
   constructor(opts?: { keepRecent?: number }) {
-    this.keepRecent = opts?.keepRecent ?? 20
+    // ~3 msgs/round × 8 rounds = 24; use 24 as default protect window in message indices.
+    this.keepRecent = opts?.keepRecent ?? 24
   }
 
   compact(messages: BaseMessage[]): MicroCompactionResult {
@@ -55,10 +71,6 @@ export class MicroCompaction {
     }
 
     // ── Phase 1: stale AIMessages whose exchange crosses the boundary ──
-    // A stale AIMessage whose tool_call has a result inside the recent
-    // window makes the entire range [AIMessage.index, staleThreshold-1]
-    // "active" — we preserve all messages there so the LLM still sees the
-    // tool-call sequence that produced the recent result.
     const preserved: Set<number> = new Set()
 
     for (let i = 0; i < staleThreshold; i++) {
@@ -68,7 +80,6 @@ export class MicroCompaction {
         if (!tc.id) continue
         const ri = resultIndex.get(tc.id)
         if (ri !== undefined && ri >= staleThreshold) {
-          // This stale AIMessage's exchange reaches into the recent window.
           for (let j = i; j < staleThreshold; j++) preserved.add(j)
           break
         }
@@ -76,8 +87,6 @@ export class MicroCompaction {
     }
 
     // ── Phase 2: recent AIMessages referencing stale results ───────────
-    // If a recent AIMessage has a tool_call whose matching ToolMessage is
-    // stale, that stale result must be preserved — the LLM still needs it.
     const recentToolCallIds: Set<string> = new Set()
     for (let i = staleThreshold; i < messages.length; i++) {
       const m = messages[i]
@@ -96,13 +105,14 @@ export class MicroCompaction {
       if (!(m instanceof ToolMessage)) continue
       if (preserved.has(i)) continue
       if (m.tool_call_id && recentToolCallIds.has(m.tool_call_id)) continue
-      // Avoid re-processing the same index (though structurally impossible
-      // with this loop, kept for defensive clarity).
-      if (typeof m.content === 'string' && m.content === STALE_STUB) continue
+      if (typeof m.content === 'string' && m.content.startsWith('[Old tool result cleared]')) continue
+      if (typeof m.content === 'string' && m.content === '[Stale tool result cleared]') continue
 
+      const name = m.name ?? 'tool'
+      const n = typeof m.content === 'string' ? m.content.length : 0
       result[i] = new ToolMessage({
         id: m.id,
-        content: STALE_STUB,
+        content: `${STALE_TOOL_STUB} | name=${name} | chars=${n}`,
         tool_call_id: m.tool_call_id,
         name: m.name,
       })
@@ -112,3 +122,6 @@ export class MicroCompaction {
     return { messages: result, truncated }
   }
 }
+
+// Re-export legacy stub string used in older tests
+export const STALE_STUB = STALE_TOOL_STUB

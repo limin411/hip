@@ -800,26 +800,47 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     if (taskId && host.backgroundTasks.has(taskId)) return `Error: subagent ${taskId} is already running`
     const existingMessages = taskId ? host.loadSubagentMessages(taskId) : undefined
     ensureStarted(childId, 'worker', 'supervisor', description, taskId)
-    const text = await runSubagent({
-      runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
-      signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
-      permissionMode: mode, requestApproval, sessionId: host.id,
-      title: host.store?.getSession(host.id)?.title,
-      networkPolicy: host.networkPolicy, toolOutputStore: host.toolOutputStore,
-      guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
-      hooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
-      ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}),
-    })
-    const run = trajectory.get(childId)
-    const tools = run
-      ? Array.from(run.toolCalls.values())
-          .sort((a, b) => a.seq - b.seq)
-          .map((t) => ({ name: t.name, status: t.status, output: t.output, error: t.error, input: t.input }))
-      : []
-    // Prefer invoker text; fall back to tee'd stream (empty lastAiText but tokens streamed).
-    const result = synthesizeSubagentResult(text || run?.output, tools)
-    ensureFinished(childId, result)
-    return result
+    const toolsOf = () => {
+      const run = trajectory.get(childId)
+      return run
+        ? Array.from(run.toolCalls.values())
+            .sort((a, b) => a.seq - b.seq)
+            .map((t) => ({ name: t.name, status: t.status, output: t.output, error: t.error, input: t.input }))
+        : []
+    }
+    try {
+      const text = await runSubagent({
+        runner, root: cwd, summarizer, emit: makeEmit(childId, 'worker'),
+        signal: signal ?? host.abortController!.signal, description, childMaxSteps: childMaxStepsForAgent('worker', cwd),
+        permissionMode: mode, requestApproval, sessionId: host.id,
+        title: host.store?.getSession(host.id)?.title,
+        networkPolicy: host.networkPolicy, toolOutputStore: host.toolOutputStore,
+        guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
+        hooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
+        ...(existingMessages && existingMessages.length > 0 ? { existingMessages } : {}),
+      })
+      const run = trajectory.get(childId)
+      const tools = toolsOf()
+      // Prefer invoker text; fall back to tee'd stream (empty lastAiText but tokens streamed).
+      const result = synthesizeSubagentResult(text || run?.output, tools)
+      ensureFinished(childId, result)
+      return result
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') throw err
+      const msg = safeErrorMessage(err)
+      const tools = toolsOf()
+      const run = trajectory.get(childId)
+      // Preserve partial research when the model dies mid-loop (e.g. provider 404).
+      const partial = synthesizeSubagentResult(run?.output, tools)
+      const result =
+        partial && !partial.startsWith('Error:')
+          ? `${partial}\n\nError: sub-agent stopped early: ${msg}`
+          : tools.length > 0
+            ? `${synthesizeSubagentResult('', tools)}\n\nError: sub-agent stopped early: ${msg}`
+            : `Error: ${msg}`
+      ensureFinished(childId, result)
+      return result
+    }
   }
 
   const retrySubagentWrapper = async (agentId: string): Promise<string> => {
@@ -898,7 +919,22 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       return result
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') throw err
-      const msg = safeErrorMessage(err); ensureFinished(childId, `Error: ${msg}`); return `Error: ${msg}`
+      const msg = safeErrorMessage(err)
+      const run = trajectory.get(childId)
+      const tools = run
+        ? Array.from(run.toolCalls.values())
+            .sort((a, b) => a.seq - b.seq)
+            .map((t) => ({ name: t.name, status: t.status, output: t.output, error: t.error, input: t.input }))
+        : []
+      const partial = synthesizeSubagentResult(run?.output, tools)
+      const result =
+        partial && !partial.startsWith('Error:')
+          ? `${partial}\n\nError: sub-agent stopped early: ${msg}`
+          : tools.length > 0
+            ? `${synthesizeSubagentResult('', tools)}\n\nError: sub-agent stopped early: ${msg}`
+            : `Error: ${msg}`
+      ensureFinished(childId, result)
+      return result
     }
   }
 

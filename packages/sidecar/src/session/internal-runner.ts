@@ -3,6 +3,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
 import type { GraphEmit, GraphCtx } from './graph.js'
 import { buildGraph } from './graph.js'
+import { SUBAGENT_COMPACT_BUDGET_TOKENS } from './compaction.js'
 import { buildTools } from './tools.js'
 import { recursionLimit } from './loop-control.js'
 import { resolveDoomLoopStrategy } from './doom-loop.js'
@@ -138,7 +139,7 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   } else {
     humanMessage = new HumanMessage({ content: humanParts })
   }
-  const app = buildGraph(childMaxSteps)
+  const app = buildGraph(childMaxSteps, SUBAGENT_COMPACT_BUDGET_TOKENS)
   const final = await app.invoke(
     {
       messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode, mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined })), humanMessage],

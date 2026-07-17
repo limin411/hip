@@ -58,6 +58,12 @@ export interface AgentLoopConfig {
    * @default 'nudge_then_pause'
    */
   doomLoopStrategy?: DoomLoopStrategy
+  /**
+   * Idle timeout (ms) with no outbound activity before aborting a turn.
+   * Override via env `HIP_IDLE_TIMEOUT_MS`. When unset, surface defaults apply
+   * (`code` 180s, others 60s). Clamped to [5000, 1800000].
+   */
+  idleTimeoutMs?: number
 }
 
 /**

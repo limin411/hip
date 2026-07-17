@@ -156,12 +156,16 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (raw.doom_loop_strategy !== undefined && raw.doomLoopStrategy === undefined) {
     raw.doomLoopStrategy = raw.doom_loop_strategy
   }
+  if (raw.idle_timeout_ms !== undefined && raw.idleTimeoutMs === undefined) {
+    raw.idleTimeoutMs = raw.idle_timeout_ms
+  }
   delete raw.max_steps
   delete raw.child_max_steps
   delete raw.explore_child_max_steps
   delete raw.max_depth
   delete raw.subagent_hitl
   delete raw.doom_loop_strategy
+  delete raw.idle_timeout_ms
 
   const out: AgentLoopConfig = {}
   if (typeof raw.maxSteps === 'number') {
@@ -182,6 +186,9 @@ function normalizeAgentLoop(raw: Record<string, unknown>): AgentLoopConfig {
   if (typeof raw.doomLoopStrategy === 'string') {
     const parsed = parseDoomLoopStrategy(raw.doomLoopStrategy)
     if (parsed) out.doomLoopStrategy = parsed
+  }
+  if (typeof raw.idleTimeoutMs === 'number' && Number.isFinite(raw.idleTimeoutMs)) {
+    out.idleTimeoutMs = raw.idleTimeoutMs
   }
   return out
 }

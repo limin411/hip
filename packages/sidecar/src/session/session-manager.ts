@@ -4,6 +4,8 @@ import type { BaseLanguageModel } from '@langchain/core/language_models/base'
 import * as path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Session } from './session.js'
+import { resolveIdleTimeoutMs } from './idle-timeout.js'
+import { readHipConfig } from '../config/hip-config.js'
 import type { SessionStore } from '../persistence/store.js'
 import { ensureScratchDir, removeScratchDir, defaultScratchRoot } from './scratch.js'
 import * as workspaceFs from './workspace-fs.js'
@@ -33,6 +35,21 @@ type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
 /** Normalize a user-typed rename: one line, bounded length, blank → default. */
 function sanitizeRename(raw: string): string {
   return raw.replace(/\s+/g, ' ').trim().slice(0, 200) || '新对话'
+}
+
+/** Resolve idle timeout for a new/resumed Session (env → hip.toml → surface default). */
+function idleTimeoutForConfig(cfg: SessionConfig): number {
+  let configMs: number | undefined
+  try {
+    configMs = readHipConfig().agentLoop?.idleTimeoutMs
+  } catch {
+    configMs = undefined
+  }
+  return resolveIdleTimeoutMs({
+    env: process.env.HIP_IDLE_TIMEOUT_MS,
+    configMs,
+    surface: cfg.surface,
+  })
 }
 
 export class SessionManager {
@@ -177,7 +194,8 @@ export class SessionManager {
     if (!cfg.cwd) cfg = { ...cfg, cwd: ensureScratchDir(id, this.scratchRoot) }
     const now = Date.now()
     this.store?.insertSession({ id, title: '新对话', config: JSON.stringify(cfg), createdAt: now, updatedAt: now })
-    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store, undefined, undefined, undefined, undefined, undefined, this.scratchRoot))
+    const idleMs = idleTimeoutForConfig(cfg)
+    this.sessions.set(id, new Session(id, cfg, this.modelFactory(cfg), this.store, undefined, idleMs, undefined, undefined, undefined, this.scratchRoot))
     void this.sessions.get(id)!.captureSnapshot().catch((err) => console.warn('[session-manager] captureSnapshot failed:', err instanceof Error ? err.message : String(err)))
     send({ type: 'session:created', sessionId: id })
     // A no-cwd (pure-chat) session got a server-derived scratch cwd — tell the client.
@@ -191,7 +209,7 @@ export class SessionManager {
     const row = this.store?.getSession(id)
     const raw: SessionConfig = row ? JSON.parse(row.config) : { llmProvider: 'deepseek', model: '', tools: [] }
     const config = normalizeSessionConfig(raw)
-    const session = new Session(id, config, this.modelFactory(config), this.store, undefined, undefined, undefined, undefined, undefined, this.scratchRoot)
+    const session = new Session(id, config, this.modelFactory(config), this.store, undefined, idleTimeoutForConfig(config), undefined, undefined, undefined, this.scratchRoot)
     if (this.store) session.hydrate(this.store.loadMessages(id))
     this.sessions.set(id, session)
     // Send immediate MCP status for this session's configured servers.

@@ -402,6 +402,7 @@ child_max_steps = 10
 explore_child_max_steps = 20
 max_depth = 2
 subagent_hitl = "inline_partial"
+idle_timeout_ms = 120000
 `)
     process.env.HIP_CONFIG_PATH = p
     const cfg = readHipConfig()
@@ -411,7 +412,20 @@ subagent_hitl = "inline_partial"
       exploreChildMaxSteps: 20,
       maxDepth: 2,
       subagentHitl: 'inline_partial',
+      idleTimeoutMs: 120_000,
     })
+  })
+
+  it('parses agentLoop.idleTimeoutMs (camelCase)', () => {
+    const dir = tmpDir()
+    const p = writeToml(dir, 'hip.toml', `version = 1
+
+[agentLoop]
+idleTimeoutMs = 90000
+`)
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.agentLoop).toEqual({ idleTimeoutMs: 90_000 })
   })
 
   it('drops unsupported subagentHitl values (placeholder accepts only inline_partial)', () => {

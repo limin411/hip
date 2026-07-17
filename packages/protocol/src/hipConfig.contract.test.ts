@@ -107,6 +107,7 @@ describe('protocol: AgentLoopConfig', () => {
         exploreChildMaxSteps: 15,
         maxDepth: 2,
         subagentHitl: 'inline_partial',
+        idleTimeoutMs: 120_000,
       },
     }
     const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
@@ -116,6 +117,7 @@ describe('protocol: AgentLoopConfig', () => {
       exploreChildMaxSteps: 15,
       maxDepth: 2,
       subagentHitl: 'inline_partial',
+      idleTimeoutMs: 120_000,
     })
   })
 })

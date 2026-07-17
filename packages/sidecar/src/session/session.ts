@@ -109,7 +109,12 @@ export {
 } from './session-helpers.js'
 
 type SendFn = (msg: ServerMessage) => void
-export const DEFAULT_IDLE_TIMEOUT_MS = 60_000
+export {
+  DEFAULT_IDLE_TIMEOUT_MS,
+  DEFAULT_CODE_IDLE_TIMEOUT_MS,
+  resolveIdleTimeoutMs,
+} from './idle-timeout.js'
+import { DEFAULT_IDLE_TIMEOUT_MS } from './idle-timeout.js'
 
 const NOOP_SUMMARIZER: Summarizer = { async summarize() { return '' } }
 

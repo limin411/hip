@@ -60,6 +60,11 @@ const BASE =
   'project directory. Use them to do the work yourself: read what you need, write actual files, then ' +
   'verify by reading the result back. Do not ask the user to do steps you can do with your tools. ' +
   'When the task is done, finish with a short plain-text summary of what you changed. ' +
+  'Prefer edit_file for localized changes (font sizes, box dimensions, labels, small SVG/HTML/CSS fixes). ' +
+  'Avoid a single write_file that rewrites multi-thousand-line files — large one-shot rewrites can stall; ' +
+  'edit in sections with edit_file, or rewrite only when creating a new file or a true full replacement is required. ' +
+  'When read_file output is truncated, re-read missing ranges with offset/limit before editing — do not invent ' +
+  'the rest of the file from a partial read. ' +
   'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
   'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
   'For a large, self-contained chunk of work or isolated research, you may call task or dispatch_agent ' +
@@ -240,7 +245,8 @@ const CHILD_BASE =
   'Right now you are acting as a focused sub-agent completing a single delegated sub-task. ' +
   'You have real file tools — read_file, write_file, edit_file, ls, glob, grep — operating on the ' +
   'project directory. Do the work yourself: read what you need, write actual files, then verify by ' +
-  'reading the result back. You cannot delegate further. When done, return a concise text result ' +
+  'reading the result back. Prefer edit_file for localized fixes; avoid one-shot multi-thousand-line write_file. ' +
+  'You cannot delegate further. When done, return a concise text result ' +
   'describing what you found or changed.'
 
 /** System prompt for a delegated sub-agent: identity + base tools + cwd convention + anti-phantom,

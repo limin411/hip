@@ -23,6 +23,13 @@ describe('buildSystemPrompt', () => {
     expect(s).toMatch(/\.git\/objects/i)
   })
 
+  it('steers large edits toward edit_file and offset/limit reads', () => {
+    const s = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code' })
+    expect(s).toMatch(/Prefer edit_file/i)
+    expect(s).toMatch(/offset\/limit/i)
+    expect(s).toMatch(/multi-thousand-line|one-shot/i)
+  })
+
   it('chat surface omits git commit guidance and is shorter than code', () => {
     const chat = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'chat' })
     const code = buildSystemPrompt({ cwd: '/tmp/proj', surface: 'code' })
@@ -74,6 +81,11 @@ describe('buildSystemPrompt', () => {
 })
 
 describe('childSystemPrompt', () => {
+  it('prefers edit_file for localized sub-agent edits', () => {
+    const s = childSystemPrompt('fix SVG labels', '/tmp/proj')
+    expect(s).toMatch(/Prefer edit_file/i)
+  })
+
   it('carries the hip identity into delegated sub-agents', () => {
     const s = childSystemPrompt('refactor the parser', '/tmp/proj')
     expect(s).toMatch(/you are hip/i)

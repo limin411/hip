@@ -24,7 +24,11 @@ export function resolveModelChoice(
 }
 
 export function buildModel(config: SessionConfig, profileBinding?: { providerID: string; modelID: string }): BaseChatModel {
-  return buildChatModel(resolveModelChoice(config, getActiveModel(), profileBinding))
+  const choice = resolveModelChoice(config, getActiveModel(), profileBinding)
+  return buildChatModel({
+    ...choice,
+    ...(config.effort ? { effort: config.effort } : {}),
+  })
 }
 
 /** Permission kinds that are considered safe (non-destructive) and auto-resolve

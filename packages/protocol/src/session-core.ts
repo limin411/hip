@@ -25,6 +25,12 @@ export interface SessionConfig {
   systemPrompt?: string
   cwd?: string                 // absolute project root; undefined → virtual FS (no real file tools)
   thinking?: boolean           // DEPRECATED: retained for back-compat; no longer swaps models
+  /**
+   * Reasoning effort / thinking intensity for models that advertise effort levels
+   * in the models.dev catalog (`reasoning_options` type `effort`). Values are
+   * model-specific (e.g. none|minimal|low|medium|high|xhigh|max). undefined ⇒ provider default.
+   */
+  effort?: string
   language?: 'en' | 'zh-CN' | 'zh-TW'
   agentId?: string             // undefined / 'builtin' => built-in hip agent; else an AgentConfig.id
   permissionMode?: PermissionMode  // per-conversation gate; undefined ⇒ treated as 'edit'

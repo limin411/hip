@@ -1233,6 +1233,12 @@ export class SessionService {
     this.transport.send({ type: 'session:setThinking', sessionId: id, thinking })
   }
 
+  /** Set reasoning effort for the session (null clears to provider default). */
+  setEffort(id: string, effort: string | null): void {
+    useDomainStore.getState().apply({ type: 'session:effort', sessionId: id, effort }) // optimistic
+    this.transport.send({ type: 'session:setEffort', sessionId: id, effort })
+  }
+
   setPermissionMode(id: string, mode: PermissionMode): void {
     useDomainStore.getState().apply({ type: 'session:permissionMode', sessionId: id, permissionMode: mode }) // optimistic
     this.transport.send({ type: 'session:setPermissionMode', sessionId: id, permissionMode: mode })
@@ -1518,10 +1524,12 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
     surface === 'code' && draft?.forcePlan
       ? { ...withMode, forcePlan: true, disablePlan: false }
       : withMode
-  if (!draft?.modelKey) return withPlan
+  const withEffort: SessionConfig =
+    draft?.effort ? { ...withPlan, effort: draft.effort } : withPlan
+  if (!draft?.modelKey) return withEffort
   const { catalog, config } = useProvidersStore.getState()
   const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
-  return { ...withPlan, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
+  return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

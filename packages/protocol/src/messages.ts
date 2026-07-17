@@ -53,6 +53,7 @@ export type ClientMessage =
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
+  | { type: 'session:setEffort'; sessionId: string; effort: string | null }
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:setForcePlan'; sessionId: string; forcePlan: boolean }
@@ -149,6 +150,7 @@ export type ServerMessage =
   | { type: 'tool:started'; sessionId: string; turnId: string; agentId: string; role: AgentRole; callId: string; name: string; input: string; seq: number; truncated?: boolean }
   | { type: 'tool:finished'; sessionId: string; turnId: string; agentId: string; callId: string; status: 'finished' | 'error'; output?: string; error?: string; truncated?: boolean }
   | { type: 'session:thinking'; sessionId: string; thinking: boolean }
+  | { type: 'session:effort'; sessionId: string; effort: string | null }
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:forcePlan'; sessionId: string; forcePlan: boolean }

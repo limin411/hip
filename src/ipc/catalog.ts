@@ -1,11 +1,20 @@
 // src/ipc/catalog.ts
 import { invoke } from '@tauri-apps/api/core'
 
+/** One entry from models.dev `reasoning_options` (effort list, toggle, or budget). */
+export type ReasoningOption =
+  | { type: 'effort'; values: string[] }
+  | { type: 'toggle' }
+  | { type: 'budget_tokens'; min?: number; max?: number }
+  | { type: string; values?: string[]; min?: number; max?: number }
+
 export interface CatalogModel {
   id: string
   name: string
   family?: string
   reasoning?: boolean
+  /** Provider-advertised reasoning controls; effort levels live here when type is `effort`. */
+  reasoning_options?: ReasoningOption[]
   tool_call?: boolean
   attachment?: boolean
   cost?: { input: number; output: number }

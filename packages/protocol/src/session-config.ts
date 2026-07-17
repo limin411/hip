@@ -22,6 +22,8 @@ export interface SessionConfigLike {
   systemPrompt?: string
   cwd?: string
   thinking?: boolean
+  /** Reasoning effort level when the model supports it; undefined ⇒ provider default. */
+  effort?: string
   language?: 'en' | 'zh-CN' | 'zh-TW'
   agentId?: string
   permissionMode?: PermissionMode

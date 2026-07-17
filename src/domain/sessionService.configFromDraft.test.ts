@@ -82,4 +82,13 @@ describe('configFromDraft', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'chat', text: '', forcePlan: true })
     expect(cfg.forcePlan).toBeUndefined()
   })
+  it('draft effort is carried into SessionConfig for chat and code', () => {
+    expect(configFromDraft({ tempId: 't', mode: 'chat', text: '', effort: 'high' }).effort).toBe('high')
+    expect(
+      configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', effort: 'xhigh' }).effort,
+    ).toBe('xhigh')
+  })
+  it('draft without effort leaves effort undefined', () => {
+    expect(configFromDraft({ tempId: 't', mode: 'chat', text: '' }).effort).toBeUndefined()
+  })
 })

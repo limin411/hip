@@ -284,6 +284,15 @@ export function applyServerMessage(
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 
+    case 'session:effort':
+      return update(msg.sessionId, (s) => ({
+        ...s,
+        config: {
+          ...s.config,
+          effort: msg.effort ?? undefined,
+        },
+      }))
+
     case 'session:permissionMode':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, permissionMode: msg.permissionMode } }))
 

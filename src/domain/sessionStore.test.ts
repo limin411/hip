@@ -306,6 +306,13 @@ describe('applyServerMessage', () => {
     const off = applyServerMessage(s0, { type: 'session:thinking', sessionId: 's1', thinking: false }, 0)
     expect(off.sessions[0].config.thinking).toBe(false)
   })
+  it('session:effort writes config.effort and null clears it', () => {
+    const s0 = { sessions: [baseSession()] }
+    const on = applyServerMessage(s0, { type: 'session:effort', sessionId: 's1', effort: 'high' }, 0)
+    expect(on.sessions[0].config.effort).toBe('high')
+    const off = applyServerMessage(on, { type: 'session:effort', sessionId: 's1', effort: null }, 0)
+    expect(off.sessions[0].config.effort).toBeUndefined()
+  })
   it('session:orchMode updates config.orchMode on the matching session', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:orchMode', sessionId: 's1', orchMode: 'dag' }, 0)

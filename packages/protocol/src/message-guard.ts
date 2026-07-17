@@ -18,6 +18,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'session:rename',
   'session:setCwd',
   'session:setThinking',
+  'session:setEffort',
   'session:setSystemPrompt',
   'session:setPermissionMode',
   'session:setForcePlan',

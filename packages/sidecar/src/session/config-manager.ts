@@ -113,6 +113,18 @@ export class ConfigManager {
     return true
   }
 
+  /**
+   * Set reasoning effort / thinking intensity for the session model.
+   * Pass null to clear (provider default). NO-OP while a turn is running.
+   */
+  setEffort(effort: string | null): boolean {
+    if (this.isRunning()) return false
+    const next = effort?.trim() || undefined
+    this.updateConfig({ ...this.getConfig(), effort: next })
+    this.rebuildAgent()
+    return true
+  }
+
   /** Set the per-conversation permission mode. NO-OP (returns false) while a turn is running. */
   setPermissionMode(permissionMode: SessionConfig['permissionMode']): boolean {
     if (this.isRunning()) return false

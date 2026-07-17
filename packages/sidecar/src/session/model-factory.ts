@@ -106,22 +106,64 @@ export function activeKey(providerID: string): string {
   return resolveApiKey(providerID) || 'sk-missing'
 }
 
+export type BuildChatModelChoice = {
+  providerID: string
+  modelID: string
+  baseURL: string
+  /** Reasoning effort from SessionConfig (catalog-advertised values). */
+  effort?: string
+}
+
+/** OpenAI-compatible reasoning effort values accepted by the SDK. */
+const OPENAI_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh'])
+/** Anthropic outputConfig.effort values. */
+const ANTHROPIC_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max'])
+
+/** Normalize effort for OpenAI-compatible providers (null when unset / unsupported). */
+export function openAiReasoningEffort(effort: string | undefined): string | undefined {
+  if (!effort) return undefined
+  return OPENAI_EFFORTS.has(effort) ? effort : undefined
+}
+
+/** Normalize effort for Anthropic (undefined when unset / unsupported). */
+export function anthropicOutputEffort(effort: string | undefined): string | undefined {
+  if (!effort || effort === 'none') return undefined
+  if (ANTHROPIC_EFFORTS.has(effort)) return effort
+  // Map OpenAI-only "minimal" down to low when using Anthropic.
+  if (effort === 'minimal') return 'low'
+  return undefined
+}
+
 /** Build the production reasoning chat model for a concrete model choice. */
-export function buildChatModel(choice: { providerID: string; modelID: string; baseURL: string }): BaseChatModel {
+export function buildChatModel(choice: BuildChatModelChoice): BaseChatModel {
   if (choice.providerID === 'anthropic') {
+    const effort = anthropicOutputEffort(choice.effort)
     return new ChatAnthropic({
       model: choice.modelID,
       apiKey: activeKey(choice.providerID),
       streaming: true,
       streamUsage: true,
+      ...(effort
+        ? {
+            // Adaptive thinking pairs with output effort on modern Claude models.
+            thinking: { type: 'adaptive' as const },
+            outputConfig: { effort: effort as 'low' | 'medium' | 'high' | 'xhigh' | 'max' },
+          }
+        : {}),
     })
   }
+  const oe = openAiReasoningEffort(choice.effort)
   return new ReasoningChatOpenAI({
     model: choice.modelID,
     apiKey: activeKey(choice.providerID),
     configuration: { baseURL: choice.baseURL },
     streaming: true,
     streamUsage: true,
+    ...(oe
+      ? {
+          reasoning: { effort: oe as 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' },
+        }
+      : {}),
   })
 }
 

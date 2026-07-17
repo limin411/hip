@@ -14,6 +14,8 @@ export interface Draft {
   permissionMode?: PermissionMode   // 'chat'|'edit'|'full' chosen for this chat; undefined ⇒ server default 'edit'
   /** When true, first committed code session forces plan mode (EnterPlanMode path). */
   forcePlan?: boolean
+  /** Reasoning effort level when the model supports it. */
+  effort?: string
 }
 
 interface DraftStore {
@@ -26,6 +28,7 @@ interface DraftStore {
   setModelKey: (modelKey: string) => void
   setPermissionMode: (permissionMode: PermissionMode) => void
   setForcePlan: (forcePlan: boolean) => void
+  setEffort: (effort: string | undefined) => void
   reset: () => void
 }
 
@@ -86,6 +89,11 @@ export const useDraftStore = create<DraftStore>()(
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
           return { draft: { ...base, forcePlan } }
+        }),
+      setEffort: (effort) =>
+        set((s) => {
+          const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
+          return { draft: { ...base, effort: effort || undefined } }
         }),
       reset: () => set({ draft: null }),
     }),

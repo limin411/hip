@@ -7,6 +7,7 @@ import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { readSkillFile } from '@/ipc/skills'
 import { ModelPicker } from './ModelPicker'
+import { EffortLevelPicker } from './EffortLevelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
@@ -205,9 +206,9 @@ export function InputBar() {
                 reconnecting={reconnecting}
                 leftSlot={
                   isCode ? (
-                    <><ModelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
+                    <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
                   ) : (
-                    <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                    <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                   )
                 }
               attachments={attachments}

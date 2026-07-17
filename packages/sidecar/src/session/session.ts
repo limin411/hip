@@ -501,6 +501,7 @@ export class Session {
   // ── Config delegation ──
   setCwd(cwd: string): void { this.configMgr.setCwd(cwd) }
   setThinking(thinking: boolean): boolean { return this.configMgr.setThinking(thinking) }
+  setEffort(effort: string | null): boolean { return this.configMgr.setEffort(effort) }
   setModel(llmProvider: string): boolean { return this.configMgr.setModel(llmProvider) }
   setSystemPrompt(systemPrompt: string | null): boolean { return this.configMgr.setSystemPrompt(systemPrompt) }
   /**

@@ -28,6 +28,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setCwd',
   'session:setOrchMode',
   'session:setThinking',
+  'session:setEffort',
   'session:setSystemPrompt',
   'session:setPermissionMode',
   'session:setForcePlan',
@@ -192,6 +193,13 @@ export function handleSessionMessage(
       const applied = s.setThinking(msg.thinking)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
       send({ type: 'session:thinking', sessionId: msg.sessionId, thinking: s.config.thinking ?? true })
+      return
+    }
+    case 'session:setEffort': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      const applied = s.setEffort(msg.effort)
+      if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
+      send({ type: 'session:effort', sessionId: msg.sessionId, effort: s.config.effort ?? null })
       return
     }
     case 'session:setSystemPrompt': {

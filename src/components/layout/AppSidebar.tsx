@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Code2, GitBranch, MessageSquare, Search } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, Code2, GitBranch, MessageSquare, Search } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
@@ -8,7 +8,13 @@ import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { useParallelStore } from '@/store/parallelStore'
+import {
+  shortWorktreeLabel,
+  slotsForHost,
+  useParallelStore,
+  type ParallelRun,
+  type ParallelSlot,
+} from '@/store/parallelStore'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
@@ -27,6 +33,8 @@ export function AppSidebar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
   const [query, setQuery] = useState('')
+  /** Session ids whose worktree subtree is collapsed (default = expanded when slots exist). */
+  const [worktreeCollapsed, setWorktreeCollapsed] = useState<Record<string, boolean>>({})
   const sidebarSection = useUiStore((s) => s.sidebarSection)
   const activeView = useUiStore((s) => s.activeView)
   const sessions = useSessions()
@@ -39,10 +47,10 @@ export function AppSidebar() {
 
   const q = query.trim().toLowerCase()
 
-  const parallelSessionIds = useMemo(() => {
+  /** Slot-only session ids (legacy multi-session fan-out) — hide from top-level list. */
+  const nestedSlotSessionIds = useMemo(() => {
     const ids = new Set<string>()
     for (const run of parallelRuns) {
-      ids.add(run.hostSessionId)
       for (const slot of run.slots) {
         if (slot.sessionId) ids.add(slot.sessionId)
       }
@@ -50,41 +58,38 @@ export function AppSidebar() {
     return ids
   }, [parallelRuns])
 
+  const runsByHost = useMemo(() => {
+    const map = new Map<string, ParallelRun[]>()
+    for (const run of parallelRuns) {
+      if (!run.hostSessionId || run.slots.length === 0) continue
+      const list = map.get(run.hostSessionId) ?? []
+      list.push(run)
+      map.set(run.hostSessionId, list)
+    }
+    return map
+  }, [parallelRuns])
+
   const filteredSessions = useMemo(() => {
     const surface = sidebarSection === 'projects' ? 'code' : 'chat'
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
     let list = sessions
       .filter((s) => surfaceOf(s.config) === surface)
-      // Host sessions are tooling-only; hide from the flat list (slots still show under Parallel).
-      .filter((s) => {
-        if (sidebarSection !== 'projects') return true
-        const run = parallelRuns.find((r) => r.hostSessionId === s.id)
-        return !run
-      })
+      // Nested slot sessions (legacy) stay under parent expand, not as top-level rows.
+      .filter((s) => !nestedSlotSessionIds.has(s.id))
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     if (q) {
       list = list.filter(
-        (s) => s.title.toLowerCase().includes(q) || s.preview.toLowerCase().includes(q),
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.preview.toLowerCase().includes(q) ||
+          // Match worktree branch when searching
+          (runsByHost.get(s.id) ?? []).some((r) =>
+            r.slots.some((sl) => sl.branch.toLowerCase().includes(q)),
+          ),
       )
     }
     return list
-  }, [sessions, sidebarSection, q, parallelRuns])
-
-  const visibleParallelRuns = useMemo(() => {
-    if (sidebarSection !== 'projects') return []
-    let list = parallelRuns.filter(
-      (r) => r.slots.some((s) => s.sessionId || s.taskId || s.worktreePath),
-    )
-    if (q) {
-      list = list.filter(
-        (r) =>
-          r.prompt.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q) ||
-          r.slots.some((s) => s.branch.toLowerCase().includes(q)),
-      )
-    }
-    return list
-  }, [parallelRuns, sidebarSection, q])
+  }, [sessions, sidebarSection, q, nestedSlotSessionIds, runsByHost])
 
   const filteredSpaces = useMemo(() => {
     if (sidebarSection !== 'knowledge') return []
@@ -114,13 +119,18 @@ export function AppSidebar() {
         ? t('sidebar.list.projects')
         : t('sidebar.list.chats')
 
+  const toggleWorktree = (sessionId: string) => {
+    setWorktreeCollapsed((prev) => ({ ...prev, [sessionId]: !prev[sessionId] }))
+  }
+
+  const isWorktreeExpanded = (sessionId: string) => worktreeCollapsed[sessionId] !== true
+
   return (
     <aside
       className="glass-surface flex h-full w-[260px] shrink-0 flex-col border-r border-glass"
       data-testid="app-sidebar"
       aria-label={t('sidebar.aria')}
     >
-      {/* mac: traffic-light clearance. Win/Linux: slim drag strip (caption lives on MainToolbar). */}
       <div
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
@@ -286,103 +296,26 @@ export function AppSidebar() {
               })}
             </ul>
           )
-        ) : filteredSessions.length === 0 && visibleParallelRuns.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {q ? t('sidebar.emptySearch') : t('sidebar.emptySessions')}
           </p>
         ) : (
           <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
-            {visibleParallelRuns.map((run) => (
-              <li key={run.id} className="mb-2" data-testid={`sidebar-parallel-${run.id}`}>
-                <div className="mb-0.5 flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">
-                  <GitBranch size={12} aria-hidden />
-                  <span className="truncate">{t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}</span>
-                </div>
-                <ul className="m-0 list-none p-0">
-                  {run.slots.map((slot) => {
-                      const session = slot.sessionId
-                        ? sessions.find((s) => s.id === slot.sessionId)
-                        : undefined
-                      const active =
-                        !!slot.sessionId &&
-                        slot.sessionId === activeSessionId &&
-                        (activeView === 'chat' || activeView === 'code')
-                      const isWinner =
-                        !!slot.sessionId && run.selectedSessionId === slot.sessionId
-                      const key = slot.sessionId || slot.taskId || `${run.id}-${slot.index}`
-                      const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
-                      return (
-                        <li key={key}>
-                          <button
-                            type="button"
-                            data-testid={`sidebar-parallel-slot-${key}`}
-                            data-no-drag
-                            aria-current={active ? 'true' : undefined}
-                            disabled={isAgentSlot && !slot.sessionId}
-                            onClick={() => {
-                              if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
-                              else if (run.hostSessionId)
-                                void selectSessionFromSidebar(run.hostSessionId)
-                            }}
-                            onDoubleClick={() => {
-                              if (slot.sessionId)
-                                sessionService.selectParallelWinner(run.id, slot.sessionId)
-                            }}
-                            title={
-                              isAgentSlot
-                                ? t('sidebar.parallel.agentSlotHint')
-                                : t('sidebar.parallel.slotHint')
-                            }
-                            className={cn(
-                              'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-                              active
-                                ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
-                                : 'hover:bg-state-hover',
-                              isAgentSlot && !slot.sessionId && 'opacity-90',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'mt-1.5 size-1.5 shrink-0 rounded-full',
-                                slot.status === 'error'
-                                  ? 'bg-danger'
-                                  : active
-                                    ? 'bg-accent'
-                                    : 'bg-success/60',
-                              )}
-                              aria-hidden
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-body font-medium text-ink">
-                                {session?.title ||
-                                  `P${slot.index} · ${slot.branch}`}
-                              </span>
-                              <span className="mt-0.5 block truncate text-[11px] text-ink-tertiary">
-                                {slot.taskId
-                                  ? `${slot.branch} · ${slot.taskId}`
-                                  : slot.branch}
-                                {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                </ul>
-              </li>
-            ))}
-            {filteredSessions
-              .filter((s) => !parallelSessionIds.has(s.id))
-              .map((session) => {
+            {filteredSessions.map((session) => {
               const surface = surfaceOf(session.config)
               const active =
                 session.id === activeSessionId &&
                 (activeView === 'chat' || activeView === 'code')
               const surfaceLabel =
                 surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
+              const hostRuns = runsByHost.get(session.id) ?? []
+              const slots = slotsForHost(parallelRuns, session.id)
+              const hasWorktrees = slots.length > 0
+              const expanded = hasWorktrees && isWorktreeExpanded(session.id)
+
               return (
-                <li key={session.id}>
+                <li key={session.id} data-testid={`sidebar-session-group-${session.id}`}>
                   <DeclarativeContextMenu
                     kind="sessionHistory"
                     payload={{
@@ -392,54 +325,134 @@ export function AppSidebar() {
                     }}
                     className="mb-0.5 block w-full"
                   >
-                    <button
-                      type="button"
-                      data-testid={`sidebar-session-${session.id}`}
-                      data-no-drag
-                      aria-current={active ? 'true' : undefined}
-                      aria-label={`${session.title}, ${surfaceLabel}`}
-                      onClick={() => void selectSessionFromSidebar(session.id)}
+                    <div
                       className={cn(
-                        'flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                        'flex w-full items-start gap-0.5 rounded-lg transition-colors',
                         active
                           ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
                           : 'hover:bg-state-hover',
                       )}
                     >
-                      <span
+                      {hasWorktrees ? (
+                        <button
+                          type="button"
+                          data-testid={`sidebar-session-expand-${session.id}`}
+                          data-no-drag
+                          aria-expanded={expanded}
+                          aria-label={
+                            expanded
+                              ? t('sidebar.parallel.collapseWorktrees')
+                              : t('sidebar.parallel.expandWorktrees')
+                          }
+                          title={
+                            expanded
+                              ? t('sidebar.parallel.collapseWorktrees')
+                              : t('sidebar.parallel.expandWorktrees')
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleWorktree(session.id)
+                          }}
+                          className={cn(
+                            'mt-1.5 ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
+                            'hover:bg-state-hover hover:text-ink',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                          )}
+                        >
+                          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                      ) : (
+                        <span className="ml-1 mt-1.5 size-5 shrink-0" aria-hidden />
+                      )}
+                      <button
+                        type="button"
+                        data-testid={`sidebar-session-${session.id}`}
+                        data-no-drag
+                        aria-current={active ? 'true' : undefined}
+                        aria-label={`${session.title}, ${surfaceLabel}`}
+                        onClick={() => void selectSessionFromSidebar(session.id)}
                         className={cn(
-                          'mt-1.5 size-1.5 shrink-0 rounded-full',
-                          active ? 'bg-accent' : 'bg-transparent',
+                          'flex min-w-0 flex-1 items-start gap-2 py-2 pr-2.5 text-left',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
                         )}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-body font-medium text-ink" aria-hidden>
-                          {session.title}
-                        </span>
-                        {session.preview ? (
-                          <span
-                            className="mt-0.5 block truncate text-[11px] text-ink-tertiary"
-                            aria-hidden
-                          >
-                            {session.preview}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span
-                        className={cn(
-                          'mt-0.5 shrink-0 rounded px-1 py-px text-[10px]',
-                          surface === 'code'
-                            ? 'bg-success/10 text-success'
-                            : 'bg-surface-muted text-ink-tertiary',
-                        )}
-                        aria-hidden
                       >
-                        {surfaceLabel}
-                      </span>
-                    </button>
+                        <span
+                          className={cn(
+                            'mt-1.5 size-1.5 shrink-0 rounded-full',
+                            active ? 'bg-accent' : 'bg-transparent',
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1">
+                            <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
+                              {session.title}
+                            </span>
+                            {hasWorktrees ? (
+                              <span
+                                className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
+                                title={t('sidebar.parallel.slotCount', { count: slots.length })}
+                                data-testid={`sidebar-session-wt-badge-${session.id}`}
+                              >
+                                {slots.length}
+                              </span>
+                            ) : null}
+                          </span>
+                          {session.preview ? (
+                            <span
+                              className="mt-0.5 block truncate text-[11px] text-ink-tertiary"
+                              aria-hidden
+                            >
+                              {session.preview}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span
+                          className={cn(
+                            'mt-0.5 shrink-0 rounded px-1 py-px text-[10px]',
+                            surface === 'code'
+                              ? 'bg-success/10 text-success'
+                              : 'bg-surface-muted text-ink-tertiary',
+                          )}
+                          aria-hidden
+                        >
+                          {surfaceLabel}
+                        </span>
+                      </button>
+                    </div>
                   </DeclarativeContextMenu>
+
+                  {expanded ? (
+                    <ul
+                      className="relative m-0 mb-1 ml-3 list-none border-l border-border/80 py-0.5 pl-0"
+                      data-testid={`sidebar-session-worktrees-${session.id}`}
+                      aria-label={t('sidebar.parallel.worktreeTree', { title: session.title })}
+                    >
+                      {hostRuns.map((run) => (
+                        <li key={run.id} className="m-0 p-0">
+                          {hostRuns.length > 1 ? (
+                            <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                              <GitBranch size={10} aria-hidden />
+                              <span className="truncate">
+                                {t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}
+                              </span>
+                            </div>
+                          ) : null}
+                          <ul className="m-0 list-none p-0">
+                            {run.slots.map((slot) => (
+                              <WorktreeSlotRow
+                                key={slot.sessionId || slot.taskId || `${run.id}-${slot.index}`}
+                                run={run}
+                                slot={slot}
+                                activeSessionId={activeSessionId}
+                                activeView={activeView}
+                              />
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               )
             })}
@@ -455,6 +468,75 @@ export function AppSidebar() {
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>
+  )
+}
+
+function WorktreeSlotRow({
+  run,
+  slot,
+  activeSessionId,
+  activeView,
+}: {
+  run: ParallelRun
+  slot: ParallelSlot
+  activeSessionId: string | null
+  activeView: string
+}) {
+  const { t } = useTranslation()
+  const sessions = useSessions()
+  const session = slot.sessionId ? sessions.find((s) => s.id === slot.sessionId) : undefined
+  const active =
+    !!slot.sessionId &&
+    slot.sessionId === activeSessionId &&
+    (activeView === 'chat' || activeView === 'code')
+  const isWinner = !!slot.sessionId && run.selectedSessionId === slot.sessionId
+  const key = slot.sessionId || slot.taskId || `${run.id}-${slot.index}`
+  const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
+  const pathLabel = shortWorktreeLabel(slot.worktreePath, slot.branch)
+
+  return (
+    <li>
+      <button
+        type="button"
+        data-testid={`sidebar-parallel-slot-${key}`}
+        data-no-drag
+        aria-current={active ? 'true' : undefined}
+        onClick={() => {
+          if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
+          else if (run.hostSessionId) void selectSessionFromSidebar(run.hostSessionId)
+        }}
+        onDoubleClick={() => {
+          if (slot.sessionId) sessionService.selectParallelWinner(run.id, slot.sessionId)
+        }}
+        title={
+          isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint')
+        }
+        className={cn(
+          'mb-0.5 flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+          active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
+        )}
+      >
+        <GitBranch
+          size={12}
+          className={cn(
+            'mt-0.5 shrink-0',
+            slot.status === 'error' ? 'text-danger' : 'text-ink-tertiary',
+          )}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12px] font-medium text-ink">
+            {session?.title || slot.branch || `P${slot.index}`}
+          </span>
+          <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={slot.worktreePath}>
+            {pathLabel}
+            {slot.taskId ? ` · ${slot.taskId}` : ''}
+            {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
+          </span>
+        </span>
+      </button>
+    </li>
   )
 }
 
@@ -484,16 +566,14 @@ function NavItem({
         'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active
-          ? 'bg-state-active text-ink'
+          ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--border)]'
           : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
-      <span className={cn('shrink-0', active ? 'text-accent-strong' : 'opacity-85')}>{icon}</span>
+      <span className="shrink-0 opacity-80">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count != null ? (
-        <span className="text-[11px] font-normal text-ink-tertiary" aria-label={String(count)}>
-          {count}
-        </span>
+        <span className="shrink-0 tabular-nums text-[11px] text-ink-tertiary">{count}</span>
       ) : null}
     </button>
   )

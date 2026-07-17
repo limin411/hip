@@ -1017,6 +1017,10 @@ export const en = {
         winner: 'selected',
         slotHint: 'Click to open · double-click to mark as selected solution',
         agentSlotHint: 'Agent-driven slot — opens the host session; workers run in background',
+        expandWorktrees: 'Show worktrees',
+        collapseWorktrees: 'Hide worktrees',
+        worktreeTree: 'Worktrees for {{title}}',
+        slotCount: '{{count}} worktrees',
       },
     },
     dropdown: {

@@ -1012,6 +1012,10 @@ export const zhCN = {
         winner: '已选用',
         slotHint: '单击打开 · 双击标记为选用方案',
         agentSlotHint: '智能体并行槽位 — 打开宿主会话；worker 在后台运行',
+        expandWorktrees: '展开 worktree',
+        collapseWorktrees: '收起 worktree',
+        worktreeTree: '{{title}} 的 worktree',
+        slotCount: '{{count}} 个 worktree',
       },
     },
     dropdown: {

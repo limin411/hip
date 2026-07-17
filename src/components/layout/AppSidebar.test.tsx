@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
+import { useParallelStore } from '@/store/parallelStore'
 
 const enterKnowledge = vi.fn(async () => {})
 const openKnowledgeHome = vi.fn(async () => {})
@@ -79,7 +80,10 @@ describe('AppSidebar', () => {
     } as never)
   })
 
-  afterEach(() => cleanup())
+  afterEach(() => {
+    useParallelStore.setState({ runs: [] })
+    cleanup()
+  })
 
   it('renders search, nav, and chat sessions for chats section', () => {
     render(<AppSidebar />)
@@ -140,5 +144,55 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-session-chat-1'))
     expect(selectSessionFromSidebar).toHaveBeenCalledWith('chat-1')
+  })
+
+  it('shows expandable worktree tree under host project session', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useParallelStore.setState({
+      runs: [
+        {
+          id: 'run-abc',
+          baseCwd: '/tmp/repo',
+          prompt: 'parallel fix',
+          hostSessionId: 'code-1',
+          source: 'agent',
+          createdAt: Date.now(),
+          slots: [
+            {
+              index: 1,
+              sessionId: '',
+              taskId: 'pwt-1',
+              worktreePath: '/tmp/wt/run-abc/hip-p-1',
+              branch: 'hip-p-1',
+              status: 'ready',
+            },
+            {
+              index: 2,
+              sessionId: '',
+              taskId: 'pwt-2',
+              worktreePath: '/tmp/wt/run-abc/hip-p-2',
+              branch: 'hip-p-2',
+              status: 'ready',
+            },
+          ],
+        },
+      ],
+    })
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-expand-code-1')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(screen.getByTestId('sidebar-session-worktrees-code-1')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-wt-badge-code-1')).toHaveTextContent('2')
+    expect(screen.getByTestId('sidebar-parallel-slot-pwt-1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('sidebar-session-expand-code-1'))
+    expect(screen.getByTestId('sidebar-session-expand-code-1')).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
   })
 })

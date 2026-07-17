@@ -1012,6 +1012,10 @@ export const zhTW = {
         winner: '已選用',
         slotHint: '單擊開啟 · 雙擊標記為選用方案',
         agentSlotHint: '智能體並行槽位 — 開啟宿主工作階段；worker 在背景執行',
+        expandWorktrees: '展開 worktree',
+        collapseWorktrees: '收起 worktree',
+        worktreeTree: '{{title}} 的 worktree',
+        slotCount: '{{count}} 個 worktree',
       },
     },
     dropdown: {

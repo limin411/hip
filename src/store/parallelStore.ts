@@ -38,6 +38,8 @@ interface ParallelState {
   selectWinner: (runId: string, sessionId: string) => void
   removeRun: (id: string) => void
   findRunBySessionId: (sessionId: string) => ParallelRun | undefined
+  /** All parallel runs hosted by this session (agent-driven worktrees). */
+  runsForHost: (sessionId: string) => ParallelRun[]
   pruneMissingSessions: (existingIds: Set<string>) => void
 }
 
@@ -104,6 +106,10 @@ export const useParallelStore = create<ParallelState>()(
         )
       },
 
+      runsForHost: (sessionId) => {
+        return get().runs.filter((r) => r.hostSessionId === sessionId && r.slots.length > 0)
+      },
+
       pruneMissingSessions: (existingIds) => {
         set((st) => ({
           runs: st.runs
@@ -126,4 +132,23 @@ export const useParallelStore = create<ParallelState>()(
 export function clampParallelCount(n: number): number {
   if (!Number.isFinite(n)) return 2
   return Math.min(4, Math.max(2, Math.floor(n)))
+}
+
+/** Flatten slots for a host session (newest run first). */
+export function slotsForHost(
+  runs: ParallelRun[],
+  hostSessionId: string,
+): Array<ParallelSlot & { runId: string }> {
+  return runs
+    .filter((r) => r.hostSessionId === hostSessionId)
+    .flatMap((r) => r.slots.map((s) => ({ ...s, runId: r.id })))
+    .sort((a, b) => a.index - b.index || a.runId.localeCompare(b.runId))
+}
+
+/** Short label for worktree path (last 1–2 segments). */
+export function shortWorktreeLabel(worktreePath: string, branch: string): string {
+  if (!worktreePath) return branch || 'worktree'
+  const parts = worktreePath.split(/[/\\]/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`
+  return parts[parts.length - 1] || branch
 }

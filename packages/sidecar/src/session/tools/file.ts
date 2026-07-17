@@ -47,7 +47,10 @@ export function buildFileTools(
     {
       name: 'write_file',
       description:
-        'Create or overwrite a file. `path` is absolute relative to the project root (e.g. "/index.html"). Returns a confirmation.',
+        'Create or overwrite a file. `path` is absolute relative to the project root (e.g. "/index.html"). ' +
+        'Prefer edit_file for localized fixes (text overflow, box sizes, small sections). ' +
+        'Avoid a single write_file with multi-thousand-line content — large one-shot rewrites can stall; ' +
+        'for big changes, edit in sections with edit_file or write smaller chunks.',
       schema: z.object({ path: z.string(), content: z.string() }),
     },
   )
@@ -85,7 +88,9 @@ export function buildFileTools(
         'Read a text file. `path` is absolute relative to the project root, OR an absolute path to a ' +
         'bundled file inside a loaded skill dir (as disclosed by use_skill). ' +
         'Optional `offset` (1-based start line) and `limit` (max lines) for large files — use these ' +
-        'instead of re-reading the whole file when you only need a section.',
+        'instead of re-reading the whole file when you only need a section. ' +
+        'If output is truncated, re-read the missing ranges with offset/limit; do not rewrite the whole ' +
+        'file from a partial read — prefer edit_file for localized changes (e.g. SVG box/font tweaks).',
       schema: z.object({
         path: z.string(),
         offset: z
@@ -119,7 +124,10 @@ export function buildFileTools(
     },
     {
       name: 'edit_file',
-      description: 'Replace an exact substring in a file. Set replaceAll to replace every occurrence.',
+      description:
+        'Replace an exact substring in a file. Prefer this over write_file for localized fixes ' +
+        '(font sizes, box dimensions, labels, CSS/SVG attributes). Set replaceAll to replace every occurrence. ' +
+        'oldString must match exactly; include enough surrounding context to be unique.',
       schema: z.object({
         path: z.string(),
         oldString: z.string(),

@@ -5,7 +5,8 @@ import * as path from 'node:path'
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_MAX_LINES = 2000
-const DEFAULT_MAX_BYTES = 50 * 1024 // 50 KB
+/** Raised from 50KB so dense single-file assets (SVG/HTML) fit more often before head+tail. */
+const DEFAULT_MAX_BYTES = 100 * 1024 // 100 KB
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
 const CLEANUP_RETENTION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const FILE_PREFIX = 'tool_'
@@ -193,7 +194,10 @@ export class ToolOutputStore {
     const head = lines.slice(0, headCount).join('\n')
     const tailStart = Math.max(0, lineCount - tailCount)
     const tail = lines.slice(tailStart).join('\n')
-    const marker = `\n... output truncated; full content saved to ${filePath} ...\n`
+    const byteLength = Buffer.byteLength(lines.join('\n'), 'utf-8')
+    const marker =
+      `\n... output truncated (${lineCount} lines, ~${byteLength} bytes); full content saved to ${filePath}. ` +
+      `Re-read sections with read_file(path, offset, limit). Prefer edit_file for localized changes instead of rewriting the whole file. ...\n`
 
     const preview = head + marker + tail
     if (Buffer.byteLength(preview, 'utf-8') > this.maxBytes) {

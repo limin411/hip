@@ -87,9 +87,11 @@ describe('ToolOutputStore', () => {
     expect(previewLines[0]).toBe('line-0')
     expect(previewLines[999]).toBe('line-999')
 
-    // Marker line sits between head and tail.
+    // Marker line sits between head and tail; includes re-read / edit guidance.
     expect(r.output).toContain('output truncated')
     expect(r.output).toContain(r.outputPaths[0])
+    expect(r.output).toMatch(/offset.*limit|read_file/i)
+    expect(r.output).toMatch(/edit_file/i)
 
     // Tail: last 1000 lines of original preserved at the end.
     expect(previewLines[previewLines.length - 1000]).toBe('line-2000')
@@ -108,7 +110,7 @@ describe('ToolOutputStore', () => {
 
   it('outputPaths file is under the configured outputDir and prefixed tool_', async () => {
     const store = makeStore()
-    const output = 'x'.repeat(60 * 1024) // byte-threshold only
+    const output = 'x'.repeat(120 * 1024) // above default 100KB byte threshold
     const r = await store.bound({ sessionId: 's1', toolCallId: 't1', output })
     expect(r.outputPaths).toHaveLength(1)
     expect(r.outputPaths[0].startsWith(tmpDir)).toBe(true)
@@ -173,7 +175,7 @@ describe('ToolOutputStore', () => {
 
     expect(r.truncated).toBe(true)
     expect(r.outputPaths).toHaveLength(1)
-    expect(Buffer.byteLength(r.output, 'utf-8')).toBeLessThanOrEqual(50 * 1024)
+    expect(Buffer.byteLength(r.output, 'utf-8')).toBeLessThanOrEqual(100 * 1024)
 
     // The managed file MUST contain the full 10MB (not just a path promise).
     const fileContent = await fs.readFile(r.outputPaths[0], 'utf-8')

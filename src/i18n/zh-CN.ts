@@ -7,6 +7,18 @@ export const zhCN = {
       newChatDesc: '开始一段新的对话…',
       sendMessage: '发送一条消息开始对话',
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
+      parallel: {
+        action: '并行',
+        countLabel: '并行路数',
+        tooltip: '在 N 个隔离 git worktree 中运行此提示',
+        needCwd: '请先打开项目文件夹再并行运行',
+        started: '已启动 {{count}} 路并行',
+        failed: '并行运行失败',
+      },
+      diffAnnotations: {
+        chip: '将发送 {{count}} 条 diff 批注',
+        clear: '清除 diff 批注',
+      },
       slash: {
         listLabel: '命令',
         noMatch: '无匹配命令',
@@ -999,6 +1011,11 @@ export const zhCN = {
       emptySearch: '无匹配项',
       emptySessions: '暂无会话',
       emptySpaces: '暂无知识空间',
+      parallel: {
+        group: '并行 · {{id}}',
+        winner: '已选用',
+        slotHint: '单击打开 · 双击标记为选用方案',
+      },
     },
     dropdown: {
       newChat: '新建办公对话',
@@ -1244,6 +1261,9 @@ export const zhCN = {
       },
       diffHunk: {
         copy: '复制片段',
+        annotate: '批注给 Agent',
+        quoteToComposer: '引用到输入框',
+        needSession: '请先打开会话',
       },
       checkpoint: {
         copyId: '复制检查点 ID',
@@ -1260,6 +1280,7 @@ export const zhCN = {
         openFiles: '在文件中打开',
         copySelection: '复制',
         copySelectionDisabled: '没有可复制的选区',
+        sendSelectionToChat: '发送选区到对话',
         paste: '粘贴',
       },
       filePreview: {

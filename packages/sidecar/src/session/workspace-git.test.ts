@@ -4,7 +4,8 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, createWorktree, listWorktrees, removeWorktree, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { parseUnifiedDiff, collectWorkspaceDiff, collectWorkspaceDiffSummary, collectWorkspaceDiffFile, gitInit, captureSessionSnapshot, sanitizeRefComponent, isSafeBranchName, getCurrentBranch, listCheckpointRefs, deleteCheckpointRefs, captureCheckpoint, collectCommitLog, listBranches, switchBranch, createWorktree, listWorktrees, removeWorktree, gitCommit, gitCreateBranch, gitSwitchBranch, revertToCheckpoint, checkpointRefMeta, resolveManagedWorktreePath, MAX_DIFF_LINES_PER_FILE, MAX_DIFF_FILES } from './workspace-git.js'
+import { getWorktreesDir } from './worktree-config.js'
 
 const execFileP = promisify(execFile)
 const git = (cwd: string, ...args: string[]) => execFileP('git', args, { cwd })
@@ -565,6 +566,27 @@ describe('isSafeBranchName', () => {
     for (const n of ['', '-f', '-', '.', '..', 'a b', 'a\tb', 'a~b', 'a^b', 'a:b', 'feat;rm', '说明']) {
       expect(isSafeBranchName(n)).toBe(false)
     }
+  })
+})
+
+describe('resolveManagedWorktreePath', () => {
+  it('joins sanitized pathKey under managed worktrees dir', () => {
+    const p = resolveManagedWorktreePath('run-abc/slot-1', 'hip-p-x-1')
+    expect(p.startsWith(getWorktreesDir())).toBe(true)
+    expect(p).toContain('run-abc')
+    expect(p).toContain('slot-1')
+  })
+  it('falls back to branch when pathKey empty', () => {
+    const p = resolveManagedWorktreePath(undefined, 'feature')
+    expect(p).toBe(path.join(getWorktreesDir(), 'feature'))
+  })
+})
+
+describe('gitCreateBranch with startPoint', () => {
+  it('creates a branch from HEAD by default', async () => {
+    await fs.writeFile(path.join(root, 'a.txt'), 'one\n'); await makeRepo(root)
+    const r = await gitCreateBranch(root, 'from-head')
+    expect(r.ok).toBe(true)
   })
 })
 

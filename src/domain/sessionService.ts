@@ -813,6 +813,133 @@ export class SessionService {
     return id
   }
 
+  /**
+   * Parallel Studio: fan out one prompt across N isolated git worktrees + sessions.
+   * Uses a host session on `baseCwd` for git:worktree ops; agent turns run on slot sessions.
+   */
+  async startParallelRun(opts: {
+    prompt: string
+    baseCwd: string
+    count: number
+    permissionMode?: PermissionMode
+  }): Promise<{ runId: string; slotSessionIds: string[] }> {
+    const prompt = opts.prompt.trim()
+    if (!prompt) throw new Error('empty prompt')
+    const baseCwd = opts.baseCwd.trim()
+    if (!baseCwd) throw new Error('baseCwd required')
+    const { clampParallelCount, useParallelStore } = await import('@/store/parallelStore')
+    const { parallelHostTitle, parallelSlotTitle } = await import('@/lib/parallelFormat')
+    const n = clampParallelCount(opts.count)
+    const runId = nanoid(10)
+    const runShort = runId.slice(0, 6)
+
+    const hostConfig: SessionConfig = normalizeSessionConfig({
+      ...DEFAULT_CONFIG,
+      surface: 'code',
+      cwd: baseCwd,
+      permissionMode: opts.permissionMode ?? 'edit',
+      language: currentLanguage(),
+    })
+    const hostSessionId = this.createSession({
+      ...hostConfig,
+    })
+    this.renameSession(hostSessionId, parallelHostTitle(runShort))
+
+    useParallelStore.getState().addRun({
+      id: runId,
+      baseCwd,
+      prompt,
+      hostSessionId,
+      slots: [],
+      createdAt: Date.now(),
+    })
+
+    const slotSessionIds: string[] = []
+    for (let i = 1; i <= n; i++) {
+      const branch = `hip-p-${runShort}-${i}`
+      const pathKey = `${runId}/${branch}`
+      try {
+        const createP = this.waitForServerMessageWhere(
+          'git:worktree:create:result',
+          (m) => m.sessionId === hostSessionId,
+          60_000,
+        )
+        this.transport.send({
+          type: 'git:worktree:create',
+          sessionId: hostSessionId,
+          branch,
+          createBranch: true,
+          pathKey,
+        })
+        const created = await createP
+        if (!created.ok || !created.path) {
+          useParallelStore.getState().setSlot(runId, i, {
+            index: i,
+            sessionId: '',
+            worktreePath: '',
+            branch,
+            status: 'error',
+            error: created.error ?? 'worktree create failed',
+          })
+          continue
+        }
+
+        const slotConfig: SessionConfig = normalizeSessionConfig({
+          ...DEFAULT_CONFIG,
+          surface: 'code',
+          cwd: created.path,
+          permissionMode: opts.permissionMode ?? 'edit',
+          language: currentLanguage(),
+        })
+        const slotId = this.createSession(slotConfig)
+        this.renameSession(slotId, parallelSlotTitle(runShort, i, n))
+
+        useParallelStore.getState().setSlot(runId, i, {
+          index: i,
+          sessionId: slotId,
+          worktreePath: created.path,
+          branch,
+          status: 'ready',
+        })
+
+        const msgId = nanoid()
+        useDomainStore.getState().appendUserMessage(slotId, msgId, prompt, [])
+        this.transport.send({
+          type: 'message:send',
+          sessionId: slotId,
+          id: msgId,
+          content: prompt,
+          role: 'user',
+        })
+        slotSessionIds.push(slotId)
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err)
+        useParallelStore.getState().setSlot(runId, i, {
+          index: i,
+          sessionId: '',
+          worktreePath: '',
+          branch,
+          status: 'error',
+          error,
+        })
+      }
+    }
+
+    if (slotSessionIds.length > 0) {
+      this.selectSession(slotSessionIds[0]!)
+      useUiStore.getState().setSidebarSection('projects')
+    }
+    return { runId, slotSessionIds }
+  }
+
+  /** Mark a parallel slot as the winner and focus it. */
+  selectParallelWinner(runId: string, sessionId: string): void {
+    void import('@/store/parallelStore').then(({ useParallelStore }) => {
+      useParallelStore.getState().selectWinner(runId, sessionId)
+    })
+    this.selectSession(sessionId)
+  }
+
   selectSession(id: string, messageId?: string): void {
     useDomainStore.getState().selectSession(id)
     useUiStore.getState().setSelectedArtifactPath(null)

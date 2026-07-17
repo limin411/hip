@@ -533,10 +533,31 @@ export async function gitCommit(cwd: string, message: string, gitBin = 'git'): P
 
 /** Create a branch at HEAD without switching to it. Rejects unsafe names up front.
  *  Never throws → { ok:false, error }. */
-export async function gitCreateBranch(cwd: string, name: string, gitBin = 'git'): Promise<{ ok: boolean; error?: string }> {
+export async function gitCreateBranch(
+  cwd: string,
+  name: string,
+  gitBin = 'git',
+  startPoint?: string,
+): Promise<{ ok: boolean; error?: string }> {
   if (!isSafeBranchName(name)) return { ok: false, error: 'invalid branch name' }
-  try { await runGit(cwd, ['branch', name], gitBin); return { ok: true } }
-  catch (e) { return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) } }
+  if (startPoint != null && startPoint !== '' && !isSafeBranchName(startPoint) && !/^[A-Za-z0-9_./^-]+$/.test(startPoint)) {
+    return { ok: false, error: 'invalid start point' }
+  }
+  try {
+    const args = startPoint && startPoint !== '' ? ['branch', name, startPoint] : ['branch', name]
+    await runGit(cwd, args, gitBin)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 500) }
+  }
+}
+
+/** Build a managed worktree path under getWorktreesDir() from an optional pathKey. */
+export function resolveManagedWorktreePath(pathKey: string | undefined, branch: string): string {
+  const key = (pathKey && pathKey.trim()) || branch
+  const parts = key.split(/[/\\]+/).filter(Boolean).map((p) => sanitizeRefComponent(p))
+  if (parts.length === 0) parts.push(sanitizeRefComponent(branch))
+  return path.join(getWorktreesDir(), ...parts)
 }
 
 /** Switch to an existing branch (agent tool path). Thin alias over switchBranch (which guards the

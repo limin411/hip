@@ -87,7 +87,20 @@ export type ClientMessage =
   | { type: 'plugin:install:url'; url: string }
   | { type: 'plugin:install:github'; url: string }
   | { type: 'plugin:delete'; pluginId: string }
-  | { type: 'git:worktree:create'; sessionId: string; branch: string }
+  | {
+      type: 'git:worktree:create'
+      sessionId: string
+      branch: string
+      /** When true, create branch from baseRef (or HEAD) before worktree add. */
+      createBranch?: boolean
+      /** Start point for createBranch (ref/commit). Defaults to HEAD. */
+      baseRef?: string
+      /**
+       * Relative key under managed worktrees dir (e.g. `runId/branch`).
+       * Segments are sanitized; default is `branch`.
+       */
+      pathKey?: string
+    }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string }
   | { type: 'workflow:run'; sessionId: string; def: WorkflowDef; runInputs?: { text: string; data?: unknown } }

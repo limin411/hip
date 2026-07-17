@@ -7,6 +7,18 @@ export const zhTW = {
       newChatDesc: '開始一段新的對話…',
       sendMessage: '發送一條消息開始對話',
       inputPlaceholder: '給 hip 發消息…（Enter 發送，Shift+Enter 換行）',
+      parallel: {
+        action: '並行',
+        countLabel: '並行路數',
+        tooltip: '在 N 個隔離 git worktree 中執行此提示',
+        needCwd: '請先開啟專案資料夾再並行執行',
+        started: '已啟動 {{count}} 路並行',
+        failed: '並行執行失敗',
+      },
+      diffAnnotations: {
+        chip: '將傳送 {{count}} 條 diff 批註',
+        clear: '清除 diff 批註',
+      },
       slash: {
         listLabel: '命令',
         noMatch: '無匹配命令',
@@ -999,6 +1011,11 @@ export const zhTW = {
       emptySearch: '無符合項目',
       emptySessions: '尚無會話',
       emptySpaces: '尚無知識空間',
+      parallel: {
+        group: '並行 · {{id}}',
+        winner: '已選用',
+        slotHint: '單擊開啟 · 雙擊標記為選用方案',
+      },
     },
     dropdown: {
       newChat: '新增辦公對話',
@@ -1244,6 +1261,9 @@ export const zhTW = {
       },
       diffHunk: {
         copy: '複製片段',
+        annotate: '批註給 Agent',
+        quoteToComposer: '引用到輸入框',
+        needSession: '請先開啟工作階段',
       },
       checkpoint: {
         copyId: '複製檢查點 ID',
@@ -1260,6 +1280,7 @@ export const zhTW = {
         openFiles: '在檔案中開啟',
         copySelection: '複製',
         copySelectionDisabled: '沒有可複製的選區',
+        sendSelectionToChat: '傳送選區到對話',
         paste: '貼上',
       },
       filePreview: {

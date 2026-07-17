@@ -7,6 +7,18 @@ export const en = {
       newChatDesc: 'Start a new conversation…',
       sendMessage: 'Send a message to start the conversation',
       inputPlaceholder: 'Message hip… (Enter to send, Shift+Enter for newline)',
+      parallel: {
+        action: 'Parallel',
+        countLabel: 'Parallel slot count',
+        tooltip: 'Run this prompt in N isolated git worktrees',
+        needCwd: 'Open a project folder before parallel run',
+        started: 'Started {{count}} parallel slots',
+        failed: 'Parallel run failed',
+      },
+      diffAnnotations: {
+        chip: '{{count}} diff annotation(s) will be sent',
+        clear: 'Clear diff annotations',
+      },
       slash: {
         listLabel: 'Commands',
         noMatch: 'No matching commands',
@@ -1004,6 +1016,11 @@ export const en = {
       emptySearch: 'No matches',
       emptySessions: 'No sessions yet',
       emptySpaces: 'No spaces yet',
+      parallel: {
+        group: 'Parallel · {{id}}',
+        winner: 'selected',
+        slotHint: 'Click to open · double-click to mark as selected solution',
+      },
     },
     dropdown: {
       newChat: 'New Work Chat',
@@ -1253,6 +1270,9 @@ export const en = {
       },
       diffHunk: {
         copy: 'Copy hunk',
+        annotate: 'Annotate for agent',
+        quoteToComposer: 'Quote into composer',
+        needSession: 'Open a session first',
       },
       checkpoint: {
         copyId: 'Copy checkpoint ID',
@@ -1269,6 +1289,7 @@ export const en = {
         openFiles: 'Open in Files',
         copySelection: 'Copy',
         copySelectionDisabled: 'No selection to copy',
+        sendSelectionToChat: 'Send selection to chat',
         paste: 'Paste',
       },
       filePreview: {

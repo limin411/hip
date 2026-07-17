@@ -11,7 +11,9 @@ import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
+import { ParallelRunChip } from './ParallelRunChip'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { surfaceOf } from '@/lib/sessions'
 import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
@@ -156,12 +158,24 @@ export function InputBar() {
   const submit = () => {
     const text = value.trim()
     if (!text && attachments.length === 0) return
-    const content = quoteText ? `${formatQuoteForComposer(quoteText)}${text}` : text
+    const sessionKey = activeId ?? 'draft'
+    const ann = useDiffAnnotationStore.getState().list(sessionKey)
+    const annBlock = formatDiffAnnotationsForComposer(ann)
+    if (ann.length > 0 && activeId) {
+      useDiffAnnotationStore.getState().clear(activeId)
+    }
+    let content = text
+    if (annBlock) content = `${annBlock}${content}`
+    if (quoteText) content = `${formatQuoteForComposer(quoteText)}${content}`
     sessionService.sendMessage(content, attachments)
     setValue('')
     setAttachments([])
     setQuoteText(null)
   }
+
+  const annotationCount = useDiffAnnotationStore((s) =>
+    activeId ? (s.bySession[activeId]?.length ?? 0) : 0,
+  )
   return (
     <div className="shrink-0 px-5 pb-5" data-testid="input-bar">
       <div className="mx-auto max-w-3xl">
@@ -192,7 +206,21 @@ export function InputBar() {
                 reconnecting={reconnecting}
                 leftSlot={
                   isCode ? (
-                    <><ModelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><AttachmentButton onAttach={setAttachments} /></>
+                    <>
+                      <ModelPicker />
+                      <PermissionModePicker />
+                      <PlanModeChip />
+                      <ProjectGuidanceChip />
+                      <ParallelRunChip
+                        prompt={value}
+                        onStarted={() => {
+                          setValue('')
+                          setAttachments([])
+                          setQuoteText(null)
+                        }}
+                      />
+                      <AttachmentButton onAttach={setAttachments} />
+                    </>
                   ) : (
                     <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                   )
@@ -201,6 +229,10 @@ export function InputBar() {
               onAttachmentsChange={setAttachments}
               quoteText={quoteText}
               onQuoteClear={() => setQuoteText(null)}
+              annotationCount={annotationCount}
+              onAnnotationClear={() => {
+                if (activeId) useDiffAnnotationStore.getState().clear(activeId)
+              }}
             />
             {selectedSkill && (
               <SkillArgInput

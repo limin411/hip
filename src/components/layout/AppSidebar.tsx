@@ -1,13 +1,14 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Code2, MessageSquare, Search } from 'lucide-react'
-import { useActiveSessionId, useSessions } from '@/domain'
+import { BookOpen, Code2, GitBranch, MessageSquare, Search } from 'lucide-react'
+import { sessionService, useActiveSessionId, useSessions } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useParallelStore } from '@/store/parallelStore'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
@@ -32,16 +33,34 @@ export function AppSidebar() {
   const activeSessionId = useActiveSessionId()
   const spaces = useKnowledgeStore((s) => s.spaces)
   const activeSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const parallelRuns = useParallelStore((s) => s.runs)
   const isMac = isMacPlatform()
   const mod = isMac ? '⌘' : 'Ctrl+'
 
   const q = query.trim().toLowerCase()
+
+  const parallelSessionIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const run of parallelRuns) {
+      ids.add(run.hostSessionId)
+      for (const slot of run.slots) {
+        if (slot.sessionId) ids.add(slot.sessionId)
+      }
+    }
+    return ids
+  }, [parallelRuns])
 
   const filteredSessions = useMemo(() => {
     const surface = sidebarSection === 'projects' ? 'code' : 'chat'
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
     let list = sessions
       .filter((s) => surfaceOf(s.config) === surface)
+      // Host sessions are tooling-only; hide from the flat list (slots still show under Parallel).
+      .filter((s) => {
+        if (sidebarSection !== 'projects') return true
+        const run = parallelRuns.find((r) => r.hostSessionId === s.id)
+        return !run
+      })
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     if (q) {
       list = list.filter(
@@ -49,7 +68,21 @@ export function AppSidebar() {
       )
     }
     return list
-  }, [sessions, sidebarSection, q])
+  }, [sessions, sidebarSection, q, parallelRuns])
+
+  const visibleParallelRuns = useMemo(() => {
+    if (sidebarSection !== 'projects') return []
+    let list = parallelRuns.filter((r) => r.slots.some((s) => s.sessionId))
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.prompt.toLowerCase().includes(q) ||
+          r.id.toLowerCase().includes(q) ||
+          r.slots.some((s) => s.branch.toLowerCase().includes(q)),
+      )
+    }
+    return list
+  }, [parallelRuns, sidebarSection, q])
 
   const filteredSpaces = useMemo(() => {
     if (sidebarSection !== 'knowledge') return []
@@ -251,13 +284,77 @@ export function AppSidebar() {
               })}
             </ul>
           )
-        ) : filteredSessions.length === 0 ? (
+        ) : filteredSessions.length === 0 && visibleParallelRuns.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {q ? t('sidebar.emptySearch') : t('sidebar.emptySessions')}
           </p>
         ) : (
           <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
-            {filteredSessions.map((session) => {
+            {visibleParallelRuns.map((run) => (
+              <li key={run.id} className="mb-2" data-testid={`sidebar-parallel-${run.id}`}>
+                <div className="mb-0.5 flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">
+                  <GitBranch size={12} aria-hidden />
+                  <span className="truncate">{t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}</span>
+                </div>
+                <ul className="m-0 list-none p-0">
+                  {run.slots
+                    .filter((s) => s.sessionId)
+                    .map((slot) => {
+                      const session = sessions.find((s) => s.id === slot.sessionId)
+                      const active =
+                        slot.sessionId === activeSessionId &&
+                        (activeView === 'chat' || activeView === 'code')
+                      const isWinner = run.selectedSessionId === slot.sessionId
+                      return (
+                        <li key={slot.sessionId}>
+                          <button
+                            type="button"
+                            data-testid={`sidebar-parallel-slot-${slot.sessionId}`}
+                            data-no-drag
+                            aria-current={active ? 'true' : undefined}
+                            onClick={() => void selectSessionFromSidebar(slot.sessionId)}
+                            onDoubleClick={() =>
+                              sessionService.selectParallelWinner(run.id, slot.sessionId)
+                            }
+                            title={t('sidebar.parallel.slotHint')}
+                            className={cn(
+                              'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                              active
+                                ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
+                                : 'hover:bg-state-hover',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'mt-1.5 size-1.5 shrink-0 rounded-full',
+                                slot.status === 'error'
+                                  ? 'bg-danger'
+                                  : active
+                                    ? 'bg-accent'
+                                    : 'bg-success/60',
+                              )}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-body font-medium text-ink">
+                                {session?.title || `P${slot.index} · ${slot.branch}`}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[11px] text-ink-tertiary">
+                                {slot.branch}
+                                {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                </ul>
+              </li>
+            ))}
+            {filteredSessions
+              .filter((s) => !parallelSessionIds.has(s.id))
+              .map((session) => {
               const surface = surfaceOf(session.config)
               const active =
                 session.id === activeSessionId &&

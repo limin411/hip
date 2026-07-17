@@ -1,7 +1,5 @@
-import * as path from 'node:path'
 import type { ClientMessage } from '@hip/protocol'
 import * as workspaceGit from '../workspace-git.js'
-import { getWorktreesDir } from '../worktree-config.js'
 import type { SendFn, SessionManagerContext } from './types.js'
 
 export const WORKSPACE_MESSAGE_TYPES = new Set([
@@ -118,7 +116,18 @@ export async function handleWorkspaceMessage(
       const s = ctx.ensureSession(msg.sessionId, send)
       const cwd = s.config.cwd
       if (!cwd) { send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: 'no cwd' }); return }
-      const worktreePath = path.join(getWorktreesDir(), msg.branch)
+      if (msg.createBranch) {
+        const br = await workspaceGit.gitCreateBranch(cwd, msg.branch, 'git', msg.baseRef)
+        if (!br.ok) {
+          const err = (br.error ?? '').toLowerCase()
+          // Branch may already exist from a prior slot attempt — continue to worktree add.
+          if (!err.includes('already exists') && !err.includes('already exist')) {
+            send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: false, error: br.error ?? 'create branch failed' })
+            return
+          }
+        }
+      }
+      const worktreePath = workspaceGit.resolveManagedWorktreePath(msg.pathKey, msg.branch)
       const r = await workspaceGit.createWorktree(cwd, msg.branch, worktreePath)
       send({ type: 'git:worktree:create:result', sessionId: msg.sessionId, ok: r.ok, ...(r.path ? { path: r.path } : {}), ...(r.error ? { error: r.error } : {}) })
       return

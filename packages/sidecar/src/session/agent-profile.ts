@@ -39,6 +39,17 @@ const SUBAGENT_BASE_TOOLS: string[] = [
   'web_fetch',
 ]
 
+/** Read-only tools for explore (primary profile + managed dispatch agent). */
+export const EXPLORE_ALLOWED_TOOLS: string[] = [
+  'read_file',
+  'ls',
+  'glob',
+  'grep',
+  'use_skill',
+  'web_search',
+  'web_fetch',
+]
+
 export const ALL_BUILTIN_TOOLS: string[] = [
   'write_file',
   'read_file',
@@ -62,6 +73,10 @@ export const ALL_BUILTIN_TOOLS: string[] = [
   'run_script',
   'task',
   'dispatch_agent',
+  'task_batch',
+  'task_retry',
+  'task_stop',
+  'task_output',
   'goal_create',
   'goal_status',
   'goal_update',
@@ -101,15 +116,7 @@ export const BUILTIN_PROFILES: AgentProfile[] = [
     description:
       'Read-only profile for codebase exploration and research. Cannot write todos or modify anything.',
     mode: 'primary',
-    allowedTools: [
-      'read_file',
-      'ls',
-      'glob',
-      'grep',
-      'use_skill',
-      'web_search',
-      'web_fetch',
-    ],
+    allowedTools: [...EXPLORE_ALLOWED_TOOLS],
   },
   {
     // LEGACY: prefer `coder` / `explore` / `plan` for new delegation (Sprint C naming).

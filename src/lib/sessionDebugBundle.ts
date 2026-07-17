@@ -1,7 +1,7 @@
-import type { Message, SessionConfig } from '@hip/protocol'
+import type { Message, SessionConfig, TimelineStep } from '@hip/protocol'
 
 export type SessionDebugBundle = {
-  version: 1
+  version: 2
   exportedAt: string
   appVersion?: string
   session: {
@@ -10,6 +10,11 @@ export type SessionDebugBundle = {
     surface?: string
     cwd?: string
     config: Record<string, unknown>
+    /** Runtime knobs useful for parallel-scheduling / perf diagnosis. */
+    runtime?: {
+      subagentMaxConcurrency: number
+      toolParallelismDefault: number
+    }
   }
   messages: Array<{
     id: string
@@ -17,8 +22,10 @@ export type SessionDebugBundle = {
     content: string
     agentId?: string
     stopped?: boolean
+    timestamp?: number
     toolCalls?: unknown[]
     agentRuns?: unknown[]
+    timeline?: unknown[]
   }>
   recentErrors?: Array<{ code?: string; message: string; at?: number }>
 }
@@ -31,6 +38,14 @@ export const MAX_CONTENT = 12_000
  * retain usable code snippets; marker text distinguishes export vs runtime caps.
  */
 export const MAX_TOOL_FIELD = 16_384
+
+/** Default toolParallelism used by graph toolsNode when unset. */
+const DEFAULT_TOOL_PARALLELISM = 5
+/**
+ * Default HIP_SUBAGENT_MAX_CONCURRENCY (must match sidecar subagent-batch).
+ * Renderer cannot read sidecar process env; this is the product default for diagnosis.
+ */
+const DEFAULT_SUBAGENT_MAX_CONCURRENCY = 4
 
 function redactValue(key: string, value: unknown): unknown {
   if (SENSITIVE_KEY.test(key)) return '[redacted]'
@@ -89,6 +104,30 @@ function sanitizeToolCalls(toolCalls: unknown[] | undefined): unknown[] | undefi
   })
 }
 
+function sanitizeTimeline(steps: TimelineStep[] | undefined): unknown[] | undefined {
+  if (!steps?.length) return undefined
+  return steps.map((s) => {
+    if (s.kind === 'reasoning') {
+      const clipped = clipForExport(s.content ?? '', MAX_CONTENT)
+      return {
+        kind: 'reasoning',
+        stepSeq: s.stepSeq,
+        agentId: s.agentId,
+        role: s.role,
+        content: clipped.text,
+        ...(clipped.exportClipped ? { exportClipped: true } : {}),
+      }
+    }
+    return {
+      kind: 'tool',
+      stepSeq: s.stepSeq,
+      agentId: s.agentId,
+      role: s.role,
+      callId: s.callId,
+    }
+  })
+}
+
 export type BuildDebugBundleInput = {
   sessionId: string
   title: string
@@ -105,7 +144,7 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
   const surface = typeof cfg.surface === 'string' ? cfg.surface : undefined
   const cwd = typeof cfg.cwd === 'string' ? cfg.cwd : undefined
   return {
-    version: 1,
+    version: 2,
     exportedAt: (input.now ?? (() => new Date().toISOString()))(),
     ...(input.appVersion ? { appVersion: input.appVersion } : {}),
     session: {
@@ -114,6 +153,10 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
       ...(surface ? { surface } : {}),
       ...(cwd ? { cwd } : {}),
       config: cfg,
+      runtime: {
+        subagentMaxConcurrency: DEFAULT_SUBAGENT_MAX_CONCURRENCY,
+        toolParallelismDefault: DEFAULT_TOOL_PARALLELISM,
+      },
     },
     messages: input.messages.map((m) => ({
       id: m.id,
@@ -121,6 +164,7 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
       content: clipForExport(m.content ?? '', MAX_CONTENT).text,
       ...(m.agentId ? { agentId: m.agentId } : {}),
       ...(m.stopped ? { stopped: true } : {}),
+      ...(typeof m.timestamp === 'number' ? { timestamp: m.timestamp } : {}),
       ...(m.toolCalls?.length ? { toolCalls: sanitizeToolCalls(m.toolCalls) } : {}),
       ...(m.agentRuns?.length
         ? {
@@ -130,10 +174,15 @@ export function buildSessionDebugBundle(input: BuildDebugBundleInput): SessionDe
               output: clipForExport(r.output ?? '', MAX_CONTENT).text,
               startedAt: r.startedAt,
               finishedAt: r.finishedAt,
+              seq: r.seq,
+              ...(r.taskInput ? { taskInput: clipForExport(r.taskInput, MAX_CONTENT).text } : {}),
+              ...(r.parentAgentId ? { parentAgentId: r.parentAgentId } : {}),
+              ...(r.messageId ? { messageId: r.messageId } : {}),
               ...(r.usage ? { usage: r.usage } : {}),
             })),
           }
         : {}),
+      ...(m.timeline?.length ? { timeline: sanitizeTimeline(m.timeline) } : {}),
     })),
     ...(input.recentErrors?.length ? { recentErrors: input.recentErrors } : {}),
   }

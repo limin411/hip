@@ -149,6 +149,36 @@ describe('toolsNode parallel execution', () => {
     expect(write!.start).toBeGreaterThanOrEqual(Math.max(...reads.map((l) => l.end)) - 5)
   })
 
+  it('executes multiple dispatch_agent tools concurrently', async () => {
+    const log: ToolLog[] = []
+    const tools: StructuredToolInterface[] = [
+      delayTool('dispatch_agent', 100, log),
+      delayTool('dispatch_agent', 100, log),
+    ]
+    // Same tool name twice — LangChain tools list needs unique instances; both named dispatch_agent.
+    // ToolRunner matches by name; two identical names share one tool instance which is fine.
+    const runner = fakeRunner([
+      new AIMessage({
+        content: '',
+        tool_calls: [
+          { name: 'dispatch_agent', args: { agent: 'explore', task: 'a' }, id: 'd1' },
+          { name: 'dispatch_agent', args: { agent: 'explore', task: 'b' }, id: 'd2' },
+        ],
+      }),
+      new AIMessage('done'),
+    ])
+    const start = Date.now()
+    await buildGraph().invoke(
+      { messages: [new HumanMessage('parallel dispatch')], steps: 0 },
+      { configurable: { ctx: { sessionId: 'test-session', runner, tools, emit: noopEmit, summarizer: noopSummarizer } } },
+    )
+    expect(log.length).toBe(2)
+    const latestStart = Math.max(...log.map((l) => l.start - start))
+    const earliestEnd = Math.min(...log.map((l) => l.end - start))
+    expect(latestStart).toBeLessThan(earliestEnd)
+    expect(Date.now() - start).toBeLessThan(280)
+  })
+
   it('returns ToolMessages in original call order, not execution order', async () => {
     const log: ToolLog[] = []
     const tools: StructuredToolInterface[] = [

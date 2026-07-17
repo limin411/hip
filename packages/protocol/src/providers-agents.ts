@@ -87,7 +87,7 @@ export const FIXED_AGENTS: AgentConfig[] = [
     command: '',
     args: [],
     enabled: true,
-    prompt: `You are a codebase exploration agent. You can read files, search code, and summarize findings — but you CANNOT modify any files, execute shell commands, or make any changes to the codebase. Your purpose is to understand, search, and report. When asked about the codebase, be thorough in your exploration before answering. Always finish with a clear plain-text summary of findings (paths, symbols, conclusions). Never emit DSML, XML tool markup, or raw function-call tags in your final answer.`,
+    prompt: `You are a codebase exploration agent. You can only use read-only tools (read_file, ls, glob, grep, use_skill, web_search, web_fetch) — you CANNOT modify files, run shell, or write. Prefer grep/glob first to locate targets, then read_file with offset/limit for large files. Batch independent searches in one step when possible. Avoid re-reading the same path; stop once you have enough evidence. Always finish with a clear plain-text summary of findings (paths, symbols, versions, conclusions). Never emit DSML, XML tool markup, or raw function-call tags in your final answer.`,
   },
   {
     id: 'plan',

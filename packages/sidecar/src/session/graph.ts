@@ -5,7 +5,8 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { TurnUsage, PermissionMode, PlanItem } from '@hip/protocol'
 import type { ModelRunner } from './model-runner.js'
 import { MAX_STEPS } from './loop-control.js'
-import { READ_TOOLS, defaultToolPolicy } from './tool-runner/tool-policy.js'
+import { READ_TOOLS, DELEGATE_TOOLS, defaultToolPolicy } from './tool-runner/tool-policy.js'
+import { resolveMaxConcurrency } from './subagent-batch.js'
 import type { ToolPolicy } from './tool-runner/tool-policy.js'
 import type { ApprovalCache } from './tool-runner/approval-cache.js'
 import { SessionApprovalCache } from './tool-runner/approval-cache.js'
@@ -538,11 +539,18 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
     calls.push(...allowedCalls)
 
     const parallelism = ctx.toolParallelism ?? 5
+    const delegateParallelism = resolveMaxConcurrency()
     const parallelIndices: number[] = []
+    const delegateIndices: number[] = []
     const sequentialIndices: number[] = []
     for (let i = 0; i < calls.length; i++) {
-      if (READ_TOOLS.has(calls[i].name)) {
+      const name = calls[i].name
+      if (READ_TOOLS.has(name)) {
         parallelIndices.push(i)
+      } else if (DELEGATE_TOOLS.has(name)) {
+        // Multiple task/dispatch_agent/task_batch in one model step run concurrently
+        // (capped by HIP_SUBAGENT_MAX_CONCURRENCY). task_batch is itself parallel internally.
+        delegateIndices.push(i)
       } else {
         sequentialIndices.push(i)
       }
@@ -561,7 +569,9 @@ export function buildGraph(maxSteps: number = MAX_STEPS, compactBudget: number =
       })
     }
 
+    // Reads first (cheap, feed context), then parallel delegates, then writes/scripts serial.
     await runWithConcurrency(parallelIndices, parallelism, runOne)
+    await runWithConcurrency(delegateIndices, delegateParallelism, runOne)
 
     for (const index of sequentialIndices) {
       await runOne(index)

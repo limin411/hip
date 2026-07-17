@@ -43,10 +43,12 @@ describe('sessionDebugBundle', () => {
       ],
       now: () => '2026-07-10T00:00:00.000Z',
     })
-    expect(bundle.version).toBe(1)
+    expect(bundle.version).toBe(2)
     expect(bundle.exportedAt).toBe('2026-07-10T00:00:00.000Z')
     expect(bundle.session.config.apiKey).toBeUndefined()
     expect(bundle.session.surface).toBe('code')
+    expect(bundle.session.runtime?.subagentMaxConcurrency).toBeGreaterThanOrEqual(1)
+    expect(bundle.session.runtime?.toolParallelismDefault).toBe(5)
     expect(bundle.messages[1]!.content).toContain('export clipped')
     expect(bundle.messages[1]!.content).toContain('not a runtime tool cap')
     expect(bundle.messages[1]!.stopped).toBe(true)
@@ -55,7 +57,45 @@ describe('sessionDebugBundle', () => {
       title: 'T',
       messages: [],
       now: () => 't',
-    })).toContain('"version": 1')
+    })).toContain('"version": 2')
+  })
+
+  it('preserves agentRun taskInput/parentAgentId/seq and timeline', () => {
+    const bundle = buildSessionDebugBundle({
+      sessionId: 's1',
+      title: 'T',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'ok',
+          timestamp: 99,
+          agentRuns: [
+            {
+              agentId: 'subagent-1',
+              role: 'subagent',
+              output: 'report',
+              startedAt: 1,
+              finishedAt: 2,
+              seq: 3,
+              taskInput: 'check poms',
+              parentAgentId: 'supervisor',
+              messageId: 'm1',
+            },
+          ],
+          timeline: [
+            { kind: 'tool', stepSeq: 1, agentId: 'subagent-1', role: 'subagent', callId: 'c1' },
+          ],
+        },
+      ],
+      now: () => 't',
+    })
+    const run = (bundle.messages[0]!.agentRuns as Array<Record<string, unknown>>)[0]!
+    expect(run.taskInput).toBe('check poms')
+    expect(run.parentAgentId).toBe('supervisor')
+    expect(run.seq).toBe(3)
+    expect(bundle.messages[0]!.timestamp).toBe(99)
+    expect(bundle.messages[0]!.timeline).toHaveLength(1)
   })
 
   it('marks tool fields with exportClipped and preserves runtime truncated', () => {

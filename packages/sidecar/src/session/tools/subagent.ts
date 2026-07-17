@@ -2,8 +2,7 @@ import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { DispatchSpec } from './helpers.js'
-import { SubagentBatch } from '../subagent-batch.js'
-import type { RunSubagentFn } from '../orchestrator-adapter.js'
+import { SubagentBatch, type BatchRunSubagentFn } from '../subagent-batch.js'
 import { isSubagentPausedText, isUselessSubagentText } from '../subagent-result.js'
 
 export interface SubagentTools {
@@ -38,10 +37,9 @@ export function buildSubagentTools(
     {
       name: 'task',
       description:
-        'Delegate a focused, self-contained sub-task to a fresh sub-agent that runs its own loop ' +
-        'with the file tools and returns a text result. Use to isolate research or a chunk of work. ' +
-        'The sub-agent cannot itself delegate. Set mode to "background" to run the sub-agent ' +
-        'without blocking the current turn (max 10 concurrent background tasks). ' +
+        'Delegate ONE focused sub-task to a generic sub-agent (blocking unless mode is background). ' +
+        'Foreground mode waits for the full result. Prefer task_batch when you have 2+ independent sub-tasks. ' +
+        'Set mode to "background" only for fire-and-forget (max 10 concurrent); use task_output/task_stop to follow up. ' +
         'Do not use for simple single-step requests (greetings, list one directory, read one file).',
       schema: z.object({
         description: z.string(),
@@ -123,8 +121,10 @@ export function buildSubagentTools(
     {
       name: 'dispatch_agent',
       description:
-        'Delegate a focused, self-contained task to a specialized sub-agent and return its result. ' +
-        'Pick the agent best matched to the task. Available agents:\n' +
+        'Delegate ONE focused task to a specialized sub-agent and wait for its result (blocking). ' +
+        'For 2+ independent specialized tasks, prefer task_batch with per-task agent instead of multiple ' +
+        'dispatch_agent calls. Emitting several dispatch_agent calls in the same tool-call batch may run ' +
+        'them in parallel; sequential turns are always serial. Available agents:\n' +
         roster,
       schema: z.object({
         agent: z.enum(ids).describe('id of the sub-agent to delegate to'),
@@ -141,24 +141,45 @@ export function buildSubagentTools(
  * Build the task_batch tool that dispatches multiple subagent tasks in parallel.
  * Returns an empty array when spawnSubagent is not provided (same guard as task/dispatchAgent).
  *
+ * When `dispatch` is provided, each task may set optional `agent` to a roster id (e.g. explore);
+ * those run via dispatch.run. Tasks without agent use generic spawnSubagent workers.
+ *
  * Each task line is `[id] ${text}`. Pause detection accepts that prefix on the first line
  * (`isSubagentPausedText`), so a single-task (or first-task) pause remains detectable on the
  * aggregate ToolMessage. Multi-task pause on a non-first segment still needs per-segment scan (B4).
  */
 export function buildTaskBatchTools(
   spawnSubagent?: (description: string, mode?: 'foreground' | 'background', taskId?: string, signal?: AbortSignal) => Promise<string>,
+  dispatch?: DispatchSpec,
 ): StructuredToolInterface[] {
   if (!spawnSubagent) return []
 
+  const rosterIds = new Set((dispatch?.agents ?? []).map((a) => a.id))
+  const rosterHint =
+    rosterIds.size > 0
+      ? ` Optional per-task agent (one of: ${[...rosterIds].join(', ')}) routes to that specialized agent; ` +
+        'omit agent for a generic worker. Prefer explore for parallel read-only research.'
+      : ' Tasks use generic workers (no specialized roster).'
+
   const taskBatch = tool(
     async ({ tasks: batchTasks }) => {
-      const runner: RunSubagentFn = async (input: string, signal: AbortSignal) => spawnSubagent(input, undefined, undefined, signal)
+      const runner: BatchRunSubagentFn = async (task, signal) => {
+        const agent = task.agent?.trim()
+        if (agent && dispatch) {
+          if (!rosterIds.has(agent)) {
+            throw new Error(`unknown or disabled agent "${agent}" for task_batch`)
+          }
+          return dispatch.run(agent, task.prompt, signal)
+        }
+        return spawnSubagent(task.prompt, undefined, undefined, signal)
+      }
       const batch = new SubagentBatch(runner)
       const results = await batch.run(
         batchTasks.map((t, i) => ({
           id: String(i),
           prompt: t.prompt,
           description: t.description,
+          ...(t.agent ? { agent: t.agent } : {}),
         })),
       )
       return results
@@ -173,14 +194,23 @@ export function buildTaskBatchTools(
     {
       name: 'task_batch',
       description:
-        'Dispatch multiple subagent tasks in parallel and collect all results. ' +
-        'Each task runs independently — one task failing does not abort the others. ' +
-        'Returns results grouped by task index prefixed with [<index>].',
+        'PREFERRED for 2+ independent sub-tasks: dispatch them in parallel and collect all results. ' +
+        'Runs up to HIP_SUBAGENT_MAX_CONCURRENCY concurrent workers (default 4). ' +
+        'Each task runs independently — one failing does not abort the others. ' +
+        'Returns results grouped by task index prefixed with [<index>].' +
+        rosterHint +
+        ' For concurrent write/edit work on the same tree prefer parallel_worktrees or serial tasks.',
       schema: z.object({
         tasks: z.array(
           z.object({
-            description: z.string(),
-            prompt: z.string(),
+            description: z.string().describe('short label for the sub-task'),
+            prompt: z.string().describe('full self-contained instruction for the sub-agent'),
+            agent: z
+              .string()
+              .optional()
+              .describe(
+                'optional specialized agent id (e.g. explore, plan, coder) when a roster is available',
+              ),
           }),
         ),
       }),

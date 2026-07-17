@@ -1,5 +1,3 @@
-import type { RunSubagentFn } from './orchestrator-adapter.js'
-
 /** A single task to dispatch to a subagent. */
 export interface QueuedSubagentTask {
   /** Unique identifier for correlating results. */
@@ -10,7 +8,12 @@ export interface QueuedSubagentTask {
   description: string
   /** Optional per-task abort signal. When aborted the runner promise rejects. */
   signal?: AbortSignal
+  /** Optional specialized agent id (explore/plan/coder/…) for dispatch routing. */
+  agent?: string
 }
+
+/** Runner for one queued batch task (receives full task so agent routing is possible). */
+export type BatchRunSubagentFn = (task: QueuedSubagentTask, signal: AbortSignal) => Promise<string>
 
 /** Result from a single subagent dispatch. */
 export interface SubagentResult {
@@ -32,12 +35,12 @@ function isRateLimitError(err: unknown): boolean {
 /**
  * Resolve the max-concurrency cap for parallel subagent dispatch.
  *
- * Reads `HIP_SUBAGENT_MAX_CONCURRENCY` env var (default 3, clamped to 1–10).
+ * Reads `HIP_SUBAGENT_MAX_CONCURRENCY` env var (default 4, clamped to 1–10).
  * Non-numeric or out-of-range values are clamped to the nearest bound.
  */
 export function resolveMaxConcurrency(): number {
   const raw = process.env.HIP_SUBAGENT_MAX_CONCURRENCY
-  if (raw === undefined) return 3
+  if (raw === undefined) return 4
   const n = Number(raw)
   if (!Number.isFinite(n) || n < 1) return 1
   if (n > 10) return 10
@@ -54,11 +57,11 @@ export function resolveMaxConcurrency(): number {
  * - Per-task `AbortSignal` is forwarded to the runner.
  */
 export class SubagentBatch {
-  private readonly runSubagent: RunSubagentFn
+  private readonly runSubagent: BatchRunSubagentFn
   private readonly maxConcurrency: number
 
   constructor(
-    runSubagent: RunSubagentFn,
+    runSubagent: BatchRunSubagentFn,
     opts?: { maxConcurrency?: number },
   ) {
     this.runSubagent = runSubagent
@@ -82,7 +85,7 @@ export class SubagentBatch {
         chunk.map(async (task) => {
           const signal = task.signal ?? new AbortController().signal
           try {
-            const text = await this.runSubagent(task.prompt, signal)
+            const text = await this.runSubagent(task, signal)
             results.set(task.id, { id: task.id, text })
           } catch (err) {
             if (isRateLimitError(err)) {

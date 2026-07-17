@@ -50,4 +50,29 @@ describe('profile-based tool filtering', () => {
     expect(names).toContain('write_file')
     expect(names).toContain('edit_file')
   })
+
+  it('supervisor profile keeps task_batch when spawnSubagent is provided', () => {
+    const mgr = new AgentProfileManager()
+    mgr.setActiveProfile('supervisor')
+    const profile = mgr.getActiveProfile()
+    const spawn = async () => 'ok'
+    const tools = buildTools(
+      '/tmp',
+      spawn,
+      '/tmp',
+      {
+        agents: [{ id: 'explore', name: 'Explore' }],
+        run: async () => 'ok',
+      },
+      {
+        permissionMode: 'edit',
+        allowedTools: profile.allowedTools,
+        blockedTools: profile.blockedTools,
+      },
+    )
+    const names = tools.map((t) => t.name)
+    expect(names).toContain('task')
+    expect(names).toContain('task_batch')
+    expect(names).toContain('dispatch_agent')
+  })
 })

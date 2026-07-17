@@ -1,5 +1,5 @@
 /** Resume / regenerate / plan / subagent continuation (Phase 3b). */
-import type { AgentConfig, ContentPart, Attachment, PermissionMode } from '@hip/protocol'
+import type { AgentConfig, AgentRole, ContentPart, Attachment, PermissionMode } from '@hip/protocol'
 import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { GraphEmit } from './graph.js'
 import { persistApprovedPlan } from './plan-persistence.js'
@@ -13,6 +13,7 @@ import { isRichContentParts } from './session-message-codec.js'
 import { isImageAttachment, logNonCritical } from './session-helpers.js'
 import { safeErrorMessage } from './error.js'
 import { loadSubagentMessages } from './session-background.js'
+import { clipForTool, stringify } from './tool-trace.js'
 import {
   type SessionTurnHost,
   type SendFn,
@@ -304,8 +305,12 @@ export async function resumeSubagent(host: SessionTurnHost, taskId: string, cont
   const emit: GraphEmit = {
     token: (delta) => { if (delta) { output += delta; send({ type: 'token:stream', sessionId: host.id, turnId, agentId: taskId, delta }) } },
     reasoning: () => {},
-    toolStarted: (name, callId, input) => { const inClip = clip(stringify(input)); send({ type: 'tool:started', sessionId: host.id, turnId, agentId: taskId, role, callId, name, input: inClip.text, seq: 0, ...(inClip.truncated ? { truncated: true } : {}) }) },
-    toolFinished: (callId, status, resOutput, error) => { const outClip = resOutput !== undefined ? clip(stringify(resOutput)) : undefined; send({ type: 'tool:finished', sessionId: host.id, turnId, agentId: taskId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }) },
+    toolStarted: (name, callId, input) => { const inClip = clipForTool(name, stringify(input)); send({ type: 'tool:started', sessionId: host.id, turnId, agentId: taskId, role, callId, name, input: inClip.text, seq: 0, ...(inClip.truncated ? { truncated: true } : {}) }) },
+    toolFinished: (callId, status, resOutput, error) => {
+      // resume path has no trajectory map; default to standard cap unless name was tracked
+      const outClip = resOutput !== undefined ? clipForTool('', stringify(resOutput)) : undefined
+      send({ type: 'tool:finished', sessionId: host.id, turnId, agentId: taskId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
+    },
     usage: () => {},
     planDelta: () => {},
     compaction: () => {},

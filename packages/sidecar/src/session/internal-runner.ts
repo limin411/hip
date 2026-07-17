@@ -56,27 +56,41 @@ export interface RunManagedAgentArgs {
   nodeId?: string
   agentId?: string
   parentAgentId?: string
+  /**
+   * Optional built-in tool allow-list for this managed run (e.g. explore read-only).
+   * When set, `buildTools` filters to these names (+ MCP still allowed via name prefix).
+   */
+  allowedTools?: string[]
 }
 
 /**
+/**
  * Run an internal managed agent: hip's built-in ReAct loop with a custom persona prompt and a model of
- * the agent's choosing (or the global active model). Depth-1 (no task/dispatch). ALL built-in tools are
- * always granted (+ run_script when requestApproval is present, + use_skill when skills are present);
- * the per-agent narrowing already happened on the inputs (skills/mcpTools) at the caller. The permission
- * mode controls write/edit registration and the filesystem jail (see buildTools). Streams every event
- * through `emit` and returns the final assistant text.
+ * the agent's choosing (or the global active model). Depth-1 (no task/dispatch). Built-in tools are
+ * granted unless `allowedTools` is set (e.g. explore read-only). Skills/MCP are pre-narrowed by the
+ * caller. The permission mode controls write/edit registration and the filesystem jail (see buildTools).
+ * Streams every event through `emit` and returns the final assistant text.
  */
 export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string> {
   const {
     resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps,
     mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer,
-    hooks, turnId, runId, nodeId, agentId, parentAgentId,
+    hooks, turnId, runId, nodeId, agentId, parentAgentId, allowedTools,
   } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
-  // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1). No allow-list
-  // narrowing: built-ins are always on; skills/mcp were pre-filtered by the caller; mode gates write/edit.
-  const tools = buildTools(cwd, undefined, cwd, undefined, { mcpTools, skills, requestApproval, permissionMode, webSearchEnabled: true, sessionId: args.sessionId, networkPolicy })
+  // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1).
+  // Optional allowedTools gates built-ins (explore); skills/mcp were pre-filtered by the caller.
+  const tools = buildTools(cwd, undefined, cwd, undefined, {
+    mcpTools,
+    skills,
+    requestApproval,
+    permissionMode,
+    webSearchEnabled: true,
+    sessionId: args.sessionId,
+    networkPolicy,
+    ...(allowedTools?.length ? { allowedTools } : {}),
+  })
   const toolNames = tools.map((t) => t.name)
   // Inherit doom strategy from effective hip.toml (same as parent turn path).
   const doomLoopStrategy = resolveDoomLoopStrategy(

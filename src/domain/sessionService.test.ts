@@ -649,7 +649,7 @@ describe('workspace diff', () => {
     expect(sess.error).toMatchObject({ code: 'AGENT_ERROR', message: 'boom' })
     const json = svc.getSessionDebugBundleJson()
     expect(json).toBeTruthy()
-    expect(json).toContain('"version": 1')
+    expect(json).toContain('"version": 2')
     expect(json).not.toContain('sk-secret')
     expect(json).toContain('AGENT_ERROR')
   })

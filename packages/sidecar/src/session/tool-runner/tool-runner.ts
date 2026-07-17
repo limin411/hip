@@ -7,6 +7,7 @@ import type { HookResult } from '@hip/protocol'
 import type { ApprovalFn, ApprovalDecision } from '../tools.js'
 import type { ApprovalCache } from './approval-cache.js'
 import type { ToolPolicy } from './tool-policy.js'
+import { DELEGATE_TOOLS } from './tool-policy.js'
 import { ToolOutputStore } from '../tool-output-store.js'
 import { GuardianReviewer, FAIL_OPEN_REVIEW } from '../guardian.js'
 import { safeErrorMessage } from '../error.js'
@@ -270,13 +271,16 @@ export class ToolRunner {
           call.callbacks !== undefined ? { callbacks: call.callbacks } : undefined,
         ),
       )
-      const bound = this.deps.toolOutputStore
-        ? await this.deps.toolOutputStore.bound({
-            sessionId,
-            toolCallId: call.callId,
-            output: rawResult,
-          })
-        : undefined
+      // Delegate tool results are the parent model's research source of truth — do not
+      // head/tail-bound them through ToolOutputStore (file tools still get the dual cap).
+      const bound =
+        this.deps.toolOutputStore && !DELEGATE_TOOLS.has(call.name)
+          ? await this.deps.toolOutputStore.bound({
+              sessionId,
+              toolCallId: call.callId,
+              output: rawResult,
+            })
+          : undefined
       const result = bound?.output ?? rawResult
       this.emitFinished(call.callId, 'finished', result)
 

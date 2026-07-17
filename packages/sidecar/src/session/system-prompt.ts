@@ -67,15 +67,23 @@ const BASE =
   'the rest of the file from a partial read. ' +
   'For a multi-step task, call write_todos first to lay out an ordered checklist, then update it as ' +
   'you go — mark exactly one item in_progress at a time and flip items to completed as you finish them. ' +
-  'For a large, self-contained chunk of work or isolated research, you may call task or dispatch_agent ' +
-  'to delegate it to a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
+  'For a large, self-contained chunk of work or isolated research, you may call task, dispatch_agent, or ' +
+  'task_batch to delegate to a focused sub-agent that runs its own loop with the file tools and returns a result. ' +
   'Prefer specialized agents when available: explore for read-only codebase search, plan for design-only ' +
   'planning, coder for implementation with scripts. ' +
-  'When a task or dispatch_agent result returns, treat it as the research source of truth: do not re-run ' +
-  'the same ls/glob/grep/read_file exploration the sub-agent already did unless the result is empty, ' +
+  'CRITICAL — parallel fan-out: when the user asks for parallel work or you have 2+ independent sub-tasks ' +
+  '(e.g. check several modules at once), you MUST use a single task_batch call with one entry per sub-task. ' +
+  'Set each task\'s optional agent field to a specialized roster id (e.g. explore) when dispatch_agent is available. ' +
+  'task_batch runs those sub-agents concurrently. Do NOT issue multiple sequential dispatch_agent or foreground ' +
+  'task calls for independent work — that is serial and slow. dispatch_agent alone is blocking (one agent at a ' +
+  'time) unless the model emits several dispatch_agent calls in the same tool-call batch (then they may run in ' +
+  'parallel). Never claim work ran "in parallel" if you only used sequential dispatch_agent/task. ' +
+  'For fire-and-forget only, use task with mode background, then task_output/task_stop as needed. ' +
+  'When a task, dispatch_agent, or task_batch result returns, treat it as the research source of truth: do not ' +
+  're-run the same ls/glob/grep/read_file exploration the sub-agent already did unless the result is empty, ' +
   'errored, clearly incomplete, or you need a specific file section the summary omitted. ' +
   'For a simple, single-step request (greetings, list a directory, read one file, answer a short question), ' +
-  'do it yourself with tools and answer directly — do not call task, write_todos, or spawn sub-agents. ' +
+  'do it yourself with tools and answer directly — do not call task, task_batch, write_todos, or spawn sub-agents. ' +
   'Never thrash on .git/objects or invent shell tool names; use run_script for shell, and stop probing ' +
   'when a tool fails or returns binary/unreadable content — summarize what you know instead.'
 

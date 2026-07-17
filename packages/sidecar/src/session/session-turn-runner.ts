@@ -22,7 +22,7 @@ import type {
 import { FIXED_AGENTS } from '@hip/protocol'
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseLanguageModel } from '@langchain/core/language_models/base'
-import { clip, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
+import { clipForTool, stringify, trajectoryToRuns, trajectoryToTimeline, ReasoningTracker, type TraceRun, type TraceRecorder } from './tool-trace.js'
 import { IdleWatchdog, idleTimeoutMessage } from './idle-watchdog.js'
 import { getActiveModel, isOpenAICompatible } from '../config/providers.js'
 import { isMultimodalModel } from '../config/catalog.js'
@@ -469,12 +469,15 @@ export async function runManagedAgentTurn(host: SessionTurnHost, input: SessionI
       // tool steps share a single turn-global ordering (mirrors runTurn).
       closeReasoningBurst()
       const seq = stepSeq++
-      const inClip = clip(typeof input === 'string' ? input : JSON.stringify(input))
+      const inClip = clipForTool(name, typeof input === 'string' ? input : JSON.stringify(input))
       recorder.start(agent.id, callId, name, inClip.text, seq, inClip.truncated)
       _send({ type: 'tool:started', sessionId: host.id, turnId, agentId: agent.id, role: 'subagent', callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
     },
     toolFinished: (callId, status, output, error) => {
-      const outClip = output !== undefined ? clip(typeof output === 'string' ? output : JSON.stringify(output)) : undefined
+      const toolName = trajectory.get(agent.id)?.toolCalls.get(callId)?.name ?? ''
+      const outClip = output !== undefined
+        ? clipForTool(toolName, typeof output === 'string' ? output : JSON.stringify(output))
+        : undefined
       recorder.finish(agent.id, callId, status, outClip?.text, error, outClip?.truncated ?? false)
       _send({ type: 'tool:finished', sessionId: host.id, turnId, agentId: agent.id, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) })
     },
@@ -764,8 +767,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
   const makeEmit = (agentId: string, role: AgentRole): GraphEmit => ({
     token: (delta) => { if (!delta) return; logToken(); if (agentId === 'supervisor') supervisorText += delta; const r = trajectory.get(agentId); if (r) r.output += delta; send({ type: 'token:stream', sessionId: host.id, turnId, agentId, delta }) },
     reasoning: (delta) => reasoningDelta(agentId, role, delta),
-    toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clip(stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: host.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); host.emit({ type: 'tool_called', sessionId: host.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }); host.checkSteerPromotion() },
-    toolFinished: (callId, status, output, error) => { const outClip = output !== undefined ? clip(stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: host.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { host.emit({ type: 'tool_success', sessionId: host.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { host.emit({ type: 'tool_failed', sessionId: host.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; host.checkSteerPromotion() },
+    toolStarted: (name, callId, input) => { closeReasoning(agentId); const seq = nextSeq(); const inClip = clipForTool(name, stringify(input)); recorder.start(agentId, callId, name, inClip.text, seq, inClip.truncated); send({ type: 'tool:started', sessionId: host.id, turnId, agentId, role, callId, name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); host.emit({ type: 'tool_called', sessionId: host.id, callId, name, input: inClip.text, timestamp: Date.now() }, { stepId }); host.checkSteerPromotion() },
+    toolFinished: (callId, status, output, error) => { const toolName = trajectory.get(agentId)?.toolCalls.get(callId)?.name ?? ''; const outClip = output !== undefined ? clipForTool(toolName, stringify(output)) : undefined; recorder.finish(agentId, callId, status, outClip?.text, error, outClip?.truncated ?? false); send({ type: 'tool:finished', sessionId: host.id, turnId, agentId, callId, status, ...(outClip ? { output: outClip.text } : {}), ...(error ? { error } : {}), ...(outClip?.truncated ? { truncated: true } : {}) }); const stepId = host.activeSteps.get(agentId) ?? (agentId === 'supervisor' ? turnId : agentId); if (status === 'finished') { host.emit({ type: 'tool_success', sessionId: host.id, callId, output: outClip?.text ?? '', timestamp: Date.now() }, { stepId }) } else { host.emit({ type: 'tool_failed', sessionId: host.id, callId, error: error ?? '', timestamp: Date.now() }, { stepId }) }; host.checkSteerPromotion() },
     usage: (u) => { usageByAgent.set(agentId, addUsage(usageByAgent.get(agentId), u)) },
     planDelta: (itemId, delta) => { send({ type: 'plan:delta', sessionId: host.id, turnId, itemId, delta }) },
     planUpdated: (plan) => { send({ type: 'plan:updated', sessionId: host.id, turnId, plan }) },

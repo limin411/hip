@@ -30,7 +30,7 @@ switches off the default ReAct loop; session `orchMode` is ignored for routing
 
 | Entry | When | Behavior |
 |-------|------|----------|
-| **Default ReAct + task/dispatch** | Ordinary `message:send` (no pending workflow) | Supervisor ReAct graph (`buildGraph`). Agent-driven isolation via `task` / `dispatch_agent`; parallel sub-tasks via `task_batch`. |
+| **Default ReAct + task/dispatch** | Ordinary `message:send` (no pending workflow) | Supervisor ReAct graph (`buildGraph`). Agent-driven isolation via `task` / `dispatch_agent`; **true parallel** multi-part research via one `task_batch` (optional per-task `agent`, default concurrency 4). Prefer `task_batch` over sequential `dispatch_agent`. |
 | **Explicit DAG** | `pendingWorkflowDef` set, or `workflow:run` | Orchestrator / workflow-runner DAG. Not forced by mode flags. Builtin cluster templates (e.g. planner→coder) are internal/test helpers only. |
 | **Multi-agent handoff** | Optional / non-default callers | `multi-agent-graph` handoff (`handoff_to_*`) composition. Experimental surface; not the product default session path. |
 

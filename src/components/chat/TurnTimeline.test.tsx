@@ -52,4 +52,71 @@ describe('TurnTimeline', () => {
     const groups = screen.getAllByTestId('tool-call-group')
     expect(groups.length).toBeGreaterThan(0)
   })
+
+  it('renders per-agent sections in start order for multi-agent turns', () => {
+    render(
+      <TurnTimeline
+        agentRuns={[
+          {
+            agentId: 'supervisor',
+            role: 'supervisor',
+            output: 'summary',
+            startedAt: 1000,
+            finishedAt: 5000,
+            seq: 0,
+          },
+          {
+            agentId: 'subagent-1',
+            role: 'subagent',
+            output: 'a',
+            startedAt: 1100,
+            finishedAt: 2000,
+            seq: 1,
+            taskInput: 'check module A',
+            parentAgentId: 'supervisor',
+          },
+          {
+            agentId: 'subagent-2',
+            role: 'subagent',
+            output: 'b',
+            startedAt: 1200,
+            finishedAt: 3000,
+            seq: 2,
+            taskInput: 'check module B',
+            parentAgentId: 'supervisor',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c1',
+            agentId: 'subagent-1',
+            name: 'grep',
+            input: '{"pattern":"A"}',
+            status: 'finished',
+            seq: 2,
+            output: 'hitA',
+          },
+          {
+            callId: 'c2',
+            agentId: 'subagent-2',
+            name: 'grep',
+            input: '{"pattern":"B"}',
+            status: 'finished',
+            seq: 3,
+            output: 'hitB',
+          },
+        ]}
+      />,
+    )
+    const sections = screen.getAllByTestId('agent-timeline-section')
+    expect(sections.length).toBeGreaterThanOrEqual(2)
+    const ids = sections.map((s) => s.getAttribute('data-agent-id'))
+    expect(ids).toContain('subagent-1')
+    expect(ids).toContain('subagent-2')
+    // tools stay under their agent section
+    const s1 = sections.find((s) => s.getAttribute('data-agent-id') === 'subagent-1')!
+    const s2 = sections.find((s) => s.getAttribute('data-agent-id') === 'subagent-2')!
+    expect(s1.textContent).toMatch(/A|hitA|grep/)
+    expect(s2.textContent).toMatch(/B|hitB|grep/)
+  })
 })

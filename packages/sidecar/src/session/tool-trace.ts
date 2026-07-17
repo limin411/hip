@@ -2,9 +2,34 @@ import type { AgentRole, AgentRun, ServerMessage, TimelineStep, ToolCall, ToolSt
 
 export const TOOL_BLOB_CAP = 4096
 
+/**
+ * Higher cap for subagent/delegate tool I/O on the UI/DB wire path so parent
+ * task/dispatch_agent/task_batch results are not mutilated to 4KB.
+ */
+export const DELEGATE_BLOB_CAP = 32_768
+
+/** Tool names whose input/output use {@link DELEGATE_BLOB_CAP} when clipping for transport. */
+export const DELEGATE_CLIP_TOOLS = new Set([
+  'task',
+  'dispatch_agent',
+  'task_batch',
+  'task_retry',
+  'task_output',
+  'task_stop',
+])
+
 /** Clip a blob to the cap and report whether it was shortened. */
 export function clip(s: string, cap = TOOL_BLOB_CAP): { text: string; truncated: boolean } {
   return s.length > cap ? { text: s.slice(0, cap), truncated: true } : { text: s, truncated: false }
+}
+
+/** Clip tool input/output using a higher cap for delegate tools. */
+export function clipForTool(
+  toolName: string,
+  s: string,
+): { text: string; truncated: boolean } {
+  const cap = DELEGATE_CLIP_TOOLS.has(toolName) ? DELEGATE_BLOB_CAP : TOOL_BLOB_CAP
+  return clip(s, cap)
 }
 
 // Reasoning traces are far longer than tool blobs; cap generously (32 KB) to keep
@@ -127,7 +152,7 @@ export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable
     // burst's stepSeq stays strictly below the tool's in the turn-global ordering.
     ctx.onToolStart(agentId)
     const seq = ctx.nextSeq()
-    const inClip = clip(stringify(tc.input))
+    const inClip = clipForTool(tc.name, stringify(tc.input))
     ctx.record.start(agentId, tc.callId, tc.name, inClip.text, seq, inClip.truncated)
     ctx.send({ type: 'tool:started', sessionId: ctx.sessionId, turnId: ctx.turnId, agentId, role: ctx.roleOf(agentId), callId: tc.callId, name: tc.name, input: inClip.text, seq, ...(inClip.truncated ? { truncated: true } : {}) })
     ctx.pending.push((async () => {
@@ -145,7 +170,7 @@ export async function consumeToolCalls(agentId: string, toolCalls: AsyncIterable
           error = await tc.error
         } else if (resolved === 'finished') {
           status = 'finished'
-          const outClip = clip(stringify(await tc.output))
+          const outClip = clipForTool(tc.name, stringify(await tc.output))
           output = outClip.text
           truncated = outClip.truncated
         } else {

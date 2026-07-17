@@ -46,6 +46,13 @@ describe('BUILTIN_PROFILES', () => {
     expect(supervisor!.allowedTools).toContain('read_file')
   })
 
+  it('supervisor allowedTools includes task_batch and task helpers', () => {
+    const supervisor = BUILTIN_PROFILES.find((p) => p.id === 'supervisor')
+    expect(supervisor!.allowedTools).toEqual(
+      expect.arrayContaining(['task', 'dispatch_agent', 'task_batch', 'task_retry', 'task_stop', 'task_output']),
+    )
+  })
+
   it('all profiles have required fields', () => {
     for (const profile of BUILTIN_PROFILES) {
       expect(typeof profile.id).toBe('string')

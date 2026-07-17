@@ -182,4 +182,26 @@ describe('createAgentInvoker', () => {
     expect(managedCalls).toHaveLength(1)
     expect(managedCalls[0].attachments).toEqual(attachments)
   })
+
+  it('passes explore allowedTools (read-only) into runInternal', async () => {
+    let seen: string[] | undefined
+    const exploreAgent: AgentConfig = {
+      id: 'explore', name: 'Explore', kind: 'internal', command: '', args: [],
+      enabled: true, prompt: 'explore only',
+    }
+    const invoker = createAgentInvoker('/work', {
+      readAgents: () => [exploreAgent],
+      resolveModel: () => null,
+      runInternal: async (a) => {
+        seen = a.allowedTools
+        return 'ok'
+      },
+    })
+    await invoker.invoke('explore', 'scan', collectingEmit().emit, new AbortController().signal)
+    expect(seen).toEqual(
+      expect.arrayContaining(['read_file', 'ls', 'glob', 'grep']),
+    )
+    expect(seen).not.toContain('write_file')
+    expect(seen).not.toContain('run_script')
+  })
 })

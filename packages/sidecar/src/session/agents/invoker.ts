@@ -8,6 +8,7 @@ import type { GuardianReviewer } from '../guardian.js'
 import type { AttachmentPayload, ContentPart } from '../attachments.js'
 import { runManagedAgent } from '../internal-runner.js'
 import { childMaxStepsForAgent } from '../loop-control.js'
+import { EXPLORE_ALLOWED_TOOLS } from '../agent-profile.js'
 import { createAgentProvider } from './index.js'
 import { readAgentsConfig, resolveAgentModel, type ResolvedModel } from './registry.js'
 import type { AgentProvider, ExternalAgentHooks } from './types.js'
@@ -78,6 +79,8 @@ export interface RunInternalArgs {
   runId?: string
   nodeId?: string
   parentAgentId?: string
+  /** Built-in tool allow-list (explore read-only). */
+  allowedTools?: string[]
 }
 
 export interface InvokerDeps {
@@ -126,6 +129,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       nodeId: a.nodeId,
       agentId: a.agentId,
       parentAgentId: a.parentAgentId,
+      allowedTools: a.allowedTools,
     }))
   return {
     // `hooks` here is ExternalAgentHooks (ACP permission bridge), not HookRegistry.
@@ -161,6 +165,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           runId: extras?.runId,
           nodeId: extras?.nodeId,
           parentAgentId: extras?.parentAgentId,
+          // Enforce read-only tools for the fixed explore agent (not prompt-only).
+          ...(agentId === 'explore' ? { allowedTools: [...EXPLORE_ALLOWED_TOOLS] } : {}),
         })
       }
 

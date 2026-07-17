@@ -6,13 +6,13 @@ import {
 } from './subagent-batch.js'
 import { buildTaskBatchTools } from './tools/subagent.js'
 import { buildTools } from './tools.js'
-import type { RunSubagentFn } from './orchestrator-adapter.js'
+import type { BatchRunSubagentFn } from './subagent-batch.js'
 
 // Helper: a runner that resolves after a micro-tick with the prompt echoed back.
-function echoRunner(): RunSubagentFn {
-  return async (input: string) => {
+function echoRunner(): BatchRunSubagentFn {
+  return async (task) => {
     await new Promise((r) => setTimeout(r, 5))
-    return `echo: ${input}`
+    return `echo: ${task.prompt}`
   }
 }
 
@@ -20,14 +20,14 @@ function echoRunner(): RunSubagentFn {
 function selectiveFailRunner(
   failIds: Set<string>,
   errorMsg = 'task failed',
-): RunSubagentFn {
-  return async (input: string, signal: AbortSignal) => {
+): BatchRunSubagentFn {
+  return async (task, signal) => {
     signal?.throwIfAborted?.()
     await new Promise((r) => setTimeout(r, 5))
-    // The task id is embedded in the prompt for correlation in this test harness.
-    const id = input
+    // The task prompt is used as correlation id in this test harness.
+    const id = task.prompt
     if (failIds.has(id)) throw new Error(errorMsg)
-    return `done: ${input}`
+    return `done: ${task.prompt}`
   }
 }
 
@@ -46,8 +46,8 @@ afterEach(() => {
 // ── resolveMaxConcurrency ──────────────────────────────────────────────────
 
 describe('resolveMaxConcurrency', () => {
-  it('defaults to 3 when env is unset', () => {
-    expect(resolveMaxConcurrency()).toBe(3)
+  it('defaults to 4 when env is unset', () => {
+    expect(resolveMaxConcurrency()).toBe(4)
   })
 
   it('reads HIP_SUBAGENT_MAX_CONCURRENCY when set', () => {
@@ -114,12 +114,12 @@ describe('SubagentBatch.run', () => {
   it('enforces maxConcurrency — max 2 in-flight at a time', async () => {
     let running = 0
     let maxRunning = 0
-    const concurrencyRunner: RunSubagentFn = async (input: string) => {
+    const concurrencyRunner: BatchRunSubagentFn = async (task) => {
       running++
       maxRunning = Math.max(maxRunning, running)
       await new Promise((r) => setTimeout(r, 15))
       running--
-      return `ok: ${input}`
+      return `ok: ${task.prompt}`
     }
 
     const batch = new SubagentBatch(concurrencyRunner, { maxConcurrency: 2 })
@@ -132,7 +132,7 @@ describe('SubagentBatch.run', () => {
   })
 
   it('respects per-task AbortSignal — aborted task errors, others continue', async () => {
-    const signalRunner: RunSubagentFn = async (_input: string, signal: AbortSignal) => {
+    const signalRunner: BatchRunSubagentFn = async (_task, signal) => {
       signal.throwIfAborted()
       await new Promise((r) => setTimeout(r, 10))
       return 'ok'
@@ -161,13 +161,13 @@ describe('SubagentBatch.run', () => {
   it('switches to serial mode on rate-limit error', async () => {
     let running = 0
     let maxRunning = 0
-    const rateLimitRunner: RunSubagentFn = async (input: string) => {
+    const rateLimitRunner: BatchRunSubagentFn = async (task) => {
       running++
       maxRunning = Math.max(maxRunning, running)
       await new Promise((r) => setTimeout(r, 10))
       running--
-      if (input === 'task-b') throw new Error('429 rate limit exceeded')
-      return `ok: ${input}`
+      if (task.prompt === 'task-b') throw new Error('429 rate limit exceeded')
+      return `ok: ${task.prompt}`
     }
 
     // maxConcurrency=3, but after task-b's rate-limit error, task-c should run
@@ -222,5 +222,39 @@ describe('task_batch in buildTools', () => {
     expect(capturedSignal).toBeInstanceOf(AbortSignal)
     expect(capturedSignal!.aborted).toBe(false)
     expect(typeof result).toBe('string')
+  })
+
+  it('routes task.agent via dispatch.run when dispatch is provided', async () => {
+    const spawnFn = vi.fn(async () => 'from-spawn')
+    const dispatchRun = vi.fn(async (_agent: string, task: string) => `from-dispatch:${task}`)
+    const tools = buildTaskBatchTools(spawnFn, {
+      agents: [{ id: 'explore', name: 'Explore' }],
+      run: dispatchRun,
+    })
+    const result = await tools[0].invoke({
+      tasks: [
+        { description: 'a', prompt: 'read A', agent: 'explore' },
+        { description: 'b', prompt: 'generic B' },
+      ],
+    })
+    expect(dispatchRun).toHaveBeenCalledWith('explore', 'read A', expect.any(AbortSignal))
+    expect(spawnFn).toHaveBeenCalledWith('generic B', undefined, undefined, expect.any(AbortSignal))
+    expect(result).toContain('[0] from-dispatch:read A')
+    expect(result).toContain('[1] from-spawn')
+  })
+
+  it('errors a batch slot when agent id is unknown', async () => {
+    const spawnFn = vi.fn(async () => 'ok')
+    const tools = buildTaskBatchTools(spawnFn, {
+      agents: [{ id: 'explore', name: 'Explore' }],
+      run: async () => 'x',
+    })
+    const result = String(
+      await tools[0].invoke({
+        tasks: [{ description: 'bad', prompt: 'p', agent: 'nope' }],
+      }),
+    )
+    expect(result).toMatch(/\[0\] Error:.*unknown or disabled agent/)
+    expect(spawnFn).not.toHaveBeenCalled()
   })
 })

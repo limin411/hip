@@ -38,7 +38,15 @@ const GIT_TOOLS = new Set([
   'git_worktree_remove',
 ])
 
-const DELEGATE_TOOLS = new Set(['task', 'dispatch_agent'])
+/** Tools that spawn or orchestrate sub-agents (medium risk; may run concurrently). */
+export const DELEGATE_TOOLS = new Set([
+  'task',
+  'dispatch_agent',
+  'task_batch',
+  'task_retry',
+  'task_stop',
+  'task_output',
+])
 
 const MEDIUM_TOOLS = new Set(['generate_agent'])
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ServerMessage, ToolCall } from '@hip/protocol'
-import { clip, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, ReasoningTracker, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
+import { clip, clipForTool, DELEGATE_BLOB_CAP, TOOL_BLOB_CAP, stringify, consumeToolCalls, trajectoryToRuns, trajectoryToTimeline, REASONING_CAP, clipReasoning, ReasoningTracker, type ToolCallStreamLike, type TraceRun, type TraceRecorder, type ReasoningBurst } from './tool-trace.js'
 
 // A fake ToolCallStream whose Promises are already resolved.
 function fakeTool(over: Partial<ToolCallStreamLike> & { name: string; callId: string }): ToolCallStreamLike {
@@ -30,6 +30,25 @@ describe('clip', () => {
   })
   it('clips overlong strings and flags truncated', () => {
     expect(clip('abcdef', 3)).toEqual({ text: 'abc', truncated: true })
+  })
+})
+
+describe('clipForTool', () => {
+  it('uses TOOL_BLOB_CAP for ordinary tools', () => {
+    const big = 'x'.repeat(TOOL_BLOB_CAP + 50)
+    const r = clipForTool('read_file', big)
+    expect(r.truncated).toBe(true)
+    expect(r.text.length).toBe(TOOL_BLOB_CAP)
+  })
+  it('uses DELEGATE_BLOB_CAP for dispatch_agent / task_batch', () => {
+    const mid = 'y'.repeat(TOOL_BLOB_CAP + 100)
+    const r = clipForTool('dispatch_agent', mid)
+    expect(r.truncated).toBe(false)
+    expect(r.text.length).toBe(mid.length)
+    const huge = 'z'.repeat(DELEGATE_BLOB_CAP + 10)
+    const r2 = clipForTool('task_batch', huge)
+    expect(r2.truncated).toBe(true)
+    expect(r2.text.length).toBe(DELEGATE_BLOB_CAP)
   })
 })
 

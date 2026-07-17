@@ -121,7 +121,8 @@ export function buildAllTools(
   }
 
   // ── Assemble result ────────────────────────────────────────────────────────────
-  const taskBatchTools = buildTaskBatchTools(spawnSubagent)
+  // Pass dispatch so task_batch can route per-task agent ids (explore/plan/coder).
+  const taskBatchTools = buildTaskBatchTools(spawnSubagent, dispatch)
   let result: StructuredToolInterface[]
   if (!spawnSubagent) {
     result = [...base, ...extras]

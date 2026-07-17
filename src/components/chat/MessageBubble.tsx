@@ -44,9 +44,9 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
   const isUser = message.role === 'user'
 
   // Only assistant turns have a timeline / sub-agent runs; skip the work for user bubbles.
+  // Nested subagents still get SubAgentCard summaries; TurnTimeline receives the full timeline
+  // so per-agent tool order is preserved (not stripped before ActivityBar).
   const nested = isUser ? [] : splitAgents(groupByAgent(message, !!streaming)).nested
-  const nestedIds = new Set(nested.map((a) => a.agentId))
-  const flatSteps = (message.timeline ?? []).filter((s) => !nestedIds.has(s.agentId))
 
   const displayContent = useMemo(
     () => (isUser ? message.content : normalizeMessageContent(message.content)),
@@ -99,7 +99,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
           {message.role === 'assistant' && (hasProcess || streaming) && (
             <div className="mb-1 text-meta text-ink-tertiary" data-testid="message-process">
               <ActivityBar
-                steps={flatSteps}
+                steps={message.timeline}
                 toolCalls={message.toolCalls}
                 agentRuns={message.agentRuns}
                 streaming={streaming}

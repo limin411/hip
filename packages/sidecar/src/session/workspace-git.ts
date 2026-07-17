@@ -3,10 +3,12 @@ import { promisify } from 'node:util'
 import { promises as fs } from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { createHash } from 'node:crypto'
 import type { DiffFile, DiffHunk, DiffFileStatus, DiffState, DiffSummary, DiffBase, CommitLogEntry, Branch, WorktreeInfo } from '@hip/protocol'
 import { getWorktreesDir } from './worktree-config.js'
 import { computeManagedWorktreePath } from './worktree-paths.js'
+import { sanitizeRefComponent } from './ref-sanitize.js'
+
+export { sanitizeRefComponent } from './ref-sanitize.js'
 
 const execFileP = promisify(execFile)
 
@@ -28,14 +30,6 @@ const HEADER_PATH_RE = /^a\/(.+) b\/\1$/                       // 仅当 ---/+++
 const BINARY_RE = /^Binary files a\/(.+) and b\/(.+) differ$/
 
 function stripPrefix(p: string): string { return p.replace(/^[ab]\//, '') }
-
-/** Make a turnId / id safe to embed in a git ref path. Keep alnum/-/_ verbatim; if anything else
- *  appears (slash, dot, space, ~, CJK, …) fall back to a short deterministic sha1 so the ref is
- *  always valid (`git check-ref-format`-safe) and collision-resistant. */
-export function sanitizeRefComponent(s: string): string {
-  if (s.length > 0 && /^[A-Za-z0-9_-]+$/.test(s)) return s
-  return 'h' + createHash('sha1').update(s).digest('hex').slice(0, 16)
-}
 
 /** Conservative branch-name guard for agent-supplied names. Rejects anything that could be read by
  *  git as a flag or a pathspec rather than a branch — empty, leading '-', '.'/'..', whitespace, and

@@ -13,7 +13,7 @@
  * @see docs/design/2026-07-17-worktree-studio-orca-alignment.md (KD3, KD11, PR1)
  */
 import * as path from 'node:path'
-import { sanitizeRefComponent } from './workspace-git.js'
+import { sanitizeRefComponent } from './ref-sanitize.js'
 
 /**
  * Derive a short repo slug from a git root path for nest-by-repo layouts.
@@ -21,6 +21,12 @@ import { sanitizeRefComponent } from './workspace-git.js'
  * dot-prefixed segments), joined by `-`. Falls back to `"repo"`.
  *
  * Mirrors grok-build `repo_slug` / Orca basename nesting intent; simple is OK.
+ *
+ * Home-skip list (exact, case-sensitive): `home`, `Users`. Other home markers
+ * (`HOME`, `users`, …) are kept as segments. Only-home paths collapse to `"repo"`.
+ * Known collision risk when nest is on (PR2b): two clones both ending in the same
+ * last two segments (e.g. `org-repo`) share a nest prefix — call sites must not
+ * assume global uniqueness of the slug alone.
  */
 export function repoSlug(gitRoot: string): string {
   if (!gitRoot || !gitRoot.trim()) return 'repo'

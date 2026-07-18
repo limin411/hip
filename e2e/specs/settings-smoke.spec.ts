@@ -12,7 +12,7 @@ const PAGES = [
   { id: 'agents', label: '智能体管理' },
   { id: 'mcp', label: '外部工具服务' },
   { id: 'skill', label: '技能' },
-  { id: 'plugins', label: '插件' },
+  { id: 'plugins', label: '插件市场' },
 ] as const
 
 describe('settings smoke @settings @smoke', () => {

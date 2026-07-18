@@ -121,10 +121,12 @@ describe('sidebarActions', () => {
     useUiStore.setState({
       activeView: 'knowledge',
       sidebarSection: 'knowledge',
+      settingsPage: 'model',
     })
     await openSettingsFromChrome()
     expect(flushSave).toHaveBeenCalled()
     expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().settingsPage).toBe('general')
     expect(useUiStore.getState().previousView).toBe('knowledge')
     expect(useUiStore.getState().sidebarSection).toBe('projects')
   })

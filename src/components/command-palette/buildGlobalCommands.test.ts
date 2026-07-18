@@ -174,6 +174,7 @@ describe('buildGlobalCommandGroups', () => {
     const groups = buildGlobalCommandGroups(ctx)
     const settings = groups.flatMap((g) => g.items).find((i) => i.id === 'nav-settings')!
     settings.run?.()
+    expect(ctx.setSettingsPage).toHaveBeenCalledWith('general')
     expect(ctx.setActiveView).toHaveBeenCalledWith('settings')
   })
 

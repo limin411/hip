@@ -320,7 +320,10 @@ export function buildGlobalCommandGroups(
       group: 'navigation',
       run: () => {
         if (ctx.openSettingsFromChrome) void ctx.openSettingsFromChrome()
-        else ctx.setActiveView('settings')
+        else {
+          ctx.setSettingsPage('general')
+          ctx.setActiveView('settings')
+        }
       },
     },
     {

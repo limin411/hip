@@ -43,10 +43,12 @@ describe('GlobalCommandPalette actions and sessions', () => {
   })
 
   it('selecting Settings navigates and closes the palette', () => {
+    useUiStore.setState({ settingsPage: 'model' })
     useCommandPaletteStore.setState({ open: true })
     render(<GlobalCommandPalette />)
     fireEvent.click(screen.getByTestId('global-cmd-nav-settings'))
     expect(useUiStore.getState().activeView).toBe('settings')
+    expect(useUiStore.getState().settingsPage).toBe('general')
     expect(useCommandPaletteStore.getState().open).toBe(false)
   })
 

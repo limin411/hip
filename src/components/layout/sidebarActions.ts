@@ -83,6 +83,8 @@ export async function openSettingsFromChrome(): Promise<void> {
     await leaveKnowledge()
     assignSectionAfterLeavingKnowledge()
   }
+  // Always land on General when opening Settings from chrome (not last-visited page).
+  useUiStore.getState().setSettingsPage('general')
   useUiStore.getState().setActiveView('settings')
 }
 

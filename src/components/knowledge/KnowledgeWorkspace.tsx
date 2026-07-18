@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Download,
   FilePlus,
-  FileText,
   FolderPlus,
   ImagePlus,
   History,
@@ -34,6 +33,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { HipLogo } from '@/components/login/HipLogo'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   DropdownMenu,
@@ -723,7 +723,7 @@ export function KnowledgeWorkspace() {
         {!activeDocId ? (
           <div className="flex min-h-0 flex-1 items-center justify-center px-8 py-6">
             <EmptyState
-              icon={FileText}
+              tier="friendly"
               title={t('knowledge.workspace.noDocTitle')}
               description={t('knowledge.workspace.noDocHint')}
               className="w-full max-w-md border-0 py-16"
@@ -731,7 +731,9 @@ export function KnowledgeWorkspace() {
                 label: t('knowledge.tree.newDoc'),
                 onClick: () => newDoc(null),
               }}
-            />
+            >
+              <HipLogo size={32} decorative />
+            </EmptyState>
           </div>
         ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

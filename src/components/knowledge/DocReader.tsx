@@ -152,6 +152,7 @@ export function DocReader({
     return (
       <div data-testid="knowledge-doc-empty">
         <EmptyState
+          tier="professional"
           icon={FileText}
           title={t('knowledge.doc.emptyTitle')}
           description={t('knowledge.doc.emptyHint')}

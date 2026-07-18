@@ -25,7 +25,12 @@ export function AgentGrid({
   return (
     <div>
       {agents.length === 0 ? (
-        <EmptyState icon={Bot} title={emptyTitle} description={emptyHint} />
+        <EmptyState
+          tier="professional"
+          icon={Bot}
+          title={emptyTitle}
+          description={emptyHint}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => (

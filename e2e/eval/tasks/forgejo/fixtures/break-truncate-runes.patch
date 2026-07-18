@@ -1,0 +1,15 @@
+diff --git a/modules/util/truncate.go b/modules/util/truncate.go
+index 35836f745c..c152e67171 100644
+--- a/modules/util/truncate.go
++++ b/modules/util/truncate.go
+@@ -58,8 +58,6 @@ func SplitTrimSpace(input, sep string) []string {
+ // TruncateRunes returns a truncated string with given rune limit,
+ // it returns input string if its rune length doesn't exceed the limit.
+ func TruncateRunes(str string, limit int) string {
+-	if utf8.RuneCountInString(str) < limit {
+-		return str
+-	}
+-	return string([]rune(str)[:limit])
++	// hip-eval fixture: intentional bug — ignore limit
++	return str
+ }

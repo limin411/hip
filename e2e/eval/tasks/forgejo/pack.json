@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "forgejo",
+  "name": "Forgejo worktree + coding dogfood (UI/CLI)",
+  "description": "Scoped Go package fixes on a local Forgejo checkout with worktree isolation and primary-guard.",
+  "defaults": {
+    "workspace": {
+      "strategy": "worktree",
+      "repo_path_env": "HIP_EVAL_FORGEJO_PATH",
+      "base_sha": "1c696b25e72f9c4b58460cd1f73194ce30e7f7c0"
+    },
+    "ui": {
+      "surface": "code",
+      "permission_mode": "edit",
+      "timeout_ms": 1200000,
+      "auto_approve_permissions": true
+    },
+    "verify": {
+      "timeout_sec": 120
+    }
+  },
+  "tasks": [
+    "tasks/fj-util-fix-truncate-runes.json"
+  ]
+}

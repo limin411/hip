@@ -194,6 +194,40 @@ describe('WorktreeService create → meta → list', () => {
     expect(meta?.records[created.worktree!.id]).toBeUndefined()
   })
 
+  it('list matches create by id when porcelain realpath differs from create path string (macOS /var)', async () => {
+    await git(root, 'branch', 'realpath-slot')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'realpath-slot',
+      pathKey: 'dogfood/realpath-slot',
+      source: 'host_parallel',
+      parallelRunId: 'run-realpath',
+    })
+    expect(created.ok).toBe(true)
+    expect(created.path).toBeTruthy()
+    expect(created.worktree?.id).toBeTruthy()
+
+    const listed = await svc.list({ cwd: root, managedOnly: true })
+    expect(listed.ok).toBe(true)
+    const row = listed.worktrees.find((w) => w.id === created.worktree!.id)
+    expect(row).toBeTruthy()
+    expect(row!.branch).toBe('realpath-slot')
+    // Create may return /var/... while git porcelain lists /private/var/... — ids must still match.
+    const createReal = await fs.realpath(created.path!).catch(() => path.resolve(created.path!))
+    const listReal = await fs.realpath(row!.path).catch(() => path.resolve(row!.path))
+    expect(createReal).toBe(listReal)
+
+    // Remove using the create-returned path string (not porcelain realpath) must succeed.
+    const removed = await svc.remove({
+      cwd: root,
+      worktreePath: created.path!,
+      force: true,
+    })
+    expect(removed.ok).toBe(true)
+    await expect(fs.access(created.path!).then(() => false).catch(() => true)).resolves.toBe(true)
+  })
+
   it('worktreeIdFromPath is stable for same path', () => {
     const repoKey = 'abc123'
     const p = path.join(worktreesDir, 'slot-1')

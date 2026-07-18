@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "fj-util-fix-truncate-runes",
+  "name": "Fix TruncateRunes in modules/util",
+  "level": "L1",
+  "difficulty": "medium",
+  "tags": ["edit_single", "unit-test", "forgejo", "worktree"],
+  "prompt": "In this Forgejo checkout, package modules/util has failing unit tests for TruncateRunes. Find and fix the bug in modules/util/truncate.go so `go test ./modules/util/ -count=1 -timeout 60s` passes. Do not weaken or delete tests. Do not modify files outside modules/util/. Do not commit or push.",
+  "workspace": {
+    "setup": { "kind": "patch", "path": "fixtures/break-truncate-runes.patch" }
+  },
+  "ui": {
+    "timeout_ms": 1200000,
+    "auto_resume_interrupt": 4,
+    "expect": {
+      "changes_paths_regex": ["modules/util/"],
+      "changes_avoid_regex": ["^web_src/", "^templates/"],
+      "no_permission_modal_stuck": true
+    }
+  },
+  "verify": {
+    "commands": [
+      { "cmd": ["go", "test", "./modules/util/", "-count=1", "-timeout", "60s"] }
+    ],
+    "soft": [
+      { "kind": "change_nonempty" },
+      { "kind": "paths_touched_regex", "pattern": "modules/util/" },
+      { "kind": "paths_avoid_regex", "pattern": "^(web_src|templates)/" }
+    ]
+  },
+  "rubric": { "axes": ["edit_single", "forgejo_dogfood"], "pass_policy": "verify_all" },
+  "scoring": { "pass_requires": "verify_all" },
+  "metadata": {
+    "pack": "forgejo",
+    "bug": "TruncateRunes ignores limit",
+    "repo_default": "/Users/lijiamin/data/code-repository/project-go/forgejo"
+  }
+}

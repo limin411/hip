@@ -857,11 +857,12 @@ export const en = {
         acpPickTitle: 'New ACP agent — pick a provider',
         statusInstalled: 'Installed',
         statusNotInstalled: 'Not installed',
+        statusAdapterNotInstalled: 'Adapter not installed',
         statusAdded: 'Added',
         redetect: 'Re-check',
         apiKey: 'API Key',
         apiKeyHint: 'Stored in this agent’s {{env}} env var; leave blank to use your system environment.',
-        acpAdapterNote: 'No native ACP — bridged via the community adapter {{pkg}}',
+        acpAdapterNote: 'No native ACP — requires the community adapter {{pkg}} on PATH',
         backToProviders: '← Back to providers',
       },
       plugins: {

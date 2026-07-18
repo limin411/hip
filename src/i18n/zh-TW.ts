@@ -849,11 +849,12 @@ export const zhTW = {
         acpPickTitle: '新增 ACP — 選擇提供方',
         statusInstalled: '已安裝',
         statusNotInstalled: '未安裝',
+        statusAdapterNotInstalled: '介接器未安裝',
         statusAdded: '已新增',
         redetect: '重新偵測',
         apiKey: 'API Key',
         apiKeyHint: '將寫入該智能體的 {{env}} 環境變數；留空則使用系統環境變數。',
-        acpAdapterNote: '無官方 ACP，經社區介接器 {{pkg}} 接入',
+        acpAdapterNote: '無官方 ACP，需預裝社區介接器 {{pkg}}（並加入 PATH）',
         backToProviders: '← 返回選擇提供方',
       },
       plugins: {

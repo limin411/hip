@@ -14,6 +14,7 @@ vi.mock('react-i18next', () => ({
         'settings.agents.enableThis': 'Available as sub-agent',
         'settings.agents.statusInstalled': 'Installed',
         'settings.agents.statusNotInstalled': 'Not installed',
+        'settings.agents.statusAdapterNotInstalled': 'Adapter not installed',
         'settings.agents.edit': 'Edit',
         'settings.agents.delete': 'Delete',
         'settings.agents.menuMore': 'More',
@@ -112,6 +113,32 @@ describe('AgentCard — grid view', () => {
     expect(onToggle).not.toHaveBeenCalled()
   })
 
+  it('forces switch off and shows adapter install cmd when only the adapter is missing', () => {
+    const onToggle = vi.fn()
+    render(
+      <AgentCard
+        agent={acpAgent({
+          name: 'Pi',
+          command: 'pi-acp',
+          args: [],
+          quirks: 'pi',
+        })}
+        viewMode="grid"
+        installed={{ pi: true, 'pi-acp': false }}
+        detectionChecked
+        onToggle={onToggle}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).not.toBeChecked()
+    expect(sw).toBeDisabled()
+    expect(screen.getByText('Adapter not installed')).toBeInTheDocument()
+    expect(screen.getByText('npm i -g pi-acp')).toBeInTheDocument()
+    expect(screen.queryByText('Not installed')).not.toBeInTheDocument()
+  })
+
   it('does not show install status for internal agents', () => {
     render(
       <AgentCard
@@ -202,7 +229,34 @@ describe('AgentCard — list view', () => {
     const sw = screen.getByRole('switch')
     expect(sw).not.toBeChecked()
     expect(sw).toBeDisabled()
-    expect(screen.getByText('Not installed')).toBeInTheDocument()
+    // badge + install hint both say "Not installed"
+    expect(screen.getAllByText('Not installed').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('npm i -g opencode-ai')).toBeInTheDocument()
+  })
+
+  it('shows adapter-not-installed badge when agent is present but adapter is missing', () => {
+    render(
+      <AgentCard
+        agent={acpAgent({
+          name: 'Pi',
+          command: 'pi-acp',
+          args: [],
+          quirks: 'pi',
+        })}
+        viewMode="list"
+        installed={{ pi: true, 'pi-acp': false }}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const sw = screen.getByRole('switch')
+    expect(sw).not.toBeChecked()
+    expect(sw).toBeDisabled()
+    // badge + install hint both say "Adapter not installed"
+    expect(screen.getAllByText('Adapter not installed').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('npm i -g pi-acp')).toBeInTheDocument()
   })
 
   it('shows installed badge when binary is present', () => {

@@ -849,11 +849,12 @@ export const zhCN = {
         acpPickTitle: '新增 ACP — 选择提供方',
         statusInstalled: '已安装',
         statusNotInstalled: '未安装',
+        statusAdapterNotInstalled: '适配器未安装',
         statusAdded: '已添加',
         redetect: '重新检测',
         apiKey: 'API Key',
         apiKeyHint: '将写入该智能体的 {{env}} 环境变量；留空则使用系统环境变量。',
-        acpAdapterNote: '无官方 ACP，经社区适配器 {{pkg}} 接入',
+        acpAdapterNote: '无官方 ACP，需预装社区适配器 {{pkg}}（并加入 PATH）',
         backToProviders: '← 返回选择提供方',
       },
       plugins: {

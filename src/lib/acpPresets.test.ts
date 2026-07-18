@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import type { AgentConfig } from '@hip/protocol'
-import { ACP_PRESETS, acpPresetById, presetInstalled, presetAdded, agentBinaryStatus, type AcpPreset } from './acpPresets'
+import {
+  ACP_PRESETS,
+  acpDetectNames,
+  acpPresetById,
+  presetInstalled,
+  presetAgentInstalled,
+  presetAdapterInstalled,
+  presetAdded,
+  agentBinaryStatus,
+  type AcpPreset,
+} from './acpPresets'
 
 describe('ACP_PRESETS', () => {
   it('lists the four supported providers with unique ids', () => {
@@ -25,27 +35,50 @@ describe('ACP_PRESETS', () => {
     expect(acpPresetById('pi')?.authEnvVar).toBeUndefined()
   })
 
-  it('adapter presets detect the AGENT command, bridge ACP via npx, and name the adapter pkg', () => {
+  it('adapter presets require a global adapter bin and install cmd; launch that bin directly', () => {
     const pi = acpPresetById('pi')!
     expect(pi.detectBin).toBe('pi')
-    expect(pi.command).toBe('npx')
-    expect(pi.args).toEqual(['-y', 'pi-acp'])
+    expect(pi.command).toBe('pi-acp')
+    expect(pi.args).toEqual([])
     expect(pi.adapterPkg).toBe('pi-acp')
+    expect(pi.adapterBin).toBe('pi-acp')
+    expect(pi.adapterInstallCmd).toBeTruthy()
+
     const cc = acpPresetById('claude-code')!
     expect(cc.detectBin).toBe('claude')
-    expect(cc.command).toBe('npx')
-    expect(cc.args).toEqual(['-y', '@agentclientprotocol/claude-agent-acp@latest'])
+    expect(cc.command).toBe('claude-agent-acp')
+    expect(cc.args).toEqual([])
     expect(cc.adapterPkg).toBe('@agentclientprotocol/claude-agent-acp')
+    expect(cc.adapterBin).toBe('claude-agent-acp')
+    expect(cc.adapterInstallCmd).toBeTruthy()
+
     const cx = acpPresetById('codex')!
     expect(cx.detectBin).toBe('codex')
-    expect(cx.command).toBe('npx')
-    expect(cx.args).toEqual(['-y', '@zed-industries/codex-acp'])
+    expect(cx.command).toBe('codex-acp')
+    expect(cx.args).toEqual([])
     expect(cx.adapterPkg).toBe('@zed-industries/codex-acp')
+    expect(cx.adapterBin).toBe('codex-acp')
+    expect(cx.adapterInstallCmd).toBeTruthy()
   })
 
-  it('native presets launch their detected binary directly with no adapter pkg', () => {
-    expect(acpPresetById('opencode')).toMatchObject({ detectBin: 'opencode', command: 'opencode', args: ['acp', '--pure'] })
+  it('native presets launch their detected binary directly with no adapter', () => {
+    expect(acpPresetById('opencode')).toMatchObject({
+      detectBin: 'opencode',
+      command: 'opencode',
+      args: ['acp', '--pure'],
+    })
     expect(acpPresetById('opencode')?.adapterPkg).toBeUndefined()
+    expect(acpPresetById('opencode')?.adapterBin).toBeUndefined()
+  })
+
+  it('adapterPkg and adapterBin are paired when either is set', () => {
+    for (const p of ACP_PRESETS) {
+      if (p.adapterPkg || p.adapterBin) {
+        expect(p.adapterPkg).toBeTruthy()
+        expect(p.adapterBin).toBeTruthy()
+        expect(p.adapterInstallCmd).toBeTruthy()
+      }
+    }
   })
 
   it('looks presets up by id', () => {
@@ -53,17 +86,44 @@ describe('ACP_PRESETS', () => {
     expect(acpPresetById('pi')?.name).toBe('Pi')
     expect(acpPresetById('nope')).toBeUndefined()
   })
+
+  it('acpDetectNames includes agent and adapter binaries', () => {
+    const names = acpDetectNames()
+    expect(names).toEqual(expect.arrayContaining([
+      'opencode', 'pi', 'pi-acp', 'claude', 'claude-agent-acp', 'codex', 'codex-acp',
+    ]))
+    expect(new Set(names).size).toBe(names.length)
+  })
 })
 
 const mk = (over: Partial<AcpPreset>): AcpPreset => ({
   id: 'x', name: 'X', icon: 'code', detectBin: 'x', command: 'x', args: [], quirks: 'x', installCmd: 'i', ...over,
 })
 
-describe('presetInstalled', () => {
-  it('true iff the agent detect binary is present', () => {
-    expect(presetInstalled(mk({ detectBin: 'claude' }), { claude: true })).toBe(true)
-    expect(presetInstalled(mk({ detectBin: 'claude' }), { claude: false })).toBe(false)
-    expect(presetInstalled(mk({ detectBin: 'claude' }), {})).toBe(false)
+describe('preset install helpers', () => {
+  it('presetAgentInstalled checks detectBin only', () => {
+    const p = mk({ detectBin: 'claude', adapterBin: 'claude-agent-acp' })
+    expect(presetAgentInstalled(p, { claude: true, 'claude-agent-acp': false })).toBe(true)
+    expect(presetAgentInstalled(p, { claude: false, 'claude-agent-acp': true })).toBe(false)
+  })
+
+  it('presetAdapterInstalled is true when no adapterBin; else checks adapterBin', () => {
+    expect(presetAdapterInstalled(mk({ detectBin: 'opencode' }), {})).toBe(true)
+    const p = mk({ detectBin: 'pi', adapterBin: 'pi-acp' })
+    expect(presetAdapterInstalled(p, { 'pi-acp': true })).toBe(true)
+    expect(presetAdapterInstalled(p, { 'pi-acp': false })).toBe(false)
+    expect(presetAdapterInstalled(p, {})).toBe(false)
+  })
+
+  it('presetInstalled requires agent + adapter when bridged', () => {
+    const native = mk({ detectBin: 'opencode' })
+    expect(presetInstalled(native, { opencode: true })).toBe(true)
+    expect(presetInstalled(native, { opencode: false })).toBe(false)
+
+    const bridged = mk({ detectBin: 'pi', adapterBin: 'pi-acp' })
+    expect(presetInstalled(bridged, { pi: true, 'pi-acp': true })).toBe(true)
+    expect(presetInstalled(bridged, { pi: true, 'pi-acp': false })).toBe(false)
+    expect(presetInstalled(bridged, { pi: false, 'pi-acp': true })).toBe(false)
   })
 })
 
@@ -93,9 +153,11 @@ describe('agentBinaryStatus', () => {
     expect(agentBinaryStatus({ ...agent('opencode'), quirks: undefined }, {})).toBeUndefined()
   })
 
-  it('reports installed when the preset binary is present', () => {
+  it('reports installed when native binary is present', () => {
     expect(agentBinaryStatus(agent('opencode'), { opencode: true })).toEqual({
       preset: acpPresetById('opencode'),
+      agentInstalled: true,
+      adapterInstalled: true,
       installed: true,
     })
   })
@@ -103,18 +165,28 @@ describe('agentBinaryStatus', () => {
   it('reports not installed when the preset binary is missing', () => {
     expect(agentBinaryStatus(agent('opencode'), { opencode: false })).toEqual({
       preset: acpPresetById('opencode'),
-      installed: false,
-    })
-    expect(agentBinaryStatus(agent('opencode'), {})).toEqual({
-      preset: acpPresetById('opencode'),
+      agentInstalled: false,
+      adapterInstalled: true,
       installed: false,
     })
   })
 
-  it('maps pi to the pi detect binary', () => {
-    expect(agentBinaryStatus(agent('pi'), { pi: true })).toEqual({
+  it('maps pi readiness to agent + adapter bins', () => {
+    expect(agentBinaryStatus(agent('pi'), { pi: true, 'pi-acp': true })).toEqual({
       preset: acpPresetById('pi'),
+      agentInstalled: true,
+      adapterInstalled: true,
       installed: true,
+    })
+    expect(agentBinaryStatus(agent('pi'), { pi: true, 'pi-acp': false })).toMatchObject({
+      agentInstalled: true,
+      adapterInstalled: false,
+      installed: false,
+    })
+    expect(agentBinaryStatus(agent('pi'), { pi: false, 'pi-acp': true })).toMatchObject({
+      agentInstalled: false,
+      adapterInstalled: true,
+      installed: false,
     })
   })
 })

@@ -3,10 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const detectBinaries = vi.fn()
 vi.mock('@/ipc/detect', () => ({ detectBinaries: (...a: unknown[]) => detectBinaries(...a) }))
 vi.mock('@/lib/acpPresets', () => ({
-  ACP_PRESETS: [
-    { id: 'opencode', detectBin: 'opencode' },
-    { id: 'claude-code', detectBin: 'claude' },
-  ],
+  acpDetectNames: () => ['opencode', 'claude', 'claude-agent-acp'],
 }))
 
 beforeEach(async () => {
@@ -16,12 +13,16 @@ beforeEach(async () => {
 })
 
 describe('detectionStore', () => {
-  it('refresh() probes each preset detect (agent) command and stores the result', async () => {
-    detectBinaries.mockResolvedValueOnce({ opencode: true, claude: false })
+  it('refresh() probes agent + adapter binaries and stores the result', async () => {
+    detectBinaries.mockResolvedValueOnce({ opencode: true, claude: false, 'claude-agent-acp': true })
     const { useDetectionStore } = await import('./detectionStore.js')
     await useDetectionStore.getState().refresh()
-    expect(detectBinaries).toHaveBeenCalledWith(expect.arrayContaining(['opencode', 'claude']))
-    expect(useDetectionStore.getState().installed).toEqual({ opencode: true, claude: false })
+    expect(detectBinaries).toHaveBeenCalledWith(expect.arrayContaining(['opencode', 'claude', 'claude-agent-acp']))
+    expect(useDetectionStore.getState().installed).toEqual({
+      opencode: true,
+      claude: false,
+      'claude-agent-acp': true,
+    })
     expect(useDetectionStore.getState().checked).toBe(true)
   })
 })

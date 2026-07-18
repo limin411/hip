@@ -76,18 +76,8 @@ export function AgentCard({
                   <span className="font-mono text-ink-tertiary">{cmdline}</span>
                 )}
               </p>
-              {missingBinary && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-1 text-caption text-danger">
-                    <AlertCircle size={12} />
-                    {t('settings.agents.statusNotInstalled')}
-                  </div>
-                  {binaryStatus.preset.installCmd && (
-                    <code className="block select-all rounded bg-surface-muted px-1.5 py-1 font-mono text-caption text-ink-secondary">
-                      {binaryStatus.preset.installCmd}
-                    </code>
-                  )}
-                </div>
+              {missingBinary && binaryStatus && (
+                <MissingInstallHints status={binaryStatus} />
               )}
             </div>
           </div>
@@ -144,10 +134,15 @@ export function AgentCard({
                       <CircleCheck size={11} />
                       {t('settings.agents.statusInstalled')}
                     </>
-                  ) : (
+                  ) : !binaryStatus.agentInstalled ? (
                     <>
                       <AlertCircle size={11} />
                       {t('settings.agents.statusNotInstalled')}
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle size={11} />
+                      {t('settings.agents.statusAdapterNotInstalled')}
                     </>
                   )}
                 </Badge>
@@ -162,6 +157,9 @@ export function AgentCard({
                   <span className="min-w-0 truncate">{cmdline}</span>
                 </div>
                 {agent.description && <div className="mt-1 truncate text-caption text-ink-tertiary">{agent.description}</div>}
+                {missingBinary && binaryStatus && (
+                  <MissingInstallHints status={binaryStatus} compact />
+                )}
               </>
             )}
           </div>
@@ -197,6 +195,47 @@ export function AgentCard({
           </DropdownMenu>
         </div>
       </DeclarativeContextMenu>
+    </div>
+  )
+}
+
+function MissingInstallHints({
+  status,
+  compact,
+}: {
+  status: NonNullable<ReturnType<typeof agentBinaryStatus>>
+  compact?: boolean
+}) {
+  const { t } = useTranslation()
+  const { preset, agentInstalled, adapterInstalled } = status
+  return (
+    <div className={cn('space-y-1', compact ? 'mt-1.5' : 'mt-2')}>
+      {!agentInstalled && (
+        <>
+          <div className="flex items-center gap-1 text-caption text-danger">
+            <AlertCircle size={12} />
+            {t('settings.agents.statusNotInstalled')}
+          </div>
+          {preset.installCmd && (
+            <code className="block select-all rounded bg-surface-muted px-1.5 py-1 font-mono text-caption text-ink-secondary">
+              {preset.installCmd}
+            </code>
+          )}
+        </>
+      )}
+      {!adapterInstalled && preset.adapterBin && (
+        <>
+          <div className="flex items-center gap-1 text-caption text-danger">
+            <AlertCircle size={12} />
+            {t('settings.agents.statusAdapterNotInstalled')}
+          </div>
+          {preset.adapterInstallCmd && (
+            <code className="block select-all rounded bg-surface-muted px-1.5 py-1 font-mono text-caption text-ink-secondary">
+              {preset.adapterInstallCmd}
+            </code>
+          )}
+        </>
+      )}
     </div>
   )
 }

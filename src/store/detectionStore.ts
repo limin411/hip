@@ -1,15 +1,6 @@
 import { create } from 'zustand'
 import { detectBinaries } from '@/ipc/detect'
-import { ACP_PRESETS } from '@/lib/acpPresets'
-
-/** All executable names worth probing: each preset's detect (agent) command. */
-function detectNames(): string[] {
-  const s = new Set<string>()
-  for (const p of ACP_PRESETS) {
-    if (p.detectBin) s.add(p.detectBin)
-  }
-  return [...s]
-}
+import { acpDetectNames } from '@/lib/acpPresets'
 
 interface DetectionStore {
   installed: Record<string, boolean>
@@ -21,7 +12,7 @@ export const useDetectionStore = create<DetectionStore>((set) => ({
   installed: {},
   checked: false,
   refresh: async () => {
-    const installed = await detectBinaries(detectNames())
+    const installed = await detectBinaries(acpDetectNames())
     set({ installed, checked: true })
   },
 }))

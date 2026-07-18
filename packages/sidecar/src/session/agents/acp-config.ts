@@ -8,8 +8,9 @@ export interface AcpSpawn { command: string; args: string[]; env: NodeJS.Process
 // (agent, model) provider/connection factory signature; it is intentionally unused here.
 export function buildAcpSpawn(agent: AgentConfig, model: ResolvedModel | null): AcpSpawn {
   // All four ACP presets (opencode/pi/claude-code/codex) bake their concrete command/args
-  // at add-time (src/lib/acpPresets.ts), so this path spawns them verbatim. agent.env carries any
-  // user-supplied API key (claude-code/codex). Self-managed: no model/key injection here.
+  // at add-time (src/lib/acpPresets.ts): native agents run their own binary; bridged ones
+  // run a pre-installed adapter CLI (pi-acp / claude-agent-acp / codex-acp). agent.env carries
+  // any user-supplied API key (claude-code/codex). Self-managed: no model/key injection here.
   void model
   const env: NodeJS.ProcessEnv = { ...process.env, ...(agent.env ?? {}) }
   // All ACP agents are self-managed: inject nothing model/key-related; OpenCode reads its own auth.json.

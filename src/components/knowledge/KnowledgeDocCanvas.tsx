@@ -2,14 +2,16 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * Elevated paper shell chrome (KD1). Exported for visual class guardrail tests.
+ * Full-page document body chrome (no elevated card).
  * Mode overflow is parent-owned via paperClassName — not part of this constant.
  */
-export const DOC_PAPER_SHELL =
-  'rounded-xl border border-border bg-surface shadow-panel'
+export const DOC_PAGE_SHELL = 'w-full min-h-0 flex-1 flex flex-col bg-surface'
+
+/** @deprecated Use DOC_PAGE_SHELL — kept as alias for any residual imports. */
+export const DOC_PAPER_SHELL = DOC_PAGE_SHELL
 
 /**
- * Document paper column: elevated reading surface.
+ * Document page column: fills the workspace main area (no rounded card).
  * Scroll ownership stays in KnowledgeWorkspace (edit: CM/Live scroller; preview: outer stage).
  *
  * Mode overflow is applied by the parent via paperClassName — default classes omit
@@ -22,25 +24,24 @@ export function KnowledgeDocCanvas({
 }: {
   children: ReactNode
   className?: string
-  /** Classes on the elevated paper shell (overflow, flex grow). */
+  /** Classes on the page body (overflow, flex grow). */
   paperClassName?: string
 }) {
   return (
     <div
       data-testid="knowledge-doc-canvas"
       className={cn(
-        // Outer: center paper. Prefer horizontal gutter; keep vertical pad modest
-        // so short windows still give CM a usable height budget.
-        'mx-auto flex min-h-0 w-full max-w-3xl flex-col px-4 sm:px-6 py-3 sm:py-4',
+        // Full-bleed in main: stretch width/height; modest horizontal pad for prose.
+        'flex min-h-0 w-full flex-1 flex-col',
         className,
       )}
     >
       <div
         data-testid="knowledge-doc-paper"
         className={cn(
-          'flex min-h-0 flex-1 flex-col',
-          DOC_PAPER_SHELL,
-          'px-8 sm:px-10',
+          DOC_PAGE_SHELL,
+          // Side padding only — content uses the full stage, not a floating card.
+          'px-8 sm:px-12 lg:px-16',
           paperClassName,
         )}
       >

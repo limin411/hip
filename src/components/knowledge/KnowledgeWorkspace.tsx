@@ -424,7 +424,7 @@ export function KnowledgeWorkspace() {
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      {/* Sidebar bg-surface; border-r separates tree from stage (bg-surface-subtle + paper). */}
+      {/* Sidebar bg-surface; border-r separates tree from full-page document stage. */}
       <aside className="flex w-[280px] shrink-0 flex-col border-r border-border/70 bg-surface">
         {/* Space identity + actions — no hard header rule */}
         <div className="flex flex-col gap-3 px-3 pb-2 pt-3">
@@ -590,7 +590,7 @@ export function KnowledgeWorkspace() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-surface-subtle">
+      <main className="flex min-w-0 flex-1 flex-col bg-surface">
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
           <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
             {pathNodes.length === 0 ? (

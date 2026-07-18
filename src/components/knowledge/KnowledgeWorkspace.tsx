@@ -739,7 +739,7 @@ export function KnowledgeWorkspace() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas
               className="min-h-0 flex-1"
-              paperClassName="min-h-0 flex-1 overflow-hidden"
+              paperClassName="overflow-hidden"
             >
               <InlineDocTitle
                 docId={activeDocId}
@@ -774,7 +774,7 @@ export function KnowledgeWorkspace() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <KnowledgeDocCanvas
               className="min-h-0 flex-1"
-              paperClassName="min-h-0 flex-1 overflow-hidden"
+              paperClassName="overflow-hidden"
             >
               <InlineDocTitle
                 docId={activeDocId}

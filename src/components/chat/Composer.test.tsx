@@ -103,6 +103,11 @@ describe('Composer', () => {
     const root = screen.getByTestId('composer')
     expect(root).toHaveAttribute('data-variant', 'flat')
     expect(root.className).not.toContain('rounded-xl')
+    // Transparent top border reserves space; accent on focus (no ring, no layout jump)
+    expect(root.className).toContain('border-t')
+    expect(root.className).toContain('border-transparent')
+    expect(root.className).toContain('focus-within:border-t-accent')
+    expect(root.className).not.toContain('ring-')
   })
 
   it('applies fixed textarea height when provided', () => {

@@ -73,7 +73,7 @@ export function Composer({
       className={cn(
         isCard
           ? 'rounded-xl border border-border bg-surface p-2 transition-shadow focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8'
-          : 'bg-surface',
+          : 'border-t border-transparent bg-surface focus-within:border-t-accent',
       )}
       data-testid="composer"
       data-variant={variant}

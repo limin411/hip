@@ -1110,7 +1110,7 @@ export async function clearPickAttachmentFilesSeam(): Promise<void> {
   })
 }
 
-/** Opt-in Live editor flag (default off). Re-read on next React render. */
+/** Live editor flag (product-on by default; pass false to opt out). Re-read on next React render. */
 export async function setKnowledgeLiveFlag(enabled: boolean): Promise<void> {
   await browser.execute((on: boolean) => {
     try {

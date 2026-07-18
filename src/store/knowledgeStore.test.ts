@@ -101,26 +101,32 @@ describe('knowledgeStore openDoc editorMode default', () => {
     })
   })
 
-  it('openDoc sets editorMode source with body (live flag off by default)', async () => {
+  it('openDoc sets editorMode live by default (所见即所得 / product-on)', async () => {
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
     const s = useKnowledgeStore.getState()
     expect(s.activeDocId).toBe('doc_1')
     expect(s.docBody).toBe('# hello')
     expect(s.draftBody).toBe('# hello')
-    expect(s.editorMode).toBe('source')
+    expect(s.editorMode).toBe('live')
     expect(knowledgeReadDoc).toHaveBeenCalledWith('spc_1', 'doc_1')
   })
 
-  it('openDoc sets editorMode live when flag on and no pref', async () => {
-    localStorage.setItem('hip-knowledge-live', 'true')
+  it('openDoc sets editorMode source when live flag explicitly off', async () => {
+    localStorage.setItem('hip-knowledge-live', 'false')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('live')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
-  it('openDoc forces source when live flag on but body is large', async () => {
-    localStorage.setItem('hip-knowledge-live', 'true')
+  it('openDoc respects stored source pref when live is on', async () => {
+    localStorage.setItem('hip-knowledge-editor-mode', 'source')
+    knowledgeReadDoc.mockResolvedValueOnce('# hello')
+    await useKnowledgeStore.getState().openDoc('doc_1')
+    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+  })
+
+  it('openDoc forces source when live on but body is large', async () => {
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'y'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 10)
     knowledgeReadDoc.mockResolvedValueOnce(big)
@@ -594,20 +600,19 @@ describe('knowledgeStore setEditorMode', () => {
     expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('source')
   })
 
-  it('clamps live to source when flag is off', async () => {
+  it('clamps live to source when flag is explicitly off', async () => {
+    localStorage.setItem('hip-knowledge-live', 'false')
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
-  it('allows live when flag is on', async () => {
-    localStorage.setItem('hip-knowledge-live', 'true')
+  it('allows live when flag is on (product default)', async () => {
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('live')
     expect(localStorage.getItem('hip-knowledge-editor-mode')).toBe('live')
   })
 
   it('live ↔ source keeps dirty draft (no silent reseed)', async () => {
-    localStorage.setItem('hip-knowledge-live', 'true')
     vi.useFakeTimers()
     useKnowledgeStore.setState({
       editorMode: 'source',
@@ -628,7 +633,6 @@ describe('knowledgeStore setEditorMode', () => {
   })
 
   it('setEditorMode live clamps to source when body exceeds large-doc threshold', async () => {
-    localStorage.setItem('hip-knowledge-live', 'true')
     const { KNOWLEDGE_LARGE_DOC_CHARS } = await import('@/domain/knowledge/limits')
     const big = 'x'.repeat(KNOWLEDGE_LARGE_DOC_CHARS + 1)
     useKnowledgeStore.setState({
@@ -638,6 +642,131 @@ describe('knowledgeStore setEditorMode', () => {
     })
     await useKnowledgeStore.getState().setEditorMode('live')
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
+  })
+})
+
+describe('knowledgeStore loadSpaces early hydrate (cold-start counts)', () => {
+  beforeEach(() => {
+    knowledgeReadDoc.mockReset()
+    knowledgeGetTree.mockReset()
+    knowledgeEnsureRoot.mockReset()
+    knowledgeListSpaces.mockReset()
+    knowledgeEnsureRoot.mockResolvedValue(undefined)
+    knowledgeListSpaces.mockResolvedValue([
+      { id: 'spc_1', name: 'Notes', createdAt: 1, updatedAt: 1 },
+      { id: 'spc_2', name: 'Wiki', createdAt: 1, updatedAt: 1 },
+    ])
+    knowledgeGetTree.mockImplementation(async (spaceId: string) => {
+      if (spaceId === 'spc_1') {
+        return {
+          version: 1,
+          nodes: [
+            {
+              id: 'doc_a',
+              parentId: null,
+              kind: 'doc',
+              title: 'A',
+              order: 0,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+            {
+              id: 'doc_b',
+              parentId: null,
+              kind: 'doc',
+              title: 'B',
+              order: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          ],
+        }
+      }
+      return {
+        version: 1,
+        nodes: [
+          {
+            id: 'doc_c',
+            parentId: null,
+            kind: 'doc',
+            title: 'C',
+            order: 0,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      }
+    })
+    knowledgeReadDoc.mockResolvedValue('body')
+    useKnowledgeStore.setState({
+      loaded: false,
+      spaces: [],
+      activeSpaceId: null,
+      nodes: [],
+      activeDocId: null,
+      docBody: '',
+      draftBody: '',
+      editorMode: 'preview',
+      mode: 'home',
+      searchQuery: '',
+      searchHits: [],
+      indexStatus: 'idle',
+      indexProgress: null,
+      pendingReveal: null,
+      spaceDocCounts: {},
+      recent: [],
+      expandedFolderIds: {},
+      busy: false,
+      error: null,
+      saveState: 'idle',
+    })
+  })
+
+  it('loadSpaces hydrates spaces from IPC without requiring Knowledge enter', async () => {
+    expect(useKnowledgeStore.getState().spaces).toEqual([])
+    expect(useKnowledgeStore.getState().loaded).toBe(false)
+
+    await useKnowledgeStore.getState().loadSpaces()
+
+    const s = useKnowledgeStore.getState()
+    expect(s.loaded).toBe(true)
+    expect(s.spaces).toHaveLength(2)
+    expect(s.spaces.map((sp) => sp.id)).toEqual(['spc_1', 'spc_2'])
+    expect(knowledgeEnsureRoot).toHaveBeenCalled()
+    expect(knowledgeListSpaces).toHaveBeenCalled()
+    // Same fields the sidebar badge reads (spaces.length).
+    expect(s.spaces.length > 0 ? s.spaces.length : undefined).toBe(2)
+  })
+
+  it('loadSpaces kicks rebuild so spaceDocCounts fill from trees (before index ready finishes)', async () => {
+    // Slow body reads so we can observe tree-derived counts mid-build.
+    let releaseBodies!: () => void
+    const bodyGate = new Promise<void>((resolve) => {
+      releaseBodies = resolve
+    })
+    knowledgeReadDoc.mockImplementation(async () => {
+      await bodyGate
+      return 'body'
+    })
+
+    const loadPromise = useKnowledgeStore.getState().loadSpaces()
+
+    // Wait until tree-derived counts land (index may still be building).
+    await vi.waitFor(() => {
+      const s = useKnowledgeStore.getState()
+      expect(s.spaces).toHaveLength(2)
+      expect(s.spaceDocCounts).toEqual({ spc_1: 2, spc_2: 1 })
+    })
+
+    // Counts available while bodies still pending (index not ready yet).
+    expect(useKnowledgeStore.getState().indexStatus).not.toBe('ready')
+
+    releaseBodies()
+    await loadPromise
+    await vi.waitFor(() => {
+      expect(useKnowledgeStore.getState().indexStatus).toBe('ready')
+    })
+    expect(useKnowledgeStore.getState().spaceDocCounts).toEqual({ spc_1: 2, spc_2: 1 })
   })
 })
 

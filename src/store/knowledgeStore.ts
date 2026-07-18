@@ -279,7 +279,7 @@ interface KnowledgeState {
   activeDocId: string | null
   docBody: string
   draftBody: string
-  /** live | source | preview — Live UI gated by hip-knowledge-live flag. */
+  /** live | source | preview — Live is product-on; opt out via hip-knowledge-live=false. */
   editorMode: EditorMode
   mode: 'home' | 'workspace'
   searchQuery: string
@@ -289,7 +289,10 @@ interface KnowledgeState {
   indexProgress: KnowledgeIndexProgress | null
   /** After opening a search hit, UI scrolls near this query (best-effort). */
   pendingReveal: KnowledgePendingReveal | null
-  /** Doc counts per space, filled when the search index is built. */
+  /**
+   * Doc counts per space. Tree-derived counts land as soon as trees load during
+   * index rebuild (before body reads); finalized when indexStatus is ready.
+   */
   spaceDocCounts: Record<string, number>
   /** Facet values from indexed frontmatter (sorted). */
   availableTags: string[]
@@ -521,26 +524,28 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     const counts: Record<string, number> = {}
     try {
       const spaces = get().spaces
-      // Preload trees so we can report accurate n/N progress.
+      // Preload trees so we can report accurate n/N progress and early doc counts
+      // without waiting for full body reads (counts ≠ index ready).
       const loaded: { space: (typeof spaces)[number]; nodes: KnowledgeNode[] }[] = []
       let total = 0
       for (const space of spaces) {
         if (gen !== indexBuildGen) return
         const tree = await knowledgeGetTree(space.id)
         const nodes = tree.nodes ?? []
-        total += nodes.reduce((n, node) => n + (node.kind === 'doc' ? 1 : 0), 0)
+        const docs = nodes.reduce((n, node) => n + (node.kind === 'doc' ? 1 : 0), 0)
+        total += docs
+        counts[space.id] = docs
         loaded.push({ space, nodes })
       }
       if (gen !== indexBuildGen) return
-      set({ indexProgress: { done: 0, total } })
+      // Tree-derived counts available before body indexing finishes.
+      set({ indexProgress: { done: 0, total }, spaceDocCounts: { ...counts } })
 
       let done = 0
       for (const { space, nodes } of loaded) {
         if (gen !== indexBuildGen) return
-        let docs = 0
         for (const node of nodes) {
           if (node.kind !== 'doc') continue
-          docs += 1
           if (gen !== indexBuildGen) return
           let body = ''
           try {
@@ -569,7 +574,6 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
             if (gen !== indexBuildGen) return
           }
         }
-        counts[space.id] = docs
         if (gen !== indexBuildGen) return
         set({ indexProgress: { done, total, spaceName: space.name } })
       }

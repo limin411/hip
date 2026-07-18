@@ -3,6 +3,7 @@ import { createHashRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { useProvidersStore } from '@/store/providersStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { usePluginsStore } from '@/store/pluginsStore'
+import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { LoadingScreen } from '@/components/layout/LoadingScreen'
 import { AppLayout } from './routes/AppLayout'
 
@@ -32,6 +33,12 @@ function App() {
     void usePluginsStore.getState().load().catch((err) => {
       console.error('Failed to preload plugins:', err)
       usePluginsStore.setState({ loaded: true })
+    })
+    // Early knowledge list hydrate so sidebar space count is not empty until first
+    // Knowledge enter. Idempotent with enterKnowledge / KnowledgePage loadSpaces.
+    void useKnowledgeStore.getState().loadSpaces().catch((err) => {
+      console.error('Failed to preload knowledge spaces:', err)
+      useKnowledgeStore.setState({ loaded: true })
     })
   }, [])
 

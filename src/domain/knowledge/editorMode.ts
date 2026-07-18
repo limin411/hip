@@ -5,9 +5,11 @@ export type EditorMode = 'live' | 'source' | 'preview'
 export type WritableEditorMode = 'live' | 'source'
 
 /**
- * localStorage: Live editor feature flag.
- * Default **off** until full PR-17 quality gate (unit + e2e Source/Live smoke +
- * portable zip image round-trip). Opt-in: `localStorage.hip-knowledge-live=true`.
+ * localStorage: Live editor feature flag (product-on by default for 所见即所得).
+ * - Key absent / missing storage → **on** (default WYSIWYG edit)
+ * - Exact `"false"` → off (explicit opt-out; Source is primary edit path)
+ * - Exact `"true"` → on (explicit opt-in; same as default)
+ * - Any other value → off (conservative; treat as non-enabled)
  */
 export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 
@@ -20,25 +22,27 @@ export function shouldAutosave(mode: EditorMode): boolean {
 }
 
 /**
- * Whether Live mode is enabled via localStorage flag.
- * - Key absent / missing storage → false (default off; e2e gate not closed)
- * - Exact `"true"` → true (explicit opt-in)
- * - Any other value (incl. `"false"`) → false
+ * Whether Live mode is enabled (product default on).
+ * - Key absent / missing storage → true
+ * - Exact `"true"` → true
+ * - Exact `"false"` or any other value → false
  */
 export function isKnowledgeLiveEnabled(): boolean {
-  if (typeof localStorage === 'undefined') return false
+  if (typeof localStorage === 'undefined') return true
   try {
-    return localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY) === 'true'
+    const v = localStorage.getItem(KNOWLEDGE_LIVE_FLAG_KEY)
+    if (v === null) return true
+    return v === 'true'
   } catch {
-    return false
+    return true
   }
 }
 
 /**
- * Preferred writable mode when opening a doc.
+ * Preferred writable mode when opening a doc / starting edit.
  * - Flag off → always `source`
  * - Flag on + stored pref → that pref (live|source)
- * - Flag on + no pref → `live`
+ * - Flag on + no pref → `live` (所见即所得 default)
  */
 export function loadEditorModePref(): WritableEditorMode {
   if (!isKnowledgeLiveEnabled()) return 'source'

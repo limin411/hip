@@ -419,11 +419,11 @@ export function MemoryConfig() {
 
   // Extra bottom padding: long / expanded content scrolls inside SettingsPanel;
   // plain p-6 leaves the last block flush against the pane edge.
-  const rootCls = 'space-y-6 px-6 pt-6 pb-12'
+  const rootCls = 'space-y-6 px-6 pt-6 pb-20'
 
   if (loading && !config) {
     return (
-      <div className="px-6 pt-6 pb-12">
+      <div className="px-6 pt-6 pb-20">
         <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
         <p className="mt-2 text-body text-ink-secondary">{t('settings.memory.loading')}</p>
       </div>

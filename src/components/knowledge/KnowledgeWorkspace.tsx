@@ -424,12 +424,8 @@ export function KnowledgeWorkspace() {
 
   return (
     <div className="flex min-h-0 flex-1" data-testid="knowledge-workspace">
-      {/* Scheme A: same surface as main, soft gradient edge (no gray slab / hard border). */}
-      <aside className="relative flex w-[280px] shrink-0 flex-col bg-surface">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-px bg-gradient-to-b from-transparent via-border/50 to-transparent"
-        />
+      {/* Same surface as main; border rail separates tree from paper canvas. */}
+      <aside className="relative flex w-[280px] shrink-0 flex-col border-r border-border/70 bg-surface">
         {/* Space identity + actions — no hard header rule */}
         <div className="flex flex-col gap-3 px-3 pb-2 pt-3">
           <div className="flex items-start gap-1">

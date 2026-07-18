@@ -34,6 +34,10 @@ const DEPTH_STEP = 12
 const BASE_PAD = 6
 /** Pointer move distance before a press becomes a drag (px). */
 const DRAG_THRESHOLD_PX = 5
+/** Soft accent wash + left rail for the active document row (local; not SIDEBAR_ACTIVE_RAIL). */
+const TREE_ACTIVE_DOC =
+  'relative bg-accent/10 font-medium text-ink ' +
+  'before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
 
 function dropModeFor(node: KnowledgeNode, clientY: number, rect: DOMRect): DropMode {
   const ratio = (clientY - rect.top) / Math.max(rect.height, 1)
@@ -295,7 +299,7 @@ export function SpaceTree({
         className="flex flex-col items-center gap-2.5 px-3 py-10 text-center"
         data-testid="knowledge-tree-empty"
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-muted text-ink-tertiary">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-ink-tertiary">
           <Library size={18} strokeWidth={1.75} />
         </span>
         <p className="max-w-[11rem] text-meta leading-relaxed text-ink-tertiary">
@@ -418,9 +422,7 @@ export function SpaceTree({
         }}
         className={cn(
           'group relative flex w-full min-h-[32px] items-center gap-0.5 rounded-lg py-1 pr-1.5 text-body transition-[background-color,color,box-shadow,opacity] duration-100 outline-none select-none',
-          isActiveDoc
-            ? 'bg-accent/10 font-medium text-accent-strong'
-            : 'text-ink hover:bg-state-hover',
+          isActiveDoc ? TREE_ACTIVE_DOC : 'text-ink hover:bg-state-hover',
           isFocused && !isActiveDoc && 'bg-state-hover ring-1 ring-accent/25',
           draggingId === node.id && 'opacity-45',
           dropHint?.targetId === node.id &&
@@ -532,7 +534,7 @@ export function SpaceTree({
             <span
               className={cn(
                 'truncate leading-snug tracking-tight',
-                isActiveDoc ? 'font-medium' : 'font-normal text-ink',
+                isActiveDoc ? 'font-medium text-ink' : 'font-normal text-ink',
               )}
             >
               {node.title}

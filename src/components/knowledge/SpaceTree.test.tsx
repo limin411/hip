@@ -70,7 +70,7 @@ describe('SpaceTree selection visuals', () => {
     cleanup()
   })
 
-  it('marks the active doc row with soft accent selection and no inset bar', () => {
+  it('marks the active doc row with soft accent wash and left rail', () => {
     render(
       <SpaceTree
         onRename={noop}
@@ -81,11 +81,12 @@ describe('SpaceTree selection visuals', () => {
     )
 
     const active = screen.getByTestId('knowledge-tree-doc-doc_1')
-    // Scheme A: soft accent wash (not hard gray accent-active slab)
+    // Soft accent wash + left rail (not hard gray accent-active slab)
     expect(active.className).toContain('bg-accent/10')
-    expect(active.className).toContain('text-accent-strong')
+    expect(active.className).toContain('text-ink')
     expect(active.className).toContain('font-medium')
-    expect(active.className).not.toMatch(/inset/)
+    expect(active.className).toContain('before:bg-accent')
+    expect(active.className).toContain('before:w-0.5')
     expect(active.className).not.toContain('shadow-[inset')
     expect(active.className).not.toContain('bg-accent-active')
 

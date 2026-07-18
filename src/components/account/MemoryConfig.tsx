@@ -430,7 +430,7 @@ export function MemoryConfig() {
 
   if (bothOff) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 p-6" data-testid="memory-config-empty">
+      <div className="space-y-6 p-6" data-testid="memory-config-empty">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
             <Brain size={20} />
@@ -488,7 +488,7 @@ export function MemoryConfig() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6" data-testid="memory-config">
+    <div className="space-y-6 p-6" data-testid="memory-config">
       {/* Header */}
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">

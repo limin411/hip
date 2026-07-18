@@ -4,22 +4,31 @@ import type { PluginMeta } from '@hip/protocol'
 import { usePluginsStore } from '@/store/pluginsStore'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import { PluginConfigView, type Translate } from './PluginConfigView'
+import { PluginConfigView, PluginViewModal, type Translate } from './PluginConfigView'
 
 /**
  * Settings → Plugin Market.
  * Lists plugins scanned from ~/.hip/plugins (plugin.json + optional PLUGIN.md).
- * Install is directory-only — no in-app install UI.
+ * View details + enable switch; install is directory-only.
  */
 export function PluginConfig() {
   const { t } = useTranslation()
-  const { plugins, loaded, load, remove } = usePluginsStore()
+  const { plugins, loaded, load, remove, toggle } = usePluginsStore()
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<PluginMeta | null>(null)
+  const [viewing, setViewing] = useState<PluginMeta | null>(null)
 
   useEffect(() => {
     if (!loaded) void load()
   }, [loaded, load])
+
+  // Keep viewing modal in sync when toggle refreshes plugin list.
+  useEffect(() => {
+    setViewing((v) => {
+      if (!v) return v
+      return plugins.find((p) => p.id === v.id) ?? null
+    })
+  }, [plugins])
 
   return (
     <>
@@ -30,8 +39,26 @@ export function PluginConfig() {
           setError(null)
           setDeleting(plugin)
         }}
+        onToggle={(plugin, enabled) => {
+          setError(null)
+          void toggle(plugin.id, enabled).catch((err: Error) => {
+            setError(err.message ?? t('settings.plugins.toggleError'))
+          })
+        }}
+        onView={(plugin) => {
+          setError(null)
+          setViewing(plugin)
+        }}
         t={t as Translate}
       />
+
+      {viewing && (
+        <PluginViewModal
+          plugin={viewing}
+          onClose={() => setViewing(null)}
+          t={t as Translate}
+        />
+      )}
 
       {deleting && (
         <Modal
@@ -53,7 +80,10 @@ export function PluginConfig() {
                 size="sm"
                 onClick={() => {
                   remove(deleting.id)
-                    .then(() => setDeleting(null))
+                    .then(() => {
+                      if (viewing?.id === deleting.id) setViewing(null)
+                      setDeleting(null)
+                    })
                     .catch((err: Error) => {
                       setDeleting(null)
                       setError(err.message ?? t('settings.plugins.deleteError'))

@@ -19,3 +19,12 @@ export async function installPluginZip(zipPath: string): Promise<string> {
 export async function deletePlugin(id: string): Promise<void> {
   await invoke<void>('delete_plugin', { id })
 }
+
+export async function setPluginEnabled(id: string, enabled: boolean): Promise<void> {
+  await invoke<void>('set_plugin_enabled', { id, enabled })
+}
+
+/** Read a file relative to the plugin root (e.g. PLUGIN.md). */
+export async function readPluginFile(id: string, rel: string): Promise<string> {
+  return invoke<string>('read_plugin_file', { id, rel })
+}

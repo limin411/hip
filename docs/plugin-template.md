@@ -594,5 +594,7 @@ Provides a single `hello` skill.
 ## 相关文档
 
 - 插件市场产品与实施规格：[`docs/plugin-market-spec.md`](./plugin-market-spec.md)
+- 示范插件（obra/superpowers）：`bash scripts/install-demo-plugin-superpowers.sh`  
+  安装到 `~/.hip/plugins/superpowers` 并写入 `hip-plugins.json`；重启或新开会话后技能可 `use_skill`。
 
 *文档版本：与 hip 当前 plugin 加载路径对齐；若 `PluginManifest` 增字段，先改 protocol，再同步本节 schema。*

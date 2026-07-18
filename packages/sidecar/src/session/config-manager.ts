@@ -2,7 +2,7 @@ import type { SessionConfig, SkillMeta, AgentConfig, McpServerConfig } from '@hi
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveEffectiveConfig } from '../config/hip-config.js'
-import { readPluginsConfig } from '../config/plugins.js'
+import { isPluginEnabled, readPluginsConfig } from '../config/plugins.js'
 import { readEnabledSkills, mergeSkills, extractSkillMetaFromData, readEnabledMap } from './skills/registry.js'
 import { parseFrontmatter } from './skills/frontmatter.js'
 import { parsePluginManifest, PluginManifestError } from './plugins/parser.js'
@@ -62,7 +62,9 @@ export class ConfigManager {
     const enabled = readEnabledMap(cwd, cfg)
     const pluginAgents: AgentConfig[] = []
     try {
-      for (const pluginDir of readPluginsConfig().plugins) {
+      const pluginsCfg = readPluginsConfig()
+      for (const pluginDir of pluginsCfg.plugins) {
+        if (!isPluginEnabled(pluginDir, pluginsCfg)) continue
         try {
           const manifest = parsePluginManifest(pluginDir)
           const synth = synthesizePlugin(manifest)

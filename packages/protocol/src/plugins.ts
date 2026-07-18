@@ -23,7 +23,16 @@ export interface PluginComponentRef {
   componentId: string
 }
 
-export interface PluginsConfig { plugins: string[] }
+/**
+ * Plugin registry (`~/.hip/config/hip-plugins.json`).
+ * `plugins` = absolute directory paths the sidecar loads.
+ * `enabled` = per-id switches (folder slug). Missing id ⇒ enabled when registered.
+ */
+export interface PluginsConfig {
+  plugins: string[]
+  /** Keyed by plugin folder id/slug. Explicit `false` disables session load. */
+  enabled?: Record<string, boolean>
+}
 
 /** One installed plugin, scanned from ~/.hip/plugins/<id>/.plugin/plugin.json
  *  (optionally enriched by PLUGIN.md frontmatter for marketplace display). */
@@ -39,6 +48,11 @@ export interface PluginMeta {
   hookCount: number                   // number of hook entries declared
   /** Unique HookEvent names detected in the plugin's hooks module/JSON (best-effort scan). */
   hookEvents: string[]
+  /**
+   * Whether the sidecar should load this plugin into sessions.
+   * True when path is registered and enabled[id] is not false.
+   */
+  enabled: boolean
   /** Marketplace display: author display name (PLUGIN.md or plugin.json). */
   author?: string
   license?: string

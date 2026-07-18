@@ -79,6 +79,7 @@ function plugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
     agents: [],
     hookCount: 0,
     hookEvents: [],
+    enabled: true,
     ...overrides,
   }
 }
@@ -275,6 +276,7 @@ describe('derivePluginSkills duplicate policy', () => {
         agents: [],
         hookCount: 0,
     hookEvents: [],
+    enabled: true,
       },
     ]
     const result = derivePluginSkills(plugins, new Set(['shared']))

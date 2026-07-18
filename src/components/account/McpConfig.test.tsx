@@ -67,6 +67,7 @@ function makePlugin(id: string, name: string, servers: McpServerConfig[]): Plugi
     agents: [],
     hookCount: 0,
     hookEvents: [],
+    enabled: true,
   }
 }
 

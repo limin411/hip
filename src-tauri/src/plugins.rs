@@ -51,6 +51,8 @@ pub struct PluginMeta {
     pub source_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_plugin_md: Option<bool>,
+    /// Whether the plugin is registered and not explicitly disabled.
+    pub enabled: bool,
 }
 
 /// Scan `<root>/*/.plugin/plugin.json`, parse each to build a `PluginMeta`.
@@ -113,6 +115,8 @@ pub fn scan_one_plugin(dir: &Path) -> Option<PluginMeta> {
         source_url: author_url_from_manifest(&meta),
         source_type: None,
         has_plugin_md: None,
+        // Filled by list_installed_plugins from the registry.
+        enabled: false,
     };
 
     merge_plugin_md(dir, &mut plugin);
@@ -121,6 +125,7 @@ pub fn scan_one_plugin(dir: &Path) -> Option<PluginMeta> {
 
 /// List plugins under `plugins_root`, then any paths registered in `hip-plugins.json`
 /// that were not already discovered (external checkouts / e2e fixtures).
+/// Sets `enabled` from registry: registered path + not explicitly disabled.
 pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -> Vec<PluginMeta> {
     let mut out = scan_plugins(plugins_root);
     let mut seen: std::collections::HashSet<String> = out
@@ -130,29 +135,142 @@ pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -
     // Also key by id so we don't double-list.
     let mut seen_ids: std::collections::HashSet<String> = out.iter().map(|m| m.id.clone()).collect();
 
-    if let Some(cfg) = config_path {
-        let (paths, _) = read_plugins_config(cfg);
-        for p in paths {
-            let dir = PathBuf::from(&p);
-            let canon = std::fs::canonicalize(&dir)
-                .unwrap_or_else(|_| dir.clone())
-                .to_string_lossy()
-                .into_owned();
-            if seen.contains(&canon) {
+    let (reg_paths, _entries, enabled_map) = match config_path {
+        Some(cfg) => {
+            let (p, e) = read_plugins_config(cfg);
+            let en = read_enabled_map(cfg);
+            (p, e, en)
+        }
+        None => (Vec::new(), Vec::new(), std::collections::HashMap::new()),
+    };
+
+    let mut registered_canons: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut registered_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for p in &reg_paths {
+        let dir = PathBuf::from(p);
+        let canon = std::fs::canonicalize(&dir)
+            .unwrap_or_else(|_| dir.clone())
+            .to_string_lossy()
+            .into_owned();
+        registered_canons.insert(canon.clone());
+        if let Some(id) = dir.file_name().and_then(|s| s.to_str()) {
+            registered_ids.insert(id.to_string());
+        }
+        if seen.contains(&canon) {
+            continue;
+        }
+        if let Some(meta) = scan_one_plugin(&dir) {
+            if seen_ids.contains(&meta.id) {
                 continue;
             }
-            if let Some(meta) = scan_one_plugin(&dir) {
-                if seen_ids.contains(&meta.id) {
-                    continue;
-                }
-                seen.insert(canon);
-                seen_ids.insert(meta.id.clone());
-                out.push(meta);
+            seen.insert(canon);
+            seen_ids.insert(meta.id.clone());
+            out.push(meta);
+        }
+    }
+
+    for meta in &mut out {
+        let canon = std::fs::canonicalize(&meta.dir)
+            .unwrap_or_else(|_| PathBuf::from(&meta.dir))
+            .to_string_lossy()
+            .into_owned();
+        let registered = registered_canons.contains(&canon) || registered_ids.contains(&meta.id);
+        let not_disabled = enabled_map.get(&meta.id).copied() != Some(false);
+        meta.enabled = registered && not_disabled;
+    }
+
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out
+}
+
+fn read_enabled_map(config_path: &Path) -> std::collections::HashMap<String, bool> {
+    let raw: serde_json::Value = match std::fs::read_to_string(config_path) {
+        Ok(body) if !body.trim().is_empty() => serde_json::from_str(&body).unwrap_or_default(),
+        _ => serde_json::Value::Null,
+    };
+    let mut map = std::collections::HashMap::new();
+    if let Some(obj) = raw.get("enabled").and_then(|v| v.as_object()) {
+        for (k, v) in obj {
+            if let Some(b) = v.as_bool() {
+                map.insert(k.clone(), b);
             }
         }
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-    out
+    map
+}
+
+/// Enable or disable a plugin by id (folder slug). Enabling registers `plugin_dir` if needed.
+pub fn set_plugin_enabled(
+    config_path: &Path,
+    plugin_id: &str,
+    enabled: bool,
+    plugin_dir: &Path,
+) -> Result<(), String> {
+    if plugin_id.is_empty()
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+        || plugin_id.contains("..")
+    {
+        return Err("非法 plugin id".to_string());
+    }
+    if !plugin_dir.is_dir() {
+        return Err("plugin 目录不存在".to_string());
+    }
+    let (mut plugins, entries) = read_plugins_config(config_path);
+    let mut enabled_map = read_enabled_map(config_path);
+    let dir_str = plugin_dir.to_string_lossy().into_owned();
+
+    if enabled {
+        if !plugins.iter().any(|p| {
+            Path::new(p).file_name().and_then(|s| s.to_str()) == Some(plugin_id)
+                || p == &dir_str
+        }) {
+            plugins.push(dir_str);
+        }
+        enabled_map.insert(plugin_id.to_string(), true);
+    } else {
+        enabled_map.insert(plugin_id.to_string(), false);
+        // Keep path registered so toggle can re-enable without losing install path.
+        if !plugins.iter().any(|p| {
+            Path::new(p).file_name().and_then(|s| s.to_str()) == Some(plugin_id)
+                || p == &dir_str
+        }) {
+            plugins.push(dir_str);
+        }
+    }
+
+    write_plugins_config_full(config_path, &plugins, &entries, &enabled_map)
+}
+
+/// Read a file under the plugin directory (path-traversal safe). `rel` e.g. `PLUGIN.md`.
+pub fn read_plugin_file(plugin_dir: &Path, rel: &str) -> Result<String, String> {
+    if rel.is_empty() || rel.contains("..") {
+        return Err("非法文件路径".to_string());
+    }
+    let target = safe_resolve(rel, plugin_dir).ok_or_else(|| "非法文件路径".to_string())?;
+    if !target.is_file() {
+        return Err("文件不存在".to_string());
+    }
+    std::fs::read_to_string(&target).map_err(|e| e.to_string())
+}
+
+fn write_plugins_config_full(
+    config_path: &Path,
+    plugins: &[String],
+    entries: &[serde_json::Value],
+    enabled: &std::collections::HashMap<String, bool>,
+) -> Result<(), String> {
+    let enabled_obj: serde_json::Map<String, serde_json::Value> = enabled
+        .iter()
+        .map(|(k, v)| (k.clone(), serde_json::Value::Bool(*v)))
+        .collect();
+    let cfg = serde_json::json!({
+        "plugins": plugins,
+        "entries": entries,
+        "enabled": serde_json::Value::Object(enabled_obj),
+    });
+    let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    std::fs::write(config_path, json).map_err(|e| e.to_string())
 }
 
 #[derive(serde::Deserialize)]
@@ -709,19 +827,6 @@ fn read_plugins_config(config_path: &Path) -> (Vec<String>, Vec<serde_json::Valu
     (plugins, entries)
 }
 
-fn write_plugins_config(
-    config_path: &Path,
-    plugins: &[String],
-    entries: &[serde_json::Value],
-) -> Result<(), String> {
-    let cfg = serde_json::json!({
-        "plugins": plugins,
-        "entries": entries,
-    });
-    let json = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(config_path, json).map_err(|e| e.to_string())
-}
-
 /// Register an installed plugin directory so the sidecar can discover it.
 pub fn register_plugin(config_path: &Path, plugin_dir: &Path) -> Result<(), String> {
     let dir_str = plugin_dir.to_string_lossy().into_owned();
@@ -729,7 +834,11 @@ pub fn register_plugin(config_path: &Path, plugin_dir: &Path) -> Result<(), Stri
     if !plugins.contains(&dir_str) {
         plugins.push(dir_str);
     }
-    write_plugins_config(config_path, &plugins, &entries)
+    let mut enabled = read_enabled_map(config_path);
+    if let Some(id) = plugin_dir.file_name().and_then(|s| s.to_str()) {
+        enabled.insert(id.to_string(), true);
+    }
+    write_plugins_config_full(config_path, &plugins, &entries, &enabled)
 }
 
 /// Remove a plugin directory from the registry by its slug/id.
@@ -762,7 +871,9 @@ pub fn unregister_plugin(config_path: &Path, plugin_id: &str) -> Result<(), Stri
         }
     });
 
-    write_plugins_config(config_path, &plugins, &entries)
+    let mut enabled = read_enabled_map(config_path);
+    enabled.remove(plugin_id);
+    write_plugins_config_full(config_path, &plugins, &entries, &enabled)
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -1244,6 +1355,42 @@ Long body ignored for list scan.
         assert_eq!(metas.len(), 1);
         assert_eq!(metas[0].id, "external-plugin");
         assert_eq!(metas[0].name, "External");
+        assert!(metas[0].enabled);
+    }
+
+    #[test]
+    fn set_plugin_enabled_registers_and_disables() {
+        let tmp = TempDir::new();
+        let plugin_dir = tmp.child("demo");
+        fs::create_dir_all(plugin_dir.join(".plugin")).unwrap();
+        tmp.write(
+            "demo/.plugin/plugin.json",
+            r#"{ "name": "Demo", "version": "1.0.0" }"#,
+        );
+        let config_path = tmp.child("hip-plugins.json");
+        fs::write(&config_path, r#"{"plugins":[],"entries":[]}"#).unwrap();
+
+        set_plugin_enabled(&config_path, "demo", true, &plugin_dir).unwrap();
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(raw["enabled"]["demo"], true);
+        assert!(raw["plugins"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("demo")));
+
+        set_plugin_enabled(&config_path, "demo", false, &plugin_dir).unwrap();
+        let raw2: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert_eq!(raw2["enabled"]["demo"], false);
+
+        let plugins_root = tmp.child("plugins");
+        fs::create_dir_all(&plugins_root).unwrap();
+        // list from registry path
+        let metas = list_installed_plugins(&plugins_root, Some(&config_path));
+        assert_eq!(metas.len(), 1);
+        assert!(!metas[0].enabled);
     }
 
     #[test]

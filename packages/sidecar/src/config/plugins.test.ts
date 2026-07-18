@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readPluginsConfig } from './plugins.js'
+import { isPluginEnabled, readPluginsConfig } from './plugins.js'
 
 const tmps: string[] = []
 function writeConfig(name: string, obj: unknown): string {
@@ -59,5 +59,31 @@ describe('readPluginsConfig', () => {
     expect(result).toEqual({ plugins: [] })
     expect(warnSpy).toHaveBeenCalledTimes(3)
     warnSpy.mockRestore()
+  })
+
+  it('reads enabled map', () => {
+    process.env.HIP_PLUGINS_PATH = writeConfig('plugins.json', {
+      plugins: ['/path/superpowers'],
+      enabled: { superpowers: false },
+    })
+    expect(readPluginsConfig()).toEqual({
+      plugins: ['/path/superpowers'],
+      enabled: { superpowers: false },
+    })
+  })
+})
+
+describe('isPluginEnabled', () => {
+  it('defaults to enabled when map omits the id', () => {
+    expect(isPluginEnabled('/x/superpowers', { plugins: ['/x/superpowers'] })).toBe(true)
+  })
+
+  it('respects explicit false', () => {
+    expect(
+      isPluginEnabled('/x/superpowers', {
+        plugins: ['/x/superpowers'],
+        enabled: { superpowers: false },
+      }),
+    ).toBe(false)
   })
 })

@@ -219,6 +219,51 @@ fn list_plugins(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn set_plugin_enabled(
+    app: tauri::AppHandle,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("非法 plugin id".to_string());
+    }
+    let plugin_dir = paths::plugins_dir(&app)
+        .ok_or("no plugins dir")?
+        .join(&id);
+    // Prefer registered absolute path when the plugin lives outside the default root.
+    let config_path = paths::plugins_config_path(&app).ok_or("no config dir")?;
+    let dir = if plugin_dir.is_dir() {
+        plugin_dir
+    } else {
+        let metas = plugins::list_installed_plugins(
+            paths::plugins_dir(&app).as_ref().ok_or("no plugins dir")?,
+            Some(&config_path),
+        );
+        metas
+            .into_iter()
+            .find(|m| m.id == id)
+            .map(|m| std::path::PathBuf::from(m.dir))
+            .ok_or_else(|| "plugin 不存在".to_string())?
+    };
+    plugins::set_plugin_enabled(&config_path, &id, enabled, &dir)
+}
+
+#[tauri::command]
+fn read_plugin_file(app: tauri::AppHandle, id: String, rel: String) -> Result<String, String> {
+    if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("非法 plugin id".to_string());
+    }
+    let config = paths::plugins_config_path(&app);
+    let root = paths::plugins_dir(&app).ok_or("no plugins dir")?;
+    let metas = plugins::list_installed_plugins(&root, config.as_deref());
+    let meta = metas
+        .into_iter()
+        .find(|m| m.id == id)
+        .ok_or_else(|| "plugin 不存在".to_string())?;
+    plugins::read_plugin_file(std::path::Path::new(&meta.dir), &rel)
+}
+
+#[tauri::command]
 fn install_plugin(app: tauri::AppHandle, zip_path: String) -> Result<String, String> {
     let plugins_root = paths::plugins_dir(&app).ok_or("no plugins dir")?;
     let staging = plugins_root.join(format!(".staging-{}", std::process::id()));
@@ -536,6 +581,8 @@ pub fn run() {
             list_plugins,
             install_plugin,
             delete_plugin,
+            set_plugin_enabled,
+            read_plugin_file,
             list_worktrees,
             path_tools::which_binaries,
             path_tools::path_is_dir,

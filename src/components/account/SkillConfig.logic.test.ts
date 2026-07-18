@@ -31,6 +31,7 @@ function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
     agents: [],
     hookCount: 0,
     hookEvents: [],
+    enabled: true,
     ...overrides,
   }
 }

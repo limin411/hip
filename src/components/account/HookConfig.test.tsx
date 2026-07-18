@@ -90,6 +90,7 @@ function plugin(partial: Partial<PluginMeta> & Pick<PluginMeta, 'id' | 'name' | 
     mcpServers: [],
     agents: [],
     hookEvents: [],
+    enabled: true,
     ...partial,
   }
 }

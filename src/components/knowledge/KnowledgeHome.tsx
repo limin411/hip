@@ -178,7 +178,7 @@ export function KnowledgeHome() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('knowledge.home.searchPlaceholder')}
-            className="h-10 pl-9"
+            className="h-11 rounded-xl pl-9 focus-visible:ring-2 focus-visible:ring-accent/25"
           />
           {searching && indexStatus === 'building' && (
             <p
@@ -359,12 +359,12 @@ export function KnowledgeHome() {
                     label: t('knowledge.home.createSpace'),
                     onClick: () => setCreateOpen(true),
                   }}
-                  className="border-0"
+                  className="border-0 py-16"
                 >
                   <HipLogo size={32} decorative />
                 </EmptyState>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredSpaces.map((space) => {
                     const docCount = spaceDocCounts[space.id]
                     const lastOpen = lastOpenBySpace.get(space.id)
@@ -375,21 +375,21 @@ export function KnowledgeHome() {
                         data-testid="knowledge-space-card"
                         data-space-id={space.id}
                         data-space-name={space.name}
-                        className="group relative flex min-h-[8rem] flex-col rounded-lg border border-border bg-surface transition-colors hover:bg-surface-subtle"
+                        className="group relative flex min-h-[9rem] flex-col rounded-xl border border-border bg-surface transition-shadow duration-[var(--duration-chrome)] ease-[var(--ease-standard)] hover:shadow-panel focus-within:shadow-panel"
                       >
                         <button
                           type="button"
                           className="flex flex-1 flex-col items-start p-4 text-left"
                           onClick={() => void openSpace(space.id)}
                         >
-                          <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-muted text-ink-secondary">
+                          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-surface-muted text-ink-secondary">
                             {space.icon ? (
-                              <span className="text-lg leading-none">{space.icon}</span>
+                              <span className="text-xl leading-none">{space.icon}</span>
                             ) : (
-                              <BookOpen size={18} className="text-accent-strong" />
+                              <BookOpen size={20} className="text-accent-strong" />
                             )}
                           </span>
-                          <span className="line-clamp-2 pr-6 text-body font-semibold leading-snug text-ink">
+                          <span className="line-clamp-2 pr-6 text-title font-semibold tracking-tight leading-snug text-ink">
                             {space.name}
                           </span>
                           <span className="mt-auto pt-3 text-meta text-ink-tertiary">
@@ -408,7 +408,7 @@ export function KnowledgeHome() {
                               <button
                                 type="button"
                                 data-testid="knowledge-space-menu"
-                                className="rounded-md p-1.5 text-ink-tertiary hover:bg-surface hover:text-ink"
+                                className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
                                 aria-label={t('knowledge.space.menu')}
                               >
                                 <MoreHorizontal size={16} />

@@ -10,6 +10,10 @@ export type RefreshMemoryCoreSnapshotArgs = {
   hostSnapshot?: string
   hostCoreIds?: string[]
   hostProjectKey?: string
+  /** Generation last baked into host snapshot. */
+  hostGeneration?: number
+  /** Current store generation from MemoryService.getCoreGeneration(). */
+  storeGeneration?: number
   load: (projectKeyHash: string) => MemoryInjectBlock
   resolveKey: (cwd: string) => { projectKeyHash: string }
 }
@@ -18,26 +22,33 @@ export type RefreshMemoryCoreSnapshotResult = {
   snapshot?: string
   coreIds?: string[]
   projectKey?: string
+  generation?: number
   /** True when useMemories is false and host cache should be cleared. */
   cleared?: boolean
 }
 
 /**
- * Freeze / refresh host-cached core memory by project key only.
- * Empty-string snapshots are valid freezes — do not reload solely because
- * the snapshot is falsy.
+ * Freeze / refresh host-cached core memory.
+ * Reload when project key changes, generation advances, or empty freeze after extract.
  */
 export function refreshMemoryCoreSnapshot(
   args: RefreshMemoryCoreSnapshotArgs,
 ): RefreshMemoryCoreSnapshotResult {
   if (!args.useMemories) {
-    return { snapshot: undefined, coreIds: undefined, projectKey: undefined, cleared: true }
+    return {
+      snapshot: undefined,
+      coreIds: undefined,
+      projectKey: undefined,
+      generation: undefined,
+      cleared: true,
+    }
   }
   if (!args.cwd) {
     return {
       snapshot: args.hostSnapshot,
       coreIds: args.hostCoreIds,
       projectKey: args.hostProjectKey,
+      generation: args.hostGeneration,
     }
   }
 
@@ -49,15 +60,33 @@ export function refreshMemoryCoreSnapshot(
       snapshot: args.hostSnapshot,
       coreIds: args.hostCoreIds,
       projectKey: args.hostProjectKey,
+      generation: args.hostGeneration,
     }
   }
 
-  if (args.hostProjectKey !== projectKeyHash) {
+  const storeGen = args.storeGeneration ?? 0
+  const projectChanged = args.hostProjectKey !== projectKeyHash
+  // First load (no project key yet): treat host gen as -1 so we always load.
+  // Cached host without generation field: assume current storeGen (legacy freeze).
+  const effectiveHostGen =
+    args.hostGeneration !== undefined
+      ? args.hostGeneration
+      : args.hostProjectKey !== undefined
+        ? storeGen
+        : -1
+  const genChanged = effectiveHostGen !== storeGen
+  // Empty freeze is valid; recover only when store generation advanced past host.
+  const emptyRecover =
+    (args.hostSnapshot === '' || args.hostSnapshot === undefined) &&
+    storeGen > effectiveHostGen
+
+  if (projectChanged || genChanged || emptyRecover) {
     const loaded = args.load(projectKeyHash)
     return {
       snapshot: loaded.text,
       coreIds: loaded.ids,
       projectKey: projectKeyHash,
+      generation: storeGen,
     }
   }
 
@@ -65,6 +94,7 @@ export function refreshMemoryCoreSnapshot(
     snapshot: args.hostSnapshot,
     coreIds: args.hostCoreIds,
     projectKey: args.hostProjectKey,
+    generation: effectiveHostGen,
   }
 }
 

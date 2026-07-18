@@ -10,7 +10,7 @@ import {
   type Phase2LlmItem,
   type Phase2LlmOutput,
 } from './prompts.js'
-import { writeMemoryMirror } from '../mirror.js'
+import { rewriteMirrorsFromDb, type MemoryMutationScopes } from '../mirror.js'
 
 /** Default stage1 rows loaded per Phase2 run (design phase2_max_stage1_inputs). */
 export const PHASE2_MAX_STAGE1_DEFAULT = 20
@@ -48,6 +48,8 @@ export type RunPhase2ConsolidateOpts = {
   now?: number
   /** Override stage1 limit (default 20). */
   stage1Limit?: number
+  /** Optional: bump core generation after multi-scope mirror rewrite. */
+  onMutation?: (scopes: MemoryMutationScopes) => void
 }
 
 export type Phase2PostPassItem = {
@@ -564,16 +566,43 @@ export async function runPhase2Consolidate(
 
   opts.store.updateStage1Selected(stage1Ids, true)
 
+  // Multi-scope mirror rewrite: global and/or every touched project hash.
+  const scopes: MemoryMutationScopes = { global: false, projectKeyHashes: [] }
+  for (const it of post.items) {
+    if (it.scope === 'global') scopes.global = true
+    if (it.scope === 'project') {
+      const h = resolvedHash
+      if (h) {
+        scopes.projectKeyHashes = scopes.projectKeyHashes ?? []
+        if (!scopes.projectKeyHashes.includes(h)) scopes.projectKeyHashes.push(h)
+      }
+    }
+  }
+  if (sumScope === 'global') scopes.global = true
+  if (sumScope === 'project' && resolvedHash) {
+    scopes.projectKeyHashes = scopes.projectKeyHashes ?? []
+    if (!scopes.projectKeyHashes.includes(resolvedHash)) {
+      scopes.projectKeyHashes.push(resolvedHash)
+    }
+  }
+  if (!scopes.global && (!scopes.projectKeyHashes || scopes.projectKeyHashes.length === 0)) {
+    scopes.global = sumScope === 'global'
+    if (resolvedHash) scopes.projectKeyHashes = [resolvedHash]
+  }
+
   try {
-    writeMemoryMirror({
-      store: opts.store,
-      config: opts.config,
-      projectKeyHash: sumScope === 'project' ? resolvedHash : undefined,
-      summaryMd: post.summaryMd,
-    })
+    if (opts.onMutation) {
+      opts.onMutation(scopes)
+    } else {
+      rewriteMirrorsFromDb({
+        store: opts.store,
+        config: opts.config,
+        scopes,
+      })
+    }
   } catch (err) {
     console.warn(
-      '[memory-phase2] mirror write failed',
+      '[memory-phase2] mirror rewrite failed',
       err instanceof Error ? err.message : String(err),
     )
   }

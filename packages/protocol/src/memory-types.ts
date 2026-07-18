@@ -93,6 +93,36 @@ export interface MemoryFileConfig {
   maxExtractsPerDay?: number
   /** Soft-deleted memories hard-purged after this many days. Default 30. */
   trashRetentionDays?: number
+  /**
+   * Core inject mode. `rich` = profile + summaries + pinned/active bodies + capacity.
+   * `legacy` = summaries + pinned titles only.
+   */
+  coreInjectionMode?: 'legacy' | 'rich'
+  /** Max active (non-profile, non-pinned) items in rich core. Default 12. */
+  coreMaxItems?: number
+  /** Max chars per item body in rich core. Default 280. */
+  coreItemBodyChars?: number
+  /** Soft store cap on active items (tool add/replace). Default 200. */
+  maxActiveItems?: number
+  /** Soft store cap on sum of active content lengths. Default 50_000. */
+  maxActiveItemChars?: number
+  /**
+   * When true, `succeeded_no_output` counts toward minExtractIntervalHours spacing.
+   * Default false (cost still counts toward maxExtractsPerDay).
+   */
+  throttleOnEmptyExtract?: boolean
+  /** Import hip memories mirror files when that scope's DB is empty. Default true. */
+  importMirrorIfDbEmpty?: boolean
+  /** Require UI confirmation before tool/UI memory writes. Default false. */
+  requireWriteConfirmation?: boolean
+  /** Tools exposed to managed subagents. Default `search`. */
+  memoryToolsForSubagents?: 'none' | 'search' | 'all'
+  /** Inject memory into external (ACP) agents. Default false. */
+  useMemoriesWithExternal?: boolean
+  /** Isolate memories by agent id (future). Default false. */
+  perAgentMemory?: boolean
+  /** Memory backend selector. Default `sqlite`. */
+  backend?: 'sqlite' | 'noop'
 }
 
 export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
@@ -114,6 +144,61 @@ export const MEMORY_FILE_CONFIG_DEFAULTS: MemoryFileConfig = {
   hybridSearchEnabled: false,
   maxExtractsPerDay: 20,
   trashRetentionDays: 30,
+  coreInjectionMode: 'rich',
+  coreMaxItems: 12,
+  coreItemBodyChars: 280,
+  maxActiveItems: 200,
+  maxActiveItemChars: 50_000,
+  throttleOnEmptyExtract: false,
+  importMirrorIfDbEmpty: true,
+  requireWriteConfirmation: false,
+  memoryToolsForSubagents: 'search',
+  useMemoriesWithExternal: false,
+  perAgentMemory: false,
+  backend: 'sqlite',
+}
+
+/**
+ * Applied when the user enables both use+generate and idle/interval still equal cold defaults.
+ * Does not overwrite user-tuned values (e.g. e2e idleMinutes: 0).
+ */
+export const DOGFOOD_MEMORY_PRESET: Partial<MemoryFileConfig> = {
+  idleMinutes: 2,
+  minExtractIntervalHours: 0.25,
+}
+
+export type MemoryExtractSkipReason =
+  | 'incognito'
+  | 'generate_disabled'
+  | 'not_idle'
+  | 'min_content'
+  | 'empty_transcript'
+  | 'no_llm'
+  | 'rate_limited'
+  | 'interval_throttle'
+  | 'inflight'
+  | 'unknown'
+
+/** Pipeline + store health for UI poll (`memory:getStatus`). */
+export interface MemoryPipelineStatus {
+  lastPhase1At?: number
+  lastPhase1Status?: 'succeeded' | 'succeeded_no_output' | 'skipped' | 'failed'
+  lastPhase1Reason?: string
+  lastPhase1SessionId?: string
+  lastPhase2At?: number
+  lastPhase2Status?: 'succeeded' | 'succeeded_no_output' | 'skipped' | 'failed'
+  lastPhase2Reason?: string
+  extractsToday: number
+  maxExtractsPerDay: number
+  llmAvailable: boolean
+  itemCounts: { active: number; deleted: number; archived: number }
+  summaryCounts: { global: number; project: number }
+  stage1Pending: number
+  coreGeneration: number
+  mirrorDesync?: boolean
+  index?: { embedded: number; total: number; modelKey?: string; vecEnabled: boolean }
+  /** Only when client passed projectKeyHash (or cwd-resolved hash). */
+  capacity?: { usedChars: number; budgetChars: number; percent: number }
 }
 
 /**

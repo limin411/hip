@@ -7,6 +7,13 @@ agent instances; each UI tab is an independent session. The product default is a
 (`task` / `dispatch_agent` / `task_batch`). There is no forced Planner → Coder →
 Reviewer pipeline on ordinary turns.
 
+## Memory
+
+Cross-session memory is **off by default**. Enable under **Settings → Memory**.
+SQLite is the source of truth; `~/.hip/memories/` holds markdown export mirrors.
+See [docs/memory.md](./docs/memory.md) and the long-term design
+[docs/memory-longterm-design.md](./docs/memory-longterm-design.md).
+
 ## Architecture
 
 Three processes communicate at runtime:

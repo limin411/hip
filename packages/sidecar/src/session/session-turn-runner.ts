@@ -82,6 +82,8 @@ import {
   scheduleMemoryExtractAfterTurn,
   parseMemoryCitations,
   bumpMemoryUseCounts,
+  buildMemorySearchToolOnly,
+  buildMemoryTools,
 } from '../memory/index.js'
 import { MemoryInjector } from '../memory/inject.js'
 import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.js'
@@ -237,6 +239,8 @@ export interface SessionTurnHost {
   memoryCoreIds?: string[]
   /** projectKeyHash used when memoryCoreSnapshot was loaded. */
   memorySnapshotProjectKey?: string
+  /** Generation baked into memoryCoreSnapshot (KD-13 invalidation). */
+  memoryCoreGeneration?: number
   /** Memory item ids injected into context this turn (core + prefetch). */
   memoryIdsInjectedThisTurn?: Set<string>
   /** Lazy MemoryService shared across turns on this host. */
@@ -915,12 +919,35 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       configOptions: () => {},
     }
     try {
+      // Read-only memory for managed agents when useMemories (KD-7).
+      // Resolve at dispatch time (host snapshot is set earlier in this turn).
+      let systemPromptExtra: string | undefined
+      let extraTools: import('@langchain/core/tools').StructuredToolInterface[] | undefined
+      const memFlags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
+      const coreSnap = host.memoryCoreSnapshot
+      if (memFlags.use && host.memoryService && coreSnap) {
+        systemPromptExtra = `## Cross-session memory (read-only for sub-agent)\n\n${coreSnap}`
+        const memCfg = host.memoryService.getConfig()
+        const subTools = memCfg.memoryToolsForSubagents ?? 'search'
+        if (subTools === 'search' || subTools === 'all') {
+          extraTools =
+            subTools === 'all'
+              ? buildMemoryTools(host.memoryService, {
+                  sessionId: host.id,
+                  cwd,
+                  defaultScope: memCfg.defaultScope,
+                })
+              : [buildMemorySearchToolOnly(host.memoryService, { sessionId: host.id, cwd })]
+        }
+      }
       const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? host.abortController!.signal, hooks, {
         mcpTools: tooling?.tools, skills, requestApproval, permissionMode: mode, sessionId: host.id,
         title: host.store?.getSession(host.id)?.title,
         networkPolicy: host.networkPolicy, toolOutputStore: host.toolOutputStore,
         guardianReviewer: host.usesEnvModel ? new GuardianReviewer({ modelRunner: runner }) : undefined,
         pluginHooks: host.hooks, turnId, agentId: childId, parentAgentId: 'supervisor',
+        systemPromptExtra,
+        extraTools,
       })
       const run = trajectory.get(childId)
       const tools = run
@@ -974,12 +1001,15 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       hostSnapshot: host.memoryCoreSnapshot,
       hostCoreIds: host.memoryCoreIds,
       hostProjectKey: host.memorySnapshotProjectKey,
+      hostGeneration: host.memoryCoreGeneration,
+      storeGeneration: host.memoryService?.getCoreGeneration() ?? 0,
       load: (projectKeyHash) => host.memoryService!.loadCoreSnapshot(projectKeyHash),
       resolveKey: resolveProjectKey,
     })
     host.memoryCoreSnapshot = snapshotResult.snapshot
     host.memoryCoreIds = snapshotResult.coreIds
     host.memorySnapshotProjectKey = snapshotResult.projectKey
+    host.memoryCoreGeneration = snapshotResult.generation
     const memoryCoreSnapshot = snapshotResult.snapshot
     const memoryIdsInjectedThisTurn = new Set<string>()
     host.memoryIdsInjectedThisTurn = memoryIdsInjectedThisTurn

@@ -44,6 +44,10 @@ export interface InvokerExtras {
   nodeId?: string
   agentId?: string
   parentAgentId?: string
+  /** Appended to managed agent system prompt (e.g. cross-session memory core). */
+  systemPromptExtra?: string
+  /** Extra tools merged before toolNames / prompt construction (e.g. memory_search). */
+  extraTools?: StructuredToolInterface[]
 }
 
 export interface AgentInvoker {
@@ -81,6 +85,8 @@ export interface RunInternalArgs {
   parentAgentId?: string
   /** Built-in tool allow-list (explore read-only). */
   allowedTools?: string[]
+  systemPromptExtra?: string
+  extraTools?: StructuredToolInterface[]
 }
 
 export interface InvokerDeps {
@@ -130,6 +136,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
       agentId: a.agentId,
       parentAgentId: a.parentAgentId,
       allowedTools: a.allowedTools,
+      systemPromptExtra: a.systemPromptExtra,
+      extraTools: a.extraTools,
     }))
   return {
     // `hooks` here is ExternalAgentHooks (ACP permission bridge), not HookRegistry.
@@ -165,6 +173,8 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
           runId: extras?.runId,
           nodeId: extras?.nodeId,
           parentAgentId: extras?.parentAgentId,
+          systemPromptExtra: extras?.systemPromptExtra,
+          extraTools: extras?.extraTools,
           // Enforce read-only tools for the fixed explore agent (not prompt-only).
           ...(agentId === 'explore' ? { allowedTools: [...EXPLORE_ALLOWED_TOOLS] } : {}),
         })

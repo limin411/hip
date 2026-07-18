@@ -203,3 +203,13 @@ export function buildMemoryTools(
 
   return [memorySearch, memoryAdd, memoryReplace, memoryRemove]
 }
+
+/** Search-only tool for managed subagents (read-only memory path). */
+export function buildMemorySearchToolOnly(
+  svc: MemoryService,
+  ctx: { sessionId: string; cwd?: string },
+): StructuredToolInterface {
+  return buildMemoryTools(svc, { ...ctx, defaultScope: 'project' }).find(
+    (t) => t.name === 'memory_search',
+  )!
+}

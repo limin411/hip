@@ -16,6 +16,8 @@ export type Phase1QueueJob = {
   llm: MemoryLlmClient
   config: MemoryFileConfig
   sessionConfig?: { generateMemories?: boolean; incognito?: boolean; cwd?: string }
+  /** When set, persist throttle/status and multi-scope mutation. */
+  memoryService?: MemoryService
 }
 
 type SessionHostLike = {
@@ -46,8 +48,31 @@ function todayKey(now = Date.now()): string {
   return new Date(now).toISOString().slice(0, 10)
 }
 
+function hydrateExtractCountFromService(svc?: MemoryService, now = Date.now()): void {
+  if (!svc) return
+  try {
+    const { day, count } = svc.getExtractsToday()
+    const today = todayKey(now)
+    if (day !== today) return
+    // Merge L1 (process) with L2 (durable): take the higher so in-process
+    // increments are not wiped by a stale or zero L2 read.
+    if (extractCountByDay.day !== today) {
+      extractCountByDay = { day, count }
+    } else {
+      extractCountByDay = { day, count: Math.max(extractCountByDay.count, count) }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 /** True when more Phase1 extracts are allowed today under maxExtractsPerDay. */
-export function assertUnderDailyExtractLimit(config: MemoryFileConfig, now = Date.now()): boolean {
+export function assertUnderDailyExtractLimit(
+  config: MemoryFileConfig,
+  now = Date.now(),
+  svc?: MemoryService,
+): boolean {
+  hydrateExtractCountFromService(svc, now)
   const max = config.maxExtractsPerDay ?? 20
   const day = todayKey(now)
   if (extractCountByDay.day !== day) extractCountByDay = { day, count: 0 }
@@ -55,10 +80,36 @@ export function assertUnderDailyExtractLimit(config: MemoryFileConfig, now = Dat
 }
 
 /** Count a Phase1 success toward the daily extract limit (UTC day). */
-export function recordExtractSuccess(now = Date.now()): void {
+export function recordExtractSuccess(now = Date.now(), svc?: MemoryService): void {
+  hydrateExtractCountFromService(svc, now)
   const day = todayKey(now)
   if (extractCountByDay.day !== day) extractCountByDay = { day, count: 0 }
   extractCountByDay.count += 1
+  try {
+    svc?.recordExtractsToday(extractCountByDay.count, day)
+  } catch {
+    // ignore
+  }
+}
+
+function resolveLastExtractAt(sessionId: string, svc?: MemoryService): number | undefined {
+  const mem = lastExtractSuccessAt.get(sessionId)
+  if (mem !== undefined) return mem
+  const durable = svc?.getSessionLastExtractAt(sessionId)
+  if (durable !== undefined) {
+    lastExtractSuccessAt.set(sessionId, durable)
+    return durable
+  }
+  return undefined
+}
+
+function setLastExtractAt(sessionId: string, atMs: number, svc?: MemoryService): void {
+  lastExtractSuccessAt.set(sessionId, atMs)
+  try {
+    svc?.setSessionLastExtractAt(sessionId, atMs)
+  } catch {
+    // ignore
+  }
 }
 
 /** Test hook: set concurrency (default 1). */
@@ -106,8 +157,15 @@ export async function processQueue(): Promise<void> {
       active += 1
       // Sequential await when concurrency=1; keeps process simple and testable.
       try {
-        if (!assertUnderDailyExtractLimit(job.config)) {
+        const svc = job.memoryService
+        if (!assertUnderDailyExtractLimit(job.config, Date.now(), svc)) {
           console.warn('[memory-queue] phase1 skipped rate_limited', job.sessionId)
+          svc?.recordPipelineStatus({
+            lastPhase1At: Date.now(),
+            lastPhase1Status: 'skipped',
+            lastPhase1Reason: 'rate_limited',
+            lastPhase1SessionId: job.sessionId,
+          })
         } else {
           const phase1 = await runPhase1Extract({
             store: job.store,
@@ -117,10 +175,20 @@ export async function processQueue(): Promise<void> {
             config: job.config,
             sessionConfig: job.sessionConfig,
           })
-          // After successful Phase1, count toward daily limit and enqueue Phase2.
+          svc?.recordPipelineStatus({
+            lastPhase1At: Date.now(),
+            lastPhase1Status: phase1.status,
+            lastPhase1Reason: phase1.reason,
+            lastPhase1SessionId: job.sessionId,
+          })
+          // After Phase1 success (incl. empty): count daily cost; interval only on real success
+          // unless throttleOnEmptyExtract is true (KD-12).
           if (phase1.status === 'succeeded' || phase1.status === 'succeeded_no_output') {
-            recordExtractSuccess()
-            lastExtractSuccessAt.set(job.sessionId, Date.now())
+            recordExtractSuccess(Date.now(), svc)
+            const countEmptyAsInterval = job.config.throttleOnEmptyExtract === true
+            if (phase1.status === 'succeeded' || countEmptyAsInterval) {
+              setLastExtractAt(job.sessionId, Date.now(), svc)
+            }
             let projectKeyHash: string | undefined
             let projectKey: string | undefined
             const cwd = job.sessionConfig?.cwd
@@ -140,11 +208,22 @@ export async function processQueue(): Promise<void> {
                 config: job.config,
                 projectKeyHash,
                 projectKey,
+                onMutation: svc
+                  ? (scopes) => svc.afterMemoryMutation(scopes)
+                  : undefined,
+              })
+              svc?.recordPipelineStatus({
+                lastPhase2At: Date.now(),
+                lastPhase2Status: phase2.status,
+                lastPhase2Reason: phase2.reason,
               })
               // Best-effort decay after a successful Phase2 run.
               if (phase2.status === 'succeeded' || phase2.status === 'succeeded_no_output') {
                 try {
-                  runDecayJob(job.store, job.config)
+                  const decay = runDecayJob(job.store, job.config)
+                  if (decay.archived > 0 && svc) {
+                    svc.afterMemoryMutation({ all: true })
+                  }
                 } catch (err) {
                   console.warn(
                     '[memory-queue] decay failed',
@@ -158,7 +237,14 @@ export async function processQueue(): Promise<void> {
                 job.sessionId,
                 err instanceof Error ? err.message : String(err),
               )
+              svc?.recordPipelineStatus({
+                lastPhase2At: Date.now(),
+                lastPhase2Status: 'failed',
+                lastPhase2Reason: err instanceof Error ? err.message : String(err),
+              })
             }
+          } else if (phase1.status === 'skipped' || phase1.status === 'failed') {
+            // status already recorded
           }
         }
       } catch (err) {
@@ -167,6 +253,12 @@ export async function processQueue(): Promise<void> {
           job.sessionId,
           err instanceof Error ? err.message : String(err),
         )
+        job.memoryService?.recordPipelineStatus({
+          lastPhase1At: Date.now(),
+          lastPhase1Status: 'failed',
+          lastPhase1Reason: err instanceof Error ? err.message : String(err),
+          lastPhase1SessionId: job.sessionId,
+        })
       } finally {
         inflight.delete(job.sessionId)
         active -= 1
@@ -233,18 +325,38 @@ export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
     if (!flags.generate || flags.incognito) return
 
     const intervalHours = config.minExtractIntervalHours ?? 6
-    const last = lastExtractSuccessAt.get(host.id)
+    const last = resolveLastExtractAt(host.id, svc)
     if (last !== undefined && Date.now() - last < intervalHours * 3_600_000) {
+      svc.recordPipelineStatus({
+        lastPhase1At: Date.now(),
+        lastPhase1Status: 'skipped',
+        lastPhase1Reason: 'interval_throttle',
+        lastPhase1SessionId: host.id,
+      })
       return
     }
 
-    if (!assertUnderDailyExtractLimit(config)) {
+    if (!assertUnderDailyExtractLimit(config, Date.now(), svc)) {
       console.warn('[memory] phase1 skipped rate_limited', host.id)
+      svc.recordPipelineStatus({
+        lastPhase1At: Date.now(),
+        lastPhase1Status: 'skipped',
+        lastPhase1Reason: 'rate_limited',
+        lastPhase1SessionId: host.id,
+      })
       return
     }
 
     const llm = createDefaultMemoryLlmClient({ extractModel: config.extractModel })
-    if (!llm) return
+    if (!llm) {
+      svc.recordPipelineStatus({
+        lastPhase1At: Date.now(),
+        lastPhase1Status: 'skipped',
+        lastPhase1Reason: 'no_llm',
+        lastPhase1SessionId: host.id,
+      })
+      return
+    }
 
     enqueuePhase1({
       sessionId: host.id,
@@ -252,6 +364,7 @@ export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
       sessionStore,
       llm,
       config,
+      memoryService: svc,
       sessionConfig: {
         generateMemories: host._config.generateMemories,
         incognito: host._config.incognito,
@@ -260,7 +373,7 @@ export function maybeEnqueueMemoryExtract(host: SessionHostLike): void {
     })
   } catch (err) {
     console.warn(
-      '[memory] scheduleMemoryExtractAfterTurn failed',
+      '[memory] maybeEnqueueMemoryExtract failed',
       err instanceof Error ? err.message : String(err),
     )
   }

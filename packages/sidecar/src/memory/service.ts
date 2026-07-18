@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import type { MemoryFileConfig, MemoryItem, MemoryModelRef, MemorySource } from '@hip/protocol'
-import { normalizeExtractModel } from '@hip/protocol'
+import type {
+  MemoryFileConfig,
+  MemoryItem,
+  MemoryModelRef,
+  MemoryPipelineStatus,
+  MemorySource,
+} from '@hip/protocol'
+import { DOGFOOD_MEMORY_PRESET, MEMORY_FILE_CONFIG_DEFAULTS, normalizeExtractModel } from '@hip/protocol'
 import {
   loadMemoryConfig,
   saveMemoryConfig,
@@ -22,6 +28,16 @@ import {
 } from './embedding-client.js'
 import { searchHybrid } from './hybrid-search.js'
 import { embeddingIndexStatus, getEmbedding, upsertEmbedding } from './vec.js'
+import {
+  detectMirrorDesync,
+  importFromMirror,
+  listKnownProjectKeyHashes,
+  rewriteMirrorsFromDb,
+  writeUserProfileMirror,
+  type MemoryMutationScopes,
+} from './mirror.js'
+import { sortByMemoryRank } from './ranking.js'
+import { runtimeGet, runtimeGetNumber, runtimeSet, runtimeSetNumber } from './runtime-kv.js'
 import type {
   MemoryListFilter,
   MemorySearchOpts,
@@ -76,6 +92,10 @@ export class MemoryService {
   private readonly configPath?: string
   private readonly createEmbeddingClient: MemoryEmbeddingClientFactory
   private startupDecayRan = false
+  /** Process-local core generation (L1). Hydrated from memory_runtime when available (L2). */
+  private coreGeneration = 0
+  private coreGenerationHydrated = false
+  private lastMirrorDesync = false
   /** In-flight embed jobs (dedupe concurrent scheduleEmbed for same id). */
   private readonly embedInFlight = new Map<string, Promise<void>>()
 
@@ -97,11 +117,70 @@ export class MemoryService {
           return null
         }
       })
+    this.hydrateCoreGeneration()
+  }
+
+  getCoreGeneration(): number {
+    this.hydrateCoreGeneration()
+    return this.coreGeneration
+  }
+
+  bumpCoreGeneration(): number {
+    this.hydrateCoreGeneration()
+    this.coreGeneration += 1
+    try {
+      runtimeSetNumber(this.store.getDb(), 'core_generation', this.coreGeneration)
+    } catch {
+      // L2 optional when table missing (pre-migration tests)
+    }
+    return this.coreGeneration
+  }
+
+  private hydrateCoreGeneration(): void {
+    if (this.coreGenerationHydrated) return
+    this.coreGenerationHydrated = true
+    try {
+      const n = runtimeGetNumber(this.store.getDb(), 'core_generation')
+      if (typeof n === 'number' && Number.isFinite(n) && n >= 0) {
+        this.coreGeneration = Math.floor(n)
+      }
+    } catch {
+      // table may not exist in older DBs until migrate runs
+    }
   }
 
   /**
-   * Best-effort decay + trash retention once per service instance
-   * (call from getMemoryService / process startup).
+   * Single chokepoint after logical mutations: bump generation; rewrite mirrors when enabled.
+   */
+  afterMemoryMutation(scopes: MemoryMutationScopes = { all: true }): void {
+    this.bumpCoreGeneration()
+    const config = this.getConfig()
+    try {
+      const result = rewriteMirrorsFromDb({
+        store: this.store,
+        config,
+        scopes,
+      })
+      if (!result.skipped && result.written.length > 0) {
+        // best-effort USER.md when global scope touched
+        if (scopes.all || scopes.global) {
+          try {
+            writeUserProfileMirror({ store: this.store, config })
+          } catch {
+            // optional
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[memory] afterMemoryMutation mirror rewrite failed',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+  }
+
+  /**
+   * Best-effort decay + trash + mirror reconcile once per service instance.
    * Safe to invoke repeatedly; only the first call runs the jobs.
    */
   runStartupDecayOnce(): void {
@@ -109,7 +188,10 @@ export class MemoryService {
     this.startupDecayRan = true
     const config = this.getConfig()
     try {
-      runDecayJob(this.store, config)
+      const decay = runDecayJob(this.store, config)
+      if (decay.archived > 0 || decay.decayed > 0) {
+        this.afterMemoryMutation({ all: true })
+      }
     } catch (err) {
       console.warn(
         '[memory] startup decay failed',
@@ -124,6 +206,67 @@ export class MemoryService {
         err instanceof Error ? err.message : String(err),
       )
     }
+    try {
+      this.reconcileMirrorsOnStartup(config)
+    } catch (err) {
+      console.warn(
+        '[memory] startup mirror reconcile failed',
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+  }
+
+  private reconcileMirrorsOnStartup(config: MemoryFileConfig): void {
+    if (config.importMirrorIfDbEmpty !== false) {
+      const counts = this.store.countItemsByStatus()
+      if (counts.active === 0) {
+        // Import global + each project mirror when DB empty
+        try {
+          importFromMirror({ store: this.store, conflict: 'keep' })
+        } catch {
+          // ignore
+        }
+        for (const hash of this.store.listDistinctProjectKeyHashes()) {
+          try {
+            importFromMirror({
+              store: this.store,
+              projectKeyHash: hash,
+              conflict: 'keep',
+            })
+          } catch {
+            // ignore
+          }
+        }
+        // Also scan disk project dirs when DB truly empty
+        for (const hash of listKnownProjectKeyHashes(this.store)) {
+          try {
+            importFromMirror({
+              store: this.store,
+              projectKeyHash: hash,
+              conflict: 'keep',
+            })
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+
+    // Detect desync then DB-wins rewrite
+    let desync = false
+    try {
+      const g = detectMirrorDesync({ store: this.store })
+      if (!g.inSync && g.mirrorOnlyIds.length > 0) desync = true
+    } catch {
+      // ignore
+    }
+    this.lastMirrorDesync = desync
+    if (desync) {
+      console.warn('[memory] mirror_desync detected; rewriting mirrors from DB')
+    }
+    rewriteMirrorsFromDb({ store: this.store, config, scopes: { all: true } })
+    // Generation bump so host caches invalidate after startup import/rewrite
+    this.bumpCoreGeneration()
   }
 
   getConfig(): MemoryFileConfig {
@@ -148,7 +291,34 @@ export class MemoryService {
     if (effectiveHybrid && !effectiveEmbed) {
       throw new Error('hybridSearchEnabled requires embeddingModel')
     }
-    return saveMemoryConfig(partial, this.configPath)
+
+    // Dogfood preset when enabling both use+generate from cold defaults.
+    let toSave = { ...partial }
+    const enablingBoth =
+      partial.useMemories === true &&
+      partial.generateMemories === true &&
+      !current.useMemories &&
+      !current.generateMemories
+    if (enablingBoth) {
+      if (
+        (toSave.idleMinutes === undefined || toSave.idleMinutes === MEMORY_FILE_CONFIG_DEFAULTS.idleMinutes) &&
+        current.idleMinutes === MEMORY_FILE_CONFIG_DEFAULTS.idleMinutes
+      ) {
+        toSave.idleMinutes = DOGFOOD_MEMORY_PRESET.idleMinutes
+      }
+      const coldInterval = MEMORY_FILE_CONFIG_DEFAULTS.minExtractIntervalHours ?? 6
+      const curInterval = current.minExtractIntervalHours ?? coldInterval
+      if (
+        (toSave.minExtractIntervalHours === undefined || toSave.minExtractIntervalHours === coldInterval) &&
+        curInterval === coldInterval
+      ) {
+        toSave.minExtractIntervalHours = DOGFOOD_MEMORY_PRESET.minExtractIntervalHours
+      }
+    }
+
+    const saved = saveMemoryConfig(toSave, this.configPath)
+    this.bumpCoreGeneration()
+    return saved
   }
 
   resolveFlags(sessionConfig: SessionMemoryFlagsInput): ResolvedSessionMemoryFlags {
@@ -156,11 +326,22 @@ export class MemoryService {
   }
 
   /**
-   * Frozen core block: global + project summaries and pinned item titles.
-   * Empty text when nothing to inject. Truncated to core budget.
-   * `ids` lists pinned memory item ids included (for citation allowedIds).
+   * Core inject block: rich (default) or legacy titles-only.
+   * `ids` lists item ids whose bodies appear (citation allowedIds).
    */
   loadCoreSnapshot(
+    projectKeyHash: string | undefined,
+    contextWindowTokens?: number,
+  ): MemoryInjectBlock {
+    const cfg = this.getConfig()
+    const mode = cfg.coreInjectionMode ?? 'rich'
+    if (mode === 'legacy') {
+      return this.loadCoreSnapshotLegacy(projectKeyHash, contextWindowTokens)
+    }
+    return this.loadCoreSnapshotRich(projectKeyHash, contextWindowTokens)
+  }
+
+  private loadCoreSnapshotLegacy(
     projectKeyHash: string | undefined,
     contextWindowTokens?: number,
   ): MemoryInjectBlock {
@@ -187,6 +368,166 @@ export class MemoryService {
     return {
       text: truncateToBudget(`${header}\n${body}`, budget),
       ids: pinned.map((p) => p.id),
+    }
+  }
+
+  private loadCoreSnapshotRich(
+    projectKeyHash: string | undefined,
+    contextWindowTokens?: number,
+  ): MemoryInjectBlock {
+    const cfg = this.getConfig()
+    const budget = getMemoryCoreBudget(cfg.maxCoreSummaryChars, contextWindowTokens)
+    const bodyCap = cfg.coreItemBodyChars ?? 280
+    const maxActive = cfg.coreMaxItems ?? 12
+    const now = Date.now()
+    const ids: string[] = []
+    const sections: string[] = []
+    let used = 0
+
+    const appendSection = (text: string): boolean => {
+      if (!text.trim()) return true
+      const next = used === 0 ? text : `\n\n${text}`
+      if (used + next.length > budget && used > 0) return false
+      if (used + next.length > budget) {
+        sections.push(truncateToBudget(text, Math.max(40, budget - used)))
+        used = budget
+        return false
+      }
+      sections.push(text)
+      used += next.length
+      return true
+    }
+
+    // Collect candidates in scope
+    const candidates = this.loadActiveCoreItems(projectKeyHash)
+    const profile = candidates.filter((i) => i.kind === 'profile' && i.scope === 'global')
+    const pinned = candidates.filter((i) => i.pinned && i.kind !== 'profile')
+    const profileIds = new Set(profile.map((p) => p.id))
+    const pinnedIds = new Set(pinned.map((p) => p.id))
+    const activePool = sortByMemoryRank(
+      candidates.filter((i) => !profileIds.has(i.id) && !pinnedIds.has(i.id) && i.kind !== 'profile'),
+      now,
+    ).slice(0, maxActive)
+
+    // Profile reserve
+    const profileBudget = Math.min(400, Math.floor(0.25 * budget))
+    if (profile.length > 0) {
+      const lines: string[] = ['### User profile']
+      let pUsed = 0
+      for (const p of sortByMemoryRank(profile, now)) {
+        const body = truncateToBudget(p.content.replace(/\s+/g, ' ').trim(), bodyCap)
+        const line = `- **${p.title}**: ${body}`
+        if (pUsed + line.length + 1 > profileBudget && lines.length > 1) break
+        lines.push(line)
+        pUsed += line.length + 1
+        ids.push(p.id)
+      }
+      if (lines.length > 1) appendSection(lines.join('\n'))
+    }
+
+    // Summaries
+    const summaries = this.loadSummaries(projectKeyHash)
+    const sumParts: string[] = []
+    for (const s of summaries) {
+      const label = s.scope === 'global' ? 'Global' : 'Project'
+      const body = s.summary_md.trim()
+      if (!body) continue
+      sumParts.push(`#### ${label}\n${body}`)
+    }
+    if (sumParts.length > 0) {
+      appendSection(`### Summaries\n${sumParts.join('\n\n')}`)
+    }
+
+    // Pinned bodies
+    if (pinned.length > 0) {
+      const lines: string[] = ['### Pinned']
+      for (const p of sortByMemoryRank(pinned, now)) {
+        const body = truncateToBudget(p.content.replace(/\s+/g, ' ').trim(), bodyCap)
+        const line = `- **${p.title}**: ${body}`
+        if (used + line.length + 20 > budget && lines.length > 1) break
+        lines.push(line)
+        ids.push(p.id)
+      }
+      if (lines.length > 1) appendSection(lines.join('\n'))
+    }
+
+    // Active top-N
+    if (activePool.length > 0) {
+      const lines: string[] = ['### Active']
+      for (const a of activePool) {
+        const body = truncateToBudget(a.content.replace(/\s+/g, ' ').trim(), bodyCap)
+        const line = `- **[${a.scope}/${a.kind}] ${a.title}**: ${body}`
+        if (used + line.length + 20 > budget && lines.length > 1) break
+        lines.push(line)
+        ids.push(a.id)
+      }
+      if (lines.length > 1) appendSection(lines.join('\n'))
+    }
+
+    if (sections.length === 0) return { text: '', ids: [] }
+
+    const body = sections.join('\n\n')
+    const usedChars = Math.min(budget, body.length + 40)
+    const percent = budget > 0 ? Math.floor((100 * usedChars) / budget) : 0
+    const header = `## Memory (core) [${percent}% — ${usedChars}/${budget} chars]`
+    return {
+      text: truncateToBudget(`${header}\n${body}`, budget),
+      ids: [...new Set(ids)],
+    }
+  }
+
+  private loadActiveCoreItems(projectKeyHash: string | undefined): MemoryItem[] {
+    const db = this.store.getDb()
+    if (projectKeyHash) {
+      const rows = db.prepare(`
+        SELECT * FROM memory_items
+        WHERE status = 'active'
+          AND scope != 'session'
+          AND (
+            scope = 'global'
+            OR (scope = 'project' AND project_key_hash = ?)
+          )
+        ORDER BY updated_at DESC
+        LIMIT 500
+      `).all(projectKeyHash) as Array<Record<string, unknown>>
+      return rows.map((r) => this.rowToItemLoose(r))
+    }
+    const rows = db.prepare(`
+      SELECT * FROM memory_items
+      WHERE status = 'active' AND scope = 'global'
+      ORDER BY updated_at DESC
+      LIMIT 500
+    `).all() as Array<Record<string, unknown>>
+    return rows.map((r) => this.rowToItemLoose(r))
+  }
+
+  private rowToItemLoose(r: Record<string, unknown>): MemoryItem {
+    let tags: string[] = []
+    try {
+      const parsed = JSON.parse(String(r.tags_json ?? '[]')) as unknown
+      if (Array.isArray(parsed)) tags = parsed.map(String)
+    } catch {
+      tags = []
+    }
+    return {
+      id: String(r.id),
+      scope: r.scope as MemoryItem['scope'],
+      projectKey: (r.project_key as string | null) ?? undefined,
+      projectKeyHash: (r.project_key_hash as string | null) ?? undefined,
+      sessionId: (r.session_id as string | null) ?? undefined,
+      kind: r.kind as MemoryItem['kind'],
+      title: String(r.title),
+      content: String(r.content),
+      confidence: Number(r.confidence),
+      status: r.status as MemoryItem['status'],
+      source: r.source as MemoryItem['source'],
+      sourceSessionId: (r.source_session_id as string | null) ?? undefined,
+      tags,
+      createdAt: Number(r.created_at),
+      updatedAt: Number(r.updated_at),
+      lastUsedAt: (r.last_used_at as number | null) ?? undefined,
+      useCount: Number(r.use_count ?? 0),
+      pinned: Number(r.pinned ?? 0) !== 0,
     }
   }
 
@@ -276,10 +617,38 @@ export class MemoryService {
       pinned: input.pinned ?? existing?.pinned ?? false,
     }
 
+    // Soft store capacity (Hermes-style string errors for tools)
+    if (!existing || existing.status !== 'active') {
+      this.assertUnderStoreCapacity(item)
+    }
+
     this.store.upsertItem(item)
     // Best-effort async embed when embeddingModel is configured; never throws on upsert.
     this.queueEmbed(item.id)
+    this.afterMemoryMutation(scopesFromItem(item))
     return item
+  }
+
+  /** Throws Error with a clear message when over maxActiveItems / maxActiveItemChars. */
+  assertUnderStoreCapacity(incoming: Pick<MemoryItem, 'content' | 'title'>): void {
+    const cfg = this.getConfig()
+    const maxItems = cfg.maxActiveItems ?? 200
+    const maxChars = cfg.maxActiveItemChars ?? 50_000
+    const counts = this.store.countItemsByStatus()
+    if (counts.active >= maxItems) {
+      throw new Error(
+        `Memory store full (${counts.active}/${maxItems} active items). Archive or delete memories before adding more.`,
+      )
+    }
+    const active = this.store.listItems({ status: 'active', limit: 10_000 })
+    let charSum = 0
+    for (const a of active) charSum += a.title.length + a.content.length
+    charSum += incoming.title.length + incoming.content.length
+    if (charSum > maxChars) {
+      throw new Error(
+        `Memory store character budget exceeded (${charSum}/${maxChars}). Consolidate or delete before adding more.`,
+      )
+    }
   }
 
   getItem(id: string): MemoryItem | undefined {
@@ -346,11 +715,17 @@ export class MemoryService {
   }
 
   softDelete(id: string): boolean {
-    return this.store.softDelete(id)
+    const prev = this.store.getItem(id)
+    const ok = this.store.softDelete(id)
+    if (ok && prev) this.afterMemoryMutation(scopesFromItem(prev))
+    return ok
   }
 
   hardDelete(id: string): boolean {
-    return this.store.hardDelete(id)
+    const prev = this.store.getItem(id)
+    const ok = this.store.hardDelete(id)
+    if (ok && prev) this.afterMemoryMutation(scopesFromItem(prev))
+    return ok
   }
 
   /**
@@ -360,13 +735,164 @@ export class MemoryService {
     const ok = this.store.restoreItem(id)
     if (!ok) return undefined
     const item = this.store.getItem(id)
-    if (item) this.queueEmbed(item.id)
+    if (item) {
+      this.queueEmbed(item.id)
+      this.afterMemoryMutation(scopesFromItem(item))
+    }
     return item
   }
 
   /** Hard-delete all soft-deleted memories (also drops embedding rows via store). */
   emptyTrash(): number {
-    return this.store.emptyTrash()
+    const n = this.store.emptyTrash()
+    if (n > 0) this.afterMemoryMutation({ all: true })
+    return n
+  }
+
+  rewriteMirrors(projectKeyHash?: string): string[] {
+    const scopes: MemoryMutationScopes = projectKeyHash
+      ? { projectKeyHashes: [projectKeyHash], global: true }
+      : { all: true }
+    this.afterMemoryMutation(scopes)
+    const result = rewriteMirrorsFromDb({
+      store: this.store,
+      config: this.getConfig(),
+      scopes,
+    })
+    return result.written
+  }
+
+  importMirror(opts: {
+    projectKeyHash?: string
+    conflict?: 'keep' | 'overwrite'
+  }): { imported: number; skipped: number } {
+    const result = importFromMirror({
+      store: this.store,
+      projectKeyHash: opts.projectKeyHash,
+      conflict: opts.conflict ?? 'keep',
+    })
+    if (result.imported > 0) {
+      this.afterMemoryMutation(
+        opts.projectKeyHash
+          ? { projectKeyHashes: [opts.projectKeyHash] }
+          : { global: true },
+      )
+    }
+    return result
+  }
+
+  /**
+   * Pipeline + store health for UI poll. Capacity only when projectKeyHash provided.
+   */
+  getPipelineStatus(opts?: {
+    projectKeyHash?: string
+    contextWindowTokens?: number
+    llmAvailable?: boolean
+  }): MemoryPipelineStatus {
+    const cfg = this.getConfig()
+    const pipeline = (runtimeGet(this.store.getDb(), 'pipeline_status') ?? {}) as Partial<MemoryPipelineStatus>
+    const extracts = (runtimeGet(this.store.getDb(), 'extracts_day') ?? {}) as {
+      day?: string
+      count?: number
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const extractsToday =
+      extracts.day === today && typeof extracts.count === 'number' ? extracts.count : 0
+
+    const status: MemoryPipelineStatus = {
+      lastPhase1At: pipeline.lastPhase1At,
+      lastPhase1Status: pipeline.lastPhase1Status,
+      lastPhase1Reason: pipeline.lastPhase1Reason,
+      lastPhase1SessionId: pipeline.lastPhase1SessionId,
+      lastPhase2At: pipeline.lastPhase2At,
+      lastPhase2Status: pipeline.lastPhase2Status,
+      lastPhase2Reason: pipeline.lastPhase2Reason,
+      extractsToday,
+      maxExtractsPerDay: cfg.maxExtractsPerDay ?? 20,
+      llmAvailable: opts?.llmAvailable ?? true,
+      itemCounts: this.store.countItemsByStatus(),
+      summaryCounts: this.store.countSummaries(),
+      stage1Pending: this.store.countStage1Pending(),
+      coreGeneration: this.getCoreGeneration(),
+      mirrorDesync: this.lastMirrorDesync,
+      index: this.getIndexStatus(),
+    }
+
+    if (opts?.projectKeyHash) {
+      const block = this.loadCoreSnapshot(opts.projectKeyHash, opts.contextWindowTokens)
+      const budget = getMemoryCoreBudget(cfg.maxCoreSummaryChars, opts.contextWindowTokens)
+      const used = block.text.length
+      status.capacity = {
+        usedChars: used,
+        budgetChars: budget,
+        percent: budget > 0 ? Math.floor((100 * used) / budget) : 0,
+      }
+    }
+
+    return status
+  }
+
+  /** Persist pipeline outcome for poll UI (called from queue). */
+  recordPipelineStatus(partial: Partial<MemoryPipelineStatus>): void {
+    try {
+      const prev = (runtimeGet(this.store.getDb(), 'pipeline_status') ?? {}) as Record<string, unknown>
+      runtimeSet(this.store.getDb(), 'pipeline_status', { ...prev, ...partial })
+    } catch {
+      // ignore
+    }
+  }
+
+  recordExtractsToday(count: number, day?: string): void {
+    try {
+      runtimeSet(this.store.getDb(), 'extracts_day', {
+        day: day ?? new Date().toISOString().slice(0, 10),
+        count,
+      })
+    } catch {
+      // ignore
+    }
+  }
+
+  getExtractsToday(): { day: string; count: number } {
+    try {
+      const extracts = (runtimeGet(this.store.getDb(), 'extracts_day') ?? {}) as {
+        day?: string
+        count?: number
+      }
+      const today = new Date().toISOString().slice(0, 10)
+      if (extracts.day === today && typeof extracts.count === 'number') {
+        return { day: today, count: extracts.count }
+      }
+    } catch {
+      // ignore
+    }
+    return { day: new Date().toISOString().slice(0, 10), count: 0 }
+  }
+
+  getSessionLastExtractAt(sessionId: string): number | undefined {
+    try {
+      const map = (runtimeGet(this.store.getDb(), 'session_last_extract') ?? {}) as Record<
+        string,
+        number
+      >
+      const v = map[sessionId]
+      return typeof v === 'number' ? v : undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  setSessionLastExtractAt(sessionId: string, atMs: number): void {
+    try {
+      const map = (runtimeGet(this.store.getDb(), 'session_last_extract') ?? {}) as Record<
+        string,
+        number
+      >
+      map[sessionId] = atMs
+      runtimeSet(this.store.getDb(), 'session_last_extract', map)
+    } catch {
+      // ignore
+    }
   }
 
   /** Index coverage for the configured embedding model (BLOB rows; vec0 optional). */
@@ -464,6 +990,8 @@ export class MemoryService {
         // threat-scan / validation failure — skip line
       }
     }
+    // upsert already bumps mirrors; ensure full rewrite for multi-scope import
+    if (imported > 0) this.afterMemoryMutation({ all: true })
     return { imported }
   }
 
@@ -562,4 +1090,12 @@ export class MemoryService {
     `).all() as Array<{ id: string; title: string }>
   }
 
+}
+
+function scopesFromItem(item: Pick<MemoryItem, 'scope' | 'projectKeyHash'>): MemoryMutationScopes {
+  if (item.scope === 'global') return { global: true }
+  if (item.scope === 'project' && item.projectKeyHash) {
+    return { projectKeyHashes: [item.projectKeyHash] }
+  }
+  return { global: true }
 }

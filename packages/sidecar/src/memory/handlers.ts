@@ -22,6 +22,9 @@ export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:consolidate',
   'memory:reindex',
   'memory:indexStatus',
+  'memory:getStatus',
+  'memory:rewriteMirrors',
+  'memory:importMirror',
   'session:setMemoryFlags',
 ])
 
@@ -121,9 +124,9 @@ export function handleMemoryMessage(
     case 'memory:deleteBySourceSession': {
       try {
         // Default remains hard delete (privacy for session-derived items).
-        const deleted = ctx
-          .getMemoryService()
-          .store.deleteBySourceSession(msg.sessionId, { soft: msg.soft })
+        const svc = ctx.getMemoryService()
+        const deleted = svc.store.deleteBySourceSession(msg.sessionId, { soft: msg.soft })
+        if (deleted > 0) svc.afterMemoryMutation({ all: true })
         send({
           type: 'memory:deleteBySourceSession:result',
           sessionId: msg.sessionId,
@@ -241,6 +244,7 @@ export function handleMemoryMessage(
         llm,
         config,
         projectKeyHash: msg.projectKeyHash,
+        onMutation: (scopes) => svc.afterMemoryMutation(scopes),
       })
         .then((res) => {
           if (res.status === 'skipped') {
@@ -263,7 +267,8 @@ export function handleMemoryMessage(
           }
           // Best-effort decay + trash retention after successful Phase2.
           try {
-            runDecayJob(svc.store, config)
+            const decay = runDecayJob(svc.store, config)
+            if (decay.archived > 0) svc.afterMemoryMutation({ all: true })
           } catch (err) {
             console.warn(
               '[memory] decay after consolidate failed',
@@ -293,6 +298,64 @@ export function handleMemoryMessage(
             detail: err instanceof Error ? err.message : String(err),
           })
         })
+      return
+    }
+    case 'memory:getStatus': {
+      try {
+        const svc = ctx.getMemoryService()
+        const config = svc.getConfig()
+        const llm = createDefaultMemoryLlmClient({ extractModel: config.extractModel })
+        const status = svc.getPipelineStatus({
+          projectKeyHash: msg.projectKeyHash,
+          contextWindowTokens: msg.contextWindowTokens,
+          llmAvailable: !!llm,
+        })
+        send({ type: 'memory:status', status })
+      } catch (e) {
+        send({
+          type: 'memory:status',
+          status: {
+            extractsToday: 0,
+            maxExtractsPerDay: 20,
+            llmAvailable: false,
+            itemCounts: { active: 0, deleted: 0, archived: 0 },
+            summaryCounts: { global: 0, project: 0 },
+            stage1Pending: 0,
+            coreGeneration: 0,
+          },
+          error: String(e),
+        })
+      }
+      return
+    }
+    case 'memory:rewriteMirrors': {
+      try {
+        const written = ctx.getMemoryService().rewriteMirrors(msg.projectKeyHash)
+        send({ type: 'memory:rewriteMirrors:result', written })
+      } catch (e) {
+        send({ type: 'memory:rewriteMirrors:result', written: [], error: String(e) })
+      }
+      return
+    }
+    case 'memory:importMirror': {
+      try {
+        const result = ctx.getMemoryService().importMirror({
+          projectKeyHash: msg.projectKeyHash,
+          conflict: msg.conflict,
+        })
+        send({
+          type: 'memory:importMirror:result',
+          imported: result.imported,
+          skipped: result.skipped,
+        })
+      } catch (e) {
+        send({
+          type: 'memory:importMirror:result',
+          imported: 0,
+          skipped: 0,
+          error: String(e),
+        })
+      }
       return
     }
     case 'memory:indexStatus': {

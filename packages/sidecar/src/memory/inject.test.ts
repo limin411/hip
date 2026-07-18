@@ -141,6 +141,7 @@ describe('refreshMemoryCoreSnapshot', () => {
       snapshot: undefined,
       coreIds: undefined,
       projectKey: undefined,
+      generation: undefined,
       cleared: true,
     })
     expect(load).not.toHaveBeenCalled()
@@ -156,7 +157,12 @@ describe('refreshMemoryCoreSnapshot', () => {
       load,
       resolveKey,
     })
-    expect(first).toEqual({ snapshot: '', coreIds: [], projectKey: 'hash:/proj' })
+    expect(first).toEqual({
+      snapshot: '',
+      coreIds: [],
+      projectKey: 'hash:/proj',
+      generation: 0,
+    })
     expect(load).toHaveBeenCalledTimes(1)
 
     const second = refreshMemoryCoreSnapshot({
@@ -165,10 +171,17 @@ describe('refreshMemoryCoreSnapshot', () => {
       hostSnapshot: first.snapshot,
       hostCoreIds: first.coreIds,
       hostProjectKey: first.projectKey,
+      hostGeneration: first.generation,
+      storeGeneration: 0,
       load,
       resolveKey,
     })
-    expect(second).toEqual({ snapshot: '', coreIds: [], projectKey: 'hash:/proj' })
+    expect(second).toEqual({
+      snapshot: '',
+      coreIds: [],
+      projectKey: 'hash:/proj',
+      generation: 0,
+    })
     expect(load).toHaveBeenCalledTimes(1)
   })
 
@@ -201,6 +214,7 @@ describe('refreshMemoryCoreSnapshot', () => {
       snapshot: '## Memory (core)\nnew',
       coreIds: ['n1'],
       projectKey: 'hash:/other',
+      generation: 0,
     })
     expect(load).toHaveBeenCalledTimes(2)
     expect(load).toHaveBeenLastCalledWith('hash:/other')
@@ -214,6 +228,8 @@ describe('refreshMemoryCoreSnapshot', () => {
       hostSnapshot: '',
       hostCoreIds: [],
       hostProjectKey: 'hash:/proj',
+      hostGeneration: 0,
+      storeGeneration: 0,
       load,
       resolveKey,
     })
@@ -221,6 +237,24 @@ describe('refreshMemoryCoreSnapshot', () => {
     expect(result.coreIds).toEqual([])
     expect(result.projectKey).toBe('hash:/proj')
     expect(load).not.toHaveBeenCalled()
+  })
+
+  it('reloads empty freeze when store generation advances', () => {
+    const load = vi.fn(() => ({ text: '## Memory (core)\nbody', ids: ['x'] }))
+    const result = refreshMemoryCoreSnapshot({
+      useMemories: true,
+      cwd: '/proj',
+      hostSnapshot: '',
+      hostCoreIds: [],
+      hostProjectKey: 'hash:/proj',
+      hostGeneration: 0,
+      storeGeneration: 2,
+      load,
+      resolveKey,
+    })
+    expect(result.snapshot).toContain('body')
+    expect(result.generation).toBe(2)
+    expect(load).toHaveBeenCalledTimes(1)
   })
 
   it('resolveKey failure keeps host cache', () => {

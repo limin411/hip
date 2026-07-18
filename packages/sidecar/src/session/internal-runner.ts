@@ -62,6 +62,10 @@ export interface RunManagedAgentArgs {
    * When set, `buildTools` filters to these names (+ MCP still allowed via name prefix).
    */
   allowedTools?: string[]
+  /** Appended after managed system prompt (memory core, etc.). */
+  systemPromptExtra?: string
+  /** Extra tools merged BEFORE toolNames / prompt (must be in toolNames for explore allowlist). */
+  extraTools?: StructuredToolInterface[]
 }
 
 /**
@@ -77,12 +81,13 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     resolved, cwd, prompt, task, attachments, attachmentParts, emit, signal, childMaxSteps,
     mcpTools, skills, requestApproval, permissionMode, networkPolicy, toolOutputStore, guardianReviewer,
     hooks, turnId, runId, nodeId, agentId, parentAgentId, allowedTools,
+    systemPromptExtra, extraTools,
   } = args
   const runner = args.runner ?? new RealModelRunner(buildChatModel(resolved ?? getActiveModel()))
   const summarizer = args.summarizer ?? createSummarizer()
   // base + git tools + skill/script/mcp extras (no task/dispatch closures → depth-1).
   // Optional allowedTools gates built-ins (explore); skills/mcp were pre-filtered by the caller.
-  const tools = buildTools(cwd, undefined, cwd, undefined, {
+  const baseTools = buildTools(cwd, undefined, cwd, undefined, {
     mcpTools,
     skills,
     requestApproval,
@@ -92,6 +97,8 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
     networkPolicy,
     ...(allowedTools?.length ? { allowedTools } : {}),
   })
+  // Mandatory order (KD-7 / design §7): buildTools → append extraTools → toolNames → prompt → systemExtra
+  const tools = extraTools?.length ? [...baseTools, ...extraTools] : baseTools
   const toolNames = tools.map((t) => t.name)
   // Inherit doom strategy from effective hip.toml (same as parent turn path).
   const doomLoopStrategy = resolveDoomLoopStrategy(
@@ -139,10 +146,21 @@ export async function runManagedAgent(args: RunManagedAgentArgs): Promise<string
   } else {
     humanMessage = new HumanMessage({ content: humanParts })
   }
+  let systemText = buildManagedAgentPrompt({
+    cwd,
+    persona: prompt,
+    toolNames,
+    skills,
+    permissionMode,
+    mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined,
+  })
+  if (systemPromptExtra?.trim()) {
+    systemText = `${systemText}\n\n${systemPromptExtra.trim()}`
+  }
   const app = buildGraph(childMaxSteps, SUBAGENT_COMPACT_BUDGET_TOKENS)
   const final = await app.invoke(
     {
-      messages: [new SystemMessage(buildManagedAgentPrompt({ cwd, persona: prompt, toolNames, skills, permissionMode, mcpCatalog: toolNames.includes('mcp_search') ? mcpManager.toolCatalog() : undefined })), humanMessage],
+      messages: [new SystemMessage(systemText), humanMessage],
       steps: 0,
       recentSigs: [],
       nudgedSig: undefined,

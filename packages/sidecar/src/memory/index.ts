@@ -46,7 +46,7 @@ export {
   type HybridWeights,
   type SearchHybridOpts,
 } from './hybrid-search.js'
-export { buildMemoryTools } from './tools.js'
+export { buildMemoryTools, buildMemorySearchToolOnly } from './tools.js'
 export {
   MemoryInjector,
   refreshMemoryCoreSnapshot,
@@ -118,13 +118,21 @@ export {
 export { runTrashRetentionJob } from './trash.js'
 export {
   writeMemoryMirror,
+  rewriteMirrorsFromDb,
+  detectMirrorDesync,
+  importFromMirror,
+  listKnownProjectKeyHashes,
+  parseMemoryMirrorMarkdown,
+  writeUserProfileMirror,
   atomicWriteFile,
   formatMemoryMirrorMarkdown,
   memoriesRootDir,
   globalMemoryMirrorPath,
   projectMemoryMirrorPath,
   type WriteMemoryMirrorOpts,
+  type MemoryMutationScopes,
 } from './mirror.js'
+export { scoreMemoryItem, sortByMemoryRank, kindWeight } from './ranking.js'
 export {
   enqueuePhase1,
   processQueue,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Brain, Download, Pencil, Pin, RotateCcw, Trash2, Upload } from 'lucide-react'
-import type { MemoryFileConfig, MemoryItem, MemoryStatus } from '@hip/protocol'
+import type { MemoryFileConfig, MemoryItem, MemoryPipelineStatus, MemoryStatus } from '@hip/protocol'
 import { sessionService } from '@/domain'
 import { useProvidersStore } from '@/store/providersStore'
 import { groupModelOptions } from '@/lib/agentModelOptions'
@@ -55,6 +55,8 @@ export function MemoryConfig() {
   } | null>(null)
   const [reindexing, setReindexing] = useState(false)
   const [needEmbedOpen, setNeedEmbedOpen] = useState(false)
+  const [pipelineStatus, setPipelineStatus] = useState<MemoryPipelineStatus | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
@@ -78,6 +80,15 @@ export function MemoryConfig() {
     }
   }, [])
 
+  const refreshPipelineStatus = useCallback(async () => {
+    try {
+      const status = await sessionService.getMemoryStatus()
+      setPipelineStatus(status)
+    } catch {
+      setPipelineStatus(null)
+    }
+  }, [])
+
   const refresh = useCallback(async () => {
     setError(null)
     try {
@@ -90,12 +101,13 @@ export function MemoryConfig() {
         setItems([])
       }
       await refreshIndexStatus()
+      await refreshPipelineStatus()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [listStatus, loadItems, refreshIndexStatus])
+  }, [listStatus, loadItems, refreshIndexStatus, refreshPipelineStatus])
 
   const switchListStatus = async (status: MemoryStatus) => {
     if (status === listStatus) return
@@ -117,6 +129,15 @@ export function MemoryConfig() {
     void loadProviders()
   }, [refresh, loadProviders])
 
+  // Poll pipeline status while generate is on and panel is mounted (KD-14).
+  useEffect(() => {
+    if (!config?.generateMemories) return
+    const id = window.setInterval(() => {
+      void refreshPipelineStatus()
+    }, 5000)
+    return () => window.clearInterval(id)
+  }, [config?.generateMemories, refreshPipelineStatus])
+
   const applyConfig = async (partial: Partial<MemoryFileConfig>) => {
     setBusy(true)
     setError(null)
@@ -129,6 +150,7 @@ export function MemoryConfig() {
       } else {
         setItems([])
       }
+      await refreshPipelineStatus()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -361,6 +383,44 @@ export function MemoryConfig() {
         <p className="mt-1 text-body text-ink-secondary">{t('settings.memory.intro')}</p>
       </div>
 
+      {pipelineStatus && (
+        <div
+          className="mt-4 rounded-md border border-border bg-surface px-3 py-2 text-meta text-ink-secondary"
+          data-testid="memory-status-strip"
+        >
+          <div>
+            {t('settings.memory.statusItems', {
+              active: pipelineStatus.itemCounts.active,
+              deleted: pipelineStatus.itemCounts.deleted,
+              archived: pipelineStatus.itemCounts.archived,
+            })}
+            {' · '}
+            {t('settings.memory.statusExtracts', {
+              today: pipelineStatus.extractsToday,
+              max: pipelineStatus.maxExtractsPerDay,
+            })}
+            {' · '}
+            gen {pipelineStatus.coreGeneration}
+          </div>
+          {pipelineStatus.lastPhase1Status && (
+            <div className="mt-1">
+              {t('settings.memory.statusLastPhase1', {
+                status: pipelineStatus.lastPhase1Status,
+                reason: pipelineStatus.lastPhase1Reason ?? '—',
+              })}
+            </div>
+          )}
+          {!pipelineStatus.llmAvailable && config?.generateMemories && (
+            <div className="mt-1 text-warning" data-testid="memory-no-llm-cta">
+              {t('settings.memory.noLlmCta')}
+            </div>
+          )}
+          {pipelineStatus.mirrorDesync && (
+            <div className="mt-1 text-warning">{t('settings.memory.mirrorDesync')}</div>
+          )}
+        </div>
+      )}
+
       {error && (
         <p className="mt-4 text-body text-danger" role="alert">
           {error}
@@ -433,6 +493,46 @@ export function MemoryConfig() {
               </option>
             )}
         </select>
+      </div>
+
+      <div className="mt-4 border-t border-border pt-4">
+        <button
+          type="button"
+          className="text-prose font-medium text-ink underline-offset-2 hover:underline"
+          data-testid="memory-advanced-toggle"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          {t('settings.memory.advancedGates')}
+        </button>
+        <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.advancedGatesDesc')}</p>
+        {showAdvanced && config && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="memory-advanced-gates">
+            {(
+              [
+                ['idleMinutes', 'idleMinutes'],
+                ['minExtractIntervalHours', 'minExtractIntervalHours'],
+                ['minUserTurns', 'minUserTurns'],
+                ['minUserChars', 'minUserChars'],
+                ['maxExtractsPerDay', 'maxExtractsPerDay'],
+              ] as const
+            ).map(([key, labelKey]) => (
+              <label key={key} className="block text-meta text-ink-secondary">
+                {t(`settings.memory.${labelKey}`)}
+                <input
+                  type="number"
+                  className={cn(inputCls, 'mt-1')}
+                  value={config[key] ?? ''}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const n = Number(e.target.value)
+                    if (!Number.isFinite(n)) return
+                    void applyConfig({ [key]: n } as Partial<MemoryFileConfig>)
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-2 divide-y divide-border border-t border-border">

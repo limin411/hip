@@ -53,6 +53,18 @@ function isOptionalMemoryKey(k: string): boolean {
     'hybridSearchEnabled',
     'maxExtractsPerDay',
     'trashRetentionDays',
+    'coreInjectionMode',
+    'coreMaxItems',
+    'coreItemBodyChars',
+    'maxActiveItems',
+    'maxActiveItemChars',
+    'throttleOnEmptyExtract',
+    'importMirrorIfDbEmpty',
+    'requireWriteConfirmation',
+    'memoryToolsForSubagents',
+    'useMemoriesWithExternal',
+    'perAgentMemory',
+    'backend',
   ].includes(k)
 }
 

@@ -72,6 +72,8 @@ export function runDecayJob(
   let archived = 0
 
   for (const item of candidates) {
+    // Profile memories are stable user prefs — never auto-decay.
+    if (item.kind === 'profile') continue
     if (!isDecayCandidate(item, now, maxUnusedDays)) continue
     scanned += 1
     const next = applyDecayStep(item, decayFactor, forgetConfidence, now)

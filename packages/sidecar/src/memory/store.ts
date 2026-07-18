@@ -547,4 +547,49 @@ export class MemoryStore {
       updatedAt: r.updated_at,
     }
   }
+
+  /** Distinct non-null project_key_hash values on memory_items. */
+  listDistinctProjectKeyHashes(): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT project_key_hash AS h FROM memory_items
+         WHERE project_key_hash IS NOT NULL AND project_key_hash != ''`,
+      )
+      .all() as Array<{ h: string }>
+    return rows.map((r) => r.h).filter(Boolean)
+  }
+
+  countItemsByStatus(): { active: number; deleted: number; archived: number } {
+    const rows = this.db
+      .prepare(`SELECT status, COUNT(*) AS n FROM memory_items GROUP BY status`)
+      .all() as Array<{ status: string; n: number }>
+    const out = { active: 0, deleted: 0, archived: 0 }
+    for (const r of rows) {
+      if (r.status === 'active') out.active = r.n
+      else if (r.status === 'deleted') out.deleted = r.n
+      else if (r.status === 'archived') out.archived = r.n
+    }
+    return out
+  }
+
+  countSummaries(): { global: number; project: number } {
+    const rows = this.db
+      .prepare(`SELECT scope, COUNT(*) AS n FROM memory_summaries GROUP BY scope`)
+      .all() as Array<{ scope: string; n: number }>
+    const out = { global: 0, project: 0 }
+    for (const r of rows) {
+      if (r.scope === 'global') out.global = r.n
+      else if (r.scope === 'project') out.project = r.n
+    }
+    return out
+  }
+
+  countStage1Pending(): number {
+    const r = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM memory_stage1 WHERE selected_for_phase2 = 0`,
+      )
+      .get() as { n: number }
+    return r?.n ?? 0
+  }
 }

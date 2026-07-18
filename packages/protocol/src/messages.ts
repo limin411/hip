@@ -36,7 +36,13 @@ import type { PluginManifest } from './plugins.js'
 import type { WorkflowDef, OrchestratorEvent, RunState } from './workflow-protocol.js'
 import type { OrchestrationMode } from './orchestration-types.js'
 import type { AgentProfileInfo } from './agent-profile.js'
-import type { MemoryItem, MemoryScope, MemoryStatus, MemoryFileConfig } from './memory-types.js'
+import type {
+  MemoryItem,
+  MemoryScope,
+  MemoryStatus,
+  MemoryFileConfig,
+  MemoryPipelineStatus,
+} from './memory-types.js'
 
 export type ClientMessage =
   | { type: 'session:create'; id: string; config: SessionConfig }
@@ -151,6 +157,9 @@ export type ClientMessage =
   | { type: 'memory:consolidate'; projectKeyHash?: string }
   | { type: 'memory:reindex' }
   | { type: 'memory:indexStatus' }
+  | { type: 'memory:getStatus'; projectKeyHash?: string; contextWindowTokens?: number }
+  | { type: 'memory:rewriteMirrors'; projectKeyHash?: string }
+  | { type: 'memory:importMirror'; projectKeyHash?: string; conflict?: 'keep' | 'overwrite' }
   | { type: 'session:setMemoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 
 type AttachmentSendPayload = Attachment & { path: string }
@@ -347,6 +356,9 @@ export type ServerMessage =
       vecEnabled?: boolean
       error?: string
     }
+  | { type: 'memory:status'; status: MemoryPipelineStatus; error?: string }
+  | { type: 'memory:rewriteMirrors:result'; written: string[]; error?: string }
+  | { type: 'memory:importMirror:result'; imported: number; skipped: number; error?: string }
   | { type: 'session:memoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
 
 /** Taxonomy for provider key usability probes (config:testProvider). */

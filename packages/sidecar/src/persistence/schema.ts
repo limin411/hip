@@ -504,6 +504,24 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 19) {
+    db.exec('BEGIN')
+    try {
+      // Durable KV for extract throttle, pipeline status, core_generation.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS memory_runtime (
+          key TEXT PRIMARY KEY,
+          value_json TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `)
+      db.exec('PRAGMA user_version = 19')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

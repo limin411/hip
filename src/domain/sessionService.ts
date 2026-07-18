@@ -1444,6 +1444,49 @@ export class SessionService {
     })
   }
 
+  async getMemoryStatus(opts?: {
+    projectKeyHash?: string
+    contextWindowTokens?: number
+  }): Promise<import('@hip/protocol').MemoryPipelineStatus> {
+    const wait = this.waitForServerMessage('memory:status')
+    this.transport.send({
+      type: 'memory:getStatus',
+      ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
+      ...(opts?.contextWindowTokens !== undefined
+        ? { contextWindowTokens: opts.contextWindowTokens }
+        : {}),
+    })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.status
+  }
+
+  async rewriteMemoryMirrors(projectKeyHash?: string): Promise<string[]> {
+    const wait = this.waitForServerMessage('memory:rewriteMirrors:result')
+    this.transport.send({
+      type: 'memory:rewriteMirrors',
+      ...(projectKeyHash ? { projectKeyHash } : {}),
+    })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return msg.written
+  }
+
+  async importMemoryMirror(opts?: {
+    projectKeyHash?: string
+    conflict?: 'keep' | 'overwrite'
+  }): Promise<{ imported: number; skipped: number }> {
+    const wait = this.waitForServerMessage('memory:importMirror:result')
+    this.transport.send({
+      type: 'memory:importMirror',
+      ...(opts?.projectKeyHash ? { projectKeyHash: opts.projectKeyHash } : {}),
+      ...(opts?.conflict ? { conflict: opts.conflict } : {}),
+    })
+    const msg = await wait
+    if (msg.error) throw new Error(msg.error)
+    return { imported: msg.imported, skipped: msg.skipped }
+  }
+
   setMemoryFlags(
     sessionId: string,
     flags: { useMemories?: boolean; generateMemories?: boolean; incognito?: boolean },

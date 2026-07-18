@@ -87,7 +87,7 @@ export function PlanProgressPanel({ view, onApprove, onReject, onAmend }: PlanPr
           </span>
         )}
         {(view.phase === 'planning' || view.phase === 'executing') && (
-          <Loader2 size={14} className="ml-auto shrink-0 animate-spin text-accent-strong" aria-hidden />
+          <Loader2 size={14} className="shrink-0 animate-spin text-accent-strong" aria-hidden />
         )}
       </div>
 

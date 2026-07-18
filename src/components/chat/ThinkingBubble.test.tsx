@@ -14,6 +14,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('./TurnTimeline', () => ({
   AgentBadge: ({ role }: { role: string }) => `<AgentBadge role="${role}" />`,
   TurnTimeline: () => null,
+  TRAIL_ROW: 'flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5',
 }))
 
 describe('ThinkingBubble', () => {

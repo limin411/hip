@@ -73,11 +73,11 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       className="min-w-0 w-full"
       data-testid="message-context-menu"
     >
-      {/* CLI-style: left-aligned role label, no avatar / chat bubble chrome */}
-      <div className="mb-1 flex items-center gap-2 text-meta font-medium text-ink-secondary">
+      {/* CLI-style: role + time on one meta line (same leading / size) */}
+      <div className="mb-1 flex min-h-5 items-center gap-1.5 text-meta font-medium leading-5 text-ink-secondary">
         <span data-testid="message-role">{isUser ? t('chat.you') : 'hip'}</span>
         {message.timestamp > 0 && (
-          <span className="text-caption font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
+          <span className="font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
             {formatClockTime(message.timestamp, locale)}
           </span>
         )}
@@ -128,7 +128,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
         <ArtifactCard toolCalls={message.toolCalls} />
       )}
       {!streaming && (
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1 flex min-h-5 items-center gap-1.5 text-meta leading-5">
           <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
           {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (
             <DropdownMenu>
@@ -136,7 +136,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
                 <button
                   type="button"
                   data-testid="memory-citations-chip"
-                  className="bg-accent/10 px-2 py-0.5 text-caption text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-accent"
+                  className="bg-accent/10 px-1.5 py-0.5 text-meta leading-5 text-accent outline-none transition-colors hover:bg-accent/15 focus-visible:ring-1 focus-visible:ring-accent"
                 >
                   {t('settings.memory.citationsChip', { count: message.memoryCitations.length })}
                 </button>
@@ -164,7 +164,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
                   ? t('chat.usage.io', { input: message.usage.inputTokens, output: message.usage.outputTokens })
                   : undefined
               }
-              className="text-caption text-ink-tertiary"
+              className="text-ink-tertiary"
             >
               {[
                 elapsedMs != null ? t('chat.activity.elapsed', { time: formatElapsed(elapsedMs) }) : null,

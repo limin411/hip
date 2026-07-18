@@ -31,6 +31,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('./TurnTimeline', () => ({
   TurnTimeline: vi.fn(() => <div data-testid="turn-timeline">TurnTimeline content</div>),
   AgentBadge: ({ role }: { role: string }) => <span data-role={role} />,
+  TRAIL_ROW: 'flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5',
 }))
 
 const baseSteps = [

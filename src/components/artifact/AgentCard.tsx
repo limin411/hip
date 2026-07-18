@@ -38,31 +38,32 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
       data-testid="agent-card"
       data-status={agent.status}
     >
-      <button onClick={() => setManual(!open)} aria-expanded={open} className="flex items-center justify-between gap-2 p-3 text-left" data-testid="agent-card-header">
-        <div className="flex min-w-0 items-center gap-2">
-          <ChevronRight size={12} className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: isError ? 'var(--danger)' : color }} />
-          <span className="truncate text-body font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
-          {agent.tools.length > 0 && <Badge className="shrink-0">{t('artifact.toolsCount', { count: agent.tools.length })}</Badge>}
-          {isError && (
-            <Badge className="shrink-0 border-danger/30 bg-danger/10 text-danger">{t('artifact.failed')}</Badge>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {typeof agent.totalTokens === 'number' && agent.totalTokens > 0 && (
-            <span className="text-caption text-ink-tertiary" data-testid="agent-tokens">
-              {t('artifact.tokens', { count: agent.totalTokens })}
-            </span>
-          )}
-          <StatusDot status={agent.status} color={color} />
-          <span className={cn('text-caption capitalize', isError ? 'text-danger' : 'text-ink-tertiary')}>
-            {agent.status === 'done' && agent.elapsedMs > 0
-              ? t('chat.thoughtFor', { seconds: Math.round(agent.elapsedMs / 1000) })
-              : agent.status === 'error'
-                ? t('artifact.failed')
-                : agent.status}
+      <button
+        onClick={() => setManual(!open)}
+        aria-expanded={open}
+        className="flex min-h-9 items-center gap-1.5 px-3 py-2 text-left text-meta leading-5"
+        data-testid="agent-card-header"
+      >
+        <ChevronRight size={14} className={cn('block shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
+        <StatusDot status={agent.status} color={color} />
+        <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: isError ? 'var(--danger)' : color }} />
+        <span className="min-w-0 truncate font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
+        {agent.tools.length > 0 && <Badge className="shrink-0">{t('artifact.toolsCount', { count: agent.tools.length })}</Badge>}
+        {isError && (
+          <Badge className="shrink-0 border-danger/30 bg-danger/10 text-danger">{t('artifact.failed')}</Badge>
+        )}
+        {typeof agent.totalTokens === 'number' && agent.totalTokens > 0 && (
+          <span className="shrink-0 text-ink-tertiary" data-testid="agent-tokens">
+            {t('artifact.tokens', { count: agent.totalTokens })}
           </span>
-        </div>
+        )}
+        <span className={cn('shrink-0 capitalize', isError ? 'text-danger' : 'text-ink-tertiary')}>
+          {agent.status === 'done' && agent.elapsedMs > 0
+            ? t('chat.thoughtFor', { seconds: Math.round(agent.elapsedMs / 1000) })
+            : agent.status === 'error'
+              ? t('artifact.failed')
+              : agent.status}
+        </span>
       </button>
       {open && (
         <div className="flex flex-col gap-2 border-t border-border p-3 pt-2.5">

@@ -50,32 +50,41 @@ export function SubAgentCard({
 
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
-      {/* Always expanded — CLI-style flat trail, no collapse toggle */}
+      {/* Always expanded — CLI-style flat trail, single-line baseline for header */}
       <div className="mb-2 border-l border-border pl-3" data-testid="subagent-card">
-        <div className="flex w-full items-center gap-2 py-1 text-left">
-          <span className="min-w-0 flex-1 truncate text-meta font-medium text-ink" title={title}>
+        <div className="flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5">
+          <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+            {agent.status === 'running' ? (
+              <Loader2 size={14} className="block animate-spin text-accent-strong" />
+            ) : agent.status === 'error' ? (
+              <XCircle size={14} className="block text-danger" />
+            ) : (
+              <CheckCircle2 size={14} className="block text-success" />
+            )}
+          </span>
+          <span className="min-w-0 truncate font-medium text-ink" title={title}>
             {title}
           </span>
-          <span className="hidden shrink-0 font-mono text-caption text-ink-tertiary sm:inline" title={agent.agentId}>
+          <span className="hidden min-w-0 shrink-0 truncate font-mono text-ink-tertiary sm:inline" title={agent.agentId}>
             {agent.agentId}
           </span>
           {runningTool && (
-            <span className="hidden max-w-[8rem] shrink-0 truncate text-caption text-ink-tertiary sm:inline">
+            <span className="hidden max-w-[8rem] shrink-0 truncate text-ink-tertiary sm:inline">
               {runningTool.name}
             </span>
           )}
           {toolCount > 0 && (
-            <span className="shrink-0 text-caption text-ink-tertiary">
+            <span className="shrink-0 text-ink-tertiary">
               {t('chat.subagent.toolsCount', { count: toolCount })}
             </span>
           )}
           {elapsedSec != null && (
-            <span className="shrink-0 text-caption text-ink-tertiary">{elapsedSec}s</span>
+            <span className="shrink-0 text-ink-tertiary">{elapsedSec}s</span>
           )}
           <span
             role="button"
             tabIndex={0}
-            className="shrink-0 text-caption text-accent hover:underline"
+            className="shrink-0 text-accent hover:underline"
             data-testid="subagent-open-agents"
             onClick={openInAgents}
             onKeyDown={(ev) => {
@@ -87,32 +96,23 @@ export function SubAgentCard({
           >
             Agents
           </span>
-          <span className="ml-auto shrink-0">
-            {agent.status === 'running' ? (
-              <Loader2 size={12} className="animate-spin text-accent-strong" />
-            ) : agent.status === 'error' ? (
-              <XCircle size={12} className="text-danger" />
-            ) : (
-              <CheckCircle2 size={12} className="text-success" />
-            )}
-          </span>
         </div>
-        <div className="space-y-1.5 py-1">
+        <div className="mt-0.5 flex flex-col gap-0.5">
           {agent.reasoning && (
-            <pre className="whitespace-pre-wrap text-caption text-ink-secondary">
+            <pre className="whitespace-pre-wrap text-meta leading-5 text-ink-secondary">
               {sanitizeDisplayText(agent.reasoning)}
             </pre>
           )}
           {showTools && agent.tools.map((tc) => <ToolCallRow key={tc.callId} tool={tc} />)}
           {!showTools && toolCount > 0 && (
-            <p className="text-caption text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
+            <p className="text-meta leading-5 text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
           )}
           {cleanOutput ? (
             <div className="max-h-48 overflow-auto" data-testid="subagent-output">
               <MarkdownBody content={cleanOutput} className="text-meta [&_p]:my-1" />
             </div>
           ) : (
-            <div className="text-caption text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
+            <div className="text-meta leading-5 text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
           )}
         </div>
       </div>

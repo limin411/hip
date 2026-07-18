@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
-import { AgentBadge, TurnTimeline } from './TurnTimeline'
+import { AgentBadge, TRAIL_ROW, TurnTimeline } from './TurnTimeline'
 import { buildActivitySummary, type SummaryPart } from '@/lib/activitySummary'
 
 interface ActivityBarProps {
@@ -103,55 +103,55 @@ export function ActivityBar({
     if (!streaming) return null
     return (
       <div
-        className="mb-2 flex items-center gap-2 py-1"
+        className={cn('mb-2', TRAIL_ROW, 'text-ink-tertiary')}
         data-testid="activity-bar"
         role="status"
         aria-live="polite"
       >
-        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">{t('chat.activity.initializing')}</span>
-        <Loader2 aria-hidden size={14} className="animate-spin text-accent-strong" />
+        <Loader2 aria-hidden size={14} className="block shrink-0 animate-spin text-accent-strong" />
+        <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        <span className="min-w-0 truncate">{t('chat.activity.initializing')}</span>
       </div>
     )
   }
 
   const statusIcon =
     status === 'running' ? (
-      <Loader2 size={14} className="animate-spin text-accent-strong" />
+      <Loader2 size={14} className="block shrink-0 animate-spin text-accent-strong" />
     ) : status === 'error' ? (
-      <XCircle size={14} className="text-danger" data-testid="activity-status-error" />
+      <XCircle size={14} className="block shrink-0 text-danger" data-testid="activity-status-error" />
     ) : status === 'success_partial' ? (
-      <AlertTriangle size={14} className="text-warning" data-testid="activity-status-partial" />
+      <AlertTriangle size={14} className="block shrink-0 text-warning" data-testid="activity-status-partial" />
     ) : status === 'stopped' ? (
-      <Circle size={14} className="text-ink-tertiary" data-testid="activity-status-stopped" />
+      <Circle size={14} className="block shrink-0 text-ink-tertiary" data-testid="activity-status-stopped" />
     ) : (
-      <CheckCircle2 size={14} className="text-success" data-testid="activity-status-success" />
+      <CheckCircle2 size={14} className="block shrink-0 text-success" data-testid="activity-status-success" />
     )
 
-  // Always expanded (CLI-style process trail) — no collapse toggle.
+  // Always expanded (CLI-style process trail) — one min-h-5 row for icon/dot/text alignment.
   return (
     <div className="mb-2" data-testid="activity-bar" aria-live="polite">
       <div
-        className="flex w-full items-center gap-2 py-1 text-left"
+        className={TRAIL_ROW}
         role="status"
         data-testid="activity-bar-summary"
       >
+        {statusIcon}
         {activeRole ? (
-          <span className={cn('inline-flex', status === 'running' && 'animate-pulse')}>
+          <span className={cn('inline-flex items-center', status === 'running' && 'animate-pulse')}>
             <AgentBadge role={activeRole} />
           </span>
         ) : (
-          <Circle size={10} className="text-ink-tertiary" />
+          <Circle size={14} className="block shrink-0 text-ink-tertiary" />
         )}
         {activeRole && (
-          <span className="shrink-0 text-meta font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
+          <span className="shrink-0 font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
         )}
-        <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary" title={summaryText}>
+        <span className="min-w-0 truncate text-ink-tertiary" title={summaryText}>
           {summaryText}
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1.5">{statusIcon}</span>
       </div>
-      <div className="mt-1 border-l border-border pl-3">
+      <div className="mt-1 flex flex-col gap-0.5 border-l border-border pl-3">
         <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} hidePlan={hidePlan} />
       </div>
     </div>

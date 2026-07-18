@@ -13,15 +13,20 @@ import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from './MarkdownBody'
 import { TodoChecklist } from './TodoChecklist'
 
+/** Role color dot — no top margin; parents use items-center for baseline alignment. */
 export function AgentBadge({ role }: { role: AgentRole }) {
   return (
     <span
-      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+      className="inline-block h-2 w-2 shrink-0 rounded-full"
       style={{ background: ROLE_COLOR[role] }}
       aria-hidden
     />
   )
 }
+
+/** Shared single-line trail row: fixed line box so icons + text share one baseline. */
+export const TRAIL_ROW =
+  'flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5'
 
 function ThinkingDisclosure({
   role,
@@ -38,29 +43,27 @@ function ThinkingDisclosure({
     seconds != null ? t('chat.thoughtFor', { seconds }) : t('chat.thinkingMode')
   const clean = sanitizeDisplayText(content)
   return (
-    <div className="flex gap-2">
-      <AgentBadge role={role} />
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex items-center gap-1.5 text-left text-meta text-ink-tertiary transition-colors hover:text-ink-secondary"
-          data-testid="thinking-disclosure"
-        >
-          <ChevronRight
-            size={12}
-            className={cn('shrink-0 transition-transform', open && 'rotate-90')}
-          />
-          <Brain size={12} className="shrink-0" aria-hidden />
-          <span>{label}</span>
-        </button>
-        {open && (
-          <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-meta leading-relaxed text-ink-secondary">
-            {clean}
-          </pre>
-        )}
-      </div>
+    <div className="min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(TRAIL_ROW, 'text-ink-tertiary transition-colors hover:text-ink-secondary')}
+        data-testid="thinking-disclosure"
+      >
+        <AgentBadge role={role} />
+        <ChevronRight
+          size={14}
+          className={cn('block shrink-0 transition-transform', open && 'rotate-90')}
+        />
+        <Brain size={14} className="block shrink-0" aria-hidden />
+        <span className="min-w-0 truncate">{label}</span>
+      </button>
+      {open && (
+        <pre className="mt-1 whitespace-pre-wrap break-words border-l border-border pl-3 font-sans text-meta leading-relaxed text-ink-secondary">
+          {clean}
+        </pre>
+      )}
     </div>
   )
 }
@@ -74,13 +77,7 @@ function renderToolList(tools: ToolCall[]) {
   }
   return grouped.tools
     .filter((tool) => tool.name !== 'write_todos')
-    .map((tool) => (
-      <div key={tool.callId} className="flex gap-2">
-        <div className="min-w-0 flex-1">
-          <ToolCallRow tool={tool} />
-        </div>
-      </div>
-    ))
+    .map((tool) => <ToolCallRow key={tool.callId} tool={tool} />)
 }
 
 /** Parent-shell delegation tools when child agentRuns already represent the work. */
@@ -255,11 +252,11 @@ function buildAgentSections(
       headerNodes.push(
         <div
           key={`d-${s.agentId}`}
-          className="flex items-center gap-2 text-meta text-ink-tertiary"
+          className={cn(TRAIL_ROW, 'text-ink-tertiary')}
           data-testid="delegation-row"
         >
           <AgentBadge role={s.role} />
-          <span className="truncate">
+          <span className="min-w-0 truncate">
             <span className="font-medium text-ink-secondary">
               {t('chat.delegatedTo', { role: t(ROLE_NAME_KEY[s.role]) })}
             </span>
@@ -271,11 +268,11 @@ function buildAgentSections(
       headerNodes.push(
         <div
           key={`h-${s.agentId}`}
-          className="flex items-center gap-2 text-meta text-ink-tertiary"
+          className={cn(TRAIL_ROW, 'text-ink-tertiary')}
           data-testid="agent-section-header"
         >
           <AgentBadge role={s.role} />
-          <span className="font-medium text-ink-secondary">{s.agentId}</span>
+          <span className="min-w-0 truncate font-medium text-ink-secondary">{s.agentId}</span>
         </div>,
       )
     }

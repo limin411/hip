@@ -32,19 +32,19 @@ export function TodoChecklist({
       {showHeading && (
         <div className="mb-1 text-caption uppercase tracking-wide text-ink-tertiary">{t('chat.todos.plan')}</div>
       )}
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-0.5">
         {todos.map((todo, i) => {
           const Icon = TODO_ICON[todo.status]
           return (
-            <li key={i} className="flex items-start gap-1.5" data-status={todo.status}>
+            <li key={i} className="flex min-h-5 items-center gap-1.5 text-meta leading-5" data-status={todo.status}>
               <Icon
-                size={13}
-                className={cn('mt-0.5 shrink-0', TODO_ICON_CLASS[todo.status])}
+                size={14}
+                className={cn('block shrink-0', TODO_ICON_CLASS[todo.status])}
                 aria-label={t(`chat.todos.${todo.status}`)}
               />
               <span
                 className={cn(
-                  'min-w-0 flex-1 text-meta',
+                  'min-w-0 truncate',
                   todo.status === 'completed' ? 'text-ink-tertiary line-through' : 'text-ink-secondary',
                 )}
               >

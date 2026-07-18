@@ -24,13 +24,13 @@ export function ToolCallGroup({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="space-y-1" data-testid="tool-call-group" data-category={category}>
+    <div className="flex flex-col gap-0.5" data-testid="tool-call-group" data-category={category}>
       <div
-        className="flex items-center gap-2 py-0.5 text-meta"
+        className="flex min-h-5 items-center gap-1.5 text-meta leading-5"
         data-testid="tool-call-group-header"
       >
         <span className="shrink-0 font-medium text-ink-secondary">{t(CATEGORY_I18N[category])}</span>
-        <span className="shrink-0 text-caption text-ink-tertiary">({tools.length})</span>
+        <span className="shrink-0 text-ink-tertiary">({tools.length})</span>
       </div>
       {tools.map((tool) => (
         <ToolCallRow key={tool.callId} tool={tool} />

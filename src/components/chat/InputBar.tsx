@@ -234,21 +234,16 @@ export function InputBar() {
       className="relative shrink-0 border-t border-border bg-surface"
       data-testid="input-bar"
     >
+      {/* Invisible hit target on the top rule — drag still resizes; no visible grip chrome. */}
       {!planApprovalPending && (
         <div
           role="separator"
           aria-orientation="horizontal"
           aria-label={t('chat.resizeInput')}
-          title={t('chat.resizeInput')}
           data-testid="input-bar-resize"
           onPointerDown={onResizePointerDown}
-          className="group absolute inset-x-0 top-0 z-10 flex h-3 -translate-y-1/2 cursor-ns-resize items-center justify-center"
-        >
-          <div
-            className="h-1 w-10 rounded-full bg-border transition-colors group-hover:bg-accent group-active:bg-accent"
-            aria-hidden
-          />
-        </div>
+          className="absolute inset-x-0 top-0 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
+        />
       )}
       <div className="w-full px-4 py-3">
         {planApprovalPending ? (

@@ -5,7 +5,8 @@ import type { Message } from '@hip/protocol'
 import { copyText } from '@/ipc/clipboard'
 import { sessionService } from '@/domain'
 
-const BTN = 'flex h-6 w-6 items-center justify-center rounded-md text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink-secondary focus-visible:ring-2 focus-visible:ring-accent/60'
+const BTN =
+  'inline-flex h-5 w-5 shrink-0 items-center justify-center text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink-secondary focus-visible:ring-2 focus-visible:ring-accent/60'
 
 export function MessageActions({ message, isLastAssistant }: { message: Message; isLastAssistant: boolean }) {
   const { t } = useTranslation()
@@ -19,13 +20,13 @@ export function MessageActions({ message, isLastAssistant }: { message: Message;
   }
 
   return (
-    <div className="mt-1 flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       <button onClick={onCopy} data-testid="msg-copy" title={t('chat.copy')} aria-label={t('chat.copy')} className={BTN}>
-        {copied ? <Check size={14} /> : <Copy size={14} />}
+        {copied ? <Check size={14} className="block" /> : <Copy size={14} className="block" />}
       </button>
       {isLastAssistant && (
         <button onClick={() => sessionService.regenerate()} data-testid="msg-regenerate" title={t('chat.regenerate')} aria-label={t('chat.regenerate')} className={BTN}>
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className="block" />
         </button>
       )}
     </div>

@@ -127,7 +127,7 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
   return (
     <DeclarativeContextMenu kind="toolCall" payload={{ tool }}>
       <div
-        className="rounded-lg border border-border bg-surface-muted/40"
+        className="min-w-0"
         data-testid="tool-card"
         data-tool-status={tool.status}
       >
@@ -135,32 +135,32 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors"
+          className="flex min-h-5 w-full items-center gap-1.5 py-0.5 text-left text-meta leading-5 transition-colors hover:text-ink"
           data-testid={tool.status === 'running' ? 'tool-card-running' : 'tool-row'}
         >
           <ChevronRight
-            size={12}
-            className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')}
+            size={14}
+            className={cn('block shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')}
           />
-          <span className="min-w-0 flex-1 truncate font-mono text-meta text-ink" title={title}>
+          <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+            {tool.status === 'running' && <Loader2 size={14} className="block animate-spin text-accent-strong" />}
+            {tool.status === 'finished' && <CheckCircle2 size={14} className="block text-success" />}
+            {tool.status === 'error' && <XCircle size={14} className="block text-danger" />}
+          </span>
+          <span className="min-w-0 truncate font-mono text-ink" title={title}>
             {title}
           </span>
           {model.kind === 'shell' && model.exitCode != null && (
-            <span className="shrink-0 rounded bg-surface px-1 font-mono text-caption text-ink-tertiary">
+            <span className="shrink-0 font-mono text-ink-tertiary">
               exit {model.exitCode}
             </span>
           )}
           {tool.truncated && (
-            <span className="shrink-0 text-caption text-ink-tertiary">{t('chat.tool.truncated')}</span>
+            <span className="shrink-0 text-ink-tertiary">{t('chat.tool.truncated')}</span>
           )}
-          <span className="ml-auto shrink-0">
-            {tool.status === 'running' && <Loader2 size={12} className="animate-spin text-accent-strong" />}
-            {tool.status === 'finished' && <CheckCircle2 size={12} className="text-success" />}
-            {tool.status === 'error' && <XCircle size={12} className="text-danger" />}
-          </span>
         </button>
         {open && (
-          <div className="space-y-1.5 border-t border-border px-2 py-1.5" data-testid="tool-result-view">
+          <div className="mt-0.5 space-y-1.5 border-l border-border py-1 pl-3" data-testid="tool-result-view">
             {tool.status === 'error' ? (
               <Field label={t('artifact.failed')} value={humanError || tool.error || ''} danger mono={false} />
             ) : model.kind === 'diff' && model.diff ? (

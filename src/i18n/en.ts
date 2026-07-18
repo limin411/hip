@@ -308,6 +308,10 @@ export const en = {
     artifact: {
       files: 'Files',
       agents: 'Agents',
+      outline: 'Outline',
+      outlineEmpty: 'Your sent messages will appear here as a jump list',
+      outlineCount: '{{count}} turns',
+      outlineCount_one: '{{count}} turn',
       terminal: 'Terminal',
       closePanel: 'Close Panel',
       collaborationStructure: 'Collaboration',

@@ -305,6 +305,10 @@ export const zhCN = {
     artifact: {
       files: '文件',
       agents: '智能体',
+      outline: '对话目录',
+      outlineEmpty: '你发出的消息会按目录列在这里，点击可跳转',
+      outlineCount: '{{count}} 条',
+      outlineCount_one: '{{count}} 条',
       terminal: '终端',
       closePanel: '关闭面板',
       collaborationStructure: '协作结构',

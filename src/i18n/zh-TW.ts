@@ -305,6 +305,10 @@ export const zhTW = {
     artifact: {
       files: '文件',
       agents: '智能體',
+      outline: '對話目錄',
+      outlineEmpty: '你送出的訊息會以目錄列在這裡，點擊可跳轉',
+      outlineCount: '{{count}} 則',
+      outlineCount_one: '{{count}} 則',
       terminal: '終端',
       closePanel: '關閉面板',
       collaborationStructure: '協作結構',

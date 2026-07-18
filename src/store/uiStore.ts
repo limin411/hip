@@ -4,11 +4,11 @@ import type { CheckpointMode } from '@hip/protocol'
 // Lazy helpers used only inside closeKnowledgeView to avoid circular init issues
 // are imported dynamically in that method.
 
-export type ArtifactTab = 'files' | 'agents' | 'timeline' | 'changes' | 'terminal'
+export type ArtifactTab = 'files' | 'agents' | 'outline' | 'timeline' | 'changes' | 'terminal'
 
 export type ActiveView = 'chat' | 'code' | 'settings' | 'history' | 'knowledge'
 export type Surface = 'chat' | 'code'
-export type ChatTab = 'files' | 'agents'
+export type ChatTab = 'files' | 'agents' | 'outline'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
 /** Left sidebar primary section (memory-only; cold launch always 'chats'). */

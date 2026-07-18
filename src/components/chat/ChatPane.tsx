@@ -71,15 +71,19 @@ export function ChatPane() {
     bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
-  // Search jump: when a target message id is set, center it and flash a highlight, then clear the
-  // target. If the session is still loading, `messages` is empty and the effect no-ops until they
+  // Search / outline jump: when a target message id is set, center it (if not already
+  // scrolled by the click path) and flash a highlight, then clear the target.
+  // If the session is still loading, `messages` is empty and the effect no-ops until they
   // arrive (it re-runs on `messages`). If messages are present but the anchor is gone (deleted/
   // regenerated since indexing), clear the stale target so it doesn't linger.
   useEffect(() => {
     if (!scrollTargetMessageId) return
-    const el = scrollRef.current?.querySelector(`[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`)
+    const el = scrollRef.current?.querySelector(
+      `[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`,
+    )
     if (el) {
-      el.scrollIntoView({ block: 'center' })
+      // Pin jumped message to the top of the transcript viewport.
+      el.scrollIntoView({ block: 'start', behavior: 'auto' })
       setHighlightedId(scrollTargetMessageId)
       // Unpin from the bottom so that clearing the target below (which re-runs the autoscroll
       // effect) doesn't yank us to the latest message — covers a jump within the already-active

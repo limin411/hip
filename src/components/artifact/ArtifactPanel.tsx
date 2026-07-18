@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { FileTree } from './FileTree'
 import { FilePreview } from './FilePreview'
 import { AgentDashboard } from './AgentDashboard'
+import { ConversationOutline } from './ConversationOutline'
 import { TimelineView } from './TimelineView'
 import { ChangesView } from './ChangesView'
 import { GitInitBanner } from './GitInitBanner'
@@ -18,9 +19,21 @@ import { useDomainStore } from '@/domain/sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 const GIT_GATED: ReadonlySet<ArtifactTab> = new Set(['timeline', 'changes'])
 
-function tabLabel(tab: ArtifactTab, t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.timeline' | 'artifact.changes' | 'artifact.terminal') => string): string {
+function tabLabel(
+  tab: ArtifactTab,
+  t: (
+    key:
+      | 'artifact.files'
+      | 'artifact.agents'
+      | 'artifact.outline'
+      | 'artifact.timeline'
+      | 'artifact.changes'
+      | 'artifact.terminal',
+  ) => string,
+): string {
   if (tab === 'files') return t('artifact.files')
   if (tab === 'agents') return t('artifact.agents')
+  if (tab === 'outline') return t('artifact.outline')
   if (tab === 'timeline') return t('artifact.timeline')
   if (tab === 'changes') return t('artifact.changes')
   return t('artifact.terminal')
@@ -67,6 +80,7 @@ export function ArtifactPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${effectiveTab}`}>
+        {effectiveTab === 'outline' && <ConversationOutline />}
         {effectiveTab === 'files' && (
           <div className="flex h-full flex-col">
             {!isGitRepo && <GitInitBanner />}

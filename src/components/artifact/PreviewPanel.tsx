@@ -10,6 +10,7 @@ import { collectConversationArtifacts } from '@/lib/renderedArtifacts'
 import { iconFor } from './ArtifactCard'
 import { FilePreview } from './FilePreview'
 import { AgentDashboard } from './AgentDashboard'
+import { ConversationOutline } from './ConversationOutline'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
@@ -21,8 +22,13 @@ function base64ToBytes(b64: string): Uint8Array {
   return out
 }
 
-function tabLabel(tab: ChatTab, t: (key: 'artifact.files' | 'artifact.agents') => string): string {
-  return tab === 'agents' ? t('artifact.agents') : t('artifact.files')
+function tabLabel(
+  tab: ChatTab,
+  t: (key: 'artifact.files' | 'artifact.agents' | 'artifact.outline') => string,
+): string {
+  if (tab === 'agents') return t('artifact.agents')
+  if (tab === 'outline') return t('artifact.outline')
+  return t('artifact.files')
 }
 
 export function PreviewPanel() {
@@ -87,6 +93,7 @@ export function PreviewPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden" data-testid={`panel-view-${chatActiveTab}`}>
+        {chatActiveTab === 'outline' && <ConversationOutline />}
         {chatActiveTab === 'files' && (
           artifacts.length === 0 ? (
             <div className="flex h-full items-center justify-center p-6 text-center text-body text-ink-tertiary" data-testid="preview-no-artifacts">

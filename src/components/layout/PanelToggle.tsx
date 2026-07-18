@@ -39,6 +39,7 @@ export function PanelToggle() {
   const isCode = activeView === 'code'
 
   const codeTabs: PanelTabOption[] = [
+    { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
     { value: 'timeline', label: t('artifact.timeline'), gated: true },
@@ -48,6 +49,7 @@ export function PanelToggle() {
       : []),
   ]
   const chatTabs: PanelTabOption[] = [
+    { value: 'outline', label: t('artifact.outline') },
     { value: 'files', label: t('artifact.files') },
     { value: 'agents', label: t('artifact.agents') },
   ]

@@ -1076,7 +1076,7 @@ export function KnowledgeWorkspace() {
               return (
                 <div
                   key={v.id}
-                  className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2.5"
                   data-testid="knowledge-version-row"
                   data-version-id={v.id}
                 >

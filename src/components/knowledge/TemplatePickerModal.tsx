@@ -34,7 +34,7 @@ export function TemplatePickerModal() {
         </div>
       }
     >
-      <div className="flex flex-col gap-1 px-3 py-3" data-testid="knowledge-template-picker">
+      <div className="flex flex-col gap-2 px-3 py-3" data-testid="knowledge-template-picker">
         <p className="px-2 pb-2 text-meta text-ink-secondary">
           {t('knowledge.template.pickHint')}
         </p>
@@ -43,12 +43,12 @@ export function TemplatePickerModal() {
           data-testid="knowledge-template-empty"
           disabled={busy}
           className={cn(
-            'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
+            'flex w-full items-center gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-left transition-colors',
             'hover:bg-state-hover disabled:opacity-50',
           )}
           onClick={() => void confirmTemplateCreate(null)}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
             <FileText size={14} className="text-ink-tertiary" />
           </span>
           <span className="min-w-0 flex-1">
@@ -63,16 +63,16 @@ export function TemplatePickerModal() {
         {(picker?.templates ?? []).map((tpl) => (
           <div
             key={tpl.id}
-            className="group flex items-center gap-1 rounded-md hover:bg-state-hover"
+            className="group flex items-center gap-1 rounded-lg border border-border bg-surface px-3 py-3 hover:bg-state-hover"
           >
             <button
               type="button"
               data-testid={`knowledge-template-item-${tpl.id}`}
               disabled={busy}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2.5 text-left disabled:opacity-50"
+              className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:opacity-50"
               onClick={() => void confirmTemplateCreate(tpl.id)}
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-muted">
                 <FileText size={14} className="text-accent-strong" />
               </span>
               <span className="min-w-0 flex-1">
@@ -90,7 +90,7 @@ export function TemplatePickerModal() {
               disabled={busy}
               title={t('knowledge.template.delete')}
               aria-label={t('knowledge.template.delete')}
-              className="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-tertiary opacity-0 transition-opacity hover:bg-surface hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-tertiary opacity-0 transition-opacity hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-50"
               onClick={(e) => {
                 e.stopPropagation()
                 void deleteTemplate(tpl.id)

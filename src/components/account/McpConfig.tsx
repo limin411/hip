@@ -91,19 +91,28 @@ export function toggleTool(
   return { enabledTools, disabledTools: disabledTools.filter((t) => t !== toolName) }
 }
 
-/** Pure helper: derive read-only plugin-contributed MCP servers, excluding duplicates already owned by standalone configs or earlier plugins. */
+/** Pure helper: derive read-only plugin-contributed MCP servers, excluding duplicates already owned by standalone configs or earlier plugins.
+ *  When the parent plugin is disabled in the market, the server is forced `enabled: false`. */
 export function derivePluginMcpServers(
   plugins: PluginMeta[],
   standaloneIds: Set<string>,
-): Array<McpServerConfig & { pluginId: string; pluginName: string }> {
+): Array<McpServerConfig & { pluginId: string; pluginName: string; pluginEnabled: boolean }> {
   const seen = new Set<string>()
-  const out: Array<McpServerConfig & { pluginId: string; pluginName: string }> = []
+  const out: Array<McpServerConfig & { pluginId: string; pluginName: string; pluginEnabled: boolean }> = []
   for (const plugin of plugins) {
+    const pluginEnabled = plugin.enabled === true
     for (const server of plugin.mcpServers) {
       if (standaloneIds.has(server.id)) continue
       if (seen.has(server.id)) continue
       seen.add(server.id)
-      out.push({ ...server, pluginId: plugin.id, pluginName: plugin.name })
+      out.push({
+        ...server,
+        // Parent plugin off ⇒ MCP is off for UI + reconnect payloads.
+        enabled: pluginEnabled && server.enabled !== false,
+        pluginId: plugin.id,
+        pluginName: plugin.name,
+        pluginEnabled,
+      })
     }
   }
   return out
@@ -165,7 +174,9 @@ export function McpConfig() {
   }
 
   const reconnectMcpServers = useCallback(() => {
-    const allServers: McpServerConfig[] = [...servers, ...pluginMcpServers]
+    // Only reconnect enabled plugin MCP servers (disabled plugins stay out of the active set).
+    const activePlugin = pluginMcpServers.filter((s) => s.enabled)
+    const allServers: McpServerConfig[] = [...servers, ...activePlugin]
     const msg: ClientMessage = { type: 'mcp:reconnect', servers: allServers }
     wsClient.send(msg)
   }, [servers, pluginMcpServers])
@@ -173,13 +184,19 @@ export function McpConfig() {
   // Ask the sidecar for the current MCP status as soon as the page has both
   // standalone and plugin server configs loaded. Without this the list stays
   // blank until the user manually hits the refresh button.
+  // Also re-reconcile when a plugin is enabled/disabled in Plugin Market.
   const statusRequestedRef = useRef(false)
+  const pluginEnableKey = plugins.map((p) => `${p.id}:${p.enabled}`).join('|')
   useEffect(() => {
-    if (!loaded || !pluginsLoaded || statusRequestedRef.current) return
+    if (!loaded || !pluginsLoaded) return
     if (servers.length === 0 && pluginMcpServers.length === 0) return
-    statusRequestedRef.current = true
+    if (!statusRequestedRef.current) {
+      statusRequestedRef.current = true
+      reconnectMcpServers()
+      return
+    }
     reconnectMcpServers()
-  }, [loaded, pluginsLoaded, servers, pluginMcpServers, reconnectMcpServers])
+  }, [loaded, pluginsLoaded, servers, pluginMcpServers, pluginEnableKey, reconnectMcpServers])
 
   return (
     <div className="p-6">
@@ -253,12 +270,14 @@ export function McpConfig() {
       {pluginMcpServers.length > 0 && (
         <div className="mt-6">
           <h3 className="text-subtitle font-medium text-ink">{t('settings.mcp.pluginSectionTitle')}</h3>
+          <p className="mt-1 text-caption text-ink-tertiary">{t('settings.mcp.pluginSectionHint')}</p>
           <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {pluginMcpServers.map((s) => (
               <PluginMcpServerCard
                 key={s.id}
                 server={s}
                 pluginName={s.pluginName}
+                pluginEnabled={s.pluginEnabled}
                 status={statusByServer.get(s.id)}
               />
             ))}
@@ -550,10 +569,12 @@ function McpServerCard({
 function PluginMcpServerCard({
   server,
   pluginName,
+  pluginEnabled,
   status,
 }: {
   server: McpServerConfig
   pluginName: string
+  pluginEnabled: boolean
   status?: McpServerStatusVM
 }) {
   const { t } = useTranslation()
@@ -565,9 +586,9 @@ function PluginMcpServerCard({
         : t('settings.mcp.transportHttp')
   const detail =
     server.transport === 'stdio' ? [server.command, ...(server.args ?? [])].join(' ') : (server.url ?? '')
-  const statusLabel = status ? getStatusLabel(t, status.status) : null
+  const statusLabel = status && pluginEnabled ? getStatusLabel(t, status.status) : null
   const statusTitle = status?.lastError ? `${statusLabel}: ${status.lastError}` : statusLabel || undefined
-  const toolCount = status?.toolCount
+  const toolCount = pluginEnabled ? status?.toolCount : undefined
 
   return (
     <div
@@ -585,7 +606,10 @@ function PluginMcpServerCard({
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <Badge>{transportLabel}</Badge>
             <Badge className="bg-accent-subtle text-accent-strong">{t('settings.mcp.via', { name: pluginName })}</Badge>
-            {status && (
+            {!pluginEnabled && (
+              <Badge className="bg-surface-muted text-ink-tertiary">{t('settings.mcp.pluginDisabledBadge')}</Badge>
+            )}
+            {pluginEnabled && status && (
               <span
                 className="inline-flex items-center gap-1 text-caption text-ink-secondary"
                 title={statusTitle}
@@ -593,6 +617,9 @@ function PluginMcpServerCard({
                 <StatusDot status={status.status} />
                 {statusLabel}
               </span>
+            )}
+            {pluginEnabled && !status && (
+              <span className="text-caption text-ink-tertiary">{t('settings.mcp.statusDisconnected')}</span>
             )}
           </div>
         </div>

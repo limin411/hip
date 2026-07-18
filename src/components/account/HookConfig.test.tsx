@@ -119,6 +119,17 @@ describe('hookCatalog helpers', () => {
     expect([...configuredHookEvents(list)]).toEqual(['PreToolUse'])
     expect(sourcesByHookEvent(list).get('PreToolUse')?.[0].pluginId).toBe('b')
   })
+
+  it('ignores hooks from disabled plugins', () => {
+    const list = [
+      plugin({ id: 'off', name: 'Off', hookCount: 3, hookEvents: ['PreToolUse'], enabled: false }),
+      plugin({ id: 'on', name: 'On', hookCount: 1, hookEvents: ['Stop'], enabled: true }),
+    ]
+    expect(pluginsWithHooks(list).map((p) => p.id)).toEqual(['on'])
+    expect(totalConfiguredHookCount(list)).toBe(1)
+    expect([...configuredHookEvents(list)]).toEqual(['Stop'])
+    expect(sourcesByHookEvent(list).has('PreToolUse')).toBe(false)
+  })
 })
 
 describe('HookConfig (compact page)', () => {

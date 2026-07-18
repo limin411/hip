@@ -30,6 +30,7 @@ export function HookConfig() {
         <div>
           <h2 className="text-title font-semibold text-ink">{t('settings.hooks.title')}</h2>
           <p className="mt-1 text-body text-ink-secondary">{t('settings.hooks.introShort')}</p>
+          <p className="mt-1 text-caption text-ink-tertiary">{t('settings.hooks.pluginManagedHint')}</p>
         </div>
         {loaded && sources.length > 0 && (
           <span className="text-meta text-ink-tertiary" data-testid="hooks-summary">

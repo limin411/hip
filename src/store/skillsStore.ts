@@ -50,6 +50,10 @@ export const useSkillsStore = create<SkillsStore>((set, get) => ({
     set({ skills, enabled: entriesToEnabled(useHipConfigStore.getState().config.skills) })
   },
   remove: async (id) => {
+    const skill = get().skills.find((s) => s.id === id)
+    if (skill?.scope === 'plugin' || skill?.pluginId) {
+      throw new Error('Plugin-managed skills cannot be deleted individually; uninstall the plugin instead.')
+    }
     await deleteSkill(id)
     const enabled = { ...get().enabled }
     delete enabled[id]

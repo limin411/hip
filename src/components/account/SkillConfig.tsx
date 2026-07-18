@@ -51,6 +51,11 @@ export function toolAllowlistPreview(skill: SkillMeta, max = 3): string | null {
   return preview
 }
 
+/** True when a skill is owned by a plugin package (not a standalone ~/.hip/skills entry). */
+export function isPluginManagedSkill(skill: SkillMeta): boolean {
+  return skill.scope === 'plugin' || Boolean(skill.pluginId)
+}
+
 /**
  * Build read-only SkillMeta entries from plugin manifests.
  * - Standalone skills take precedence over plugin-provided skills with the same id.
@@ -84,17 +89,75 @@ export function derivePluginSkills(
   return result
 }
 
+/**
+ * Split scanned skills into standalone (deletable) vs plugin-managed (toggle-only).
+ * Merges list_skills plugin-scoped rows with manifest-derived rows so neither is lost.
+ * `pluginEnabled` follows the parent plugin market switch (false when parent is off).
+ */
+export function partitionSkillsForSettings(
+  skills: SkillMeta[],
+  plugins: PluginMeta[],
+): {
+  standalone: SkillMeta[]
+  pluginEntries: Array<{ skill: SkillMeta; pluginName: string; pluginEnabled: boolean }>
+} {
+  const standalone = skills.filter((s) => !isPluginManagedSkill(s))
+  const standaloneIds = new Set(standalone.map((s) => s.id))
+  const pluginById = new Map(plugins.map((p) => [p.id, p]))
+
+  const pluginEntries: Array<{ skill: SkillMeta; pluginName: string; pluginEnabled: boolean }> = []
+  const seen = new Set<string>()
+
+  for (const s of skills) {
+    if (!isPluginManagedSkill(s)) continue
+    if (seen.has(s.id)) continue
+    seen.add(s.id)
+    const parent = s.pluginId ? pluginById.get(s.pluginId) : undefined
+    pluginEntries.push({
+      skill: s,
+      pluginName: parent?.name || s.pluginId || 'plugin',
+      // Parent off / missing ⇒ skill treated as disabled in settings + session.
+      pluginEnabled: parent?.enabled === true,
+    })
+  }
+
+  for (const row of derivePluginSkills(plugins, standaloneIds)) {
+    if (seen.has(row.skill.id)) continue
+    seen.add(row.skill.id)
+    const parent = row.skill.pluginId ? pluginById.get(row.skill.pluginId) : undefined
+    pluginEntries.push({
+      skill: row.skill,
+      pluginName: row.pluginName,
+      pluginEnabled: parent?.enabled === true,
+    })
+  }
+
+  return { standalone, pluginEntries }
+}
+
+/** Effective skill switch: parent plugin must be on AND per-skill enabled. */
+export function effectivePluginSkillEnabled(
+  skillEnabled: boolean,
+  pluginEnabled: boolean,
+): boolean {
+  return pluginEnabled && skillEnabled
+}
+
 export function SkillConfig() {
   const { t } = useTranslation()
   const { skills, enabled, loaded, load, toggle, remove } = useSkillsStore()
-  const { plugins } = usePluginsStore()
-  const pluginSkills = derivePluginSkills(plugins, new Set(skills.map((s) => s.id)))
+  const { plugins, loaded: pluginsLoaded, load: loadPlugins } = usePluginsStore()
+  const { standalone, pluginEntries } = partitionSkillsForSettings(skills, plugins)
   const [viewing, setViewing] = useState<SkillMeta | null>(null)
   const [deleting, setDeleting] = useState<SkillMeta | null>(null)
 
   useEffect(() => {
     if (!loaded) void load()
   }, [loaded, load])
+
+  useEffect(() => {
+    if (!pluginsLoaded) void loadPlugins()
+  }, [pluginsLoaded, loadPlugins])
 
   return (
     <div className="p-6">
@@ -104,7 +167,7 @@ export function SkillConfig() {
       </div>
 
       <div className="mt-5">
-        {skills.length === 0 && pluginSkills.length === 0 ? (
+        {standalone.length === 0 && pluginEntries.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border bg-surface-subtle px-4 py-8 text-center">
             <Sparkles size={22} className="mx-auto text-ink-tertiary" />
             <div className="mt-2 text-body text-ink-secondary">{t('settings.skill.empty')}</div>
@@ -113,7 +176,7 @@ export function SkillConfig() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {skills.map((skill) => (
+              {standalone.map((skill) => (
                 <SkillCard
                   key={skill.id}
                   skill={skill}
@@ -124,21 +187,26 @@ export function SkillConfig() {
                 />
               ))}
             </div>
-            {pluginSkills.length > 0 && (
+            {pluginEntries.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-meta font-medium text-ink-secondary">{t('settings.skill.pluginSkills')}</h3>
+                <p className="mt-1 text-caption text-ink-tertiary">{t('settings.skill.pluginSkillsHint')}</p>
                 <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {pluginSkills.map(({ skill, pluginName }) => (
-                    <SkillCard
-                      key={skill.id}
-                      skill={skill}
-                      enabled={enabled[skill.id] !== false}
-                      onToggle={(on) => void toggle(skill.id, on)}
-                      onView={() => setViewing(skill)}
-                      onDelete={() => {}}
-                      readOnly={{ pluginName }}
-                    />
-                  ))}
+                  {pluginEntries.map(({ skill, pluginName, pluginEnabled }) => {
+                    const skillOn = enabled[skill.id] !== false
+                    return (
+                      <SkillCard
+                        key={skill.id}
+                        skill={skill}
+                        enabled={effectivePluginSkillEnabled(skillOn, pluginEnabled)}
+                        onToggle={(on) => void toggle(skill.id, on)}
+                        onView={() => setViewing(skill)}
+                        onDelete={() => {}}
+                        readOnly={{ pluginName, pluginEnabled }}
+                        switchDisabled={!pluginEnabled}
+                      />
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -188,13 +256,16 @@ export function SkillCard({
   onView,
   onDelete,
   readOnly,
+  switchDisabled,
 }: {
   skill: SkillMeta
   enabled: boolean
   onToggle: (on: boolean) => void
   onView: () => void
   onDelete: () => void
-  readOnly?: { pluginName: string }
+  readOnly?: { pluginName: string; pluginEnabled?: boolean }
+  /** When true, the enable switch cannot be flipped (e.g. parent plugin is off). */
+  switchDisabled?: boolean
 }) {
   const { t } = useTranslation()
   const autoBadge = badgeForAutoInvoke(skill)
@@ -206,7 +277,7 @@ export function SkillCard({
   return (
     <div
       data-testid="skill-card"
-      className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
+      className={`flex flex-col gap-3 rounded-lg border border-border bg-surface p-4${!enabled ? ' opacity-60' : ''}`}
     >
       <DeclarativeContextMenu
         kind="skillConfig"
@@ -228,11 +299,17 @@ export function SkillCard({
                 via {readOnly.pluginName}
               </Badge>
             )}
+            {readOnly && readOnly.pluginEnabled === false && (
+              <Badge className="shrink-0 bg-surface-muted text-ink-tertiary">
+                {t('settings.skill.pluginDisabledBadge')}
+              </Badge>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Switch
               checked={enabled}
               onCheckedChange={onToggle}
+              disabled={switchDisabled}
               ariaLabel={t('settings.skill.enableThis')}
             />
             {/* modal={false}: a modal menu + a dialog its item opens both lock body{pointer-events:none};

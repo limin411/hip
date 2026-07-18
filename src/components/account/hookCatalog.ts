@@ -56,20 +56,25 @@ export type LifecyclePhaseId = 'session' | 'turn' | 'turnEnd' | 'activity'
 
 const CATALOG_SET = new Set<string>(HOOK_EVENT_CATALOG)
 
-/** Plugins that declare at least one hook entry. */
+/** Only plugins that are market-enabled contribute hooks to the live/settings view. */
+export function enabledPlugins(plugins: PluginMeta[]): PluginMeta[] {
+  return plugins.filter((p) => p.enabled === true)
+}
+
+/** Plugins that declare at least one hook entry (enabled plugins only). */
 export function pluginsWithHooks(plugins: PluginMeta[]): PluginMeta[] {
-  return plugins.filter((p) => p.hookCount > 0 || (p.hookEvents?.length ?? 0) > 0)
+  return enabledPlugins(plugins).filter((p) => p.hookCount > 0 || (p.hookEvents?.length ?? 0) > 0)
 }
 
-/** Sum of hook entries declared by installed plugins. */
+/** Sum of hook entries declared by enabled plugins. */
 export function totalConfiguredHookCount(plugins: PluginMeta[]): number {
-  return plugins.reduce((n, p) => n + (p.hookCount > 0 ? p.hookCount : 0), 0)
+  return enabledPlugins(plugins).reduce((n, p) => n + (p.hookCount > 0 ? p.hookCount : 0), 0)
 }
 
-/** Unique configured HookEvent names across installed plugins (catalog-filtered). */
+/** Unique configured HookEvent names across enabled plugins (catalog-filtered). */
 export function configuredHookEvents(plugins: PluginMeta[]): Set<string> {
   const out = new Set<string>()
-  for (const p of plugins) {
+  for (const p of enabledPlugins(plugins)) {
     for (const e of p.hookEvents ?? []) {
       if (CATALOG_SET.has(e)) out.add(e)
     }
@@ -84,10 +89,10 @@ export type HookEventSource = {
   hookCount: number
 }
 
-/** Map each HookEvent → plugins that declare it (for diagram expand panel). */
+/** Map each HookEvent → enabled plugins that declare it (for diagram expand panel). */
 export function sourcesByHookEvent(plugins: PluginMeta[]): Map<string, HookEventSource[]> {
   const map = new Map<string, HookEventSource[]>()
-  for (const p of plugins) {
+  for (const p of enabledPlugins(plugins)) {
     for (const e of p.hookEvents ?? []) {
       if (!CATALOG_SET.has(e)) continue
       const list = map.get(e) ?? []

@@ -82,6 +82,16 @@ describe('derivePluginMcpServers', () => {
     expect(result[0].id).toBe('plugin-mcp-1')
     expect(result[0].pluginId).toBe('plugin-a')
     expect(result[0].pluginName).toBe('Plugin A')
+    expect(result[0].enabled).toBe(true)
+    expect(result[0].pluginEnabled).toBe(true)
+  })
+
+  it('forces MCP off when parent plugin is disabled', () => {
+    const plugin = makePlugin('plugin-a', 'Plugin A', [makeServer('plugin-mcp-1', { enabled: true })])
+    plugin.enabled = false
+    const result = derivePluginMcpServers([plugin], new Set())
+    expect(result[0].enabled).toBe(false)
+    expect(result[0].pluginEnabled).toBe(false)
   })
 
   it('hides plugin MCP server when its id collides with a standalone server', () => {

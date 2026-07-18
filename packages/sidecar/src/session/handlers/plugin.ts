@@ -5,6 +5,7 @@ export const PLUGIN_MESSAGE_TYPES = new Set([
   'plugin:install:url',
   'plugin:install:github',
   'plugin:delete',
+  'plugin:reload',
   'replay:session',
 ])
 
@@ -17,8 +18,21 @@ export type PluginHandlerContext = SessionLifecycleContext & {
   replayTurn(sessionId: string, turnIndex: number, send: SendFn): Promise<void>
 }
 
+function reloadAllSessionPlugins(ctx: PluginHandlerContext): void {
+  ctx.forEachSession((session) => {
+    try {
+      session.reloadPlugins()
+    } catch (err) {
+      console.warn(
+        `[session-manager] failed to reload plugins for session ${session.id}:`,
+        err instanceof Error ? err.message : String(err),
+      )
+    }
+  })
+}
+
 /**
- * Plugin install/delete and session replay — always async-capable.
+ * Plugin install/delete/reload and session replay — always async-capable.
  * Caller should only await after isPluginMessage (sync gate).
  */
 export function handlePluginMessage(
@@ -38,19 +52,13 @@ export function handlePluginMessage(
         send({ type: 'plugin:delete:result', pluginId: pluginId ?? '', ok: false, error: 'pluginId is required' })
         return
       }
-      ctx.forEachSession((session) => {
-        try {
-          session.reloadPlugins()
-        } catch (err) {
-          console.warn(
-            `[session-manager] failed to reload plugins for session ${session.id}:`,
-            err instanceof Error ? err.message : String(err),
-          )
-        }
-      })
+      reloadAllSessionPlugins(ctx)
       send({ type: 'plugin:delete:result', pluginId, ok: true })
       return
     }
+    case 'plugin:reload':
+      reloadAllSessionPlugins(ctx)
+      return
     case 'replay:session':
       return ctx.replayTurn(msg.sessionId, msg.turnIndex, send)
     default:

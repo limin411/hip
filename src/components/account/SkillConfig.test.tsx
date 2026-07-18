@@ -176,6 +176,37 @@ describe('SkillCard plugin variant', () => {
   })
 })
 
+describe('SkillConfig partitions plugin-managed skills', () => {
+  it('does not offer delete for skills scanned with scope=plugin', async () => {
+    useSkillsStore.setState({
+      skills: [
+        skill({ id: 'local', name: 'Local' }),
+        skill({
+          id: 'via-plugin',
+          name: 'Via Plugin',
+          scope: 'plugin',
+          pluginId: 'test-plugin',
+        }),
+      ],
+      enabled: {},
+      loaded: true,
+    })
+    usePluginsStore.setState({
+      plugins: [plugin({ skills: ['via-plugin'] })],
+      loaded: true,
+    })
+
+    render(<SkillConfig />)
+
+    // Local skill can delete; plugin skill only appears under plugin section without delete.
+    const deleteButtons = screen.queryAllByText('settings.skill.delete')
+    // Kebab delete only for standalone (one menu item)
+    expect(deleteButtons.length).toBe(1)
+    expect(screen.getByText('settings.skill.pluginSkills')).toBeInTheDocument()
+    expect(screen.getByText('Via Plugin')).toBeInTheDocument()
+  })
+})
+
 describe('SkillCard standalone variant', () => {
   it('remains interactive and keeps the delete menu item', () => {
     render(

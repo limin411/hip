@@ -685,6 +685,9 @@ export const zhTW = {
         toolCountLabel: '{{count}} 個工具',
         reconnect: '重新連線',
         pluginSectionTitle: '外掛外部工具服務',
+        pluginSectionHint:
+          '由已安裝外掛提供。此處不可編輯或刪除；要移除請在「外掛市集」卸載整個外掛。在市集中停用外掛會同步關閉其 MCP。',
+        pluginDisabledBadge: '外掛已關',
         via: 'via {{name}}',
         sectionTools: '工具',
         toolToggleDesc: '切換各個工具的啟用狀態。啟用的工具可供智能體使用。',
@@ -787,6 +790,9 @@ export const zhTW = {
         installError: '安裝失敗。請確認 .zip 內含 SKILL.md。',
         loadError: '無法讀取該技能檔案。',
         pluginSkills: '外掛技能',
+        pluginSkillsHint:
+          '由已安裝外掛提供。可在此開關啟用；刪除只能透過在「外掛市集」卸載整個外掛。外掛在市集中停用時，其全部技能一併關閉。',
+        pluginDisabledBadge: '外掛已關',
       },
       agents: {
         title: '智能體管理',
@@ -898,6 +904,8 @@ export const zhTW = {
         intro: '檢視外掛宣告的生命週期掛鉤與可掛接事件。本頁唯讀，修改請編輯本機設定檔。',
         introShort:
           '唯讀概覽：展示外掛宣告的生命週期事件（靜態掃描，非目前工作階段探測）。工具類掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點；不含 gate 與外部 ACP 工作階段。點擊節點查看來源與路徑說明；修改請編輯外掛 hooks 檔案。',
+        pluginManagedHint:
+          '外掛掛鉤無法在此刪除。要移除請在「外掛市集」卸載整個外掛。',
         editHint:
           '掛鉤由外掛清單（plugin.json 的 hooks 欄位）宣告，handler 寫在外掛目錄下的 CJS 模組。安裝或更新外掛後可在此查看宣告計數。',
         loading: '載入中…',

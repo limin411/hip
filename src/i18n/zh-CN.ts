@@ -685,6 +685,9 @@ export const zhCN = {
         toolCountLabel: '{{count}} 个工具',
         reconnect: '重新连接',
         pluginSectionTitle: '插件外部工具服务',
+        pluginSectionHint:
+          '由已安装插件提供。此处不可编辑或删除；要移除请在「插件市场」卸载整个插件。在市场中禁用插件会同步关闭其 MCP。',
+        pluginDisabledBadge: '插件已关',
         via: 'via {{name}}',
         sectionTools: '工具',
         toolToggleDesc: '切换各个工具的启用状态。启用的工具可供智能体使用。',
@@ -787,6 +790,9 @@ export const zhCN = {
         installError: '安装失败。请确认 .zip 内含 SKILL.md。',
         loadError: '无法读取该技能文件。',
         pluginSkills: '插件技能',
+        pluginSkillsHint:
+          '由已安装插件提供。可在此开关启用；删除只能通过在「插件市场」卸载整个插件。插件在市场中禁用时，其全部技能一并关闭。',
+        pluginDisabledBadge: '插件已关',
       },
       agents: {
         title: '智能体管理',
@@ -898,6 +904,8 @@ export const zhCN = {
         intro: '查看插件声明的生命周期挂钩与可挂接事件。本页只读，修改请编辑本地配置文件。',
         introShort:
           '只读概览：展示插件声明的生命周期事件（静态扫描，非当前会话探针）。工具类挂钩生效于主循环、task 子智能体与工作流 agent 节点；不含 gate 与外部 ACP 会话。点击节点查看来源与路径说明；修改请编辑插件 hooks 文件。',
+        pluginManagedHint:
+          '插件挂钩无法在此删除。要移除请在「插件市场」卸载整个插件。',
         editHint:
           '挂钩通过插件清单（plugin.json 的 hooks 字段）声明，handler 写在插件目录下的 CJS 模块中。安装或更新插件后，在此刷新可见。',
         loading: '正在加载…',

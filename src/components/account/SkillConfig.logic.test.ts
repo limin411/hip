@@ -6,6 +6,9 @@ import {
   refCountLabel,
   toolAllowlistPreview,
   derivePluginSkills,
+  isPluginManagedSkill,
+  partitionSkillsForSettings,
+  effectivePluginSkillEnabled,
 } from './SkillConfig'
 
 function baseSkill(overrides: Partial<SkillMeta> = {}): SkillMeta {
@@ -161,5 +164,47 @@ describe('derivePluginSkills', () => {
     expect(result).toHaveLength(1)
     expect(result[0].skill.id).toBe('unique')
     expect(result[0].skill.pluginId).toBe('plugin-b')
+  })
+})
+
+describe('isPluginManagedSkill / partitionSkillsForSettings', () => {
+  it('detects plugin-managed skills by scope or pluginId', () => {
+    expect(isPluginManagedSkill(baseSkill())).toBe(false)
+    expect(isPluginManagedSkill(baseSkill({ scope: 'plugin' }))).toBe(true)
+    expect(isPluginManagedSkill(baseSkill({ pluginId: 'p1' }))).toBe(true)
+  })
+
+  it('keeps plugin-scoped list_skills out of standalone and out of delete path', () => {
+    const skills = [
+      baseSkill({ id: 'local', name: 'Local' }),
+      baseSkill({
+        id: 'from-plugin',
+        name: 'From Plugin',
+        scope: 'plugin',
+        pluginId: 'test-plugin',
+      }),
+    ]
+    const plugins = [basePlugin({ skills: ['from-plugin', 'manifest-only'] })]
+    const { standalone, pluginEntries } = partitionSkillsForSettings(skills, plugins)
+    expect(standalone.map((s) => s.id)).toEqual(['local'])
+    expect(pluginEntries.map((e) => e.skill.id).sort()).toEqual(['from-plugin', 'manifest-only'])
+    expect(pluginEntries.find((e) => e.skill.id === 'from-plugin')?.pluginName).toBe('Test Plugin')
+    expect(pluginEntries.every((e) => e.pluginEnabled)).toBe(true)
+  })
+
+  it('marks skills disabled when parent plugin is off', () => {
+    const skills = [
+      baseSkill({
+        id: 'from-plugin',
+        scope: 'plugin',
+        pluginId: 'test-plugin',
+      }),
+    ]
+    const plugins = [basePlugin({ skills: ['from-plugin'], enabled: false })]
+    const { pluginEntries } = partitionSkillsForSettings(skills, plugins)
+    expect(pluginEntries).toHaveLength(1)
+    expect(pluginEntries[0].pluginEnabled).toBe(false)
+    expect(effectivePluginSkillEnabled(true, false)).toBe(false)
+    expect(effectivePluginSkillEnabled(true, true)).toBe(true)
   })
 })

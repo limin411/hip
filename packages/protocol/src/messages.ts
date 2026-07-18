@@ -100,6 +100,8 @@ export type ClientMessage =
   | { type: 'plugin:install:url'; url: string }
   | { type: 'plugin:install:github'; url: string }
   | { type: 'plugin:delete'; pluginId: string }
+  /** Reload plugin components in all sessions (after enable/disable or disk change). */
+  | { type: 'plugin:reload' }
   | {
       type: 'git:worktree:create'
       sessionId: string

@@ -692,6 +692,9 @@ export const en = {
         toolCountLabel: '{{count}} tool(s)',
         reconnect: 'Reconnect',
         pluginSectionTitle: 'Plugin external tool services',
+        pluginSectionHint:
+          'Provided by installed plugins. Not editable or deletable here — uninstall the plugin in Plugin Market to remove them. Disabling a plugin in Plugin Market turns its MCP servers off.',
+        pluginDisabledBadge: 'Plugin off',
         via: 'via {{name}}',
         sectionTools: 'Tools',
         toolToggleDesc: 'Toggle individual tools on or off. Enabled tools are available to the agent.',
@@ -795,6 +798,9 @@ export const en = {
         installError: 'Install failed. Make sure the .zip contains a SKILL.md.',
         loadError: 'Could not read this skill file.',
         pluginSkills: 'Plugin Skills',
+        pluginSkillsHint:
+          'Owned by an installed plugin. You can enable or disable each skill here; delete only by uninstalling the plugin in Plugin Market. If the plugin is disabled in Plugin Market, all of its skills stay off.',
+        pluginDisabledBadge: 'Plugin off',
       },
       agents: {
         title: 'Agent Management',
@@ -908,6 +914,8 @@ export const en = {
         intro: 'See which lifecycle hooks plugins declare and which events you can attach. This page is read-only — edit local config files to change hooks.',
         introShort:
           'Read-only overview of lifecycle events declared by plugins (static scan, not a live session probe). Tool hooks run on the main loop, task subagents, and workflow agent nodes—not gates or external ACP sessions. Click a node for sources and path notes; edit plugin hook files to change config.',
+        pluginManagedHint:
+          'Plugin hooks cannot be deleted here. Uninstall the whole plugin in Plugin Market to remove them.',
         editHint:
           'Hooks are declared by plugins via the hooks field in plugin.json, with handlers in a CJS module under the plugin directory. After install or update, they appear here as declared counts.',
         loading: 'Loading…',

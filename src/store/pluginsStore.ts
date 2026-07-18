@@ -6,6 +6,7 @@ import {
   deletePlugin,
   setPluginEnabled,
 } from '@/ipc/plugins'
+import { wsClient } from '@/ipc/ws-client'
 
 interface PluginsStore {
   plugins: PluginMeta[]
@@ -14,6 +15,15 @@ interface PluginsStore {
   install: (zipPath: string) => Promise<void>
   remove: (id: string) => Promise<void>
   toggle: (id: string, enabled: boolean) => Promise<void>
+}
+
+/** Ask sidecar sessions to drop/reload plugin components after registry change. */
+function notifyPluginReload(): void {
+  try {
+    wsClient.send({ type: 'plugin:reload' })
+  } catch {
+    /* app may not be connected yet */
+  }
 }
 
 export const usePluginsStore = create<PluginsStore>((set, get) => ({
@@ -27,13 +37,15 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
     await installPluginZip(zipPath)
     const plugins = await listPlugins()
     set({ plugins })
+    notifyPluginReload()
   },
   remove: async (id) => {
     await deletePlugin(id)
     set({ plugins: get().plugins.filter((p) => p.id !== id) })
+    notifyPluginReload()
   },
   toggle: async (id, enabled) => {
-    // Optimistic UI update
+    // Optimistic UI update so skill/MCP/hook pages immediately reflect disabled parent.
     set({
       plugins: get().plugins.map((p) => (p.id === id ? { ...p, enabled } : p)),
     })
@@ -41,6 +53,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
       await setPluginEnabled(id, enabled)
       const plugins = await listPlugins()
       set({ plugins })
+      notifyPluginReload()
     } catch (err) {
       // Revert on failure
       const plugins = await listPlugins()

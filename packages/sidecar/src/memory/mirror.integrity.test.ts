@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { MEMORY_FILE_CONFIG_DEFAULTS } from '@hip/protocol'
 import { openDatabase } from '../persistence/open.js'
 import { MemoryStore } from './store.js'
 import { MemoryService } from './service.js'
-import { projectMemoryMirrorPath, globalMemoryMirrorPath } from './mirror.js'
+import {
+  projectMemoryMirrorPath,
+  globalMemoryMirrorPath,
+  formatMemoryMirrorMarkdown,
+} from './mirror.js'
 
 describe('mirror integrity (PR1)', () => {
   let dir: string
@@ -33,6 +37,55 @@ describe('mirror integrity (PR1)', () => {
     if (prevEnv === undefined) delete process.env.HIP_MEMORIES_DIR
     else process.env.HIP_MEMORIES_DIR = prevEnv
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('startup reconcile clears mirrorDesync after repairing orphan mirror ids', () => {
+    const live = svc.upsert({
+      title: 'Live',
+      content: 'in sqlite',
+      kind: 'preference',
+      scope: 'global',
+    })
+    // Corrupt on-disk mirror: live id + orphan not in DB (simulates stale export)
+    const ghost = {
+      id: 'orphan-mirror-only',
+      scope: 'global' as const,
+      kind: 'lesson' as const,
+      title: 'Ghost',
+      content: 'only on disk',
+      confidence: 0.5,
+      status: 'active' as const,
+      source: 'user' as const,
+      tags: [] as string[],
+      createdAt: 1,
+      updatedAt: 1,
+      useCount: 0,
+      pinned: false,
+    }
+    writeFileSync(
+      globalMemoryMirrorPath(),
+      formatMemoryMirrorMarkdown(undefined, [live, ghost]),
+      'utf8',
+    )
+
+    // Fresh service instance re-runs startup reconcile on same store semantics
+    const { db, memoriesFtsEnabled } = openDatabase(':memory:')
+    // Reuse config/memories dir; use same service's store by constructing sibling on new db
+    // that we seed with the live item only, plus corrupted mirror already on disk.
+    const store2 = new MemoryStore(db, memoriesFtsEnabled)
+    store2.upsertItem(live)
+    const svc2 = new MemoryService(store2, { configPath })
+    svc2.setConfig({
+      ...MEMORY_FILE_CONFIG_DEFAULTS,
+      useMemories: true,
+      exportMarkdownMirror: true,
+    })
+    svc2.runStartupDecayOnce()
+
+    expect(svc2.getPipelineStatus().mirrorDesync).toBe(false)
+    const mirror = readFileSync(globalMemoryMirrorPath(), 'utf8')
+    expect(mirror).not.toContain('orphan-mirror-only')
+    expect(mirror).toContain(live.id)
   })
 
   it('upsert then delete removes id from mirror and bumps generation', () => {

@@ -193,7 +193,8 @@ export const zhTW = {
         healthDaysAgo: '{{n}} 天前',
         healthQuota: '今日自動學習額度：{{today}} / {{max}}',
         noLlmCta: '沒有 API 金鑰無法自動學習。請到 設定 → 模型提供商 配置後再回來。',
-        mirrorDesync: 'Markdown 鏡像與資料庫不一致，已自動從資料庫修復。',
+        mirrorDesync:
+          'Markdown 鏡像仍含資料庫中已刪除的條目，自動修復未完全成功。可忽略，或刪除 ~/.hip/memories 後重啟。',
         advancedTitle: '進階設定（一般不用改）',
         advancedDesc: '學習時機、模型與混合檢索。預設值對大多數人夠用。',
         advancedGates: '進階抽取門檻',

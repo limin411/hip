@@ -851,7 +851,8 @@ export const zhCN = {
         healthDaysAgo: '{{n}} 天前',
         healthQuota: '今日自动学习额度：{{today}} / {{max}}',
         noLlmCta: '没有 API 密钥无法自动学习。请到 设置 → 模型提供商 配置后再回来。',
-        mirrorDesync: 'Markdown 镜像与数据库不一致，已自动从数据库修复。',
+        mirrorDesync:
+          'Markdown 镜像仍含数据库中已删除的条目，自动修复未完全成功。可忽略，或删除 ~/.hip/memories 后重启。',
         advancedTitle: '高级设置（一般不用改）',
         advancedDesc: '学习时机、模型与混合检索。默认值对大多数人够用。',
         advancedGates: '高级抽取门槛',

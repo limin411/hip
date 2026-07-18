@@ -257,19 +257,38 @@ export class MemoryService {
       }
     }
 
-    // Detect desync then DB-wins rewrite
-    let desync = false
+    // Detect desync (mirror has ids SQLite no longer has) then DB-wins rewrite.
+    let foundOrphans = false
     try {
       const g = detectMirrorDesync({ store: this.store })
-      if (!g.inSync && g.mirrorOnlyIds.length > 0) desync = true
+      if (!g.inSync && g.mirrorOnlyIds.length > 0) foundOrphans = true
     } catch {
       // ignore
     }
-    this.lastMirrorDesync = desync
-    if (desync) {
+    if (foundOrphans) {
       console.warn('[memory] mirror_desync detected; rewriting mirrors from DB')
     }
     rewriteMirrorsFromDb({ store: this.store, config, scopes: { all: true } })
+    // Re-check after rewrite so the UI flag is not sticky for the whole process.
+    // Previously lastMirrorDesync stayed true forever → Memory page always warned.
+    try {
+      if (!config.exportMarkdownMirror) {
+        this.lastMirrorDesync = false
+      } else {
+        const after = detectMirrorDesync({ store: this.store })
+        this.lastMirrorDesync = !after.inSync && after.mirrorOnlyIds.length > 0
+        if (this.lastMirrorDesync) {
+          console.warn(
+            '[memory] mirror_desync persists after rewrite',
+            after.mirrorPath,
+            `mirrorOnly=${after.mirrorOnlyIds.length}`,
+            `dbOnly=${after.dbOnlyIds.length}`,
+          )
+        }
+      }
+    } catch {
+      this.lastMirrorDesync = false
+    }
     // Generation bump so host caches invalidate after startup import/rewrite
     this.bumpCoreGeneration()
   }

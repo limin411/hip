@@ -870,7 +870,8 @@ export const en = {
         healthQuota: 'Today’s auto-learn quota: {{today}} / {{max}}',
         noLlmCta:
           'Cannot auto-learn without an API key. Open Settings → Providers, then come back.',
-        mirrorDesync: 'Markdown mirror was out of sync; repaired from the database.',
+        mirrorDesync:
+          'Markdown mirror still has entries missing from the database; auto-repair did not fully succeed. Safe to ignore, or delete ~/.hip/memories and restart.',
         advancedTitle: 'Advanced (usually leave alone)',
         advancedDesc:
           'Timing thresholds, extraction model, and hybrid search. Defaults work for most people.',

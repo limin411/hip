@@ -43,9 +43,6 @@ src/                 React frontend
 src-tauri/           Rust shell
 ```
 
-See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design and
-[`docs/superpowers/plans/`](docs/superpowers/plans/) for the implementation plan.
-
 ## Development setup
 
 > The DeepSeek API key is entered in the app's **Settings** panel and stored in
@@ -93,8 +90,7 @@ LLM spans are named `hip.model`. Keep `api_key` out of git; hip.toml lives under
 | `~/.hip/logs/` | Sidecar / Tauri logs |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
 
-Session delete removes DB rows for that session (including event log). See
-[`docs/superpowers/specs/2026-07-10-persistence-data-model.md`](docs/superpowers/specs/2026-07-10-persistence-data-model.md).
+Session delete removes DB rows for that session (including event log).
 
 ```bash
 # Optional: reclaim free pages after large deletes (app must be closed)
@@ -129,8 +125,7 @@ yarn tauri dev
 ### Product CLI (`@hip/cli`)
 
 Attach-only companion for the **running** hip desktop app (shared sidecar +
-`~/.hip` data). Design:
-[`docs/superpowers/specs/2026-07-18-hip-cli-tauri-host-attach.md`](docs/superpowers/specs/2026-07-18-hip-cli-tauri-host-attach.md).
+`~/.hip` data).
 
 There is **no** separate SDK package — scripts should call `hip … --json`.
 CLI does **not** start the product sidecar; start the app first or commands fail

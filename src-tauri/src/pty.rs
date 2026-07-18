@@ -1,6 +1,5 @@
 //! Interactive PTY manager for the code-surface Terminal tab.
 //!
-//! Spec: `docs/superpowers/specs/2026-07-10-code-panel-terminal-design.md` (PR-2).
 //! - 1 PTY per sessionId; soft cap 8
 //! - Shell: `$SHELL -il` (login + interactive) on Unix
 //! - Events: `pty:data` (base64) / `pty:exit`

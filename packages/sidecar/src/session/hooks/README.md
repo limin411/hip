@@ -22,7 +22,7 @@ When `message:send` enters the workflow branch via an explicit `pendingWorkflowD
 so UserPromptSubmit is not double-fired after `processInput`. Direct `workflow:run`
 leaves the flag false and may fire UserPromptSubmit itself when run text is present.
 
-Settings UI「挂钩配置」shows **declared** events from a static plugin scan (not a live session probe). Runtime path coverage is the table above. Honesty copy for the settings page: `docs/superpowers/specs/2026-07-13-hooks-settings-honesty-spec.md`.
+Settings UI「挂钩配置」shows **declared** events from a static plugin scan (not a live session probe). Runtime path coverage is the table above.
 
 ## Hook Event Types
 

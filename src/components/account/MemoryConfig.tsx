@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Brain,
@@ -10,6 +10,7 @@ import {
   Pin,
   Plus,
   RotateCcw,
+  Search,
   Trash2,
   Upload,
 } from 'lucide-react'
@@ -127,6 +128,8 @@ export function MemoryConfig() {
     tone: 'ok' | 'warn' | 'err'
     text: string
   } | null>(null)
+  /** Client-side filter over the loaded list (keeps layout stable when many items). */
+  const [listQuery, setListQuery] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
@@ -136,6 +139,15 @@ export function MemoryConfig() {
     config.embeddingModel.providerID &&
     config.embeddingModel.modelID
   )
+
+  const filteredItems = useMemo(() => {
+    const q = listQuery.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((it) => {
+      const hay = `${it.title}\n${it.content}\n${it.kind}\n${it.scope}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [items, listQuery])
 
   const loadItems = useCallback(async (status: MemoryStatus) => {
     return sessionService.listMemories({ limit: 200, status })
@@ -672,11 +684,26 @@ export function MemoryConfig() {
         </div>
       </section>
 
-      {/* Memory list — primary content */}
+      {/* Memory list — primary content (scrolls internally when long) */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-prose font-medium text-ink">{t('settings.memory.listTitle')}</h3>
+            <h3 className="text-prose font-medium text-ink">
+              {t('settings.memory.listTitle')}
+              {items.length > 0 && (
+                <span
+                  className="ml-2 text-meta font-normal text-ink-tertiary"
+                  data-testid="memory-list-count"
+                >
+                  {listQuery.trim()
+                    ? t('settings.memory.listCountFiltered', {
+                        shown: filteredItems.length,
+                        total: items.length,
+                      })
+                    : t('settings.memory.listCount', { n: items.length })}
+                </span>
+              )}
+            </h3>
             <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.listHint')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -708,7 +735,10 @@ export function MemoryConfig() {
                 )}
                 aria-pressed={listStatus === 'active'}
                 disabled={busy}
-                onClick={() => void switchListStatus('active')}
+                onClick={() => {
+                  setListQuery('')
+                  void switchListStatus('active')
+                }}
               >
                 {t('settings.memory.filterActive')}
               </button>
@@ -723,7 +753,10 @@ export function MemoryConfig() {
                 )}
                 aria-pressed={isTrash}
                 disabled={busy}
-                onClick={() => void switchListStatus('deleted')}
+                onClick={() => {
+                  setListQuery('')
+                  void switchListStatus('deleted')
+                }}
               >
                 {t('settings.memory.filterTrash')}
               </button>
@@ -741,6 +774,25 @@ export function MemoryConfig() {
             )}
           </div>
         </div>
+
+        {items.length > 0 && (
+          <div className="relative mt-3">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-tertiary"
+              aria-hidden
+            />
+            <input
+              type="search"
+              className={cn(inputCls, 'pl-8')}
+              value={listQuery}
+              data-testid="memory-list-search"
+              placeholder={t('settings.memory.listSearchPlaceholder')}
+              aria-label={t('settings.memory.listSearchPlaceholder')}
+              onChange={(e) => setListQuery(e.target.value)}
+            />
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div
@@ -762,88 +814,108 @@ export function MemoryConfig() {
               </div>
             )}
           </div>
+        ) : filteredItems.length === 0 ? (
+          <div
+            className="mt-3 rounded-xl border border-dashed border-border px-4 py-5 text-center"
+            data-testid="memory-list-no-match"
+          >
+            <p className="text-body text-ink-secondary">{t('settings.memory.listNoMatch')}</p>
+          </div>
         ) : (
-          <ul className="mt-3 divide-y divide-border rounded-xl border border-border" data-testid="memory-list">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start gap-2 px-3 py-3"
-                data-testid={`memory-item-${item.id}`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    {item.pinned && !isTrash && (
-                      <Pin
-                        size={12}
-                        className="shrink-0 text-accent"
-                        aria-hidden
-                        data-testid={`memory-pinned-badge-${item.id}`}
-                      />
-                    )}
-                    <div className="truncate text-body font-medium text-ink">{item.title}</div>
+          <div
+            className="mt-3 overflow-hidden rounded-xl border border-border"
+            data-testid="memory-list-frame"
+          >
+            <ul
+              className="max-h-[min(28rem,55vh)] divide-y divide-border overflow-y-auto overscroll-contain"
+              data-testid="memory-list"
+            >
+              {filteredItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-2 px-3 py-2.5"
+                  data-testid={`memory-item-${item.id}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {item.pinned && !isTrash && (
+                        <Pin
+                          size={12}
+                          className="shrink-0 text-accent"
+                          aria-hidden
+                          data-testid={`memory-pinned-badge-${item.id}`}
+                        />
+                      )}
+                      <div className="truncate text-body font-medium text-ink">{item.title}</div>
+                    </div>
+                    <p className="mt-0.5 line-clamp-1 text-caption text-ink-secondary">{item.content}</p>
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-caption text-ink-tertiary">
+                      <span>{t(`settings.memory.kind.${item.kind}`, { defaultValue: item.kind })}</span>
+                      <span>·</span>
+                      <span>{t(`settings.memory.scope.${item.scope}`, { defaultValue: item.scope })}</span>
+                    </div>
                   </div>
-                  <p className="mt-0.5 line-clamp-2 text-caption text-ink-secondary">{item.content}</p>
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-caption text-ink-tertiary">
-                    <span>{t(`settings.memory.kind.${item.kind}`, { defaultValue: item.kind })}</span>
-                    <span>·</span>
-                    <span>{t(`settings.memory.scope.${item.scope}`, { defaultValue: item.scope })}</span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5">
-                  {isTrash ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="shrink-0 text-ink-secondary"
-                      disabled={busy}
-                      aria-label={t('settings.memory.restore')}
-                      data-testid={`memory-restore-${item.id}`}
-                      onClick={() => void onRestore(item)}
-                    >
-                      <RotateCcw size={15} />
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className={cn('shrink-0', item.pinned ? 'text-accent' : 'text-ink-secondary')}
-                        disabled={busy}
-                        aria-label={item.pinned ? t('settings.memory.unpin') : t('settings.memory.pin')}
-                        aria-pressed={item.pinned}
-                        data-testid={`memory-pin-${item.id}`}
-                        onClick={() => void onTogglePin(item)}
-                      >
-                        <Pin size={15} fill={item.pinned ? 'currentColor' : 'none'} />
-                      </Button>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {isTrash ? (
                       <Button
                         size="icon"
                         variant="ghost"
                         className="shrink-0 text-ink-secondary"
                         disabled={busy}
-                        aria-label={t('settings.memory.edit')}
-                        data-testid={`memory-edit-${item.id}`}
-                        onClick={() => openEdit(item)}
+                        aria-label={t('settings.memory.restore')}
+                        data-testid={`memory-restore-${item.id}`}
+                        onClick={() => void onRestore(item)}
                       >
-                        <Pencil size={15} />
+                        <RotateCcw size={15} />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="shrink-0 text-ink-secondary hover:text-danger"
-                        disabled={busy}
-                        aria-label={t('settings.memory.delete')}
-                        data-testid={`memory-delete-${item.id}`}
-                        onClick={() => setDeleting(item)}
-                      >
-                        <Trash2 size={15} />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                    ) : (
+                      <>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className={cn('shrink-0', item.pinned ? 'text-accent' : 'text-ink-secondary')}
+                          disabled={busy}
+                          aria-label={item.pinned ? t('settings.memory.unpin') : t('settings.memory.pin')}
+                          aria-pressed={item.pinned}
+                          data-testid={`memory-pin-${item.id}`}
+                          onClick={() => void onTogglePin(item)}
+                        >
+                          <Pin size={15} fill={item.pinned ? 'currentColor' : 'none'} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="shrink-0 text-ink-secondary"
+                          disabled={busy}
+                          aria-label={t('settings.memory.edit')}
+                          data-testid={`memory-edit-${item.id}`}
+                          onClick={() => openEdit(item)}
+                        >
+                          <Pencil size={15} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="shrink-0 text-ink-secondary hover:text-danger"
+                          disabled={busy}
+                          aria-label={t('settings.memory.delete')}
+                          data-testid={`memory-delete-${item.id}`}
+                          onClick={() => setDeleting(item)}
+                        >
+                          <Trash2 size={15} />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {items.length >= 200 && (
+              <p className="border-t border-border px-3 py-2 text-caption text-ink-tertiary" data-testid="memory-list-cap">
+                {t('settings.memory.listCapHint')}
+              </p>
+            )}
+          </div>
         )}
       </section>
 

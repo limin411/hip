@@ -790,6 +790,11 @@ export const en = {
         consolidateFailed: 'Learn failed: {{reason}}',
         listTitle: 'Stored memories',
         listHint: 'These facts can be injected into future chats. Pin ones that always matter.',
+        listCount: '{{n}}',
+        listCountFiltered: '{{shown}} / {{total}}',
+        listSearchPlaceholder: 'Search title or content…',
+        listNoMatch: 'No memories match your search.',
+        listCapHint: 'Showing the first 200 items. Export JSONL or search to narrow the list.',
         listEmpty: 'No memories yet.',
         listEmptyGuide: 'Nothing saved yet. Add one yourself, or chat and wait for auto-learn.',
         listEmptyAutoHint:

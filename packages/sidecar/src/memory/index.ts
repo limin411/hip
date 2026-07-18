@@ -109,6 +109,12 @@ export {
   type Phase2PostPassResult,
 } from './pipeline/phase2-consolidate.js'
 export {
+  runLearnNow,
+  formatLearnNowDetail,
+  type LearnNowResult,
+  type RunLearnNowOpts,
+} from './pipeline/learn-now.js'
+export {
   runDecayJob,
   applyDecayStep,
   isDecayCandidate,

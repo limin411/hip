@@ -765,10 +765,15 @@ export const zhCN = {
         consolidate: '立即学习',
         consolidating: '学习中…',
         consolidateHint:
-          '把后台已抽取、尚未巩固的内容整理成长期记忆（会用 API）。不会重读当前对话——请先聊天并等自动学习，或用「添加记忆」。',
+          '若还没有待巩固内容，会先从最近对话抽取，再整理成长期记忆（会用 API）。建议先聊几轮；也可手动「添加记忆」。',
         consolidateOk: '完成。更新了 {{upserted}} 条记忆（归档 {{archived}}）。',
+        consolidateOkExtracted:
+          '完成。已从对话抽取并更新 {{upserted}} 条记忆（归档 {{archived}}）。',
         consolidateNoStage1:
-          '目前没有可巩固的抽取结果。请先聊几轮并停一会儿让自动学习跑起来，或点「添加记忆」。',
+          '还没抽出可长期保存的内容。请再聊几句偏好/约定，确认已开启「生成记忆」，然后再试；或用「添加记忆」。',
+        consolidateNoEligibleSession:
+          '最近会话消息还不够。先聊几轮，再点「立即学习」。',
+        consolidateRateLimited: '今日自动学习额度已用完。明天再试，或用「添加记忆」。',
         consolidateNoLlm: '无法学习：请先在 设置 → 模型提供商 配置 API 密钥。',
         consolidateNoop: '已跳过（{{reason}}）。',
         consolidateFailed: '学习失败：{{reason}}',

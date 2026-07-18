@@ -107,10 +107,15 @@ export const zhTW = {
         consolidate: '立即學習',
         consolidating: '學習中…',
         consolidateHint:
-          '把背景已抽取、尚未鞏固的內容整理成長期記憶（會用 API）。不會重讀目前對話——請先聊天並等自動學習，或用「新增記憶」。',
+          '若還沒有待鞏固內容，會先從最近對話抽取，再整理成長期記憶（會用 API）。建議先聊幾輪；也可手動「新增記憶」。',
         consolidateOk: '完成。更新了 {{upserted}} 條記憶（封存 {{archived}}）。',
+        consolidateOkExtracted:
+          '完成。已從對話抽取並更新 {{upserted}} 條記憶（封存 {{archived}}）。',
         consolidateNoStage1:
-          '目前沒有可鞏固的抽取結果。請先聊幾輪並停一會兒讓自動學習跑起來，或點「新增記憶」。',
+          '還沒抽出可長期保存的內容。請再聊幾句偏好/約定，確認已開啟「產生記憶」，然後再試；或用「新增記憶」。',
+        consolidateNoEligibleSession:
+          '最近會話訊息還不夠。先聊幾輪，再點「立即學習」。',
+        consolidateRateLimited: '今日自動學習額度已用完。明天再試，或用「新增記憶」。',
         consolidateNoLlm: '無法學習：請先在 設定 → 模型提供商 配置 API 金鑰。',
         consolidateNoop: '已跳過（{{reason}}）。',
         consolidateFailed: '學習失敗：{{reason}}',

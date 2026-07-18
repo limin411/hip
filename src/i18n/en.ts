@@ -780,10 +780,16 @@ export const en = {
         consolidate: 'Learn now',
         consolidating: 'Learning…',
         consolidateHint:
-          'Consolidates pending auto-extracts into durable memories (uses API). It does not re-read the current chat — chat first and wait for auto-learn, or add a memory manually.',
+          'If nothing is pending, extracts from recent chats first, then consolidates into long-term memories (uses API). Prefer a few chat turns first; you can also Add memory manually.',
         consolidateOk: 'Done. Updated {{upserted}} memories (archived {{archived}}).',
+        consolidateOkExtracted:
+          'Done. Extracted from chat, then updated {{upserted}} memories (archived {{archived}}).',
         consolidateNoStage1:
-          'Nothing to consolidate yet. Auto-learn needs a few chat turns and an idle pause first, or use “Add memory”.',
+          'Nothing durable found yet. Chat a bit more (preferences/conventions), ensure Generate is on, then try again — or use Add memory.',
+        consolidateNoEligibleSession:
+          'No recent chat has enough messages to learn from. Chat a few turns, then try Learn now again.',
+        consolidateRateLimited:
+          'Daily auto-learn quota reached. Try again tomorrow, or use Add memory.',
         consolidateNoLlm:
           'Cannot learn: configure a provider API key under Settings → Providers.',
         consolidateNoop: 'Skipped ({{reason}}).',

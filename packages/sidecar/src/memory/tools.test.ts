@@ -1,14 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { openDatabase } from '../persistence/open.js'
 import { MemoryStore } from './store.js'
 import { MemoryService } from './service.js'
 import { buildMemoryTools } from './tools.js'
 
 function freshService() {
+  const dir = mkdtempSync(join(tmpdir(), 'hip-mem-tools-'))
+  const configPath = join(dir, 'memory.json')
   const { db, memoriesFtsEnabled } = openDatabase(':memory:')
   const store = new MemoryStore(db, memoriesFtsEnabled)
-  const svc = new MemoryService(store)
-  return { store, svc }
+  const svc = new MemoryService(store, { configPath })
+  return { store, svc, dir }
 }
 
 function byName(tools: ReturnType<typeof buildMemoryTools>, name: string) {
@@ -20,10 +25,21 @@ function byName(tools: ReturnType<typeof buildMemoryTools>, name: string) {
 describe('buildMemoryTools', () => {
   let svc: MemoryService
   let tools: ReturnType<typeof buildMemoryTools>
+  let tmpDir: string
 
   beforeEach(() => {
-    ;({ svc } = freshService())
+    const fresh = freshService()
+    svc = fresh.svc
+    tmpDir = fresh.dir
     tools = buildMemoryTools(svc, { sessionId: 'sess-1', cwd: '/tmp/proj', defaultScope: 'global' })
+  })
+
+  afterEach(() => {
+    try {
+      rmSync(tmpDir, { recursive: true, force: true })
+    } catch {
+      // ignore
+    }
   })
 
   it('exposes the four expected tool names', () => {

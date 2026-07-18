@@ -1,11 +1,9 @@
-import type { ClientMessage, MemoryItem, SessionConfig } from '@hip/protocol'
+import type { ClientMessage, MemoryItem, Message, SessionConfig } from '@hip/protocol'
 import type { Session } from '../session/session.js'
 import type { SendFn } from '../session/handlers/types.js'
 import type { MemoryService } from './service.js'
 import { createDefaultMemoryLlmClient } from './llm-client.js'
-import { runPhase2Consolidate } from './pipeline/phase2-consolidate.js'
-import { runDecayJob } from './pipeline/evolution.js'
-import { runTrashRetentionJob } from './trash.js'
+import { formatLearnNowDetail, runLearnNow } from './pipeline/learn-now.js'
 
 export const MEMORY_MESSAGE_TYPES = new Set([
   'memory:list',
@@ -39,6 +37,8 @@ export type MemoryHandlerContext = {
   store?: {
     updateConfig(id: string, config: string): void
     getSession?(id: string): { config: string } | undefined
+    loadMessagesWithRuns?(sessionId: string): Message[]
+    listSessions?(): Array<{ id: string; messageCount: number; config?: string }>
   } | null
 }
 
@@ -235,29 +235,53 @@ export function handleMemoryMessage(
       return
     }
     case 'memory:consolidate': {
+      // Dogfood "Learn now": optional Phase1 on recent chats when stage1 empty, then Phase2.
       const svc = ctx.getMemoryService()
       const config = svc.getConfig()
       const llm = createDefaultMemoryLlmClient({ extractModel: config.extractModel })
       send({ type: 'memory:pipeline', phase: 2, status: 'started' })
-      void runPhase2Consolidate({
+      const sessionStore =
+        ctx.store?.loadMessagesWithRuns && ctx.store.listSessions
+          ? {
+              loadMessagesWithRuns: (id: string) => ctx.store!.loadMessagesWithRuns!(id),
+              listSessions: () =>
+                ctx.store!.listSessions!().map((s) => {
+                  const row = ctx.store!.getSession?.(s.id)
+                  return {
+                    id: s.id,
+                    messageCount: s.messageCount,
+                    config: row?.config,
+                  }
+                }),
+            }
+          : null
+      void runLearnNow({
         store: svc.store,
+        memoryService: svc,
         llm,
         config,
+        sessionStore,
         projectKeyHash: msg.projectKeyHash,
-        onMutation: (scopes) => svc.afterMemoryMutation(scopes),
       })
-        .then((res) => {
+        .then((result) => {
+          const res = result.phase2
+          const detail = formatLearnNowDetail(result)
           if (res.status === 'skipped') {
             svc.recordPipelineStatus({
               lastPhase2At: Date.now(),
               lastPhase2Status: 'skipped',
               lastPhase2Reason: res.reason ?? 'skipped',
             })
+            // Prefer concrete no_stage1 for UI; include phase1 reason in detail for parsing.
+            const noopDetail =
+              res.reason === 'no_stage1' && result.phase1.lastReason
+                ? `no_stage1;${detail}`
+                : res.reason ?? 'skipped'
             send({
               type: 'memory:pipeline',
               phase: 2,
               status: 'noop',
-              detail: res.reason ?? 'skipped',
+              detail: noopDetail,
             })
             return
           }
@@ -271,32 +295,14 @@ export function handleMemoryMessage(
               type: 'memory:pipeline',
               phase: 2,
               status: 'failed',
-              detail: res.reason,
+              detail: res.reason ?? detail,
             })
             return
           }
-          // Best-effort decay + trash retention after successful Phase2.
-          try {
-            const decay = runDecayJob(svc.store, config)
-            if (decay.archived > 0) svc.afterMemoryMutation({ all: true })
-          } catch (err) {
-            console.warn(
-              '[memory] decay after consolidate failed',
-              err instanceof Error ? err.message : String(err),
-            )
-          }
-          try {
-            runTrashRetentionJob(svc.store, config)
-          } catch (err) {
-            console.warn(
-              '[memory] trash retention after consolidate failed',
-              err instanceof Error ? err.message : String(err),
-            )
-          }
-          const detail = `upserted=${res.upserted ?? 0};archived=${res.archived ?? 0}`
           svc.recordPipelineStatus({
             lastPhase2At: Date.now(),
-            lastPhase2Status: res.status === 'succeeded_no_output' ? 'succeeded_no_output' : 'succeeded',
+            lastPhase2Status:
+              res.status === 'succeeded_no_output' ? 'succeeded_no_output' : 'succeeded',
             lastPhase2Reason: detail,
           })
           send({

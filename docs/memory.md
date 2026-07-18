@@ -40,11 +40,21 @@ Managed sub-agents receive **read-only** core text and optional `memory_search` 
 - Threat-scan + secret redact on write.
 - Soft-delete trash + retention; session-derived hard delete available.
 
+## Learn now (立即学习)
+
+**Settings → Memory → Learn now** runs a dogfood-friendly path:
+
+1. If there is **no pending stage1**, try **Phase1 extract** on recent chat sessions (skips idle/interval gates; still respects daily extract quota and needs API key + Generate on).
+2. Then **Phase2 consolidate** into durable `memory_items`.
+
+Feedback appears under the button (`no_llm`, not enough chat, quota, or success with counts).
+
 ## Troubleshooting empty memory
 
 | Symptom | Check |
 |---------|--------|
-| List empty after enable | Wait idle debounce; need ≥ min user turns/chars; look at status strip for `succeeded_no_output` / `no_llm` / `rate_limited` |
+| List empty after enable | Chat ≥ min turns, enable Generate, click **Learn now**, or wait idle auto-learn; status strip for `succeeded_no_output` / `no_llm` / `rate_limited` |
+| Learn now → nothing | Need API key; recent sessions need enough messages; daily quota; or LLM returned empty extract |
 | `no_llm` CTA | Configure API key; optional extract model |
 | Mirror files have old content | SQLite is SoT; mirrors rewrite from DB on mutation/startup. Use **Import from mirror** only when DB is empty for that scope |
 | Sub-agent forgets | Managed path injects parent core when use is on; external agents need `useMemoriesWithExternal` |

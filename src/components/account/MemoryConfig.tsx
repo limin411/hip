@@ -398,27 +398,46 @@ export function MemoryConfig() {
       if (res.status === 'succeeded') {
         const upserted = /upserted=(\d+)/.exec(res.detail ?? '')?.[1] ?? '0'
         const archived = /archived=(\d+)/.exec(res.detail ?? '')?.[1] ?? '0'
+        const extracted = /extracted=(\d+)/.exec(res.detail ?? '')?.[1]
         setConsolidateMsg({
           tone: 'ok',
-          text: t('settings.memory.consolidateOk', { upserted, archived }),
+          text:
+            extracted && extracted !== '0'
+              ? t('settings.memory.consolidateOkExtracted', {
+                  upserted,
+                  archived,
+                  extracted,
+                })
+              : t('settings.memory.consolidateOk', { upserted, archived }),
         })
-        // Refresh list so new items appear
-        if (listStatus === 'active') {
-          const list = await loadItems('active')
-          setItems(list)
-        }
+        // Always refresh so new items / status strip update after dogfood learn.
+        await refresh()
       } else if (res.status === 'noop') {
-        const reason = res.detail ?? 'skipped'
-        const key =
-          reason === 'no_stage1'
-            ? 'settings.memory.consolidateNoStage1'
-            : reason === 'no_llm'
-              ? 'settings.memory.consolidateNoLlm'
-              : 'settings.memory.consolidateNoop'
+        const detail = res.detail ?? 'skipped'
+        // Detail may be "no_stage1;upserted=0;...;phase1Reason=no_eligible_session"
+        const primary = detail.split(';')[0] ?? detail
+        const phase1Reason = /phase1Reason=([^;]+)/.exec(detail)?.[1]
+        let key: string
+        if (primary === 'no_stage1' || detail.includes('no_stage1')) {
+          if (phase1Reason === 'no_llm' || detail.includes('phase1Reason=no_llm')) {
+            key = 'settings.memory.consolidateNoLlm'
+          } else if (phase1Reason === 'no_eligible_session') {
+            key = 'settings.memory.consolidateNoEligibleSession'
+          } else if (phase1Reason === 'rate_limited') {
+            key = 'settings.memory.consolidateRateLimited'
+          } else {
+            key = 'settings.memory.consolidateNoStage1'
+          }
+        } else if (primary === 'no_llm') {
+          key = 'settings.memory.consolidateNoLlm'
+        } else {
+          key = 'settings.memory.consolidateNoop'
+        }
         setConsolidateMsg({
           tone: 'warn',
-          text: t(key, { reason }),
+          text: t(key, { reason: phase1Reason ?? primary }),
         })
+        await refreshPipelineStatus()
       } else {
         setConsolidateMsg({
           tone: 'err',
@@ -426,8 +445,8 @@ export function MemoryConfig() {
             reason: res.detail ?? 'error',
           }),
         })
+        await refreshPipelineStatus()
       }
-      await refreshPipelineStatus()
     } catch (e) {
       setConsolidateMsg({
         tone: 'err',

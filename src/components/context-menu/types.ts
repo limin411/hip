@@ -25,6 +25,7 @@ export type ContextKind =
   | 'artifactChrome'
   | 'knowledgeNode'
   | 'knowledgeSpace'
+  | 'knowledgeTree'
   | 'worktree'
 
 export type ContextGroupId =
@@ -128,6 +129,14 @@ export type ContextPayloadMap = {
   knowledgeSpace: {
     spaceId: string
     name: string
+  }
+  /**
+   * Knowledge tree blank area (root). Hosts supply create callbacks so menus
+   * reuse Workspace create flows (same pattern as knowledgeNode).
+   */
+  knowledgeTree: {
+    onNewDoc: () => void
+    onNewFolder: () => void
   }
 }
 

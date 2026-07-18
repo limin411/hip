@@ -1,6 +1,6 @@
 /**
  * Knowledge base e2e helpers (WebdriverIO + Tauri).
- * Prefer stable data-testids; reuse + menu open retries from surface patterns.
+ * Prefer stable data-testids; reuse context-menu open retries from surface patterns.
  */
 
 import fs from 'node:fs'
@@ -147,13 +147,14 @@ async function clickMenuItem(triggerTestId: string, itemTestId: string): Promise
     `menu item [data-testid="${itemTestId}"] did not open from [data-testid="${triggerTestId}"]`,
   )
 }
-/** Create a doc and wait for default edit mode (CodeMirror host). */
+/** Create a doc via tree blank-area context menu and wait for CodeMirror host. */
 export async function createDocAndExpectEditor(): Promise<void> {
   // Already editing? skip create
   if (await (await browser.$('[data-testid="knowledge-doc-editor"] .cm-content')).isExisting()) {
     return
   }
-  await clickMenuItem('knowledge-new-menu', 'knowledge-new-doc')
+  await openContextMenu('[data-testid="knowledge-tree-pane"]')
+  await clickContextMenuItem('knowledgeTree.newDoc')
   await (await browser.$('[data-testid="knowledge-doc-editor"]')).waitForExist({
     timeout: 15000,
   })
@@ -751,12 +752,13 @@ export async function exportSpaceZipTo(destPath: string): Promise<void> {
   )
 }
 
-/** Create folder via toolbar new-menu. */
+/** Create folder via tree blank-area context menu (root). */
 export async function createFolderFromToolbar(): Promise<void> {
   const before = await browser.execute(
     () => document.querySelectorAll('[data-testid^="knowledge-tree-folder-"]').length,
   )
-  await clickMenuItem('knowledge-new-menu', 'knowledge-new-folder')
+  await openContextMenu('[data-testid="knowledge-tree-pane"]')
+  await clickContextMenuItem('knowledgeTree.newFolder')
   await browser.waitUntil(
     async () => {
       const n = await browser.execute(
@@ -1075,9 +1077,10 @@ export async function cancelWikiCreate(): Promise<void> {
   await browser.pause(200)
 }
 
-/** Create a second doc via toolbar (always creates even if editor already open). */
+/** Create a second doc via tree context menu (always creates even if editor already open). */
 export async function createNewDocFromMenu(): Promise<void> {
-  await clickMenuItem('knowledge-new-menu', 'knowledge-new-doc')
+  await openContextMenu('[data-testid="knowledge-tree-pane"]')
+  await clickContextMenuItem('knowledgeTree.newDoc')
   // May open template picker first when space has templates.
   const picker = await browser.$('[data-testid="knowledge-template-picker"]')
   if (await picker.isExisting()) {
@@ -1186,11 +1189,12 @@ export async function saveDocAsTemplate(name: string): Promise<void> {
 }
 
 /**
- * Open new-doc menu; returns whether template picker appeared.
+ * Open new-doc via tree context menu; returns whether template picker appeared.
  * Does **not** confirm — use pickTemplateEmpty / pickTemplateByName / cancelTemplatePicker.
  */
 export async function openNewDocMaybePicker(): Promise<'picker' | 'editor'> {
-  await clickMenuItem('knowledge-new-menu', 'knowledge-new-doc')
+  await openContextMenu('[data-testid="knowledge-tree-pane"]')
+  await clickContextMenuItem('knowledgeTree.newDoc')
   await browser.pause(300)
   const picker = await browser.$('[data-testid="knowledge-template-picker"]')
   if (await picker.isExisting()) return 'picker'

@@ -61,7 +61,7 @@ describe('knowledge tree node crud @knowledge @core', () => {
     await closeKnowledgeChipIfOpen()
   })
 
-  it('KT1: create folder from toolbar', async () => {
+  it('KT1: create folder from tree context menu', async () => {
     await createFolderFromToolbar()
     folderTid = await firstKnowledgeFolderTestId()
     expect(folderTid).toBeTruthy()

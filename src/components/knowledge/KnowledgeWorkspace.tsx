@@ -5,11 +5,9 @@ import {
   ChevronRight,
   Download,
   FilePlus,
-  FolderPlus,
   ImagePlus,
   History,
   MoreHorizontal,
-  Plus,
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -52,6 +50,7 @@ import {
   knowledgeRevealDoc,
 } from '@/ipc/knowledge'
 import { revealInCodeMirror, revealInPreviewRoot } from '@/domain/knowledge/searchReveal'
+import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
 import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
@@ -440,38 +439,6 @@ export function KnowledgeWorkspace() {
               </div>
             </div>
             <div className="mt-0.5 flex shrink-0 items-center gap-0.5">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    data-testid="knowledge-new-menu"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink disabled:opacity-50"
-                    title={t('knowledge.tree.newDoc')}
-                    aria-label={t('knowledge.workspace.new')}
-                  >
-                    <Plus size={16} strokeWidth={2} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    data-testid="knowledge-new-doc"
-                    onClick={() => newDoc(parentForNew)}
-                  >
-                    <FilePlus size={14} />
-                    {t('knowledge.tree.newDoc')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="knowledge-new-folder"
-                    onClick={() =>
-                      void createFolder(parentForNew, t('knowledge.folder.untitled'))
-                    }
-                  >
-                    <FolderPlus size={14} />
-                    {t('knowledge.tree.newFolder')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               {/* modal={false}: menu + KnowledgeSpaceDialogHost Modal both lock body
                   pointer-events; stacking leaves the app unclickable after close. */}
               <DropdownMenu modal={false}>
@@ -549,34 +516,46 @@ export function KnowledgeWorkspace() {
               </span>
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            <SpaceTree
-              visibleIds={visibleIds}
-              onRename={(node) => {
-                setNodeEdit(node)
-                setNodeTitle(node.title)
-              }}
-              onDelete={(node) => setNodeDelete(node)}
-              onNewDoc={(parentId) => newDoc(parentId)}
-              onNewFolder={(parentId) =>
-                void createFolder(parentId, t('knowledge.folder.untitled'))
-              }
-              onReveal={(node) => {
-                if (!activeSpaceId || node.kind !== 'doc') return
-                void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
-                  toast.error(knowledgeErrorMessage(e))
-                })
-              }}
-            />
-            {visibleIds && visibleIds.size === 0 && (
-              <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
-                <Search size={16} className="text-ink-tertiary/60" strokeWidth={1.75} />
-                <p className="text-meta text-ink-tertiary">
-                  {t('knowledge.tree.filterEmpty')}
-                </p>
-              </div>
-            )}
-          </div>
+          {/* Blank-area right-click creates at root; node rows use knowledgeNode menu. */}
+          <DeclarativeContextMenu
+            kind="knowledgeTree"
+            className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+            data-testid="knowledge-tree-pane"
+            payload={{
+              onNewDoc: () => newDoc(null),
+              onNewFolder: () =>
+                void createFolder(null, t('knowledge.folder.untitled')),
+            }}
+          >
+            <div className="min-h-full">
+              <SpaceTree
+                visibleIds={visibleIds}
+                onRename={(node) => {
+                  setNodeEdit(node)
+                  setNodeTitle(node.title)
+                }}
+                onDelete={(node) => setNodeDelete(node)}
+                onNewDoc={(parentId) => newDoc(parentId)}
+                onNewFolder={(parentId) =>
+                  void createFolder(parentId, t('knowledge.folder.untitled'))
+                }
+                onReveal={(node) => {
+                  if (!activeSpaceId || node.kind !== 'doc') return
+                  void knowledgeRevealDoc(activeSpaceId, node.id).catch((e) => {
+                    toast.error(knowledgeErrorMessage(e))
+                  })
+                }}
+              />
+              {visibleIds && visibleIds.size === 0 && (
+                <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
+                  <Search size={16} className="text-ink-tertiary/60" strokeWidth={1.75} />
+                  <p className="text-meta text-ink-tertiary">
+                    {t('knowledge.tree.filterEmpty')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </DeclarativeContextMenu>
         </div>
       </aside>
 

@@ -346,6 +346,18 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
+    id: 'knowledgeTree.newDoc',
+    labelKey: 'knowledge.tree.newDoc',
+    kind: 'knowledgeTree',
+    group: 'primary',
+  },
+  {
+    id: 'knowledgeTree.newFolder',
+    labelKey: 'knowledge.tree.newFolder',
+    kind: 'knowledgeTree',
+    group: 'primary',
+  },
+  {
     id: 'skillConfig.view',
     labelKey: 'settings.skill.view',
     kind: 'skillConfig',

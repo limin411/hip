@@ -5,7 +5,7 @@ import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
-import { ROLE_NAME_KEY } from '@/lib/roleColor'
+import { ROLE_COLOR, ROLE_NAME_KEY } from '@/lib/roleColor'
 import { useFocusStore } from '@/store/focusStore'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain/sessionStore'
@@ -30,15 +30,16 @@ export function SubAgentCard({
   showTools?: boolean
 }) {
   const { t } = useTranslation()
-  const title =
-    agent.taskInput?.trim() ||
-    t(ROLE_NAME_KEY[agent.role] ?? 'artifact.roles.subagent', {
-      defaultValue: agent.role,
-    })
+  const hasTaskTitle = Boolean(agent.taskInput?.trim())
+  const roleLabel = t(ROLE_NAME_KEY[agent.role] ?? 'artifact.roles.subagent', {
+    defaultValue: agent.role,
+  })
+  const title = hasTaskTitle ? agent.taskInput!.trim() : roleLabel
   const cleanOutput = sanitizeDisplayText(agent.output)
   const toolCount = agent.tools.length
   const elapsedSec = agent.elapsedMs > 0 ? Math.round(agent.elapsedMs / 1000) : null
   const runningTool = agent.tools.find((tc) => tc.status === 'running')
+  const railColor = ROLE_COLOR[agent.role] ?? ROLE_COLOR.subagent
 
   const openInAgents = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -51,7 +52,11 @@ export function SubAgentCard({
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
       {/* Always expanded — CLI-style flat trail, single-line baseline for header */}
-      <div className="mb-2 border-l border-border pl-3" data-testid="subagent-card">
+      <div
+        className="mb-2 border-l-2 pl-3"
+        style={{ borderLeftColor: railColor }}
+        data-testid="subagent-card"
+      >
         <div className="flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5">
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
             {agent.status === 'running' ? (
@@ -65,6 +70,9 @@ export function SubAgentCard({
           <span className="min-w-0 truncate font-medium text-ink" title={title}>
             {title}
           </span>
+          {hasTaskTitle && (
+            <span className="hidden shrink-0 text-ink-tertiary sm:inline">{roleLabel}</span>
+          )}
           <span className="hidden min-w-0 shrink-0 truncate font-mono text-ink-tertiary sm:inline" title={agent.agentId}>
             {agent.agentId}
           </span>

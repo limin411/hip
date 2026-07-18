@@ -119,4 +119,54 @@ describe('TurnTimeline', () => {
     expect(s1.textContent).toMatch(/A|hitA|grep/)
     expect(s2.textContent).toMatch(/B|hitB|grep/)
   })
+
+  it('applies role-colored left rails on all multi-agent sections including supervisor', () => {
+    render(
+      <TurnTimeline
+        agentRuns={[
+          {
+            agentId: 'supervisor',
+            role: 'supervisor',
+            output: 'summary',
+            startedAt: 1000,
+            finishedAt: 5000,
+            seq: 0,
+          },
+          {
+            agentId: 'subagent-1',
+            role: 'subagent',
+            output: 'a',
+            startedAt: 1100,
+            finishedAt: 2000,
+            seq: 1,
+            taskInput: 'check module A',
+            parentAgentId: 'supervisor',
+          },
+        ]}
+        toolCalls={[
+          {
+            callId: 'c1',
+            agentId: 'subagent-1',
+            name: 'grep',
+            input: '{"pattern":"A"}',
+            status: 'finished',
+            seq: 2,
+            output: 'hitA',
+          },
+        ]}
+      />,
+    )
+    const sections = screen.getAllByTestId('agent-timeline-section')
+    expect(sections.length).toBeGreaterThanOrEqual(2)
+    const supervisor = sections.find((s) => s.getAttribute('data-agent-id') === 'supervisor')!
+    const child = sections.find((s) => s.getAttribute('data-agent-id') === 'subagent-1')!
+    // Both multi-agent sections get border-l-2 rails colored by ROLE_COLOR
+    expect(supervisor.className).toContain('border-l-2')
+    expect(child.className).toContain('border-l-2')
+    expect(supervisor.style.borderLeftColor).toBe('var(--role-supervisor)')
+    // subagent maps to worker color
+    expect(child.style.borderLeftColor).toBe('var(--role-worker)')
+    // non-supervisor keeps extra top margin
+    expect(child.className).toContain('mt-1')
+  })
 })

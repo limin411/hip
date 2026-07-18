@@ -96,6 +96,28 @@ describe('ActivityBar', () => {
     expect(html).toContain('data-testid="turn-timeline"')
   })
 
+  it('running with activeRole: pulse on badge only — no Loader2 on summary', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />,
+    )
+    // Summary uses pulse on AgentBadge; dual Loader2+pulse is forbidden.
+    expect(html).toContain('animate-pulse')
+    expect(html).toContain('data-role="planner"')
+    // lucide Loader2 is absent from the summary path when role is present
+    expect(html).not.toContain('animate-spin')
+    expect(html).not.toContain('lucide-loader-circle')
+  })
+
+  it('success status uses CheckCircle2 only — no completion flash classes', () => {
+    const html = renderToStaticMarkup(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,
+    )
+    expect(html).toContain('data-testid="activity-status-success"')
+    expect(html).not.toContain('animate-completion')
+    expect(html).not.toContain('completion-rail')
+    expect(html).not.toContain('animate-pulse')
+  })
+
   it('hides when there is no activity', () => {
     const html = renderToStaticMarkup(<ActivityBar />)
     expect(html).toBe('')
@@ -105,6 +127,9 @@ describe('ActivityBar', () => {
     const html = renderToStaticMarkup(<ActivityBar streaming />)
     expect(html).toContain('data-testid="activity-bar"')
     expect(html).toContain('准备中…')
+    // Loader2 only — no second pulse dot
+    expect(html).toContain('animate-spin')
+    expect(html).not.toContain('animate-pulse')
   })
 
   it('shows partial status (not error) when tools fail but content exists', () => {

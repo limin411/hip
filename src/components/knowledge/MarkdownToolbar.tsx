@@ -22,12 +22,15 @@ import {
   prefixAndDispatch,
   wrapAndDispatch,
 } from '@/domain/knowledge/mdEdit'
+import { cn } from '@/lib/utils'
 
 export interface MarkdownToolbarProps {
   getView: () => EditorView | null
   /** Called after a successful edit so parent can sync draftBody from the view. */
   onAfterEdit?: (text: string) => void
   disabled?: boolean
+  /** Merge/override root classes (e.g. strip plate when nested in a shared chrome bar). */
+  className?: string
 }
 
 function ToolBtn({
@@ -63,7 +66,12 @@ function ToolBtn({
   )
 }
 
-export function MarkdownToolbar({ getView, onAfterEdit, disabled }: MarkdownToolbarProps) {
+export function MarkdownToolbar({
+  getView,
+  onAfterEdit,
+  disabled,
+  className,
+}: MarkdownToolbarProps) {
   const { t } = useTranslation()
 
   const run = (fn: (view: EditorView) => boolean) => {
@@ -76,7 +84,10 @@ export function MarkdownToolbar({ getView, onAfterEdit, disabled }: MarkdownTool
 
   return (
     <div
-      className="-mx-1 mb-1 flex shrink-0 flex-wrap items-center gap-0.5 rounded-md px-1 py-0.5 text-ink-secondary opacity-80 transition-opacity hover:opacity-100 focus-within:opacity-100"
+      className={cn(
+        '-mx-1 mb-1 flex shrink-0 flex-wrap items-center gap-0.5 rounded-md px-1 py-0.5 text-ink-secondary',
+        className,
+      )}
       data-testid="knowledge-md-toolbar"
       role="toolbar"
       aria-label={t('knowledge.toolbar.label')}

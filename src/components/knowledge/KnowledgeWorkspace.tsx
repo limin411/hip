@@ -742,6 +742,7 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
+              <DocPropertiesRow body={draftBody} />
               <Suspense
                 fallback={
                   <div
@@ -777,11 +778,14 @@ export function KnowledgeWorkspace() {
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
                 onCommit={(title) => void renameNode(activeDocId, title)}
               />
-              <div className="flex items-center gap-1">
+              <DocPropertiesRow body={draftBody} />
+              <div className="mt-3 mb-2 flex shrink-0 items-center gap-0.5 rounded-lg border border-border/80 bg-surface-muted/60 px-1 py-0.5">
                 <MarkdownToolbar
+                  className="mb-0 border-0 bg-transparent p-0 opacity-100"
                   getView={() => editorRef.current?.getView() ?? null}
                   onAfterEdit={(text) => setDraftBody(text)}
                 />
+                <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
                 <Button
                   type="button"
                   size="icon"
@@ -797,7 +801,6 @@ export function KnowledgeWorkspace() {
                   <ImagePlus size={14} />
                 </Button>
               </div>
-              <DocPropertiesRow body={draftBody} />
               <DocEditor
                 ref={editorRef}
                 key={`${activeDocId}-source`}

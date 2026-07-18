@@ -15,12 +15,12 @@ export function DocPropertiesRow({ body }: { body: string }) {
 
   return (
     <div
-      className="mt-2 flex flex-wrap items-center gap-1.5"
+      className="mt-1 flex flex-wrap items-center gap-1.5"
       data-testid="knowledge-doc-properties"
     >
       {hasStatus && (
         <span
-          className="rounded-md border border-border bg-surface-muted px-2 py-0.5 text-meta text-ink-secondary"
+          className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-caption text-ink-secondary"
           data-testid="knowledge-doc-status"
           title={t('knowledge.wiki.propertyStatus')}
         >
@@ -30,7 +30,7 @@ export function DocPropertiesRow({ body }: { body: string }) {
       {meta.tags.map((tag) => (
         <span
           key={tag}
-          className="rounded-full bg-surface-muted px-2 py-0.5 text-meta text-ink-secondary"
+          className="rounded-full bg-surface-muted px-2.5 py-0.5 text-caption text-ink-secondary"
           data-testid="knowledge-doc-tag"
         >
           {tag}

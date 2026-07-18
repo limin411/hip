@@ -148,6 +148,7 @@ export function NewConversation() {
             <SlashCommandPalette value={text} surface={surface} sessionId={activeId} skills={skills} onSelect={handleCommandSelect} onDismiss={handleDismiss} />
           )}
           <Composer
+            variant="card"
             value={text}
             onChange={(v) => setText(v)}
             onSubmit={submit}

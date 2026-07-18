@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { Composer } from './Composer'
+import {
+  heightFromDrag,
+  loadComposerHeight,
+  saveComposerHeight,
+} from './composerHeight'
 import { SlashCommandPalette, extractSlashQuery, type ComposerSurface } from './SlashCommandPalette'
 import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
 import { useSlashCommandHandler } from './useSlashCommandHandler'
@@ -33,6 +38,12 @@ export function InputBar() {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState<LocalAttachment[]>([])
   const [quoteText, setQuoteText] = useState<string | null>(null)
+  const [textareaHeight, setTextareaHeight] = useState(loadComposerHeight)
+  // Keep a ref of the latest height so drag-finish can persist without stale closures.
+  const latestHeight = useRef(textareaHeight)
+  latestHeight.current = textareaHeight
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null)
+  const dragTeardown = useRef<(() => void) | null>(null)
   const status = useActiveSessionStatus()
   const connection = useConnectionStatus()
   const activeId = useActiveSessionId()
@@ -44,6 +55,45 @@ export function InputBar() {
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
   const reconnecting = status === 'running' && connection !== 'connected'
+
+  // Tear down an in-flight height drag if the bar unmounts mid-gesture.
+  useEffect(() => () => dragTeardown.current?.(), [])
+
+  const onResizePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0 || dragRef.current) return
+    e.preventDefault()
+    dragRef.current = { startY: e.clientY, startH: latestHeight.current }
+
+    const onMove = (ev: PointerEvent) => {
+      if (!dragRef.current) return
+      const next = heightFromDrag(dragRef.current.startH, dragRef.current.startY, ev.clientY)
+      latestHeight.current = next
+      setTextareaHeight(next)
+    }
+    const finish = () => {
+      if (!dragRef.current) return
+      dragRef.current = null
+      dragTeardown.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      saveComposerHeight(latestHeight.current)
+    }
+    const onUp = (ev: PointerEvent) => {
+      if (ev.button !== 0) return
+      finish()
+    }
+    const onCancel = () => finish()
+
+    dragTeardown.current = finish
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'ns-resize'
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+  }, [])
 
   const allSkills = useSkillsStore((s) => s.skills)
   const skillsEnabled = useSkillsStore((s) => s.enabled) ?? {}
@@ -178,40 +228,63 @@ export function InputBar() {
     activeId ? (s.bySession[activeId]?.length ?? 0) : 0,
   )
   return (
-    <div className="shrink-0 px-5 pb-5" data-testid="input-bar">
-      <div className="mx-auto max-w-3xl">
+    // CLI-style dock: horizontal rule separates transcript (above) from input (below).
+    // Top edge is a drag handle to resize the textarea height.
+    <div
+      className="relative shrink-0 border-t border-border bg-surface"
+      data-testid="input-bar"
+    >
+      {!planApprovalPending && (
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t('chat.resizeInput')}
+          title={t('chat.resizeInput')}
+          data-testid="input-bar-resize"
+          onPointerDown={onResizePointerDown}
+          className="group absolute inset-x-0 top-0 z-10 flex h-3 -translate-y-1/2 cursor-ns-resize items-center justify-center"
+        >
+          <div
+            className="h-1 w-10 rounded-full bg-border transition-colors group-hover:bg-accent group-active:bg-accent"
+            aria-hidden
+          />
+        </div>
+      )}
+      <div className="w-full px-4 py-3">
         {planApprovalPending ? (
-          <div className="rounded-xl border border-border bg-surface px-4 py-3 text-center text-meta text-ink-secondary">
+          <div className="border-y border-border bg-surface px-1 py-3 text-left text-meta text-ink-secondary">
             {t('chat.planApproval.reviewAbove')}
           </div>
         ) : (
-            <div className="relative">
-              {query !== null && (
-                <SlashCommandPalette
-                  value={value}
-                  surface={surface}
-                  sessionId={activeId}
-                  skills={skills}
-                  skillsEnabled={skillsEnabled}
-                  onSelect={handleCommandSelect}
-                  onDismiss={handleDismiss}
-                />
-              )}
-              <Composer
+          <div className="relative">
+            {query !== null && (
+              <SlashCommandPalette
                 value={value}
-                onChange={setValue}
-                onSubmit={submit}
-                inputRef={inputRef}
-                running={status === 'running'}
-                onStop={() => sessionService.cancel()}
-                reconnecting={reconnecting}
-                leftSlot={
-                  isCode ? (
-                    <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><ParallelRunButton draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>
-                  ) : (
-                    <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
-                  )
-                }
+                surface={surface}
+                sessionId={activeId}
+                skills={skills}
+                skillsEnabled={skillsEnabled}
+                onSelect={handleCommandSelect}
+                onDismiss={handleDismiss}
+              />
+            )}
+            <Composer
+              variant="flat"
+              textareaHeight={textareaHeight}
+              value={value}
+              onChange={setValue}
+              onSubmit={submit}
+              inputRef={inputRef}
+              running={status === 'running'}
+              onStop={() => sessionService.cancel()}
+              reconnecting={reconnecting}
+              leftSlot={
+                isCode ? (
+                  <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><ParallelRunButton draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>
+                ) : (
+                  <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                )
+              }
               attachments={attachments}
               onAttachmentsChange={setAttachments}
               quoteText={quoteText}

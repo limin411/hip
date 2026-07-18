@@ -13,13 +13,15 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('./TurnTimeline', () => ({
   AgentBadge: ({ role }: { role: string }) => `<AgentBadge role="${role}" />`,
+  TurnTimeline: () => null,
 }))
 
 describe('ThinkingBubble', () => {
-  it('renders AI badge and hip label', () => {
+  it('renders hip label without avatar badge', () => {
     const html = renderToStaticMarkup(<ThinkingBubble />)
-    expect(html).toContain('AI')
     expect(html).toContain('hip')
+    expect(html).not.toContain('>AI<')
+    expect(html).not.toContain('text-on-accent')
   })
 
   it('does not render old bouncing dots', () => {

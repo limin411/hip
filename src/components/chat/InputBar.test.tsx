@@ -380,4 +380,29 @@ describe('InputBar', () => {
     })
     expect(setSessionModel).not.toHaveBeenCalled()
   })
+
+  it('exposes a top drag handle that resizes the textarea height', () => {
+    baseMocks()
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+    } as any)
+
+    render(<InputBar />)
+    const handle = screen.getByTestId('input-bar-resize')
+    const ta = screen.getByPlaceholderText(
+      'Message hip… (Enter to send, Shift+Enter for newline)',
+    ) as HTMLTextAreaElement
+
+    const startH = parseInt(ta.style.height || '56', 10) || 56
+    fireEvent.pointerDown(handle, { button: 0, clientY: 400 })
+    fireEvent.pointerMove(window, { clientY: 360 })
+    fireEvent.pointerUp(window, { button: 0, clientY: 360 })
+
+    const nextH = parseInt(ta.style.height || '0', 10)
+    expect(nextH).toBeGreaterThan(startH)
+  })
 })

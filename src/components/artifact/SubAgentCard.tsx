@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import type { TurnAgent } from '@/lib/turnAgents'
 import { ToolCallRow } from '@/components/artifact/ToolCallRow'
 import { DeclarativeContextMenu } from '@/components/context-menu'
-import { cn } from '@/lib/utils'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ROLE_NAME_KEY } from '@/lib/roleColor'
@@ -32,7 +30,6 @@ export function SubAgentCard({
   showTools?: boolean
 }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(agent.status === 'running')
   const title =
     agent.taskInput?.trim() ||
     t(ROLE_NAME_KEY[agent.role] ?? 'artifact.roles.subagent', {
@@ -53,18 +50,9 @@ export function SubAgentCard({
 
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
-      <div className="mb-2 rounded-lg border border-border bg-surface-muted/30">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-center gap-2 px-2 py-1.5 text-left"
-          data-testid="subagent-card"
-        >
-          <ChevronRight
-            size={12}
-            className={cn('shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')}
-          />
+      {/* Always expanded — CLI-style flat trail, no collapse toggle */}
+      <div className="mb-2 border-l border-border pl-3" data-testid="subagent-card">
+        <div className="flex w-full items-center gap-2 py-1 text-left">
           <span className="min-w-0 flex-1 truncate text-meta font-medium text-ink" title={title}>
             {title}
           </span>
@@ -108,27 +96,25 @@ export function SubAgentCard({
               <CheckCircle2 size={12} className="text-success" />
             )}
           </span>
-        </button>
-        {open && (
-          <div className="space-y-1.5 border-t border-border px-2 py-1.5">
-            {agent.reasoning && (
-              <pre className="whitespace-pre-wrap text-caption text-ink-secondary">
-                {sanitizeDisplayText(agent.reasoning)}
-              </pre>
-            )}
-            {showTools && agent.tools.map((tc) => <ToolCallRow key={tc.callId} tool={tc} />)}
-            {!showTools && toolCount > 0 && (
-              <p className="text-caption text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
-            )}
-            {cleanOutput ? (
-              <div className="max-h-48 overflow-auto" data-testid="subagent-output">
-                <MarkdownBody content={cleanOutput} className="text-meta [&_p]:my-1" />
-              </div>
-            ) : (
-              <div className="text-caption text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
-            )}
-          </div>
-        )}
+        </div>
+        <div className="space-y-1.5 py-1">
+          {agent.reasoning && (
+            <pre className="whitespace-pre-wrap text-caption text-ink-secondary">
+              {sanitizeDisplayText(agent.reasoning)}
+            </pre>
+          )}
+          {showTools && agent.tools.map((tc) => <ToolCallRow key={tc.callId} tool={tc} />)}
+          {!showTools && toolCount > 0 && (
+            <p className="text-caption text-ink-tertiary">{t('chat.activity.viewInActivity')}</p>
+          )}
+          {cleanOutput ? (
+            <div className="max-h-48 overflow-auto" data-testid="subagent-output">
+              <MarkdownBody content={cleanOutput} className="text-meta [&_p]:my-1" />
+            </div>
+          ) : (
+            <div className="text-caption text-ink-tertiary">{t('chat.subagent.noSummary')}</div>
+          )}
+        </div>
       </div>
     </DeclarativeContextMenu>
   )

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Loader2, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Circle, AlertTriangle } from 'lucide-react'
 import type { AgentRole, AgentRun, TimelineStep, ToolCall } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { AgentBadge, TurnTimeline } from './TurnTimeline'
@@ -77,8 +77,6 @@ export function ActivityBar({
   hidePlan,
 }: ActivityBarProps) {
   const { t } = useTranslation()
-  // Spec U2: running turn process is expanded by default so tools are visible without a click.
-  const [open, setOpen] = useState(!!streaming)
 
   const ordered = useMemo(() => [...steps].sort((a, b) => a.stepSeq - b.stepSeq), [steps])
   const lastStep = ordered[ordered.length - 1]
@@ -105,12 +103,12 @@ export function ActivityBar({
     if (!streaming) return null
     return (
       <div
-        className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5"
+        className="mb-2 flex items-center gap-2 py-1"
         data-testid="activity-bar"
         role="status"
         aria-live="polite"
       >
-        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary">{t('chat.activity.initializing')}</span>
         <Loader2 aria-hidden size={14} className="animate-spin text-accent-strong" />
       </div>
@@ -130,42 +128,32 @@ export function ActivityBar({
       <CheckCircle2 size={14} className="text-success" data-testid="activity-status-success" />
     )
 
-  const barClassName = cn(
-    'flex w-full items-center gap-2 rounded-lg border border-border bg-surface-muted/40 px-2.5 py-1.5 text-left transition-colors hover:border-accent/30 hover:bg-surface-muted/60',
-  )
-
-  const barContent = (
-    <>
-      {activeRole ? (
-        <span className={cn('inline-flex', status === 'running' && 'animate-pulse')}>
-          <AgentBadge role={activeRole} />
-        </span>
-      ) : (
-        <Circle size={10} className="mt-1.5 text-ink-tertiary" />
-      )}
-      {activeRole && (
-        <span className="shrink-0 text-meta font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
-      )}
-      <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary" title={summaryText}>
-        {summaryText}
-      </span>
-      <span className="ml-auto flex shrink-0 items-center gap-1.5">
-        {statusIcon}
-        <ChevronRight size={14} className={cn('text-ink-tertiary transition-transform', open && 'rotate-90')} />
-      </span>
-    </>
-  )
-
+  // Always expanded (CLI-style process trail) — no collapse toggle.
   return (
     <div className="mb-2" data-testid="activity-bar" aria-live="polite">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className={barClassName}>
-        {barContent}
-      </button>
-      {open && (
-        <div className="mt-1.5 rounded-lg border border-border bg-surface-muted/30 px-2 py-1.5">
-          <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} hidePlan={hidePlan} />
-        </div>
-      )}
+      <div
+        className="flex w-full items-center gap-2 py-1 text-left"
+        role="status"
+        data-testid="activity-bar-summary"
+      >
+        {activeRole ? (
+          <span className={cn('inline-flex', status === 'running' && 'animate-pulse')}>
+            <AgentBadge role={activeRole} />
+          </span>
+        ) : (
+          <Circle size={10} className="text-ink-tertiary" />
+        )}
+        {activeRole && (
+          <span className="shrink-0 text-meta font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-meta text-ink-tertiary" title={summaryText}>
+          {summaryText}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">{statusIcon}</span>
+      </div>
+      <div className="mt-1 border-l border-border pl-3">
+        <TurnTimeline steps={steps} toolCalls={toolCalls} agentRuns={agentRuns} hidePlan={hidePlan} />
+      </div>
     </div>
   )
 }

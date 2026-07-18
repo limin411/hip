@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, cleanup, within } from '@testing-library/react'
 import { ActivityBar } from './ActivityBar'
 import { TurnTimeline } from './TurnTimeline'
 
@@ -29,7 +29,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('./TurnTimeline', () => ({
-  TurnTimeline: vi.fn(() => null),
+  TurnTimeline: vi.fn(() => <div data-testid="turn-timeline">TurnTimeline content</div>),
   AgentBadge: ({ role }: { role: string }) => <span data-role={role} />,
 }))
 
@@ -54,7 +54,12 @@ const baseRuns = [
 ]
 
 describe('ActivityBar', () => {
-  it('renders collapsed summary for completed activity', () => {
+  beforeEach(() => {
+    cleanup()
+    vi.mocked(TurnTimeline).mockClear()
+  })
+
+  it('renders always-expanded summary and timeline for completed activity', () => {
     const html = renderToStaticMarkup(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,
     )
@@ -62,8 +67,10 @@ describe('ActivityBar', () => {
     expect(html).toContain('已完成')
     expect(html).toContain('1/1 个工具')
     expect(html).toContain('1 个子 Agent')
-    expect(html).toContain('aria-expanded="false"')
     expect(html).toContain('data-testid="activity-status-success"')
+    expect(html).toContain('data-testid="turn-timeline"')
+    // No collapse control
+    expect(html).not.toContain('aria-expanded')
   })
 
   it('includes category summary when tools span categories', () => {
@@ -84,9 +91,8 @@ describe('ActivityBar', () => {
     )
     expect(html).toContain('正在')
     expect(html).toContain('a.ts')
-    // Spec U2: process expanded by default while streaming
-    expect(html).toContain('aria-expanded="true"')
     expect(html).toContain('animate-pulse')
+    expect(html).toContain('data-testid="turn-timeline"')
   })
 
   it('hides when there is no activity', () => {
@@ -166,44 +172,25 @@ describe('ActivityBar', () => {
     expect(html).toContain('a.ts')
   })
 
-  it('toggles the activity drawer on click', () => {
-    vi.mocked(TurnTimeline).mockReturnValue(<div data-testid="turn-timeline">TurnTimeline content</div>)
+  it('always shows the timeline (no collapse toggle)', () => {
+    const { container } = render(
+      <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,
+    )
+    const bar = within(container).getByTestId('activity-bar')
 
-    render(<ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />)
-
-    const button = screen.getByTestId('activity-bar').querySelector('button')!
-
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByTestId('turn-timeline')).not.toBeInTheDocument()
-
-    fireEvent.click(button)
-
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('turn-timeline')).toBeInTheDocument()
-    expect(screen.getByTestId('turn-timeline')).toHaveTextContent('TurnTimeline content')
-
-    vi.mocked(TurnTimeline).mockReturnValue(null)
+    expect(within(bar).getByTestId('activity-bar-summary')).toBeInTheDocument()
+    expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
+    expect(bar.querySelector('button')).toBeNull()
   })
 
-  it('toggles the activity drawer on click while streaming', () => {
-    vi.mocked(TurnTimeline).mockReturnValue(<div data-testid="turn-timeline">TurnTimeline content</div>)
-
+  it('always shows the timeline while streaming', () => {
     const { container } = render(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} streaming />,
     )
+    const bar = within(container).getByTestId('activity-bar')
 
-    const button = container.querySelector('[data-testid="activity-bar"] button')!
-
-    // Default open while streaming (U2)
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
-
-    fireEvent.click(button)
-
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(container.querySelector('[data-testid="turn-timeline"]')).not.toBeInTheDocument()
-
-    vi.mocked(TurnTimeline).mockReturnValue(null)
+    expect(within(bar).getByTestId('turn-timeline')).toBeInTheDocument()
+    expect(bar.querySelector('button')).toBeNull()
   })
 
   it('does not break React hook rules when activity appears after initial render', () => {
@@ -215,5 +202,6 @@ describe('ActivityBar', () => {
     ).not.toThrow()
 
     expect(container.querySelector('[data-testid="activity-bar"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
   })
 })

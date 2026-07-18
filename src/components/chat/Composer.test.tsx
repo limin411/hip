@@ -89,4 +89,27 @@ describe('Composer', () => {
     render(<Composer value="" onChange={vi.fn()} onSubmit={vi.fn()} quoteText="   " />)
     expect(screen.queryByTestId('composer-quote')).not.toBeInTheDocument()
   })
+
+  it('card variant uses rounded rectangle shell', () => {
+    render(<Composer variant="card" value="" onChange={vi.fn()} onSubmit={vi.fn()} />)
+    const root = screen.getByTestId('composer')
+    expect(root).toHaveAttribute('data-variant', 'card')
+    expect(root.className).toContain('rounded-xl')
+    expect(root.className).toContain('border')
+  })
+
+  it('flat variant has no rounded card shell', () => {
+    render(<Composer variant="flat" value="" onChange={vi.fn()} onSubmit={vi.fn()} />)
+    const root = screen.getByTestId('composer')
+    expect(root).toHaveAttribute('data-variant', 'flat')
+    expect(root.className).not.toContain('rounded-xl')
+  })
+
+  it('applies fixed textarea height when provided', () => {
+    render(
+      <Composer variant="flat" textareaHeight={120} value="" onChange={vi.fn()} onSubmit={vi.fn()} />,
+    )
+    const ta = screen.getByPlaceholderText(/Message hip/)
+    expect(ta).toHaveStyle({ height: '120px' })
+  })
 })

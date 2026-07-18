@@ -56,10 +56,16 @@ describe('SubAgentCard context menu', () => {
     expect(screen.getByTestId('subagent-card')).toBeInTheDocument()
   })
 
-  it('defaults to collapsed when agent is done', () => {
-    render(<SubAgentCard agent={agent} />)
-    expect(screen.getByTestId('subagent-card')).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByTestId('subagent-card')).toHaveTextContent('fix bug')
+  it('always shows content (no collapse) when agent is done', () => {
+    render(<SubAgentCard agent={agent} showTools />)
+    const card = screen.getByTestId('subagent-card')
+    expect(card).toHaveTextContent('fix bug')
+    // SubAgentCard itself is not a collapsible control (ToolCallRow may still expand details)
+    expect(card).not.toHaveAttribute('aria-expanded')
+    expect(card.tagName).not.toBe('BUTTON')
+    expect(screen.getByTestId('subagent-output')).toBeInTheDocument()
+    expect(screen.getByTestId('subagent-output')).toHaveTextContent('result text')
+    expect(screen.getByTestId('tool-row')).toBeInTheDocument()
   })
 
   it('strips DSML from expanded output', () => {
@@ -73,7 +79,6 @@ describe('SubAgentCard context menu', () => {
         }}
       />,
     )
-    fireEvent.click(screen.getByTestId('subagent-card'))
     const out = screen.getByTestId('subagent-output')
     expect(out.textContent).not.toMatch(/DSML/i)
     expect(out.textContent).toContain('Done')
@@ -81,8 +86,6 @@ describe('SubAgentCard context menu', () => {
 
   it('nests toolCall host inside subAgent; right-click tool → tool items only', async () => {
     render(<SubAgentCard agent={agent} showTools />)
-
-    fireEvent.click(screen.getByTestId('subagent-card'))
 
     const toolHost = document.querySelector('[data-context-menu-kind="toolCall"]')
     expect(toolHost).toBeTruthy()

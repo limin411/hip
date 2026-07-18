@@ -138,9 +138,10 @@ export function ChatPane() {
   return (
     <div className="relative flex-1 overflow-hidden">
       <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-8 px-5 py-6">
+        {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
+        <div className="flex w-full flex-col gap-5 px-4 py-4">
           {showAgentRestart && (
-            <div className="mx-auto my-2 w-fit rounded-full bg-surface-muted px-3 py-1 text-meta text-ink-tertiary">
+            <div className="my-1 w-fit bg-surface-muted px-2 py-0.5 text-meta text-ink-tertiary">
               {t('chat.agentRestarted')}
             </div>
           )}
@@ -155,8 +156,8 @@ export function ChatPane() {
                 // way OUT too (when the color/ring classes are removed), not just on the way in.
                 className={cn(
                   'transition-[background-color,box-shadow] duration-700',
-                  isNew && (m.role === 'user' ? 'animate-msg-enter-right' : 'animate-msg-enter-left'),
-                  highlightedId === m.id && 'bg-accent-subtle ring-2 ring-accent/50',
+                  isNew && 'animate-msg-enter-left',
+                  highlightedId === m.id && 'bg-accent-subtle ring-1 ring-accent/40',
                 )}
               >
                 <MessageBubble
@@ -170,7 +171,7 @@ export function ChatPane() {
           })}
           {showThinking && <ThinkingBubble />}
           {interrupt && !showPlanApproval && (
-            <div className="rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3 text-body text-ink" data-testid="chat-interrupt">
+            <div className="border border-accent/30 bg-accent-subtle px-3 py-2.5 text-body text-ink" data-testid="chat-interrupt">
               <p className="flex items-start gap-2"><span aria-hidden>⏸</span><span>{interrupt.question}</span></p>
               <p className="mt-1 text-meta text-ink-secondary">{t('chat.interruptHint')}</p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -188,7 +189,7 @@ export function ChatPane() {
           )}
           {error && (
             <div
-              className={`rounded-lg border px-4 py-3 text-body ${
+              className={`border px-3 py-2.5 text-body ${
                 error.code === 'NO_API_KEY'
                   ? 'border-warning/30 bg-warning/10 text-warning'
                   : 'border-danger/30 bg-danger/10 text-danger'

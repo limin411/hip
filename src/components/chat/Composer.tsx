@@ -2,12 +2,15 @@ import { useTranslation } from 'react-i18next'
 import { ArrowUp, Square } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
+import { cn } from '@/lib/utils'
 import type { LocalAttachment } from './attachmentTypes'
 
 /** Collapse whitespace for the one-line quote chip; CSS truncate handles overflow. */
 function quotePreviewLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
+
+export type ComposerVariant = 'flat' | 'card'
 
 export function Composer({
   value,
@@ -26,6 +29,8 @@ export function Composer({
   annotationCount = 0,
   onAnnotationClear,
   inputRef,
+  variant = 'flat',
+  textareaHeight,
 }: {
   value: string
   onChange: (v: string) => void
@@ -45,15 +50,34 @@ export function Composer({
   annotationCount?: number
   onAnnotationClear?: () => void
   inputRef?: React.RefObject<HTMLTextAreaElement>
+  /**
+   * `card` — rounded rectangle (new-conversation empty state).
+   * `flat` — CLI dock style under a horizontal rule (active session InputBar).
+   */
+  variant?: ComposerVariant
+  /** Fixed textarea height in px (session InputBar resize). When set, overrides rows. */
+  textareaHeight?: number
 }) {
   const { t } = useTranslation()
   const hasQuote = !!quoteText?.trim()
   const hasAnns = annotationCount > 0
+  const isCard = variant === 'card'
   return (
-    <div className="rounded-xl border border-border bg-surface p-2 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8 transition-shadow">
+    <div
+      className={cn(
+        isCard
+          ? 'rounded-xl border border-border bg-surface p-2 transition-shadow focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8'
+          : 'bg-surface',
+      )}
+      data-testid="composer"
+      data-variant={variant}
+    >
       {hasAnns && (
         <div
-          className="mb-2 flex items-center gap-2 rounded-md border border-border bg-surface-muted px-2.5 py-1.5"
+          className={cn(
+            'mb-2 flex items-center gap-2 border border-border bg-surface-muted px-2.5 py-1.5',
+            isCard && 'rounded-md',
+          )}
           data-testid="composer-diff-annotations"
         >
           <span className="min-w-0 flex-1 truncate text-meta text-ink-secondary">
@@ -72,7 +96,10 @@ export function Composer({
       )}
       {hasQuote && (
         <div
-          className="mb-2 flex items-start gap-2 rounded-md border-l-2 border-accent bg-surface-muted px-2.5 py-1.5"
+          className={cn(
+            'mb-2 flex items-start gap-2 border-l-2 border-accent bg-surface-muted px-2.5 py-1.5',
+            isCard && 'rounded-md',
+          )}
           data-testid="composer-quote"
         >
           <span
@@ -93,11 +120,14 @@ export function Composer({
         </div>
       )}
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-1 px-2 pb-2">
+        <div className={cn('flex flex-wrap gap-1 pb-2', isCard && 'px-2')}>
           {attachments.map((a) => (
             <div
               key={a.id}
-              className="flex items-center gap-1 rounded-md bg-surface-muted px-2 py-1 text-meta"
+              className={cn(
+                'flex items-center gap-1 bg-surface-muted px-2 py-1 text-meta',
+                isCard && 'rounded-md',
+              )}
               data-testid="attachment-chip"
             >
               <span className="max-w-[120px] truncate">{a.name}</span>
@@ -125,11 +155,16 @@ export function Composer({
             if (!running && !submitDisabled) onSubmit()
           }
         }}
-        rows={2}
+        rows={textareaHeight != null ? 1 : 2}
         placeholder={t('chat.inputPlaceholder')}
-        className="border-0 px-2 py-1 focus-visible:ring-0"
+        style={textareaHeight != null ? { height: textareaHeight } : undefined}
+        className={cn(
+          'border-0 focus-visible:ring-0',
+          isCard ? 'px-2 py-1' : 'px-0 py-1',
+          textareaHeight != null && 'min-h-0 overflow-y-auto',
+        )}
       />
-      <div className="flex items-center justify-between px-1 pt-1">
+      <div className={cn('flex items-center justify-between pt-1', isCard && 'px-1')}>
         <div className="flex items-center gap-1">
           {leftSlot}
         </div>
@@ -140,7 +175,7 @@ export function Composer({
               type="button"
               variant="primary"
               size="icon"
-              className="h-7 w-7 shrink-0 rounded-full"
+              className={cn('h-7 w-7 shrink-0', isCard && 'rounded-full')}
               onClick={onStop}
               disabled={reconnecting}
               data-testid="composer-stop"
@@ -153,7 +188,7 @@ export function Composer({
           <Button
             variant="primary"
             size="icon"
-            className="h-7 w-7 shrink-0 rounded-full"
+            className={cn('h-7 w-7 shrink-0', isCard && 'rounded-full')}
             onClick={onSubmit}
             disabled={(!value.trim() && attachments.length === 0) || submitDisabled}
             data-testid="composer-send"

@@ -7,6 +7,7 @@ export const zhCN = {
       newChatDesc: '开始一段新的对话…',
       sendMessage: '发送一条消息开始对话',
       inputPlaceholder: '给 hip 发消息…（Enter 发送，Shift+Enter 换行）',
+      resizeInput: '拖拽调整输入框高度',
       parallel: {
         started: '已启动 {{count}} 路并行 worktree',
         failed: '并行运行失败',

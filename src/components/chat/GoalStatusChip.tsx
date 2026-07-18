@@ -15,7 +15,7 @@ export function GoalStatusChip() {
   return (
     <div
       className={cn(
-        'mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-lg border px-3 py-1.5 text-meta',
+        'mb-0 flex w-full items-center gap-2 border-b px-4 py-1.5 text-meta',
         goal.status === 'active' && 'border-accent/40 bg-accent/5 text-ink',
         goal.status === 'paused' && 'border-border bg-surface-muted text-ink-secondary',
         goal.status === 'blocked' && 'border-warning/40 bg-warning/5 text-ink',

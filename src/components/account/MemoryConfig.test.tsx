@@ -72,6 +72,15 @@ describe('MemoryConfig', () => {
       embedded: 0,
       total: 0,
     })
+    vi.spyOn(sessionService, 'getMemoryStatus').mockResolvedValue({
+      extractsToday: 0,
+      maxExtractsPerDay: 20,
+      llmAvailable: true,
+      itemCounts: { active: 0, deleted: 0, archived: 0 },
+      summaryCounts: { global: 0, project: 0 },
+      stage1Pending: 0,
+      coreGeneration: 0,
+    })
     vi.spyOn(sessionService, 'reindexMemories').mockResolvedValue({
       embedded: 0,
       total: 0,
@@ -142,6 +151,11 @@ describe('MemoryConfig', () => {
     expect(screen.getByTestId('memory-item-m1')).toBeInTheDocument()
     expect(listSpy).toHaveBeenCalledWith({ limit: 200, status: 'active' })
     expect(screen.getByTestId('memory-filter-active')).toHaveAttribute('aria-pressed', 'true')
+    // Advanced section is collapsed; expand to reach hybrid controls
+    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-switch-hybrid')).toBeInTheDocument()
+    })
     // Without embedding: controls stay interactive; enabling hybrid shows a prompt modal
     expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
     expect(screen.getByTestId('memory-reindex')).not.toBeDisabled()
@@ -172,6 +186,10 @@ describe('MemoryConfig', () => {
 
     render(<MemoryConfig />)
 
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-advanced-toggle')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
     await waitFor(() => {
       expect(screen.getByTestId('memory-switch-hybrid')).not.toBeDisabled()
     })
@@ -344,6 +362,11 @@ describe('MemoryConfig', () => {
     }))
 
     render(<MemoryConfig />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('memory-advanced-toggle')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('memory-advanced-toggle'))
 
     await waitFor(() => {
       expect(screen.getByTestId('memory-extract-model')).toBeInTheDocument()

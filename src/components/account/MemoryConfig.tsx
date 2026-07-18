@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Brain, Download, Pencil, Pin, RotateCcw, Trash2, Upload } from 'lucide-react'
-import type { MemoryFileConfig, MemoryItem, MemoryPipelineStatus, MemoryStatus } from '@hip/protocol'
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Lightbulb,
+  Pencil,
+  Pin,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+} from 'lucide-react'
+import type {
+  MemoryFileConfig,
+  MemoryItem,
+  MemoryKind,
+  MemoryPipelineStatus,
+  MemoryScope,
+  MemoryStatus,
+} from '@hip/protocol'
 import { sessionService } from '@/domain'
 import { useProvidersStore } from '@/store/providersStore'
 import { groupModelOptions } from '@/lib/agentModelOptions'
@@ -17,6 +36,14 @@ const inputCls =
 const textareaCls =
   'w-full min-h-[120px] resize-y rounded-md border border-border bg-surface px-2.5 py-2 text-body text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
 
+const KIND_OPTIONS: MemoryKind[] = [
+  'preference',
+  'convention',
+  'lesson',
+  'workflow',
+  'profile',
+]
+
 function downloadText(filename: string, data: string, mime = 'application/x-ndjson') {
   const blob = new Blob([data], { type: mime })
   const url = URL.createObjectURL(blob)
@@ -25,6 +52,39 @@ function downloadText(filename: string, data: string, mime = 'application/x-ndjs
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function formatRelativeTime(ts: number | undefined, t: (k: string, p?: Record<string, unknown>) => string): string {
+  if (!ts) return t('settings.memory.healthNever')
+  const mins = Math.max(0, Math.floor((Date.now() - ts) / 60_000))
+  if (mins < 1) return t('settings.memory.healthJustNow')
+  if (mins < 60) return t('settings.memory.healthMinsAgo', { n: mins })
+  const hours = Math.floor(mins / 60)
+  if (hours < 48) return t('settings.memory.healthHoursAgo', { n: hours })
+  const days = Math.floor(hours / 24)
+  return t('settings.memory.healthDaysAgo', { n: days })
+}
+
+function phase1HealthLabel(
+  status: MemoryPipelineStatus,
+  t: (k: string, p?: Record<string, unknown>) => string,
+): string {
+  const s = status.lastPhase1Status
+  const reason = status.lastPhase1Reason
+  if (!s) return t('settings.memory.healthNoExtractYet')
+  if (s === 'succeeded') return t('settings.memory.healthExtractOk')
+  if (s === 'succeeded_no_output') return t('settings.memory.healthExtractEmpty')
+  if (s === 'failed') return t('settings.memory.healthExtractFailed', { reason: reason ?? 'error' })
+  if (s === 'skipped') {
+    if (reason === 'no_llm') return t('settings.memory.healthNoLlm')
+    if (reason === 'rate_limited') return t('settings.memory.healthRateLimited')
+    if (reason === 'interval_throttle') return t('settings.memory.healthInterval')
+    if (reason === 'min_content') return t('settings.memory.healthMinContent')
+    if (reason === 'incognito') return t('settings.memory.healthIncognito')
+    if (reason === 'generate_disabled') return t('settings.memory.healthGenerateOff')
+    return t('settings.memory.healthSkipped', { reason: reason ?? 'skipped' })
+  }
+  return t('settings.memory.healthUnknown')
 }
 
 export function MemoryConfig() {
@@ -40,13 +100,17 @@ export function MemoryConfig() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** List filter: Active | Trash. */
   const [listStatus, setListStatus] = useState<MemoryStatus>('active')
   const [editing, setEditing] = useState<MemoryItem | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [deleting, setDeleting] = useState<MemoryItem | null>(null)
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [addTitle, setAddTitle] = useState('')
+  const [addContent, setAddContent] = useState('')
+  const [addKind, setAddKind] = useState<MemoryKind>('preference')
+  const [addScope, setAddScope] = useState<MemoryScope>('global')
   const [indexStatus, setIndexStatus] = useState<{
     embedded: number
     total: number
@@ -57,6 +121,7 @@ export function MemoryConfig() {
   const [needEmbedOpen, setNeedEmbedOpen] = useState(false)
   const [pipelineStatus, setPipelineStatus] = useState<MemoryPipelineStatus | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showHowTo, setShowHowTo] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
@@ -129,7 +194,6 @@ export function MemoryConfig() {
     void loadProviders()
   }, [refresh, loadProviders])
 
-  // Poll pipeline status while generate is on and panel is mounted (KD-14).
   useEffect(() => {
     if (!config?.generateMemories) return
     const id = window.setInterval(() => {
@@ -209,12 +273,41 @@ export function MemoryConfig() {
     }
   }
 
+  const onSaveAdd = async () => {
+    const title = addTitle.trim()
+    const content = addContent.trim()
+    if (!title || !content) return
+    setBusy(true)
+    setError(null)
+    try {
+      await sessionService.upsertMemory({
+        title,
+        content,
+        kind: addKind,
+        scope: addScope,
+        source: 'user',
+      })
+      setAdding(false)
+      setAddTitle('')
+      setAddContent('')
+      setAddKind('preference')
+      setAddScope('global')
+      if (listStatus !== 'active') setListStatus('active')
+      const list = await loadItems('active')
+      setItems(list)
+      await refreshPipelineStatus()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onConfirmDelete = async () => {
     if (!deleting) return
     setBusy(true)
     setError(null)
     try {
-      // Soft delete (hard: false / omitted) → trash semantics.
       await sessionService.deleteMemory(deleting.id)
       setItems((prev) => prev.filter((it) => it.id !== deleting.id))
       setDeleting(null)
@@ -281,6 +374,7 @@ export function MemoryConfig() {
 
   const onConsolidate = () => {
     sessionService.consolidateMemories()
+    void refreshPipelineStatus()
   }
 
   const onReindex = async () => {
@@ -310,7 +404,6 @@ export function MemoryConfig() {
 
   const onExtractModelChange = async (key: string) => {
     if (!key) {
-      // Clear override → cheap fallback for active provider.
       await applyConfig({ extractModel: null } as unknown as Partial<MemoryFileConfig>)
       return
     }
@@ -337,30 +430,47 @@ export function MemoryConfig() {
 
   if (bothOff) {
     return (
-      <div className="p-6" data-testid="memory-config-empty">
+      <div className="mx-auto max-w-2xl space-y-6 p-6" data-testid="memory-config-empty">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-            <Brain size={18} />
+          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <Brain size={20} />
           </span>
           <div>
             <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
-            <p className="mt-1 text-body text-ink-secondary">{t('settings.memory.intro')}</p>
-            <p className="mt-3 text-body text-ink-tertiary">{t('settings.memory.emptyHint')}</p>
+            <p className="mt-1 text-body text-ink-secondary">{t('settings.memory.introPlain')}</p>
           </div>
         </div>
+
+        <div
+          className="rounded-xl border border-border bg-surface-muted/40 px-4 py-4"
+          data-testid="memory-howto-empty"
+        >
+          <div className="mb-2 flex items-center gap-2 text-prose font-medium text-ink">
+            <Lightbulb size={16} className="text-accent" />
+            {t('settings.memory.howtoTitle')}
+          </div>
+          <ol className="list-decimal space-y-2 pl-5 text-body text-ink-secondary">
+            <li>{t('settings.memory.howtoStep1')}</li>
+            <li>{t('settings.memory.howtoStep2')}</li>
+            <li>{t('settings.memory.howtoStep3')}</li>
+          </ol>
+          <p className="mt-3 text-meta text-ink-tertiary">{t('settings.memory.howtoTip')}</p>
+        </div>
+
         {error && (
-          <p className="mt-4 text-body text-danger" role="alert">
+          <p className="text-body text-danger" role="alert">
             {error}
           </p>
         )}
-        <div className="mt-6 flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             disabled={busy}
             data-testid="memory-enable-both"
             onClick={() => void applyConfig({ useMemories: true, generateMemories: true })}
           >
-            {t('settings.memory.enableBoth')}
+            {t('settings.memory.enableBothRecommended')}
           </Button>
           <Button
             size="sm"
@@ -372,66 +482,114 @@ export function MemoryConfig() {
             {t('settings.memory.enableUseOnly')}
           </Button>
         </div>
+        <p className="text-caption text-ink-tertiary">{t('settings.memory.enableBothHint')}</p>
       </div>
     )
   }
 
   return (
-    <div className="p-6" data-testid="memory-config">
-      <div>
-        <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
-        <p className="mt-1 text-body text-ink-secondary">{t('settings.memory.intro')}</p>
+    <div className="mx-auto max-w-2xl space-y-6 p-6" data-testid="memory-config">
+      {/* Header */}
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+          <Brain size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
+          <p className="mt-1 text-body text-ink-secondary">{t('settings.memory.introPlain')}</p>
+        </div>
       </div>
 
+      {/* How to use (collapsible) */}
+      <section
+        className="rounded-xl border border-border bg-surface-muted/30"
+        data-testid="memory-howto"
+      >
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-prose font-medium text-ink"
+          onClick={() => setShowHowTo((v) => !v)}
+          data-testid="memory-howto-toggle"
+        >
+          {showHowTo ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <Lightbulb size={16} className="text-accent" />
+          {t('settings.memory.howtoTitle')}
+        </button>
+        {showHowTo && (
+          <div className="space-y-3 border-t border-border px-4 py-3 text-body text-ink-secondary">
+            <ol className="list-decimal space-y-2 pl-5">
+              <li>{t('settings.memory.howtoStep1On')}</li>
+              <li>{t('settings.memory.howtoStep2On')}</li>
+              <li>{t('settings.memory.howtoStep3On')}</li>
+            </ol>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-border bg-surface px-3 py-2">
+                <div className="text-meta font-medium text-ink">{t('settings.memory.useMemories')}</div>
+                <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.useMemoriesPlain')}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-surface px-3 py-2">
+                <div className="text-meta font-medium text-ink">{t('settings.memory.generateMemories')}</div>
+                <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.generateMemoriesPlain')}</p>
+              </div>
+            </div>
+            <p className="text-caption text-ink-tertiary">{t('settings.memory.howtoTipOn')}</p>
+          </div>
+        )}
+      </section>
+
+      {/* Health / status in plain language */}
       {pipelineStatus && (
-        <div
-          className="mt-4 rounded-md border border-border bg-surface px-3 py-2 text-meta text-ink-secondary"
+        <section
+          className="rounded-xl border border-border bg-surface px-4 py-3"
           data-testid="memory-status-strip"
         >
-          <div>
-            {t('settings.memory.statusItems', {
-              active: pipelineStatus.itemCounts.active,
-              deleted: pipelineStatus.itemCounts.deleted,
-              archived: pipelineStatus.itemCounts.archived,
-            })}
-            {' · '}
-            {t('settings.memory.statusExtracts', {
-              today: pipelineStatus.extractsToday,
-              max: pipelineStatus.maxExtractsPerDay,
-            })}
-            {' · '}
-            gen {pipelineStatus.coreGeneration}
-          </div>
-          {pipelineStatus.lastPhase1Status && (
-            <div className="mt-1">
-              {t('settings.memory.statusLastPhase1', {
-                status: pipelineStatus.lastPhase1Status,
-                reason: pipelineStatus.lastPhase1Reason ?? '—',
+          <div className="text-meta font-medium text-ink">{t('settings.memory.healthTitle')}</div>
+          <ul className="mt-2 space-y-1.5 text-body text-ink-secondary">
+            <li>
+              {t('settings.memory.healthCount', {
+                n: pipelineStatus.itemCounts.active,
               })}
-            </div>
-          )}
+            </li>
+            {config?.generateMemories && (
+              <>
+                <li>{phase1HealthLabel(pipelineStatus, t)}</li>
+                <li>
+                  {t('settings.memory.healthLastRun', {
+                    when: formatRelativeTime(pipelineStatus.lastPhase1At, t),
+                  })}
+                </li>
+                <li>
+                  {t('settings.memory.healthQuota', {
+                    today: pipelineStatus.extractsToday,
+                    max: pipelineStatus.maxExtractsPerDay,
+                  })}
+                </li>
+              </>
+            )}
+          </ul>
           {!pipelineStatus.llmAvailable && config?.generateMemories && (
-            <div className="mt-1 text-warning" data-testid="memory-no-llm-cta">
+            <p className="mt-2 text-meta text-warning" data-testid="memory-no-llm-cta">
               {t('settings.memory.noLlmCta')}
-            </div>
+            </p>
           )}
           {pipelineStatus.mirrorDesync && (
-            <div className="mt-1 text-warning">{t('settings.memory.mirrorDesync')}</div>
+            <p className="mt-2 text-meta text-warning">{t('settings.memory.mirrorDesync')}</p>
           )}
-        </div>
+        </section>
       )}
 
       {error && (
-        <p className="mt-4 text-body text-danger" role="alert">
+        <p className="text-body text-danger" role="alert">
           {error}
         </p>
       )}
 
-      <div className="mt-2 divide-y divide-border border-t border-border">
-        <div className="flex items-center justify-between px-0 py-5">
+      {/* Core switches */}
+      <section className="divide-y divide-border rounded-xl border border-border">
+        <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div className="min-w-0 flex-1">
             <div className="text-prose font-medium text-ink">{t('settings.memory.useMemories')}</div>
-            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.useMemoriesDesc')}</div>
+            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.useMemoriesPlain')}</div>
           </div>
           <Switch
             checked={!!config?.useMemories}
@@ -441,10 +599,10 @@ export function MemoryConfig() {
             onCheckedChange={(v) => void applyConfig({ useMemories: v })}
           />
         </div>
-        <div className="flex items-center justify-between px-0 py-5">
+        <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div className="min-w-0 flex-1">
             <div className="text-prose font-medium text-ink">{t('settings.memory.generateMemories')}</div>
-            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.generateMemoriesDesc')}</div>
+            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.generateMemoriesPlain')}</div>
             <div className="mt-1 text-caption text-ink-tertiary" data-testid="memory-generate-cost-hint">
               {t('settings.memory.generateMemoriesCostHint', {
                 max: config?.maxExtractsPerDay ?? 20,
@@ -459,157 +617,33 @@ export function MemoryConfig() {
             onCheckedChange={(v) => void applyConfig({ generateMemories: v })}
           />
         </div>
-      </div>
+      </section>
 
-      <div className="mt-2 border-t border-border pt-5">
-        <label className="text-prose font-medium text-ink" htmlFor="memory-extract-model">
-          {t('settings.memory.extractModel')}
-        </label>
-        <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.extractModelDesc')}</p>
-        <select
-          id="memory-extract-model"
-          className={cn(inputCls, 'mt-2')}
-          value={memoryModelKey(config?.extractModel)}
-          disabled={busy || !config}
-          data-testid="memory-extract-model"
-          onChange={(e) => void onExtractModelChange(e.target.value)}
-        >
-          <option value="">{t('settings.memory.extractModelDefault')}</option>
-          {modelGroups.map((g) => (
-            <optgroup key={g.providerID} label={g.providerName}>
-              {g.models.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.modelID}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-          {/* Legacy free-text / missing catalog entry still displayable */}
-          {config?.extractModel &&
-            !modelGroups.some((g) => g.models.some((m) => m.key === memoryModelKey(config.extractModel))) &&
-            memoryModelKey(config.extractModel).includes('/') && (
-              <option value={memoryModelKey(config.extractModel)}>
-                {memoryModelKey(config.extractModel)}
-              </option>
-            )}
-        </select>
-      </div>
-
-      <div className="mt-4 border-t border-border pt-4">
-        <button
-          type="button"
-          className="text-prose font-medium text-ink underline-offset-2 hover:underline"
-          data-testid="memory-advanced-toggle"
-          onClick={() => setShowAdvanced((v) => !v)}
-        >
-          {t('settings.memory.advancedGates')}
-        </button>
-        <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.advancedGatesDesc')}</p>
-        {showAdvanced && config && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="memory-advanced-gates">
-            {(
-              [
-                ['idleMinutes', 'idleMinutes'],
-                ['minExtractIntervalHours', 'minExtractIntervalHours'],
-                ['minUserTurns', 'minUserTurns'],
-                ['minUserChars', 'minUserChars'],
-                ['maxExtractsPerDay', 'maxExtractsPerDay'],
-              ] as const
-            ).map(([key, labelKey]) => (
-              <label key={key} className="block text-meta text-ink-secondary">
-                {t(`settings.memory.${labelKey}`)}
-                <input
-                  type="number"
-                  className={cn(inputCls, 'mt-1')}
-                  value={config[key] ?? ''}
-                  disabled={busy}
-                  onChange={(e) => {
-                    const n = Number(e.target.value)
-                    if (!Number.isFinite(n)) return
-                    void applyConfig({ [key]: n } as Partial<MemoryFileConfig>)
-                  }}
-                />
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-2 divide-y divide-border border-t border-border">
-        <div className="flex items-center justify-between px-0 py-5">
-          <div className="min-w-0 flex-1">
-            <div className="text-prose font-medium text-ink">{t('settings.memory.hybridSearch')}</div>
-            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.hybridSearchDesc')}</div>
-            <p className="mt-2 text-caption text-ink-tertiary" data-testid="memory-hybrid-privacy">
-              {t('settings.memory.hybridPrivacyNote')}
-            </p>
-          </div>
-          <Switch
-            checked={!!config?.hybridSearchEnabled}
-            disabled={busy || !config}
-            ariaLabel={t('settings.memory.hybridSearch')}
-            data-testid="memory-switch-hybrid"
-            onCheckedChange={onHybridChange}
-          />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-2 px-0 py-5">
-          <div className="min-w-0 flex-1 text-meta text-ink-secondary" data-testid="memory-index-status">
-            {hasEmbeddingModel && indexStatus
-              ? t('settings.memory.indexStatus', {
-                  embedded: indexStatus.embedded,
-                  total: indexStatus.total,
-                })
-              : t('settings.memory.indexStatusNone')}
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy || reindexing}
-            data-testid="memory-reindex"
-            onClick={() => void onReindex()}
-          >
-            {reindexing ? t('settings.memory.reindexing') : t('settings.memory.reindex')}
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" disabled={busy} data-testid="memory-export" onClick={() => void onExport()}>
-          <Download size={14} />
-          {t('settings.memory.exportJsonl')}
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={busy}
-          data-testid="memory-import"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload size={14} />
-          {t('settings.memory.importJsonl')}
-        </Button>
-        <Button size="sm" variant="secondary" disabled={busy} data-testid="memory-consolidate" onClick={onConsolidate}>
-          {t('settings.memory.consolidate')}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".jsonl,application/x-ndjson,text/plain"
-          className="hidden"
-          data-testid="memory-import-input"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            e.target.value = ''
-            if (f) void onImportFile(f)
-          }}
-        />
-      </div>
-
-      <div className="mt-8">
+      {/* Memory list — primary content */}
+      <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-prose font-medium text-ink">{t('settings.memory.listTitle')}</h3>
+          <div>
+            <h3 className="text-prose font-medium text-ink">{t('settings.memory.listTitle')}</h3>
+            <p className="mt-0.5 text-caption text-ink-tertiary">{t('settings.memory.listHint')}</p>
+          </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <div className="flex flex-wrap gap-1.5" data-testid="memory-list-filters" role="group" aria-label={t('settings.memory.listFilters')}>
+            {!isTrash && (
+              <Button
+                size="sm"
+                disabled={busy}
+                data-testid="memory-add"
+                onClick={() => setAdding(true)}
+              >
+                <Plus size={14} />
+                {t('settings.memory.add')}
+              </Button>
+            )}
+            <div
+              className="flex flex-wrap gap-1.5"
+              data-testid="memory-list-filters"
+              role="group"
+              aria-label={t('settings.memory.listFilters')}
+            >
               <button
                 type="button"
                 data-testid="memory-filter-active"
@@ -654,14 +688,35 @@ export function MemoryConfig() {
             )}
           </div>
         </div>
+
         {items.length === 0 ? (
-          <p className="mt-3 text-body text-ink-tertiary" data-testid="memory-list-empty">
-            {isTrash ? t('settings.memory.listEmptyTrash') : t('settings.memory.listEmpty')}
-          </p>
+          <div
+            className="mt-3 rounded-xl border border-dashed border-border bg-surface-muted/20 px-4 py-6 text-center"
+            data-testid="memory-list-empty"
+          >
+            <p className="text-body text-ink-secondary">
+              {isTrash ? t('settings.memory.listEmptyTrash') : t('settings.memory.listEmptyGuide')}
+            </p>
+            {!isTrash && (
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <Button size="sm" disabled={busy} onClick={() => setAdding(true)} data-testid="memory-add-empty">
+                  <Plus size={14} />
+                  {t('settings.memory.add')}
+                </Button>
+                {config?.generateMemories && (
+                  <p className="w-full text-caption text-ink-tertiary">{t('settings.memory.listEmptyAutoHint')}</p>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
-          <ul className="mt-3 divide-y divide-border rounded-lg border border-border" data-testid="memory-list">
+          <ul className="mt-3 divide-y divide-border rounded-xl border border-border" data-testid="memory-list">
             {items.map((item) => (
-              <li key={item.id} className="flex items-start gap-2 px-3 py-3" data-testid={`memory-item-${item.id}`}>
+              <li
+                key={item.id}
+                className="flex items-start gap-2 px-3 py-3"
+                data-testid={`memory-item-${item.id}`}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     {item.pinned && !isTrash && (
@@ -674,16 +729,11 @@ export function MemoryConfig() {
                     )}
                     <div className="truncate text-body font-medium text-ink">{item.title}</div>
                   </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-caption text-ink-tertiary">
-                    <span>{item.kind}</span>
+                  <p className="mt-0.5 line-clamp-2 text-caption text-ink-secondary">{item.content}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-caption text-ink-tertiary">
+                    <span>{t(`settings.memory.kind.${item.kind}`, { defaultValue: item.kind })}</span>
                     <span>·</span>
-                    <span>{item.scope}</span>
-                    <span>·</span>
-                    <span>
-                      {t('settings.memory.confidence', {
-                        value: Math.round(item.confidence * 100),
-                      })}
-                    </span>
+                    <span>{t(`settings.memory.scope.${item.scope}`, { defaultValue: item.scope })}</span>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
@@ -742,7 +792,248 @@ export function MemoryConfig() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" disabled={busy} data-testid="memory-export" onClick={() => void onExport()}>
+          <Download size={14} />
+          {t('settings.memory.exportJsonl')}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          data-testid="memory-import"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Upload size={14} />
+          {t('settings.memory.importJsonl')}
+        </Button>
+        {config?.generateMemories && (
+          <Button size="sm" variant="secondary" disabled={busy} data-testid="memory-consolidate" onClick={onConsolidate}>
+            {t('settings.memory.consolidate')}
+          </Button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".jsonl,application/x-ndjson,text/plain"
+          className="hidden"
+          data-testid="memory-import-input"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) void onImportFile(f)
+          }}
+        />
       </div>
+      {config?.generateMemories && (
+        <p className="text-caption text-ink-tertiary">{t('settings.memory.consolidateHint')}</p>
+      )}
+
+      {/* Advanced — collapsed by default */}
+      <section className="rounded-xl border border-border" data-testid="memory-advanced-section">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 px-4 py-3 text-left text-prose font-medium text-ink"
+          data-testid="memory-advanced-toggle"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          {showAdvanced ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          {t('settings.memory.advancedTitle')}
+        </button>
+        {showAdvanced && config && (
+          <div className="space-y-5 border-t border-border px-4 py-4" data-testid="memory-advanced-gates">
+            <p className="text-meta text-ink-tertiary">{t('settings.memory.advancedDesc')}</p>
+
+            <div>
+              <label className="text-prose font-medium text-ink" htmlFor="memory-extract-model">
+                {t('settings.memory.extractModel')}
+              </label>
+              <p className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.extractModelPlain')}</p>
+              <select
+                id="memory-extract-model"
+                className={cn(inputCls, 'mt-2')}
+                value={memoryModelKey(config?.extractModel)}
+                disabled={busy || !config}
+                data-testid="memory-extract-model"
+                onChange={(e) => void onExtractModelChange(e.target.value)}
+              >
+                <option value="">{t('settings.memory.extractModelDefault')}</option>
+                {modelGroups.map((g) => (
+                  <optgroup key={g.providerID} label={g.providerName}>
+                    {g.models.map((m) => (
+                      <option key={m.key} value={m.key}>
+                        {m.modelID}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+                {config?.extractModel &&
+                  !modelGroups.some((g) =>
+                    g.models.some((m) => m.key === memoryModelKey(config.extractModel)),
+                  ) &&
+                  memoryModelKey(config.extractModel).includes('/') && (
+                    <option value={memoryModelKey(config.extractModel)}>
+                      {memoryModelKey(config.extractModel)}
+                    </option>
+                  )}
+              </select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(
+                [
+                  ['idleMinutes', 'idleMinutes', 'idleMinutesHint'],
+                  ['minExtractIntervalHours', 'minExtractIntervalHours', 'minExtractIntervalHoursHint'],
+                  ['minUserTurns', 'minUserTurns', 'minUserTurnsHint'],
+                  ['minUserChars', 'minUserChars', 'minUserCharsHint'],
+                  ['maxExtractsPerDay', 'maxExtractsPerDay', 'maxExtractsPerDayHint'],
+                ] as const
+              ).map(([key, labelKey, hintKey]) => (
+                <label key={key} className="block text-meta text-ink-secondary">
+                  <span className="font-medium text-ink">{t(`settings.memory.${labelKey}`)}</span>
+                  <span className="mt-0.5 block text-caption text-ink-tertiary">
+                    {t(`settings.memory.${hintKey}`)}
+                  </span>
+                  <input
+                    type="number"
+                    className={cn(inputCls, 'mt-1')}
+                    value={config[key] ?? ''}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      if (!Number.isFinite(n)) return
+                      void applyConfig({ [key]: n } as Partial<MemoryFileConfig>)
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+              <div className="min-w-0 flex-1">
+                <div className="text-prose font-medium text-ink">{t('settings.memory.hybridSearch')}</div>
+                <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.memory.hybridSearchPlain')}</div>
+                <p className="mt-1 text-caption text-ink-tertiary" data-testid="memory-hybrid-privacy">
+                  {t('settings.memory.hybridPrivacyNote')}
+                </p>
+              </div>
+              <Switch
+                checked={!!config?.hybridSearchEnabled}
+                disabled={busy || !config}
+                ariaLabel={t('settings.memory.hybridSearch')}
+                data-testid="memory-switch-hybrid"
+                onCheckedChange={onHybridChange}
+              />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0 flex-1 text-meta text-ink-secondary" data-testid="memory-index-status">
+                {hasEmbeddingModel && indexStatus
+                  ? t('settings.memory.indexStatus', {
+                      embedded: indexStatus.embedded,
+                      total: indexStatus.total,
+                    })
+                  : t('settings.memory.indexStatusNone')}
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={busy || reindexing}
+                data-testid="memory-reindex"
+                onClick={() => void onReindex()}
+              >
+                {reindexing ? t('settings.memory.reindexing') : t('settings.memory.reindex')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Add modal */}
+      {adding && (
+        <Modal
+          open
+          onOpenChange={(o) => {
+            if (!o) setAdding(false)
+          }}
+          title={t('settings.memory.addTitle')}
+          className="max-w-md"
+        >
+          <div className="space-y-3 p-5" data-testid="memory-add-modal">
+            <p className="text-meta text-ink-tertiary">{t('settings.memory.addHint')}</p>
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-title">
+                {t('settings.memory.fieldTitle')}
+              </label>
+              <input
+                id="memory-add-title"
+                className={inputCls}
+                value={addTitle}
+                data-testid="memory-add-title"
+                placeholder={t('settings.memory.addTitlePlaceholder')}
+                onChange={(e) => setAddTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-meta text-ink-tertiary" htmlFor="memory-add-content">
+                {t('settings.memory.fieldContent')}
+              </label>
+              <textarea
+                id="memory-add-content"
+                className={textareaCls}
+                value={addContent}
+                data-testid="memory-add-content"
+                placeholder={t('settings.memory.addContentPlaceholder')}
+                onChange={(e) => setAddContent(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block text-meta text-ink-tertiary">
+                {t('settings.memory.fieldKind')}
+                <select
+                  className={cn(inputCls, 'mt-1')}
+                  value={addKind}
+                  data-testid="memory-add-kind"
+                  onChange={(e) => setAddKind(e.target.value as MemoryKind)}
+                >
+                  {KIND_OPTIONS.map((k) => (
+                    <option key={k} value={k}>
+                      {t(`settings.memory.kind.${k}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-meta text-ink-tertiary">
+                {t('settings.memory.fieldScope')}
+                <select
+                  className={cn(inputCls, 'mt-1')}
+                  value={addScope}
+                  data-testid="memory-add-scope"
+                  onChange={(e) => setAddScope(e.target.value as MemoryScope)}
+                >
+                  <option value="global">{t('settings.memory.scope.global')}</option>
+                  <option value="project">{t('settings.memory.scope.project')}</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy || !addTitle.trim() || !addContent.trim()}
+                data-testid="memory-add-save"
+                onClick={() => void onSaveAdd()}
+              >
+                {t('settings.memory.save')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {editing && (
         <Modal
@@ -874,6 +1165,7 @@ export function MemoryConfig() {
           </div>
         </Modal>
       )}
+
     </div>
   )
 }

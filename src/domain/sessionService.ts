@@ -1437,11 +1437,30 @@ export class SessionService {
     return msg.imported
   }
 
-  consolidateMemories(projectKeyHash?: string): void {
+  /**
+   * Run Phase2 consolidate and wait for the terminal `memory:pipeline` event
+   * (succeeded | failed | noop). Phase "started" is ignored.
+   */
+  async consolidateMemories(projectKeyHash?: string): Promise<{
+    status: 'succeeded' | 'failed' | 'noop'
+    detail?: string
+  }> {
+    const wait = this.waitForServerMessageWhere(
+      'memory:pipeline',
+      (msg) =>
+        msg.phase === 2 &&
+        (msg.status === 'succeeded' || msg.status === 'failed' || msg.status === 'noop'),
+      180_000,
+    )
     this.transport.send({
       type: 'memory:consolidate',
       ...(projectKeyHash ? { projectKeyHash } : {}),
     })
+    const msg = await wait
+    return {
+      status: msg.status as 'succeeded' | 'failed' | 'noop',
+      detail: msg.detail,
+    }
   }
 
   async getMemoryStatus(opts?: {

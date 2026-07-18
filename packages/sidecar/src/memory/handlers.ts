@@ -248,6 +248,11 @@ export function handleMemoryMessage(
       })
         .then((res) => {
           if (res.status === 'skipped') {
+            svc.recordPipelineStatus({
+              lastPhase2At: Date.now(),
+              lastPhase2Status: 'skipped',
+              lastPhase2Reason: res.reason ?? 'skipped',
+            })
             send({
               type: 'memory:pipeline',
               phase: 2,
@@ -257,6 +262,11 @@ export function handleMemoryMessage(
             return
           }
           if (res.status === 'failed') {
+            svc.recordPipelineStatus({
+              lastPhase2At: Date.now(),
+              lastPhase2Status: 'failed',
+              lastPhase2Reason: res.reason,
+            })
             send({
               type: 'memory:pipeline',
               phase: 2,
@@ -283,19 +293,31 @@ export function handleMemoryMessage(
               err instanceof Error ? err.message : String(err),
             )
           }
+          const detail = `upserted=${res.upserted ?? 0};archived=${res.archived ?? 0}`
+          svc.recordPipelineStatus({
+            lastPhase2At: Date.now(),
+            lastPhase2Status: res.status === 'succeeded_no_output' ? 'succeeded_no_output' : 'succeeded',
+            lastPhase2Reason: detail,
+          })
           send({
             type: 'memory:pipeline',
             phase: 2,
             status: 'succeeded',
-            detail: `upserted=${res.upserted ?? 0};archived=${res.archived ?? 0}`,
+            detail,
           })
         })
         .catch((err) => {
+          const detail = err instanceof Error ? err.message : String(err)
+          svc.recordPipelineStatus({
+            lastPhase2At: Date.now(),
+            lastPhase2Status: 'failed',
+            lastPhase2Reason: detail,
+          })
           send({
             type: 'memory:pipeline',
             phase: 2,
             status: 'failed',
-            detail: err instanceof Error ? err.message : String(err),
+            detail,
           })
         })
       return

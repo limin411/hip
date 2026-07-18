@@ -105,7 +105,15 @@ export const zhTW = {
         exportJsonl: '匯出',
         importJsonl: '匯入',
         consolidate: '立即學習',
-        consolidateHint: '「立即學習」馬上跑一輪鞏固（會用 API）。日常一般不用點。',
+        consolidating: '學習中…',
+        consolidateHint:
+          '把背景已抽取、尚未鞏固的內容整理成長期記憶（會用 API）。不會重讀目前對話——請先聊天並等自動學習，或用「新增記憶」。',
+        consolidateOk: '完成。更新了 {{upserted}} 條記憶（封存 {{archived}}）。',
+        consolidateNoStage1:
+          '目前沒有可鞏固的抽取結果。請先聊幾輪並停一會兒讓自動學習跑起來，或點「新增記憶」。',
+        consolidateNoLlm: '無法學習：請先在 設定 → 模型提供商 配置 API 金鑰。',
+        consolidateNoop: '已跳過（{{reason}}）。',
+        consolidateFailed: '學習失敗：{{reason}}',
         listTitle: '已存記憶',
         listHint: '這些事實會在後續對話裡被注入。重要的可點圖釘固定。',
         listEmpty: '尚無記憶。',

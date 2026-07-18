@@ -778,8 +778,16 @@ export const en = {
         exportJsonl: 'Export',
         importJsonl: 'Import',
         consolidate: 'Learn now',
+        consolidating: 'Learning…',
         consolidateHint:
-          '“Learn now” runs a consolidation pass immediately (uses API). Usually you can ignore this.',
+          'Consolidates pending auto-extracts into durable memories (uses API). It does not re-read the current chat — chat first and wait for auto-learn, or add a memory manually.',
+        consolidateOk: 'Done. Updated {{upserted}} memories (archived {{archived}}).',
+        consolidateNoStage1:
+          'Nothing to consolidate yet. Auto-learn needs a few chat turns and an idle pause first, or use “Add memory”.',
+        consolidateNoLlm:
+          'Cannot learn: configure a provider API key under Settings → Providers.',
+        consolidateNoop: 'Skipped ({{reason}}).',
+        consolidateFailed: 'Learn failed: {{reason}}',
         listTitle: 'Stored memories',
         listHint: 'These facts can be injected into future chats. Pin ones that always matter.',
         listEmpty: 'No memories yet.',

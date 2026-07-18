@@ -763,7 +763,15 @@ export const zhCN = {
         exportJsonl: '导出',
         importJsonl: '导入',
         consolidate: '立即学习',
-        consolidateHint: '「立即学习」马上跑一轮巩固（会用 API）。日常一般不用点。',
+        consolidating: '学习中…',
+        consolidateHint:
+          '把后台已抽取、尚未巩固的内容整理成长期记忆（会用 API）。不会重读当前对话——请先聊天并等自动学习，或用「添加记忆」。',
+        consolidateOk: '完成。更新了 {{upserted}} 条记忆（归档 {{archived}}）。',
+        consolidateNoStage1:
+          '目前没有可巩固的抽取结果。请先聊几轮并停一会儿让自动学习跑起来，或点「添加记忆」。',
+        consolidateNoLlm: '无法学习：请先在 设置 → 模型提供商 配置 API 密钥。',
+        consolidateNoop: '已跳过（{{reason}}）。',
+        consolidateFailed: '学习失败：{{reason}}',
         listTitle: '已存记忆',
         listHint: '这些事实会在后续对话里被注入。重要的可点图钉固定。',
         listEmpty: '暂无记忆。',

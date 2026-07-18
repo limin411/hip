@@ -122,6 +122,11 @@ export function MemoryConfig() {
   const [pipelineStatus, setPipelineStatus] = useState<MemoryPipelineStatus | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showHowTo, setShowHowTo] = useState(true)
+  const [consolidating, setConsolidating] = useState(false)
+  const [consolidateMsg, setConsolidateMsg] = useState<{
+    tone: 'ok' | 'warn' | 'err'
+    text: string
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const modelGroups = groupModelOptions(catalog, providersConfig, keyConfigured)
   const isTrash = listStatus === 'deleted'
@@ -372,9 +377,53 @@ export function MemoryConfig() {
     }
   }
 
-  const onConsolidate = () => {
-    sessionService.consolidateMemories()
-    void refreshPipelineStatus()
+  const onConsolidate = async () => {
+    setConsolidating(true)
+    setConsolidateMsg(null)
+    setError(null)
+    try {
+      const res = await sessionService.consolidateMemories()
+      if (res.status === 'succeeded') {
+        const upserted = /upserted=(\d+)/.exec(res.detail ?? '')?.[1] ?? '0'
+        const archived = /archived=(\d+)/.exec(res.detail ?? '')?.[1] ?? '0'
+        setConsolidateMsg({
+          tone: 'ok',
+          text: t('settings.memory.consolidateOk', { upserted, archived }),
+        })
+        // Refresh list so new items appear
+        if (listStatus === 'active') {
+          const list = await loadItems('active')
+          setItems(list)
+        }
+      } else if (res.status === 'noop') {
+        const reason = res.detail ?? 'skipped'
+        const key =
+          reason === 'no_stage1'
+            ? 'settings.memory.consolidateNoStage1'
+            : reason === 'no_llm'
+              ? 'settings.memory.consolidateNoLlm'
+              : 'settings.memory.consolidateNoop'
+        setConsolidateMsg({
+          tone: 'warn',
+          text: t(key, { reason }),
+        })
+      } else {
+        setConsolidateMsg({
+          tone: 'err',
+          text: t('settings.memory.consolidateFailed', {
+            reason: res.detail ?? 'error',
+          }),
+        })
+      }
+      await refreshPipelineStatus()
+    } catch (e) {
+      setConsolidateMsg({
+        tone: 'err',
+        text: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setConsolidating(false)
+    }
   }
 
   const onReindex = async () => {
@@ -815,8 +864,14 @@ export function MemoryConfig() {
           {t('settings.memory.importJsonl')}
         </Button>
         {config?.generateMemories && (
-          <Button size="sm" variant="secondary" disabled={busy} data-testid="memory-consolidate" onClick={onConsolidate}>
-            {t('settings.memory.consolidate')}
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy || consolidating}
+            data-testid="memory-consolidate"
+            onClick={() => void onConsolidate()}
+          >
+            {consolidating ? t('settings.memory.consolidating') : t('settings.memory.consolidate')}
           </Button>
         )}
         <input
@@ -833,7 +888,23 @@ export function MemoryConfig() {
         />
       </div>
       {config?.generateMemories && (
-        <p className="text-caption text-ink-tertiary">{t('settings.memory.consolidateHint')}</p>
+        <div className="space-y-1">
+          <p className="text-caption text-ink-tertiary">{t('settings.memory.consolidateHint')}</p>
+          {consolidateMsg && (
+            <p
+              className={cn(
+                'text-meta',
+                consolidateMsg.tone === 'ok' && 'text-ink-secondary',
+                consolidateMsg.tone === 'warn' && 'text-warning',
+                consolidateMsg.tone === 'err' && 'text-danger',
+              )}
+              data-testid="memory-consolidate-result"
+              role="status"
+            >
+              {consolidateMsg.text}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Advanced — collapsed by default */}

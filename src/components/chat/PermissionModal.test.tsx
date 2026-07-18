@@ -30,7 +30,7 @@ describe('PermissionModal', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('renders the modal and responds with the chosen option', () => {
+  it('renders the inline prompt and responds with the chosen option', () => {
     vi.mocked(domain.useActiveSessionId).mockReturnValue('s1')
     vi.mocked(domain.useActivePendingPermission).mockReturnValue({
       requestId: 'r1',
@@ -41,6 +41,9 @@ describe('PermissionModal', () => {
 
     render(<PermissionModal />)
     expect(screen.getByTestId('permission-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('permission-prompt-slot')).toBeInTheDocument()
+    // Non-modal: no dialog overlay / role=dialog
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('permission-option-allow'))
     expect(respondPermission).toHaveBeenCalledWith('s1', 'r1', { optionId: 'allow' })
   })

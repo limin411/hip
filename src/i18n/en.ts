@@ -172,6 +172,7 @@ export const en = {
         title: 'Permission required',
         intro: 'The agent is requesting to perform this action:',
         fromSubagent: 'Requested by sub-agent {{name}}',
+        reviewAbove: 'Respond to the permission request above to continue this session.',
         label: 'Permission mode for this conversation',
         modes: {
           chat: 'Chat only',

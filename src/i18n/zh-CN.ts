@@ -170,6 +170,7 @@ export const zhCN = {
         title: '需要授权',
         intro: '智能体请求执行以下操作：',
         fromSubagent: '来自子智能体 {{name}} 的请求',
+        reviewAbove: '请先回应上方的权限请求，以继续本会话。',
         label: '本对话的权限模式',
         modes: {
           // Short chip labels (keep parity with en: Chat only / Edit files / Full access)

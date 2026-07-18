@@ -11,7 +11,6 @@ import { selectLivePlan } from '@/lib/todos'
 import { toast } from 'sonner'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
-import { PermissionModal } from './PermissionModal'
 import { hasPlanApproval } from './planApproval'
 
 export function ChatPane() {
@@ -254,7 +253,6 @@ export function ChatPane() {
           {t('chat.jumpToLatest')}
         </button>
       )}
-      <PermissionModal />
     </div>
   )
 }

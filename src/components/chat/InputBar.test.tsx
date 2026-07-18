@@ -405,4 +405,46 @@ describe('InputBar', () => {
     const nextH = parseInt(ta.style.height || '0', 10)
     expect(nextH).toBeGreaterThan(startH)
   })
+
+  it('blocks this session composer while a permission request is pending', () => {
+    baseMocks()
+    useDomainStore.setState({
+      sessions: [{
+        id: 's1',
+        config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+        title: 'T',
+        preview: 'P',
+        updatedAtMs: 0,
+        loaded: true,
+        messages: [],
+        status: 'running',
+        error: null,
+        pendingPermission: {
+          turnId: 't1',
+          requestId: 'r1',
+          tool: { title: 'Run', kind: 'execute' },
+          options: [{ optionId: 'allow', name: 'Allow', kind: 'allow' }],
+        },
+      }],
+      activeSessionId: 's1',
+    })
+    vi.spyOn(domain, 'useActiveSession').mockReturnValue({
+      id: 's1',
+      config: { llmProvider: 'openai', model: 'gpt-4o', tools: [] },
+      title: '',
+      preview: '',
+      messages: [],
+      pendingPermission: {
+        turnId: 't1',
+        requestId: 'r1',
+        tool: { title: 'Run', kind: 'execute' },
+        options: [],
+      },
+    } as any)
+
+    render(<InputBar />)
+    expect(screen.queryByTestId('composer')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('input-bar-resize')).not.toBeInTheDocument()
+    expect(screen.getByText(/Respond to the permission request above/i)).toBeInTheDocument()
+  })
 })

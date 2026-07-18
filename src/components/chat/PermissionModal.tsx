@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next'
 import type { PermissionOption } from '@hip/protocol'
 import { sessionService, useActiveSessionId, useActivePendingPermission } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
-import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 
 const REJECT_PREFIX = 'reject'
@@ -15,11 +14,10 @@ function orderOptions(options: PermissionOption[]): PermissionOption[] {
 }
 
 /**
- * HITL tool-permission modal (ACP agents). When the active session has a `pendingPermission`,
- * a standalone modal (mounted at the chat root — no Radix menu wrapper, so no `modal={false}`
- * pointer-events footgun) shows the gated tool and one button per advertised option. Picking an
- * option forwards the choice to the agent and clears the local queue so the blocked tool proceeds;
- * closing/dismissing the modal denies with a cancellation.
+ * HITL tool-permission prompt (ACP agents). When the active session has a `pendingPermission`,
+ * an inline panel above the composer shows the gated tool and one button per advertised option.
+ * Non-modal: other sessions and chrome stay usable; only this session's turn waits on the choice.
+ * Picking an option forwards it to the agent and clears the local queue so the blocked tool proceeds.
  */
 export function PermissionModal() {
   const { t } = useTranslation()
@@ -36,26 +34,33 @@ export function PermissionModal() {
   }
 
   return (
-    <Modal
-      open
-      onOpenChange={(open) => { if (!open) respond({ cancelled: true }) }}
-      title={t('chat.permission.title')}
+    <div
+      className="shrink-0 border-t border-border bg-surface px-4 py-3"
+      data-testid="permission-prompt-slot"
     >
-      <div className="flex flex-col gap-4 px-5 py-4" data-testid="permission-modal">
-        <p className="text-body text-ink-secondary">{t('chat.permission.intro')}</p>
-        {agentFrame && (
-          <p className="text-meta text-ink-tertiary" data-testid="permission-subagent">
-            {t('chat.permission.fromSubagent', { name: agentFrame.name })}
-          </p>
-        )}
-        <div className="rounded-md border border-border bg-surface-muted px-3 py-2">
+      <div
+        className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-accent-subtle px-4 py-3"
+        data-testid="permission-modal"
+        role="region"
+        aria-label={t('chat.permission.title')}
+      >
+        <div className="flex flex-col gap-1">
+          <p className="text-body font-medium text-ink">{t('chat.permission.title')}</p>
+          <p className="text-meta text-ink-secondary">{t('chat.permission.intro')}</p>
+          {agentFrame && (
+            <p className="text-meta text-ink-tertiary" data-testid="permission-subagent">
+              {t('chat.permission.fromSubagent', { name: agentFrame.name })}
+            </p>
+          )}
+        </div>
+        <div className="rounded-md border border-border bg-surface px-3 py-2">
           <p className="text-body font-medium text-ink">{tool.title}</p>
           <p className="mt-0.5 text-meta uppercase tracking-wide text-ink-tertiary">{tool.kind}</p>
         </div>
         {tool.diff && (
           <div className="rounded-md border border-border bg-surface">
             <p className="border-b border-border px-3 py-1.5 text-meta font-medium text-ink-secondary">{tool.diff.path}</p>
-            <pre className="max-h-64 overflow-auto px-3 py-2 text-meta">
+            <pre className="max-h-48 overflow-auto px-3 py-2 text-meta">
               <code>
                 {tool.diff.oldText && <span className="text-danger">{tool.diff.oldText}</span>}
                 {tool.diff.newText && <span className="text-success">{tool.diff.newText}</span>}
@@ -64,11 +69,11 @@ export function PermissionModal() {
           </div>
         )}
         {tool.content && !tool.diff && (
-          <pre className="max-h-64 overflow-auto rounded-md border border-border bg-surface px-3 py-2 text-meta">
+          <pre className="max-h-48 overflow-auto rounded-md border border-border bg-surface px-3 py-2 text-meta">
             <code>{tool.content}</code>
           </pre>
         )}
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap gap-2">
           {orderOptions(options).map((o) => {
             const isReject = o.kind.startsWith(REJECT_PREFIX)
             return (
@@ -85,6 +90,6 @@ export function PermissionModal() {
           })}
         </div>
       </div>
-    </Modal>
+    </div>
   )
 }

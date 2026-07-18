@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { NewConversation } from '@/components/chat/NewConversation'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { ComposerPlanPanel } from '@/components/chat/ComposerPlanPanel'
+import { PermissionModal } from '@/components/chat/PermissionModal'
 import { GoalStatusChip } from '@/components/chat/GoalStatusChip'
 import { InputBar } from '@/components/chat/InputBar'
 import { MissingProjectBanner } from '@/components/chat/MissingProjectBanner'
@@ -116,6 +117,8 @@ export function AppLayout() {
         <ChatPane />
         {/* Sticky plan/todo checklist directly above the composer */}
         <ComposerPlanPanel />
+        {/* Session-scoped HITL permission prompt above the composer (not a global modal) */}
+        <PermissionModal />
         <InputBar />
       </>
     )

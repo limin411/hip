@@ -170,6 +170,7 @@ export const zhTW = {
         title: '需要授權',
         intro: '智能體請求執行以下操作：',
         fromSubagent: '來自子智能體 {{name}} 的請求',
+        reviewAbove: '請先回應上方的權限請求，以繼續本工作階段。',
         label: '本對話的權限模式',
         modes: {
           // Short chip labels (keep parity with en: Chat only / Edit files / Full access)

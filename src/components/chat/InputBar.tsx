@@ -18,7 +18,7 @@ import { PlanModeChip } from './PlanModeChip'
 import { ProjectGuidanceChip } from './ProjectGuidanceChip'
 import { AttachmentButton } from './AttachmentButton'
 import { ParallelRunButton } from './ParallelRunButton'
-import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
+import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useActivePendingPermission, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
 import { isProjectPathBlocked } from '@/lib/projectPathGate'
 import { surfaceOf } from '@/lib/sessions'
@@ -55,6 +55,9 @@ export function InputBar() {
   const pathStatus = useProjectPathStore((s) => s.statusOf(active?.config.cwd))
   const projectPathBlocked = active ? isProjectPathBlocked(active.config, pathStatus) : false
   const planApprovalPending = hasPlanApproval(active)
+  const pendingPermission = useActivePendingPermission()
+  // HITL gate for this session only: plan approval or tool permission. Other sessions stay usable.
+  const sessionActionBlocked = planApprovalPending || !!pendingPermission
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
   // continuously, and the real recourse for a hard disconnect is the title-bar reconnect button.
@@ -240,7 +243,7 @@ export function InputBar() {
       data-testid="input-bar"
     >
       {/* Invisible hit target on the top rule — drag still resizes; no visible grip chrome. */}
-      {!planApprovalPending && (
+      {!sessionActionBlocked && (
         <div
           role="separator"
           aria-orientation="horizontal"
@@ -251,9 +254,11 @@ export function InputBar() {
         />
       )}
       <div className="w-full px-4 py-3">
-        {planApprovalPending ? (
+        {sessionActionBlocked ? (
           <div className="border-y border-border bg-surface px-1 py-3 text-left text-meta text-ink-secondary">
-            {t('chat.planApproval.reviewAbove')}
+            {pendingPermission
+              ? t('chat.permission.reviewAbove')
+              : t('chat.planApproval.reviewAbove')}
           </div>
         ) : (
           <div className="relative">

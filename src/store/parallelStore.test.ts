@@ -7,8 +7,9 @@ import {
 } from './parallelStore'
 
 describe('clampParallelCount', () => {
-  it('clamps to 2..4', () => {
-    expect(clampParallelCount(1)).toBe(2)
+  it('clamps to 1..4 (agent-decided N bounds)', () => {
+    expect(clampParallelCount(0)).toBe(1)
+    expect(clampParallelCount(1)).toBe(1)
     expect(clampParallelCount(2)).toBe(2)
     expect(clampParallelCount(3)).toBe(3)
     expect(clampParallelCount(9)).toBe(4)

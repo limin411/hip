@@ -35,7 +35,7 @@ describe('harness complex agent loop @harness @core', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
     await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
@@ -71,10 +71,18 @@ describe('harness complex agent loop @harness @core', () => {
     await activityBarStep1.waitForExist({ timeout: 15000 })
     const expandStep1 = await activityBarStep1.$('button')
     await expandStep1.waitForExist({ timeout: 5000 })
-    await browser.execute((el: HTMLElement) => el.click(), expandStep1)
+    // U2: may already be expanded while streaming — only click when collapsed.
+    const expandedStep1 = await expandStep1.getAttribute('aria-expanded')
+    if (expandedStep1 !== 'true') {
+      await browser.execute((el: HTMLElement) => el.click(), expandStep1)
+    }
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="tool-row"]')).length) >= 1,
+      async () => {
+        const rows = await browser.$$('[data-testid="tool-row"]')
+        const cards = await browser.$$('[data-testid="tool-card"]')
+        return (await rows.length) + (await cards.length) >= 1
+      },
       {
         timeout: 15000,
         interval: 300,

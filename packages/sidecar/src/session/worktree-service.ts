@@ -28,6 +28,7 @@ import {
   upsertMetaRecord,
   worktreeIdFromPath,
 } from './worktree-meta.js'
+import { assertWorktreeCleanForRemoval, WorktreeDirtyError } from './worktree-preflight.js'
 
 const execFileP = promisify(execFile)
 
@@ -341,6 +342,22 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
       const found = findMetaRecord(meta, repoKey, worktreePath)
       const id = found?.id ?? worktreeIdFromPath(repoKey, worktreePath)
       const metaRec = found?.rec
+
+      // H4: dirty preflight before git remove / PTY teardown (force skips).
+      try {
+        await assertWorktreeCleanForRemoval(worktreePath, removeOpts.force === true)
+      } catch (e) {
+        // Duck-type code as well as instanceof (bundler/duplicate-class safe).
+        const dirty =
+          e instanceof WorktreeDirtyError ||
+          (e !== null &&
+            typeof e === 'object' &&
+            (e as { code?: string }).code === 'WORKTREE_DIRTY')
+        if (dirty) {
+          return { ok: false, error: e instanceof Error ? e.message : String(e) }
+        }
+        throw e
+      }
 
       // Product default: preflight (force false). Bg / explicit cleanup pass force: true.
       const r = await removeWorktree(cwd, worktreePath, 'git', removeOpts.force === true)

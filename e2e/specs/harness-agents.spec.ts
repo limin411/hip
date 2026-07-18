@@ -2,7 +2,7 @@
 // Phase 1 H6: Agents panel structure + cards via inject (no LLM).
 import { expect } from 'expect-webdriverio'
 import * as path from 'node:path'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   createCodeSessionForE2e,
@@ -10,7 +10,6 @@ import {
   waitForHipE2E,
 } from '../helpers/e2e-hooks.js'
 import { selectPanelTab } from '../helpers/panel.js'
-import { switchToCodeSurface } from '../helpers/surface.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 
@@ -19,8 +18,8 @@ describe('harness agents panel @harness @panel', () => {
     await waitForAppReady()
     await skipLoginIfPresent()
     await waitForMainApp()
+    await leaveSpecialViewsIfOpen()
     await waitForHipE2E()
-    await switchToCodeSurface()
   })
 
   it('shows collaboration structure and agent cards after seed', async () => {
@@ -28,10 +27,18 @@ describe('harness agents panel @harness @panel', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () =>
+        (await (await browser.$$('[data-session-tab="true"]')).length) >= 1 ||
+        (await (await browser.$(`[data-testid="sidebar-session-${sessionId}"]`)).isExisting()),
       { timeout: 30000, interval: 300 },
     )
-    await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
+    // Open code panel for agents tab
+    await browser.execute((id: string) => {
+      // ensure projects section shows host session
+      void id
+    }, sessionId)
+    const toggle = await browser.$('[data-testid="toggle-panel"]')
+    await toggle.waitForExist({ timeout: 30000 })
 
     await seedAgentCollaboration(sessionId)
 

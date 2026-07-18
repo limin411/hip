@@ -36,13 +36,14 @@ export interface ParallelWorktreeToolOpts {
   onWorktreeChanged?: WorktreeChangedNotify
 }
 
+/** Keep in sync with src/lib/parallelCount.ts PARALLEL_COUNT_MIN/MAX. */
 function clampCount(n: number): number {
   if (!Number.isFinite(n)) return 2
-  return Math.min(4, Math.max(2, Math.floor(n)))
+  return Math.min(4, Math.max(1, Math.floor(n)))
 }
 
 function parseCountOption(optionId: string): number | null {
-  const m = /^n([2-4])$/.exec(optionId)
+  const m = /^n([1-4])$/.exec(optionId)
   if (!m) return null
   return Number(m[1])
 }
@@ -67,6 +68,11 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
       ].join('\n')
 
       const options: PermissionOption[] = [
+        {
+          optionId: 'n1',
+          name: suggested === 1 ? '隔离 1 路（建议）' : '隔离 1 路',
+          kind: 'allow_once',
+        },
         {
           optionId: 'n2',
           name: suggested === 2 ? '并行 2 路（建议）' : '并行 2 路',

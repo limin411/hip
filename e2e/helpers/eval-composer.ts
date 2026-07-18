@@ -177,7 +177,7 @@ export async function waitForTurnSettle(opts: {
     if (hasUser) break
     // Also accept session tab existence after send
     const hasSession = await browser.execute(
-      () => document.querySelectorAll('[data-testid="session-tab"]').length > 0,
+      () => document.querySelectorAll('[data-session-tab="true"]').length > 0,
     )
     if (hasSession && Date.now() > deadline - opts.timeoutMs + 15_000) break
     await browser.pause(400)

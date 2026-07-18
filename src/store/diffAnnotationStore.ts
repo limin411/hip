@@ -59,16 +59,28 @@ export const useDiffAnnotationStore = create<DiffAnnotationState>((set, get) => 
   list: (sessionId) => get().bySession[sessionId] ?? [],
 }))
 
-/** Markdown block prepended to the user message when sending annotations. */
+/** Markdown + JSON block prepended to the user message when sending annotations (spec G2). */
 export function formatDiffAnnotationsForComposer(anns: DiffAnnotation[]): string {
   if (anns.length === 0) return ''
-  const blocks = anns.map((a, i) => {
-    const note = a.note?.trim() ? `\nNote: ${a.note.trim()}` : ''
-    return `### Annotation ${i + 1}: \`${a.path}\`${note}\n\`\`\`diff\n${a.body.trim()}\n\`\`\``
-  })
+  const payload = anns.map((a) => ({
+    id: a.id,
+    path: a.path,
+    body: a.body,
+    note: a.note ?? null,
+    createdAt: a.createdAt,
+  }))
+  const human = anns
+    .map((a, i) => {
+      const note = a.note?.trim() ? `\nNote: ${a.note.trim()}` : ''
+      return `### Annotation ${i + 1}: \`${a.path}\`${note}\n\`\`\`diff\n${a.body.trim()}\n\`\`\``
+    })
+    .join('\n\n')
   return (
     `## Diff annotations for agent\n` +
     `Please address the following review notes on the working tree diff.\n\n` +
-    `${blocks.join('\n\n')}\n\n---\n\n`
+    `${human}\n\n` +
+    '```json\n' +
+    `${JSON.stringify({ type: 'hip.diff_annotations', annotations: payload }, null, 2)}\n` +
+    '```\n\n---\n\n'
   )
 }

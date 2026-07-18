@@ -31,6 +31,7 @@ export interface SessionConfigLike {
   forcePlan?: boolean
   disablePlan?: boolean
   surface?: 'chat' | 'code'
+  workspaceMode?: 'sandbox' | 'project'
   useEventSource?: boolean
   /** @deprecated Ignored for turn routing; retained for config JSON compatibility. */
   orchMode?: OrchModeDefault

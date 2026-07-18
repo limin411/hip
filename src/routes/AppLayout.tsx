@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { NewConversation } from '@/components/chat/NewConversation'
 import { ChatPane } from '@/components/chat/ChatPane'
 import { ComposerPlanPanel } from '@/components/chat/ComposerPlanPanel'
+import { GoalStatusChip } from '@/components/chat/GoalStatusChip'
 import { InputBar } from '@/components/chat/InputBar'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
@@ -91,6 +92,7 @@ export function AppLayout() {
       <NewConversation />
     ) : (
       <>
+        <GoalStatusChip />
         <ChatPane />
         {/* Sticky plan/todo checklist directly above the composer */}
         <ComposerPlanPanel />

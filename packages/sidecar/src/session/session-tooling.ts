@@ -57,6 +57,8 @@ export interface BuildSessionToolingInput {
   onToolFinished: (callId: string, status: 'finished' | 'error', output?: string, error?: string) => void
   emitRisk: (toolName: string, risk: 'low' | 'medium' | 'high', approval: string) => void
   goalManager?: GoalManager
+  /** Emit goal:updated to the UI when goal tools change state. */
+  onGoalUpdated?: (goal: import('./goal.js').Goal | null) => void
   cronManager?: CronManager
   planMode?: PlanMode
   memoryService?: MemoryService
@@ -101,7 +103,7 @@ export async function buildSessionTooling(input: BuildSessionToolingInput): Prom
     registry.register(t)
   }
   if (input.goalManager) {
-    const goalTools = buildGoalTools(input.goalManager)
+    const goalTools = buildGoalTools(input.goalManager, input.onGoalUpdated)
     for (const t of goalTools) {
       registry.register(t)
     }

@@ -11,72 +11,27 @@ import {
   clickContextMenuItem,
 } from './context-menu.js'
 
-async function openNewSessionMenu(): Promise<void> {
-  const button = await browser.$('[data-testid="new-session-button"]')
-  await button.waitForExist({ timeout: 20000 })
-
-  let chatItem = await browser.$('[data-testid="new-session-chat"]')
-  if (await chatItem.isExisting()) return
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await browser.execute((el: HTMLElement) => {
-      el.focus()
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }, button)
-    await browser.pause(50)
-    await browser.keys('Enter')
-
-    chatItem = await browser.$('[data-testid="new-session-chat"]')
-    try {
-      await chatItem.waitForExist({ timeout: 1000 })
-      return
-    } catch {
-      try {
-        await browser.execute((el: HTMLElement) => {
-          const rect = el.getBoundingClientRect()
-          const x = rect.left + rect.width / 2
-          const y = rect.top + rect.height / 2
-          el.dispatchEvent(
-            new PointerEvent('pointerdown', {
-              bubbles: true,
-              pointerType: 'mouse',
-              clientX: x,
-              clientY: y,
-            }),
-          )
-          el.dispatchEvent(
-            new PointerEvent('pointerup', {
-              bubbles: true,
-              pointerType: 'mouse',
-              clientX: x,
-              clientY: y,
-            }),
-          )
-          el.click()
-        }, button)
-        chatItem = await browser.$('[data-testid="new-session-chat"]')
-        await chatItem.waitForExist({ timeout: 1000 })
-        return
-      } catch {
-        // retry
-      }
-    }
-  }
-
-  throw new Error('new-session menu did not open after retries')
-}
-
 async function clickTestId(testid: string, timeout = 10000): Promise<void> {
   const el = await browser.$(`[data-testid="${testid}"]`)
   await el.waitForExist({ timeout })
   await browser.execute((node: HTMLElement) => node.click(), el)
 }
 
-/** Open knowledge surface from title-bar + menu. */
+/** Open knowledge surface via sidebar nav (product path). */
 export async function openKnowledgeFromMenu(): Promise<void> {
-  await openNewSessionMenu()
-  await clickTestId('new-session-kb')
+  const nav = await browser.$('[data-testid="sidebar-nav-knowledge"]')
+  await nav.waitForExist({ timeout: 20000 })
+  await browser.execute((el: HTMLElement) => el.click(), nav)
   await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
+  // Prefer home so create-space is available (workspace may restore last space).
+  const home = await browser.$('[data-testid="knowledge-home"]')
+  if (!(await home.isExisting())) {
+    const back = await browser.$('[data-testid="knowledge-back-home"]')
+    if (await back.isExisting()) {
+      await browser.execute((el: HTMLElement) => el.click(), back)
+    }
+  }
+  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
 }
 
 /**

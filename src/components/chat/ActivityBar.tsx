@@ -77,7 +77,8 @@ export function ActivityBar({
   hidePlan,
 }: ActivityBarProps) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  // Spec U2: running turn process is expanded by default so tools are visible without a click.
+  const [open, setOpen] = useState(!!streaming)
 
   const ordered = useMemo(() => [...steps].sort((a, b) => a.stepSeq - b.stepSeq), [steps])
   const lastStep = ordered[ordered.length - 1]

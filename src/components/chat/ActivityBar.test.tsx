@@ -84,7 +84,8 @@ describe('ActivityBar', () => {
     )
     expect(html).toContain('正在')
     expect(html).toContain('a.ts')
-    expect(html).toContain('aria-expanded="false"')
+    // Spec U2: process expanded by default while streaming
+    expect(html).toContain('aria-expanded="true"')
     expect(html).toContain('animate-pulse')
   })
 
@@ -193,13 +194,14 @@ describe('ActivityBar', () => {
 
     const button = container.querySelector('[data-testid="activity-bar"] button')!
 
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(container.querySelector('[data-testid="turn-timeline"]')).not.toBeInTheDocument()
+    // Default open while streaming (U2)
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
 
     fireEvent.click(button)
 
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(container.querySelector('[data-testid="turn-timeline"]')).toBeInTheDocument()
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(container.querySelector('[data-testid="turn-timeline"]')).not.toBeInTheDocument()
 
     vi.mocked(TurnTimeline).mockReturnValue(null)
   })

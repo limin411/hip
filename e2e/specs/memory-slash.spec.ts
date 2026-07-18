@@ -72,7 +72,7 @@ describe('memory slash commands @memory', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 20000, interval: 300 },
     )
 

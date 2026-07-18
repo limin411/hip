@@ -43,7 +43,7 @@ async function commitCodeSession(message: string): Promise<void> {
   await send.click()
 
   await browser.waitUntil(
-    async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+    async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
     { timeout: 120000, interval: 500 },
   )
   await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })

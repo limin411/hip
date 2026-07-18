@@ -17,7 +17,7 @@ export async function sendChatMessage(text: string): Promise<void> {
 }
 
 export async function activeSessionTitle(): Promise<string> {
-  const active = await browser.$('[data-testid="session-tab"][aria-selected="true"]')
+  const active = await browser.$('[data-session-tab="true"][aria-selected="true"]')
   await active.waitForExist({ timeout: 10000 })
   const title = await active.$('span.truncate')
   return title.getText()

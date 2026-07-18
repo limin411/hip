@@ -33,11 +33,13 @@ describe('harness plan approval @harness @core', () => {
     const panel = await chat.planProgressPanel
     await panel.waitForExist({ timeout: 15000 })
 
+    // Plan steps live on the sticky panel; nested plan-approval-card is actions only.
+    const panelText = await panel.getText()
+    expect(panelText).toContain('e2e plan step one')
+    expect(panelText).toContain('e2e plan step two')
+
     const card = await chat.planApprovalCard
     await card.waitForExist({ timeout: 15000 })
-    const text = await card.getText()
-    expect(text).toContain('e2e plan step one')
-    expect(text).toContain('e2e plan step two')
 
     // Plan approval replaces plain interrupt banner.
     const interrupt = await chat.chatInterrupt

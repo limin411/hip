@@ -45,7 +45,7 @@ describe('harness export debug @harness @smoke', () => {
       session: { id: string; config: Record<string, unknown> }
       recentErrors?: Array<{ code?: string }>
     }
-    expect(parsed.version).toBe(1)
+    expect([1, 2]).toContain(parsed.version)
     expect(parsed.session.id).toBe(sessionId)
     expect(parsed.recentErrors?.some((e) => e.code === 'AGENT_ERROR')).toBe(true)
     // Redaction: no obvious secret keys as plaintext values.

@@ -141,8 +141,15 @@ describe('GoalManager', () => {
     const gm = new GoalManager()
     gm.createGoal('Status goal')
 
-    gm.updateGoal('completed')
-    expect(gm.getStatus()!.status).toBe('completed')
+    gm.updateGoal('paused')
+    expect(gm.getStatus()!.status).toBe('paused')
+  })
+
+  it('completeAndClear clears the goal', () => {
+    const gm = new GoalManager()
+    gm.createGoal('Done')
+    expect(gm.completeAndClear()).toBe(true)
+    expect(gm.getStatus()).toBeNull()
   })
 
   it('updateGoal returns false when no goal exists', () => {
@@ -176,7 +183,7 @@ describe('GoalManager', () => {
   it('recordTurn and recordTokens do nothing when goal is not active', () => {
     const gm = new GoalManager()
     gm.createGoal('Non-active record')
-    gm.updateGoal('completed')
+    gm.updateGoal('paused')
 
     gm.recordTurn()
     gm.recordTokens(100)
@@ -267,7 +274,7 @@ describe('buildGoalTools', () => {
 
     const result = await goalUpdate.invoke({ status: 'completed' })
     expect(result).toContain('completed')
-    expect(gm.getStatus()!.status).toBe('completed')
+    expect(gm.getStatus()).toBeNull()
   })
 
   it('goal_update tool returns error when no goal exists', async () => {

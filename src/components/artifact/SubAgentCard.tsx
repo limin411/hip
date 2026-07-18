@@ -8,6 +8,9 @@ import { cn } from '@/lib/utils'
 import { sanitizeDisplayText } from '@/lib/sanitizeDisplayText'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { ROLE_NAME_KEY } from '@/lib/roleColor'
+import { useFocusStore } from '@/store/focusStore'
+import { useUiStore } from '@/store/uiStore'
+import { useDomainStore } from '@/domain/sessionStore'
 
 /** Split grouped agents into flat (supervisor) vs nested (dispatched sub-agents). */
 export function splitAgents(agents: TurnAgent[]): { flat: TurnAgent[]; nested: TurnAgent[] } {
@@ -38,6 +41,15 @@ export function SubAgentCard({
   const cleanOutput = sanitizeDisplayText(agent.output)
   const toolCount = agent.tools.length
   const elapsedSec = agent.elapsedMs > 0 ? Math.round(agent.elapsedMs / 1000) : null
+  const runningTool = agent.tools.find((tc) => tc.status === 'running')
+
+  const openInAgents = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    useFocusStore.getState().setFocusedAgentId(agent.agentId)
+    useUiStore.getState().setTab('agents')
+    const sid = useDomainStore.getState().activeSessionId
+    if (sid) useDomainStore.getState().setSessionCodePanelOpen(sid, true)
+  }
 
   return (
     <DeclarativeContextMenu kind="subAgent" payload={{ agent }}>
@@ -59,6 +71,11 @@ export function SubAgentCard({
           <span className="hidden shrink-0 font-mono text-caption text-ink-tertiary sm:inline" title={agent.agentId}>
             {agent.agentId}
           </span>
+          {runningTool && (
+            <span className="hidden max-w-[8rem] shrink-0 truncate text-caption text-ink-tertiary sm:inline">
+              {runningTool.name}
+            </span>
+          )}
           {toolCount > 0 && (
             <span className="shrink-0 text-caption text-ink-tertiary">
               {t('chat.subagent.toolsCount', { count: toolCount })}
@@ -67,6 +84,21 @@ export function SubAgentCard({
           {elapsedSec != null && (
             <span className="shrink-0 text-caption text-ink-tertiary">{elapsedSec}s</span>
           )}
+          <span
+            role="button"
+            tabIndex={0}
+            className="shrink-0 text-caption text-accent hover:underline"
+            data-testid="subagent-open-agents"
+            onClick={openInAgents}
+            onKeyDown={(ev) => {
+              if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault()
+                openInAgents(ev as unknown as React.MouseEvent)
+              }
+            }}
+          >
+            Agents
+          </span>
           <span className="ml-auto shrink-0">
             {agent.status === 'running' ? (
               <Loader2 size={12} className="animate-spin text-accent-strong" />

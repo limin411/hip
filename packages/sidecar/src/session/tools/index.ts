@@ -57,7 +57,16 @@ export function buildAllTools(
   // 'chat' = read-only: drop write_file/edit_file. (read_file/ls/glob/grep + write_todos stay.)
   const base: StructuredToolInterface[] = mode === 'chat'
     ? [fileTools.readFile, fileTools.ls, fileTools.glob, fileTools.grep, ...planningTools]
-    : [fileTools.writeFile, fileTools.readFile, fileTools.editFile, fileTools.ls, fileTools.glob, fileTools.grep, ...planningTools]
+    : [
+        fileTools.writeFile,
+        fileTools.readFile,
+        fileTools.editFile,
+        fileTools.applyPatch,
+        fileTools.ls,
+        fileTools.glob,
+        fileTools.grep,
+        ...planningTools,
+      ]
 
   // ── Git tools (only for a real on-disk cwd; dropped in chat — all mutate) ─────
   // chat is read-only: omit commit / branch / worktree tools along with write_file.

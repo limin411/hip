@@ -38,7 +38,8 @@ describe('hip desktop app @smoke', () => {
     )
     expect(await greeting.getText()).toContain(CHAT_GREETING)
 
-    const newSessionBtn = await browser.$('[data-testid="new-session-button"]')
+    // Product chrome: sidebar "new chat" (legacy new-session-button dropdown removed).
+    const newSessionBtn = await browser.$('[data-testid="sidebar-new-chat-list"]')
     await newSessionBtn.waitForExist({ timeout: 10000 })
   })
 })

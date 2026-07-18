@@ -77,6 +77,7 @@ export function NewConversation() {
   }
 
   const greeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
+  // J1 empty-state CTA identity for e2e (@smooth-p4)
 
   const setText = useCallback((value: string) => useDraftStore.getState().setText(value), [])
 

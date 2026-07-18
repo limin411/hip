@@ -34,7 +34,7 @@ describe('harness subagent pause @harness @core', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
     await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })
@@ -78,7 +78,11 @@ describe('harness subagent pause @harness @core', () => {
     await activityBar.waitForExist({ timeout: 15000 })
     const expandBtn = await activityBar.$('button')
     await expandBtn.waitForExist({ timeout: 5000 })
-    await browser.execute((el: HTMLElement) => el.click(), expandBtn)
+    // U2: may already be expanded while streaming — only click when collapsed.
+    const expanded = await expandBtn.getAttribute('aria-expanded')
+    if (expanded !== 'true') {
+      await browser.execute((el: HTMLElement) => el.click(), expandBtn)
+    }
 
     const delegation = await browser.$('[data-testid="delegation-row"]')
     await delegation.waitForExist({ timeout: 10000 })

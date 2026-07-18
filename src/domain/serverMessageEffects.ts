@@ -13,6 +13,9 @@ import { surfaceOf } from '@/lib/sessions'
 import { consumeUserDiffRequest } from '@/domain/commands/diffFeedback'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
+import { pathFromToolInput, shouldAutoFollowWrite } from '@/lib/writeFollow'
+import { useFocusStore } from '@/store/focusStore'
+import { useGoalStore } from '@/store/goalStore'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -238,11 +241,47 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
 
     case 'tool:finished': {
       // tool:finished has no name — resolve from in-flight toolCalls on the turn message.
-      const sess = useDomainStore.getState().sessions.find((s) => s.id === msg.sessionId)
+      const domain = useDomainStore.getState()
+      const sess = domain.sessions.find((s) => s.id === msg.sessionId)
       const turn = sess?.messages.find((m) => m.id === msg.turnId || m.toolCalls?.some((tc) => tc.callId === msg.callId))
-      const name = turn?.toolCalls?.find((tc) => tc.callId === msg.callId)?.name ?? ''
+      const tool = turn?.toolCalls?.find((tc) => tc.callId === msg.callId)
+      const name = tool?.name ?? ''
       if (shouldRefreshDiffOnToolFinish(name, msg.status)) {
         debouncedRequestDiff(msg.sessionId)
+      }
+      // P1 C1: auto-follow write-like tools to preview before turn ends.
+      const focus = useFocusStore.getState()
+      if (
+        tool &&
+        shouldAutoFollowWrite({
+          autoFollow: focus.autoFollowEdits,
+          followPaused: focus.followPaused,
+          isActiveSession: domain.activeSessionId === msg.sessionId,
+          toolName: name,
+          status: msg.status,
+        })
+      ) {
+        const path = pathFromToolInput(name, tool.input)
+        if (path) {
+          useFsStore.getState().setActive(msg.sessionId, path)
+          useFsStore.getState().setPreview(msg.sessionId, { status: 'loading', path })
+          deps.send({ type: 'fs:read', sessionId: msg.sessionId, path })
+          focus.setFocusedPath(path)
+          focus.setFocusedCallId(msg.callId)
+          const ui = useUiStore.getState()
+          if (sess && surfaceOf(sess.config) === 'code') {
+            // Keep Changes/Terminal if already there — only auto-open Files when not reviewing diffs.
+            const tab = ui.activeTab
+            if (tab !== 'changes' && tab !== 'terminal') {
+              ui.setTab('files')
+            }
+            domain.setSessionCodePanelOpen(msg.sessionId, true)
+          } else if (sess) {
+            ui.setChatActiveTab('files')
+            ui.setSelectedArtifactPath(path)
+            domain.setSessionChatPanelOpen(msg.sessionId, true)
+          }
+        }
       }
       return
     }
@@ -368,6 +407,21 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       toast.success(
         i18n.t('chat.parallel.started', { count: msg.slots.length }),
       )
+      return
+    }
+
+    case 'goal:updated': {
+      if (!msg.goal) {
+        useGoalStore.getState().setGoal(msg.sessionId, null)
+        return
+      }
+      useGoalStore.getState().setGoal(msg.sessionId, {
+        id: msg.goal.id,
+        description: msg.goal.description,
+        status: msg.goal.status,
+        turns: msg.goal.turns,
+        maxTurns: msg.goal.maxTurns,
+      })
       return
     }
 

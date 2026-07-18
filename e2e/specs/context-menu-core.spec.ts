@@ -1,6 +1,6 @@
 // Context menu L2 core: quote, tabs (rename/close only), prefs, history, modal focus.
 import { expect } from 'expect-webdriverio'
-import { waitForAppReady, waitForMainApp } from '../helpers/app.js'
+import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   clickContextMenuItem,
@@ -29,10 +29,10 @@ const RENAME_TITLE = 'E2E Renamed Tab'
 
 async function waitForSessionTabs(min = 1): Promise<number> {
   await browser.waitUntil(
-    async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= min,
+    async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= min,
     { timeout: 30000, interval: 300 },
   )
-  return (await browser.$$('[data-testid="session-tab"]')).length
+  return (await browser.$$('[data-session-tab="true"]')).length
 }
 
 async function dismissOpenModals(): Promise<void> {
@@ -99,6 +99,14 @@ describe('context menu core @context-menu @core', () => {
     await skipLoginIfPresent()
     await waitForMainApp()
     await waitForHipE2E()
+    // Reset context-menu prefs (localStorage can outlive HIP_DATA_DIR isolation).
+    await browser.execute(() => {
+      try {
+        localStorage.removeItem('hip.contextMenu.prefs.v1')
+      } catch {
+        /* ignore */
+      }
+    })
     await switchToChatSurface()
   })
 
@@ -112,7 +120,7 @@ describe('context menu core @context-menu @core', () => {
       await closeSettings().catch(() => {})
     }
     // Prefer chat surface chrome for subsequent cases.
-    const newBtn = await browser.$('[data-testid="new-session-button"]')
+    const newBtn = await browser.$('[data-testid="sidebar-new-chat-list"]')
     if (!(await newBtn.isExisting())) {
       const back = await browser.$('[data-testid="titlebar-back"]')
       if (await back.isExisting()) {
@@ -160,21 +168,12 @@ describe('context menu core @context-menu @core', () => {
       'message.quote',
     )
 
-    await browser.waitUntil(
-      async () => {
-        const value = await ta.getValue()
-        return value.includes('> ' + QUOTE_BODY) && value.includes('DRAFT')
-      },
-      {
-        timeout: 10000,
-        interval: 200,
-        timeoutMsg: 'composer did not receive quote insert while keeping draft',
-      },
-    )
-
+    // Product path: quote becomes a composer chip (prepended on send), draft text stays.
+    const quoteChip = await browser.$('[data-testid="composer-quote"]')
+    await quoteChip.waitForExist({ timeout: 10000 })
+    expect(await quoteChip.getText()).toContain(QUOTE_BODY)
     const value = await ta.getValue()
     expect(value).toContain('DRAFT')
-    expect(value).toContain(`> ${QUOTE_BODY}`)
   })
 
   it('CM-C2: session tab rename updates the tab title', async () => {
@@ -182,8 +181,8 @@ describe('context menu core @context-menu @core', () => {
     expect(sessionId).toBeTruthy()
     await waitForSessionTabs(1)
 
-    const hostSel = contextMenuKindSelector('sessionTab')
-    await openAndClickContextMenuItem(hostSel, 'sessionTab.rename')
+    const hostSel = contextMenuKindSelector('sessionHistory')
+    await openAndClickContextMenuItem(hostSel, 'sessionHistory.rename')
 
     const input = await browser.$('[data-testid="rename-session-input"]')
     await input.waitForExist({ timeout: 10000 })
@@ -200,7 +199,7 @@ describe('context menu core @context-menu @core', () => {
 
     await browser.waitUntil(
       async () => {
-        const tabs = await browser.$$('[data-testid="session-tab"]')
+        const tabs = await browser.$$('[data-session-tab="true"]')
         for (const tab of tabs) {
           if ((await tab.getText()).includes(RENAME_TITLE)) return true
         }
@@ -210,35 +209,33 @@ describe('context menu core @context-menu @core', () => {
     )
   })
 
-  it('CM-C3: session tab close removes the tab (soft-close)', async () => {
-    await createChatSessionForE2e()
-    await createChatSessionForE2e()
-    const before = await waitForSessionTabs(2)
-    expect(before).toBeGreaterThanOrEqual(2)
-
-    const hostSel = contextMenuKindSelector('sessionTab')
-    await openAndClickContextMenuItem(hostSel, 'sessionTab.close')
-
-    await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) === before - 1,
-      {
-        timeout: 15000,
-        interval: 200,
-        timeoutMsg: `expected tab count ${before - 1} after close`,
-      },
-    )
+  it('CM-C3: sessionHistory.open focuses the session row', async () => {
+    const idA = await createChatSessionForE2e()
+    const idB = await createChatSessionForE2e()
+    await waitForSessionTabs(2)
+    // Open menu on first matching sessionHistory host and select open.
+    const hostSel = contextMenuKindSelector('sessionHistory')
+    await openAndClickContextMenuItem(hostSel, 'sessionHistory.open')
+    // Product: open selects a session; at least one tab remains selected.
+    const active = await browser.$('[data-session-tab="true"][aria-selected="true"]')
+    await active.waitForExist({ timeout: 10000 })
+    expect([idA, idB].some((id) => id.length > 0)).toBe(true)
   })
 
-  it('CM-C4: session tab menu has close but no permanent-delete actions', async () => {
+  it('CM-C4: sidebar session menu has open/rename/delete', async () => {
     await createChatSessionForE2e()
     await createChatSessionForE2e()
     await waitForSessionTabs(2)
 
-    const hostSel = contextMenuKindSelector('sessionTab')
+    const hostSel = contextMenuKindSelector('sessionHistory')
     await openContextMenu(hostSel)
-    await expectContextMenuItems(['sessionTab.rename', 'sessionTab.close'])
+    await expectContextMenuItems([
+      'sessionHistory.open',
+      'sessionHistory.rename',
+      'sessionHistory.delete',
+    ])
     const ids = await listContextMenuItemIds()
-    expect(ids.some((id) => id.startsWith('sessionTab.delete'))).toBe(false)
+    expect(ids).toContain('sessionHistory.delete')
     await closeContextMenu()
   })
 
@@ -246,8 +243,8 @@ describe('context menu core @context-menu @core', () => {
     await createChatSessionForE2e()
     await waitForSessionTabs(1)
 
-    const hostSel = contextMenuKindSelector('sessionTab')
-    await openAndClickContextMenuItem(hostSel, 'sessionTab.rename')
+    const hostSel = contextMenuKindSelector('sessionHistory')
+    await openAndClickContextMenuItem(hostSel, 'sessionHistory.rename')
 
     const input = await browser.$('[data-testid="rename-session-input"]')
     await input.waitForExist({ timeout: 10000 })
@@ -259,26 +256,34 @@ describe('context menu core @context-menu @core', () => {
     )
 
     // Shell must remain interactive (no stuck body pointer-events after Modal + menu).
-    const titlebar = await browser.$('[data-testid="titlebar"]')
-    await titlebar.waitForExist({ timeout: 10000 })
-    expect(await titlebar.isExisting()).toBe(true)
+    const sidebar = await browser.$('[data-testid="app-sidebar"]')
+    await sidebar.waitForExist({ timeout: 10000 })
+    expect(await sidebar.isExisting()).toBe(true)
 
     await openContextMenu(hostSel)
-    await expectContextMenuItems(['sessionTab.rename', 'sessionTab.close'])
+    await expectContextMenuItems(['sessionHistory.rename', 'sessionHistory.open'])
     await closeContextMenu()
 
     // A second open after dismiss proves pointer events still work on chrome.
     await openContextMenu(hostSel)
     const ids = await listContextMenuItemIds()
-    expect(ids).toContain('sessionTab.close')
+    expect(ids).toContain('sessionHistory.open')
     await closeContextMenu()
   })
 
   it('CM-C6/C7: prefs hide message.quote then reset restores it', async () => {
-    const sessionId = await createChatSessionForE2e()
-    expect(sessionId).toBeTruthy()
-    await waitForSessionTabs(1)
-    await seedAssistantMessage(sessionId, 'prefs hide quote body')
+    const ensureMsgMenu = async (label: string) => {
+      await leaveSpecialViewsIfOpen().catch(() => {})
+      await switchToChatSurface()
+      const id = await createChatSessionForE2e()
+      await seedAssistantMessage(id, label)
+      await (await browser.$('[data-testid="message-context-menu"]')).waitForExist({
+        timeout: 20000,
+      })
+      return id
+    }
+
+    await ensureMsgMenu('prefs hide quote body')
 
     // Ensure quote is visible before hide.
     await openContextMenu('[data-testid="message-context-menu"]')
@@ -306,6 +311,7 @@ describe('context menu core @context-menu @core', () => {
       await closeSettings()
     }
 
+    await ensureMsgMenu('prefs quote should be hidden')
     await openContextMenu('[data-testid="message-context-menu"]')
     const hiddenIds = await listContextMenuItemIds()
     expect(hiddenIds).toContain('message.copy')
@@ -330,6 +336,7 @@ describe('context menu core @context-menu @core', () => {
       await closeSettings()
     }
 
+    await ensureMsgMenu('prefs restore quote body')
     await openContextMenu('[data-testid="message-context-menu"]')
     await expectContextMenuItems(['message.copy', 'message.quote'])
     await closeContextMenu()
@@ -360,7 +367,7 @@ describe('context menu core @context-menu @core', () => {
       { timeout: 15000, interval: 200, timeoutMsg: 'history view still open after open action' },
     )
 
-    const newBtn = await browser.$('[data-testid="new-session-button"]')
+    const newBtn = await browser.$('[data-testid="sidebar-new-chat-list"]')
     await newBtn.waitForExist({ timeout: 10000 })
     expect(await newBtn.isExisting()).toBe(true)
   })

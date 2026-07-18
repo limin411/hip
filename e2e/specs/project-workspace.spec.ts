@@ -9,7 +9,7 @@ import { CodePage } from '../page-objects/CodePage.js'
 
 const FIXTURE = path.resolve('e2e/fixtures/sample-project')
 const codePage = new CodePage()
-const sessionItems = () => browser.$$('[data-testid="session-tab"]')
+const sessionItems = () => browser.$$('[data-session-tab="true"]')
 
 describe('new conversation @core', () => {
   before(async () => {

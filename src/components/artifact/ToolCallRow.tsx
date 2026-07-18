@@ -10,6 +10,7 @@ import {
   parseToolInput,
   toolTitleHint,
 } from '@/lib/toolPresentation'
+import { buildToolResultModel } from '@/lib/toolResultView'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 
 function Field({
@@ -101,7 +102,11 @@ function StructuredOutput({ tool, cleanOutput }: { tool: ToolCall; cleanOutput: 
 
 export function ToolCallRow({ tool }: { tool: ToolCall }) {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  const model = useMemo(() => buildToolResultModel(tool), [tool])
+  // U2 / P2: running tools and edit diffs start expanded for visibility.
+  const [open, setOpen] = useState(
+    () => tool.status === 'running' || model.kind === 'diff',
+  )
   const [showRaw, setShowRaw] = useState(false)
   const title = useMemo(() => toolTitleHint(tool), [tool])
   const cleanOutput = useMemo(
@@ -121,13 +126,17 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
 
   return (
     <DeclarativeContextMenu kind="toolCall" payload={{ tool }}>
-      <div className="rounded-lg border border-border bg-surface-muted/40">
+      <div
+        className="rounded-lg border border-border bg-surface-muted/40"
+        data-testid="tool-card"
+        data-tool-status={tool.status}
+      >
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors"
-          data-testid="tool-row"
+          data-testid={tool.status === 'running' ? 'tool-card-running' : 'tool-row'}
         >
           <ChevronRight
             size={12}
@@ -136,6 +145,11 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           <span className="min-w-0 flex-1 truncate font-mono text-meta text-ink" title={title}>
             {title}
           </span>
+          {model.kind === 'shell' && model.exitCode != null && (
+            <span className="shrink-0 rounded bg-surface px-1 font-mono text-caption text-ink-tertiary">
+              exit {model.exitCode}
+            </span>
+          )}
           {tool.truncated && (
             <span className="shrink-0 text-caption text-ink-tertiary">{t('chat.tool.truncated')}</span>
           )}
@@ -146,9 +160,18 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           </span>
         </button>
         {open && (
-          <div className="space-y-1.5 border-t border-border px-2 py-1.5">
+          <div className="space-y-1.5 border-t border-border px-2 py-1.5" data-testid="tool-result-view">
             {tool.status === 'error' ? (
               <Field label={t('artifact.failed')} value={humanError || tool.error || ''} danger mono={false} />
+            ) : model.kind === 'diff' && model.diff ? (
+              <pre
+                className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-surface px-2 py-1 font-mono text-caption text-ink-secondary"
+                data-testid="tool-inline-diff"
+              >
+                {model.diff}
+              </pre>
+            ) : model.kind === 'lines' && model.lines ? (
+              <LineList lines={model.lines} />
             ) : (
               tool.output !== undefined && <StructuredOutput tool={tool} cleanOutput={cleanOutput} />
             )}

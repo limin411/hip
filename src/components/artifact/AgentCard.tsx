@@ -7,6 +7,7 @@ import type { TurnAgent } from '@/lib/turnAgents'
 import { Badge } from '@/components/ui/Badge'
 import { ToolTrace } from './ToolTrace'
 import { useUiStore } from '@/store/uiStore'
+import { useFocusStore } from '@/store/focusStore'
 
 function StatusDot({ status, color }: { status: TurnAgent['status']; color: string }) {
   if (status === 'running') return <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: color }} data-testid="status-dot-running" />
@@ -25,6 +26,7 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
 
   const jumpToTurn = () => {
     if (agent.messageId) setScrollTarget(agent.messageId)
+    useFocusStore.getState().setFocusedAgentId(agent.agentId)
   }
 
   return (

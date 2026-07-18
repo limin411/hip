@@ -15,7 +15,20 @@ export async function waitForHipE2E(timeoutMs = 30000): Promise<void> {
 type HipE2E = {
   injectServerMessage: (msg: Record<string, unknown>) => void
   getActiveSessionId: () => string | null
-  simulateAgentWriteFinished: (s: string) => { turnId: string; callId: string }
+  simulateAgentWriteFinished: (s: string, opts?: { path?: string }) => { turnId: string; callId: string }
+  simulateToolStarted?: (s: string, opts?: { name?: string; path?: string }) => { turnId: string; callId: string }
+  getFocusedPath?: () => string | null
+  getFsActivePath?: (s: string) => string | null
+  seedGoal?: (
+    s: string,
+    g: { id?: string; description: string; status: 'active' | 'paused' | 'blocked' | 'completed'; turns?: number; maxTurns?: number },
+  ) => void
+  seedParallelRun?: (o: {
+    hostSessionId: string
+    n?: number
+    baseCwd: string
+    prompt?: string
+  }) => { runId: string; slotCount: number }
   createChatSessionForE2e: () => string
   createCodeSessionForE2e: (cwd: string) => string
   simulateTurnRunning: (s: string) => { turnId: string; callId: string }

@@ -245,6 +245,23 @@ export type ServerMessage =
   | { type: 'plan:updated'; sessionId: string; turnId: string; plan: PlanItem[] }
   /** Authoritative plan snapshot at plan-approval boundary (ExitPlanMode / pause). */
   | { type: 'plan:published'; sessionId: string; turnId: string; plan: PlanItem[] }
+  /**
+   * Goal mode chrome (smoothness I1). Emitted when goal_create / goal_update changes state.
+   * goal=null means cleared (completed or cancelled).
+   */
+  | {
+      type: 'goal:updated'
+      sessionId: string
+      goal: null | {
+        id: string
+        description: string
+        status: 'active' | 'paused' | 'blocked' | 'completed'
+        turns: number
+        maxTurns: number
+        tokens: number
+        maxTokens: number
+      }
+    }
   | { type: 'agent:profiles'; sessionId: string; profiles: AgentProfileInfo[] }
   | { type: 'agent:notification'; sessionId: string; taskId: string; description: string; status: 'completed' | 'failed' | 'killed'; result?: string; error?: string }
   | { type: 'plugin:install:progress'; status: 'cloning' | 'scanning' | 'generating_manifest' | 'registering' | 'done' | 'error'; message: string; pluginId?: string; components?: { skills: number; mcpServers: number; agents: number; hooks: number } }

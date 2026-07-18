@@ -34,7 +34,7 @@ const CONTROLLED = '[data-testid="controlled-context-menu-content"]' as const
 
 async function waitForTabs(min = 1): Promise<void> {
   await browser.waitUntil(
-    async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= min,
+    async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= min,
     { timeout: 30000, interval: 300 },
   )
 }

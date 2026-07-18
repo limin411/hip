@@ -1,17 +1,38 @@
 import { tool } from '@langchain/core/tools'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
-import type { GoalManager, GoalStatus } from '../goal.js'
+import type { Goal, GoalManager, GoalStatus } from '../goal.js'
 
-const goalStatusSchema = z.enum(['active', 'paused', 'completed'])
+const goalStatusSchema = z.enum(['active', 'paused', 'blocked', 'completed'])
 
-export function buildGoalTools(goalManager: GoalManager): StructuredToolInterface[] {
+export type GoalUpdatedEmit = (goal: Goal | null) => void
+
+function snapshot(goal: Goal | null) {
+  if (!goal) return null
+  return {
+    id: goal.id,
+    description: goal.description,
+    status: goal.status as 'active' | 'paused' | 'blocked' | 'completed',
+    turns: goal.usage.turns,
+    maxTurns: goal.budget.maxTurns,
+    tokens: goal.usage.tokens,
+    maxTokens: goal.budget.maxTokens,
+  }
+}
+
+export function buildGoalTools(
+  goalManager: GoalManager,
+  onGoalUpdated?: GoalUpdatedEmit,
+): StructuredToolInterface[] {
+  const emit = () => onGoalUpdated?.(goalManager.getStatus())
+
   const goalCreate = tool(
     async ({ description, max_turns, max_tokens }) => {
       const budget: { maxTurns?: number; maxTokens?: number } = {}
       if (max_turns !== undefined) budget.maxTurns = max_turns
       if (max_tokens !== undefined) budget.maxTokens = max_tokens
       const goal = goalManager.createGoal(description, budget)
+      emit()
       return `Goal created: "${goal.description}" (id: ${goal.id})\n` +
         `Budget: ${goal.budget.maxTurns} turns, ${goal.budget.maxTokens.toLocaleString()} tokens\n` +
         `Status: ${goal.status}`
@@ -60,24 +81,34 @@ export function buildGoalTools(goalManager: GoalManager): StructuredToolInterfac
         if (!resumed) {
           return 'No paused goal to resume. Use goal_create to start a new goal.'
         }
+        emit()
         const goal = goalManager.getStatus()!
         return `Goal resumed: "${goal.description}"`
       }
-      const ok = goalManager.updateGoal(status)
+      if (status === 'completed') {
+        const g = goalManager.getStatus()
+        if (!g) return 'No goal currently exists.'
+        const desc = g.description
+        goalManager.completeAndClear()
+        onGoalUpdated?.(null)
+        return `Goal status updated to "completed": "${desc}"`
+      }
+      const ok = goalManager.updateGoal(status as GoalStatus)
       if (!ok) {
         return 'No goal currently exists.'
       }
+      emit()
       const goal = goalManager.getStatus()!
       return `Goal status updated to "${status}": "${goal.description}"`
     },
     {
       name: 'goal_update',
       description:
-        'Update the status of the current goal. Set to "paused" to temporarily stop ' +
-        'auto-continuation, "active" to resume a paused goal, or "completed" to finish the goal.',
+        'Update the status of the current goal. Set to "paused" or "blocked" to stop ' +
+        'auto-continuation, "active" to resume, or "completed" to finish and clear the goal.',
       schema: z.object({
         status: goalStatusSchema.describe(
-          'New goal status: "active" (resume paused goal), "paused" (stop auto-continue), ' +
+          'New goal status: "active" (resume), "paused"/"blocked" (stop auto-continue), ' +
           'or "completed" (finish the goal)',
         ),
       }),
@@ -86,3 +117,5 @@ export function buildGoalTools(goalManager: GoalManager): StructuredToolInterfac
 
   return [goalCreate, goalStatus, goalUpdate]
 }
+
+export { snapshot as goalSnapshotForWire }

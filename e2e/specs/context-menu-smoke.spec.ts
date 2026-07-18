@@ -28,6 +28,13 @@ describe('context menu smoke @context-menu @smoke @core', () => {
     await skipLoginIfPresent()
     await waitForMainApp()
     await waitForHipE2E()
+    await browser.execute(() => {
+      try {
+        localStorage.removeItem('hip.contextMenu.prefs.v1')
+      } catch {
+        /* ignore */
+      }
+    })
   })
 
   afterEach(async () => {
@@ -40,7 +47,7 @@ describe('context menu smoke @context-menu @smoke @core', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
 
@@ -74,15 +81,15 @@ describe('context menu smoke @context-menu @smoke @core', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
 
-    const hostSel = contextMenuKindSelector('sessionTab')
+    const hostSel = contextMenuKindSelector('sessionHistory')
     await (await browser.$(hostSel)).waitForExist({ timeout: 15000 })
 
     await openContextMenu(hostSel)
-    await expectContextMenuItems(['sessionTab.rename', 'sessionTab.close'])
+    await expectContextMenuItems(['sessionHistory.open', 'sessionHistory.rename'])
     await closeContextMenu()
   })
 
@@ -92,7 +99,7 @@ describe('context menu smoke @context-menu @smoke @core', () => {
     expect(sessionId).toBeTruthy()
 
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
     await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })

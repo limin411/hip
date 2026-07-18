@@ -71,6 +71,7 @@ import {
   SubagentStatusInjector,
 } from './context-injector.js'
 import { ProjectAgentsMdInjector } from './project-agents-md.js'
+import { OpenFileContextInjector } from './open-file-context.js'
 import {
   MemoryService,
   MemoryStore,
@@ -994,6 +995,8 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       memoryCoreIds: snapshotResult.coreIds,
       memoryIdsInjected: memoryIdsInjectedThisTurn,
       prefetchQuery: prefetchQuery || undefined,
+      openFilePath: (host as { openFilePath?: string }).openFilePath,
+      openFileExcerpt: (host as { openFileExcerpt?: string }).openFileExcerpt,
     }
 
     const injectorRegistry = new ContextInjectorRegistry()
@@ -1003,6 +1006,7 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     injectorRegistry.register(new PermissionModeInjector())
     injectorRegistry.register(new TokenBudgetInjector())
     injectorRegistry.register(new SubagentStatusInjector())
+    injectorRegistry.register(new OpenFileContextInjector())
     // Memory last (Option A): AGENTS.md / other injectors take priority ordering-wise.
     if (host.memoryService) {
       injectorRegistry.register(new MemoryInjector(host.memoryService))
@@ -1063,6 +1067,23 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
         send({ type: 'guardian:risk', sessionId: host.id, turnId, toolName, risk, category: approval, reason: '' })
       },
       goalManager: host.goalManager,
+      onGoalUpdated: (goal) => {
+        send({
+          type: 'goal:updated',
+          sessionId: host.id,
+          goal: goal
+            ? {
+                id: goal.id,
+                description: goal.description,
+                status: goal.status as 'active' | 'paused' | 'blocked' | 'completed',
+                turns: goal.usage.turns,
+                maxTurns: goal.budget.maxTurns,
+                tokens: goal.usage.tokens,
+                maxTokens: goal.budget.maxTokens,
+              }
+            : null,
+        })
+      },
       cronManager: host.cronManager,
       planMode,
       memoryService: host.memoryService,

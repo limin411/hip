@@ -8,7 +8,8 @@ export interface GoalUsage {
   tokens: number
 }
 
-export type GoalStatus = 'active' | 'paused' | 'completed'
+/** Spec I / Kimi: active | paused | blocked | completed (complete is terminal clear). */
+export type GoalStatus = 'active' | 'paused' | 'blocked' | 'completed'
 
 export interface Goal {
   readonly id: string
@@ -65,9 +66,20 @@ export class GoalManager {
     return true
   }
 
-  /** Resume a paused goal. Returns false if no goal or not paused. */
+  /**
+   * Mark goal completed and clear it (Kimi: complete is instantaneous).
+   * Prefer updateGoal('completed') when callers need a retained completed snapshot.
+   */
+  completeAndClear(): boolean {
+    if (!this.goal) return false
+    this.goal.status = 'completed'
+    this.goal = null
+    return true
+  }
+
+  /** Resume a paused or blocked goal. Returns false if no goal or not paused/blocked. */
   resumePausedGoal(): boolean {
-    if (!this.goal || this.goal.status !== 'paused') return false
+    if (!this.goal || (this.goal.status !== 'paused' && this.goal.status !== 'blocked')) return false
     this.goal.status = 'active'
     return true
   }

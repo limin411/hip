@@ -36,7 +36,7 @@ describe('timeline panel @panel @harness', () => {
     const sessionId = await createCodeSessionForE2e(dir)
     expect(sessionId).toBeTruthy()
     await browser.waitUntil(
-      async () => (await (await browser.$$('[data-testid="session-tab"]')).length) >= 1,
+      async () => (await (await browser.$$('[data-session-tab="true"]')).length) >= 1,
       { timeout: 30000, interval: 300 },
     )
     await (await browser.$('[data-testid="toggle-panel"]')).waitForExist({ timeout: 30000 })

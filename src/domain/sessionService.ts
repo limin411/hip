@@ -35,6 +35,14 @@ import { applyServerMessageEffects } from './serverMessageEffects'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useWorkflowStore } from '@/store/workflowStore'
+import { useFocusStore } from '@/store/focusStore'
+import { useGoalStore } from '@/store/goalStore'
+import { useParallelStore } from '@/store/parallelStore'
+import { planParallelFanout } from '@/lib/parallelFanout'
+import {
+  formatDiffAnnotationsForComposer,
+  useDiffAnnotationStore,
+} from '@/store/diffAnnotationStore'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -79,6 +87,8 @@ export class SessionService {
     checkpoints: Checkpoint[]
     branch: string
   } | null = null
+  /** E2E: last user content passed to sendMessage (annotation inject assertions). */
+  private lastOutboundUserContent: string | null = null
 
   constructor(transport: Transport) {
     this.transport = transport
@@ -314,9 +324,13 @@ export class SessionService {
    * Sprint B diff-refresh path runs (debounced requestDiff). E2E uses this
    * after writing the file on disk without a real LLM turn.
    */
-  simulateAgentWriteFinished(sessionId: string): { turnId: string; callId: string } {
+  simulateAgentWriteFinished(
+    sessionId: string,
+    opts?: { path?: string },
+  ): { turnId: string; callId: string } {
     const turnId = `e2e-turn-${nanoid(8)}`
     const callId = `e2e-write-${nanoid(8)}`
+    const filePath = opts?.path ?? '/README.md'
     const now = Date.now()
     useDomainStore.setState((st) => ({
       ...st,
@@ -325,6 +339,7 @@ export class SessionService {
           ? s
           : {
               ...s,
+              status: 'running' as const,
               messages: [
                 ...s.messages,
                 {
@@ -337,9 +352,18 @@ export class SessionService {
                       callId,
                       agentId: 'coder',
                       name: 'write_file',
-                      input: '{}',
+                      input: JSON.stringify({ path: filePath, content: 'e2e' }),
                       status: 'running' as const,
                       seq: 1,
+                    },
+                  ],
+                  timeline: [
+                    {
+                      kind: 'tool' as const,
+                      stepSeq: 1,
+                      agentId: 'coder',
+                      role: 'coder' as const,
+                      callId,
                     },
                   ],
                 },
@@ -354,8 +378,140 @@ export class SessionService {
       agentId: 'coder',
       callId,
       status: 'finished',
-      output: 'ok',
+      output: `wrote ${filePath}`,
     })
+    // Ensure Changes refresh is not lost if debounce is cancelled mid-test.
+    this.requestDiff(sessionId)
+    return { turnId, callId }
+  }
+
+  /**
+   * E2E: seed a finished edit_file tool with unified-diff-shaped output so
+   * ToolCallRow renders tool-inline-diff (P2).
+   */
+  simulateEditWithDiff(
+    sessionId: string,
+    opts?: { path?: string },
+  ): { turnId: string; callId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-edit-${nanoid(8)}`
+    const filePath = opts?.path ?? '/README.md'
+    const now = Date.now()
+    const diffOut = `@@ -1 +1 @@\n-a\n+b\nedited ${filePath}`
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: st.sessions.map((s) =>
+        s.id !== sessionId
+          ? s
+          : {
+              ...s,
+              status: 'running' as const,
+              messages: [
+                ...s.messages,
+                {
+                  id: turnId,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: now,
+                  agentRuns: [
+                    {
+                      agentId: 'supervisor',
+                      role: 'supervisor' as const,
+                      output: '',
+                      startedAt: now,
+                      finishedAt: null,
+                      seq: 0,
+                      messageId: turnId,
+                    },
+                  ],
+                  toolCalls: [
+                    {
+                      callId,
+                      agentId: 'supervisor',
+                      name: 'edit_file',
+                      input: JSON.stringify({ path: filePath, oldString: 'a', newString: 'b' }),
+                      status: 'finished' as const,
+                      output: diffOut,
+                      seq: 1,
+                    },
+                  ],
+                  timeline: [
+                    {
+                      kind: 'tool' as const,
+                      stepSeq: 1,
+                      agentId: 'supervisor',
+                      role: 'supervisor' as const,
+                      callId,
+                    },
+                  ],
+                },
+              ],
+            },
+      ),
+    }))
+    return { turnId, callId }
+  }
+
+  /** E2E: seed a running tool card on the active turn for process-UI assertions. */
+  simulateToolStarted(
+    sessionId: string,
+    opts?: { name?: string; path?: string },
+  ): { turnId: string; callId: string } {
+    const turnId = `e2e-turn-${nanoid(8)}`
+    const callId = `e2e-tool-${nanoid(8)}`
+    const name = opts?.name ?? 'read_file'
+    const filePath = opts?.path ?? '/README.md'
+    const now = Date.now()
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: st.sessions.map((s) =>
+        s.id !== sessionId
+          ? s
+          : {
+              ...s,
+              status: 'running' as const,
+              messages: [
+                ...s.messages,
+                {
+                  id: turnId,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: now,
+                  agentRuns: [
+                    {
+                      agentId: 'supervisor',
+                      role: 'supervisor' as const,
+                      output: '',
+                      startedAt: now,
+                      finishedAt: null,
+                      seq: 0,
+                      messageId: turnId,
+                    },
+                  ],
+                  toolCalls: [
+                    {
+                      callId,
+                      agentId: 'supervisor',
+                      name,
+                      input: JSON.stringify({ path: filePath }),
+                      status: 'running' as const,
+                      seq: 1,
+                    },
+                  ],
+                  timeline: [
+                    {
+                      kind: 'tool' as const,
+                      stepSeq: 1,
+                      agentId: 'supervisor',
+                      role: 'supervisor' as const,
+                      callId,
+                    },
+                  ],
+                },
+              ],
+            },
+      ),
+    }))
     return { turnId, callId }
   }
 
@@ -376,6 +532,8 @@ export class SessionService {
       permissionMode: 'edit',
     })
     this.selectSession(id)
+    // Ensure code panel is open so Files/Agents/Changes tabs exist for e2e.
+    useDomainStore.getState().setSessionCodePanelOpen(id, true)
     return id
   }
 
@@ -823,28 +981,45 @@ export class SessionService {
     baseCwd: string
     count: number
     permissionMode?: PermissionMode
-  }): Promise<{ runId: string; slotSessionIds: string[] }> {
+    /** Prefer an existing code session on baseCwd (avoids extra host + create race). */
+    hostSessionId?: string
+    /**
+     * When true, immediately message:send the prompt on each slot (starts N agent turns).
+     * Default false — fan-out only creates worktrees/sessions so the UI stays responsive.
+     */
+    autoSend?: boolean
+  }): Promise<{ runId: string; slotSessionIds: string[]; slotPaths: string[] }> {
     const prompt = opts.prompt.trim()
     if (!prompt) throw new Error('empty prompt')
     const baseCwd = opts.baseCwd.trim()
     if (!baseCwd) throw new Error('baseCwd required')
+    const autoSend = opts.autoSend === true
     const { clampParallelCount, useParallelStore } = await import('@/store/parallelStore')
     const { parallelHostTitle, parallelSlotTitle } = await import('@/lib/parallelFormat')
+    const { planParallelFanout, assertPrimaryNotInSlotPaths } = await import('@/lib/parallelFanout')
     const n = clampParallelCount(opts.count)
     const runId = nanoid(10)
     const runShort = runId.slice(0, 6)
+    // Spec H1: branch/pathKey plan from shared pure helper (product path uses it).
+    const fanout = planParallelFanout({ n, prompt, runId: runShort })
 
-    const hostConfig: SessionConfig = normalizeSessionConfig({
-      ...DEFAULT_CONFIG,
-      surface: 'code',
-      cwd: baseCwd,
-      permissionMode: opts.permissionMode ?? 'edit',
-      language: currentLanguage(),
-    })
-    const hostSessionId = this.createSession({
-      ...hostConfig,
-    })
-    this.renameSession(hostSessionId, parallelHostTitle(runShort))
+    // Reuse caller's session when it is already bound to baseCwd.
+    let hostSessionId = opts.hostSessionId?.trim() || ''
+    if (hostSessionId) {
+      const host = useDomainStore.getState().sessions.find((s) => s.id === hostSessionId)
+      if (!host || host.config.cwd !== baseCwd) hostSessionId = ''
+    }
+    if (!hostSessionId) {
+      const hostConfig: SessionConfig = normalizeSessionConfig({
+        ...DEFAULT_CONFIG,
+        surface: 'code',
+        cwd: baseCwd,
+        permissionMode: opts.permissionMode ?? 'edit',
+        language: currentLanguage(),
+      })
+      hostSessionId = this.createSession(hostConfig)
+      this.renameSession(hostSessionId, parallelHostTitle(runShort))
+    }
 
     useParallelStore.getState().addRun({
       id: runId,
@@ -853,17 +1028,20 @@ export class SessionService {
       hostSessionId,
       slots: [],
       createdAt: Date.now(),
+      source: 'host',
     })
 
     const slotSessionIds: string[] = []
-    for (let i = 1; i <= n; i++) {
-      const branch = `hip-p-${runShort}-${i}`
-      const pathKey = `${runId}/${branch}`
+    const slotPaths: string[] = []
+    for (const slotPlan of fanout.slots) {
+      const i = slotPlan.index + 1
+      const branch = slotPlan.branch
+      const pathKey = `${runId}/${slotPlan.pathKey}`
       try {
         const createP = this.waitForServerMessageWhere(
           'git:worktree:create:result',
           (m) => m.sessionId === hostSessionId,
-          60_000,
+          45_000,
         )
         this.transport.send({
           type: 'git:worktree:create',
@@ -903,16 +1081,21 @@ export class SessionService {
           status: 'ready',
         })
 
-        const msgId = nanoid()
-        useDomainStore.getState().appendUserMessage(slotId, msgId, prompt, [])
-        this.transport.send({
-          type: 'message:send',
-          sessionId: slotId,
-          id: msgId,
-          content: prompt,
-          role: 'user',
-        })
+        // Optional: kick agent turns. Product UI leaves this off so click never
+        // freezes the shell under dual LLM / sidecar load.
+        if (autoSend) {
+          const msgId = nanoid()
+          useDomainStore.getState().appendUserMessage(slotId, msgId, prompt, [])
+          this.transport.send({
+            type: 'message:send',
+            sessionId: slotId,
+            id: msgId,
+            content: prompt,
+            role: 'user',
+          })
+        }
         slotSessionIds.push(slotId)
+        slotPaths.push(created.path)
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err)
         useParallelStore.getState().setSlot(runId, i, {
@@ -926,11 +1109,19 @@ export class SessionService {
       }
     }
 
+    // H5: product path must not place slot worktrees on the primary cwd itself.
+    const primaryCheck = assertPrimaryNotInSlotPaths(baseCwd, slotPaths)
+    if (!primaryCheck.ok) {
+      useParallelStore.getState().updateRun(runId, {
+        error: `slot path collides with primary: ${primaryCheck.conflict}`,
+      })
+    }
+
     if (slotSessionIds.length > 0) {
       this.selectSession(slotSessionIds[0]!)
       useUiStore.getState().setSidebarSection('projects')
     }
-    return { runId, slotSessionIds }
+    return { runId, slotSessionIds, slotPaths }
   }
 
   /** Mark a parallel slot as the winner and focus it. */
@@ -1441,6 +1632,7 @@ export class SessionService {
   sendMessage(content: string, attachments: LocalAttachment[] = []): void {
     const text = content.trim()
     if (!text && attachments.length === 0) return
+    this.lastOutboundUserContent = text
     const st = useDomainStore.getState()
     const active = st.sessions.find((s) => s.id === st.activeSessionId)
     if (active?.interrupt) { this.resume(text, attachments); return }
@@ -1463,6 +1655,31 @@ export class SessionService {
       role: 'user',
       attachments: attachments.map((a) => ({ id: a.id, name: a.name, mimeType: a.mimeType, path: a.path })),
     })
+  }
+
+  getLastOutboundUserContent(): string | null {
+    return this.lastOutboundUserContent
+  }
+
+  /** Product path: remove worktree (preflight when force=false). */
+  async removeWorktree(
+    sessionId: string,
+    worktreePath: string,
+    force = false,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const resultP = this.waitForServerMessageWhere(
+      'git:worktree:remove:result',
+      (m) => m.sessionId === sessionId,
+      60_000,
+    )
+    this.transport.send({
+      type: 'git:worktree:remove',
+      sessionId,
+      worktreePath,
+      force,
+    })
+    const res = await resultP
+    return { ok: res.ok, error: res.error }
   }
 
   /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and
@@ -1556,7 +1773,18 @@ export const sessionService = new SessionService(new WsTransport())
 /** E2E bridge: only installed outside production builds (vite DEV / e2e). */
 export type HipE2EHooks = {
   injectServerMessage: (msg: ServerMessage) => void
-  simulateAgentWriteFinished: (sessionId: string) => { turnId: string; callId: string }
+  simulateAgentWriteFinished: (
+    sessionId: string,
+    opts?: { path?: string },
+  ) => { turnId: string; callId: string }
+  simulateToolStarted: (
+    sessionId: string,
+    opts?: { name?: string; path?: string },
+  ) => { turnId: string; callId: string }
+  simulateEditWithDiff: (
+    sessionId: string,
+    opts?: { path?: string },
+  ) => { turnId: string; callId: string }
   getActiveSessionId: () => string | null
   createChatSessionForE2e: () => string
   createCodeSessionForE2e: (cwd: string) => string
@@ -1630,6 +1858,42 @@ export type HipE2EHooks = {
   simulateInvalidWorkflowError: (sessionId: string, reason?: string) => void
   getLastAssistantText: (sessionId: string) => string | null
   getPendingInterrupt: (sessionId: string) => { turnId: string; question: string } | null
+  /** Focus / write-follow inspection for e2e. */
+  getFocusedPath: () => string | null
+  getFsActivePath: (sessionId: string) => string | null
+  seedGoal: (
+    sessionId: string,
+    goal: { id?: string; description: string; status: 'active' | 'paused' | 'blocked' | 'completed'; turns?: number; maxTurns?: number },
+  ) => void
+  seedParallelRun: (opts: {
+    hostSessionId: string
+    n?: number
+    baseCwd: string
+    prompt?: string
+  }) => { runId: string; slotCount: number }
+  /** Product path: host fan-out N worktrees + sessions. */
+  startParallelRun: (opts: {
+    prompt: string
+    baseCwd: string
+    count: number
+    hostSessionId?: string
+    autoSend?: boolean
+  }) => Promise<{ runId: string; slotSessionIds: string[]; slotPaths: string[] }>
+  /** Last user message content sent via sendMessage (e2e annotation inject). */
+  getLastOutboundUserContent: () => string | null
+  /** Assert worktree dirty preflight via product remove path. */
+  removeWorktree: (
+    sessionId: string,
+    worktreePath: string,
+    force?: boolean,
+  ) => Promise<{ ok: boolean; error?: string }>
+  /** Seed pending diff annotations (InputBar product inject path). */
+  seedDiffAnnotation: (
+    sessionId: string,
+    ann: { path: string; body: string; note?: string },
+  ) => string
+  /** Mirror InputBar submit: format pending annotations + sendMessage. */
+  sendWithPendingAnnotations: (sessionId: string, text: string) => void
 }
 
 declare global {
@@ -1644,7 +1908,9 @@ function installE2eHooks(svc: SessionService): void {
   if (import.meta.env.PROD) return
   window.__hipE2E = {
     injectServerMessage: (msg) => svc.injectServerMessage(msg),
-    simulateAgentWriteFinished: (sessionId) => svc.simulateAgentWriteFinished(sessionId),
+    simulateAgentWriteFinished: (sessionId, opts) => svc.simulateAgentWriteFinished(sessionId, opts),
+    simulateToolStarted: (sessionId, opts) => svc.simulateToolStarted(sessionId, opts),
+    simulateEditWithDiff: (sessionId, opts) => svc.simulateEditWithDiff(sessionId, opts),
     getActiveSessionId: () => useDomainStore.getState().activeSessionId,
     createChatSessionForE2e: () => svc.createChatSessionForE2e(),
     createCodeSessionForE2e: (cwd) => svc.createCodeSessionForE2e(cwd),
@@ -1695,6 +1961,63 @@ function installE2eHooks(svc: SessionService): void {
     simulateInvalidWorkflowError: (sessionId, reason) => svc.simulateInvalidWorkflowError(sessionId, reason),
     getLastAssistantText: (sessionId) => svc.getLastAssistantText(sessionId),
     getPendingInterrupt: (sessionId) => svc.getPendingInterrupt(sessionId),
+    getFocusedPath: () => useFocusStore.getState().focusedPath,
+    getFsActivePath: (sessionId) => useFsStore.getState().bySession[sessionId]?.activePath ?? null,
+    seedGoal: (sessionId, goal) => {
+      if (goal.status === 'completed') {
+        useGoalStore.getState().setGoal(sessionId, null)
+        return
+      }
+      useGoalStore.getState().setGoal(sessionId, {
+        id: goal.id ?? `goal-${Date.now()}`,
+        description: goal.description,
+        status: goal.status,
+        turns: goal.turns,
+        maxTurns: goal.maxTurns,
+      })
+    },
+    seedParallelRun: (opts) => {
+      // Deprecated for P5 e2e — prefer startParallelRun (real product path).
+      const n = opts.n ?? 2
+      const runId = `e2e-prun-${Date.now().toString(36)}`
+      const plan = planParallelFanout({
+        n,
+        prompt: opts.prompt ?? 'e2e parallel',
+        runId,
+      })
+      useParallelStore.getState().addRun({
+        id: runId,
+        baseCwd: opts.baseCwd,
+        prompt: plan.prompt,
+        hostSessionId: opts.hostSessionId,
+        source: 'host',
+        createdAt: Date.now(),
+        slots: plan.slots.map((s) => ({
+          index: s.index,
+          sessionId: `slot-sess-${s.index}`,
+          worktreePath: `${opts.baseCwd}/.hip-wt/${s.pathKey}`,
+          branch: s.branch,
+          status: 'ready' as const,
+        })),
+      })
+      return { runId, slotCount: plan.slots.length }
+    },
+    startParallelRun: (opts) => svc.startParallelRun(opts),
+    getLastOutboundUserContent: () => svc.getLastOutboundUserContent(),
+    removeWorktree: (sessionId, worktreePath, force) =>
+      svc.removeWorktree(sessionId, worktreePath, force),
+    seedDiffAnnotation: (sessionId, ann) =>
+      useDiffAnnotationStore.getState().add(sessionId, ann),
+    sendWithPendingAnnotations: (sessionId, text) => {
+      // Same composition order as InputBar.submit (product path).
+      const ann = useDiffAnnotationStore.getState().list(sessionId)
+      const annBlock = formatDiffAnnotationsForComposer(ann)
+      if (ann.length > 0) useDiffAnnotationStore.getState().clear(sessionId)
+      let content = text
+      if (annBlock) content = `${annBlock}${content}`
+      useDomainStore.getState().selectSession(sessionId)
+      svc.sendMessage(content, [])
+    },
   }
 }
 

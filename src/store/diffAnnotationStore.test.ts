@@ -23,7 +23,7 @@ describe('formatDiffAnnotationsForComposer', () => {
     expect(formatDiffAnnotationsForComposer([])).toBe('')
   })
 
-  it('formats path, note, and diff fence', () => {
+  it('formats path, note, diff fence, and structured JSON', () => {
     const text = formatDiffAnnotationsForComposer([
       { id: '1', path: 'x.go', body: '+x', note: 'fix name', createdAt: 1 },
     ])
@@ -32,5 +32,7 @@ describe('formatDiffAnnotationsForComposer', () => {
     expect(text).toContain('Note: fix name')
     expect(text).toContain('```diff')
     expect(text).toContain('+x')
+    expect(text).toContain('hip.diff_annotations')
+    expect(text).toContain('```json')
   })
 })

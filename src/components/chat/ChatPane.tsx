@@ -67,7 +67,8 @@ export function ChatPane() {
 
   useEffect(() => {
     if (!atBottom || scrollTargetMessageId) return
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Spec A4: pinned-to-bottom uses instant scroll — smooth + high-frequency tokens fights.
+    bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
   // Search jump: when a target message id is set, center it and flash a highlight, then clear the
@@ -239,7 +240,7 @@ export function ChatPane() {
       </div>
       {!atBottom && (
         <button
-          onClick={() => { setAtBottom(true); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }}
+          onClick={() => { setAtBottom(true); bottomRef.current?.scrollIntoView({ behavior: 'auto' }) }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
           className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"

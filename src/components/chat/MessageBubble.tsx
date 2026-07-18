@@ -111,7 +111,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
                 <SubAgentCard
                   key={a.agentId}
                   agent={a}
-                  showTools={false}
+                  showTools={!!streaming || a.status === 'running'}
                 />
               ))}
             </div>

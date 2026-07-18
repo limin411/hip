@@ -246,6 +246,7 @@ export function AppSidebar() {
             <button
               type="button"
               data-testid="sidebar-new-task"
+              data-new-session="code"
               data-no-drag
               onClick={() => void newConversationFromSidebar('code')}
               className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
@@ -256,6 +257,7 @@ export function AppSidebar() {
             <button
               type="button"
               data-testid="sidebar-new-chat-list"
+              data-new-session="chat"
               data-no-drag
               onClick={() => void newConversationFromSidebar('chat')}
               className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
@@ -385,6 +387,10 @@ export function AppSidebar() {
                       <button
                         type="button"
                         data-testid={`sidebar-session-${session.id}`}
+                        // Legacy e2e gate selectors (title-bar tabs removed).
+                        data-session-tab="true"
+                        data-session-id={session.id}
+                        aria-selected={active ? 'true' : 'false'}
                         data-no-drag
                         aria-current={active ? 'true' : undefined}
                         aria-label={`${session.title}, ${surfaceLabel}`}

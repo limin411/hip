@@ -1,5 +1,5 @@
 /** Write-like tools that should trigger a workspace diff refresh (Sprint B). */
-export const DIFF_REFRESH_TOOLS = new Set(['write_file', 'edit_file', 'git_commit'])
+export const DIFF_REFRESH_TOOLS = new Set(['write_file', 'edit_file', 'apply_patch', 'git_commit'])
 
 export function shouldRefreshDiffOnToolFinish(name: string, status: string): boolean {
   return status === 'finished' && DIFF_REFRESH_TOOLS.has(name)

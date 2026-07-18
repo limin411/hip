@@ -130,11 +130,8 @@ export const useParallelStore = create<ParallelState>()(
   ),
 )
 
-/** Default / clamp fan-out size for Parallel Studio. */
-export function clampParallelCount(n: number): number {
-  if (!Number.isFinite(n)) return 2
-  return Math.min(4, Math.max(2, Math.floor(n)))
-}
+/** Re-export shared clamp (MIN=1, MAX=4). Prefer `@/lib/parallelCount` for new code. */
+export { clampParallelCount } from '@/lib/parallelCount'
 
 /** Flatten slots for a host session (newest run first). */
 export function slotsForHost(

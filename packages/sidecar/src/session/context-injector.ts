@@ -24,6 +24,10 @@ export interface InjectorState {
   memoryIdsInjected?: Set<string>
   /** Last user text used as memory prefetch query. */
   prefetchQuery?: string
+  /** Currently focused/previewed project-relative path (UI → context). */
+  openFilePath?: string
+  /** Optional short excerpt of the open file. */
+  openFileExcerpt?: string
 }
 
 // ── Result ─────────────────────────────────────────────────────────────────────

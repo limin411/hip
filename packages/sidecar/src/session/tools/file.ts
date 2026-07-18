@@ -16,6 +16,7 @@ export interface FileTools {
   writeFile: StructuredToolInterface
   readFile: StructuredToolInterface
   editFile: StructuredToolInterface
+  applyPatch: StructuredToolInterface
   ls: StructuredToolInterface
   glob: StructuredToolInterface
   grep: StructuredToolInterface
@@ -110,14 +111,67 @@ export function buildFileTools(
   )
 
   const editFile = tool(
-    async ({ path: p, oldString, newString, replaceAll }) => {
+    async (raw) => {
       try {
+        const p = raw.path
         const abs = await resolvePath(p)
-        const cur = await fs.readFile(abs, 'utf8')
-        if (!cur.includes(oldString)) return `Error: oldString not found in ${p}`
-        const next = replaceAll ? cur.split(oldString).join(newString) : cur.replace(oldString, newString)
-        await fs.writeFile(abs, next, 'utf8')
-        return `edited ${p}`
+        let cur = await fs.readFile(abs, 'utf8')
+        const edits =
+          Array.isArray(raw.edits) && raw.edits.length > 0
+            ? raw.edits
+            : raw.oldString !== undefined
+              ? [{ oldString: raw.oldString, newString: raw.newString ?? '', replaceAll: raw.replaceAll }]
+              : []
+        if (edits.length === 0) return `Error: no edits provided for ${p}`
+
+        const diffs: string[] = []
+        for (const ed of edits) {
+          const oldS = ed.oldString ?? ''
+          const newS = ed.newString ?? ''
+          const replaceAll = !!ed.replaceAll
+          let idx = cur.indexOf(oldS)
+          if (idx < 0) {
+            // Limited fuzzy: normalize trailing whitespace / smart quotes for match only.
+            const norm = (s: string) =>
+              s
+                .replace(/[\u2018\u2019]/g, "'")
+                .replace(/[\u201C\u201D]/g, '"')
+                .replace(/[\u2013\u2014]/g, '-')
+                .split('\n')
+                .map((l) => l.trimEnd())
+                .join('\n')
+            const nCur = norm(cur)
+            const nOld = norm(oldS)
+            const nIdx = nCur.indexOf(nOld)
+            if (nIdx < 0) {
+              const snippet = cur.slice(0, 200).replace(/\n/g, '\\n')
+              const count = cur.split(oldS).length - 1
+              return (
+                `Error: oldString not found in ${p}` +
+                (count > 1 ? ` (note: raw count would be ${count})` : '') +
+                `. File starts with: ${snippet}`
+              )
+            }
+            // Fall back to exact-only when fuzzy index differs in length mapping — require unique normalized match.
+            if (nCur.indexOf(nOld, nIdx + 1) >= 0 && !replaceAll) {
+              return `Error: oldString matches multiple locations in ${p}; expand context or set replaceAll`
+            }
+            // Apply using original oldS failure path message if we cannot map offsets safely:
+            return `Error: oldString not found exactly in ${p} (fuzzy-normalized match exists — use exact bytes from read_file)`
+          }
+          if (!replaceAll) {
+            const second = cur.indexOf(oldS, idx + 1)
+            if (second >= 0) {
+              return `Error: oldString matches multiple locations in ${p}; expand context or set replaceAll`
+            }
+          }
+          const before = cur
+          cur = replaceAll ? cur.split(oldS).join(newS) : cur.replace(oldS, newS)
+          diffs.push(`@@ ${p}\n-${oldS.slice(0, 80)}\n+${newS.slice(0, 80)}`)
+          if (before === cur) return `Error: edit produced no change in ${p}`
+        }
+        await fs.writeFile(abs, cur, 'utf8')
+        return `edited ${p}\n${diffs.join('\n')}`
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }
@@ -125,15 +179,119 @@ export function buildFileTools(
     {
       name: 'edit_file',
       description:
-        'Replace an exact substring in a file. Prefer this over write_file for localized fixes ' +
-        '(font sizes, box dimensions, labels, CSS/SVG attributes). Set replaceAll to replace every occurrence. ' +
-        'oldString must match exactly; include enough surrounding context to be unique.',
+        'Replace substring(s) in a file. Prefer this over write_file for localized fixes. ' +
+        'Provide oldString/newString, or edits[] for multiple non-overlapping replacements against the original file. ' +
+        'oldString must be unique unless replaceAll is true.',
       schema: z.object({
         path: z.string(),
-        oldString: z.string(),
-        newString: z.string(),
+        oldString: z.string().optional(),
+        newString: z.string().optional(),
         replaceAll: z.boolean().optional(),
+        edits: z
+          .array(
+            z.object({
+              oldString: z.string(),
+              newString: z.string(),
+              replaceAll: z.boolean().optional(),
+            }),
+          )
+          .optional(),
       }),
+    },
+  )
+
+  const applyPatch = tool(
+    async ({ patch }) => {
+      try {
+        const text = patch.trim()
+        if (!text.includes('*** Begin Patch') || !text.includes('*** End Patch')) {
+          return 'Error: patch must include *** Begin Patch and *** End Patch'
+        }
+        const body = text
+          .replace(/^\*\*\* Begin Patch\s*/m, '')
+          .replace(/\*\*\* End Patch\s*$/m, '')
+          .trim()
+        const hunks = body.split(/(?=\*\*\* (?:Add|Update|Delete) File: )/).filter(Boolean)
+        if (hunks.length === 0) return 'Error: no file hunks in patch'
+        const results: string[] = []
+        for (const hunk of hunks) {
+          const add = hunk.match(/^\*\*\* Add File: (.+)\n([\s\S]*)$/)
+          const del = hunk.match(/^\*\*\* Delete File: (.+)\s*$/)
+          const upd = hunk.match(/^\*\*\* Update File: (.+)\n([\s\S]*)$/)
+          if (add) {
+            const rel = add[1].trim()
+            const abs = await resolvePath(rel)
+            const lines = add[2]
+              .split('\n')
+              .filter((l) => l.startsWith('+'))
+              .map((l) => l.slice(1))
+              .join('\n')
+            await fs.mkdir(path.dirname(abs), { recursive: true })
+            await fs.writeFile(abs, lines.endsWith('\n') ? lines : `${lines}\n`, 'utf8')
+            results.push(`added ${rel}`)
+            continue
+          }
+          if (del) {
+            const rel = del[1].trim()
+            const abs = await resolvePath(rel)
+            await fs.unlink(abs)
+            results.push(`deleted ${rel}`)
+            continue
+          }
+          if (upd) {
+            const rel = upd[1].trim()
+            const abs = await resolvePath(rel)
+            let cur = await fs.readFile(abs, 'utf8')
+            const changeLines = upd[2].split('\n').filter((l) => l.startsWith('-') || l.startsWith('+') || l.startsWith(' '))
+            // Simple apply: collect contiguous -/+ groups as replace pairs (Codex subset).
+            let i = 0
+            while (i < changeLines.length) {
+              if (changeLines[i].startsWith('@@') || changeLines[i].startsWith('***')) {
+                i++
+                continue
+              }
+              const oldParts: string[] = []
+              const newParts: string[] = []
+              while (i < changeLines.length && (changeLines[i].startsWith(' ') || changeLines[i].startsWith('-') || changeLines[i].startsWith('+'))) {
+                const line = changeLines[i]
+                if (line.startsWith(' ')) {
+                  oldParts.push(line.slice(1))
+                  newParts.push(line.slice(1))
+                } else if (line.startsWith('-')) {
+                  oldParts.push(line.slice(1))
+                } else if (line.startsWith('+')) {
+                  newParts.push(line.slice(1))
+                }
+                i++
+              }
+              const oldBlock = oldParts.join('\n')
+              const newBlock = newParts.join('\n')
+              if (oldBlock.length === 0 && newBlock.length > 0) {
+                // pure insert at EOF fallback
+                cur = cur.endsWith('\n') ? cur + newBlock + '\n' : cur + '\n' + newBlock + '\n'
+              } else if (!cur.includes(oldBlock)) {
+                return `Error: patch context not found in ${rel}: ${oldBlock.slice(0, 80)}`
+              } else {
+                cur = cur.replace(oldBlock, newBlock)
+              }
+            }
+            await fs.writeFile(abs, cur, 'utf8')
+            results.push(`updated ${rel}`)
+            continue
+          }
+          return `Error: unrecognized patch hunk: ${hunk.slice(0, 60)}`
+        }
+        return results.join('\n')
+      } catch (err) {
+        return `Error: ${(err as Error).message}`
+      }
+    },
+    {
+      name: 'apply_patch',
+      description:
+        'Apply a structured multi-file patch (Codex-style). Prefer this for multi-hunk edits. ' +
+        'Format: *** Begin Patch / *** Add|Update|Delete File: path / +/-/ space lines / *** End Patch.',
+      schema: z.object({ patch: z.string() }),
     },
   )
 
@@ -277,5 +435,5 @@ export function buildFileTools(
     },
   )
 
-  return { writeFile, readFile, editFile, ls, glob, grep }
+  return { writeFile, readFile, editFile, applyPatch, ls, glob, grep }
 }

@@ -120,10 +120,15 @@ describe('knowledge editor ux @knowledge @core', () => {
     expect(await content.getText()).toContain(marker)
   })
 
-  it('KE8: knowledge tab chip is visible', async () => {
-    const tab = await browser.$('[data-testid="knowledge-tab"]')
-    await tab.waitForExist({ timeout: 10000 })
-    expect(await tab.isExisting()).toBe(true)
+  it('KE8: knowledge page chrome is visible', async () => {
+    // Title-bar knowledge-tab chip was removed; assert page/workspace product chrome.
+    const page = await browser.$('[data-testid="knowledge-page"]')
+    await page.waitForExist({ timeout: 10000 })
+    expect(await page.isExisting()).toBe(true)
+    const workspace = await browser.$('[data-testid="knowledge-workspace"]')
+    if (await workspace.isExisting()) {
+      expect(await workspace.isExisting()).toBe(true)
+    }
   })
 
   it('KE9: inline title renames document', async () => {

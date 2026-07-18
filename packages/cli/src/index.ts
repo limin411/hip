@@ -14,7 +14,7 @@ export { pickAllowOptionId, parseInterruptContextKind } from './client/hitl-poli
 export { runTurn, waitReady } from './client/turn-runner.js'
 export { StreamRenderer } from './client/stream-renderer.js'
 export { redactSecrets } from './artifacts/redact.js'
-export { captureGitBaseline, captureGitAfter } from './artifacts/git.js'
+export { captureGitBaseline, captureGitAfter, buildWorktreePatch } from './artifacts/git.js'
 export { exportArtifacts } from './artifacts/export.js'
 export { connectSidecar, waitForServerMessage } from './sidecar/connect.js'
 export { userHipEnv } from './sidecar/user-hip.js'

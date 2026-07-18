@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { listVisibleTreeNodes, siblingInsertIndex, SpaceTree } from './SpaceTree'
+import { listVisibleTreeNodes, siblingInsertIndex, SpaceTree, TREE_ACTIVE_DOC } from './SpaceTree'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import type { KnowledgeNode } from '@/domain/knowledge/types'
 
@@ -71,6 +71,14 @@ describe('SpaceTree selection visuals', () => {
   })
 
   it('marks the active doc row with soft accent wash and left rail', () => {
+    // Canonical string locks KD3 fragments (wash + rail; not SIDEBAR_ACTIVE_RAIL / accent-active).
+    expect(TREE_ACTIVE_DOC).toContain('bg-accent/10')
+    expect(TREE_ACTIVE_DOC).toContain('before:bg-accent')
+    expect(TREE_ACTIVE_DOC).toContain('before:w-0.5')
+    expect(TREE_ACTIVE_DOC).toContain('font-medium')
+    expect(TREE_ACTIVE_DOC).not.toContain('bg-accent-active')
+    expect(TREE_ACTIVE_DOC).not.toContain('SIDEBAR_ACTIVE_RAIL')
+
     render(
       <SpaceTree
         onRename={noop}
@@ -81,12 +89,9 @@ describe('SpaceTree selection visuals', () => {
     )
 
     const active = screen.getByTestId('knowledge-tree-doc-doc_1')
-    // Soft accent wash + left rail (not hard gray accent-active slab)
-    expect(active.className).toContain('bg-accent/10')
-    expect(active.className).toContain('text-ink')
-    expect(active.className).toContain('font-medium')
-    expect(active.className).toContain('before:bg-accent')
-    expect(active.className).toContain('before:w-0.5')
+    for (const token of TREE_ACTIVE_DOC.split(/\s+/).filter(Boolean)) {
+      expect(active.className).toContain(token)
+    }
     expect(active.className).not.toContain('shadow-[inset')
     expect(active.className).not.toContain('bg-accent-active')
 

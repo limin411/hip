@@ -34,8 +34,11 @@ const DEPTH_STEP = 12
 const BASE_PAD = 6
 /** Pointer move distance before a press becomes a drag (px). */
 const DRAG_THRESHOLD_PX = 5
-/** Soft accent wash + left rail for the active document row (local; not SIDEBAR_ACTIVE_RAIL). */
-const TREE_ACTIVE_DOC =
+/**
+ * Soft accent wash + left rail for the active document row (local; not SIDEBAR_ACTIVE_RAIL).
+ * Exported so visual guardrail tests can assert against the canonical class string.
+ */
+export const TREE_ACTIVE_DOC =
   'relative bg-accent/10 font-medium text-ink ' +
   'before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
 

@@ -2,6 +2,13 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
+ * Elevated paper shell chrome (KD1). Exported for visual class guardrail tests.
+ * Mode overflow is parent-owned via paperClassName — not part of this constant.
+ */
+export const DOC_PAPER_SHELL =
+  'rounded-xl border border-border bg-surface shadow-panel'
+
+/**
  * Document paper column: elevated reading surface.
  * Scroll ownership stays in KnowledgeWorkspace (edit: CM/Live scroller; preview: outer stage).
  *
@@ -32,7 +39,7 @@ export function KnowledgeDocCanvas({
         data-testid="knowledge-doc-paper"
         className={cn(
           'flex min-h-0 flex-1 flex-col',
-          'rounded-xl border border-border bg-surface shadow-panel',
+          DOC_PAPER_SHELL,
           'px-8 sm:px-10',
           paperClassName,
         )}

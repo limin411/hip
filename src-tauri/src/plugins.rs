@@ -25,7 +25,7 @@ pub struct PluginMcpServerConfig {
     pub enabled: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginMeta {
     pub id: String,
@@ -39,10 +39,22 @@ pub struct PluginMeta {
     pub hook_count: u32,
     /// Unique hook event names detected in the plugin hooks module/JSON (best-effort).
     pub hook_events: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_plugin_md: Option<bool>,
 }
 
 /// Scan `<root>/*/.plugin/plugin.json`, parse each to build a `PluginMeta`.
-/// Never panics; a missing/unreadable root yields an empty list.
+/// Skips `.staging-*` install temp dirs. Never panics; missing root → empty list.
 pub fn scan_plugins(root: &Path) -> Vec<PluginMeta> {
     let mut out = Vec::new();
     let entries = match std::fs::read_dir(root) {
@@ -54,37 +66,92 @@ pub fn scan_plugins(root: &Path) -> Vec<PluginMeta> {
         if !dir.is_dir() {
             continue;
         }
-        let manifest_path = dir.join(".plugin").join("plugin.json");
-        let meta = match parse_plugin_json(&manifest_path) {
-            Some(m) => m,
-            None => continue,
-        };
-        let id = match dir.file_name().and_then(|s| s.to_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let name = match meta.name {
-            Some(n) if !n.trim().is_empty() => n,
-            _ => continue,
-        };
-        let version = meta.version.unwrap_or_default();
-        let skills = extract_skill_ids(meta.skills.as_ref(), &dir);
-        let mcp_servers = extract_mcp_servers(meta.mcp_servers.as_ref(), &dir);
-        let agents = extract_component_ids(meta.agents.as_ref(), &dir, "agents");
-        let (hook_count, hook_events) = scan_hooks(meta.hooks.as_ref(), &dir);
-        out.push(PluginMeta {
-            id,
-            name,
-            version,
-            description: meta.description.unwrap_or_default(),
-            dir: dir.to_string_lossy().into_owned(),
-            skills,
-            mcp_servers,
-            agents,
-            hook_count,
-            hook_events,
-        });
+        if let Some(name) = dir.file_name().and_then(|s| s.to_str()) {
+            if name.starts_with(".staging-") || name.starts_with('.') {
+                continue;
+            }
+        }
+        if let Some(meta) = scan_one_plugin(&dir) {
+            out.push(meta);
+        }
     }
+    out
+}
+
+/// Scan a single plugin directory. Returns `None` if missing/invalid manifest.
+pub fn scan_one_plugin(dir: &Path) -> Option<PluginMeta> {
+    if !dir.is_dir() {
+        return None;
+    }
+    let manifest_path = dir.join(".plugin").join("plugin.json");
+    let meta = parse_plugin_json(&manifest_path)?;
+    let id = dir.file_name()?.to_str()?.to_string();
+    let name = match meta.name {
+        Some(ref n) if !n.trim().is_empty() => n.clone(),
+        _ => return None,
+    };
+    let version = meta.version.clone().unwrap_or_default();
+    let skills = extract_skill_ids(meta.skills.as_ref(), dir);
+    let mcp_servers = extract_mcp_servers(meta.mcp_servers.as_ref(), dir);
+    let agents = extract_component_ids(meta.agents.as_ref(), dir, "agents");
+    let (hook_count, hook_events) = scan_hooks(meta.hooks.as_ref(), dir);
+
+    let mut plugin = PluginMeta {
+        id,
+        name,
+        version,
+        description: meta.description.clone().unwrap_or_default(),
+        dir: dir.to_string_lossy().into_owned(),
+        skills,
+        mcp_servers,
+        agents,
+        hook_count,
+        hook_events,
+        author: author_name_from_manifest(&meta),
+        license: meta.license.clone(),
+        keywords: meta.keywords.clone().filter(|k| !k.is_empty()),
+        source_url: author_url_from_manifest(&meta),
+        source_type: None,
+        has_plugin_md: None,
+    };
+
+    merge_plugin_md(dir, &mut plugin);
+    Some(plugin)
+}
+
+/// List plugins under `plugins_root`, then any paths registered in `hip-plugins.json`
+/// that were not already discovered (external checkouts / e2e fixtures).
+pub fn list_installed_plugins(plugins_root: &Path, config_path: Option<&Path>) -> Vec<PluginMeta> {
+    let mut out = scan_plugins(plugins_root);
+    let mut seen: std::collections::HashSet<String> = out
+        .iter()
+        .map(|m| std::fs::canonicalize(&m.dir).unwrap_or_else(|_| PathBuf::from(&m.dir)).to_string_lossy().into_owned())
+        .collect();
+    // Also key by id so we don't double-list.
+    let mut seen_ids: std::collections::HashSet<String> = out.iter().map(|m| m.id.clone()).collect();
+
+    if let Some(cfg) = config_path {
+        let (paths, _) = read_plugins_config(cfg);
+        for p in paths {
+            let dir = PathBuf::from(&p);
+            let canon = std::fs::canonicalize(&dir)
+                .unwrap_or_else(|_| dir.clone())
+                .to_string_lossy()
+                .into_owned();
+            if seen.contains(&canon) {
+                continue;
+            }
+            if let Some(meta) = scan_one_plugin(&dir) {
+                if seen_ids.contains(&meta.id) {
+                    continue;
+                }
+                seen.insert(canon);
+                seen_ids.insert(meta.id.clone());
+                out.push(meta);
+            }
+        }
+    }
+    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     out
 }
 
@@ -93,6 +160,9 @@ struct RawManifest {
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,
+    license: Option<String>,
+    keywords: Option<Vec<String>>,
+    author: Option<serde_json::Value>,
     #[serde(default)]
     skills: Option<serde_json::Value>,
     #[serde(default)]
@@ -107,6 +177,129 @@ struct RawManifest {
 fn parse_plugin_json(path: &Path) -> Option<RawManifest> {
     let body = std::fs::read_to_string(path).ok()?;
     serde_json::from_str::<RawManifest>(&body).ok()
+}
+
+fn author_name_from_manifest(meta: &RawManifest) -> Option<String> {
+    let a = meta.author.as_ref()?;
+    if let Some(s) = a.as_str() {
+        let t = s.trim();
+        return if t.is_empty() { None } else { Some(t.to_string()) };
+    }
+    a.get("name")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+fn author_url_from_manifest(meta: &RawManifest) -> Option<String> {
+    let a = meta.author.as_ref()?;
+    a.get("url")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Optional marketplace card: `PLUGIN.md` YAML frontmatter (same fence rules as SKILL.md).
+#[derive(serde::Deserialize, Default)]
+struct PluginMdFrontmatter {
+    description: Option<String>,
+    license: Option<String>,
+    keywords: Option<Vec<String>>,
+    author: Option<serde_yaml::Value>,
+    source: Option<PluginMdSource>,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct PluginMdSource {
+    #[serde(rename = "type")]
+    source_type: Option<String>,
+    url: Option<String>,
+}
+
+fn parse_plugin_md_frontmatter(body: &str) -> Option<PluginMdFrontmatter> {
+    let rest = body
+        .strip_prefix("---\n")
+        .or_else(|| body.strip_prefix("---\r\n"))?;
+    let end = rest
+        .find("\n---")
+        .map(|i| i + 1)
+        .or_else(|| if rest.starts_with("---") { Some(0) } else { None })?;
+    let yaml = &rest[..end];
+    serde_yaml::from_str::<PluginMdFrontmatter>(yaml).ok()
+}
+
+fn author_name_from_yaml(v: &serde_yaml::Value) -> Option<String> {
+    match v {
+        serde_yaml::Value::String(s) => {
+            let t = s.trim();
+            if t.is_empty() {
+                None
+            } else {
+                Some(t.to_string())
+            }
+        }
+        serde_yaml::Value::Mapping(map) => {
+            let key = serde_yaml::Value::String("name".into());
+            map.get(&key)
+                .and_then(|x| x.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+        }
+        _ => None,
+    }
+}
+
+fn merge_plugin_md(dir: &Path, plugin: &mut PluginMeta) {
+    let path = dir.join("PLUGIN.md");
+    if !path.is_file() {
+        return;
+    }
+    plugin.has_plugin_md = Some(true);
+    let body = match std::fs::read_to_string(&path) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    let fm = match parse_plugin_md_frontmatter(&body) {
+        Some(f) => f,
+        None => return,
+    };
+    if let Some(d) = fm.description {
+        let t = d.trim();
+        if !t.is_empty() {
+            plugin.description = t.to_string();
+        }
+    }
+    if let Some(lic) = fm.license {
+        let t = lic.trim();
+        if !t.is_empty() {
+            plugin.license = Some(t.to_string());
+        }
+    }
+    if let Some(kw) = fm.keywords {
+        if !kw.is_empty() {
+            plugin.keywords = Some(kw);
+        }
+    }
+    if let Some(a) = fm.author.as_ref().and_then(author_name_from_yaml) {
+        plugin.author = Some(a);
+    }
+    if let Some(src) = fm.source {
+        if let Some(t) = src.source_type {
+            let t = t.trim();
+            if !t.is_empty() {
+                plugin.source_type = Some(t.to_string());
+            }
+        }
+        if let Some(u) = src.url {
+            let u = u.trim();
+            if !u.is_empty() {
+                plugin.source_url = Some(u.to_string());
+            }
+        }
+    }
 }
 
 // ── component extraction helpers ──────────────────────────────────────────────
@@ -968,6 +1161,89 @@ mod tests {
         assert_eq!(meta.agents, vec!["coder", "reviewer"]);
         assert_eq!(meta.hook_count, 2);
         assert_eq!(meta.hook_events, vec!["TurnStart", "TurnComplete"]);
+        assert_eq!(meta.has_plugin_md, None);
+    }
+
+    #[test]
+    fn plugin_md_enriches_marketplace_fields() {
+        let tmp = TempDir::new();
+        let plugin_dir = tmp.child("docs-plugin");
+        fs::create_dir_all(plugin_dir.join(".plugin")).unwrap();
+        tmp.write(
+            "docs-plugin/.plugin/plugin.json",
+            r#"{ "name": "Docs Plugin", "version": "0.2.0", "description": "from json", "skills": ["skills/hello"] }"#,
+        );
+        tmp.write(
+            "docs-plugin/PLUGIN.md",
+            r#"---
+description: from plugin md
+license: MIT
+keywords: [git, review]
+author:
+  name: Alice
+source:
+  type: github
+  url: https://github.com/org/docs-plugin
+---
+
+# Docs Plugin
+
+Long body ignored for list scan.
+"#,
+        );
+        let meta = scan_one_plugin(&plugin_dir).expect("plugin");
+        assert_eq!(meta.description, "from plugin md");
+        assert_eq!(meta.license.as_deref(), Some("MIT"));
+        assert_eq!(meta.keywords.as_deref(), Some(&["git".to_string(), "review".to_string()][..]));
+        assert_eq!(meta.author.as_deref(), Some("Alice"));
+        assert_eq!(meta.source_type.as_deref(), Some("github"));
+        assert_eq!(
+            meta.source_url.as_deref(),
+            Some("https://github.com/org/docs-plugin")
+        );
+        assert_eq!(meta.has_plugin_md, Some(true));
+        assert_eq!(meta.skills, vec!["hello"]);
+    }
+
+    #[test]
+    fn scan_plugins_skips_staging_dirs() {
+        let tmp = TempDir::new();
+        fs::create_dir_all(tmp.child(".staging-abc").join(".plugin")).unwrap();
+        tmp.write(
+            ".staging-abc/.plugin/plugin.json",
+            r#"{ "name": "Staging", "version": "1.0.0" }"#,
+        );
+        fs::create_dir_all(tmp.child("real").join(".plugin")).unwrap();
+        tmp.write(
+            "real/.plugin/plugin.json",
+            r#"{ "name": "Real", "version": "1.0.0" }"#,
+        );
+        let metas = scan_plugins(&tmp.path);
+        assert_eq!(metas.len(), 1);
+        assert_eq!(metas[0].id, "real");
+    }
+
+    #[test]
+    fn list_installed_includes_registry_external_path() {
+        let tmp = TempDir::new();
+        let plugins_root = tmp.child("plugins");
+        fs::create_dir_all(&plugins_root).unwrap();
+        let external = tmp.child("external-plugin");
+        fs::create_dir_all(external.join(".plugin")).unwrap();
+        tmp.write(
+            "external-plugin/.plugin/plugin.json",
+            r#"{ "name": "External", "version": "1.0.0", "skills": ["./skills/x"] }"#,
+        );
+        let config_path = tmp.child("hip-plugins.json");
+        fs::write(
+            &config_path,
+            serde_json::json!({ "plugins": [external.to_string_lossy()] }).to_string(),
+        )
+        .unwrap();
+        let metas = list_installed_plugins(&plugins_root, Some(&config_path));
+        assert_eq!(metas.len(), 1);
+        assert_eq!(metas[0].id, "external-plugin");
+        assert_eq!(metas[0].name, "External");
     }
 
     #[test]

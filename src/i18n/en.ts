@@ -860,12 +860,14 @@ export const en = {
       },
       plugins: {
         title: 'Plugin Market',
-        intro: 'Browse the built-in plugin catalog. Only built-in plugins are listed here; adding your own is not supported. Source management will arrive in a later phase.',
+        intro:
+          'Plugins installed under ~/.hip/plugins. Capabilities come from .plugin/plugin.json (optional PLUGIN.md for marketplace details). Add plugins by placing packages in that directory — there is no in-app install.',
         install: 'Install Plugin',
         urlLabel: 'Git Repository URL',
         urlPlaceholder: 'https://github.com/owner/repo.git',
         cancel: 'Cancel',
-        componentCounts: '{{skills}} skills · {{mcpServers}} external tool services · {{agents}} agents · {{hooks}} hooks',
+        componentCounts:
+          '{{skills}} skills · {{mcpServers}} external tool services · {{agents}} agents · {{hooks}} hooks',
         statusCloning: 'Cloning',
         statusScanning: 'Scanning',
         statusGeneratingManifest: 'Generating manifest',
@@ -876,11 +878,14 @@ export const en = {
         installSuccess: 'Plugin installed successfully.',
         deleteError: 'Uninstall failed. The plugin may still be in use.',
         retry: 'Retry',
-        empty: 'No built-in plugins yet',
-        emptyHint: 'The plugin market catalog will be available in a later phase.',
+        empty: 'No plugins installed',
+        emptyHint:
+          'Place a package with .plugin/plugin.json under ~/.hip/plugins/ (or register a path in hip-plugins.json).',
         deleteConfirmTitle: 'Uninstall plugin "{{name}}"?',
-        deleteConfirmBody: 'This removes the plugin from disk. Its components will no longer be available.',
+        deleteConfirmBody:
+          'This removes the plugin from disk. Its components will no longer be available.',
         uninstall: 'Uninstall',
+        source: 'Source',
       },
       hooks: {
         title: 'Hooks',

@@ -852,12 +852,14 @@ export const zhCN = {
       },
       plugins: {
         title: '插件市场',
-        intro: '浏览程序内置的插件清单。此处仅展示内置插件，不支持自行新增；来源管理将在后续阶段提供。',
+        intro:
+          '展示 ~/.hip/plugins 下已安装的插件。能力由 .plugin/plugin.json 决定（可选 PLUGIN.md 补充市场信息）。请将插件包放入该目录完成安装，应用内不提供安装入口。',
         install: '安装插件',
         urlLabel: 'Git 仓库地址',
         urlPlaceholder: 'https://github.com/owner/repo.git',
         cancel: '取消',
-        componentCounts: '{{skills}} 个技能 · {{mcpServers}} 个外部工具服务 · {{agents}} 个智能体 · {{hooks}} 个钩子',
+        componentCounts:
+          '{{skills}} 个技能 · {{mcpServers}} 个外部工具服务 · {{agents}} 个智能体 · {{hooks}} 个钩子',
         statusCloning: '正在克隆',
         statusScanning: '正在扫描',
         statusGeneratingManifest: '正在生成清单',
@@ -868,11 +870,12 @@ export const zhCN = {
         installSuccess: '插件安装成功。',
         deleteError: '卸载失败，插件可能仍在使用中。',
         retry: '重试',
-        empty: '暂无内置插件',
-        emptyHint: '插件市场清单将在后续阶段提供。',
+        empty: '尚未安装插件',
+        emptyHint: '将含 .plugin/plugin.json 的包放到 ~/.hip/plugins/（或在 hip-plugins.json 中注册路径）。',
         deleteConfirmTitle: '卸载插件「{{name}}」？',
         deleteConfirmBody: '这将从磁盘移除该插件，相关组件将不再可用。',
         uninstall: '卸载',
+        source: '来源',
       },
       hooks: {
         title: '挂钩配置',

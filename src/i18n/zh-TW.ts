@@ -852,12 +852,14 @@ export const zhTW = {
       },
       plugins: {
         title: '外掛市集',
-        intro: '瀏覽程式內建的外掛清單。此處僅展示內建外掛，不支援自行新增；來源管理將在後續階段提供。',
+        intro:
+          '展示 ~/.hip/plugins 下已安裝的外掛。能力由 .plugin/plugin.json 決定（可選 PLUGIN.md 補充市集資訊）。請將外掛包放入該目錄完成安裝，應用內不提供安裝入口。',
         install: '安裝外掛',
         urlLabel: 'Git 倉庫位址',
         urlPlaceholder: 'https://github.com/owner/repo.git',
         cancel: '取消',
-        componentCounts: '{{skills}} 個技能 · {{mcpServers}} 個外部工具服務 · {{agents}} 個智能體 · {{hooks}} 個鉤子',
+        componentCounts:
+          '{{skills}} 個技能 · {{mcpServers}} 個外部工具服務 · {{agents}} 個智能體 · {{hooks}} 個鉤子',
         statusCloning: '正在克隆',
         statusScanning: '正在掃描',
         statusGeneratingManifest: '正在產生清單',
@@ -868,11 +870,12 @@ export const zhTW = {
         installSuccess: '外掛安裝成功。',
         deleteError: '卸載失敗，外掛可能仍在使用中。',
         retry: '重試',
-        empty: '暫無內建外掛',
-        emptyHint: '外掛市集清單將在後續階段提供。',
+        empty: '尚未安裝外掛',
+        emptyHint: '將含 .plugin/plugin.json 的包放到 ~/.hip/plugins/（或在 hip-plugins.json 中註冊路徑）。',
         deleteConfirmTitle: '卸載外掛「{{name}}」？',
         deleteConfirmBody: '這將從磁碟移除此外掛，相關元件將不再可用。',
         uninstall: '卸載',
+        source: '來源',
       },
       hooks: {
         title: '掛鉤設定',

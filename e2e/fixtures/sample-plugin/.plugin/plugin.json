@@ -1,6 +1,8 @@
 {
+  "id": "sample-plugin",
   "name": "sample-plugin",
   "version": "0.0.1",
+  "description": "E2E sample plugin with two skills",
   "skills": [
     "./skills/sample-greet",
     "./skills/sample-format"

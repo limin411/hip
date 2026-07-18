@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import type { PluginMeta, McpServerConfig } from '@hip/protocol'
+import { usePluginsStore } from '@/store/pluginsStore'
+import { listPlugins } from '@/ipc/plugins'
 import { PluginConfigView, formatComponentCounts } from './PluginConfigView'
 import { PluginConfig } from './PluginConfig'
 
@@ -15,6 +17,12 @@ vi.mock('react-i18next', () => ({
       return key
     },
   }),
+}))
+
+vi.mock('@/ipc/plugins', () => ({
+  listPlugins: vi.fn().mockResolvedValue([]),
+  installPluginZip: vi.fn().mockResolvedValue(''),
+  deletePlugin: vi.fn().mockResolvedValue(undefined),
 }))
 
 function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
@@ -65,53 +73,69 @@ describe('PluginConfigView', () => {
     cleanup()
   })
 
-  it('renders empty marketplace when catalog is empty', () => {
-    render(<PluginConfigView plugins={[]} t={mockT} />)
+  it('renders empty marketplace with no install control', () => {
+    render(<PluginConfigView plugins={[]} error={null} onDelete={vi.fn()} t={mockT} />)
     expect(screen.getByTestId('plugin-market-empty')).toBeInTheDocument()
     expect(screen.getByText('settings.plugins.empty')).toBeInTheDocument()
     expect(screen.getByText('settings.plugins.emptyHint')).toBeInTheDocument()
     expect(screen.queryByTestId('plugin-install-open')).not.toBeInTheDocument()
-  })
-
-  it('does not offer install or uninstall actions', () => {
-    render(
-      <PluginConfigView
-        plugins={[basePlugin()]}
-        t={mockT}
-      />,
-    )
-    expect(screen.queryByText('settings.plugins.install')).not.toBeInTheDocument()
-    expect(screen.queryByText('settings.plugins.uninstall')).not.toBeInTheDocument()
     expect(screen.queryByTestId('plugin-install-form')).not.toBeInTheDocument()
   })
 
-  it('renders read-only plugin cards with component counts', () => {
+  it('renders plugin cards with component counts and uninstall', () => {
     const plugins = [
       basePlugin({
         skills: ['s1'],
         mcpServers: [{ id: 'm1', name: 'M1', transport: 'stdio', enabled: true }],
         agents: ['a1'],
         hookCount: 2,
+        sourceUrl: 'https://github.com/org/repo',
+        keywords: ['git'],
       }),
     ]
-    render(<PluginConfigView plugins={plugins} t={mockT} />)
+    render(<PluginConfigView plugins={plugins} error={null} onDelete={vi.fn()} t={mockT} />)
     expect(screen.getByText('Test Plugin')).toBeInTheDocument()
     expect(screen.getByText('A test plugin')).toBeInTheDocument()
     expect(screen.getByText('1 skills · 1 MCP · 1 agents · 2 hooks')).toBeInTheDocument()
     expect(screen.getByTestId('plugin-card')).toBeInTheDocument()
+    expect(screen.getByTestId('plugin-uninstall')).toBeInTheDocument()
+    expect(screen.getByText('git')).toBeInTheDocument()
+    expect(screen.getByText('settings.plugins.source')).toBeInTheDocument()
+  })
+
+  it('shows uninstall error banner', () => {
+    render(
+      <PluginConfigView plugins={[]} error="remove failed" onDelete={vi.fn()} t={mockT} />,
+    )
+    expect(screen.getByText('remove failed')).toBeInTheDocument()
   })
 })
 
 describe('PluginConfig', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    usePluginsStore.setState({ plugins: [], loaded: true })
+  })
+
   afterEach(() => {
     cleanup()
   })
 
-  it('shows the empty built-in marketplace catalog', () => {
+  it('loads plugins on mount', async () => {
+    const plugin = basePlugin()
+    vi.mocked(listPlugins).mockResolvedValueOnce([plugin])
+    usePluginsStore.setState({ loaded: false })
+
     render(<PluginConfig />)
-    expect(screen.getByTestId('plugin-market')).toBeInTheDocument()
-    expect(screen.getByTestId('plugin-market-empty')).toBeInTheDocument()
-    expect(screen.getByText('settings.plugins.title')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Plugin')).toBeInTheDocument()
+    })
+  })
+
+  it('does not offer install affordances', () => {
+    render(<PluginConfig />)
     expect(screen.queryByTestId('plugin-install-open')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('plugin-install-form')).not.toBeInTheDocument()
   })
 })

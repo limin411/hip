@@ -1,4 +1,4 @@
-// Plugin market is a read-only built-in catalog; install UI was removed.
+// Plugin market: directory-scanned list only (no in-app install UI).
 import { expect } from 'expect-webdriverio'
 import { leaveSpecialViewsIfOpen, waitForAppReady, waitForMainApp } from '../helpers/app.js'
 import { skipLoginIfPresent } from '../helpers/auth.js'
@@ -8,7 +8,7 @@ import { SettingsPage } from '../page-objects/SettingsPage.js'
 
 const settings = new SettingsPage()
 
-describe('plugin market empty catalog @settings @harness', () => {
+describe('plugin market directory-only @settings @harness', () => {
   before(async () => {
     await waitForAppReady()
     await skipLoginIfPresent()
@@ -22,15 +22,15 @@ describe('plugin market empty catalog @settings @harness', () => {
     if (await settings.backButton.isExisting()) await closeSettings()
   })
 
-  it('shows empty marketplace and no install affordances', async () => {
+  it('shows plugin market without install control', async () => {
     const market = await browser.$('[data-testid="plugin-market"]')
     await market.waitForExist({ timeout: 15000 })
-
-    const empty = await browser.$('[data-testid="plugin-market-empty"]')
-    await empty.waitForExist({ timeout: 10000 })
-    expect(await empty.isDisplayed()).toBe(true)
+    expect(await market.isDisplayed()).toBe(true)
 
     const installOpen = await browser.$('[data-testid="plugin-install-open"]')
     expect(await installOpen.isExisting()).toBe(false)
+
+    const form = await browser.$('[data-testid="plugin-install-form"]')
+    expect(await form.isExisting()).toBe(false)
   })
 })

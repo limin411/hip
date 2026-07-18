@@ -213,7 +213,8 @@ fn list_worktrees(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 fn list_plugins(app: tauri::AppHandle) -> Result<String, String> {
     let dir = paths::plugins_dir(&app).ok_or("no plugins dir")?;
-    let metas = plugins::scan_plugins(&dir);
+    let config = paths::plugins_config_path(&app);
+    let metas = plugins::list_installed_plugins(&dir, config.as_deref());
     serde_json::to_string(&metas).map_err(|e| e.to_string())
 }
 

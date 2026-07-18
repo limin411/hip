@@ -354,7 +354,7 @@ export function AppSidebar() {
                   >
                     <div
                       className={cn(
-                        'flex w-full items-start gap-0.5 rounded-lg transition-colors',
+                        'flex w-full items-center gap-0.5 rounded-lg transition-colors',
                         active
                           ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
                           : 'hover:bg-state-hover',
@@ -383,7 +383,7 @@ export function AppSidebar() {
                             if (next) hydrateWorktrees(session.id)
                           }}
                           className={cn(
-                            'mt-1.5 ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
+                            'ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
                             'hover:bg-state-hover hover:text-ink',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                           )}
@@ -391,7 +391,7 @@ export function AppSidebar() {
                           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </button>
                       ) : (
-                        <span className="ml-1 mt-1.5 size-5 shrink-0" aria-hidden />
+                        <span className="ml-1 size-5 shrink-0" aria-hidden />
                       )}
                       <button
                         type="button"
@@ -405,46 +405,36 @@ export function AppSidebar() {
                         aria-label={`${session.title}, ${surfaceLabel}`}
                         onClick={() => void selectSessionFromSidebar(session.id)}
                         className={cn(
-                          'flex min-w-0 flex-1 items-start gap-2 py-2 pr-2.5 text-left',
+                          'flex min-w-0 flex-1 items-center gap-2 py-2 pr-2.5 text-left',
                           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
                         )}
                       >
                         <span
                           className={cn(
-                            'mt-1.5 size-1.5 shrink-0 rounded-full',
+                            'size-1.5 shrink-0 rounded-full',
                             active ? 'bg-accent' : 'bg-transparent',
                           )}
                           aria-hidden
                         />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1">
-                            <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
-                              {session.title}
-                            </span>
-                            {hasWorktrees ? (
-                              <span
-                                className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
-                                title={t('sidebar.parallel.slotCount', {
-                                  count: slots.length + catalogRows.length,
-                                })}
-                                data-testid={`sidebar-session-wt-badge-${session.id}`}
-                              >
-                                {slots.length + catalogRows.length}
-                              </span>
-                            ) : null}
+                        <span className="flex min-w-0 flex-1 items-center gap-1">
+                          <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
+                            {session.title}
                           </span>
-                          {session.preview ? (
+                          {hasWorktrees ? (
                             <span
-                              className="mt-0.5 block truncate text-[11px] text-ink-tertiary"
-                              aria-hidden
+                              className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
+                              title={t('sidebar.parallel.slotCount', {
+                                count: slots.length + catalogRows.length,
+                              })}
+                              data-testid={`sidebar-session-wt-badge-${session.id}`}
                             >
-                              {session.preview}
+                              {slots.length + catalogRows.length}
                             </span>
                           ) : null}
                         </span>
                         <span
                           className={cn(
-                            'mt-0.5 shrink-0 rounded px-1 py-px text-[10px]',
+                            'shrink-0 rounded px-1 py-px text-[10px]',
                             surface === 'code'
                               ? 'bg-success/10 text-success'
                               : 'bg-surface-muted text-ink-tertiary',

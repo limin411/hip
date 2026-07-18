@@ -522,6 +522,25 @@ export function migrate(db: DatabaseSync): void {
       throw e
     }
   }
+  if (version < 20) {
+    db.exec('BEGIN')
+    try {
+      // Per-agent buckets + soft expiration (Mem0-inspired; FTS unchanged).
+      db.exec(`ALTER TABLE memory_items ADD COLUMN agent_id TEXT`)
+      db.exec(`ALTER TABLE memory_items ADD COLUMN expires_at INTEGER`)
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_memory_items_agent
+          ON memory_items(agent_id) WHERE agent_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_memory_items_expires
+          ON memory_items(expires_at) WHERE expires_at IS NOT NULL;
+      `)
+      db.exec('PRAGMA user_version = 20')
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }
 
 /** Try to create the FTS5 objects. Returns true if FTS is available. */

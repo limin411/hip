@@ -41,10 +41,10 @@ describe('cosine / hybridScore', () => {
 
   it('hybridScore uses default weights αβγδε', () => {
     expect(DEFAULT_HYBRID_WEIGHTS).toEqual({
-      alpha: 0.35,
-      beta: 0.4,
+      alpha: 0.325,
+      beta: 0.375,
       gamma: 0.15,
-      delta: 0.05,
+      delta: 0.1,
       epsilon: 0.05,
     })
     const s = hybridScore({
@@ -54,7 +54,7 @@ describe('cosine / hybridScore', () => {
       recency: 1,
       pinned: true,
     })
-    expect(s).toBeCloseTo(0.35 + 0.4 + 0.15 + 0.05 + 0.05)
+    expect(s).toBeCloseTo(0.325 + 0.375 + 0.15 + 0.1 + 0.05)
   })
 })
 

@@ -11,10 +11,11 @@ export type HybridWeights = {
 
 /** Default hybrid score weights (FTS / cosine / confidence / recency / pin). */
 export const DEFAULT_HYBRID_WEIGHTS: HybridWeights = {
-  alpha: 0.35,
-  beta: 0.4,
+  alpha: 0.325,
+  beta: 0.375,
   gamma: 0.15,
-  delta: 0.05,
+  /** Stronger search-time recency (Mem0-style decay at retrieval). */
+  delta: 0.1,
   epsilon: 0.05,
 }
 
@@ -85,6 +86,9 @@ export type SearchHybridOpts = {
   weights?: HybridWeights
   /** When set, maybeRerank logs and pass-through (no-op reorder). */
   rerankModel?: MemoryModelRef
+  /** Shared ∪ this agent (perAgentMemory path). */
+  agentId?: string
+  includeExpired?: boolean
 }
 
 /**
@@ -99,6 +103,9 @@ export async function searchHybrid(opts: SearchHybridOpts): Promise<MemoryItem[]
     projectKeyHash: opts.projectKeyHash,
     sessionId: opts.sessionId,
     limit: Math.max(limit * 4, 40),
+    agentId: opts.agentId,
+    includeExpired: opts.includeExpired,
+    now: opts.now,
   })
   if (ftsHits.length === 0) return []
 

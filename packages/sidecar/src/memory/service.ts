@@ -36,7 +36,7 @@ import {
   writeUserProfileMirror,
   type MemoryMutationScopes,
 } from './mirror.js'
-import { sortByMemoryRank } from './ranking.js'
+import { rerankByQuery, sortByMemoryRank } from './ranking.js'
 import { runtimeGet, runtimeGetNumber, runtimeSet, runtimeSetNumber } from './runtime-kv.js'
 import type {
   MemoryListFilter,
@@ -64,8 +64,13 @@ export type MemoryReindexResult = {
   modelKey?: string
 }
 
-export type MemoryUpsertInput = Partial<MemoryItem> &
-  Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'>
+export type MemoryUpsertInput = Partial<Omit<MemoryItem, 'expiresAt' | 'agentId'>> &
+  Pick<MemoryItem, 'title' | 'content' | 'kind' | 'scope'> & {
+    /** Epoch ms; pass `null` to clear. */
+    expiresAt?: number | null
+    /** Managed-agent bucket; pass `null` to clear. */
+    agentId?: string | null
+  }
 
 export type MemoryImportConflict = 'keep' | 'overwrite' | 'merge'
 
@@ -328,22 +333,27 @@ export class MemoryService {
   /**
    * Core inject block: rich (default) or legacy titles-only.
    * `ids` lists item ids whose bodies appear (citation allowedIds).
+   * When `perAgentMemory` and `opts.agentId` are set, includes shared + that agent’s items.
    */
   loadCoreSnapshot(
     projectKeyHash: string | undefined,
     contextWindowTokens?: number,
+    opts?: { agentId?: string },
   ): MemoryInjectBlock {
     const cfg = this.getConfig()
     const mode = cfg.coreInjectionMode ?? 'rich'
+    const agentId =
+      cfg.perAgentMemory && opts?.agentId?.trim() ? opts.agentId.trim() : undefined
     if (mode === 'legacy') {
-      return this.loadCoreSnapshotLegacy(projectKeyHash, contextWindowTokens)
+      return this.loadCoreSnapshotLegacy(projectKeyHash, contextWindowTokens, agentId)
     }
-    return this.loadCoreSnapshotRich(projectKeyHash, contextWindowTokens)
+    return this.loadCoreSnapshotRich(projectKeyHash, contextWindowTokens, agentId)
   }
 
   private loadCoreSnapshotLegacy(
     projectKeyHash: string | undefined,
     contextWindowTokens?: number,
+    agentId?: string,
   ): MemoryInjectBlock {
     const cfg = this.getConfig()
     const budget = getMemoryCoreBudget(cfg.maxCoreSummaryChars, contextWindowTokens)
@@ -357,7 +367,7 @@ export class MemoryService {
       parts.push(`### ${label}\n${body}`)
     }
 
-    const pinned = this.loadPinnedItems(projectKeyHash)
+    const pinned = this.loadPinnedItems(projectKeyHash, agentId)
     if (pinned.length > 0) {
       parts.push(`### Pinned\n${pinned.map((p) => `- ${p.title}`).join('\n')}`)
     }
@@ -374,6 +384,7 @@ export class MemoryService {
   private loadCoreSnapshotRich(
     projectKeyHash: string | undefined,
     contextWindowTokens?: number,
+    agentId?: string,
   ): MemoryInjectBlock {
     const cfg = this.getConfig()
     const budget = getMemoryCoreBudget(cfg.maxCoreSummaryChars, contextWindowTokens)
@@ -399,7 +410,7 @@ export class MemoryService {
     }
 
     // Collect candidates in scope
-    const candidates = this.loadActiveCoreItems(projectKeyHash)
+    const candidates = this.loadActiveCoreItems(projectKeyHash, agentId)
     const profile = candidates.filter((i) => i.kind === 'profile' && i.scope === 'global')
     const pinned = candidates.filter((i) => i.pinned && i.kind !== 'profile')
     const profileIds = new Set(profile.map((p) => p.id))
@@ -476,9 +487,18 @@ export class MemoryService {
     }
   }
 
-  private loadActiveCoreItems(projectKeyHash: string | undefined): MemoryItem[] {
+  private loadActiveCoreItems(
+    projectKeyHash: string | undefined,
+    agentId?: string,
+  ): MemoryItem[] {
     const db = this.store.getDb()
+    const now = Date.now()
+    const agentClause = agentId ? ' AND (agent_id IS NULL OR agent_id = ?)' : ''
+    const expireClause = ' AND (expires_at IS NULL OR expires_at > ?)'
     if (projectKeyHash) {
+      const params: unknown[] = [projectKeyHash]
+      if (agentId) params.push(agentId)
+      params.push(now)
       const rows = db.prepare(`
         SELECT * FROM memory_items
         WHERE status = 'active'
@@ -487,17 +507,24 @@ export class MemoryService {
             scope = 'global'
             OR (scope = 'project' AND project_key_hash = ?)
           )
+          ${agentClause}
+          ${expireClause}
         ORDER BY updated_at DESC
         LIMIT 500
-      `).all(projectKeyHash) as Array<Record<string, unknown>>
+      `).all(...params) as Array<Record<string, unknown>>
       return rows.map((r) => this.rowToItemLoose(r))
     }
+    const params: unknown[] = []
+    if (agentId) params.push(agentId)
+    params.push(now)
     const rows = db.prepare(`
       SELECT * FROM memory_items
       WHERE status = 'active' AND scope = 'global'
+        ${agentClause}
+        ${expireClause}
       ORDER BY updated_at DESC
       LIMIT 500
-    `).all() as Array<Record<string, unknown>>
+    `).all(...params) as Array<Record<string, unknown>>
     return rows.map((r) => this.rowToItemLoose(r))
   }
 
@@ -528,6 +555,8 @@ export class MemoryService {
       lastUsedAt: (r.last_used_at as number | null) ?? undefined,
       useCount: Number(r.use_count ?? 0),
       pinned: Number(r.pinned ?? 0) !== 0,
+      agentId: (r.agent_id as string | null) ?? undefined,
+      expiresAt: (r.expires_at as number | null) ?? undefined,
     }
   }
 
@@ -541,6 +570,7 @@ export class MemoryService {
     cwd: string | undefined,
     sessionId: string | undefined,
     contextWindowTokens?: number,
+    opts?: { agentId?: string },
   ): Promise<MemoryInjectBlock> {
     const q = query.trim()
     if (!q) return { text: '', ids: [] }
@@ -556,11 +586,15 @@ export class MemoryService {
       }
     }
 
+    const agentId =
+      cfg.perAgentMemory && opts?.agentId?.trim() ? opts.agentId.trim() : undefined
+
     // SQL-level scope OR so LIMIT cannot drop all in-scope hits behind foreign projects.
     const hits = await this.searchScoped(q, {
       projectKeyHash,
       sessionId: sessionId ?? undefined,
       limit: 30,
+      agentId,
     })
     if (hits.length === 0) return { text: '', ids: [] }
 
@@ -596,6 +630,26 @@ export class MemoryService {
     const existing = this.store.getItem(id)
     const source: MemorySource = input.source ?? existing?.source ?? 'user'
 
+    // expiresAt: explicit null clears; undefined keeps existing / leaves unset
+    let expiresAt: number | undefined
+    if (input.expiresAt === null) {
+      expiresAt = undefined
+    } else if (typeof input.expiresAt === 'number' && Number.isFinite(input.expiresAt)) {
+      expiresAt = input.expiresAt
+    } else {
+      expiresAt = existing?.expiresAt
+    }
+
+    // agentId: explicit null clears; undefined keeps existing
+    let agentId: string | undefined
+    if (input.agentId === null) {
+      agentId = undefined
+    } else if (typeof input.agentId === 'string' && input.agentId.trim()) {
+      agentId = input.agentId.trim()
+    } else {
+      agentId = existing?.agentId
+    }
+
     const item: MemoryItem = {
       id,
       scope: input.scope,
@@ -615,6 +669,8 @@ export class MemoryService {
       lastUsedAt: input.lastUsedAt ?? existing?.lastUsedAt,
       useCount: input.useCount ?? existing?.useCount ?? 0,
       pinned: input.pinned ?? existing?.pinned ?? false,
+      agentId,
+      expiresAt,
     }
 
     // Soft store capacity (Hermes-style string errors for tools)
@@ -666,6 +722,8 @@ export class MemoryService {
   /**
    * Scoped search: hybrid (FTS candidates + query embed + score) when enabled
    * and an embedding client is available; otherwise plain FTS `searchInScopes`.
+   * Always applies query-aware re-rank (keyword + tag + recency core) so FTS-only
+   * paths still surface relevant hits.
    */
   async searchScoped(
     query: string,
@@ -676,18 +734,26 @@ export class MemoryService {
     const cfg = this.getConfig()
     const ref = normalizeExtractModel(cfg.embeddingModel)
     const limit = opts?.limit ?? 50
+    const searchOpts: MemorySearchInScopesOpts = {
+      ...opts,
+      limit: Math.max(limit * 2, limit),
+    }
 
+    let hits: MemoryItem[]
     if (cfg.hybridSearchEnabled && ref) {
       const client = this.createEmbeddingClient(ref)
       if (client) {
         const modelKey = embeddingModelKey(ref)
         const rerankRef = normalizeExtractModel(cfg.rerankModel)
-        return searchHybrid({
+        hits = await searchHybrid({
           store: this.store,
           query: q,
           projectKeyHash: opts?.projectKeyHash,
           sessionId: opts?.sessionId,
-          limit,
+          limit: searchOpts.limit ?? limit,
+          agentId: opts?.agentId,
+          includeExpired: opts?.includeExpired,
+          now: opts?.now,
           embedQuery: async () => {
             try {
               const vecs = await client.embed([q])
@@ -708,10 +774,14 @@ export class MemoryService {
           },
           rerankModel: rerankRef,
         })
+      } else {
+        hits = this.store.searchInScopes(q, searchOpts)
       }
+    } else {
+      hits = this.store.searchInScopes(q, searchOpts)
     }
 
-    return this.store.searchInScopes(q, opts)
+    return rerankByQuery(hits, q, opts?.now ?? Date.now()).slice(0, limit)
   }
 
   softDelete(id: string): boolean {
@@ -1068,9 +1138,16 @@ export class MemoryService {
 
   private loadPinnedItems(
     projectKeyHash: string | undefined,
+    agentId?: string,
   ): Array<{ id: string; title: string }> {
     const db = this.store.getDb()
+    const now = Date.now()
+    const agentClause = agentId ? ' AND (agent_id IS NULL OR agent_id = ?)' : ''
+    const expireClause = ' AND (expires_at IS NULL OR expires_at > ?)'
     if (projectKeyHash) {
+      const params: unknown[] = [projectKeyHash]
+      if (agentId) params.push(agentId)
+      params.push(now)
       return db.prepare(`
         SELECT id, title FROM memory_items
         WHERE status = 'active' AND pinned = 1
@@ -1078,16 +1155,23 @@ export class MemoryService {
             scope = 'global'
             OR (scope = 'project' AND project_key_hash = ?)
           )
+          ${agentClause}
+          ${expireClause}
         ORDER BY updated_at DESC
         LIMIT 50
-      `).all(projectKeyHash) as Array<{ id: string; title: string }>
+      `).all(...params) as Array<{ id: string; title: string }>
     }
+    const params: unknown[] = []
+    if (agentId) params.push(agentId)
+    params.push(now)
     return db.prepare(`
       SELECT id, title FROM memory_items
       WHERE status = 'active' AND pinned = 1 AND scope = 'global'
+        ${agentClause}
+        ${expireClause}
       ORDER BY updated_at DESC
       LIMIT 50
-    `).all() as Array<{ id: string; title: string }>
+    `).all(...params) as Array<{ id: string; title: string }>
   }
 
 }

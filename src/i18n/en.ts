@@ -882,6 +882,11 @@ export const en = {
         maxExtractsPerDayHint: 'Hard cap to control API cost.',
         importMirror: 'Import from mirror files',
         rewriteMirrors: 'Rewrite mirror files from DB',
+        perAgentMemory: 'Per-agent memory buckets',
+        perAgentMemoryPlain:
+          'When on, managed sub-agents keep private memories (shared items still visible to all). Default off.',
+        expiresOn: 'Expires {{date}}',
+        expiresSoon: 'Expires in {{n}}d',
       },
       skill: {
         title: 'Skills',

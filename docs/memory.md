@@ -13,6 +13,11 @@ Long-term, cross-session memory for hip. **Disabled by default** (privacy / cost
 
 Structured items in SQLite (`memory_items`): preferences, conventions, lessons, workflows, profiles — scoped **global**, **project**, or **session**.
 
+Optional fields:
+
+- **`expiresAt`** — after this time the item is hidden from list / search / core inject (still fetchable by id). Set via `memory_add` `expiresInDays` or API upsert.
+- **`agentId`** — when **Settings → Memory → Advanced → Per-agent memory buckets** is on, managed sub-agents read/write shared items (`agentId` empty) plus their own registry id bucket.
+
 **Source of truth is SQLite.** Markdown under `~/.hip/memories/` is an export mirror (rewritten on mutations). Project cwd `MEMORY.md` / `.hip/MEMORY.md` is separate (AGENTS-style notes via `ProjectAgentsMdInjector`), not auto-imported into SQLite.
 
 ## How it works
@@ -22,6 +27,7 @@ Structured items in SQLite (`memory_items`): preferences, conventions, lessons, 
 | **Use** | Core snapshot (profile + summaries + pinned/active bodies + capacity line) + per-turn prefetch (FTS / optional hybrid) + `memory_*` tools |
 | **Generate** | After idle debounce → Phase1 extract → Phase2 consolidate → decay / mirror rewrite |
 | **Incognito** | Session flag: no inject and no extract |
+| **Search** | FTS (or hybrid) candidates, then **query re-rank** (keyword + tag overlap + recency) so relevant hits surface even when hybrid is off |
 
 Core injection uses a **generation counter**: mid-session extracts invalidate the frozen core so the next turn reloads. Within a turn, the freeze stays stable for prefix-cache friendliness.
 

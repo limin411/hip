@@ -22,6 +22,13 @@ export interface MemoryItem {
   lastUsedAt?: number
   useCount: number
   pinned: boolean
+  /**
+   * Optional managed-agent bucket. When `perAgentMemory` is on, reads see
+   * shared items (`agentId` unset) plus this agent's private items.
+   */
+  agentId?: string
+  /** Epoch ms after which the item is hidden from default list/search/core (still get-by-id). */
+  expiresAt?: number
 }
 
 export interface MemoryCitation {

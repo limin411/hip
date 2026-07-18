@@ -920,24 +920,40 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     }
     try {
       // Read-only memory for managed agents when useMemories (KD-7).
-      // Resolve at dispatch time (host snapshot is set earlier in this turn).
+      // When perAgentMemory is on, load shared ∪ this registry agentId (not ephemeral childId).
       let systemPromptExtra: string | undefined
       let extraTools: import('@langchain/core/tools').StructuredToolInterface[] | undefined
       const memFlags = resolveSessionMemoryFlags(loadMemoryConfig(), host._config)
-      const coreSnap = host.memoryCoreSnapshot
-      if (memFlags.use && host.memoryService && coreSnap) {
-        systemPromptExtra = `## Cross-session memory (read-only for sub-agent)\n\n${coreSnap}`
+      if (memFlags.use && host.memoryService) {
         const memCfg = host.memoryService.getConfig()
+        const bucketAgentId = memCfg.perAgentMemory ? agentId : undefined
+        let coreSnap = host.memoryCoreSnapshot
+        if (memCfg.perAgentMemory) {
+          let projectKeyHash: string | undefined
+          try {
+            projectKeyHash = resolveProjectKey(cwd).projectKeyHash
+          } catch {
+            projectKeyHash = undefined
+          }
+          coreSnap = host.memoryService.loadCoreSnapshot(projectKeyHash, undefined, {
+            agentId: bucketAgentId,
+          }).text
+        }
+        if (coreSnap) {
+          systemPromptExtra = `## Cross-session memory (read-only for sub-agent)\n\n${coreSnap}`
+        }
         const subTools = memCfg.memoryToolsForSubagents ?? 'search'
         if (subTools === 'search' || subTools === 'all') {
+          const toolCtx = {
+            sessionId: host.id,
+            cwd,
+            defaultScope: memCfg.defaultScope,
+            agentId: bucketAgentId,
+          }
           extraTools =
             subTools === 'all'
-              ? buildMemoryTools(host.memoryService, {
-                  sessionId: host.id,
-                  cwd,
-                  defaultScope: memCfg.defaultScope,
-                })
-              : [buildMemorySearchToolOnly(host.memoryService, { sessionId: host.id, cwd })]
+              ? buildMemoryTools(host.memoryService, toolCtx)
+              : [buildMemorySearchToolOnly(host.memoryService, toolCtx)]
         }
       }
       const text = await invoker.invoke(agentId, task, makeEmit(childId, 'subagent'), overrideSignal ?? host.abortController!.signal, hooks, {

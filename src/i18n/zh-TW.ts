@@ -205,6 +205,11 @@ export const zhTW = {
         maxExtractsPerDayHint: '控制 API 費用的硬上限。',
         importMirror: '從鏡像檔案匯入',
         rewriteMirrors: '從資料庫重寫鏡像檔案',
+        perAgentMemory: '按 Agent 隔離記憶',
+        perAgentMemoryPlain:
+          '開啟後，託管子 Agent 各自私有記憶（共用條目仍可見）。預設關閉。',
+        expiresOn: '到期 {{date}}',
+        expiresSoon: '{{n}} 天後到期',
       },
       skill: {
         title: '技能',

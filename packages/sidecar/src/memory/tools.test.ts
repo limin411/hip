@@ -113,4 +113,69 @@ describe('buildMemoryTools', () => {
     expect(await search.invoke({ query: 'widgets' })).toMatch(/No matching/)
     expect(svc.getItem(id)?.status).toBe('deleted')
   })
+
+  it('memory_add expiresInDays sets expiresAt', async () => {
+    const add = byName(tools, 'memory_add')
+    const before = Date.now()
+    const added = String(
+      await add.invoke({
+        title: 'Temp convention',
+        content: 'use feature flag flip-token-exp for two weeks',
+        kind: 'convention',
+        scope: 'global',
+        expiresInDays: 7,
+      }),
+    )
+    expect(added).toMatch(/expires:/)
+    const id = added.match(/id: ([a-f0-9-]+)/i)![1]
+    const item = svc.getItem(id)!
+    expect(item.expiresAt).toBeTypeOf('number')
+    expect(item.expiresAt!).toBeGreaterThan(before + 6 * 86_400_000)
+    expect(item.expiresAt!).toBeLessThanOrEqual(before + 8 * 86_400_000)
+  })
+
+  it('perAgentMemory stamps agentId and isolates search', async () => {
+    svc.setConfig({ perAgentMemory: true })
+    const toolsA = buildMemoryTools(svc, {
+      sessionId: 'sess-1',
+      cwd: '/tmp/proj',
+      defaultScope: 'global',
+      agentId: 'reviewer',
+    })
+    const toolsB = buildMemoryTools(svc, {
+      sessionId: 'sess-1',
+      cwd: '/tmp/proj',
+      defaultScope: 'global',
+      agentId: 'coder',
+    })
+    await byName(toolsA, 'memory_add').invoke({
+      title: 'Reviewer note',
+      content: 'agent-iso-token private to reviewer',
+      kind: 'lesson',
+      scope: 'global',
+    })
+    await byName(toolsB, 'memory_add').invoke({
+      title: 'Coder note',
+      content: 'agent-iso-token private to coder',
+      kind: 'lesson',
+      scope: 'global',
+    })
+    // Shared write (no agent)
+    await byName(tools, 'memory_add').invoke({
+      title: 'Shared note',
+      content: 'agent-iso-token shared fact',
+      kind: 'preference',
+      scope: 'global',
+    })
+
+    const aHits = String(await byName(toolsA, 'memory_search').invoke({ query: 'agent-iso-token' }))
+    expect(aHits).toContain('Reviewer note')
+    expect(aHits).toContain('Shared note')
+    expect(aHits).not.toContain('Coder note')
+
+    const bHits = String(await byName(toolsB, 'memory_search').invoke({ query: 'agent-iso-token' }))
+    expect(bHits).toContain('Coder note')
+    expect(bHits).toContain('Shared note')
+    expect(bHits).not.toContain('Reviewer note')
+  })
 })

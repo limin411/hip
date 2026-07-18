@@ -263,6 +263,80 @@ describe('MemoryStore', () => {
     expect(store.getItem('h1')).toBeUndefined()
   })
 
+  it('excludes expired items from search and default list; getItem still works', () => {
+    const now = 2_000_000_000_000
+    store.upsertItem(
+      item({
+        id: 'live',
+        title: 'Live expiry-token-zeta',
+        content: 'expiry-token-zeta still valid',
+        scope: 'global',
+        projectKeyHash: undefined,
+        expiresAt: now + 10_000,
+      }),
+    )
+    store.upsertItem(
+      item({
+        id: 'dead',
+        title: 'Dead expiry-token-zeta',
+        content: 'expiry-token-zeta expired',
+        scope: 'global',
+        projectKeyHash: undefined,
+        expiresAt: now - 1,
+      }),
+    )
+    const hits = store.searchInScopes('expiry-token-zeta', { now, limit: 10 })
+    expect(hits.map((h) => h.id)).toEqual(['live'])
+    expect(store.listItems({ status: 'active', now }).map((i) => i.id)).toEqual(['live'])
+    expect(store.getItem('dead')?.id).toBe('dead')
+    const withExpired = store.searchInScopes('expiry-token-zeta', {
+      now,
+      includeExpired: true,
+      limit: 10,
+    })
+    expect(withExpired.map((h) => h.id).sort()).toEqual(['dead', 'live'])
+  })
+
+  it('agentId filter returns shared ∪ matching agent only', () => {
+    store.upsertItem(
+      item({
+        id: 'shared',
+        title: 'Shared agent-token-omega',
+        content: 'agent-token-omega shared',
+        scope: 'global',
+        projectKeyHash: undefined,
+        agentId: undefined,
+      }),
+    )
+    store.upsertItem(
+      item({
+        id: 'a-only',
+        title: 'A private agent-token-omega',
+        content: 'agent-token-omega for a',
+        scope: 'global',
+        projectKeyHash: undefined,
+        agentId: 'reviewer',
+      }),
+    )
+    store.upsertItem(
+      item({
+        id: 'b-only',
+        title: 'B private agent-token-omega',
+        content: 'agent-token-omega for b',
+        scope: 'global',
+        projectKeyHash: undefined,
+        agentId: 'coder',
+      }),
+    )
+    const forA = store.searchInScopes('agent-token-omega', { agentId: 'reviewer', limit: 10 })
+    expect(forA.map((h) => h.id).sort()).toEqual(['a-only', 'shared'])
+    const forB = store.searchInScopes('agent-token-omega', { agentId: 'coder', limit: 10 })
+    expect(forB.map((h) => h.id).sort()).toEqual(['b-only', 'shared'])
+    // No agent filter → all visible
+    const all = store.searchInScopes('agent-token-omega', { limit: 10 })
+    expect(all.map((h) => h.id).sort()).toEqual(['a-only', 'b-only', 'shared'])
+  })
+
   it('deleteBySourceSession hard deletes project items and stage1', () => {
     store.upsertItem(item({
       id: 'p1',

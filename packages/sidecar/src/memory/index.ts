@@ -132,7 +132,15 @@ export {
   type WriteMemoryMirrorOpts,
   type MemoryMutationScopes,
 } from './mirror.js'
-export { scoreMemoryItem, sortByMemoryRank, kindWeight } from './ranking.js'
+export {
+  scoreMemoryItem,
+  sortByMemoryRank,
+  kindWeight,
+  tokenizeQuery,
+  keywordOverlapScore,
+  tagOverlapScore,
+  rerankByQuery,
+} from './ranking.js'
 export {
   enqueuePhase1,
   processQueue,

@@ -853,6 +853,32 @@ export function MemoryConfig() {
                       <span>{t(`settings.memory.kind.${item.kind}`, { defaultValue: item.kind })}</span>
                       <span>·</span>
                       <span>{t(`settings.memory.scope.${item.scope}`, { defaultValue: item.scope })}</span>
+                      {item.expiresAt != null && item.expiresAt > Date.now() && (
+                        <>
+                          <span>·</span>
+                          <span data-testid={`memory-expires-${item.id}`}>
+                            {(() => {
+                              const days = Math.max(
+                                0,
+                                Math.ceil((item.expiresAt! - Date.now()) / 86_400_000),
+                              )
+                              return days <= 14
+                                ? t('settings.memory.expiresSoon', { n: days })
+                                : t('settings.memory.expiresOn', {
+                                    date: new Date(item.expiresAt!).toISOString().slice(0, 10),
+                                  })
+                            })()}
+                          </span>
+                        </>
+                      )}
+                      {item.agentId && (
+                        <>
+                          <span>·</span>
+                          <span className="truncate" title={item.agentId}>
+                            agent:{item.agentId}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
@@ -1057,6 +1083,22 @@ export function MemoryConfig() {
                   />
                 </label>
               ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+              <div className="min-w-0 flex-1">
+                <div className="text-prose font-medium text-ink">{t('settings.memory.perAgentMemory')}</div>
+                <div className="mt-0.5 text-meta text-ink-tertiary">
+                  {t('settings.memory.perAgentMemoryPlain')}
+                </div>
+              </div>
+              <Switch
+                checked={!!config?.perAgentMemory}
+                disabled={busy || !config}
+                ariaLabel={t('settings.memory.perAgentMemory')}
+                data-testid="memory-switch-per-agent"
+                onCheckedChange={(v) => void applyConfig({ perAgentMemory: v })}
+              />
             </div>
 
             <div className="flex items-center justify-between gap-4 border-t border-border pt-4">

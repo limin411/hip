@@ -11,6 +11,15 @@ export interface MemoryListFilter {
   source?: string | string[]
   pinned?: boolean
   limit?: number
+  /**
+   * When set, only shared items (agent_id IS NULL) plus this agent’s private rows.
+   * Caller enables this only when `perAgentMemory` is on.
+   */
+  agentId?: string
+  /** When true, include rows with expires_at <= now. Default false. */
+  includeExpired?: boolean
+  /** Clock for expiry filter (tests). Default Date.now(). */
+  now?: number
 }
 
 export interface MemoryStage1ListFilter {
@@ -36,6 +45,10 @@ export interface MemorySearchOpts {
   projectKeyHash?: string
   sessionId?: string
   limit?: number
+  /** Shared ∪ this agent when set (perAgentMemory path). */
+  agentId?: string
+  includeExpired?: boolean
+  now?: number
 }
 
 /** Read-path scopes: global ∪ matching project ∪ matching session. */
@@ -43,6 +56,10 @@ export interface MemorySearchInScopesOpts {
   projectKeyHash?: string
   sessionId?: string
   limit?: number
+  /** Shared ∪ this agent when set (perAgentMemory path). */
+  agentId?: string
+  includeExpired?: boolean
+  now?: number
 }
 
 export interface MemoryStage1Row {
@@ -82,6 +99,8 @@ interface MemoryItemRow {
   last_used_at: number | null
   use_count: number
   pinned: number
+  agent_id?: string | null
+  expires_at?: number | null
 }
 
 function rowToItem(r: MemoryItemRow): MemoryItem {
@@ -111,7 +130,34 @@ function rowToItem(r: MemoryItemRow): MemoryItem {
     lastUsedAt: r.last_used_at ?? undefined,
     useCount: r.use_count,
     pinned: r.pinned !== 0,
+    agentId: r.agent_id ?? undefined,
+    expiresAt: r.expires_at ?? undefined,
   }
+}
+
+/** SQL fragment: hide expired rows unless includeExpired. `colPrefix` e.g. '' or 'm.'. */
+function pushNotExpired(
+  filters: string[],
+  params: unknown[],
+  opts: { includeExpired?: boolean; now?: number },
+  colPrefix = '',
+): void {
+  if (opts.includeExpired) return
+  const now = opts.now ?? Date.now()
+  filters.push(`(${colPrefix}expires_at IS NULL OR ${colPrefix}expires_at > ?)`)
+  params.push(now)
+}
+
+/** SQL fragment: shared ∪ agent private when agentId set. */
+function pushAgentFilter(
+  filters: string[],
+  params: unknown[],
+  agentId: string | undefined,
+  colPrefix = '',
+): void {
+  if (!agentId) return
+  filters.push(`(${colPrefix}agent_id IS NULL OR ${colPrefix}agent_id = ?)`)
+  params.push(agentId)
 }
 
 /** Persisted memory items + stage1 rows. Synchronous (node:sqlite). */
@@ -140,8 +186,8 @@ export class MemoryStore {
       INSERT INTO memory_items(
         id, scope, project_key, project_key_hash, session_id, kind, title, content,
         confidence, status, source, source_session_id, tags_json,
-        created_at, updated_at, last_used_at, use_count, pinned
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        created_at, updated_at, last_used_at, use_count, pinned, agent_id, expires_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET
         scope=excluded.scope,
         project_key=excluded.project_key,
@@ -159,7 +205,9 @@ export class MemoryStore {
         updated_at=excluded.updated_at,
         last_used_at=excluded.last_used_at,
         use_count=excluded.use_count,
-        pinned=excluded.pinned
+        pinned=excluded.pinned,
+        agent_id=excluded.agent_id,
+        expires_at=excluded.expires_at
     `).run(
       item.id,
       item.scope,
@@ -179,6 +227,8 @@ export class MemoryStore {
       item.lastUsedAt ?? null,
       item.useCount,
       item.pinned ? 1 : 0,
+      item.agentId ?? null,
+      item.expiresAt ?? null,
     )
   }
 
@@ -219,6 +269,11 @@ export class MemoryStore {
     if (filter.pinned !== undefined) {
       where.push('pinned=?')
       params.push(filter.pinned ? 1 : 0)
+    }
+    pushAgentFilter(where, params, filter.agentId)
+    // Hide expired on default active list; trash/archived views still use status filter.
+    if (filter.status === undefined || filter.status === 'active') {
+      pushNotExpired(where, params, filter)
     }
     const limit = filter.limit ?? 100
     const sql = `
@@ -321,6 +376,8 @@ export class MemoryStore {
       filters.push('m.session_id=?')
       params.push(opts.sessionId)
     }
+    pushNotExpired(filters, params, opts, 'm.')
+    pushAgentFilter(filters, params, opts.agentId, 'm.')
     return this.searchWithFilters(query, filters, params, opts.limit ?? 50)
   }
 
@@ -328,6 +385,7 @@ export class MemoryStore {
    * Search limited to the normal read path: active items in
    * global ∪ project(projectKeyHash) ∪ session(sessionId).
    * Scope OR is applied in SQL so LIMIT cannot drop all in-scope hits.
+   * Excludes expired unless `includeExpired`. Optional agent filter when set.
    */
   searchInScopes(query: string, opts: MemorySearchInScopesOpts = {}): MemoryItem[] {
     const scopeOr: string[] = [`m.scope='global'`]
@@ -341,6 +399,8 @@ export class MemoryStore {
       params.push(opts.sessionId)
     }
     const filters = [`m.status='active'`, `(${scopeOr.join(' OR ')})`]
+    pushNotExpired(filters, params, opts, 'm.')
+    pushAgentFilter(filters, params, opts.agentId, 'm.')
     return this.searchWithFilters(query, filters, params, opts.limit ?? 50)
   }
 

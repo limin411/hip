@@ -863,6 +863,11 @@ export const zhCN = {
         maxExtractsPerDayHint: '控制 API 费用的硬上限。',
         importMirror: '从镜像文件导入',
         rewriteMirrors: '从数据库重写镜像文件',
+        perAgentMemory: '按 Agent 隔离记忆',
+        perAgentMemoryPlain:
+          '开启后，托管子 Agent 各自私有记忆（共享条目仍可见）。默认关闭。',
+        expiresOn: '到期 {{date}}',
+        expiresSoon: '{{n}} 天后到期',
       },
       skill: {
         title: '技能',

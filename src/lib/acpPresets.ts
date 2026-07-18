@@ -6,10 +6,10 @@ export type AcpPresetIcon = 'code' | 'bot' | 'cpu' | 'rocket'
  *
  *  Detection (`detectBin`) is decoupled from how hip speaks ACP (`command`/`args`):
  *  "installed" means the AGENT's own global command is on PATH, regardless of how it was
- *  installed (npm / brew / curl / standalone). OpenCode and Kimi speak ACP natively, so
- *  their launch command IS the detected binary. Claude Code and Codex don't speak ACP
- *  themselves — hip bridges via the ACP adapter run with `npx` (self-contained; needs
- *  Node), so their launch command differs from the detected agent command. */
+ *  installed (npm / brew / curl / standalone). OpenCode speaks ACP natively, so its launch
+ *  command IS the detected binary. Pi, Claude Code, and Codex don't speak ACP themselves —
+ *  hip bridges via a community ACP adapter run with `npx` (self-contained; needs Node), so
+ *  their launch command differs from the detected agent command. */
 export interface AcpPreset {
   id: string                  // also the agent's `quirks` value (1:1) used to match 已添加
   name: string                // brand label, not localized
@@ -31,9 +31,13 @@ export const ACP_PRESETS: AcpPreset[] = [
     quirks: 'opencode', installCmd: 'npm i -g opencode-ai',
   },
   {
-    id: 'kimi-code', name: 'Kimi Code', icon: 'rocket',
-    detectBin: 'kimi', command: 'kimi', args: ['acp'],
-    quirks: 'kimi-code', installCmd: 'npm i -g @moonshot-ai/kimi-code',
+    // Detect the Pi agent (`pi`); speak ACP via pi-acp (spawns `pi --mode rpc`).
+    id: 'pi', name: 'Pi', icon: 'rocket',
+    detectBin: 'pi',
+    command: 'npx', args: ['-y', 'pi-acp'],
+    quirks: 'pi',
+    installCmd: 'npm i -g --ignore-scripts @earendil-works/pi-coding-agent',
+    adapterPkg: 'pi-acp',
   },
   {
     // Detect the Claude Code agent (`claude`); speak ACP via the adapter run on-demand

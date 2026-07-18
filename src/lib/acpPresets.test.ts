@@ -5,7 +5,7 @@ import { ACP_PRESETS, acpPresetById, presetInstalled, presetAdded, agentBinarySt
 describe('ACP_PRESETS', () => {
   it('lists the four supported providers with unique ids', () => {
     const ids = ACP_PRESETS.map((p) => p.id)
-    expect(new Set(ids)).toEqual(new Set(['opencode', 'kimi-code', 'claude-code', 'codex']))
+    expect(new Set(ids)).toEqual(new Set(['opencode', 'pi', 'claude-code', 'codex']))
     expect(new Set(ids).size).toBe(ids.length)
   })
 
@@ -18,14 +18,19 @@ describe('ACP_PRESETS', () => {
     }
   })
 
-  it('adapter presets declare an authEnvVar; native ones do not', () => {
+  it('key-injecting adapter presets declare an authEnvVar; self-managed ones do not', () => {
     expect(acpPresetById('claude-code')?.authEnvVar).toBe('ANTHROPIC_API_KEY')
     expect(acpPresetById('codex')?.authEnvVar).toBe('OPENAI_API_KEY')
     expect(acpPresetById('opencode')?.authEnvVar).toBeUndefined()
-    expect(acpPresetById('kimi-code')?.authEnvVar).toBeUndefined()
+    expect(acpPresetById('pi')?.authEnvVar).toBeUndefined()
   })
 
   it('adapter presets detect the AGENT command, bridge ACP via npx, and name the adapter pkg', () => {
+    const pi = acpPresetById('pi')!
+    expect(pi.detectBin).toBe('pi')
+    expect(pi.command).toBe('npx')
+    expect(pi.args).toEqual(['-y', 'pi-acp'])
+    expect(pi.adapterPkg).toBe('pi-acp')
     const cc = acpPresetById('claude-code')!
     expect(cc.detectBin).toBe('claude')
     expect(cc.command).toBe('npx')
@@ -41,12 +46,11 @@ describe('ACP_PRESETS', () => {
   it('native presets launch their detected binary directly with no adapter pkg', () => {
     expect(acpPresetById('opencode')).toMatchObject({ detectBin: 'opencode', command: 'opencode', args: ['acp', '--pure'] })
     expect(acpPresetById('opencode')?.adapterPkg).toBeUndefined()
-    expect(acpPresetById('kimi-code')).toMatchObject({ detectBin: 'kimi', command: 'kimi', args: ['acp'] })
-    expect(acpPresetById('kimi-code')?.adapterPkg).toBeUndefined()
   })
 
   it('looks presets up by id', () => {
     expect(acpPresetById('codex')?.name).toBe('Codex')
+    expect(acpPresetById('pi')?.name).toBe('Pi')
     expect(acpPresetById('nope')).toBeUndefined()
   })
 })
@@ -107,9 +111,9 @@ describe('agentBinaryStatus', () => {
     })
   })
 
-  it('maps kimi-code to the kimi detect binary', () => {
-    expect(agentBinaryStatus(agent('kimi-code'), { kimi: true })).toEqual({
-      preset: acpPresetById('kimi-code'),
+  it('maps pi to the pi detect binary', () => {
+    expect(agentBinaryStatus(agent('pi'), { pi: true })).toEqual({
+      preset: acpPresetById('pi'),
       installed: true,
     })
   })

@@ -7,11 +7,11 @@ beforeEach(() => invoke.mockReset())
 
 describe('detectBinaries', () => {
   it('passes names through and returns the install map', async () => {
-    invoke.mockResolvedValueOnce({ opencode: true, kimi: false })
+    invoke.mockResolvedValueOnce({ opencode: true, pi: false })
     const { detectBinaries } = await import('./detect')
-    const got = await detectBinaries(['opencode', 'kimi'])
-    expect(invoke).toHaveBeenCalledWith('which_binaries', { names: ['opencode', 'kimi'] })
-    expect(got).toEqual({ opencode: true, kimi: false })
+    const got = await detectBinaries(['opencode', 'pi'])
+    expect(invoke).toHaveBeenCalledWith('which_binaries', { names: ['opencode', 'pi'] })
+    expect(got).toEqual({ opencode: true, pi: false })
   })
 
   it('fails closed (returns {}) when the command errors', async () => {

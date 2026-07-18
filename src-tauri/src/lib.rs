@@ -92,6 +92,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 permissions: None,
                 agent_loop: None,
                 langsmith: None,
+                terminal: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -686,6 +687,7 @@ mod tests {
             }),
             agent_loop: None,
             langsmith: None,
+            terminal: None,
         }
     }
 
@@ -867,6 +869,7 @@ mod tests {
             }),
             agent_loop: None,
             langsmith: None,
+            terminal: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1038,6 +1041,7 @@ mod tests {
             }),
             agent_loop: None,
             langsmith: None,
+            terminal: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1152,6 +1156,7 @@ mod tests {
             permissions: None,
             agent_loop: None,
             langsmith: None,
+            terminal: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1188,6 +1193,7 @@ mod tests {
                 doom_loop_strategy: Some("pause_immediately".into()),
             }),
             langsmith: None,
+            terminal: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1245,6 +1251,46 @@ doomLoopStrategy = "auto_continue"
     }
 
     #[test]
+    fn terminal_survives_json_toml_roundtrip() {
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: Some(super::hip_config::TerminalConfig {
+                shell: Some("cmd".into()),
+            }),
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"terminal\""), "JSON must emit terminal: {json}");
+        assert!(json.contains("\"shell\""), "JSON must emit shell: {json}");
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[terminal]") || toml_str.contains("terminal"),
+            "TOML should contain terminal: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("shell") || toml_str.contains("cmd"),
+            "TOML should preserve shell: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        assert_eq!(
+            back.terminal.as_ref().and_then(|t| t.shell.as_deref()),
+            Some("cmd")
+        );
+    }
+
+    #[test]
     fn langsmith_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; langsmith must not be stripped.
         let cfg = super::HipConfig {
@@ -1263,6 +1309,7 @@ doomLoopStrategy = "auto_continue"
                 project: Some("hip".into()),
                 endpoint: Some("https://eu.api.smith.langchain.com".into()),
             }),
+            terminal: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

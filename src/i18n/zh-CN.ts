@@ -421,6 +421,7 @@ export const zhCN = {
         starting: '正在启动 shell…',
         error: '无法启动终端',
         unsupportedPlatform: '当前平台暂不支持终端',
+        noShell: '找不到可用的 shell。请在「通用设置」中更换默认终端。',
         softCap: '打开的终端过多（最多 8 个）。请先关闭一个会话。',
       },
       changeFolder: '更换文件夹',
@@ -458,6 +459,16 @@ export const zhCN = {
       densities: {
         comfortable: '舒适',
         compact: '紧凑',
+      },
+      terminalShell: '默认终端',
+      terminalShellDesc: '代码面板终端使用的默认 shell。修改后需重新启动终端生效。',
+      terminalShells: {
+        default: '系统默认',
+        cmd: 'Command Prompt (cmd)',
+        powershell: 'Windows PowerShell',
+        pwsh: 'PowerShell 7+',
+        bash: 'Bash',
+        zsh: 'Zsh',
       },
       contextMenu: {
         title: '右键菜单',

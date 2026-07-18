@@ -1,7 +1,11 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
+import type { TerminalShellPref } from '@hip/protocol'
 import { cn } from '@/lib/utils'
+import { detectHipPlatform } from '@/lib/platform'
 import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,12 +14,21 @@ import {
 } from '@/components/ui/DropdownMenu'
 import { ContextMenuSettings } from '@/components/context-menu/ContextMenuSettings'
 import { CONTEXT_MENUS } from '@/components/context-menu/feature'
+import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 
 const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
 
 const THEME_KEYS: Theme[] = ['light', 'dark', 'system']
 
 const DENSITY_KEYS: UiDensity[] = ['comfortable', 'compact']
+
+/** Shell choices shown in General Settings (platform-filtered). */
+const SHELL_KEYS_WINDOWS: TerminalShellPref[] = ['default', 'cmd', 'powershell', 'pwsh', 'bash']
+const SHELL_KEYS_UNIX: TerminalShellPref[] = ['default', 'zsh', 'bash']
+
+function shellOptionsForPlatform(): TerminalShellPref[] {
+  return detectHipPlatform() === 'windows' ? SHELL_KEYS_WINDOWS : SHELL_KEYS_UNIX
+}
 
 const selectTriggerCls =
   'flex cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
@@ -28,6 +41,20 @@ export function GeneralSettings() {
   const setTheme = useUiStore((s) => s.setTheme)
   const density = useUiStore((s) => s.density)
   const setDensity = useUiStore((s) => s.setDensity)
+
+  const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
+  const updateSection = useHipConfigStore((s) => s.updateSection)
+  const loadHipConfig = useHipConfigStore((s) => s.load)
+  const hipLoaded = useHipConfigStore((s) => s.loaded)
+
+  useEffect(() => {
+    if (!hipLoaded) void loadHipConfig()
+  }, [hipLoaded, loadHipConfig])
+
+  const shellKeys = shellOptionsForPlatform()
+  const setTerminalShell = (shell: TerminalShellPref) => {
+    void updateSection('terminal', { shell })
+  }
 
   return (
     <div className="flex flex-col">
@@ -106,6 +133,39 @@ export function GeneralSettings() {
           </DropdownMenu>
         </div>
       </div>
+      {CODE_TERMINAL ? (
+        <div className="flex items-center justify-between px-6 py-5" data-testid="settings-terminal-shell">
+          <div className="min-w-0 flex-1">
+            <div className="text-prose font-medium text-ink">{t('settings.terminalShell')}</div>
+            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.terminalShellDesc')}</div>
+          </div>
+          <div className="relative ml-4 shrink-0">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={selectTriggerCls} data-testid="settings-terminal-shell-trigger">
+                  <span>{t(`settings.terminalShells.${terminalShell}`)}</span>
+                  <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {shellKeys.map((shellKey) => (
+                  <DropdownMenuItem
+                    key={shellKey}
+                    data-testid={`settings-terminal-shell-${shellKey}`}
+                    onSelect={() => setTerminalShell(shellKey)}
+                  >
+                    <Check
+                      size={14}
+                      className={cn('shrink-0', terminalShell === shellKey ? 'opacity-100' : 'opacity-0')}
+                    />
+                    <span>{t(`settings.terminalShells.${shellKey}`)}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ) : null}
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>
   )

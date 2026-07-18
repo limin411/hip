@@ -297,6 +297,36 @@ enabled = true
     })
   })
 
+  it('parses [terminal] shell preference', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'terminal.toml',
+      `version = 1
+[terminal]
+shell = "powershell"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.terminal).toEqual({ shell: 'powershell' })
+  })
+
+  it('ignores unknown terminal.shell values', () => {
+    const dir = tmpDir()
+    const p = writeToml(
+      dir,
+      'terminal-bad.toml',
+      `version = 1
+[terminal]
+shell = "fish"
+`,
+    )
+    process.env.HIP_CONFIG_PATH = p
+    const cfg = readHipConfig()
+    expect(cfg.terminal).toEqual({})
+  })
+
   it('snake_case and camelCase TOML produce identical HipConfig objects', () => {
     const dir = tmpDir()
     const snakeFile = writeToml(dir, 'snake.toml', `version = 1

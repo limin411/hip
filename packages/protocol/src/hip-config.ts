@@ -93,6 +93,27 @@ export interface LangSmithConfig {
   endpoint?: string
 }
 
+/**
+ * Preferred interactive shell for the code-panel Terminal tab.
+ * - `default`: platform default (Windows → cmd; Unix → `$SHELL` then zsh/bash)
+ * - `cmd` / `powershell` / `pwsh`: Windows shells
+ * - `bash` / `zsh`: Unix shells (also tried on Windows when Git Bash etc. is installed)
+ */
+export type TerminalShellPref = 'default' | 'cmd' | 'powershell' | 'pwsh' | 'bash' | 'zsh'
+
+/**
+ * Optional `[terminal]` section in hip.toml.
+ *
+ * ```toml
+ * [terminal]
+ * shell = "cmd"
+ * ```
+ */
+export interface TerminalConfig {
+  /** Default shell for new / restarted PTY sessions. */
+  shell?: TerminalShellPref
+}
+
 export interface HipConfig {
   version: number
   providers?: ProviderEntry[]
@@ -109,6 +130,8 @@ export interface HipConfig {
   agentLoop?: AgentLoopConfig
   /** Optional LangSmith tracing (observability). */
   langsmith?: LangSmithConfig
+  /** Optional interactive Terminal defaults. */
+  terminal?: TerminalConfig
 }
 
 /** User-configurable network policy persisted to ~/.hip/config/network.json.

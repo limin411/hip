@@ -143,6 +143,16 @@ pub(crate) struct LangSmithConfig {
     pub(crate) endpoint: Option<String>,
 }
 
+/// Optional `[terminal]` section. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so shell preference is not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TerminalConfig {
+    /// Preferred interactive shell: default | cmd | powershell | pwsh | bash | zsh
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) shell: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -167,6 +177,9 @@ pub(crate) struct HipConfig {
     /// Optional LangSmith tracing. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) langsmith: Option<LangSmithConfig>,
+    /// Optional Terminal defaults. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) terminal: Option<TerminalConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -334,6 +347,15 @@ pub(crate) struct TomlLangSmithConfig {
     pub(crate) endpoint: Option<String>,
 }
 
+/// TOML mirror for `[terminal]`.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlTerminalConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) shell: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -357,6 +379,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) agent_loop: Option<TomlAgentLoopConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) langsmith: Option<TomlLangSmithConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) terminal: Option<TomlTerminalConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -603,6 +627,18 @@ impl From<TomlLangSmithConfig> for LangSmithConfig {
     }
 }
 
+impl From<TerminalConfig> for TomlTerminalConfig {
+    fn from(t: TerminalConfig) -> Self {
+        TomlTerminalConfig { shell: t.shell }
+    }
+}
+
+impl From<TomlTerminalConfig> for TerminalConfig {
+    fn from(t: TomlTerminalConfig) -> Self {
+        TerminalConfig { shell: t.shell }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -616,6 +652,7 @@ impl From<HipConfig> for TomlHipConfig {
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
+            terminal: cfg.terminal.map(|x| x.into()),
         }
     }
 }
@@ -633,6 +670,7 @@ impl From<TomlHipConfig> for HipConfig {
             permissions: cfg.permissions.map(|x| x.into()),
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
+            terminal: cfg.terminal.map(|x| x.into()),
         }
     }
 }

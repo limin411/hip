@@ -421,6 +421,7 @@ export const zhTW = {
         starting: '正在啟動 shell…',
         error: '無法啟動終端',
         unsupportedPlatform: '目前平台暫不支援終端',
+        noShell: '找不到可用的 shell。請在「通用設置」中更換預設終端。',
         softCap: '開啟的終端過多（最多 8 個）。請先關閉一個工作階段。',
       },
       changeFolder: '更換資料夾',
@@ -458,6 +459,16 @@ export const zhTW = {
       densities: {
         comfortable: '舒適',
         compact: '緊湊',
+      },
+      terminalShell: '預設終端',
+      terminalShellDesc: '程式碼面板終端使用的預設 shell。修改後需重新啟動終端才會生效。',
+      terminalShells: {
+        default: '系統預設',
+        cmd: 'Command Prompt (cmd)',
+        powershell: 'Windows PowerShell',
+        pwsh: 'PowerShell 7+',
+        bash: 'Bash',
+        zsh: 'Zsh',
       },
       contextMenu: {
         title: '右鍵選單',

@@ -424,6 +424,7 @@ export const en = {
         starting: 'Starting shell…',
         error: 'Could not start terminal',
         unsupportedPlatform: 'Terminal is not supported on this platform yet',
+        noShell: 'No usable shell found. Change the default terminal in General Settings.',
         softCap: 'Too many terminals open (max 8). Close a session first.',
       },
       changeFolder: 'Change Folder',
@@ -461,6 +462,17 @@ export const en = {
       densities: {
         comfortable: 'Comfortable',
         compact: 'Compact',
+      },
+      terminalShell: 'Default terminal',
+      terminalShellDesc:
+        'Shell used by the code-panel Terminal. Restart the terminal for changes to take effect.',
+      terminalShells: {
+        default: 'System default',
+        cmd: 'Command Prompt (cmd)',
+        powershell: 'Windows PowerShell',
+        pwsh: 'PowerShell 7+',
+        bash: 'Bash',
+        zsh: 'Zsh',
       },
       contextMenu: {
         title: 'Context menus',

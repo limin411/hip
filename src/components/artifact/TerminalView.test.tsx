@@ -171,11 +171,21 @@ describe('TerminalView', () => {
 
   it('shows error status bar when ptyOpen fails', async () => {
     mockSession = { config: { cwd: '/Users/me/hip' } }
-    ptyOpen.mockRejectedValueOnce(new Error('Terminal is not supported on Windows in this version'))
+    ptyOpen.mockRejectedValueOnce(new Error('spawn shell failed: access denied'))
     render(<TerminalView />)
     await waitFor(() => {
       expect(screen.getByTestId('terminal-status-bar')).toBeInTheDocument()
-      expect(screen.getByText('artifact.terminalView.unsupportedPlatform')).toBeInTheDocument()
+      expect(screen.getByText('artifact.terminalView.error')).toBeInTheDocument()
+    })
+  })
+
+  it('maps missing-shell errors to noShell label', async () => {
+    mockSession = { config: { cwd: '/Users/me/hip' } }
+    ptyOpen.mockRejectedValueOnce(new Error('pwsh.exe not found (install PowerShell 7+)'))
+    render(<TerminalView />)
+    await waitFor(() => {
+      expect(screen.getByTestId('terminal-status-bar')).toBeInTheDocument()
+      expect(screen.getByText('artifact.terminalView.noShell')).toBeInTheDocument()
     })
   })
 

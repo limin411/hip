@@ -1,22 +1,26 @@
 //! Interactive PTY manager for the code-surface Terminal tab.
 //!
 //! - 1 PTY per sessionId; soft cap 8
-//! - Shell: `$SHELL -il` (login + interactive) on Unix
+//! - Shell preference from `[terminal].shell` in hip.toml (General Settings)
+//! - Unix default: `$SHELL -il`; Windows default: `cmd.exe`
 //! - Events: `pty:data` (base64) / `pty:exit`
 //! - Coalesced reader (8–16 ms / 32 KiB); drop-oldest under backpressure
-//! - Windows: commands return a clear unsupported error (UI still shows tab)
+//! - Windows via ConPTY (`portable-pty`); PowerShell loads user profile
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
+
+use crate::hip_config::TomlHipConfig;
+use crate::paths;
 
 /// Max concurrent PTY sessions (D16).
 pub const MAX_PTY_SESSIONS: usize = 8;
@@ -67,23 +71,223 @@ pub fn coalesce_should_flush(pending_len: usize, elapsed: Duration) -> bool {
     pending_len >= COALESCE_BYTES || elapsed >= Duration::from_millis(COALESCE_MS)
 }
 
-/// Resolve shell path: `$SHELL` if non-empty and exists, else `/bin/zsh` then `/bin/bash`.
-pub fn resolve_shell() -> Result<PathBuf, String> {
-    if let Ok(shell) = std::env::var("SHELL") {
-        if !shell.is_empty() {
-            let p = PathBuf::from(&shell);
-            if p.is_file() {
-                return Ok(p);
+/// Normalize shell preference string (empty / unknown → `"default"`).
+pub fn normalize_shell_pref(raw: &str) -> &'static str {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "cmd" => "cmd",
+        "powershell" => "powershell",
+        "pwsh" => "pwsh",
+        "bash" => "bash",
+        "zsh" => "zsh",
+        _ => "default",
+    }
+}
+
+fn first_existing(paths: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    paths.into_iter().find(|p| p.is_file())
+}
+
+fn which_on_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        #[cfg(windows)]
+        {
+            // Allow bare name without extension when PATH entry already includes .exe
+            if !name.contains('.') {
+                for ext in ["exe", "cmd", "bat"] {
+                    let c = dir.join(format!("{name}.{ext}"));
+                    if c.is_file() {
+                        return Some(c);
+                    }
+                }
             }
         }
     }
-    for candidate in ["/bin/zsh", "/bin/bash"] {
-        let p = PathBuf::from(candidate);
-        if p.is_file() {
-            return Ok(p);
+    None
+}
+
+/// Resolve shell executable from preference (`default` | `cmd` | `powershell` | `pwsh` | `bash` | `zsh`).
+///
+/// Platform defaults:
+/// - Windows `default` / `cmd` → `cmd.exe`
+/// - Unix `default` → `$SHELL`, then `/bin/zsh`, `/bin/bash`
+pub fn resolve_shell(pref: &str) -> Result<PathBuf, String> {
+    let pref = normalize_shell_pref(pref);
+
+    // Explicit HIP_SHELL override (dogfood / CI).
+    if let Ok(override_path) = std::env::var("HIP_SHELL") {
+        if !override_path.is_empty() {
+            let p = PathBuf::from(&override_path);
+            if p.is_file() {
+                return Ok(p);
+            }
+            return Err(format!("HIP_SHELL is not a file: {override_path}"));
         }
     }
-    Err("no usable shell found ($SHELL, /bin/zsh, /bin/bash)".into())
+
+    #[cfg(windows)]
+    {
+        let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+        let cmd = PathBuf::from(format!("{system_root}\\System32\\cmd.exe"));
+        let powershell = PathBuf::from(format!(
+            "{system_root}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+        ));
+
+        match pref {
+            "powershell" => {
+                if powershell.is_file() {
+                    return Ok(powershell);
+                }
+                return which_on_path("powershell.exe")
+                    .ok_or_else(|| "powershell.exe not found".into());
+            }
+            "pwsh" => {
+                let mut candidates: Vec<PathBuf> = Vec::new();
+                if let Some(p) = which_on_path("pwsh.exe") {
+                    candidates.push(p);
+                }
+                if let Some(p) = which_on_path("pwsh") {
+                    candidates.push(p);
+                }
+                if let Ok(pf) = std::env::var("ProgramFiles") {
+                    candidates.push(PathBuf::from(format!("{pf}\\PowerShell\\7\\pwsh.exe")));
+                    candidates.push(PathBuf::from(format!(
+                        "{pf}\\PowerShell\\7-preview\\pwsh.exe"
+                    )));
+                }
+                return first_existing(candidates)
+                    .ok_or_else(|| "pwsh.exe not found (install PowerShell 7+)".into());
+            }
+            "bash" => {
+                let mut candidates: Vec<PathBuf> = Vec::new();
+                if let Some(p) = which_on_path("bash.exe") {
+                    candidates.push(p);
+                }
+                if let Some(p) = which_on_path("bash") {
+                    candidates.push(p);
+                }
+                if let Ok(pf) = std::env::var("ProgramFiles") {
+                    candidates.push(PathBuf::from(format!("{pf}\\Git\\bin\\bash.exe")));
+                    candidates.push(PathBuf::from(format!("{pf}\\Git\\usr\\bin\\bash.exe")));
+                }
+                return first_existing(candidates)
+                    .ok_or_else(|| "bash.exe not found (install Git for Windows?)".into());
+            }
+            "zsh" => {
+                return which_on_path("zsh.exe")
+                    .or_else(|| which_on_path("zsh"))
+                    .ok_or_else(|| "zsh not found on PATH".into());
+            }
+            // default + cmd → cmd.exe
+            _ => {
+                if cmd.is_file() {
+                    return Ok(cmd);
+                }
+                return which_on_path("cmd.exe").ok_or_else(|| "cmd.exe not found".into());
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        match pref {
+            "bash" => {
+                let mut candidates = vec![
+                    PathBuf::from("/bin/bash"),
+                    PathBuf::from("/usr/bin/bash"),
+                ];
+                if let Some(p) = which_on_path("bash") {
+                    candidates.push(p);
+                }
+                return first_existing(candidates).ok_or_else(|| "bash not found".into());
+            }
+            "zsh" => {
+                let mut candidates =
+                    vec![PathBuf::from("/bin/zsh"), PathBuf::from("/usr/bin/zsh")];
+                if let Some(p) = which_on_path("zsh") {
+                    candidates.push(p);
+                }
+                return first_existing(candidates).ok_or_else(|| "zsh not found".into());
+            }
+            "cmd" | "powershell" | "pwsh" => {
+                // Rare on Unix (e.g. pwsh). Try PATH.
+                let names: &[&str] = match pref {
+                    "cmd" => &["cmd", "cmd.exe"],
+                    "powershell" => &["powershell", "powershell.exe"],
+                    _ => &["pwsh", "pwsh.exe"],
+                };
+                for n in names {
+                    if let Some(p) = which_on_path(n) {
+                        return Ok(p);
+                    }
+                }
+                return Err(format!("{pref} not found on PATH"));
+            }
+            _ => {
+                // default → $SHELL then zsh/bash
+                if let Ok(shell) = std::env::var("SHELL") {
+                    if !shell.is_empty() {
+                        let p = PathBuf::from(&shell);
+                        if p.is_file() {
+                            return Ok(p);
+                        }
+                    }
+                }
+                return first_existing([PathBuf::from("/bin/zsh"), PathBuf::from("/bin/bash")])
+                    .ok_or_else(|| {
+                        "no usable shell found ($SHELL, /bin/zsh, /bin/bash)".into()
+                    });
+            }
+        }
+    }
+}
+
+/// Apply platform-appropriate interactive args + TERM env on `cmd`.
+pub fn configure_shell_command(cmd: &mut portable_pty::CommandBuilder, shell: &Path) {
+    let name = shell
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    if name == "cmd.exe" || name == "cmd" {
+        // Interactive session; /K keeps shell open if a startup command is ever added.
+        cmd.arg("/K");
+    } else if name == "powershell.exe" || name == "powershell" {
+        // Load user profile (no -NoProfile). -NoLogo only.
+        cmd.arg("-NoLogo");
+    } else if name == "pwsh.exe" || name == "pwsh" {
+        cmd.arg("-NoLogo");
+    } else if name.contains("bash") || name.contains("zsh") || name.contains("sh") {
+        // Login + interactive (Unix shells / Git Bash).
+        cmd.arg("-il");
+    }
+
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+}
+
+/// Read `[terminal].shell` from hip.toml; defaults to `"default"`.
+pub fn load_shell_pref(app: &AppHandle) -> String {
+    let Some(path) = paths::hip_config_path(app) else {
+        return "default".into();
+    };
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return "default".into();
+    };
+    let Ok(toml_cfg) = toml::from_str::<TomlHipConfig>(&raw) else {
+        return "default".into();
+    };
+    toml_cfg
+        .terminal
+        .and_then(|t| t.shell)
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| normalize_shell_pref(&s).to_string())
+        .unwrap_or_else(|| "default".into())
 }
 
 /// Split `data` into chunks of at most `max` bytes.
@@ -240,11 +444,6 @@ fn kill_session_handles(sess: &PtySession) {
 
 // ── Commands ────────────────────────────────────────────────────────────────
 
-#[cfg(not(unix))]
-fn unsupported() -> String {
-    "Terminal is not supported on Windows in this version".into()
-}
-
 #[tauri::command]
 pub fn pty_open(
     app: AppHandle,
@@ -254,19 +453,10 @@ pub fn pty_open(
     cols: u16,
     rows: u16,
 ) -> Result<PtyOpenResult, String> {
-    #[cfg(not(unix))]
-    {
-        let _ = (app, state, session_id, cwd, cols, rows);
-        return Err(unsupported());
-    }
-    #[cfg(unix)]
-    {
-        open_unix(app, &state, session_id, cwd, cols, rows)
-    }
+    open_session(app, &state, session_id, cwd, cols, rows)
 }
 
-#[cfg(unix)]
-fn open_unix(
+fn open_session(
     app: AppHandle,
     state: &PtyManager,
     session_id: String,
@@ -319,7 +509,8 @@ fn open_unix(
     }
 
     let generation = state.next_gen();
-    let shell = resolve_shell()?;
+    let shell_pref = load_shell_pref(&app);
+    let shell = resolve_shell(&shell_pref)?;
     let pty_system = portable_pty::native_pty_system();
     let pair = pty_system
         .openpty(portable_pty::PtySize {
@@ -331,11 +522,8 @@ fn open_unix(
         .map_err(|e| format!("openpty failed: {e}"))?;
 
     let mut cmd = portable_pty::CommandBuilder::new(&shell);
-    // Login + interactive (D11).
-    cmd.arg("-il");
+    configure_shell_command(&mut cmd, &shell);
     cmd.cwd(&cwd_path);
-    cmd.env("TERM", "xterm-256color");
-    cmd.env("COLORTERM", "truecolor");
     // Inherit process env (PATH already fixed by path_env::ensure_user_path).
 
     let mut child = pair
@@ -343,7 +531,11 @@ fn open_unix(
         .spawn_command(cmd)
         .map_err(|e| format!("spawn shell failed: {e}"))?;
 
+    #[cfg(unix)]
     let pgid = pair.master.process_group_leader();
+    #[cfg(not(unix))]
+    let pgid = None;
+
     let reader = pair
         .master
         .try_clone_reader()
@@ -363,8 +555,12 @@ fn open_unix(
         writer: Mutex::new(Some(writer)),
         master: Mutex::new(Some(pair.master)),
         killer: Mutex::new(Some(killer)),
+        #[cfg(unix)]
         pgid,
     };
+    // Silence unused on non-unix if we kept pgid local for symmetry.
+    #[cfg(not(unix))]
+    let _ = pgid;
 
     {
         let mut map = state.sessions.lock().unwrap();
@@ -527,48 +723,25 @@ pub fn pty_write(
     session_id: String,
     data: String,
 ) -> Result<(), String> {
-    #[cfg(not(unix))]
-    {
-        let _ = (state, session_id, data);
-        return Err(unsupported());
+    // Clone session lookup under map lock; hold only the per-session writer lock
+    // during I/O so a blocked slave cannot stall kill_all / other sessions.
+    let map = state.sessions.lock().unwrap();
+    let sess = map
+        .get(&session_id)
+        .ok_or_else(|| format!("no pty for session {session_id}"))?;
+    if !sess.alive.load(Ordering::SeqCst) {
+        return Err(format!("pty for session {session_id} has exited"));
     }
-    #[cfg(unix)]
-    {
-        // Clone session lookup under map lock; hold only the per-session writer lock
-        // during I/O so a blocked slave cannot stall kill_all / other sessions.
-        let writer_slot = {
-            let map = state.sessions.lock().unwrap();
-            let sess = map
-                .get(&session_id)
-                .ok_or_else(|| format!("no pty for session {session_id}"))?;
-            if !sess.alive.load(Ordering::SeqCst) {
-                return Err(format!("pty for session {session_id} has exited"));
-            }
-            // Safety: we only use the raw pointer while holding map... can't.
-            // Instead: write under per-session writer lock without holding map:
-            // get a clone of Arc is not available. Keep write under writer mutex only
-            // by looking up again — use a short map lock to validate, then re-lock.
-            true
-        };
-        let _ = writer_slot;
-        let map = state.sessions.lock().unwrap();
-        let sess = map
-            .get(&session_id)
-            .ok_or_else(|| format!("no pty for session {session_id}"))?;
-        if !sess.alive.load(Ordering::SeqCst) {
-            return Err(format!("pty for session {session_id} has exited"));
-        }
-        // Writer mutex is per-session; release map before long write by taking writer out.
-        let mut writer_guard = sess.writer.lock().unwrap();
-        let writer = writer_guard
-            .as_mut()
-            .ok_or_else(|| format!("no writer for session {session_id}"))?;
-        writer
-            .write_all(data.as_bytes())
-            .map_err(|e| format!("pty write failed: {e}"))?;
-        writer.flush().map_err(|e| format!("pty flush failed: {e}"))?;
-        Ok(())
-    }
+    // Writer mutex is per-session; write while holding map + writer (same as prior Unix path).
+    let mut writer_guard = sess.writer.lock().unwrap();
+    let writer = writer_guard
+        .as_mut()
+        .ok_or_else(|| format!("no writer for session {session_id}"))?;
+    writer
+        .write_all(data.as_bytes())
+        .map_err(|e| format!("pty write failed: {e}"))?;
+    writer.flush().map_err(|e| format!("pty flush failed: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -578,33 +751,25 @@ pub fn pty_resize(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    #[cfg(not(unix))]
-    {
-        let _ = (state, session_id, cols, rows);
-        return Err(unsupported());
-    }
-    #[cfg(unix)]
-    {
-        let cols = cols.max(2);
-        let rows = rows.max(1);
-        let map = state.sessions.lock().unwrap();
-        let sess = map
-            .get(&session_id)
-            .ok_or_else(|| format!("no pty for session {session_id}"))?;
-        let master = sess.master.lock().unwrap();
-        let master = master
-            .as_ref()
-            .ok_or_else(|| format!("no master for session {session_id}"))?;
-        master
-            .resize(portable_pty::PtySize {
-                rows,
-                cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            })
-            .map_err(|e| format!("pty resize failed: {e}"))?;
-        Ok(())
-    }
+    let cols = cols.max(2);
+    let rows = rows.max(1);
+    let map = state.sessions.lock().unwrap();
+    let sess = map
+        .get(&session_id)
+        .ok_or_else(|| format!("no pty for session {session_id}"))?;
+    let master = sess.master.lock().unwrap();
+    let master = master
+        .as_ref()
+        .ok_or_else(|| format!("no master for session {session_id}"))?;
+    master
+        .resize(portable_pty::PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("pty resize failed: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -713,25 +878,32 @@ mod tests {
     }
 
     #[test]
-    fn resolve_shell_finds_something_on_unix() {
-        #[cfg(unix)]
-        {
-            let shell = resolve_shell().expect("shell");
-            assert!(shell.is_file(), "{shell:?}");
-        }
+    fn normalize_shell_pref_maps_known_values() {
+        assert_eq!(normalize_shell_pref("CMD"), "cmd");
+        assert_eq!(normalize_shell_pref("PowerShell"), "powershell");
+        assert_eq!(normalize_shell_pref("  pwsh "), "pwsh");
+        assert_eq!(normalize_shell_pref("bash"), "bash");
+        assert_eq!(normalize_shell_pref("zsh"), "zsh");
+        assert_eq!(normalize_shell_pref(""), "default");
+        assert_eq!(normalize_shell_pref("nope"), "default");
     }
 
-    /// Smoke: open real PTY, write `echo hip-pty\n`, wait for data, kill.
-    #[cfg(unix)]
     #[test]
-    fn unix_pty_echo_smoke() {
+    fn resolve_shell_default_finds_something() {
+        let shell = resolve_shell("default").expect("shell");
+        assert!(shell.is_file(), "{shell:?}");
+    }
+
+    /// Smoke: open real PTY, write echo marker, wait for data, kill.
+    #[test]
+    fn pty_echo_smoke() {
         use portable_pty::{CommandBuilder, PtySize, native_pty_system};
         use std::io::Write;
 
         let dir = std::env::temp_dir().join(format!("hip-pty-smoke-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
 
-        let shell = resolve_shell().unwrap();
+        let shell = resolve_shell("default").unwrap();
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -743,26 +915,29 @@ mod tests {
             .unwrap();
 
         let mut cmd = CommandBuilder::new(&shell);
-        cmd.arg("-il");
+        configure_shell_command(&mut cmd, &shell);
         cmd.cwd(&dir);
-        cmd.env("TERM", "xterm-256color");
 
         let mut child = pair.slave.spawn_command(cmd).unwrap();
         let mut reader = pair.master.try_clone_reader().unwrap();
         let mut writer = pair.master.take_writer().unwrap();
 
         // Give shell a moment to start, then echo a marker.
-        thread::sleep(Duration::from_millis(200));
-        write!(writer, "echo hip-pty-marker\n").unwrap();
+        thread::sleep(Duration::from_millis(300));
+        #[cfg(windows)]
+        {
+            write!(writer, "echo hip-pty-marker\r\n").unwrap();
+        }
+        #[cfg(not(windows))]
+        {
+            write!(writer, "echo hip-pty-marker\n").unwrap();
+        }
         writer.flush().unwrap();
 
         let mut collected = Vec::new();
-        let deadline = Instant::now() + Duration::from_secs(3);
+        let deadline = Instant::now() + Duration::from_secs(5);
         let mut buf = [0u8; 4096];
         while Instant::now() < deadline {
-            // Non-blocking-ish: short reads with try pattern via set timeout isn't available;
-            // use a small sleep between blocking reads with thread::spawn timeout.
-            // For smoke test, block with overall deadline via try_wait + short reads.
             if let Ok(n) = reader.read(&mut buf) {
                 if n > 0 {
                     collected.extend_from_slice(&buf[..n]);

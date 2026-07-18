@@ -13,6 +13,8 @@ import type {
   TeamPipelineStep,
   AgentLoopConfig,
   LangSmithConfig,
+  TerminalConfig,
+  TerminalShellPref,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
 
@@ -215,6 +217,26 @@ function normalizeLangSmith(raw: Record<string, unknown>): LangSmithConfig {
   return out
 }
 
+const TERMINAL_SHELL_PREFS = new Set<TerminalShellPref>([
+  'default',
+  'cmd',
+  'powershell',
+  'pwsh',
+  'bash',
+  'zsh',
+])
+
+function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
+  const out: TerminalConfig = {}
+  if (typeof raw.shell === 'string') {
+    const shell = raw.shell.trim().toLowerCase() as TerminalShellPref
+    if (TERMINAL_SHELL_PREFS.has(shell)) {
+      out.shell = shell
+    }
+  }
+  return out
+}
+
 
 /** Validate a parsed TOML object against the HipConfig schema. Never throws. */
 function validateConfig(parsed: unknown, filePath: string): HipConfig {
@@ -274,6 +296,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const langsmith = obj.langsmith
   if (langsmith && typeof langsmith === 'object' && !Array.isArray(langsmith)) {
     config.langsmith = normalizeLangSmith(langsmith as Record<string, unknown>)
+  }
+
+  const terminal = obj.terminal
+  if (terminal && typeof terminal === 'object' && !Array.isArray(terminal)) {
+    config.terminal = normalizeTerminal(terminal as Record<string, unknown>)
   }
 
   return config

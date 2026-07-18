@@ -834,3 +834,9 @@ describe('protocol: McpServerConfig extended fields (Todo 1)', () => {
     expect(round.langsmith).toEqual(langsmith)
   })
 
+  it('round-trips terminal on HipConfig through JSON', () => {
+    const cfg: HipConfig = { version: 1, terminal: { shell: 'cmd' } }
+    const round = JSON.parse(JSON.stringify(cfg)) as HipConfig
+    expect(round.terminal).toEqual({ shell: 'cmd' })
+  })
+

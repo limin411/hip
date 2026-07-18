@@ -320,10 +320,17 @@ export function TerminalView() {
 
   const errorLabel = (() => {
     if (!lastError) return t('artifact.terminalView.error')
-    if (lastError.includes('Windows') || lastError.includes('not supported')) {
+    if (lastError.includes('not supported on this platform')) {
       return t('artifact.terminalView.unsupportedPlatform')
     }
     if (lastError.includes('Too many terminals')) return t('artifact.terminalView.softCap')
+    if (
+      lastError.includes('not found') ||
+      lastError.includes('no usable shell') ||
+      lastError.includes('HIP_SHELL')
+    ) {
+      return t('artifact.terminalView.noShell')
+    }
     return t('artifact.terminalView.error')
   })()
 

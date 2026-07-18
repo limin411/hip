@@ -154,6 +154,58 @@ describe('AppSidebar', () => {
     expect(selectSessionFromSidebar).toHaveBeenCalledWith('chat-1')
   })
 
+  it('shows a blinking running indicator while a session is running', () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'chat-1',
+          title: 'Hello chat',
+          preview: 'preview text',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'chat' },
+          messages: [],
+          status: 'running',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'chat-1',
+    } as never)
+    render(<AppSidebar />)
+    const indicator = screen.getByTestId('sidebar-session-running-chat-1')
+    expect(indicator).toBeInTheDocument()
+    expect(indicator).toHaveClass('animate-pulse')
+    expect(screen.getByTestId('sidebar-session-chat-1')).toHaveAttribute(
+      'data-session-status',
+      'running',
+    )
+    expect(screen.getByTestId('sidebar-session-chat-1')).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('hides the running indicator after the session finishes', () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'chat-1',
+          title: 'Hello chat',
+          preview: 'preview text',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'chat' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'chat-1',
+    } as never)
+    render(<AppSidebar />)
+    expect(screen.queryByTestId('sidebar-session-running-chat-1')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-chat-1')).toHaveAttribute(
+      'data-session-status',
+      'idle',
+    )
+    expect(screen.getByTestId('sidebar-session-chat-1')).not.toHaveAttribute('aria-busy')
+  })
+
   it('shows expandable worktree tree under host project session', () => {
     useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
     useParallelStore.setState({

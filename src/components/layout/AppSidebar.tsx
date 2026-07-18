@@ -482,6 +482,7 @@ function SidebarSessionRow({
   const surface = surfaceOf(session.config)
   const active =
     session.id === activeSessionId && (activeView === 'chat' || activeView === 'code')
+  const running = session.status === 'running'
   const surfaceLabel = surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
   const hostRuns = runsByHost.get(session.id) ?? []
   const slots = slotsForHost(parallelRuns, session.id)
@@ -492,6 +493,9 @@ function SidebarSessionRow({
   ).filter((c) => !c.isPrimary)
   const hasWorktrees = slots.length > 0 || catalogRows.length > 0
   const expanded = hasWorktrees && worktreeExpanded
+  const ariaLabel = running
+    ? `${session.title}, ${surfaceLabel}, ${t('sidebar.status.running')}`
+    : `${session.title}, ${surfaceLabel}`
 
   return (
     <li data-testid={`sidebar-session-group-${session.id}`}>
@@ -547,23 +551,34 @@ function SidebarSessionRow({
             // Legacy e2e gate selectors (title-bar tabs removed).
             data-session-tab="true"
             data-session-id={session.id}
+            data-session-status={session.status}
             aria-selected={active ? 'true' : 'false'}
+            aria-busy={running || undefined}
             data-no-drag
             aria-current={active ? 'true' : undefined}
-            aria-label={`${session.title}, ${surfaceLabel}`}
+            aria-label={ariaLabel}
             onClick={() => void selectSessionFromSidebar(session.id)}
             className={cn(
               'flex min-w-0 flex-1 items-center gap-2 py-2 pr-2.5 text-left',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
             )}
           >
-            <span
-              className={cn(
-                'size-1.5 shrink-0 rounded-full',
-                active ? 'bg-accent' : 'bg-transparent',
-              )}
-              aria-hidden
-            />
+            {running ? (
+              <span
+                className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+                data-testid={`sidebar-session-running-${session.id}`}
+                title={t('sidebar.status.running')}
+                aria-hidden
+              />
+            ) : (
+              <span
+                className={cn(
+                  'size-1.5 shrink-0 rounded-full',
+                  active ? 'bg-accent' : 'bg-transparent',
+                )}
+                aria-hidden
+              />
+            )}
             <span className="flex min-w-0 flex-1 items-center gap-1">
               <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
                 {session.title}
@@ -719,13 +734,16 @@ function WorktreeSlotRow({
   const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
   const pathLabel = shortWorktreeLabel(slot.worktreePath, slot.branch)
   const label = session?.title || slot.branch || `P${slot.index}`
+  const running = session?.status === 'running'
 
   const rowButton = (
     <button
       type="button"
       data-testid={`sidebar-parallel-slot-${key}`}
       data-no-drag
+      data-session-status={session?.status}
       aria-current={active ? 'true' : undefined}
+      aria-busy={running || undefined}
       onClick={() => {
         if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
         else if (run.hostSessionId) void selectSessionFromSidebar(run.hostSessionId)
@@ -751,7 +769,17 @@ function WorktreeSlotRow({
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-medium text-ink">{label}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          {running ? (
+            <span
+              className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+              data-testid={`sidebar-session-running-${slot.sessionId}`}
+              title={t('sidebar.status.running')}
+              aria-hidden
+            />
+          ) : null}
+          <span className="block min-w-0 truncate text-[12px] font-medium text-ink">{label}</span>
+        </span>
         <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={slot.worktreePath}>
           {pathLabel}
           {slot.taskId ? ` · ${slot.taskId}` : ''}

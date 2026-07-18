@@ -1048,6 +1048,9 @@ export const zhTW = {
         chat: '對話',
         code: '編碼',
       },
+      status: {
+        running: '執行中',
+      },
       viewAll: '檢視全部',
       manageSpaces: '管理',
       newTask: '新增任務',

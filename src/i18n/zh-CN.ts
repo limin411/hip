@@ -1048,6 +1048,9 @@ export const zhCN = {
         chat: '对话',
         code: '编码',
       },
+      status: {
+        running: '运行中',
+      },
       viewAll: '查看全部',
       manageSpaces: '管理',
       newTask: '新建任务',

@@ -1055,6 +1055,9 @@ export const en = {
         chat: 'Chat',
         code: 'Code',
       },
+      status: {
+        running: 'Running',
+      },
       viewAll: 'View all',
       manageSpaces: 'Manage',
       newTask: 'New task',

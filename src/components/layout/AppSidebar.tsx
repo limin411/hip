@@ -49,6 +49,7 @@ import {
   openSpaceFromSidebar,
   selectSessionFromSidebar,
 } from './sidebarActions'
+import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
 
 export function AppSidebar() {
@@ -323,9 +324,7 @@ export function AppSidebar() {
                       className={cn(
                         'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-                        active
-                          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
-                          : 'hover:bg-state-hover',
+                        active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                       )}
                     >
                       <span
@@ -511,9 +510,7 @@ function SidebarSessionRow({
         <div
           className={cn(
             'flex w-full items-center gap-0.5 rounded-lg transition-colors',
-            active
-              ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
-              : 'hover:bg-state-hover',
+            active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
           )}
         >
           {hasWorktrees ? (
@@ -759,9 +756,7 @@ function WorktreeSlotRow({
       className={cn(
         'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-        active
-          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
-          : 'hover:bg-state-hover',
+        active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
       )}
     >
       <GitBranch
@@ -842,9 +837,7 @@ function NavItem({
       className={cn(
         'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-        active
-          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
-          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
+        active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
       <span className="shrink-0 opacity-80">{icon}</span>

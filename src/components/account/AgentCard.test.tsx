@@ -223,6 +223,41 @@ describe('AgentCard — list view', () => {
     expect(screen.getByText('Installed')).toBeInTheDocument()
   })
 
+  it('internal category badge uses accent identity chip', () => {
+    render(
+      <AgentCard
+        agent={internalAgent()}
+        viewMode="list"
+        installed={{}}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const badge = screen.getByText('Internal')
+    expect(badge).toHaveClass('bg-accent/10')
+    expect(badge).toHaveClass('text-accent')
+    expect(badge).not.toHaveClass('bg-accent-subtle')
+  })
+
+  it('ACP category badge stays neutral default', () => {
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="list"
+        installed={{ opencode: true }}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const badge = screen.getByText('ACP agent')
+    expect(badge).toHaveClass('bg-surface-muted')
+    expect(badge).not.toHaveClass('bg-accent/10')
+  })
+
   it('wires DeclarativeContextMenu with agentConfig kind and handlers', () => {
     const onEdit = vi.fn()
     const onDelete = vi.fn()

@@ -770,10 +770,10 @@ export const zhTW = {
       },
       skill: {
         title: '技能',
-        intro: '安裝 Claude 格式的技能（SKILL.md 資料夾）。hip 會按需載入已啟用的技能。',
+        intro: 'Claude 格式的技能（SKILL.md 資料夾）。hip 會按需載入已啟用的技能。請透過資料目錄新增技能。',
         upload: '上傳技能（.zip）',
         empty: '尚未安裝任何技能。',
-        emptyHint: '上傳 .zip，或把技能資料夾放進 ~/.hip/skills/',
+        emptyHint: '將技能資料夾放到 ~/.hip/skills/（或你設定的資料目錄）中。',
         hasScripts: '含腳本',
         hasScriptsTitle: '該技能自帶腳本。執行腳本時每次都會請求你確認。',
         view: '檢視',

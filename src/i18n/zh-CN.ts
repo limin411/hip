@@ -770,10 +770,10 @@ export const zhCN = {
       },
       skill: {
         title: '技能',
-        intro: '安装 Claude 格式的技能（SKILL.md 文件夹）。hip 会按需加载已启用的技能。',
+        intro: 'Claude 格式的技能（SKILL.md 文件夹）。hip 会按需加载已启用的技能。请通过数据目录添加技能。',
         upload: '上传技能（.zip）',
         empty: '尚未安装任何技能。',
-        emptyHint: '上传 .zip，或把技能文件夹放进 ~/.hip/skills/',
+        emptyHint: '将技能文件夹放到 ~/.hip/skills/（或你配置的数据目录）中。',
         hasScripts: '含脚本',
         hasScriptsTitle: '该技能自带脚本。运行脚本时每次都会请求你确认。',
         view: '查看',

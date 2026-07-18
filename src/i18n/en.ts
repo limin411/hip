@@ -778,10 +778,10 @@ export const en = {
       },
       skill: {
         title: 'Skills',
-        intro: 'Install Claude-format skills (SKILL.md folders). hip loads enabled skills on demand.',
+        intro: 'Claude-format skills (SKILL.md folders). hip loads enabled skills on demand. Add skills by placing folders in the data directory.',
         upload: 'Upload skill (.zip)',
         empty: 'No skills installed yet.',
-        emptyHint: 'Upload a .zip, or drop a skill folder into ~/.hip/skills/',
+        emptyHint: 'Place a skill folder under ~/.hip/skills/ (or your configured data directory).',
         hasScripts: 'Has scripts',
         hasScriptsTitle: 'This skill ships scripts. Running them asks for your approval each time.',
         view: 'View',

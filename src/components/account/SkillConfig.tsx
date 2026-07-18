@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Components } from 'react-markdown'
-import { Sparkles, Upload, FileText, Eye, Trash2, MoreVertical, TerminalSquare, Zap, GitFork, Wrench, BookOpen } from 'lucide-react'
+import { Sparkles, FileText, Eye, Trash2, MoreVertical, TerminalSquare, Zap, GitFork, Wrench, BookOpen } from 'lucide-react'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import type { PluginMeta, SkillMeta } from '@hip/protocol'
 import { useSkillsStore } from '@/store/skillsStore'
 import { usePluginsStore } from '@/store/pluginsStore'
-import { pickZipFile } from '@/ipc/dialog'
 import { readSkillFile } from '@/ipc/skills'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
@@ -87,49 +86,22 @@ export function derivePluginSkills(
 
 export function SkillConfig() {
   const { t } = useTranslation()
-  const { skills, enabled, loaded, load, toggle, install, remove } = useSkillsStore()
+  const { skills, enabled, loaded, load, toggle, remove } = useSkillsStore()
   const { plugins } = usePluginsStore()
   const pluginSkills = derivePluginSkills(plugins, new Set(skills.map((s) => s.id)))
   const [viewing, setViewing] = useState<SkillMeta | null>(null)
   const [deleting, setDeleting] = useState<SkillMeta | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loaded) void load()
   }, [loaded, load])
 
-  const onUpload = async () => {
-    setError(null)
-    const zip = await pickZipFile()
-    if (!zip) return
-    try {
-      await install(zip)
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err ?? '')
-      const { classifyInstallError, installErrorI18nKey } = await import('@/lib/installErrorMessage')
-      const kind = classifyInstallError(raw)
-      const human = t(installErrorI18nKey(kind))
-      setError(raw ? `${human} (${raw.slice(0, 200)})` : human)
-    }
-  }
-
   return (
     <div className="p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-title font-semibold text-ink">{t('settings.skill.title')}</h2>
-          <p className="mt-1 text-body text-ink-secondary">{t('settings.skill.intro')}</p>
-        </div>
-        <Button size="sm" onClick={() => void onUpload()}>
-          <Upload size={15} /> {t('settings.skill.upload')}
-        </Button>
+      <div>
+        <h2 className="text-title font-semibold text-ink">{t('settings.skill.title')}</h2>
+        <p className="mt-1 text-body text-ink-secondary">{t('settings.skill.intro')}</p>
       </div>
-
-      {error && (
-        <div className="mt-4 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-meta text-danger">
-          {error}
-        </div>
-      )}
 
       <div className="mt-5">
         {skills.length === 0 && pluginSkills.length === 0 ? (

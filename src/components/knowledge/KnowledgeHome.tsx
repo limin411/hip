@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { BookOpen, FileText, MoreHorizontal, Plus, Search, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { groupSearchHitsBySpace } from '@/domain/knowledge/search'
+import { splitHighlight } from '@/domain/knowledge/highlightSearchText'
 import { scheduleActiveExpandPersist, useKnowledgeStore } from '@/store/knowledgeStore'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -19,6 +20,25 @@ import {
 import { pickDirectory } from '@/ipc/dialog'
 import { knowledgeErrorMessage, knowledgeImportFolder } from '@/ipc/knowledge'
 import { formatRelativeTime } from '@/lib/datetime'
+
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  const q = query.trim()
+  if (!q) return <>{text}</>
+  const parts = splitHighlight(text, q)
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.type === 'mark' ? (
+          <mark key={i} className="rounded-sm bg-accent/15 text-inherit">
+            {p.value}
+          </mark>
+        ) : (
+          <span key={i}>{p.value}</span>
+        ),
+      )}
+    </>
+  )
+}
 
 export function KnowledgeHome() {
   const { t, i18n } = useTranslation()
@@ -310,8 +330,10 @@ export function KnowledgeHome() {
                                 className="mt-0.5 shrink-0 text-ink-tertiary"
                               />
                               <div className="min-w-0 flex-1">
-                                <div className="truncate text-body text-ink">{hit.title}</div>
-                                <div className="truncate text-meta text-ink-tertiary">
+                                <div className="truncate text-body font-medium text-ink">
+                                  <HighlightedText text={hit.title} query={searchQuery} />
+                                </div>
+                                <div className="truncate text-caption text-ink-tertiary">
                                   {hit.path || hit.title}
                                 </div>
                                 {hit.snippet && (
@@ -319,7 +341,7 @@ export function KnowledgeHome() {
                                     className="mt-0.5 line-clamp-2 text-meta text-ink-secondary"
                                     data-testid="knowledge-search-snippet"
                                   >
-                                    {hit.snippet}
+                                    <HighlightedText text={hit.snippet} query={searchQuery} />
                                   </div>
                                 )}
                               </div>

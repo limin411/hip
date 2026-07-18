@@ -417,9 +417,13 @@ export function MemoryConfig() {
     if (ref) await applyConfig({ extractModel: ref })
   }
 
+  // Extra bottom padding: long / expanded content scrolls inside SettingsPanel;
+  // plain p-6 leaves the last block flush against the pane edge.
+  const rootCls = 'space-y-6 px-6 pt-6 pb-12'
+
   if (loading && !config) {
     return (
-      <div className="p-6">
+      <div className="px-6 pt-6 pb-12">
         <h2 className="text-title font-semibold text-ink">{t('settings.memory.title')}</h2>
         <p className="mt-2 text-body text-ink-secondary">{t('settings.memory.loading')}</p>
       </div>
@@ -430,7 +434,7 @@ export function MemoryConfig() {
 
   if (bothOff) {
     return (
-      <div className="space-y-6 p-6" data-testid="memory-config-empty">
+      <div className={rootCls} data-testid="memory-config-empty">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
             <Brain size={20} />
@@ -488,7 +492,7 @@ export function MemoryConfig() {
   }
 
   return (
-    <div className="space-y-6 p-6" data-testid="memory-config">
+    <div className={rootCls} data-testid="memory-config">
       {/* Header */}
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">

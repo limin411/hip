@@ -1077,7 +1077,7 @@ export const en = {
         running: 'Running',
       },
       viewAll: 'View all',
-      manageSpaces: 'Manage',
+      newSpace: 'New knowledge base',
       newTask: 'New task',
       newProject: 'New project session',
       newChat: 'New chat',
@@ -1107,6 +1107,10 @@ export const en = {
     },
     knowledge: {
       title: 'Knowledge base',
+      empty: {
+        selectTitle: 'Select a knowledge base',
+        selectHint: 'Choose a space in the sidebar, or create a new one.',
+      },
       home: {
         subtitle: 'Local spaces · folder tree · Markdown',
         searchPlaceholder: 'Search titles, body, tags, and paths…',
@@ -1117,8 +1121,8 @@ export const en = {
         docCount: '{{count}} documents',
         docCountPending: '…',
         emptyTitle: 'No spaces yet',
-        emptyHint: 'Create a space to start organizing documents.',
-        createSpace: 'New space',
+        emptyHint: 'Create a knowledge base to start organizing documents.',
+        createSpace: 'New knowledge base',
         searchResults: 'Search results',
         searchEmpty: 'No documents match your search.',
         searchIndexing: 'Building search index…',

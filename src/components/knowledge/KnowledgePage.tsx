@@ -1,12 +1,17 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import { BookOpen } from 'lucide-react'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
-import { KnowledgeHome } from './KnowledgeHome'
+import { openCreateKnowledgeSpaceDialog } from './knowledgeSpaceDialogStore'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { KnowledgeWorkspace } from './KnowledgeWorkspace'
 
 export function KnowledgePage() {
+  const { t } = useTranslation()
   const mode = useKnowledgeStore((s) => s.mode)
   const error = useKnowledgeStore((s) => s.error)
   const loaded = useKnowledgeStore((s) => s.loaded)
+  const spaces = useKnowledgeStore((s) => s.spaces)
   const loadSpaces = useKnowledgeStore((s) => s.loadSpaces)
 
   useEffect(() => {
@@ -30,7 +35,35 @@ export function KnowledgePage() {
           {error}
         </div>
       )}
-      {mode === 'workspace' ? <KnowledgeWorkspace /> : <KnowledgeHome />}
+      {mode === 'workspace' ? (
+        <KnowledgeWorkspace />
+      ) : (
+        <div
+          className="flex min-h-0 flex-1 flex-col items-center justify-center bg-surface px-8"
+          data-testid="knowledge-empty"
+        >
+          <EmptyState
+            tier="friendly"
+            title={
+              spaces.length === 0
+                ? t('knowledge.home.emptyTitle')
+                : t('knowledge.empty.selectTitle')
+            }
+            description={
+              spaces.length === 0
+                ? t('knowledge.home.emptyHint')
+                : t('knowledge.empty.selectHint')
+            }
+            action={{
+              label: t('sidebar.newSpace'),
+              onClick: () => openCreateKnowledgeSpaceDialog(),
+            }}
+            className="border-0 py-16"
+          >
+            <BookOpen size={32} className="text-accent-strong" strokeWidth={1.5} />
+          </EmptyState>
+        </div>
+      )}
     </div>
   )
 }

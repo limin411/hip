@@ -23,20 +23,13 @@ export async function openKnowledgeFromMenu(): Promise<void> {
   await nav.waitForExist({ timeout: 20000 })
   await browser.execute((el: HTMLElement) => el.click(), nav)
   await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
-  // Prefer home so create-space is available (workspace may restore last space).
-  const home = await browser.$('[data-testid="knowledge-home"]')
-  if (!(await home.isExisting())) {
-    const back = await browser.$('[data-testid="knowledge-back-home"]')
-    if (await back.isExisting()) {
-      await browser.execute((el: HTMLElement) => el.click(), back)
-    }
-  }
-  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
+  // Ensure knowledge sidebar list is the active section (create + space rows live there).
+  await (await browser.$('[data-testid="sidebar-new-space"]')).waitForExist({ timeout: 15000 })
 }
 
 /**
  * Create a space by name and enter workspace.
- * Assumes knowledge home is visible.
+ * Uses the sidebar "New knowledge base" control.
  */
 /** Set a React controlled <input> value and fire input/change. */
 async function setReactInputValue(testid: string, value: string): Promise<void> {
@@ -57,7 +50,13 @@ async function setReactInputValue(testid: string, value: string): Promise<void> 
 }
 
 export async function createSpaceAndOpen(name: string): Promise<void> {
-  await clickTestId('knowledge-create-space')
+  // Prefer sidebar CTA; fall back to empty-state alias if present.
+  const sidebarBtn = await browser.$('[data-testid="sidebar-new-space"]')
+  if (await sidebarBtn.isExisting()) {
+    await browser.execute((node: HTMLElement) => node.click(), sidebarBtn)
+  } else {
+    await clickTestId('knowledge-create-space')
+  }
   await (await browser.$('[data-testid="knowledge-create-space-name"]')).waitForExist({
     timeout: 10000,
   })
@@ -338,13 +337,12 @@ export async function clearHomeSearch(): Promise<void> {
   await browser.pause(100)
 }
 
-/** Navigate to knowledge home from workspace (back button). */
+/**
+ * Ensure knowledge section is active in the sidebar (spaces list / create CTA).
+ * No separate "home" management page — spaces live in the app sidebar.
+ */
 export async function goKnowledgeHome(): Promise<void> {
-  const back = await browser.$('[data-testid="knowledge-back-home"]')
-  await back.waitForExist({ timeout: 10000 })
-  await browser.execute((el: HTMLElement) => el.click(), back)
-  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
-  await clearHomeSearch()
+  await openKnowledgeFromMenu()
 }
 /** First folder row testid under the tree, or null. */
 export async function firstKnowledgeFolderTestId(): Promise<string | null> {
@@ -562,36 +560,36 @@ export async function waitForSaveStatusSaved(timeoutMs = 10000): Promise<void> {
   )
 }
 
-/** Whether a space card with the given name exists on home. */
+/** Whether a sidebar space row with the given name exists. */
 export async function spaceCardByName(name: string): Promise<boolean> {
   return browser.execute((target: string) => {
-    const cards = Array.from(
-      document.querySelectorAll('[data-testid="knowledge-space-card"]'),
+    const rows = Array.from(
+      document.querySelectorAll('[data-testid^="sidebar-space-"]'),
     ) as HTMLElement[]
-    return cards.some(
+    return rows.some(
       (c) =>
         c.getAttribute('data-space-name') === target ||
+        (c.textContent ?? '').trim() === target ||
         (c.textContent ?? '').includes(target),
     )
   }, name)
 }
 export async function openSpaceCardByName(name: string): Promise<void> {
-  await clearHomeSearch()
   await browser.waitUntil(async () => spaceCardByName(name), {
     timeout: 15000,
     interval: 200,
-    timeoutMsg: `space card missing: ${name}`,
+    timeoutMsg: `sidebar space missing: ${name}`,
   })
   await browser.execute((target: string) => {
-    const cards = Array.from(
-      document.querySelectorAll('[data-testid="knowledge-space-card"]'),
+    const rows = Array.from(
+      document.querySelectorAll('[data-testid^="sidebar-space-"]'),
     ) as HTMLElement[]
-    const card =
-      cards.find((c) => c.getAttribute('data-space-name') === target) ??
-      cards.find((c) => (c.textContent ?? '').includes(target))
-    if (!card) throw new Error(`space card not found: ${target}`)
-    const btn = card.querySelector('button')
-    ;(btn ?? card).click()
+    const row =
+      rows.find((c) => c.getAttribute('data-space-name') === target) ??
+      rows.find((c) => (c.textContent ?? '').trim() === target) ??
+      rows.find((c) => (c.textContent ?? '').includes(target))
+    if (!row) throw new Error(`sidebar space not found: ${target}`)
+    row.click()
   }, name)
   await (await browser.$('[data-testid="knowledge-workspace"]')).waitForExist({
     timeout: 20000,
@@ -599,46 +597,51 @@ export async function openSpaceCardByName(name: string): Promise<void> {
 }
 
 /**
- * Open home card overflow menu and click a menu item (rename/delete).
- * Menu trigger is opacity-0 until hover — force-visible then open like Radix menus.
+ * Open sidebar space context menu and click a menu item (rename/delete).
  */
 async function openSpaceCardMenuAndClick(
   name: string,
   itemTestId: string,
 ): Promise<void> {
-  await clearHomeSearch()
   await browser.waitUntil(async () => spaceCardByName(name), {
     timeout: 15000,
     interval: 200,
-    timeoutMsg: `space card not found: ${name}`,
+    timeoutMsg: `sidebar space not found: ${name}`,
   })
+
+  // Map legacy home card menu item testids → context menu item ids.
+  const contextItemId =
+    itemTestId === 'knowledge-space-rename'
+      ? 'knowledgeSpace.rename'
+      : itemTestId === 'knowledge-space-delete'
+        ? 'knowledgeSpace.delete'
+        : itemTestId
 
   for (let attempt = 0; attempt < 4; attempt++) {
     await browser.execute((target: string) => {
-      const cards = Array.from(
-        document.querySelectorAll('[data-testid="knowledge-space-card"]'),
+      const rows = Array.from(
+        document.querySelectorAll('[data-testid^="sidebar-space-"]'),
       ) as HTMLElement[]
-      const card =
-        cards.find((c) => c.getAttribute('data-space-name') === target) ??
-        cards.find((c) => (c.textContent ?? '').includes(target))
-      if (!card) throw new Error(`space card not found: ${target}`)
-      const menuBtn = card.querySelector(
-        '[data-testid="knowledge-space-menu"]',
-      ) as HTMLElement | null
-      if (!menuBtn) throw new Error('knowledge-space-menu missing on card')
-      let el: HTMLElement | null = menuBtn
-      while (el) {
-        el.style.opacity = '1'
-        el.style.pointerEvents = 'auto'
-        el.style.visibility = 'visible'
-        if (el === card) break
-        el = el.parentElement
-      }
-      menuBtn.focus()
-      menuBtn.click()
+      const row =
+        rows.find((c) => c.getAttribute('data-space-name') === target) ??
+        rows.find((c) => (c.textContent ?? '').trim() === target) ??
+        rows.find((c) => (c.textContent ?? '').includes(target))
+      if (!row) throw new Error(`sidebar space not found: ${target}`)
+      const rect = row.getBoundingClientRect()
+      const x = rect.left + rect.width / 2
+      const y = rect.top + rect.height / 2
+      row.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 2,
+        }),
+      )
     }, name)
 
-    const item = await browser.$(`[data-testid="${itemTestId}"]`)
+    const item = await browser.$(`[data-testid="context-menu-item-${contextItemId}"]`)
     try {
       await item.waitForExist({ timeout: 2000 })
       await browser.execute((node: HTMLElement) => node.click(), item)
@@ -646,17 +649,9 @@ async function openSpaceCardMenuAndClick(
     } catch {
       await browser.keys('Escape').catch(() => {})
       await browser.pause(120)
-      await browser.keys('Enter')
-      try {
-        await item.waitForExist({ timeout: 1500 })
-        await browser.execute((node: HTMLElement) => node.click(), item)
-        return
-      } catch {
-        // retry
-      }
     }
   }
-  throw new Error(`home space menu item not opened: ${itemTestId} for ${name}`)
+  throw new Error(`sidebar space context menu item not opened: ${contextItemId} for ${name}`)
 }
 
 export async function renameSpaceFromHome(
@@ -710,7 +705,8 @@ export async function deleteSpaceFromWorkspace(): Promise<void> {
   const btn = await browser.$('[data-testid="knowledge-delete-space-confirm"]')
   await btn.waitForExist({ timeout: 8000 })
   await browser.execute((node: HTMLElement) => node.click(), btn)
-  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({
+  // After deleting the active space we land on the empty knowledge surface.
+  await (await browser.$('[data-testid="knowledge-empty"]')).waitForExist({
     timeout: 20000,
   })
 }
@@ -865,29 +861,24 @@ export async function clickFirstRecentItem(): Promise<void> {
   })
 }
 
-/** Ensure knowledge home is visible (open from menu if needed, leave workspace). */
+/**
+ * Ensure knowledge sidebar section is active (spaces list / create CTA).
+ * Legacy name kept for e2e call sites.
+ */
 export async function ensureKnowledgeHome(): Promise<void> {
-  if (await (await browser.$('[data-testid="knowledge-home"]')).isExisting()) {
-    await clearHomeSearch()
-    return
-  }
-  if (await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting()) {
-    await goKnowledgeHome()
+  if (await (await browser.$('[data-testid="sidebar-new-space"]')).isExisting()) {
     return
   }
   await openKnowledgeFromMenu()
-  if (await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting()) {
-    await goKnowledgeHome()
-  }
-  await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({
+  await (await browser.$('[data-testid="sidebar-new-space"]')).waitForExist({
     timeout: 15000,
   })
-  await clearHomeSearch()
 }
-/** Count space cards on home. */
+
+/** Count knowledge spaces in the app sidebar. */
 export async function countSpaceCards(): Promise<number> {
-  const cards = await browser.$$('[data-testid="knowledge-space-card"]')
-  return cards.length
+  const rows = await browser.$$('[data-testid^="sidebar-space-"]')
+  return rows.length
 }
 
 /** Export active doc via doc menu + save seam. */

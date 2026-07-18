@@ -1069,7 +1069,7 @@ export const zhCN = {
         running: '运行中',
       },
       viewAll: '查看全部',
-      manageSpaces: '管理',
+      newSpace: '新建知识库',
       newTask: '新建任务',
       newProject: '新建项目会话',
       newChat: '新建对话',
@@ -1099,6 +1099,10 @@ export const zhCN = {
     },
     knowledge: {
       title: '知识库',
+      empty: {
+        selectTitle: '选择知识库',
+        selectHint: '在左侧边栏选择一个知识库，或新建一个。',
+      },
       home: {
         subtitle: '本地优先 · 多空间 · 目录树 + Markdown',
         searchPlaceholder: '搜索标题、正文、标签与路径…',
@@ -1108,9 +1112,9 @@ export const zhCN = {
         docCount_other: '{{count}} 篇',
         docCount: '{{count}} 篇',
         docCountPending: '…',
-        emptyTitle: '还没有知识空间',
-        emptyHint: '新建一个空间，开始整理文档。',
-        createSpace: '新建空间',
+        emptyTitle: '还没有知识库',
+        emptyHint: '新建一个知识库，开始整理文档。',
+        createSpace: '新建知识库',
         searchResults: '搜索结果',
         searchEmpty: '没有匹配的文档。',
         searchIndexing: '正在建立搜索索引…',

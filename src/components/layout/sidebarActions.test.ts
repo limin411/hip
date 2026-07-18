@@ -5,21 +5,23 @@ import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 
 const flushSave = vi.fn(async () => true)
-const loadSpaces = vi.fn(async () => {})
 const openSpace = vi.fn(async (_id: string) => {})
-const openHome = vi.fn(async () => {})
 const setSurface = vi.fn((_view: 'chat' | 'code') => {})
 const selectSession = vi.fn((_id: string) => {})
 const newConversation = vi.fn((_surface?: 'chat' | 'code') => {})
 
+const knowledgeState = {
+  spaces: [] as { id: string; name: string }[],
+  mode: 'home' as 'home' | 'workspace',
+  activeSpaceId: null as string | null,
+  flushSave: () => flushSave(),
+  loadSpaces: vi.fn(async () => {}),
+  openSpace: (id: string) => openSpace(id),
+}
+
 vi.mock('@/store/knowledgeStore', () => ({
   useKnowledgeStore: {
-    getState: () => ({
-      flushSave: () => flushSave(),
-      loadSpaces: () => loadSpaces(),
-      openSpace: (id: string) => openSpace(id),
-      openHome: () => openHome(),
-    }),
+    getState: () => knowledgeState,
   },
 }))
 
@@ -42,19 +44,21 @@ import {
   handleMainToolbarBack,
   leaveKnowledge,
   openHistoryFromChrome,
-  openKnowledgeHome,
   openSettingsFromChrome,
 } from './sidebarActions'
 
 describe('sidebarActions', () => {
   beforeEach(() => {
     flushSave.mockClear()
-    loadSpaces.mockClear()
+    knowledgeState.loadSpaces.mockClear()
     openSpace.mockClear()
-    openHome.mockClear()
     setSurface.mockClear()
     selectSession.mockClear()
     newConversation.mockClear()
+    knowledgeState.spaces = []
+    knowledgeState.mode = 'home'
+    knowledgeState.activeSpaceId = null
+    knowledgeState.loadSpaces.mockImplementation(async () => {})
     useDomainStore.setState({
       sessions: [],
       activeSessionId: null,
@@ -83,15 +87,42 @@ describe('sidebarActions', () => {
     await enterKnowledge()
     expect(useUiStore.getState().activeView).toBe('knowledge')
     expect(useUiStore.getState().sidebarSection).toBe('knowledge')
-    expect(loadSpaces).toHaveBeenCalled()
+    expect(knowledgeState.loadSpaces).toHaveBeenCalled()
   })
 
-  it('openKnowledgeHome enters knowledge then openHome', async () => {
-    await openKnowledgeHome()
-    expect(useUiStore.getState().activeView).toBe('knowledge')
-    expect(useUiStore.getState().sidebarSection).toBe('knowledge')
-    expect(loadSpaces).toHaveBeenCalled()
-    expect(openHome).toHaveBeenCalled()
+  it('enterKnowledge opens first space by name when none active', async () => {
+    knowledgeState.loadSpaces.mockImplementation(async () => {
+      knowledgeState.spaces = [
+        { id: 'z', name: 'Zebra' },
+        { id: 'a', name: 'Alpha' },
+      ]
+      knowledgeState.mode = 'home'
+      knowledgeState.activeSpaceId = null
+    })
+    await enterKnowledge()
+    expect(openSpace).toHaveBeenCalledWith('a')
+  })
+
+  it('enterKnowledge keeps current workspace when still valid', async () => {
+    knowledgeState.spaces = [
+      { id: 'a', name: 'Alpha' },
+      { id: 'b', name: 'Beta' },
+    ]
+    knowledgeState.mode = 'workspace'
+    knowledgeState.activeSpaceId = 'b'
+    knowledgeState.loadSpaces.mockImplementation(async () => {
+      // reload keeps same spaces
+    })
+    await enterKnowledge()
+    expect(openSpace).not.toHaveBeenCalled()
+  })
+
+  it('enterKnowledge does not openSpace when there are no spaces', async () => {
+    knowledgeState.loadSpaces.mockImplementation(async () => {
+      knowledgeState.spaces = []
+    })
+    await enterKnowledge()
+    expect(openSpace).not.toHaveBeenCalled()
   })
 
   it('enterSection leaves knowledge and setSurface', async () => {

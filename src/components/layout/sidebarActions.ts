@@ -32,16 +32,38 @@ export function assignSectionAfterLeavingKnowledge(): void {
   }
 }
 
+/** Name ascending — same order as the knowledge sidebar list. */
+function firstSpaceIdByName(
+  spaces: { id: string; name: string }[],
+): string | null {
+  if (spaces.length === 0) return null
+  const sorted = [...spaces].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+  )
+  return sorted[0]?.id ?? null
+}
+
+/**
+ * Enter knowledge: load spaces and open the first space by name.
+ * Keeps the current workspace if it is still valid (no flash to empty/intro).
+ * With zero spaces, stays on empty surface so the create CTA is available.
+ */
 export async function enterKnowledge(): Promise<void> {
   useUiStore.getState().openKnowledgeView()
   useUiStore.getState().setSidebarSection('knowledge')
   await useKnowledgeStore.getState().loadSpaces()
-}
-
-/** Open knowledge surface on the home (spaces list) for management. */
-export async function openKnowledgeHome(): Promise<void> {
-  await enterKnowledge()
-  await useKnowledgeStore.getState().openHome()
+  const state = useKnowledgeStore.getState()
+  if (
+    state.mode === 'workspace' &&
+    state.activeSpaceId &&
+    state.spaces.some((s) => s.id === state.activeSpaceId)
+  ) {
+    return
+  }
+  const firstId = firstSpaceIdByName(state.spaces)
+  if (firstId) {
+    await useKnowledgeStore.getState().openSpace(firstId)
+  }
 }
 
 export async function enterSection(section: 'projects' | 'chats'): Promise<void> {
@@ -69,10 +91,13 @@ export async function newConversationFromSidebar(surface: 'chat' | 'code'): Prom
 }
 
 export async function openSpaceFromSidebar(spaceId: string): Promise<void> {
-  if (useUiStore.getState().activeView !== 'knowledge') {
-    await enterKnowledge()
-  } else {
-    useUiStore.getState().setSidebarSection('knowledge')
+  // Don't go through enterKnowledge (which auto-opens first space) — open the
+  // requested id only. Still ensure view + spaces are ready.
+  useUiStore.getState().openKnowledgeView()
+  useUiStore.getState().setSidebarSection('knowledge')
+  const kb = useKnowledgeStore.getState()
+  if (!kb.loaded) {
+    await kb.loadSpaces()
   }
   await useKnowledgeStore.getState().openSpace(spaceId)
 }

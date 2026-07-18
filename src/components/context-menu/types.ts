@@ -24,6 +24,7 @@ export type ContextKind =
   | 'chatEmpty'
   | 'artifactChrome'
   | 'knowledgeNode'
+  | 'knowledgeSpace'
   | 'worktree'
 
 export type ContextGroupId =
@@ -122,6 +123,11 @@ export type ContextPayloadMap = {
     onRename: () => void
     onDelete: () => void
     onReveal?: () => void
+  }
+  /** Sidebar knowledge-space row — rename / delete via KnowledgeSpaceDialogHost. */
+  knowledgeSpace: {
+    spaceId: string
+    name: string
   }
 }
 

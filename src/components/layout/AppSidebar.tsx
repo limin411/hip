@@ -39,12 +39,12 @@ import {
 } from '@/lib/worktreeNesting'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
+import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
 import {
   enterKnowledge,
   enterSection,
   newConversationFromSidebar,
   openHistoryFromChrome,
-  openKnowledgeHome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
   selectSessionFromSidebar,
@@ -139,6 +139,8 @@ export function AppSidebar() {
     if (sidebarSection !== 'knowledge') return []
     let list = [...spaces]
     if (q) list = list.filter((sp) => sp.name.toLowerCase().includes(q))
+    // Ascending by name (locale-aware, case-insensitive).
+    list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
     return list
   }, [spaces, sidebarSection, q])
 
@@ -272,12 +274,12 @@ export function AppSidebar() {
           {sidebarSection === 'knowledge' ? (
             <button
               type="button"
-              data-testid="sidebar-manage-spaces"
+              data-testid="sidebar-new-space"
               data-no-drag
-              onClick={() => void openKnowledgeHome()}
+              onClick={() => openCreateKnowledgeSpaceDialog()}
               className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
-              {t('sidebar.manageSpaces')}
+              {t('sidebar.newSpace')}
             </button>
           ) : sidebarSection === 'projects' ? (
             <button
@@ -315,29 +317,36 @@ export function AppSidebar() {
                 const active = activeView === 'knowledge' && activeSpaceId === sp.id
                 return (
                   <li key={sp.id}>
-                    <button
-                      type="button"
-                      data-testid={`sidebar-space-${sp.id}`}
-                      data-no-drag
-                      aria-current={active ? 'true' : undefined}
-                      onClick={() => void openSpaceFromSidebar(sp.id)}
-                      className={cn(
-                        'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-                        active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
-                      )}
+                    <DeclarativeContextMenu
+                      kind="knowledgeSpace"
+                      payload={{ spaceId: sp.id, name: sp.name }}
+                      className="mb-0.5 block w-full"
                     >
-                      <span
+                      <button
+                        type="button"
+                        data-testid={`sidebar-space-${sp.id}`}
+                        data-space-name={sp.name}
+                        data-no-drag
+                        aria-current={active ? 'true' : undefined}
+                        onClick={() => void openSpaceFromSidebar(sp.id)}
                         className={cn(
-                          'mt-1.5 size-1.5 shrink-0 rounded-full',
-                          active ? 'bg-accent' : 'bg-transparent',
+                          'flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+                          active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                         )}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
-                        {sp.name}
-                      </span>
-                    </button>
+                      >
+                        <span
+                          className={cn(
+                            'mt-1.5 size-1.5 shrink-0 rounded-full',
+                            active ? 'bg-accent' : 'bg-transparent',
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+                          {sp.name}
+                        </span>
+                      </button>
+                    </DeclarativeContextMenu>
                   </li>
                 )
               })}

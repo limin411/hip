@@ -1,5 +1,5 @@
 /**
- * Knowledge home: multi-space, rename, recent, search empty, delete.
+ * Knowledge spaces in the app sidebar: create, rename, delete, list.
  * Tags: @knowledge @core
  */
 import { expect } from 'expect-webdriverio'
@@ -8,27 +8,23 @@ import { skipLoginIfPresent } from '../helpers/auth.js'
 import {
   closeKnowledgeChipIfOpen,
   createSpaceAndOpen,
-  createDocAndExpectEditor,
-  typeInKnowledgeEditor,
-  goKnowledgeHome,
   ensureKnowledgeHome,
   openSpaceCardByName,
   spaceCardByName,
-  setHomeSearchQuery,
-  clickFirstRecentItem,
-  countSpaceCards,
   waitForSpaceNameGoneOnDisk,
   deleteSpaceFromWorkspace,
   renameSpaceFromWorkspace,
   cancelDeleteSpaceFromWorkspace,
+  renameSpaceFromHome,
+  deleteSpaceFromHome,
+  countSpaceCards,
 } from '../helpers/knowledge.js'
 
-describe('knowledge home surfaces @knowledge @core', () => {
+describe('knowledge sidebar spaces @knowledge @core', () => {
   const stamp = Date.now()
   const spaceA = `e2e-kb-home-a-${stamp}`
   const spaceB = `e2e-kb-home-b-${stamp}`
   const spaceARenamed = `e2e-kb-home-a-renamed-${stamp}`
-  const recentMarker = `e2e-home-recent-${stamp}`
 
   before(async () => {
     await waitForAppReady()
@@ -43,74 +39,43 @@ describe('knowledge home surfaces @knowledge @core', () => {
     await closeKnowledgeChipIfOpen()
   })
 
-  it('KH1: create two spaces (cards on home)', async () => {
+  it('KH1: create two spaces (sidebar rows)', async () => {
     await ensureKnowledgeHome()
     const before = await countSpaceCards()
 
     await createSpaceAndOpen(spaceA)
-    await goKnowledgeHome()
+    await ensureKnowledgeHome()
     await createSpaceAndOpen(spaceB)
-    await goKnowledgeHome()
+    await ensureKnowledgeHome()
 
     await browser.waitUntil(
       async () => (await spaceCardByName(spaceA)) && (await spaceCardByName(spaceB)),
-      { timeout: 15000, interval: 200, timeoutMsg: 'two space cards not visible' },
+      { timeout: 15000, interval: 200, timeoutMsg: 'two sidebar spaces not visible' },
     )
     const after = await countSpaceCards()
     expect(after).toBeGreaterThanOrEqual(before + 2)
   })
 
-  it('KH2: rename space (workspace menu) reflects on home card', async () => {
+  it('KH2: rename space (workspace menu) reflects in sidebar', async () => {
     await ensureKnowledgeHome()
     await openSpaceCardByName(spaceA)
     await renameSpaceFromWorkspace(spaceARenamed)
-    await goKnowledgeHome()
+    await ensureKnowledgeHome()
     expect(await spaceCardByName(spaceARenamed)).toBe(true)
     expect(await spaceCardByName(spaceA)).toBe(false)
   })
 
-  it('KH3: recent list after opening a doc', async () => {
+  it('KH3: rename space via sidebar context menu', async () => {
     await ensureKnowledgeHome()
-    await openSpaceCardByName(spaceB)
-    await createDocAndExpectEditor()
-    await typeInKnowledgeEditor(recentMarker)
-    await browser.pause(800)
-    await goKnowledgeHome()
-
-    const recent = await browser.$('[data-testid="knowledge-recent-item"]')
-    await recent.waitForExist({ timeout: 15000 })
-    expect(await recent.isExisting()).toBe(true)
-
-    await clickFirstRecentItem()
-    await browser.waitUntil(
-      async () => {
-        const ed = await browser.$('[data-testid="knowledge-doc-editor"]')
-        const rd = await browser.$('[data-testid="knowledge-doc-reader"]')
-        return (await ed.isExisting()) || (await rd.isExisting())
-      },
-      { timeout: 15000, interval: 200, timeoutMsg: 'recent did not open a doc' },
-    )
-    await goKnowledgeHome()
+    const renamedAgain = `e2e-kb-home-a-ctx-${stamp}`
+    await renameSpaceFromHome(spaceARenamed, renamedAgain)
+    expect(await spaceCardByName(renamedAgain)).toBe(true)
+    // keep name for later delete steps
+    // re-assign via rename back for KH5 target stability
+    await renameSpaceFromHome(renamedAgain, spaceARenamed)
   })
 
-  it('KH4: search with no hits shows empty (or zero hits)', async () => {
-    await ensureKnowledgeHome()
-    // Avoid shared tokens with fixture names (prefix search matches substrings/numbers).
-    const nonsense = 'xqzvwmplkjhgfdsabnuytrc'
-    await setHomeSearchQuery(nonsense)
-    await browser.pause(800)
-    const hits = await browser.$$('[data-testid="knowledge-search-hit"]')
-    expect(hits.length).toBe(0)
-    // When index is ready, dedicated empty state should appear
-    const empty = await browser.$('[data-testid="knowledge-search-empty"]')
-    if (await empty.isExisting()) {
-      expect(await empty.isExisting()).toBe(true)
-    }
-    await setHomeSearchQuery('')
-    await browser.pause(200)
-  })
-
-  it('KH5: delete space from workspace clears home card', async () => {
+  it('KH5: delete space from workspace clears sidebar row', async () => {
     await ensureKnowledgeHome()
     const target =
       (await spaceCardByName(spaceARenamed)) ? spaceARenamed
@@ -125,15 +90,14 @@ describe('knowledge home surfaces @knowledge @core', () => {
     await waitForSpaceNameGoneOnDisk(target!)
   })
 
-  it('KH6: delete cancel keeps space', async () => {
+  it('KH6: delete cancel keeps space; confirm deletes via context menu', async () => {
     await ensureKnowledgeHome()
     await openSpaceCardByName(spaceB)
     await cancelDeleteSpaceFromWorkspace()
-    await goKnowledgeHome()
+    await ensureKnowledgeHome()
     expect(await spaceCardByName(spaceB)).toBe(true)
-    // Clean up
-    await openSpaceCardByName(spaceB)
-    await deleteSpaceFromWorkspace()
+    // Clean up via sidebar context menu
+    await deleteSpaceFromHome(spaceB)
     await waitForSpaceNameGoneOnDisk(spaceB)
   })
 })

@@ -10,7 +10,7 @@ import { useWorktreeStore } from '@/store/worktreeStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
 
 const enterKnowledge = vi.fn(async () => {})
-const openKnowledgeHome = vi.fn(async () => {})
+const openCreateKnowledgeSpaceDialog = vi.fn()
 const enterSection = vi.fn(async (_section: 'projects' | 'chats') => {})
 const openHistoryFromChrome = vi.fn(async () => {})
 const newConversationFromSidebar = vi.fn(async (_surface: 'chat' | 'code') => {})
@@ -18,7 +18,6 @@ const selectSessionFromSidebar = vi.fn(async (_id: string) => {})
 
 vi.mock('./sidebarActions', () => ({
   enterKnowledge: () => enterKnowledge(),
-  openKnowledgeHome: () => openKnowledgeHome(),
   enterSection: (section: 'projects' | 'chats') => enterSection(section),
   openHistoryFromChrome: () => openHistoryFromChrome(),
   openSettingsFromChrome: vi.fn(),
@@ -26,6 +25,10 @@ vi.mock('./sidebarActions', () => ({
   openSpaceFromSidebar: vi.fn(),
   selectSessionFromSidebar: (id: string) => selectSessionFromSidebar(id),
   newConversationFromSidebar: (surface: 'chat' | 'code') => newConversationFromSidebar(surface),
+}))
+
+vi.mock('@/components/knowledge/knowledgeSpaceDialogStore', () => ({
+  openCreateKnowledgeSpaceDialog: () => openCreateKnowledgeSpaceDialog(),
 }))
 
 vi.mock('./SidebarAccountFooter', () => ({
@@ -54,7 +57,7 @@ import { AppSidebar } from './AppSidebar'
 describe('AppSidebar', () => {
   beforeEach(() => {
     enterKnowledge.mockClear()
-    openKnowledgeHome.mockClear()
+    openCreateKnowledgeSpaceDialog.mockClear()
     enterSection.mockClear()
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
@@ -167,11 +170,11 @@ describe('AppSidebar', () => {
     expect(newConversationFromSidebar).toHaveBeenCalledWith('code')
   })
 
-  it('manage spaces opens knowledge home', () => {
+  it('new space button opens create dialog', () => {
     useUiStore.setState({ sidebarSection: 'knowledge' })
     render(<AppSidebar />)
-    fireEvent.click(screen.getByTestId('sidebar-manage-spaces'))
-    expect(openKnowledgeHome).toHaveBeenCalled()
+    fireEvent.click(screen.getByTestId('sidebar-new-space'))
+    expect(openCreateKnowledgeSpaceDialog).toHaveBeenCalled()
   })
 
   it('active knowledge space uses sage rail without hairline ring', () => {
@@ -183,6 +186,23 @@ describe('AppSidebar', () => {
     expect(space).toHaveClass('before:bg-accent')
     expect(space).toHaveClass('bg-surface')
     expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
+  })
+
+  it('lists knowledge spaces sorted by name ascending', () => {
+    knowledgeState.spaces = [
+      { id: 'b', name: 'Zebra' },
+      { id: 'a', name: 'Alpha' },
+      { id: 'c', name: 'beta' },
+    ]
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    render(<AppSidebar />)
+    const list = screen.getByTestId('sidebar-list')
+    const rows = within(list).getAllByTestId(/^sidebar-space-/)
+    expect(rows.map((el) => el.getAttribute('data-testid'))).toEqual([
+      'sidebar-space-a',
+      'sidebar-space-c',
+      'sidebar-space-b',
+    ])
   })
 
   it('session row calls selectSessionFromSidebar', () => {

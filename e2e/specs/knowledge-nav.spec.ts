@@ -18,14 +18,9 @@ import {
   installWriteFailSeam,
   clearWriteFailSeam,
   openTreeDocByTitle,
-  activeTreeDocTitle,
-  goKnowledgeHome,
   ensureKnowledgeHome,
-  setHomeSearchQuery,
-  expectSearchHits,
-  expectSearchGroups,
-  clickFirstSearchHit,
-  waitForKnowledgeMarker,
+  openSpaceCardByName,
+  spaceCardByName,
   ensureKnowledgeSource,
 } from '../helpers/knowledge.js'
 
@@ -82,7 +77,7 @@ describe('knowledge navigation and search @knowledge @core', () => {
     await waitForDocBodyOnDisk(`body-b-${stamp}`, 10000)
   })
 
-  it('KN2: home search groups hits by space and opens a hit', async () => {
+  it('KN2: sidebar lists spaces and can reopen them', async () => {
     await clearWriteFailSeam()
     await ensureKnowledgeHome()
 
@@ -93,19 +88,20 @@ describe('knowledge navigation and search @knowledge @core', () => {
     await waitForSaveStatusSaved(15000)
     await waitForDocBodyOnDisk(searchKw, 15000)
 
-    await goKnowledgeHome()
+    await ensureKnowledgeHome()
     await createSpaceAndOpen(spaceSearchB)
     await createDocAndExpectEditor()
     await setKnowledgeDocTitle(`SG-B-${stamp}`)
     await typeInKnowledgeEditor(`${searchKw} beta-space`)
     await waitForSaveStatusSaved(15000)
 
-    await goKnowledgeHome()
-    await setHomeSearchQuery(searchKw)
-    await expectSearchHits(2, 20000)
-    await expectSearchGroups(2, 20000)
+    await ensureKnowledgeHome()
+    expect(await spaceCardByName(spaceSearchA)).toBe(true)
+    expect(await spaceCardByName(spaceSearchB)).toBe(true)
 
-    await clickFirstSearchHit()
-    await waitForKnowledgeMarker(searchKw, 15000)
+    await openSpaceCardByName(spaceSearchA)
+    await (await browser.$('[data-testid="knowledge-workspace"]')).waitForExist({
+      timeout: 15000,
+    })
   })
 })

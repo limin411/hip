@@ -30,9 +30,6 @@ import {
   saveVersionManual,
   restoreNewestVersion,
   waitForKnowledgeMarker,
-  goKnowledgeHome,
-  setHomeSearchQuery,
-  clickFilterTag,
   attachAssetFromPath,
   exportSpaceZipTo,
   listZipEntryNames,
@@ -122,7 +119,7 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     await waitForKnowledgeMarker(v1, 15000)
   })
 
-  it('K1A: frontmatter tags show on doc and filter on home', async () => {
+  it('K1A: frontmatter tags show on doc properties', async () => {
     await createNewDocFromMenu()
     await setKnowledgeDocTitle(`FmDoc-${stamp}`)
     const body = `---\ntags:\n  - ${tagName}\nstatus: draft\n---\n\nfm-body-${stamp}\n`
@@ -130,35 +127,10 @@ describe('knowledge phase1 surfaces @knowledge', () => {
     await waitForSaveStatusSaved(15000)
     await waitForDocBodyOnDisk(tagName, 15000)
 
-    // Property row in source
+    // Property row in source (home-level tag facets were removed with the management page)
     const props = await browser.$('[data-testid="knowledge-doc-properties"]')
     await props.waitForExist({ timeout: 10000 })
     expect(await props.getText()).toContain(tagName)
-
-    await goKnowledgeHome()
-    // Facets appear after index rebuild — wait for tag chip
-    await browser.waitUntil(
-      async () => {
-        const chips = await browser.$$('[data-testid="knowledge-filter-tag"]')
-        for (const c of chips) {
-          if ((await c.getText()).includes(tagName)) return true
-        }
-        return false
-      },
-      { timeout: 30000, interval: 500, timeoutMsg: 'tag facet never appeared' },
-    )
-    await clickFilterTag(tagName)
-    // Search or filtered list should surface the doc
-    const hitOrCard = await browser.$(
-      '[data-testid="knowledge-search-hit"], [data-testid="knowledge-space-card"], [data-testid="knowledge-recent-item"]',
-    )
-    // With filter only (no query), home may list filtered docs as search results
-    await setHomeSearchQuery(tagName)
-    await browser.waitUntil(
-      async () => (await browser.$$('[data-testid="knowledge-search-hit"]')).length >= 1,
-      { timeout: 20000, interval: 400, timeoutMsg: 'no hit after tag filter/search' },
-    )
-    void hitOrCard
   })
 
   it('K1F: attach image inserts markdown and previews', async () => {

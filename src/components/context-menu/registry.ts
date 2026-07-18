@@ -24,6 +24,7 @@ import { sessionHistoryProvider } from './providers/sessionHistory'
 import { worktreeProvider } from './providers/worktree'
 import { skillConfigProvider } from './providers/skillConfig'
 import { knowledgeNodeProvider } from './providers/knowledgeNode'
+import { knowledgeSpaceProvider } from './providers/knowledgeSpace'
 import { subAgentProvider } from './providers/subAgent'
 import { terminalProvider } from './providers/terminal'
 import { toolCallProvider } from './providers/toolCall'
@@ -47,6 +48,7 @@ const BUILTIN_PROVIDERS: ContextProvider[] = [
   worktreeProvider,
   skillConfigProvider,
   knowledgeNodeProvider,
+  knowledgeSpaceProvider,
   subAgentProvider,
   terminalProvider,
   toolCallProvider,

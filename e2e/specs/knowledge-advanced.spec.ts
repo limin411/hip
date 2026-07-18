@@ -23,7 +23,7 @@ import {
   createSpaceAndOpen,
   createDocAndExpectEditor,
   closeKnowledgeChipIfOpen,
-  goKnowledgeHome,
+  ensureKnowledgeHome,
   installPickDirSeam,
   clearPickDirSeam,
   firstKnowledgeFolderTestId,
@@ -76,13 +76,8 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
   })
 
   it('KA2: create space and folder; context menu new doc under folder', async () => {
-    // Ensure home for space create if needed
-    if (await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting()) {
-      await goKnowledgeHome()
-    }
-    if (await (await browser.$('[data-testid="knowledge-home"]')).isExisting()) {
-      await createSpaceAndOpen(spaceName)
-    }
+    await ensureKnowledgeHome()
+    await createSpaceAndOpen(spaceName)
 
     await (await browser.$('[data-testid="knowledge-workspace"]')).waitForExist({
       timeout: 15000,
@@ -176,18 +171,15 @@ describe('knowledge advanced surfaces @knowledge @core', () => {
     expect(await (await browser.$('[data-testid="knowledge-page"]')).isExisting()).toBe(true)
   })
 
-  it('KA5: import folder creates space with markdown', async () => {
+  // Folder import lived on the removed management home; re-enable when import is re-homed.
+  it.skip('KA5: import folder creates space with markdown', async () => {
     importDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hip-kb-import-'))
     const sub = path.join(importDir, 'nested')
     fs.mkdirSync(sub)
     const body = `# Imported\n\ne2e-import-marker-${Date.now()}\n`
     fs.writeFileSync(path.join(sub, 'note.md'), body, 'utf8')
 
-    // Back to home for import button
-    if (await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting()) {
-      await goKnowledgeHome()
-    }
-    await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
+    await ensureKnowledgeHome()
 
     await installPickDirSeam(importDir)
     const importBtn = await browser.$('[data-testid="knowledge-import-folder"]')

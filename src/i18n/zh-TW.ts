@@ -1069,7 +1069,7 @@ export const zhTW = {
         running: '執行中',
       },
       viewAll: '檢視全部',
-      manageSpaces: '管理',
+      newSpace: '新建知識庫',
       newTask: '新增任務',
       newProject: '新增專案會話',
       newChat: '新增對話',
@@ -1099,6 +1099,10 @@ export const zhTW = {
     },
     knowledge: {
       title: '知識庫',
+      empty: {
+        selectTitle: '選擇知識庫',
+        selectHint: '在左側邊欄選擇一個知識庫，或新建一個。',
+      },
       home: {
         subtitle: '本地優先 · 多空間 · 目錄樹 + Markdown',
         searchPlaceholder: '搜尋標題、正文、標籤與路徑…',
@@ -1108,9 +1112,9 @@ export const zhTW = {
         docCount_other: '{{count}} 篇',
         docCount: '{{count}} 篇',
         docCountPending: '…',
-        emptyTitle: '尚無知識空間',
-        emptyHint: '建立一個空間，開始整理文件。',
-        createSpace: '新增空間',
+        emptyTitle: '尚無知識庫',
+        emptyHint: '新建一個知識庫，開始整理文件。',
+        createSpace: '新建知識庫',
         searchResults: '搜尋結果',
         searchEmpty: '沒有符合的文件。',
         searchIndexing: '正在建立搜尋索引…',

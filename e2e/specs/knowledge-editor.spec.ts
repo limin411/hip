@@ -38,9 +38,7 @@ describe('knowledge editor ux @knowledge @core', () => {
     await openKnowledgeFromMenu()
     await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
 
-    if (await (await browser.$('[data-testid="knowledge-home"]')).isExisting()) {
-      await createSpaceAndOpen(spaceName)
-    } else if (!(await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting())) {
+    if (!(await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting())) {
       await createSpaceAndOpen(spaceName)
     }
 

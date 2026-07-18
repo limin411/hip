@@ -22,9 +22,6 @@ import {
   goKnowledgeHome,
   openSpaceCardByName,
   spaceCardByName,
-  setHomeSearchQuery,
-  clickFirstSearchHit,
-  expectSearchHits,
   exportActiveDocTo,
   exportSpaceZipTo,
   deleteSpaceFromWorkspace,
@@ -66,15 +63,11 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
     await closeKnowledgeChipIfOpen()
   })
 
-  it('KL1: open knowledge page home', async () => {
+  it('KL1: open knowledge page + sidebar create CTA', async () => {
     await openKnowledgeFromMenu()
     await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
-    // Prefer home; if prior suite left workspace, go home
-    if (await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting()) {
-      await goKnowledgeHome()
-    }
-    await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
-    expect(await (await browser.$('[data-testid="knowledge-home"]')).isExisting()).toBe(true)
+    await (await browser.$('[data-testid="sidebar-new-space"]')).waitForExist({ timeout: 15000 })
+    expect(await (await browser.$('[data-testid="sidebar-new-space"]')).isExisting()).toBe(true)
   })
 
   it('KL2: create space and enter workspace', async () => {
@@ -119,33 +112,17 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
     )
   })
 
-  it('KL7: back home and reopen space card', async () => {
+  it('KL7: reopen space from sidebar', async () => {
     await goKnowledgeHome()
     await openSpaceCardByName(spaceName)
     await expectTreeContains(docTitle, 15000)
   })
 
-  it('KL8: home search finds marker and opens doc', async () => {
+  it('KL8: sidebar lists space after reopen', async () => {
     await goKnowledgeHome()
-    // Index may still be building after create/save
-    await setHomeSearchQuery(marker.slice(0, 24))
-    try {
-      await expectSearchHits(1, 20000)
-    } catch {
-      // Fall back to title search if body index lags
-      await setHomeSearchQuery(docTitle.slice(0, 20))
-      await expectSearchHits(1, 15000)
-    }
-    await clickFirstSearchHit()
-    // Doc may open in edit or preview
-    await browser.waitUntil(
-      async () => {
-        const ed = await browser.$('[data-testid="knowledge-doc-editor"]')
-        const rd = await browser.$('[data-testid="knowledge-doc-reader"]')
-        return (await ed.isExisting()) || (await rd.isExisting())
-      },
-      { timeout: 15000, interval: 200, timeoutMsg: 'doc not opened from search hit' },
-    )
+    expect(await spaceCardByName(spaceName)).toBe(true)
+    await openSpaceCardByName(spaceName)
+    await expectTreeContains(docTitle, 15000)
   })
 
   it('KL9: export active doc includes marker', async () => {
@@ -175,17 +152,17 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
     expect(fs.statSync(exportZip).size).toBeGreaterThan(0)
   })
 
-  it('KL10: delete space from workspace returns home and clears disk', async () => {
+  it('KL10: delete space from workspace returns empty surface and clears disk', async () => {
     if (!(await (await browser.$('[data-testid="knowledge-workspace"]')).isExisting())) {
       await ensureKnowledgeHome()
       await openSpaceCardByName(spaceName)
     }
     expect(listSpaceNamesOnDisk()).toContain(spaceName)
     await deleteSpaceFromWorkspace()
-    await (await browser.$('[data-testid="knowledge-home"]')).waitForExist({ timeout: 15000 })
+    await (await browser.$('[data-testid="knowledge-empty"]')).waitForExist({ timeout: 15000 })
     await browser.waitUntil(
       async () => !(await spaceCardByName(spaceName)),
-      { timeout: 10000, interval: 200, timeoutMsg: 'deleted space card still visible' },
+      { timeout: 10000, interval: 200, timeoutMsg: 'deleted space still visible in sidebar' },
     )
     await waitForSpaceNameGoneOnDisk(spaceName)
   })
@@ -196,6 +173,6 @@ describe('knowledge lifecycle business flow @knowledge @core', () => {
     await openKnowledgeFromMenu()
     await (await browser.$('[data-testid="knowledge-page"]')).waitForExist({ timeout: 20000 })
     await ensureKnowledgeHome()
-    expect(await (await browser.$('[data-testid="knowledge-home"]')).isExisting()).toBe(true)
+    expect(await (await browser.$('[data-testid="sidebar-new-space"]')).isExisting()).toBe(true)
   })
 })

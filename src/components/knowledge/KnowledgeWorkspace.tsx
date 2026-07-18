@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   BookOpen,
   ChevronRight,
   Download,
@@ -17,7 +16,10 @@ import { toast } from 'sonner'
 import { setExpandPersistSuspended, useKnowledgeStore } from '@/store/knowledgeStore'
 import { filterTreeVisible, getPath } from '@/domain/knowledge/tree'
 import { resolveParentForNew } from '@/domain/knowledge/parentForNew'
-import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
+import {
+  openDeleteKnowledgeSpaceDialog,
+  openRenameKnowledgeSpaceDialog,
+} from './knowledgeSpaceDialogStore'
 import {
   isKnowledgeLiveEnabled,
   loadEditorModePref,
@@ -77,11 +79,8 @@ export function KnowledgeWorkspace() {
   const editorMode = useKnowledgeStore((s) => s.editorMode)
   const busy = useKnowledgeStore((s) => s.busy)
   const saveState = useKnowledgeStore((s) => s.saveState)
-  const openHome = useKnowledgeStore((s) => s.openHome)
   const requestCreateDoc = useKnowledgeStore((s) => s.requestCreateDoc)
   const createFolder = useKnowledgeStore((s) => s.createFolder)
-  const renameSpace = useKnowledgeStore((s) => s.renameSpace)
-  const deleteSpace = useKnowledgeStore((s) => s.deleteSpace)
   const renameNode = useKnowledgeStore((s) => s.renameNode)
   const deleteNode = useKnowledgeStore((s) => s.deleteNode)
   const setEditorMode = useKnowledgeStore((s) => s.setEditorMode)
@@ -214,14 +213,6 @@ export function KnowledgeWorkspace() {
     return () => setExpandPersistSuspended(false)
   }, [])
 
-  const [renameSpaceOpen, setRenameSpaceOpen] = useState(false)
-  const [spaceName, setSpaceName] = useState('')
-  const spaceNameTrimmed = normalizeSpaceName(spaceName)
-  const spaceNameTaken =
-    activeSpaceId != null &&
-    spaceNameTrimmed.length > 0 &&
-    isSpaceNameTaken(spaces, spaceNameTrimmed, activeSpaceId)
-  const [deleteSpaceOpen, setDeleteSpaceOpen] = useState(false)
   const [nodeEdit, setNodeEdit] = useState<KnowledgeNode | null>(null)
   const [nodeTitle, setNodeTitle] = useState('')
   const [nodeDelete, setNodeDelete] = useState<KnowledgeNode | null>(null)
@@ -429,16 +420,6 @@ export function KnowledgeWorkspace() {
         {/* Space identity + actions — no hard header rule */}
         <div className="flex flex-col gap-3 px-3 pb-2 pt-3">
           <div className="flex items-start gap-1">
-            <button
-              type="button"
-              data-testid="knowledge-back-home"
-              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink"
-              onClick={() => void openHome()}
-              title={t('knowledge.tree.backHome')}
-              aria-label={t('knowledge.tree.backHome')}
-            >
-              <ArrowLeft size={15} strokeWidth={2} />
-            </button>
             <div className="min-w-0 flex-1 pt-0.5">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted">
@@ -491,7 +472,7 @@ export function KnowledgeWorkspace() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              {/* modal={false}: modal menu + rename/delete Modal both lock body
+              {/* modal={false}: menu + KnowledgeSpaceDialogHost Modal both lock body
                   pointer-events; stacking leaves the app unclickable after close. */}
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
@@ -508,8 +489,11 @@ export function KnowledgeWorkspace() {
                   <DropdownMenuItem
                     data-testid="knowledge-space-rename"
                     onClick={() => {
-                      setSpaceName(space?.name ?? '')
-                      setRenameSpaceOpen(true)
+                      if (!activeSpaceId) return
+                      openRenameKnowledgeSpaceDialog(
+                        activeSpaceId,
+                        space?.name ?? '',
+                      )
                     }}
                   >
                     {t('knowledge.tree.rename')}
@@ -523,7 +507,13 @@ export function KnowledgeWorkspace() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     data-testid="knowledge-space-delete"
-                    onClick={() => setDeleteSpaceOpen(true)}
+                    onClick={() => {
+                      if (!activeSpaceId) return
+                      openDeleteKnowledgeSpaceDialog(
+                        activeSpaceId,
+                        space?.name ?? '',
+                      )
+                    }}
                   >
                     {t('knowledge.tree.delete')}
                   </DropdownMenuItem>
@@ -838,110 +828,6 @@ export function KnowledgeWorkspace() {
           </div>
         ) : null}
       </main>
-
-      <Modal
-        open={renameSpaceOpen}
-        onOpenChange={setRenameSpaceOpen}
-        title={t('knowledge.tree.rename')}
-        className="max-w-sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              data-testid="knowledge-rename-space-cancel"
-              onClick={() => setRenameSpaceOpen(false)}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              data-testid="knowledge-rename-space-confirm"
-              disabled={!spaceNameTrimmed || spaceNameTaken || busy || !activeSpaceId}
-              onClick={() => {
-                if (!activeSpaceId || !spaceNameTrimmed || spaceNameTaken) return
-                void renameSpace(activeSpaceId, spaceNameTrimmed).then((ok) => {
-                  if (ok) setRenameSpaceOpen(false)
-                })
-              }}
-            >
-              {t('common.confirm', { defaultValue: 'OK' })}
-            </Button>
-          </div>
-        }
-      >
-        <div className="flex flex-col gap-3 px-5 py-4">
-          <label className="flex flex-col gap-2">
-            <span className="text-body text-ink-secondary">{t('knowledge.space.nameLabel')}</span>
-            <Input
-              data-testid="knowledge-rename-space-name"
-              value={spaceName}
-              onChange={(e) => setSpaceName(e.target.value)}
-              placeholder={t('knowledge.space.namePlaceholder')}
-              aria-invalid={spaceNameTaken || undefined}
-              className={
-                spaceNameTaken
-                  ? 'border-danger focus-visible:border-danger focus-visible:ring-danger/10'
-                  : undefined
-              }
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key !== 'Enter' || !activeSpaceId || !spaceNameTrimmed || spaceNameTaken) return
-                e.preventDefault()
-                void renameSpace(activeSpaceId, spaceNameTrimmed).then((ok) => {
-                  if (ok) setRenameSpaceOpen(false)
-                })
-              }}
-            />
-          </label>
-          {spaceNameTaken && (
-            <p
-              className="rounded-md bg-danger/10 px-3 py-2 text-meta text-danger"
-              data-testid="knowledge-rename-space-name-error"
-              role="alert"
-            >
-              {t('knowledge.space.nameDuplicate', { name: spaceNameTrimmed })}
-            </p>
-          )}
-        </div>
-      </Modal>
-
-      <Modal
-        open={deleteSpaceOpen}
-        onOpenChange={setDeleteSpaceOpen}
-        title={t('knowledge.space.deleteTitle', {
-          name: space?.name ?? '',
-        })}
-        className="max-w-sm"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              data-testid="knowledge-delete-space-cancel"
-              onClick={() => setDeleteSpaceOpen(false)}
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="danger"
-              data-testid="knowledge-delete-space-confirm"
-              disabled={busy || !activeSpaceId}
-              onClick={() => {
-                // Close first so RemoveScroll unlocks body before workspace unmounts.
-                const id = activeSpaceId
-                setDeleteSpaceOpen(false)
-                if (id) void deleteSpace(id)
-              }}
-            >
-              {t('knowledge.tree.delete')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="px-5 py-4">
-          <p className="text-body leading-relaxed text-ink-secondary">
-            {t('knowledge.space.deleteBody')}
-          </p>
-        </div>
-      </Modal>
 
       <Modal
         open={nodeEdit != null}

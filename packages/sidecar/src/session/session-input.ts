@@ -7,6 +7,8 @@ export interface SessionInput {
   content: string
   messageId?: string
   attachments?: AttachmentPayload[]
+  /** WS connection that enqueued this input (multi-client ownership). */
+  connectionId?: string | null
 }
 
 /** Thin facade over `SessionStore` for the durable input queue. */

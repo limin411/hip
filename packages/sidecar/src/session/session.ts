@@ -135,6 +135,13 @@ export class Session {
   /** Public so handlers can busy-check without casting (workflow:run). */
   running = false
   private awaitingResume = false
+  /**
+   * Connection that owns the active foreground turn / drain / HITL pause.
+   * Null when idle or when multi-client is off / unknown origin.
+   */
+  ownerConnectionId: string | null = null
+  /** Default origin for background tasks spawned during the current request path. */
+  currentConnectionId: string | null = null
   private readonly inputQueue: SessionInput[] = []
   private steerAbortFlag = false
   private paused: {
@@ -740,8 +747,20 @@ export class Session {
     return isMultimodalModel(choice.providerID, choice.modelID)
   }
 
-  async sendMessage(content: string, _send: SendFn, userMessageId?: string, attachments?: AttachmentPayload[]): Promise<void> {
-    this.enqueueInput({ type: 'message', content, messageId: userMessageId, attachments })
+  async sendMessage(
+    content: string,
+    _send: SendFn,
+    userMessageId?: string,
+    attachments?: AttachmentPayload[],
+    connectionId?: string | null,
+  ): Promise<void> {
+    this.enqueueInput({
+      type: 'message',
+      content,
+      messageId: userMessageId,
+      attachments,
+      connectionId: connectionId ?? this.currentConnectionId,
+    })
     if (this.running || this.awaitingResume) return
     await this.drainInputQueue(_send)
   }
@@ -786,12 +805,38 @@ export class Session {
     while (!this.running && !this.awaitingResume) {
       const steer = this.promoteSteerInput()
       const input = steer ?? this.inputQueue.shift()
-      if (!input) return
+      if (!input) {
+        if (!this.running && !this.awaitingResume) this.ownerConnectionId = null
+        return
+      }
       if (input.type === 'message' && input.messageId) {
         this.inputQueueStore?.promoteById(input.messageId)
       }
-      await this.processInput(input, _send)
+      // Ownership for the turn that is about to start.
+      this.ownerConnectionId = input.connectionId ?? this.currentConnectionId ?? null
+      this.currentConnectionId = this.ownerConnectionId
+      try {
+        await this.processInput(input, _send)
+      } finally {
+        if (!this.running && !this.awaitingResume && this.inputQueue.length === 0) {
+          this.ownerConnectionId = null
+        }
+      }
     }
+  }
+
+  /** Drop in-memory queued inputs from a disconnecting connection. */
+  dropQueuedInputsFrom(connectionId: string): number {
+    const before = this.inputQueue.length
+    const kept = this.inputQueue.filter((i) => i.connectionId !== connectionId)
+    this.inputQueue.length = 0
+    this.inputQueue.push(...kept)
+    return before - kept.length
+  }
+
+  /** Stop background tasks spawned by a connection (does not use Session.cancel). */
+  stopBackgroundFrom(connectionId: string, reason = 'owner_disconnect'): string[] {
+    return this.backgroundManager.stopFromOrigin(connectionId, reason)
   }
 
   private hasSteerInput(): boolean {
@@ -887,7 +932,12 @@ export class Session {
 
 
   cancel(): void {
-    if (this.awaitingResume) { this.awaitingResume = false; this.paused = null; return }
+    if (this.awaitingResume) {
+      this.awaitingResume = false
+      this.paused = null
+      this.ownerConnectionId = null
+      return
+    }
     this.abortController?.abort()
     this.resumeAbortController?.abort()
   }

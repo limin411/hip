@@ -160,6 +160,10 @@ export interface SessionTurnHost {
   abortController: AbortController | null
   running: boolean
   awaitingResume: boolean
+  /** Multi-client: connection owning the active foreground turn. */
+  ownerConnectionId: string | null
+  /** Multi-client: connection for the current request path (bg origin). */
+  currentConnectionId: string | null
   inputQueue: SessionInput[]
   steerAbortFlag: boolean
   paused: TurnBase | null
@@ -792,9 +796,14 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     host.spawnedSubagentIds.add(childId)
     host.subagentInstances.set(childId, { description })
     if (subagentMode === 'background') {
-      const result = host.backgroundManager.spawn(childId, description, async (signal) => {
-        await host.runBackgroundSubagent(childId, description, signal, send)
-      })
+      const result = host.backgroundManager.spawn(
+        childId,
+        description,
+        async (signal) => {
+          await host.runBackgroundSubagent(childId, description, signal, send)
+        },
+        { originConnectionId: host.currentConnectionId ?? host.ownerConnectionId ?? null },
+      )
       if (result !== childId) return result
       return `Background task started: ${childId}`
     }
@@ -872,12 +881,17 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
     const childId = args.taskId
     host.spawnedSubagentIds.add(childId)
     host.subagentInstances.set(childId, { description: args.description })
-    const result = host.backgroundManager.spawn(childId, args.description, async (signal) => {
-      await host.runBackgroundSubagent(childId, args.description, signal, send, {
-        root: args.root,
-        keepWorktree: true,
-      })
-    })
+    const result = host.backgroundManager.spawn(
+      childId,
+      args.description,
+      async (signal) => {
+        await host.runBackgroundSubagent(childId, args.description, signal, send, {
+          root: args.root,
+          keepWorktree: true,
+        })
+      },
+      { originConnectionId: host.currentConnectionId ?? host.ownerConnectionId ?? null },
+    )
     if (result !== childId) return result
     return `Background task started: ${childId}`
   }

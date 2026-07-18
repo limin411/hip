@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { IncomingMessage } from 'http'
 import { createServer } from 'net'
+import { randomUUID } from 'node:crypto'
 import type { ClientMessage, ServerMessage } from '@hip/protocol'
 import { parseClientMessage } from '@hip/protocol'
 import { SessionManager } from '../session/session-manager.js'
@@ -8,6 +9,13 @@ import type { SessionStore } from '../persistence/store.js'
 import { getActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { logInfo, logDebug } from '../debug-logger.js'
+import {
+  ClientRegistry,
+  multiClientEnabled,
+  parseClientRole,
+  type ClientConnection,
+} from './client-registry.js'
+import { createRoutedSend } from './message-route.js'
 
 const ALLOWED_ORIGINS = new Set([
   'http://localhost:1420',
@@ -22,10 +30,13 @@ const BIND_HOST = '127.0.0.1'
 export class WsServer {
   private readonly wss: WebSocketServer
   private readonly sessionManager: SessionManager
+  private readonly registry = new ClientRegistry()
+  private readonly multiClient: boolean
 
   constructor(private readonly port: number, private readonly token: string, store?: SessionStore) {
     this.wss = new WebSocketServer({ port, host: BIND_HOST })
     this.sessionManager = new SessionManager(store)
+    this.multiClient = multiClientEnabled()
   }
 
   start(): Promise<void> {
@@ -33,6 +44,20 @@ export class WsServer {
       this.wss.on('listening', resolve)
       this.wss.on('connection', (ws, req) => this.handleConnection(ws, req))
     })
+  }
+
+  /** Exposed for tests. */
+  getSessionManagerForTest(): SessionManager {
+    return this.sessionManager
+  }
+
+  private broadcastClientsChanged(): void {
+    if (!this.multiClient) return
+    const msg: ServerMessage = {
+      type: 'clients:changed',
+      clients: this.registry.listClients(),
+    }
+    this.registry.broadcast(msg)
   }
 
   private handleConnection(ws: WebSocket, req: IncomingMessage): void {
@@ -49,31 +74,90 @@ export class WsServer {
       return
     }
 
-    logInfo('ws', 'client:connected')
-
-    const send = (msg: ServerMessage) => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
+    const role = parseClientRole(url.searchParams.get('client'))
+    const connectionId = randomUUID()
+    const conn: ClientConnection = {
+      id: connectionId,
+      role,
+      socket: ws,
+      send: () => {},
+      connectedAt: Date.now(),
     }
-    // Tell the client whether this sidecar has a usable API key, so the UI can
-    // surface "no key configured" without waiting for a failed send.
-    send({ type: 'ready', hasApiKey: !!resolveApiKey(getActiveModel().providerID) })
+    // Unicast send used for connect-only / legacy single-client path.
+    conn.send = (msg) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify(msg))
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    if (this.multiClient) {
+      if (!this.registry.tryAdd(conn)) {
+        logInfo('ws', 'client:rejected_limit', { connectionId, role })
+        ws.close(1008, 'too many connections')
+        return
+      }
+    }
+
+    logInfo('ws', 'client:connected', {
+      connectionId,
+      role,
+      multiClient: this.multiClient,
+      clients: this.registry.size,
+    })
+
+    const hasApiKey = !!resolveApiKey(getActiveModel().providerID)
+    const ready: ServerMessage = this.multiClient
+      ? {
+          type: 'ready',
+          hasApiKey,
+          multiClient: true,
+          connectionId,
+          clients: this.registry.listClients(),
+        }
+      : { type: 'ready', hasApiKey }
+    conn.send(ready)
+
+    if (this.multiClient) {
+      // Notify others that registry changed (exclude connect-time self already has snapshot).
+      this.broadcastClientsChanged()
+    }
+
+    const reply = this.multiClient ? createRoutedSend(this.registry, conn) : conn.send
+
     ws.on('message', (data) => {
       try {
         const raw: unknown = JSON.parse(data.toString())
         const msg = parseClientMessage(raw)
         if (!msg) {
-          send({ type: 'error', code: 'INVALID_MESSAGE', message: 'unknown or malformed client message' })
+          reply({ type: 'error', code: 'INVALID_MESSAGE', message: 'unknown or malformed client message' })
           return
         }
-        logDebug('ws', 'msg:received', { type: msg.type, sessionId: 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined })
-        this.sessionManager.handle(msg as ClientMessage, send)
+        logDebug('ws', 'msg:received', {
+          type: msg.type,
+          sessionId: 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined,
+          connectionId,
+        })
+        this.sessionManager.handle(msg as ClientMessage, reply, connectionId, role)
       } catch (err) {
-        send({ type: 'error', code: 'PARSE_ERROR', message: String(err) })
+        reply({ type: 'error', code: 'PARSE_ERROR', message: String(err) })
       }
     })
-    // Single-client model: the Tauri shell holds one WS. Closing it cancels all in-flight
-    // turns (see SessionManager.cancelAllRunning). Multi-client would need per-connection ownership.
-    ws.on('close', () => this.sessionManager.cancelAllRunning())
+
+    ws.on('close', () => {
+      logInfo('ws', 'client:closed', { connectionId, role, multiClient: this.multiClient })
+      if (this.multiClient) {
+        this.registry.remove(connectionId)
+        this.sessionManager.cancelOwnedBy(connectionId)
+        this.broadcastClientsChanged()
+      } else {
+        // Legacy single-client: any close cancels everything.
+        this.sessionManager.cancelAllRunning()
+      }
+    })
     ws.on('error', (err) => console.error('[ws] client error', err))
   }
 

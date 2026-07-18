@@ -33,6 +33,10 @@ export interface SessionManagerContext {
 
 /** Extended context for session lifecycle / turn / config handlers. */
 export interface SessionLifecycleContext extends SessionManagerContext {
+  /** Multi-client WS connection id for the current request (null when unknown). */
+  connectionId?: string | null
+  /** Multi-client client role for HITL resolve source. */
+  connectionRole?: 'gui' | 'cli' | 'unknown' | null
   createSession(id: string, config: SessionConfig, send: SendFn): void
   destroySession(id: string): Promise<void>
   getSession(id: string): Session | undefined

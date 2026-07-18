@@ -63,10 +63,15 @@ export class SessionManager {
     private readonly scratchRoot: string = defaultScratchRoot(),
   ) {}
 
-  handle(msg: ClientMessage, send: SendFn): void {
+  handle(
+    msg: ClientMessage,
+    send: SendFn,
+    connectionId?: string | null,
+    connectionRole?: 'gui' | 'cli' | 'unknown' | null,
+  ): void {
     // Fire-and-forget, but never let a rejection (e.g. a rehydrate failure) become
     // an unhandled promise rejection — surface it to the client instead.
-    this.handleAsync(msg, send).catch((err) => {
+    this.handleAsync(msg, send, connectionId, connectionRole).catch((err) => {
       console.error('[session-manager] handler error', err)
       const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
       const code = err instanceof AttachmentError ? err.code : 'INTERNAL'
@@ -74,9 +79,30 @@ export class SessionManager {
     })
   }
 
-  async handleAsync(msg: ClientMessage, send: SendFn): Promise<void> {
+  async handleAsync(
+    msg: ClientMessage,
+    send: SendFn,
+    connectionId?: string | null,
+    connectionRole?: 'gui' | 'cli' | 'unknown' | null,
+  ): Promise<void> {
     const t0 = Date.now()
-    logDebug('mgr', 'msg:handle', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined })
+    logDebug('mgr', 'msg:handle', {
+      type: msg.type,
+      sessionId: (msg as { sessionId?: string }).sessionId ?? undefined,
+      connectionId: connectionId ?? undefined,
+    })
+
+    // Tag session with current connection for ownership / background origin.
+    const sessionId =
+      'sessionId' in msg && typeof (msg as { sessionId?: string }).sessionId === 'string'
+        ? (msg as { sessionId: string }).sessionId
+        : msg.type === 'session:create'
+          ? msg.id
+          : undefined
+    if (sessionId && connectionId) {
+      const s = this.sessions.get(sessionId)
+      if (s) s.currentConnectionId = connectionId
+    }
 
     // Sync type-gates first — never await an async handler for non-matching types
     // (session:create must complete before fire-and-forget set* messages).
@@ -89,7 +115,11 @@ export class SessionManager {
     } else if (isMemoryMessage(msg)) {
       handleMemoryMessage(this.memoryCtx(), msg, send)
     } else if (isSessionMessage(msg)) {
-      const r = handleSessionMessage(this.lifecycleCtx(), msg, send)
+      const r = handleSessionMessage(
+        this.lifecycleCtx(connectionId ?? null, connectionRole ?? null),
+        msg,
+        send,
+      )
       if (r) await r
     } else if (isPluginMessage(msg)) {
       const r = handlePluginMessage(this.pluginCtx(), msg, send)
@@ -134,10 +164,19 @@ export class SessionManager {
     }
   }
 
-  private lifecycleCtx(): SessionLifecycleContext {
+  private lifecycleCtx(
+    connectionId: string | null = null,
+    connectionRole: 'gui' | 'cli' | 'unknown' | null = null,
+  ): SessionLifecycleContext {
     return {
       ...this.handlerCtx(),
-      createSession: (id, config, send) => this.createSession(id, config, send),
+      connectionId,
+      connectionRole,
+      createSession: (id, config, send) => {
+        this.createSession(id, config, send)
+        const s = this.sessions.get(id)
+        if (s && connectionId) s.currentConnectionId = connectionId
+      },
       destroySession: (id) => this.destroySession(id),
       getSession: (id) => this.sessions.get(id),
       deleteSessionSync: (id, send, opts) => this.deleteSessionSync(id, send, opts),
@@ -170,7 +209,7 @@ export class SessionManager {
 
   private pluginCtx(): PluginHandlerContext {
     return {
-      ...this.lifecycleCtx(),
+      ...this.lifecycleCtx(null),
       installPluginFromUrl: (url, send) => this.handlePluginInstallUrl(url, send),
       replayTurn: async (sessionId, turnIndex, send) => {
         if (!this.store) {
@@ -289,16 +328,36 @@ export class SessionManager {
   }
 
   /**
-   * Cancel every in-flight turn — called when the sole UI client disconnects (ws close).
-   *
-   * **Single-client assumption:** the desktop shell opens one WebSocket per sidecar.
-   * On close we cancel all turns. Multi-client would need per-connection turn ownership
-   * before this can become selective; until then this is intentional and documented.
-   *
-   * Safe no-op for idle sessions (Session.cancel() aborts only if a turn is running).
+   * Cancel every in-flight turn — legacy single-client close policy
+   * (HIP_WS_MULTI_CLIENT=0 kill-switch). Also stops all background tasks.
    */
   cancelAllRunning(): void {
-    for (const s of this.sessions.values()) s.cancel()
+    for (const s of this.sessions.values()) {
+      s.cancel()
+      // Kill-switch path: stop all running background work for teardown parity.
+      for (const taskId of s.backgroundManager.listIds()) {
+        const meta = s.backgroundManager.meta.get(taskId)
+        if (meta?.status === 'running') s.backgroundManager.stop(taskId, 'client_disconnect_legacy')
+      }
+    }
+  }
+
+  /**
+   * Multi-client: drop queued inputs + stop connection-origin background +
+   * cancel foreground only when this connection owns the turn.
+   */
+  cancelOwnedBy(connectionId: string): void {
+    for (const s of this.sessions.values()) {
+      s.dropQueuedInputsFrom(connectionId)
+      s.stopBackgroundFrom(connectionId, 'owner_disconnect')
+      if (s.ownerConnectionId === connectionId) {
+        s.cancel()
+        s.ownerConnectionId = null
+      }
+      if (s.currentConnectionId === connectionId) {
+        s.currentConnectionId = null
+      }
+    }
   }
 
   /** Exposed for tests only: returns the in-memory session instance (or undefined if not created). */

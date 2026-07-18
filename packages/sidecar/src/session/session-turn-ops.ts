@@ -163,6 +163,15 @@ function clearForcePlanFlag(host: SessionTurnHost, send: SendFn): void {
 
 export async function handlePlanResponse(host: SessionTurnHost, action: 'approve' | 'reject' | 'amend', send: SendFn, amendContent?: string): Promise<void> {
   if (!host.awaitingResume || !host.paused) return
+  // Capture turn id for multi-client UI clear (message:complete alone does not clear interrupt).
+  const interruptTurnId = `turn-${host.turnSeq}`
+  const emitInterruptResolved = () => {
+    send({
+      type: 'agent:interrupt:resolved',
+      sessionId: host.id,
+      turnId: interruptTurnId,
+    })
+  }
   switch (action) {
     case 'approve': {
       host.planMode.exit()
@@ -182,6 +191,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         plan: host.paused.plan,
       }
       host.awaitingResume = false; host.paused = null
+      emitInterruptResolved()
       // Drop forcePlan before execution so the execute turn is not re-gated into PlanMode.
       clearForcePlanFlag(host, send)
       await runTurn(host, send, base)
@@ -190,6 +200,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
     case 'reject': {
       host.planMode.cancel()
       host.awaitingResume = false; host.paused = null
+      emitInterruptResolved()
       clearForcePlanFlag(host, send)
       send({ type: 'error', sessionId: host.id, code: 'PLAN_REJECTED', message: 'Plan was rejected by the user.' })
       break
@@ -204,6 +215,7 @@ export async function handlePlanResponse(host: SessionTurnHost, action: 'approve
         plan: host.paused.plan,
       }
       host.awaitingResume = false; host.paused = null
+      emitInterruptResolved()
       const ts = Date.now()
       if (host.store) {
         host.emit({ type: 'user_message', sessionId: host.id, content, messageId: `u-${ts}`, timestamp: ts })

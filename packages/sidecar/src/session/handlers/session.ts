@@ -99,15 +99,27 @@ export function handleSessionMessage(
       })()
     }
     case 'message:send':
-      return ctx.ensureSession(msg.sessionId, send).sendMessage(msg.content, send, msg.id, msg.attachments)
+      return ctx
+        .ensureSession(msg.sessionId, send)
+        .sendMessage(msg.content, send, msg.id, msg.attachments, ctx.connectionId ?? null)
     case 'input:enqueue': {
       const s = ctx.ensureSession(msg.sessionId, send)
-      s.enqueueInput({ type: 'message', content: msg.content, messageId: msg.id })
+      s.enqueueInput({
+        type: 'message',
+        content: msg.content,
+        messageId: msg.id,
+        connectionId: ctx.connectionId ?? null,
+      })
       return s.drainInputQueue(send)
     }
     case 'input:steer': {
       const s = ctx.ensureSession(msg.sessionId, send)
-      s.enqueueInput({ type: 'steer', content: msg.content, messageId: msg.id })
+      s.enqueueInput({
+        type: 'steer',
+        content: msg.content,
+        messageId: msg.id,
+        connectionId: ctx.connectionId ?? null,
+      })
       return s.drainInputQueue(send)
     }
     case 'message:cancel':
@@ -139,12 +151,25 @@ export function handleSessionMessage(
       }
       return
     }
-    case 'permission:respond':
-      ctx.getSession(msg.sessionId)?.respondPermission(
+    case 'permission:respond': {
+      const session = ctx.getSession(msg.sessionId)
+      if (!session) return
+      const pending = session.permissions.pendingPermissions.has(msg.requestId)
+      session.respondPermission(
         msg.requestId,
         msg.cancelled ? { cancelled: true } : { optionId: msg.optionId! },
       )
+      // First-wins: only emit resolve when a pending request was accepted.
+      if (pending) {
+        send({
+          type: 'permission:resolved',
+          sessionId: msg.sessionId,
+          requestId: msg.requestId,
+          source: ctx.connectionRole ?? 'unknown',
+        })
+      }
       return
+    }
     case 'session:list': {
       const sessions = ctx.listSessions()
       // Always-on audit: how many sessions the UI is about to see (wipe forensics).

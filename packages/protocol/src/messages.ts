@@ -194,7 +194,15 @@ export type ServerMessage =
   | { type: 'message:complete'; sessionId: string; message: Message }
   | { type: 'agent:interrupt'; sessionId: string; turnId: string; agentId: string; question: string; context?: string }
   | { type: 'error'; sessionId?: string; code: string; message: string }
-  | { type: 'ready'; hasApiKey: boolean }
+  | {
+      type: 'ready'
+      hasApiKey: boolean
+      /** Present when multi-client WS is enabled. */
+      multiClient?: true
+      connectionId?: string
+      /** Snapshot of other connections at connect time (roles only). */
+      clients?: Array<{ id: string; role: 'gui' | 'cli' | 'unknown' }>
+    }
   | { type: 'session:list:result'; sessions: SessionSummary[] }
   | { type: 'session:loaded'; sessionId: string; messages: Message[]; config?: SessionConfig }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
@@ -217,6 +225,17 @@ export type ServerMessage =
   | { type: 'git:branch:switch:result'; sessionId: string; branch: string; ok: boolean; currentBranch: string | null; error?: string }
   | { type: 'git:revert:result'; sessionId: string; checkpointId: string; ok: boolean; safetyCheckpointId?: string; error?: string }
   | { type: 'permission:request'; sessionId: string; turnId: string; requestId: string; tool: PermissionRequestPayload; options: PermissionOption[]; agentFrame?: AgentFrame }
+  /** Multi-client: first accepted permission:respond wins; broadcast so other clients clear UI. */
+  | { type: 'permission:resolved'; sessionId: string; requestId: string; source: 'gui' | 'cli' | 'unknown' }
+  /** Multi-client: plan/interrupt pause cleared (response accepted or turn abandoned). */
+  | {
+      type: 'agent:interrupt:resolved'
+      sessionId: string
+      turnId: string
+      source?: 'gui' | 'cli' | 'unknown'
+    }
+  /** Multi-client connection registry snapshot (roles only). */
+  | { type: 'clients:changed'; clients: Array<{ id: string; role: 'gui' | 'cli' | 'unknown' }> }
   | { type: 'agent:configOptions'; sessionId: string; options: AcpConfigOption[] }
   /** Emitted by the Guardian hook when a tool invocation exceeds the risk threshold. */
   | { type: 'guardian:risk'; sessionId: string; turnId: string; toolName: string; risk: 'low' | 'medium' | 'high'; category: string; reason: string }

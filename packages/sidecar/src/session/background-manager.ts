@@ -14,6 +14,8 @@ export interface BackgroundTaskMeta {
   abortController: AbortController
   outputChunks?: string[]
   outputSizeBytes?: number
+  /** WS connection that spawned this task (multi-client ownership). */
+  originConnectionId?: string | null
 }
 
 /** Durable location for background task output logs. */
@@ -200,7 +202,12 @@ export class BackgroundManager {
    * - the task is a duplicate (already running)
    * - the concurrency cap is exceeded
    */
-  spawn(taskId: string, description: string, runner: (signal: AbortSignal) => Promise<void>): string {
+  spawn(
+    taskId: string,
+    description: string,
+    runner: (signal: AbortSignal) => Promise<void>,
+    opts?: { originConnectionId?: string | null },
+  ): string {
     if (this.tasks.has(taskId)) {
       return `Error: background task ${taskId} is already running`
     }
@@ -215,6 +222,7 @@ export class BackgroundManager {
       abortController: ac,
       outputChunks: [],
       outputSizeBytes: 0,
+      originConnectionId: opts?.originConnectionId ?? null,
     }
     this.meta.set(taskId, meta)
 
@@ -270,6 +278,21 @@ export class BackgroundManager {
     })
 
     return `killed`
+  }
+
+  /**
+   * Stop all running background tasks tagged with the given origin connection.
+   * Returns task ids that were stopped.
+   */
+  stopFromOrigin(connectionId: string, reason = 'owner_disconnect'): string[] {
+    const stopped: string[] = []
+    for (const [taskId, m] of this.meta) {
+      if (m.status === 'running' && m.originConnectionId === connectionId) {
+        this.stop(taskId, reason)
+        stopped.push(taskId)
+      }
+    }
+    return stopped
   }
 
   // ── Wait ─────────────────────────────────────────────────────────────────

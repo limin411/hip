@@ -52,10 +52,11 @@ export function SettingsPanel() {
                 value={page.id}
                 data-testid={`settings-nav-${page.id}`}
                 className={cn(
-                  'flex items-center gap-2 rounded-md px-2.5 py-2 text-body transition-colors',
-                  'text-ink-secondary hover:bg-surface-muted',
-                  'data-[state=active]:bg-accent-active data-[state=active]:text-accent-strong',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                  'flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-body font-medium transition-colors',
+                  'text-ink-secondary hover:bg-state-hover hover:text-ink',
+                  // Match AppSidebar session/nav selection: surface + border ring, ink text (no accent green).
+                  'data-[state=active]:bg-surface data-[state=active]:text-ink data-[state=active]:shadow-[0_0_0_1px_var(--border)]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                 )}
               >
                 <Icon size={16} className="shrink-0" />

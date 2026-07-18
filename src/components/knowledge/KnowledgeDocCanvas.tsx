@@ -2,24 +2,43 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * Document column layout only: max width + horizontal padding.
- * Scroll ownership stays in KnowledgeWorkspace (edit: CM scroller; preview: outer stage).
+ * Document paper column: elevated reading surface.
+ * Scroll ownership stays in KnowledgeWorkspace (edit: CM/Live scroller; preview: outer stage).
+ *
+ * Mode overflow is applied by the parent via paperClassName — default classes omit
+ * overflow so Workspace can pass mode-specific overflow without fighting the primitive.
  */
 export function KnowledgeDocCanvas({
   children,
   className,
+  paperClassName,
 }: {
   children: ReactNode
   className?: string
+  /** Classes on the elevated paper shell (overflow, flex grow). */
+  paperClassName?: string
 }) {
   return (
     <div
+      data-testid="knowledge-doc-canvas"
       className={cn(
-        'mx-auto flex min-h-0 w-full max-w-3xl flex-col px-10 sm:px-12',
+        // Outer: center paper. Prefer horizontal gutter; keep vertical pad modest
+        // so short windows still give CM a usable height budget.
+        'mx-auto flex min-h-0 w-full max-w-3xl flex-col px-4 sm:px-6 py-3 sm:py-4',
         className,
       )}
     >
-      {children}
+      <div
+        data-testid="knowledge-doc-paper"
+        className={cn(
+          'flex min-h-0 flex-1 flex-col',
+          'rounded-xl border border-border bg-surface shadow-panel',
+          'px-8 sm:px-10',
+          paperClassName,
+        )}
+      >
+        {children}
+      </div>
     </div>
   )
 }

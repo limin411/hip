@@ -594,7 +594,7 @@ export function KnowledgeWorkspace() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col bg-surface">
+      <main className="flex min-w-0 flex-1 flex-col bg-surface-subtle">
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-5">
           <div className="flex min-w-0 flex-1 items-center gap-1 truncate text-meta">
             {pathNodes.length === 0 ? (
@@ -737,7 +737,10 @@ export function KnowledgeWorkspace() {
           </div>
         ) : showLiveEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <KnowledgeDocCanvas className="min-h-0 flex-1">
+            <KnowledgeDocCanvas
+              className="min-h-0 flex-1"
+              paperClassName="min-h-0 flex-1 overflow-hidden"
+            >
               <InlineDocTitle
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
@@ -769,7 +772,10 @@ export function KnowledgeWorkspace() {
           </div>
         ) : showSourceEditor ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <KnowledgeDocCanvas className="min-h-0 flex-1">
+            <KnowledgeDocCanvas
+              className="min-h-0 flex-1"
+              paperClassName="min-h-0 flex-1 overflow-hidden"
+            >
               <InlineDocTitle
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}
@@ -813,7 +819,7 @@ export function KnowledgeWorkspace() {
           </div>
         ) : showPreview ? (
           <div className="min-h-0 flex-1 overflow-y-auto pb-24">
-            <KnowledgeDocCanvas>
+            <KnowledgeDocCanvas paperClassName="overflow-visible pb-10">
               <InlineDocTitle
                 docId={activeDocId}
                 title={activeNode?.title ?? t('knowledge.doc.untitled')}

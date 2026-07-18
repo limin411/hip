@@ -49,7 +49,7 @@ export function InlineDocTitle({
       <h1
         data-testid="knowledge-doc-title"
         className={cn(
-          'shrink-0 px-0 pb-3 pt-8 text-page font-semibold tracking-tight text-ink',
+          'shrink-0 px-0 pb-2 pt-7 sm:pt-8 text-page font-semibold tracking-tight text-ink',
           className,
         )}
       >
@@ -65,7 +65,7 @@ export function InlineDocTitle({
       value={draft}
       aria-label="Document title"
       className={cn(
-        'w-full shrink-0 border-0 bg-transparent px-0 pb-3 pt-8 text-page font-semibold tracking-tight text-ink',
+        'w-full shrink-0 border-0 bg-transparent px-0 pb-2 pt-7 sm:pt-8 text-page font-semibold tracking-tight text-ink',
         'placeholder:text-ink-tertiary focus:outline-none focus-visible:ring-0',
         className,
       )}

@@ -854,7 +854,10 @@ export const en = {
         toggleFailed: 'Failed to save agent setting',
         gridEmptyTitle: 'No external agents yet',
         gridEmptyHint: 'Add an internal or ACP agent to get started.',
-        acpPickTitle: 'New ACP agent — pick a provider',
+        acpPickTitle: 'Add ACP agent',
+        acpPickIntro:
+          'Pick a coding agent installed on this machine. Providers without native ACP also need their adapter CLI on PATH.',
+        acpPickDetecting: 'Checking PATH…',
         statusInstalled: 'Installed',
         statusNotInstalled: 'Not installed',
         statusAdapterNotInstalled: 'Adapter not installed',
@@ -863,7 +866,7 @@ export const en = {
         apiKey: 'API Key',
         apiKeyHint: 'Stored in this agent’s {{env}} env var; leave blank to use your system environment.',
         acpAdapterNote: 'No native ACP — requires the community adapter {{pkg}} on PATH',
-        backToProviders: '← Back to providers',
+        backToProviders: 'Back to providers',
       },
       plugins: {
         title: 'Plugin Market',

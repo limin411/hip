@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ArrowLeft, Plug, Terminal } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
+import { Badge } from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import { groupModelOptions } from '@/lib/agentModelOptions'
 import { buildAgentDraft, isAgentDraftValid, type AgentForm } from '@/lib/agentDraft'
@@ -75,12 +77,13 @@ export function AgentEditor({
   const category = agentCategory({ kind: form.kind })
   const isAcp = category === 'acp'
   const isInternal = category === 'internal'
-  // For adapter-bridged ACP agents (Claude Code/Codex), the community adapter package — shown as a
-  // clarifying note so the `npx @<vendor>/…` launch command doesn't read as a mistake.
-  const adapterPkg = isAcp && form.quirks ? acpPresetById(form.quirks)?.adapterPkg : undefined
+  // Bridged ACP agents need a community adapter CLI on PATH — note shown so launch command is clear.
+  const selectedPreset = isAcp && form.quirks ? acpPresetById(form.quirks) : undefined
+  const adapterPkg = selectedPreset?.adapterPkg
+  const isPickStep = isAcp && acpStep === 'pick'
   const title = initial
     ? t('settings.agents.editTitle')
-    : isAcp && acpStep === 'pick'
+    : isPickStep
       ? t('settings.agents.acpPickTitle')
       : t(isAcp ? 'settings.agents.addAcp' : 'settings.agents.addInternal')
   const groups = groupModelOptions(catalog, config, keyConfigured)
@@ -91,7 +94,14 @@ export function AgentEditor({
     setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
 
   const pickPreset = (preset: AcpPreset) => {
-    patch({ command: preset.command, args: preset.args.join(' '), quirks: preset.quirks, authEnvVar: preset.authEnvVar, apiKey: '' })
+    patch({
+      name: form.name.trim() || preset.name,
+      command: preset.command,
+      args: preset.args.join(' '),
+      quirks: preset.quirks,
+      authEnvVar: preset.authEnvVar,
+      apiKey: '',
+    })
     setAcpStep('form')
   }
 
@@ -109,9 +119,9 @@ export function AgentEditor({
 
   const body = (
     <div className="flex flex-col">
-      {isAcp && acpStep === 'pick' ? (
+      {isPickStep ? (
         <>
-          <div className="p-5">
+          <div className="p-5 sm:p-6">
             <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
@@ -122,12 +132,45 @@ export function AgentEditor({
         </>
       ) : (
         <>
-          <div className="space-y-5 p-5">
+          <div className="space-y-5 p-5 sm:p-6">
             {isNewAcp && (
-              <button type="button" onClick={() => setAcpStep('pick')} className="text-meta text-accent-strong transition-colors hover:underline">
+              <button
+                type="button"
+                onClick={() => setAcpStep('pick')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5',
+                  'text-meta font-medium text-accent-strong transition-colors',
+                  'hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                )}
+              >
+                <ArrowLeft size={14} />
                 {t('settings.agents.backToProviders')}
               </button>
             )}
+
+            {isNewAcp && selectedPreset && (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-subtle/80 px-3.5 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+                  <Terminal size={16} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-body font-semibold text-ink">{selectedPreset.name}</span>
+                    {adapterPkg && (
+                      <Badge size="sm">
+                        <Plug size={10} />
+                        {adapterPkg}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-caption text-ink-tertiary">
+                    {selectedPreset.command}
+                    {selectedPreset.args.length > 0 ? ` ${selectedPreset.args.join(' ')}` : ''}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Field label={t('settings.agents.name')}>
               <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
             </Field>
@@ -227,8 +270,11 @@ export function AgentEditor({
                 </Section>
 
                 {adapterPkg && (
-                  <div className="rounded-lg border border-dashed border-border px-3 py-2 text-caption text-ink-tertiary">
-                    {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
+                  <div className="flex gap-2.5 rounded-xl border border-border bg-surface-subtle/60 px-3.5 py-2.5">
+                    <Plug size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
+                    <p className="text-caption leading-relaxed text-ink-secondary">
+                      {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
+                    </p>
                   </div>
                 )}
 
@@ -290,6 +336,7 @@ export function AgentEditor({
         if (!o) onCancel()
       }}
       title={title}
+      className={isPickStep ? 'max-w-2xl' : undefined}
     >
       {body}
     </Modal>

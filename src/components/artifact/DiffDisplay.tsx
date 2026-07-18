@@ -41,8 +41,8 @@ function HunkLines({
       className="flex bg-surface-muted/60 text-caption text-ink-tertiary"
       data-testid="diff-hunk-header"
     >
-      <span className="shrink-0 select-none px-2 font-mono">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
-      {hunk.header && <span className="truncate px-1 opacity-70">{hunk.header}</span>}
+      <span className="shrink-0 select-none px-2 font-mono text-ink-secondary">@@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@</span>
+      {hunk.header && <span className="truncate px-1 opacity-70 text-ink-tertiary">{hunk.header}</span>}
     </DeclarativeContextMenu>
   )
 
@@ -127,7 +127,7 @@ function FileDiff({
       <DeclarativeContextMenu
         kind="diffFile"
         payload={{ path: file.path, status: file.status, sessionId, cwd }}
-        className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 bg-surface-muted px-3"
+        className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 border-b border-border bg-surface-muted px-3"
         data-testid="diff-file-header"
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none">

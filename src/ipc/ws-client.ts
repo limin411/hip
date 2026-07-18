@@ -60,7 +60,9 @@ class WsClient {
     try {
       const { port, token } = await this.resolver!()
       if (this.stopped || epoch !== this.epoch) return
-      const ws = new WebSocket(`ws://localhost:${port}/?token=${encodeURIComponent(token)}`)
+      const ws = new WebSocket(
+        `ws://localhost:${port}/?token=${encodeURIComponent(token)}&client=gui`,
+      )
       this.ws = ws
       ws.onopen = () => {
         this.backoff = 500

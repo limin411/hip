@@ -31,9 +31,9 @@ describe('classify', () => {
         sessionId: 's',
         turnId: 't',
         requestId: 'r',
-        tool: { name: 'run_script', input: {} },
+        tool: { title: 'run_script', kind: 'execute' },
         options: [],
-      } as ServerMessage),
+      }),
     ).toBe('broadcast')
   })
 

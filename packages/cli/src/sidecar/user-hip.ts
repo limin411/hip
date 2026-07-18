@@ -1,11 +1,10 @@
 import { join } from 'node:path'
-import { homedir } from 'node:os'
 import { existsSync } from 'node:fs'
+import { resolveHipBaseDir } from './hip-base.js'
 
-/** Env for reading/writing the user's real ~/.hip (session list, interactive). */
+/** Env for reading/writing the user's real hip data root (session list, interactive). */
 export function userHipEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  const home = env.HOME?.trim() || homedir()
-  const hip = join(home, '.hip')
+  const hip = resolveHipBaseDir(env)
   const next: NodeJS.ProcessEnv = { ...env }
   if (!next.HIP_DB_PATH?.trim()) {
     next.HIP_DB_PATH = join(hip, 'db', 'hip.db')
@@ -29,5 +28,5 @@ export function userHipEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.Process
 }
 
 export function defaultUserDbPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.HIP_DB_PATH?.trim() || join(env.HOME?.trim() || homedir(), '.hip', 'db', 'hip.db')
+  return env.HIP_DB_PATH?.trim() || join(resolveHipBaseDir(env), 'db', 'hip.db')
 }

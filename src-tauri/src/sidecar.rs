@@ -14,6 +14,89 @@ pub struct SidecarInfo {
     pub token: String,
 }
 
+/// Product CLI discovery document (schemaVersion 1). Written by Tauri after handshake.
+#[derive(Serialize)]
+struct SidecarDiscoveryFile {
+    #[serde(rename = "schemaVersion")]
+    schema_version: u32,
+    pid: u32,
+    port: u16,
+    token: String,
+    #[serde(rename = "startedAt")]
+    started_at: String,
+    #[serde(rename = "hipDataDir")]
+    hip_data_dir: String,
+    #[serde(rename = "appVersion")]
+    app_version: Option<String>,
+}
+
+/// Atomically write `run/sidecar.json` (0600 on Unix) for product CLI attach.
+pub fn write_discovery_file(app: &AppHandle, info: &SidecarInfo, sidecar_pid: u32) {
+    let Some(path) = crate::paths::sidecar_discovery_path(app) else {
+        eprintln!("[tauri] discovery: no run path");
+        return;
+    };
+    let hip_data_dir = crate::paths::hip_base_dir(app)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let doc = SidecarDiscoveryFile {
+        schema_version: 1,
+        pid: sidecar_pid,
+        port: info.port,
+        token: info.token.clone(),
+        started_at: chrono_lite_now(),
+        hip_data_dir,
+        app_version: app.package_info().version.to_string().into(),
+    };
+    let body = match serde_json::to_string_pretty(&doc) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[tauri] discovery: serialize failed: {e}");
+            return;
+        }
+    };
+    let tmp = path.with_extension("json.tmp");
+    if let Err(e) = std::fs::write(&tmp, body.as_bytes()) {
+        eprintln!("[tauri] discovery: write temp failed: {e}");
+        return;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+    }
+    if let Err(e) = std::fs::rename(&tmp, &path) {
+        eprintln!("[tauri] discovery: rename failed: {e}");
+        let _ = std::fs::remove_file(&tmp);
+        return;
+    }
+    tauri_info!("tauri", "discovery:written");
+}
+
+/// Delete discovery file if present (generation-aware callers should gate first).
+pub fn remove_discovery_file(app: &AppHandle) {
+    if let Some(path) = crate::paths::sidecar_discovery_path(app) {
+        if path.exists() {
+            if let Err(e) = std::fs::remove_file(&path) {
+                eprintln!("[tauri] discovery: remove failed: {e}");
+            } else {
+                tauri_info!("tauri", "discovery:removed");
+            }
+        }
+    }
+}
+
+fn chrono_lite_now() -> String {
+    // RFC3339-ish without extra chrono dependency: use system time.
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Sufficient for discovery freshness; CLI treats WS as authoritative.
+    format!("{secs}")
+}
+
 pub fn parse_info_line(line: &str) -> Option<SidecarInfo> {
     serde_json::from_str::<SidecarInfo>(line.trim()).ok()
 }
@@ -97,6 +180,8 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         }
     }
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
+    // Sidecar child pid for product CLI discovery (not the Tauri host pid).
+    let sidecar_pid = child.pid();
 
     let state = app.state::<SidecarState>();
     let my_gen = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
@@ -142,6 +227,7 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
                         *state.port.lock().unwrap() = None;
                         *state.token.lock().unwrap() = None;
                         *state.child.lock().unwrap() = None;
+                        remove_discovery_file(&app_handle);
                     }
                     break;
                 }
@@ -155,6 +241,8 @@ pub async fn spawn_sidecar(app: &AppHandle) -> Result<u16, String> {
         .map_err(|_| "sidecar exited before reporting info".to_string())?;
     // Store the auth token; return the port so callers can store it.
     *app.state::<SidecarState>().token.lock().unwrap() = Some(info.token.clone());
+    // Product CLI attach: stable discovery file (pid = sidecar child).
+    write_discovery_file(app, &info, sidecar_pid);
     Ok(info.port)
 }
 

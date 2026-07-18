@@ -18,6 +18,8 @@ export interface TurnRunnerOpts {
   deadlineAt: number | null
   allowNoKey?: boolean
   isTty?: boolean
+  /** Live GUI client present (from ready/clients:changed). */
+  guiPresent?: boolean
   send: (msg: ClientMessage) => void
   /** Subscribe to server messages; return unsubscribe. */
   subscribe: (handler: (msg: ServerMessage) => void) => () => void
@@ -190,7 +192,7 @@ export async function runTurn(opts: TurnRunnerOpts): Promise<TurnRunnerOutcome> 
       requestId: string
       options?: PermissionOption[]
     }
-    const decision = decidePermissionHitl(opts.hitl, m.options, isTty)
+    const decision = decidePermissionHitl(opts.hitl, m.options, isTty, opts.guiPresent ?? false)
     if (decision.action === 'allow' && decision.optionId) {
       opts.send({
         type: 'permission:respond',
@@ -198,6 +200,11 @@ export async function runTurn(opts: TurnRunnerOpts): Promise<TurnRunnerOutcome> 
         requestId: m.requestId,
         optionId: decision.optionId,
       })
+      return
+    }
+    if (decision.action === 'wait') {
+      // GUI (or another client) will respond; keep turn open until complete/error.
+      trace('permission:wait_gui', { requestId: m.requestId })
       return
     }
     if (decision.action === 'block') {
@@ -210,9 +217,9 @@ export async function runTurn(opts: TurnRunnerOpts): Promise<TurnRunnerOutcome> 
       errors.push({ code: 'HITL_FAIL', message: decision.reason ?? 'permission blocked' })
       finish(terminalStatus(decision.status ?? 'hitl_blocked'))
     }
-    // prompt: not fully implemented in P0 headless — treat as awaiting
+    // prompt: TTY interactive not fully wired — treat as awaiting
     if (decision.action === 'prompt') {
-      errors.push({ code: 'HITL_PROMPT', message: 'interactive permission not supported in headless' })
+      errors.push({ code: 'HITL_PROMPT', message: 'interactive permission not supported in this CLI build' })
       finish(terminalStatus('awaiting_user'))
     }
   }

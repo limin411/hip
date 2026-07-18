@@ -121,52 +121,58 @@ yarn tauri dev
 | `yarn tauri dev` | Run the full desktop app in dev mode |
 | `yarn sidecar:dev` | Run the sidecar WS server standalone (prints its port) |
 | `yarn sidecar:dev-bin` | (Re)generate the dev sidecar wrapper in `src-tauri/binaries/` |
-| `yarn cli:dev` | Run the headless CLI (`hip version` / `hip doctor` / `hip run`) |
-| `yarn cli:test` | CLI unit tests (settle / isolation / HITL, no paid LLM) |
+| `yarn cli:dev` | Product CLI (`hip doctor` / `session` / `run` / `repl`) — **requires running hip app** |
+| `yarn cli:test` | CLI unit tests (no paid LLM) |
 | `yarn type-check` | Type-check the frontend |
 | `yarn workspace @hip/sidecar type-check` | Type-check the sidecar |
 
-### Headless CLI (`@hip/cli`)
+### Product CLI (`@hip/cli`)
 
-Thin client over the same Node sidecar (no Tauri). Design: [`docs/superpowers/specs/2026-07-14-hip-cli-design.md`](docs/superpowers/specs/2026-07-14-hip-cli-design.md).
+Attach-only companion for the **running** hip desktop app (shared sidecar +
+`~/.hip` data). Design:
+[`docs/superpowers/specs/2026-07-18-hip-cli-tauri-host-attach.md`](docs/superpowers/specs/2026-07-18-hip-cli-tauri-host-attach.md).
+
+There is **no** separate SDK package — scripts should call `hip … --json`.
+CLI does **not** start the product sidecar; start the app first or commands fail
+with `APP_NOT_RUNNING` (exit 3).
 
 ```bash
-# Health: spawn sidecar, handshake, report hasApiKey
+# Start the desktop app, then:
+
+# Health: discovery file + attach + hasApiKey
 yarn cli:dev doctor
 
 # Auth keys present? (never prints secrets)
 yarn cli:dev config auth-status
 
-# One-shot harness run (isolates HIP_*; writes HipRunResult JSON + optional artifacts)
-yarn cli:dev run --preset harness --stream none \
+# One-shot run against the live app (HipRunResult JSON)
+yarn cli:dev run --stream none \
   --json --output /tmp/hip-out/result.json \
-  --out-dir /tmp/hip-out \
   "Reply with exactly: pong"
 
 # Human stream modes: text | tools | all | none
 yarn cli:dev run --stream all "summarize README.md"
 
-# Acceptance demo (exit 0 on ok, or no-key preflight)
-scripts/hip-run-harness-demo.sh
-
-# Sessions (default: user ~/.hip/db — close the desktop app if DB is locked)
+# Sessions (shared with GUI)
 yarn cli:dev session list
 yarn cli:dev session show <id-prefix> --limit 20
 yarn cli:dev session delete <id> --yes
 
-# Interactive multi-turn REPL (TTY)
+# Interactive multi-turn REPL (TTY; HITL prefers GUI when present)
 yarn cli:dev repl --cwd .
 ```
 
 | Flag / command | Meaning |
 |----------------|---------|
-| `--preset harness` | full isolation + `permissionMode=full` + `disablePlan` + auto HITL |
-| `--json` / `--output` | Harness ABI result JSON |
+| `doctor` | Attach health (requires running app) |
+| `--json` / `--output` | `HipRunResult` schemaVersion 1 |
 | `--out-dir` | `result.json`, `trace.jsonl`, `patch.diff`, `usage.json` |
-| `--stream` | Human transcript FD rules (JSON still isolated) |
-| `--trace-raw` | Disable secret redaction in `trace.jsonl` |
-| `session *` | List/show/delete persisted sessions |
+| `--stream` | Human transcript (text \| tools \| all \| none) |
+| `--hitl auto` | Auto-approve tool permissions (**bypasses GUI**) |
+| `--hitl prompt` | Wait for GUI or TTY when no GUI client |
+| `session *` | List/show/delete/send on shared sessions |
 | `repl` | Multi-turn interactive chat |
+| `HIP_CLI_DEV_SPAWN=1` | Dev only: isolated spawn (never product DB) |
 
 ## Recommended IDE Setup
 

@@ -140,7 +140,10 @@ export function mapErrorCode(code: string): { status: HipRunStatus; exitCode: nu
     c === 'WS_AUTH_FAILED' ||
     c === 'SIDECAR_ENTRY_NOT_FOUND' ||
     c === 'SIDECAR_SPAWN_FAILED' ||
-    c === 'WS_DISCONNECT'
+    c === 'WS_DISCONNECT' ||
+    c === 'APP_NOT_RUNNING' ||
+    c === 'DISCOVERY_INVALID' ||
+    c === 'DISCOVERY_INSECURE'
   ) {
     return { status: 'sidecar', exitCode: 3 }
   }

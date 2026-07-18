@@ -513,6 +513,51 @@ describe('applyServerMessage', () => {
     expect(s1.sessions[0].pendingPermission?.requestId).toBe('r')
   })
 
+  it('permission:resolved clears matching pendingPermission', () => {
+    const s0 = applyServerMessage(
+      { sessions: [baseSession({ id: 's' })] },
+      {
+        type: 'permission:request',
+        sessionId: 's',
+        turnId: 't',
+        requestId: 'r',
+        tool: { title: 'x', kind: 'execute' },
+        options: [],
+      },
+    )
+    const s1 = applyServerMessage(s0, {
+      type: 'permission:resolved',
+      sessionId: 's',
+      requestId: 'r',
+      source: 'cli',
+    })
+    expect(s1.sessions[0].pendingPermission).toBeNull()
+  })
+
+  it('agent:interrupt:resolved clears interrupt and planApprovalPending', () => {
+    let s = applyServerMessage(
+      { sessions: [baseSession({ id: 's' })] },
+      {
+        type: 'agent:interrupt',
+        sessionId: 's',
+        turnId: 't1',
+        agentId: 'a',
+        question: 'Approve plan?',
+        context: JSON.stringify({ kind: 'plan_approval' }),
+      },
+    )
+    expect(s.sessions[0].interrupt?.turnId).toBe('t1')
+    expect(s.sessions[0].planApprovalPending).toBe(true)
+    s = applyServerMessage(s, {
+      type: 'agent:interrupt:resolved',
+      sessionId: 's',
+      turnId: 't1',
+      source: 'cli',
+    })
+    expect(s.sessions[0].interrupt).toBeNull()
+    expect(s.sessions[0].planApprovalPending).toBe(false)
+  })
+
   it('stores agentFrame on pendingPermission for a nested sub-agent request', () => {
     const base = { sessions: [{ id: 's1', config: { llmProvider: 'd', model: 'm', tools: [] }, title: '', preview: '', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }] } as any
     const next = applyServerMessage(base, {

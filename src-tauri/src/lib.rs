@@ -583,6 +583,8 @@ pub fn run() {
             if let Some(child) = app_handle.state::<SidecarState>().child.lock().unwrap().take() {
                 let _ = child.kill();
             }
+            // Product CLI discovery file must not outlive the host.
+            crate::sidecar::remove_discovery_file(app_handle);
             app_handle.state::<pty::PtyManager>().kill_all();
         }
         // On macOS, closing the (single) window does not quit the app by default,

@@ -29,7 +29,8 @@ export function parseInterruptContextKind(context?: string): string | undefined 
 }
 
 export interface HitlDecision {
-  action: 'allow' | 'block' | 'await_user' | 'prompt'
+  /** wait = leave request open for another client (GUI); do not finish the turn. */
+  action: 'allow' | 'block' | 'await_user' | 'prompt' | 'wait'
   optionId?: string
   status?: 'hitl_blocked' | 'awaiting_user'
   reason?: string
@@ -40,17 +41,23 @@ export function decidePermissionHitl(
   hitl: HitlMode,
   options: PermissionOption[] | undefined,
   isTty: boolean,
+  /** When true (product attach + gui client present), wait for any client — do not steal TTY first. */
+  guiPresent = false,
 ): HitlDecision {
   if (hitl === 'fail') {
     return { action: 'block', status: 'hitl_blocked', reason: 'permission:request rejected by hitl=fail' }
   }
   if (hitl === 'prompt') {
+    if (guiPresent) {
+      // Wait for GUI (or any client) permission:respond — CLI does not auto-respond or finish.
+      return { action: 'wait', reason: 'waiting for GUI permission response' }
+    }
     if (!isTty) {
-      return { action: 'block', status: 'awaiting_user', reason: 'hitl=prompt requires TTY' }
+      return { action: 'block', status: 'awaiting_user', reason: 'hitl=prompt requires TTY or running hip app GUI' }
     }
     return { action: 'prompt' }
   }
-  // auto
+  // auto — intentionally bypasses GUI approval (document in README)
   const optionId = pickAllowOptionId(options)
   if (!optionId) {
     return { action: 'block', status: 'hitl_blocked', reason: 'no allow-like permission option' }

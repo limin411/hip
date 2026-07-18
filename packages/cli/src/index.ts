@@ -1,3 +1,8 @@
+/**
+ * @internal
+ * Internal monorepo / test helpers for `@hip/cli`.
+ * Product surface is the `hip` binary (subprocess + `--json`), not a published SDK.
+ */
 export { runHip, exitCodeOf } from './run.js'
 export type {
   HipRunOptions,
@@ -18,4 +23,6 @@ export { captureGitBaseline, captureGitAfter, buildWorktreePatch } from './artif
 export { exportArtifacts } from './artifacts/export.js'
 export { connectSidecar, waitForServerMessage } from './sidecar/connect.js'
 export { userHipEnv } from './sidecar/user-hip.js'
+export { resolveHipBaseDir, resolveDiscoveryPath } from './sidecar/hip-base.js'
+export { readDiscovery, DiscoveryError } from './sidecar/discovery.js'
 export { CLI_VERSION } from './version.js'

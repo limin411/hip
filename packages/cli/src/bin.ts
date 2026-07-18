@@ -14,7 +14,9 @@ async function main(): Promise<void> {
   const program = new Command()
   program
     .name('hip')
-    .description('hip CLI — thin client for the hip sidecar (headless / harness)')
+    .description(
+      'hip CLI — attach-only companion for the running hip desktop app (shared sidecar / data)',
+    )
     .version(CLI_VERSION)
 
   program
@@ -26,9 +28,13 @@ async function main(): Promise<void> {
 
   program
     .command('doctor')
-    .description('Resolve sidecar entry, spawn, handshake, and report ready/hasApiKey')
-    .action(async () => {
-      const code = await runDoctor()
+    .description('Attach health against running hip app (discovery + ready/hasApiKey)')
+    .option(
+      '--sidecar-self-test',
+      'Dev only: isolated spawn handshake (requires HIP_CLI_DEV_SPAWN=1 or this flag with checkout)',
+    )
+    .action(async (flags: { sidecarSelfTest?: boolean }) => {
+      const code = await runDoctor({ sidecarSelfTest: flags.sidecarSelfTest === true })
       process.exitCode = code
     })
 

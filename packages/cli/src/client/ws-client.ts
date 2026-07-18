@@ -8,13 +8,22 @@ export class HipWsClient {
   private readonly handlers = new Set<MessageHandler>()
   private openPromise: Promise<void> | null = null
 
-  connect(port: number, token: string): Promise<void> {
+  connect(
+    port: number,
+    token: string,
+    opts?: { clientRole?: 'cli' | 'gui' | 'unknown' },
+  ): Promise<void> {
     if (this.openPromise) return this.openPromise
     this.openPromise = new Promise<void>((resolve, reject) => {
-      const url = `ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`
+      const role = opts?.clientRole ?? 'cli'
+      const url = `ws://127.0.0.1:${port}/?token=${encodeURIComponent(token)}&client=${encodeURIComponent(role)}`
       const ws = new WebSocket(url)
       this.ws = ws
-      ws.on('open', () => resolve())
+      let settled = false
+      ws.on('open', () => {
+        settled = true
+        resolve()
+      })
       ws.on('message', (data) => {
         let msg: ServerMessage
         try {
@@ -25,11 +34,21 @@ export class HipWsClient {
         for (const h of this.handlers) h(msg)
       })
       ws.on('error', (err) => {
-        reject(Object.assign(err, { code: 'WS_DISCONNECT' }))
+        if (!settled) {
+          reject(Object.assign(err, { code: 'WS_DISCONNECT' }))
+        }
       })
       ws.on('close', (code, reason) => {
         if (code === 1008) {
           // auth / origin — surface for attach failures
+          if (!settled) {
+            settled = true
+            reject(
+              Object.assign(new Error(reason.toString() || 'ws close 1008'), {
+                code: 'WS_AUTH_FAILED',
+              }),
+            )
+          }
           for (const h of this.handlers) {
             h({
               type: 'error',
@@ -37,6 +56,9 @@ export class HipWsClient {
               message: reason.toString() || 'ws close 1008',
             })
           }
+        } else if (!settled) {
+          settled = true
+          reject(Object.assign(new Error('ws closed before open'), { code: 'APP_NOT_RUNNING' }))
         }
       })
     })

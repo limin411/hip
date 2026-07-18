@@ -360,7 +360,7 @@ export function handleSessionMessage(
         send({ type: 'error', sessionId: msg.sessionId, code: 'BUSY', message: 'Session is busy' })
         return
       }
-      return s.runWorkflowTurn(msg.def, send, { runInputs: msg.runInputs })
+      return void s.runWorkflowTurn(msg.def, send, { runInputs: msg.runInputs })
     }
     case 'workflow:getActive': {
       const wfStore = ctx.store?.getDb ? new SqliteWorkflowStore(ctx.store.getDb()) : undefined

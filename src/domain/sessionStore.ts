@@ -295,6 +295,26 @@ export function applyServerMessage(
         pendingPermission: { turnId: msg.turnId, requestId: msg.requestId, tool: msg.tool, options: msg.options, ...(msg.agentFrame ? { agentFrame: msg.agentFrame } : {}) },
       }))
 
+    case 'permission:resolved':
+      return update(msg.sessionId, (s) => {
+        if (!s.pendingPermission || s.pendingPermission.requestId !== msg.requestId) return s
+        return { ...s, pendingPermission: null }
+      })
+
+    case 'agent:interrupt:resolved':
+      return update(msg.sessionId, (s) => {
+        // Clear sticky plan/interrupt chrome when any client resolves the pause.
+        if (s.interrupt && msg.turnId && s.interrupt.turnId !== msg.turnId) {
+          // Different turn — still clear planApprovalPending if set (foreign resolve).
+          if (!s.planApprovalPending) return s
+        }
+        return {
+          ...s,
+          interrupt: null,
+          planApprovalPending: false,
+        }
+      })
+
     case 'session:thinking':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, thinking: msg.thinking } }))
 

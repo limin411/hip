@@ -44,6 +44,24 @@ pub fn config_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "config"
 pub fn cache_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "cache") }
 pub fn scratch_dir(app: &AppHandle) -> Option<PathBuf> { hip_subdir(app, "scratch") }
 
+/// Runtime discovery for product CLI attach (`run/sidecar.json`).
+pub fn run_dir(app: &AppHandle) -> Option<PathBuf> {
+    let dir = hip_subdir(app, "run")?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)) {
+            eprintln!("[tauri] could not set 0700 on {}: {e}", dir.display());
+        }
+    }
+    Some(dir)
+}
+
+/// Canonical path of the sidecar discovery file (mode 0600 on Unix when written).
+pub fn sidecar_discovery_path(app: &AppHandle) -> Option<PathBuf> {
+    Some(run_dir(app)?.join("sidecar.json"))
+}
+
 /// Canonical path of the file-backed secret store inside `config/`.
 pub fn auth_json_path(app: &AppHandle) -> Option<PathBuf> {
     Some(config_dir(app)?.join("auth.json"))

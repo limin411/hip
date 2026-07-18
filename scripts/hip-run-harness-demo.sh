@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# P0 harness acceptance demo (design §G).
+# Product CLI demo: requires a running hip desktop app (attach-only).
 # Usage: from monorepo root:
 #   scripts/hip-run-harness-demo.sh
-# Optional: OUT_DIR=/tmp/hip-demo PROMPT='...' scripts/hip-run-harness-demo.sh
+# Optional: OUT_DIR=/tmp/hip-out PROMPT='...' scripts/hip-run-harness-demo.sh
+#
+# Dev isolation (no app): HIP_CLI_DEV_SPAWN=1 scripts/hip-run-harness-demo.sh
 
 set -euo pipefail
 
@@ -17,11 +19,15 @@ export HIP_AUTH_PATH="${HIP_AUTH_PATH:-$HOME/.hip/config/auth.json}"
 
 echo "[demo] HIP_AUTH_PATH=${HIP_AUTH_PATH}"
 echo "[demo] OUT_DIR=${OUT_DIR}"
-echo "[demo] running hip run --preset harness …"
+if [[ "${HIP_CLI_DEV_SPAWN:-}" == "1" ]]; then
+  echo "[demo] HIP_CLI_DEV_SPAWN=1 — isolated spawn (not product attach)"
+else
+  echo "[demo] product attach (start hip app first)"
+fi
+echo "[demo] running hip run …"
 
 set +e
 yarn cli:dev run \
-  --preset harness \
   --stream none \
   --json \
   --output "${OUT_DIR}/result.json" \
@@ -40,29 +46,10 @@ if [[ -f "${OUT_DIR}/result.json" ]]; then
     head -c 500 "${OUT_DIR}/result.json"
     echo
   fi
-else
-  echo "[demo] WARN: no result.json written"
 fi
 
-# Acceptance:
-# - with key: exit 0 and status ok (for the pong prompt)
-# - without key: exit 1 and NO_API_KEY_AT_READY
-if [[ ! -f "${OUT_DIR}/result.json" ]]; then
-  exit 3
+if [[ "${code}" -eq 3 ]]; then
+  echo "[demo] exit 3 often means APP_NOT_RUNNING — open the hip desktop app and retry."
 fi
 
-status="$(python3 -c "import json; print(json.load(open('${OUT_DIR}/result.json'))['status'])" 2>/dev/null || echo unknown)"
-if [[ "${code}" -eq 0 && "${status}" == "ok" ]]; then
-  echo "[demo] PASS (ok)"
-  exit 0
-fi
-if [[ "${code}" -eq 1 && "${status}" == "error" ]]; then
-  err="$(python3 -c "import json; e=json.load(open('${OUT_DIR}/result.json')).get('errors') or []; print(e[0]['code'] if e else '')" 2>/dev/null || true)"
-  if [[ "${err}" == "NO_API_KEY_AT_READY" ]]; then
-    echo "[demo] PASS (no key preflight as designed)"
-    exit 0
-  fi
-fi
-
-echo "[demo] FAIL status=${status} exit=${code}"
 exit "${code}"

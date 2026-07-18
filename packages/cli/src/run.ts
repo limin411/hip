@@ -4,11 +4,10 @@ import { resolve as pathResolve } from 'node:path'
 import { normalizeSessionConfig, type SessionConfig } from '@hip/protocol'
 import type { HipRunOptions, HipRunResult, HitlMode } from './types.js'
 import { exitForStatus, mapErrorCode } from './types.js'
-import { bootstrapIsolation } from './sidecar/env-bootstrap.js'
-import { spawnSidecar, stopSpawned, type SpawnedSidecar } from './sidecar/spawn.js'
-import { resolveAttachTarget } from './sidecar/attach.js'
-import { HipWsClient } from './client/ws-client.js'
-import { runTurn, waitReady } from './client/turn-runner.js'
+import { connectSidecar } from './sidecar/connect.js'
+import { DiscoveryError } from './sidecar/discovery.js'
+import type { SidecarConnection } from './sidecar/connect.js'
+import { runTurn } from './client/turn-runner.js'
 import { buildResult, emptyResult } from './client/result-builder.js'
 import { emitResultJson } from './client/json-channel.js'
 import { StreamRenderer } from './client/stream-renderer.js'
@@ -27,7 +26,8 @@ function readPrompt(opts: HipRunOptions): string {
 }
 
 /**
- * Programmatic entry: run one headless turn against a spawned or attached sidecar.
+ * Programmatic entry: run one turn against the product sidecar (attach-only by default).
+ * Dev isolation spawn requires HIP_CLI_DEV_SPAWN=1 and preset harness / --sidecar spawn.
  */
 export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
   const startedAt = Date.now()
@@ -91,11 +91,10 @@ export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
     return result
   }
 
-  let spawned: SpawnedSidecar | null = null
-  const client = new HipWsClient()
+  let conn: SidecarConnection | null = null
   const sessionId = randomUUID()
   const userMessageId = randomUUID()
-  let childEnv = opts.env ?? process.env
+  const childEnv = opts.env ?? process.env
   const trace: TraceEvent[] = []
   const pushTrace = (type: string, payload?: unknown) => {
     trace.push({ ts: new Date().toISOString(), type, payload })
@@ -119,55 +118,37 @@ export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
   }
 
   try {
-    const mode = opts.sidecar ?? 'spawn'
-    let port: number
-    let token: string
+    // Product: discovery attach. Dev isolation: HIP_CLI_DEV_SPAWN=1 + sidecar spawn / harness.
+    const wantDevSpawn =
+      opts.sidecar === 'spawn' ||
+      (opts.preset === 'harness' && process.env.HIP_CLI_DEV_SPAWN === '1') ||
+      process.env.HIP_CLI_DEV_SPAWN === '1'
+    const sidecarMode = wantDevSpawn ? 'spawn' : opts.sidecar === 'auto' ? 'auto' : 'attach'
 
-    if (mode === 'attach' || (mode === 'auto' && (opts.port || opts.token || opts.sidecarLog))) {
-      const target = resolveAttachTarget({
+    let hasApiKeyAtReady: boolean
+    try {
+      conn = await connectSidecar({
+        sidecar: sidecarMode,
         port: opts.port,
         token: opts.token,
         sidecarLog: opts.sidecarLog,
-        env: childEnv,
-      })
-      port = target.port
-      token = target.token
-    } else {
-      if (preset.useIsolation) {
-        const iso = bootstrapIsolation({
-          dbMemory: opts.db === 'memory',
-          setHome: preset.setHome,
-          env: childEnv,
-        })
-        childEnv = iso.env
-      } else if (opts.db === 'memory') {
-        childEnv = { ...childEnv, HIP_DB_PATH: ':memory:' }
-      }
-
-      spawned = await spawnSidecar({
-        env: childEnv,
-        parentWatch: !opts.noParentWatch,
-        debug: process.env.HIP_CLI_DEBUG === '1' || stream === 'all',
-        sidecarLogPath: opts.sidecarLog,
-      })
-      port = spawned.port
-      token = spawned.token
-      pushTrace('sidecar:spawn', { port, kind: 'spawn' })
-    }
-
-    // Subscribe before connect so we never miss the immediate `ready` frame.
-    let hasApiKeyAtReady: boolean
-    try {
-      const readyP = waitReady((h) => client.onMessage(h), {
+        useUserHip: opts.useUserHip ?? !wantDevSpawn,
         allowNoKey: opts.allowNoKey,
-        timeoutMs: 15_000,
+        dbMemory: opts.db === 'memory' || wantDevSpawn,
+        env: childEnv,
+        noParentWatch: opts.noParentWatch,
+        clientRole: 'cli',
       })
-      await client.connect(port, token)
-      const ready = await readyP
-      hasApiKeyAtReady = ready.hasApiKey
-      pushTrace('ready', { hasApiKey: hasApiKeyAtReady })
+      hasApiKeyAtReady = conn.hasApiKey
+      pushTrace(conn.spawned ? 'sidecar:spawn' : 'sidecar:attach', {
+        hasApiKey: hasApiKeyAtReady,
+        guiPresent: conn.guiPresent,
+      })
     } catch (err) {
-      const code = (err as { code?: string }).code ?? 'NO_API_KEY_AT_READY'
+      const code =
+        err instanceof DiscoveryError
+          ? err.code
+          : ((err as { code?: string }).code ?? 'APP_NOT_RUNNING')
       const mapped = mapErrorCode(code)
       const result = emptyResult({
         ...baseMeta,
@@ -179,6 +160,7 @@ export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
       result.exitCode = mapped.exitCode
       return finalize(result)
     }
+    const client = conn.client
 
     const config: SessionConfig = normalizeSessionConfig({
       llmProvider: provider,
@@ -232,6 +214,7 @@ export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
       settleMs: 2000,
       deadlineAt,
       allowNoKey: opts.allowNoKey,
+      guiPresent: conn.guiPresent,
       send: (m) => client.send(m),
       subscribe: (h) => client.onMessage(h),
       onTextDelta: (d) => streamRenderer.onTextDelta(d),
@@ -280,14 +263,13 @@ export async function runHip(opts: HipRunOptions = {}): Promise<HipRunResult> {
     }
     return finalize(result)
   } finally {
-    try {
-      client.send({ type: 'message:cancel', sessionId })
-    } catch {
-      /* ignore */
-    }
-    client.close()
-    if (spawned) {
-      await stopSpawned(spawned, 3000)
+    if (conn) {
+      try {
+        conn.client.send({ type: 'message:cancel', sessionId })
+      } catch {
+        /* ignore */
+      }
+      await conn.close()
     }
   }
 }

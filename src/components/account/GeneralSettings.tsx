@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useUiStore, type AppLanguage, type Theme } from '@/store/uiStore'
+import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,8 @@ const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
 
 const THEME_KEYS: Theme[] = ['light', 'dark', 'system']
 
+const DENSITY_KEYS: UiDensity[] = ['comfortable', 'compact']
+
 const selectTriggerCls =
   'flex cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
 
@@ -24,6 +26,8 @@ export function GeneralSettings() {
   const setLanguage = useUiStore((s) => s.setLanguage)
   const theme = useUiStore((s) => s.theme)
   const setTheme = useUiStore((s) => s.setTheme)
+  const density = useUiStore((s) => s.density)
+  const setDensity = useUiStore((s) => s.setDensity)
 
   return (
     <div className="flex flex-col">
@@ -72,6 +76,30 @@ export function GeneralSettings() {
                 <DropdownMenuItem key={themeKey} onSelect={() => setTheme(themeKey)}>
                   <Check size={14} className={cn('shrink-0', theme === themeKey ? 'opacity-100' : 'opacity-0')} />
                   <span>{t(`settings.themes.${themeKey}`)}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <div className="flex items-center justify-between px-6 py-5">
+        <div className="min-w-0 flex-1">
+          <div className="text-prose font-medium text-ink">{t('settings.density')}</div>
+          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.densityDesc')}</div>
+        </div>
+        <div className="relative ml-4 shrink-0">
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={selectTriggerCls}>
+                <span>{t(`settings.densities.${density}`)}</span>
+                <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {DENSITY_KEYS.map((densityKey) => (
+                <DropdownMenuItem key={densityKey} onSelect={() => setDensity(densityKey)}>
+                  <Check size={14} className={cn('shrink-0', density === densityKey ? 'opacity-100' : 'opacity-0')} />
+                  <span>{t(`settings.densities.${densityKey}`)}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

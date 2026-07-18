@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   useUiStore,
   normalizeAppLanguage,
+  normalizeUiDensity,
+  isUiDensity,
   isEphemeralActiveView,
   mergeUiPersistedState,
   applyColdLaunchShell,
@@ -14,6 +16,7 @@ beforeEach(() => {
     activeTab: 'agents',
     theme: 'system',
     language: 'zh-CN',
+    density: 'comfortable',
     chatSessionId: null,
     codeSessionId: null,
     activeView: 'chat',
@@ -244,6 +247,48 @@ describe('normalizeAppLanguage', () => {
   })
 })
 
+describe('uiStore - density', () => {
+  it('defaults to comfortable', () => {
+    expect(useUiStore.getState().density).toBe('comfortable')
+  })
+
+  it('setDensity switches between comfortable and compact', () => {
+    useUiStore.getState().setDensity('compact')
+    expect(useUiStore.getState().density).toBe('compact')
+
+    useUiStore.getState().setDensity('comfortable')
+    expect(useUiStore.getState().density).toBe('comfortable')
+  })
+
+  it('setDensity to the same value is a no-op (same reference)', () => {
+    useUiStore.getState().setDensity('comfortable')
+    const before = useUiStore.getState()
+    useUiStore.getState().setDensity('comfortable')
+    expect(useUiStore.getState()).toBe(before)
+  })
+})
+
+describe('isUiDensity / normalizeUiDensity', () => {
+  it('isUiDensity accepts only comfortable | compact', () => {
+    expect(isUiDensity('comfortable')).toBe(true)
+    expect(isUiDensity('compact')).toBe(true)
+    expect(isUiDensity('cozy')).toBe(false)
+    expect(isUiDensity('')).toBe(false)
+    expect(isUiDensity(null)).toBe(false)
+    expect(isUiDensity(undefined)).toBe(false)
+    expect(isUiDensity(1)).toBe(false)
+  })
+
+  it('normalizeUiDensity maps invalid values to comfortable', () => {
+    expect(normalizeUiDensity('comfortable')).toBe('comfortable')
+    expect(normalizeUiDensity('compact')).toBe('compact')
+    expect(normalizeUiDensity(undefined)).toBe('comfortable')
+    expect(normalizeUiDensity(null)).toBe('comfortable')
+    expect(normalizeUiDensity('cozy')).toBe('comfortable')
+    expect(normalizeUiDensity(42)).toBe('comfortable')
+  })
+})
+
 describe('uiStore persistence partialize', () => {
   it('includes surface pointers and settings (not activeView / open tabs)', () => {
     useUiStore.setState({
@@ -252,6 +297,7 @@ describe('uiStore persistence partialize', () => {
       activeView: 'code',
       theme: 'dark',
       language: 'en',
+      density: 'compact',
       settingsPage: 'model',
       diffViewMode: 'split',
       checkpointMode: 'since-start',
@@ -265,6 +311,7 @@ describe('uiStore persistence partialize', () => {
       codeSessionId: s.codeSessionId,
       theme: s.theme,
       language: s.language,
+      density: s.density,
       settingsPage: s.settingsPage,
       diffViewMode: s.diffViewMode,
       checkpointMode: s.checkpointMode,
@@ -274,6 +321,7 @@ describe('uiStore persistence partialize', () => {
       codeSessionId: 'c',
       theme: 'dark',
       language: 'en',
+      density: 'compact',
       settingsPage: 'model',
       diffViewMode: 'split',
       checkpointMode: 'since-start',
@@ -291,6 +339,7 @@ describe('uiStore persistence partialize', () => {
       activeView: 'chat' as const,
       sidebarSection: 'chats' as const,
       theme: 'system' as const,
+      density: 'comfortable' as const,
     }
     const merged = mergeUiPersistedState(
       {
@@ -299,6 +348,7 @@ describe('uiStore persistence partialize', () => {
         knowledgeTabOpen: true,
         sidebarSection: 'projects',
         theme: 'dark',
+        density: 'compact',
       },
       current,
     )
@@ -307,6 +357,33 @@ describe('uiStore persistence partialize', () => {
     expect(merged).not.toHaveProperty('openSessionIds')
     expect(merged).not.toHaveProperty('knowledgeTabOpen')
     expect(merged.theme).toBe('dark')
+    expect(merged.density).toBe('compact')
+  })
+
+  it('merge normalizes invalid density to comfortable', () => {
+    const current = {
+      activeView: 'chat' as const,
+      sidebarSection: 'chats' as const,
+      density: 'compact' as const,
+    }
+    const merged = mergeUiPersistedState(
+      { density: 'cozy' },
+      current,
+    )
+    expect(merged.density).toBe('comfortable')
+  })
+
+  it('merge treats missing density as comfortable', () => {
+    const current = {
+      activeView: 'chat' as const,
+      sidebarSection: 'chats' as const,
+      density: 'compact' as const,
+    }
+    const merged = mergeUiPersistedState(
+      { theme: 'dark' },
+      current,
+    )
+    expect(merged.density).toBe('comfortable')
   })
 
   it('applyColdLaunchShell forces chat section', () => {

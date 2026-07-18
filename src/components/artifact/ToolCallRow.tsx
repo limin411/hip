@@ -135,7 +135,7 @@ export function ToolCallRow({ tool }: { tool: ToolCall }) {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex min-h-5 w-full items-center gap-1.5 py-0.5 text-left text-meta leading-5 transition-colors hover:text-ink"
+          className="flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] py-0.5 text-left text-meta leading-5 transition-colors hover:text-ink"
           data-testid={tool.status === 'running' ? 'tool-card-running' : 'tool-row'}
         >
           <ChevronRight

@@ -26,7 +26,7 @@ export function AgentBadge({ role }: { role: AgentRole }) {
 
 /** Shared single-line trail row: fixed line box so icons + text share one baseline. */
 export const TRAIL_ROW =
-  'flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5'
+  'flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5'
 
 function ThinkingDisclosure({
   role,

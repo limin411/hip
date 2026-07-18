@@ -453,6 +453,12 @@ export const zhTW = {
         dark: '深色',
         system: '跟隨系統',
       },
+      density: '密度',
+      densityDesc: '控制側邊欄與活動列的間距。',
+      densities: {
+        comfortable: '舒適',
+        compact: '緊湊',
+      },
       contextMenu: {
         title: '右鍵選單',
         description: '選擇要顯示的右鍵操作及其順序。',

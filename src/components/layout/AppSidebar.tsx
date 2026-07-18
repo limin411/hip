@@ -199,7 +199,7 @@ export function AppSidebar() {
         </label>
         <div
           className={cn(
-            'flex h-[34px] items-center gap-2 rounded-lg border border-border bg-surface px-2.5',
+            'flex h-[var(--row-h-sidebar)] items-center gap-2 rounded-lg border border-border bg-surface px-2.5',
             'focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           )}
         >
@@ -322,7 +322,7 @@ export function AppSidebar() {
                       aria-current={active ? 'true' : undefined}
                       onClick={() => void openSpaceFromSidebar(sp.id)}
                       className={cn(
-                        'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
+                        'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-[var(--row-pad-y-session)] text-left transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                         active ? SIDEBAR_ACTIVE_RAIL : 'hover:bg-state-hover',
                       )}
@@ -558,7 +558,7 @@ function SidebarSessionRow({
             aria-label={ariaLabel}
             onClick={() => void selectSessionFromSidebar(session.id)}
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2 py-2 pr-2.5 text-left',
+              'flex min-w-0 flex-1 items-center gap-2 py-[var(--row-pad-y-session)] pr-2.5 text-left',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
             )}
           >
@@ -835,7 +835,7 @@ function NavItem({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
+        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}

@@ -453,6 +453,12 @@ export const zhCN = {
         dark: '深色',
         system: '跟随系统',
       },
+      density: '密度',
+      densityDesc: '控制侧边栏与活动行的间距。',
+      densities: {
+        comfortable: '舒适',
+        compact: '紧凑',
+      },
       contextMenu: {
         title: '右键菜单',
         description: '选择要显示的右键操作及其顺序。',

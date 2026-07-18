@@ -57,7 +57,7 @@ export function SubAgentCard({
         style={{ borderLeftColor: railColor }}
         data-testid="subagent-card"
       >
-        <div className="flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5">
+        <div className="flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5">
           <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
             {agent.status === 'running' ? (
               <Loader2 size={14} className="block animate-spin text-accent-strong" />

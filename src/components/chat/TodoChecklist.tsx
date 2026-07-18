@@ -36,7 +36,7 @@ export function TodoChecklist({
         {todos.map((todo, i) => {
           const Icon = TODO_ICON[todo.status]
           return (
-            <li key={i} className="flex min-h-5 items-center gap-1.5 text-meta leading-5" data-status={todo.status}>
+            <li key={i} className="flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5" data-status={todo.status}>
               <Icon
                 size={14}
                 className={cn('block shrink-0', TODO_ICON_CLASS[todo.status])}

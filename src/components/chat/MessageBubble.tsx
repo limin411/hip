@@ -74,7 +74,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
       data-testid="message-context-menu"
     >
       {/* CLI-style: role + time on one meta line (same leading / size) */}
-      <div className="mb-1 flex min-h-5 items-center gap-1.5 text-meta font-medium leading-5 text-ink-secondary">
+      <div className="mb-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta font-medium leading-5 text-ink-secondary">
         <span data-testid="message-role">{isUser ? t('chat.you') : 'hip'}</span>
         {message.timestamp > 0 && (
           <span className="font-normal text-ink-tertiary" title={formatAbsolute(message.timestamp, locale)} data-testid="message-time">
@@ -128,7 +128,7 @@ export function MessageBubble({ message, streaming, isLastAssistant, hidePlan }:
         <ArtifactCard toolCalls={message.toolCalls} />
       )}
       {!streaming && (
-        <div className="mt-1 flex min-h-5 items-center gap-1.5 text-meta leading-5">
+        <div className="mt-1 flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5">
           <MessageActions message={message} isLastAssistant={!!isLastAssistant} />
           {message.role === 'assistant' && message.memoryCitations && message.memoryCitations.length > 0 && (
             <DropdownMenu>

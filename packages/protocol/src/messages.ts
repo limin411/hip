@@ -50,7 +50,18 @@ export type ClientMessage =
   | { type: 'session:list' }
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }
-  | { type: 'session:delete'; sessionId: string; deleteDerivedMemories?: boolean }
+  /**
+   * Permanent session delete.
+   * `reason` is an audit tag (user / clearAll / worktree-cascade / worktree-menu / cli / …)
+   * so sidecar + UI logs can attribute mass wipes.
+   */
+  | {
+      type: 'session:delete'
+      sessionId: string
+      deleteDerivedMemories?: boolean
+      /** Why this delete was requested — optional for older clients. */
+      reason?: string
+    }
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }

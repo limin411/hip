@@ -6,6 +6,7 @@ import { surfaceOf } from '@/lib/sessions'
 import {
   collectNestedWorktreeSessionIds,
   extractParallelNestingHints,
+  nestableCatalogPaths,
 } from '@/lib/worktreeNesting'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
@@ -16,6 +17,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { DeleteSessionDialog } from './DeleteSessionDialog'
 import { ClearAllSessionsDialog } from './ClearAllSessionsDialog'
+import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 
 const PAGE_SIZE = 20
 
@@ -34,7 +36,8 @@ export function SessionHistory() {
 
   const nestedWorktreeSessionIds = useMemo(() => {
     const hints = extractParallelNestingHints(parallelRuns)
-    const catalogPaths = Object.values(catalogById).map((r) => r.path)
+    // Primary catalog path === host project cwd; never use it for nesting.
+    const catalogPaths = nestableCatalogPaths(Object.values(catalogById))
     return collectNestedWorktreeSessionIds({
       sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
       slotSessionIds: hints.slotSessionIds,
@@ -90,7 +93,7 @@ export function SessionHistory() {
     <div className="flex flex-1 flex-col overflow-y-auto px-6 py-5" data-testid="session-history">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-display font-semibold text-ink">{t('history.title')}</h2>
-        {sessions.length > 0 && (
+        {filtered.length > 0 && (
           <Button variant="danger" size="sm" onClick={() => setClearAllOpen(true)}>
             {t('history.clearAll')}
           </Button>
@@ -220,7 +223,15 @@ export function SessionHistory() {
         <DeleteSessionDialog
           title={deletingSession.title}
           onConfirm={(opts) => {
-            sessionService.deleteSession(deletingSession.id, opts)
+            debugSessionDelete('history single-delete confirm', {
+              sessionId: deletingSession.id,
+              title: deletingSession.title,
+            })
+            sessionService.deleteSession(deletingSession.id, {
+              ...opts,
+              reason: 'user',
+              meta: { source: 'SessionHistory' },
+            })
             setDeletingSessionId(null)
           }}
           onCancel={() => setDeletingSessionId(null)}
@@ -228,8 +239,48 @@ export function SessionHistory() {
       )}
       {clearAllOpen && (
         <ClearAllSessionsDialog
+          count={filtered.length}
+          scope={
+            query.trim()
+              ? 'search'
+              : surfaceFilter === 'chat'
+                ? 'chat'
+                : surfaceFilter === 'code'
+                  ? 'code'
+                  : 'all'
+          }
           onConfirm={() => {
-            sessions.forEach((s) => sessionService.deleteSession(s.id))
+            // Only delete the *current filter/search list*, never the global session bag.
+            const targets = filtered
+            auditSessionDelete('batch-start', {
+              reason: 'clearAll',
+              count: targets.length,
+              surfaceFilter,
+              query: query.trim() || undefined,
+              ids: targets.map((s) => s.id),
+              totalSessions: sessions.length,
+            })
+            debugSessionDelete('clearAll confirm', {
+              filteredCount: targets.length,
+              totalSessions: sessions.length,
+              surfaceFilter,
+              query: query.trim() || undefined,
+            })
+            for (const s of targets) {
+              sessionService.deleteSession(s.id, {
+                reason: 'clearAll',
+                meta: {
+                  source: 'SessionHistory.clearAll',
+                  surfaceFilter,
+                  query: query.trim() || undefined,
+                  batchSize: targets.length,
+                },
+              })
+            }
+            auditSessionDelete('batch-done', {
+              reason: 'clearAll',
+              count: targets.length,
+            })
             setClearAllOpen(false)
           }}
           onCancel={() => setClearAllOpen(false)}

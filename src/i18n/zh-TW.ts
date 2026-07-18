@@ -957,10 +957,17 @@ export const zhTW = {
       deleteSessionConfirmTitle: '刪除會話「{{title}}」？',
       deleteSessionConfirmBody: '此操作無法復原。',
       deleteDerivedMemories: '同時刪除本會話衍生的長期記憶',
-      clearAll: '清空全部',
-      clearAllConfirmTitle: '清空全部歷史會話？',
-      clearAllConfirmBody: '這將永久刪除所有歷史會話，此操作無法復原。',
-      clearAllConfirmAction: '清空',
+      clearAll: '清空列表',
+      clearAllConfirmTitle: '清空目前列表中的會話？',
+      clearAllConfirmBody:
+        '將永久刪除目前列表中的 {{count}} 條會話（範圍：{{scope}}）。不在目前篩選/搜尋結果中的會話不會被刪除。此操作無法復原。',
+      clearAllConfirmAction: '清空列表',
+      clearAllScope: {
+        all: '全部場景',
+        chat: '僅辦公',
+        code: '僅編碼',
+        search: '搜尋結果',
+      },
     },
     account: {
       menu: '賬戶選單',

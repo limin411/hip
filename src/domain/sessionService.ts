@@ -43,6 +43,7 @@ import {
   formatDiffAnnotationsForComposer,
   useDiffAnnotationStore,
 } from '@/store/diffAnnotationStore'
+import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 
 /** Map the current i18next language to one of the three SessionConfig-supported values. */
 function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
@@ -224,6 +225,24 @@ export class SessionService {
     // After the session catalog lands (or re-lands on reconnect), re-attach open title-bar
     // tabs from localStorage. Cold launch stays on New Conversation; live reconnect keeps selection.
     if (msg.type === 'session:list:result') {
+      try {
+        const bySurface = msg.sessions.reduce(
+          (acc, s) => {
+            acc[s.surface] = (acc[s.surface] ?? 0) + 1
+            return acc
+          },
+          {} as Record<string, number>,
+        )
+        // eslint-disable-next-line no-console
+        console.info('[hip][session-list] result', {
+          count: msg.sessions.length,
+          bySurface,
+          ids: msg.sessions.slice(0, 40).map((s) => s.id),
+          activeSessionId: useDomainStore.getState().activeSessionId,
+        })
+      } catch {
+        /* logging must never crash receive */
+      }
       this.restoreOpenTabsFromPersistence()
     }
     // E2E seed wins over empty/real sidecar list:result for the seeded session.
@@ -1200,8 +1219,30 @@ export class SessionService {
     }
   }
 
-  /** Permanently delete a session (History page / sidebar). */
-  deleteSession(id: string, opts?: { deleteDerivedMemories?: boolean }): void {
+  /**
+   * Permanently delete a session (History page / sidebar / cascade).
+   * Always send `reason` so sidecar audit logs can attribute mass wipes.
+   */
+  deleteSession(
+    id: string,
+    opts?: { deleteDerivedMemories?: boolean; reason?: string; meta?: Record<string, unknown> },
+  ): void {
+    const reason = opts?.reason ?? 'unknown'
+    const snap = useDomainStore.getState().sessions.find((s) => s.id === id)
+    auditSessionDelete('request', {
+      sessionId: id,
+      reason,
+      title: snap?.title,
+      surface: snap ? surfaceOf(snap.config) : undefined,
+      cwd: snap?.config.cwd,
+      activeSessionId: useDomainStore.getState().activeSessionId,
+      activeView: useUiStore.getState().activeView,
+      sessionsBefore: useDomainStore.getState().sessions.length,
+      stack: new Error().stack?.split('\n').slice(1, 8).join(' | '),
+      ...opts?.meta,
+    })
+    debugSessionDelete('local store delete + transport', { sessionId: id, reason })
+
     useDomainStore.getState().deleteSession(id)
     // Terminal / PTY only die on permanent delete, not soft-close.
     void ptyKill(id).catch(() => {})
@@ -1224,6 +1265,7 @@ export class SessionService {
     this.transport.send({
       type: 'session:delete',
       sessionId: id,
+      reason,
       ...(opts?.deleteDerivedMemories ? { deleteDerivedMemories: true } : {}),
     })
   }

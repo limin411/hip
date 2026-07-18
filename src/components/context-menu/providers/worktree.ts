@@ -21,10 +21,14 @@ async function removeWorktreeRow(
       ? t('contextMenu.worktree.removedForce', { label })
       : t('contextMenu.worktree.removed', { label }),
   )
-  // Cascade via worktree:changed usually deletes bound sessions; defensive cleanup if event missed.
+  // Cascade via worktree:changed usually deletes bound *slot* sessions; defensive cleanup if event missed.
+  // Never invent a host-session id here — only the explicit slot binding is safe.
   if (slotSessionId) {
     try {
-      sessionService.deleteSession(slotSessionId)
+      sessionService.deleteSession(slotSessionId, {
+        reason: 'worktree-menu',
+        meta: { hostSessionId, worktreePath, label, force },
+      })
     } catch {
       /* ignore */
     }

@@ -86,7 +86,10 @@ describe('worktreeProvider', () => {
     items.find((i) => i.id === 'worktree.remove')!.run()
     await vi.waitFor(() => {
       expect(removeWorktree).toHaveBeenCalledWith('host', '/wt/a', false)
-      expect(deleteSession).toHaveBeenCalledWith('slot-1')
+      expect(deleteSession).toHaveBeenCalledWith(
+        'slot-1',
+        expect.objectContaining({ reason: 'worktree-menu' }),
+      )
     })
   })
 

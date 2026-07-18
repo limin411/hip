@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   collectNestedWorktreeSessionIds,
+  collectWorktreeCascadeDeleteIds,
   extractParallelNestingHints,
   isManagedWorktreePath,
   isParallelSlotTitle,
+  nestableCatalogPaths,
   pathKey,
 } from './worktreeNesting'
 
@@ -49,6 +51,36 @@ describe('worktreeNesting', () => {
     expect(nested.has('slot-c')).toBe(true)
   })
 
+  it('nestableCatalogPaths drops primary main-repo paths', () => {
+    expect(
+      nestableCatalogPaths([
+        { path: '/repo', isPrimary: true },
+        { path: '/repo/wt-a', isPrimary: false },
+        { path: '', isPrimary: false },
+      ]),
+    ).toEqual(['/repo/wt-a'])
+  })
+
+  it('primary catalog path must not nest the host (click-to-select regression)', () => {
+    // Bug: after selectSession → git:worktree:list, primary path === host cwd was
+    // passed as worktreePaths and the host vanished from the sidebar.
+    const hostCwd = '/Users/x/code/forgejo'
+    const nestedIfBuggy = collectNestedWorktreeSessionIds({
+      sessions: [{ id: 'host', title: 'Forgejo', config: { cwd: hostCwd } }],
+      worktreePaths: [hostCwd], // wrongly included primary
+    })
+    expect(nestedIfBuggy.has('host')).toBe(true) // documents the failure mode
+
+    const nestedFixed = collectNestedWorktreeSessionIds({
+      sessions: [{ id: 'host', title: 'Forgejo', config: { cwd: hostCwd } }],
+      worktreePaths: nestableCatalogPaths([
+        { path: hostCwd, isPrimary: true },
+        { path: '/Users/x/.hip/worktrees/forgejo-slot', isPrimary: false },
+      ]),
+    })
+    expect(nestedFixed.has('host')).toBe(false)
+  })
+
   it('extractParallelNestingHints pulls sessionIds and paths', () => {
     const hints = extractParallelNestingHints([
       {
@@ -60,5 +92,78 @@ describe('worktreeNesting', () => {
     ])
     expect(hints.slotSessionIds).toEqual(['s1'])
     expect(hints.worktreePaths).toEqual(['/wt/1', '/wt/2'])
+  })
+
+  describe('collectWorktreeCascadeDeleteIds', () => {
+    it('deletes explicit slot sessions matching removed worktree', () => {
+      const r = collectWorktreeCascadeDeleteIds({
+        removedPath: '/Users/x/.hip/worktrees/hip-parallel-0',
+        removedWorktreeId: 'wt-0',
+        runs: [
+          {
+            hostSessionId: 'host',
+            slots: [
+              {
+                sessionId: 'slot-0',
+                worktreeId: 'wt-0',
+                worktreePath: '/Users/x/.hip/worktrees/hip-parallel-0',
+              },
+            ],
+          },
+        ],
+        sessions: [
+          { id: 'host', title: 'Project', config: { cwd: '/repo' } },
+          {
+            id: 'slot-0',
+            title: 'P1/2 · run',
+            config: { cwd: '/Users/x/.hip/worktrees/hip-parallel-0' },
+          },
+        ],
+      })
+      expect(r.toDelete).toEqual(['slot-0'])
+      expect(r.skipped).toEqual([])
+    })
+
+    it('never cascade-deletes a host session even if cwd matches (blind path bug)', () => {
+      const r = collectWorktreeCascadeDeleteIds({
+        removedPath: '/repo',
+        removedWorktreeId: 'primary',
+        runs: [{ hostSessionId: 'host', slots: [] }],
+        sessions: [{ id: 'host', title: 'Project', config: { cwd: '/repo' } }],
+      })
+      expect(r.toDelete).toEqual([])
+      expect(r.skipped.some((s) => s.id === 'host' && s.why === 'host-session-protected')).toBe(true)
+    })
+
+    it('skips cwd-matched non-slot project sessions', () => {
+      const r = collectWorktreeCascadeDeleteIds({
+        removedPath: '/Users/x/code/other-project',
+        runs: [],
+        sessions: [
+          {
+            id: 'proj',
+            title: 'Some project chat',
+            config: { cwd: '/Users/x/code/other-project' },
+          },
+        ],
+      })
+      expect(r.toDelete).toEqual([])
+      expect(r.skipped).toContainEqual({ id: 'proj', why: 'cwd-match-but-not-slot-like' })
+    })
+
+    it('allows cwd match when path is managed worktree root', () => {
+      const r = collectWorktreeCascadeDeleteIds({
+        removedPath: '/Users/x/.hip/worktrees/orphan-slot',
+        runs: [],
+        sessions: [
+          {
+            id: 'orphan',
+            title: 'stale slot',
+            config: { cwd: '/Users/x/.hip/worktrees/orphan-slot' },
+          },
+        ],
+      })
+      expect(r.toDelete).toEqual(['orphan'])
+    })
   })
 })

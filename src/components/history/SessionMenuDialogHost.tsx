@@ -32,7 +32,11 @@ export function SessionMenuDialogHost() {
       title={dialog.title}
       onCancel={closeSessionMenuDialog}
       onConfirm={(opts) => {
-        sessionService.deleteSession(dialog.sessionId, opts)
+        sessionService.deleteSession(dialog.sessionId, {
+          ...opts,
+          reason: 'user',
+          meta: { source: 'SessionMenuDialogHost' },
+        })
         closeSessionMenuDialog()
       }}
     />

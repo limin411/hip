@@ -196,7 +196,10 @@ describe('SessionHistory', () => {
     fireEvent.click(screen.getAllByLabelText('history.deleteSession')[4])
     expect(screen.getByText('history.deleteSessionConfirmTitle:{"title":"Session 5"}')).toBeInTheDocument()
     fireEvent.click(screen.getByText('history.delete'))
-    expect(sessionService.deleteSession).toHaveBeenCalledWith('s5', undefined)
+    expect(sessionService.deleteSession).toHaveBeenCalledWith(
+      's5',
+      expect.objectContaining({ reason: 'user' }),
+    )
   })
 
   it('does not delete a session when dialog is cancelled', () => {
@@ -206,15 +209,40 @@ describe('SessionHistory', () => {
     expect(sessionService.deleteSession).not.toHaveBeenCalled()
   })
 
-  it('clears all sessions after confirming in dialog', () => {
+  it('clears all listed sessions after confirming in dialog', () => {
     render(<SessionHistory />)
     fireEvent.click(screen.getByText('history.clearAll'))
     expect(screen.getByText('history.clearAllConfirmTitle')).toBeInTheDocument()
     fireEvent.click(screen.getByText('history.clearAllConfirmAction'))
     expect(sessionService.deleteSession).toHaveBeenCalledTimes(mockSessions.length)
     mockSessions.forEach((s) => {
-      expect(sessionService.deleteSession).toHaveBeenCalledWith(s.id)
+      expect(sessionService.deleteSession).toHaveBeenCalledWith(
+        s.id,
+        expect.objectContaining({ reason: 'clearAll' }),
+      )
     })
+  })
+
+  it('clear-all only deletes the current surface filter (not the other surface)', () => {
+    render(<SessionHistory />)
+    fireEvent.click(screen.getByText('history.filterCode'))
+    fireEvent.click(screen.getByText('history.clearAll'))
+    fireEvent.click(screen.getByText('history.clearAllConfirmAction'))
+    const codeIds = mockSessions.filter((s) => s.config.surface === 'code').map((s) => s.id)
+    const chatIds = mockSessions.filter((s) => s.config.surface === 'chat').map((s) => s.id)
+    expect(sessionService.deleteSession).toHaveBeenCalledTimes(codeIds.length)
+    for (const id of codeIds) {
+      expect(sessionService.deleteSession).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({ reason: 'clearAll' }),
+      )
+    }
+    for (const id of chatIds) {
+      expect(sessionService.deleteSession).not.toHaveBeenCalledWith(
+        id,
+        expect.anything(),
+      )
+    }
   })
 
   it('does not clear sessions when clear-all dialog is cancelled', () => {

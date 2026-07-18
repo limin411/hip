@@ -3,13 +3,25 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 
+export type ClearAllScope = 'all' | 'chat' | 'code' | 'search'
+
 export interface ClearAllSessionsDialogProps {
+  /** How many sessions will be deleted (current filter/search list). */
+  count: number
+  /** Which filter scope the list represents. */
+  scope: ClearAllScope
   onConfirm: () => void
   onCancel: () => void
 }
 
-export function ClearAllSessionsDialog({ onConfirm, onCancel }: ClearAllSessionsDialogProps) {
+export function ClearAllSessionsDialog({
+  count,
+  scope,
+  onConfirm,
+  onCancel,
+}: ClearAllSessionsDialogProps) {
   const { t } = useTranslation()
+  const scopeLabel = t(`history.clearAllScope.${scope}`)
   return (
     <Modal
       open
@@ -21,7 +33,7 @@ export function ClearAllSessionsDialog({ onConfirm, onCancel }: ClearAllSessions
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">
-          {t('history.clearAllConfirmBody')}
+          {t('history.clearAllConfirmBody', { count, scope: scopeLabel })}
         </DialogPrimitive.Description>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}>

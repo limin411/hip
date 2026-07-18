@@ -122,9 +122,25 @@ describe('SessionService', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     const id = svc.createSession()
-    svc.deleteSession(id)
+    svc.deleteSession(id, { reason: 'user' })
     expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
-    expect(t.sent.at(-1)).toMatchObject({ type: 'session:delete', sessionId: id })
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'session:delete',
+      sessionId: id,
+      reason: 'user',
+    })
+  })
+
+  it('deleteSession defaults reason to unknown when omitted', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const id = svc.createSession()
+    svc.deleteSession(id)
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'session:delete',
+      sessionId: id,
+      reason: 'unknown',
+    })
   })
 
 

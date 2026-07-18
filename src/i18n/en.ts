@@ -965,9 +965,16 @@ export const en = {
       deleteSessionConfirmBody: 'This action cannot be undone.',
       deleteDerivedMemories: 'Also delete long-term memories derived from this session',
       clearAll: 'Clear all',
-      clearAllConfirmTitle: 'Clear all conversations?',
-      clearAllConfirmBody: 'This will permanently delete all conversations. This action cannot be undone.',
-      clearAllConfirmAction: 'Clear all',
+      clearAllConfirmTitle: 'Clear listed conversations?',
+      clearAllConfirmBody:
+        'This will permanently delete {{count}} conversation(s) in the current list ({{scope}}). Conversations outside this filter are not deleted. This cannot be undone.',
+      clearAllConfirmAction: 'Clear listed',
+      clearAllScope: {
+        all: 'all surfaces',
+        chat: 'Chat only',
+        code: 'Code only',
+        search: 'search results',
+      },
     },
     account: {
       menu: 'Account menu',

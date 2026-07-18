@@ -16,6 +16,8 @@ import { useWorktreeStore } from '@/store/worktreeStore'
 import { pathFromToolInput, shouldAutoFollowWrite } from '@/lib/writeFollow'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
+import { collectWorktreeCascadeDeleteIds } from '@/lib/worktreeNesting'
+import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 
 /** Must match sidecar KEEP_RECENT_TURNS — used only in no-op copy. */
 const COMPACT_KEEP_RECENT_TURNS = 3
@@ -431,40 +433,61 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       // Domain event is the fast path; list snapshot (below) is the safety net.
       if (msg.kind === 'removed') {
         const removedPath = msg.worktree.path
-        // Capture bound slot sessions before pruning so they do not float up as top-level rows.
-        const boundSessionIds = new Set<string>()
-        if (removedPath) {
-          const key = removedPath.replace(/\\/g, '/').replace(/\/+$/, '')
-          for (const run of useParallelStore.getState().runs) {
-            for (const slot of run.slots) {
-              if (!slot.sessionId) continue
-              if (slot.worktreeId && msg.worktree.id && slot.worktreeId === msg.worktree.id) {
-                boundSessionIds.add(slot.sessionId)
-                continue
-              }
-              if (slot.worktreePath) {
-                const sk = slot.worktreePath.replace(/\\/g, '/').replace(/\/+$/, '')
-                if (sk === key) boundSessionIds.add(slot.sessionId)
-              }
-            }
-          }
-          for (const s of useDomainStore.getState().sessions) {
-            const cwd = s.config.cwd
-            if (!cwd) continue
-            const ck = cwd.replace(/\\/g, '/').replace(/\/+$/, '')
-            if (ck === key) boundSessionIds.add(s.id)
-          }
+        const runs = useParallelStore.getState().runs
+        const sessions = useDomainStore.getState().sessions
+        const cascade = collectWorktreeCascadeDeleteIds({
+          removedPath,
+          removedWorktreeId: msg.worktree.id,
+          runs,
+          sessions: sessions.map((s) => ({
+            id: s.id,
+            title: s.title,
+            config: { cwd: s.config.cwd },
+          })),
+        })
+        debugSessionDelete('worktree:changed removed — cascade plan', {
+          removedPath,
+          removedWorktreeId: msg.worktree.id,
+          hostSessionId: msg.sessionId,
+          toDelete: cascade.toDelete,
+          skipped: cascade.skipped,
+          candidatesFromSlots: cascade.candidatesFromSlots,
+          candidatesFromCwd: cascade.candidatesFromCwd,
+          parallelRunCount: runs.length,
+          sessionCount: sessions.length,
+        })
+        for (const s of cascade.skipped) {
+          auditSessionDelete('skip', {
+            sessionId: s.id,
+            reason: 'worktree-cascade',
+            why: s.why,
+            removedPath,
+            removedWorktreeId: msg.worktree.id,
+          })
         }
         useParallelStore.getState().pruneSlotsMatching({
           paths: removedPath ? [removedPath] : [],
           worktreeIds: msg.worktree.id ? [msg.worktree.id] : [],
         })
-        if (boundSessionIds.size > 0) {
+        if (cascade.toDelete.length > 0) {
+          auditSessionDelete('batch-start', {
+            reason: 'worktree-cascade',
+            count: cascade.toDelete.length,
+            ids: cascade.toDelete,
+            removedPath,
+          })
           // Lazy import avoids circular graph: sessionService → effects → sessionService.
           void import('./sessionService').then(({ sessionService }) => {
-            for (const id of boundSessionIds) {
-              sessionService.deleteSession(id)
+            for (const id of cascade.toDelete) {
+              sessionService.deleteSession(id, {
+                reason: 'worktree-cascade',
+                meta: { removedPath, removedWorktreeId: msg.worktree.id },
+              })
             }
+            auditSessionDelete('batch-done', {
+              reason: 'worktree-cascade',
+              count: cascade.toDelete.length,
+            })
           })
         }
       }

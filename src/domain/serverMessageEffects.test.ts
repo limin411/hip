@@ -483,6 +483,66 @@ describe('applyServerMessageEffects', () => {
       })
     })
 
+    it('worktree:changed removed does not hard-delete host project sessions with matching cwd', async () => {
+      // Regression: blind cwd===path matching used to wipe real Code history.
+      useDomainStore.setState((st) => ({
+        ...st,
+        sessions: [
+          ...st.sessions,
+          {
+            id: 'host-proj',
+            config: {
+              llmProvider: 'deepseek',
+              model: '',
+              tools: [],
+              surface: 'code',
+              cwd: '/Users/x/code/forgejo',
+            },
+            title: 'Forgejo work',
+            preview: '',
+            updatedAtMs: 0,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+          },
+        ],
+      }))
+      useParallelStore.getState().addRun({
+        id: 'run-host',
+        baseCwd: '/Users/x/code/forgejo',
+        prompt: 'p',
+        hostSessionId: 'host-proj',
+        source: 'agent',
+        createdAt: 1,
+        slots: [],
+      })
+
+      applyServerMessageEffects(
+        {
+          type: 'worktree:changed',
+          sessionId: 'host-proj',
+          repoKey: 'rk',
+          kind: 'removed',
+          worktree: {
+            id: 'primary-ish',
+            path: '/Users/x/code/forgejo',
+            branch: '',
+            head: '',
+            repoKey: 'rk',
+            isPrimary: true,
+            managed: false,
+            source: 'user',
+          },
+        },
+        makeDeps(),
+      )
+
+      // Allow any async cascade import to settle — host must remain.
+      await new Promise((r) => setTimeout(r, 30))
+      expect(useDomainStore.getState().sessions.some((s) => s.id === 'host-proj')).toBe(true)
+    })
+
     it('git:worktree:list:result reconciles catalog and host parallel slots', () => {
       useParallelStore.getState().addRun({
         id: 'run-1',

@@ -957,10 +957,17 @@ export const zhCN = {
       deleteSessionConfirmTitle: '删除会话「{{title}}」？',
       deleteSessionConfirmBody: '此操作无法撤销。',
       deleteDerivedMemories: '同时删除本会话衍生的长期记忆',
-      clearAll: '清空全部',
-      clearAllConfirmTitle: '清空全部历史会话？',
-      clearAllConfirmBody: '这将永久删除所有历史会话，此操作无法撤销。',
-      clearAllConfirmAction: '清空',
+      clearAll: '清空列表',
+      clearAllConfirmTitle: '清空当前列表中的会话？',
+      clearAllConfirmBody:
+        '将永久删除当前列表中的 {{count}} 条会话（范围：{{scope}}）。不在当前筛选/搜索结果中的会话不会被删除。此操作无法撤销。',
+      clearAllConfirmAction: '清空列表',
+      clearAllScope: {
+        all: '全部场景',
+        chat: '仅办公',
+        code: '仅编码',
+        search: '搜索结果',
+      },
     },
     account: {
       menu: '账户菜单',

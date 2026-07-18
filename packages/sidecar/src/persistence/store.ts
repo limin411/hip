@@ -2,6 +2,7 @@ import type { DatabaseSync } from './sqlite.js'
 import type { AgentRole, AgentRun, Attachment, Checkpoint, MemoryCitation, Message, SessionConfig, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
 import { sumUsage } from '../session/usage.js'
 import { surfaceOf } from '../session/surface.js'
+import { logInfo } from '../debug-logger.js'
 
 const PREVIEW_LEN = 80
 
@@ -317,6 +318,13 @@ export class SessionStore {
         throw e
       }
     }
+    // Best-effort pre-counts for forensics (visible under HIP_DEBUG via callers; always log via console in store would be too noisy).
+    let hadRow = false
+    try {
+      hadRow = !!this.db.prepare(`SELECT 1 FROM sessions WHERE id=?`).get(id)
+    } catch {
+      /* ignore */
+    }
     this.db.exec('BEGIN')
     try {
       runIgnoreMissing(
@@ -339,8 +347,15 @@ export class SessionStore {
       } else {
         runIgnoreMissing(`UPDATE memory_items SET source_session_id=NULL WHERE source_session_id=?`, id)
       }
-      this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id)
+      const changes = this.db.prepare(`DELETE FROM sessions WHERE id=?`).run(id).changes
       this.db.exec('COMMIT')
+      // Always-on so even partial purge / double-delete is greppable next to session-manager audit.
+      logInfo('session-delete', 'store.purge', {
+        sessionId: id,
+        hadRow,
+        deletedRows: changes,
+        deleteDerivedMemories: !!opts?.deleteDerivedMemories,
+      })
     } catch (e) {
       this.db.exec('ROLLBACK')
       throw e

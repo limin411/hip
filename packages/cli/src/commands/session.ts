@@ -308,6 +308,7 @@ export async function sessionDelete(idArg: string, opts: SessionCmdOpts = {}): P
     conn.client.send({
       type: 'session:delete',
       sessionId: id,
+      reason: 'cli',
       deleteDerivedMemories: opts.deleteDerivedMemories,
     })
     await deletedP

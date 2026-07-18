@@ -2,6 +2,7 @@ import type { ClientMessage } from '@hip/protocol'
 import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
 import { runProviderProbe } from '../../config/provider-probe.js'
 import { safeErrorMessage } from '../error.js'
+import { logDebug, logInfo } from '../../debug-logger.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
 
 export const SESSION_MESSAGE_TYPES = new Set([
@@ -144,9 +145,33 @@ export function handleSessionMessage(
         msg.cancelled ? { cancelled: true } : { optionId: msg.optionId! },
       )
       return
-    case 'session:list':
-      send({ type: 'session:list:result', sessions: ctx.listSessions() })
+    case 'session:list': {
+      const sessions = ctx.listSessions()
+      // Always-on audit: how many sessions the UI is about to see (wipe forensics).
+      const bySurface = sessions.reduce(
+        (acc, s) => {
+          acc[s.surface] = (acc[s.surface] ?? 0) + 1
+          return acc
+        },
+        {} as Record<string, number>,
+      )
+      logInfo('session-list', 'list', {
+        count: sessions.length,
+        bySurface,
+        ids: sessions.slice(0, 40).map((s) => s.id),
+      })
+      logDebug('session-list', 'list detail', {
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          surface: s.surface,
+          title: s.title,
+          messageCount: s.messageCount,
+          updatedAt: s.updatedAt,
+        })),
+      })
+      send({ type: 'session:list:result', sessions })
       return
+    }
     case 'session:load': {
       const { messages, config } = ctx.loadSession(msg.sessionId)
       send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config })
@@ -158,6 +183,7 @@ export function handleSessionMessage(
     case 'session:delete':
       ctx.deleteSessionSync(msg.sessionId, send, {
         deleteDerivedMemories: msg.deleteDerivedMemories,
+        reason: typeof msg.reason === 'string' && msg.reason ? msg.reason : 'unknown',
       })
       return
     case 'session:rename': {

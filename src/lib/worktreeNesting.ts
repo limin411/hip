@@ -34,7 +34,13 @@ export interface NestedSessionInputs {
 
 /**
  * Session ids that must not appear as top-level conversations.
- * Union of: explicit slot ids, cwd on a known worktree path, managed-root cwd, slot title pattern.
+ * Union of: explicit slot ids, cwd on a known *non-primary* worktree path,
+ * managed-root cwd, slot title pattern.
+ *
+ * Callers must NOT pass primary (main-repo) catalog paths into `worktreePaths`.
+ * Selecting a Code session hydrates `git:worktree:list`, which always includes
+ * the primary worktree whose path equals the host session cwd — matching that
+ * path would hide every host project from the sidebar.
  */
 export function collectNestedWorktreeSessionIds(input: NestedSessionInputs): Set<string> {
   const nested = new Set<string>()
@@ -63,6 +69,21 @@ export function collectNestedWorktreeSessionIds(input: NestedSessionInputs): Set
   return nested
 }
 
+/**
+ * Paths safe to use for nesting detection: non-primary catalog rows only.
+ * Primary = main repo checkout; host Code sessions live there and must stay top-level.
+ */
+export function nestableCatalogPaths(
+  catalog: Iterable<{ path: string; isPrimary?: boolean }>,
+): string[] {
+  const out: string[] = []
+  for (const row of catalog) {
+    if (row.isPrimary) continue
+    if (row.path) out.push(row.path)
+  }
+  return out
+}
+
 /** Collect slot session ids + worktree paths from parallel runs. */
 export function extractParallelNestingHints(
   runs: Array<{
@@ -78,4 +99,88 @@ export function extractParallelNestingHints(
     }
   }
   return { slotSessionIds, worktreePaths }
+}
+
+/**
+ * Decide which sessions may be hard-deleted when a worktree is removed.
+ *
+ * Safety rules (tighten vs blind cwd match):
+ * - Prefer explicit parallel-slot bindings (sessionId on matching slot).
+ * - Optionally include cwd===removedPath only when the session looks like a slot
+ *   (managed worktree path or P#/# · title).
+ * - Never cascade-delete a parallel hostSessionId (project conversation).
+ */
+export function collectWorktreeCascadeDeleteIds(input: {
+  removedPath?: string | null
+  removedWorktreeId?: string | null
+  runs: Array<{
+    hostSessionId?: string
+    slots: Array<{
+      sessionId?: string
+      worktreeId?: string
+      worktreePath?: string
+    }>
+  }>
+  sessions: Array<{ id: string; title: string; config: { cwd?: string } }>
+}): {
+  toDelete: string[]
+  skipped: Array<{ id: string; why: string }>
+  candidatesFromSlots: string[]
+  candidatesFromCwd: string[]
+} {
+  const removedKey = input.removedPath ? pathKey(input.removedPath) : ''
+  const removedId = input.removedWorktreeId || ''
+  const hostIds = new Set<string>()
+  for (const run of input.runs) {
+    if (run.hostSessionId) hostIds.add(run.hostSessionId)
+  }
+
+  const fromSlots = new Set<string>()
+  for (const run of input.runs) {
+    for (const slot of run.slots) {
+      if (!slot.sessionId) continue
+      let match = false
+      if (removedId && slot.worktreeId && slot.worktreeId === removedId) match = true
+      if (removedKey && slot.worktreePath && pathKey(slot.worktreePath) === removedKey) match = true
+      if (match) fromSlots.add(slot.sessionId)
+    }
+  }
+
+  const fromCwd = new Set<string>()
+  const skipped: Array<{ id: string; why: string }> = []
+  if (removedKey) {
+    for (const s of input.sessions) {
+      const cwd = s.config.cwd
+      if (!cwd) continue
+      if (pathKey(cwd) !== removedKey) continue
+      if (hostIds.has(s.id)) {
+        skipped.push({ id: s.id, why: 'host-session-protected' })
+        continue
+      }
+      if (fromSlots.has(s.id)) continue
+      // Only treat as cascade-eligible when clearly a worktree/slot session.
+      if (isManagedWorktreePath(cwd) || isParallelSlotTitle(s.title)) {
+        fromCwd.add(s.id)
+      } else {
+        skipped.push({ id: s.id, why: 'cwd-match-but-not-slot-like' })
+      }
+    }
+  }
+
+  const toDelete = new Set<string>()
+  for (const id of fromSlots) {
+    if (hostIds.has(id)) {
+      skipped.push({ id, why: 'slot-id-is-also-host-protected' })
+      continue
+    }
+    toDelete.add(id)
+  }
+  for (const id of fromCwd) toDelete.add(id)
+
+  return {
+    toDelete: [...toDelete],
+    skipped,
+    candidatesFromSlots: [...fromSlots],
+    candidatesFromCwd: [...fromCwd],
+  }
 }

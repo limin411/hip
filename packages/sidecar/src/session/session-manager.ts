@@ -14,7 +14,7 @@ import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
 import { safeErrorMessage } from './error.js'
-import { logDebug } from '../debug-logger.js'
+import { logDebug, logInfo } from '../debug-logger.js'
 import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js'
 import { buildTools } from './tools.js'
 import { SessionReplay } from './replay.js'
@@ -235,17 +235,48 @@ export class SessionManager {
   private deleteSessionSync(
     id: string,
     send: SendFn,
-    opts?: { deleteDerivedMemories?: boolean },
+    opts?: { deleteDerivedMemories?: boolean; reason?: string },
   ): void {
     // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
     // store delete + session:deleted being immediate — no await before them). The shadow-ref
     // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
     const delCwd = this.resolveSessionCwd(id)
+    const reason = opts?.reason ?? 'unknown'
+    let title: string | undefined
+    let surface: string | undefined
+    try {
+      const row = this.store?.getSession(id)
+      title = row?.title
+      if (row?.config) {
+        const cfg = JSON.parse(row.config) as { surface?: string }
+        surface = cfg.surface
+      }
+    } catch {
+      /* audit best-effort */
+    }
+    // Always-on INFO so mass wipes are greppable even without HIP_DEBUG=1.
+    // Tag [session-delete] — match with: grep 'session-delete' ~/.hip/logs/sidecar*.log
+    logInfo('session-delete', 'audit', {
+      sessionId: id,
+      reason,
+      title,
+      surface,
+      cwd: delCwd,
+      deleteDerivedMemories: !!opts?.deleteDerivedMemories,
+      inMemory: this.sessions.has(id),
+      stack: new Error().stack?.split('\n').slice(1, 6).join(' | '),
+    })
+    logDebug('session-delete', 'deleteSessionSync begin', {
+      sessionId: id,
+      reason,
+      cwd: delCwd,
+    })
     this.store?.deleteSession(id, opts)
     this.sessions.delete(id)
     removeScratchDir(id, this.scratchRoot)
     if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})
     send({ type: 'session:deleted', sessionId: id })
+    logDebug('session-delete', 'deleteSessionSync done', { sessionId: id, reason })
   }
 
   private profileListFor(session: Session): AgentProfileInfo[] {

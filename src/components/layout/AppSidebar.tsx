@@ -23,6 +23,7 @@ import {
 import {
   collectNestedWorktreeSessionIds,
   extractParallelNestingHints,
+  nestableCatalogPaths,
 } from '@/lib/worktreeNesting'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
@@ -64,7 +65,8 @@ export function AppSidebar() {
   /** Nested worktree / parallel-slot sessions — never top-level first-class rows. */
   const nestedWorktreeSessionIds = useMemo(() => {
     const hints = extractParallelNestingHints(parallelRuns)
-    const catalogPaths = Object.values(catalogById).map((r) => r.path)
+    // Exclude primary (main-repo) catalog paths — host cwd === primary path after list hydrate.
+    const catalogPaths = nestableCatalogPaths(Object.values(catalogById))
     return collectNestedWorktreeSessionIds({
       sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
       slotSessionIds: hints.slotSessionIds,

@@ -79,6 +79,16 @@ describe('message-guard', () => {
     expect(msg!.deleteDerivedMemories).toBe(true)
   })
 
+  it('accepts session:delete with reason audit tag', () => {
+    const msg = parseClientMessage({
+      type: 'session:delete',
+      sessionId: 's1',
+      reason: 'clearAll',
+    })
+    expect(msg?.type).toBe('session:delete')
+    expect(msg!.reason).toBe('clearAll')
+  })
+
   it('accepts config:testProvider', () => {
     const msg = parseClientMessage({
       type: 'config:testProvider',

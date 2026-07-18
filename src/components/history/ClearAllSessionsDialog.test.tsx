@@ -19,22 +19,32 @@ describe('ClearAllSessionsDialog', () => {
     vi.clearAllMocks()
   })
 
-  it('renders title and body', () => {
-    render(<ClearAllSessionsDialog onConfirm={vi.fn()} onCancel={vi.fn()} />)
+  it('renders title and body with count/scope', () => {
+    render(
+      <ClearAllSessionsDialog count={3} scope="code" onConfirm={vi.fn()} onCancel={vi.fn()} />,
+    )
     expect(screen.getByText('history.clearAllConfirmTitle')).toBeInTheDocument()
-    expect(screen.getByText('history.clearAllConfirmBody')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'history.clearAllConfirmBody:{"count":3,"scope":"history.clearAllScope.code"}',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('calls onConfirm when clear button is clicked', () => {
     const onConfirm = vi.fn()
-    render(<ClearAllSessionsDialog onConfirm={onConfirm} onCancel={vi.fn()} />)
+    render(
+      <ClearAllSessionsDialog count={1} scope="all" onConfirm={onConfirm} onCancel={vi.fn()} />,
+    )
     fireEvent.click(screen.getByText('history.clearAllConfirmAction'))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
   it('calls onCancel when cancel button is clicked', () => {
     const onCancel = vi.fn()
-    render(<ClearAllSessionsDialog onConfirm={vi.fn()} onCancel={onCancel} />)
+    render(
+      <ClearAllSessionsDialog count={1} scope="chat" onConfirm={vi.fn()} onCancel={onCancel} />,
+    )
     fireEvent.click(screen.getByText('common.cancel'))
     expect(onCancel).toHaveBeenCalledTimes(1)
   })

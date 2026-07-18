@@ -6,6 +6,7 @@ import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
 
 const enterKnowledge = vi.fn(async () => {})
 const openKnowledgeHome = vi.fn(async () => {})
@@ -82,6 +83,7 @@ describe('AppSidebar', () => {
 
   afterEach(() => {
     useParallelStore.setState({ runs: [] })
+    useWorktreeStore.getState().clear()
     cleanup()
   })
 
@@ -221,5 +223,55 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-slot-orphan')).not.toBeInTheDocument()
+  })
+
+  it('keeps host project visible after primary worktree catalog hydrate (click regression)', () => {
+    // selectSession → git:worktree:list:result upserts primary path === session.cwd.
+    // That must not nest/hide the host row.
+    const hostCwd = '/Users/x/data/code-repository/project-go/forgejo'
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: [
+        {
+          id: 'code-1',
+          title: 'Forgejo 项目介绍',
+          preview: 'repo',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-1',
+    }) as never)
+    useWorktreeStore.getState().upsertFromList(
+      [
+        {
+          id: 'primary',
+          path: hostCwd,
+          branch: 'main',
+          head: 'abc',
+          managed: false,
+          isPrimary: true,
+          source: 'git',
+          repoKey: 'rk',
+        },
+        {
+          id: 'slot-wt',
+          path: '/Users/x/.hip/worktrees/forgejo-p1',
+          branch: 'hip-p-1',
+          head: 'def',
+          managed: true,
+          isPrimary: false,
+          source: 'parallel',
+          repoKey: 'rk',
+        },
+      ],
+      'code-1',
+    )
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
   })
 })

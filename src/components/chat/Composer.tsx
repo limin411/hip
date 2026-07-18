@@ -22,6 +22,8 @@ export function Composer({
   reconnecting,
   leftSlot,
   submitDisabled,
+  inputDisabled,
+  placeholder,
   attachments = [],
   onAttachmentsChange,
   quoteText,
@@ -41,6 +43,9 @@ export function Composer({
   reconnecting?: boolean
   leftSlot?: React.ReactNode
   submitDisabled?: boolean
+  /** When true, textarea is not editable (e.g. project folder required). */
+  inputDisabled?: boolean
+  placeholder?: string
   attachments?: LocalAttachment[]
   onAttachmentsChange?: (attachments: LocalAttachment[]) => void
   /** Pending quote shown as a compact chip above the input (full text used on send). */
@@ -62,6 +67,7 @@ export function Composer({
   const hasQuote = !!quoteText?.trim()
   const hasAnns = annotationCount > 0
   const isCard = variant === 'card'
+  const locked = !!inputDisabled
   return (
     <div
       className={cn(
@@ -148,24 +154,34 @@ export function Composer({
         ref={inputRef}
         value={value}
         autoFocus={autoFocus}
-        onChange={(e) => onChange(e.target.value)}
+        disabled={locked}
+        readOnly={locked}
+        onChange={(e) => {
+          if (locked) return
+          onChange(e.target.value)
+        }}
         onKeyDown={(e) => {
+          if (locked) {
+            e.preventDefault()
+            return
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             if (!running && !submitDisabled) onSubmit()
           }
         }}
         rows={textareaHeight != null ? 1 : 2}
-        placeholder={t('chat.inputPlaceholder')}
+        placeholder={placeholder ?? t('chat.inputPlaceholder')}
         style={textareaHeight != null ? { height: textareaHeight } : undefined}
         className={cn(
           'border-0 focus-visible:ring-0',
           isCard ? 'px-2 py-1' : 'px-0 py-1',
           textareaHeight != null && 'min-h-0 overflow-y-auto',
+          locked && 'cursor-not-allowed opacity-60',
         )}
       />
       <div className={cn('flex items-center justify-between pt-1', isCard && 'px-1')}>
-        <div className="flex items-center gap-1">
+        <div className={cn('flex items-center gap-1', locked && 'pointer-events-none opacity-50')}>
           {leftSlot}
         </div>
         {running && onStop ? (
@@ -190,7 +206,7 @@ export function Composer({
             size="icon"
             className={cn('h-7 w-7 shrink-0', isCard && 'rounded-full')}
             onClick={onSubmit}
-            disabled={(!value.trim() && attachments.length === 0) || submitDisabled}
+            disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
             data-testid="composer-send"
             title={t('chat.send')}
           >

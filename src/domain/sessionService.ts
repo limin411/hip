@@ -39,7 +39,9 @@ import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
 import { useParallelStore } from '@/store/parallelStore'
 import { useProjectPathStore } from '@/store/projectPathStore'
+import { isProjectPathBlocked } from '@/lib/projectPathGate'
 import { planParallelFanout } from '@/lib/parallelFanout'
+import { toast } from 'sonner'
 import {
   formatDiffAnnotationsForComposer,
   useDiffAnnotationStore,
@@ -1693,10 +1695,22 @@ export class SessionService {
     if (!activeSessionId) {
       // Commit the draft: create a real (persisted) session, then send.
       const draft = useDraftStore.getState().draft
+      // Code drafts must bind a project folder before the first message.
+      if (draft?.mode === 'project' && !draft.cwd?.trim()) {
+        toast.error(i18n.t('chat.missingProject.sendBlocked'))
+        return
+      }
       const config: SessionConfig = configFromDraft(draft)
       activeSessionId = this.createSession(config)
       if (draft?.cwd) useFsStore.getState().clearSession(draft.cwd)
       useDraftStore.getState().reset()
+    } else if (active) {
+      // Existing code sessions cannot send without a live project folder.
+      const pathStatus = useProjectPathStore.getState().statusOf(active.config.cwd)
+      if (isProjectPathBlocked(active.config, pathStatus)) {
+        toast.error(i18n.t('chat.missingProject.sendBlocked'))
+        return
+      }
     }
     const id = nanoid()
     useDomainStore.getState().appendUserMessage(activeSessionId, id, text, attachments)

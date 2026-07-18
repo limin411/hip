@@ -140,7 +140,21 @@ function finalizeAssistant(messages: Message[], message: Message): Message[] {
 }
 
 function summaryToVM(s: SessionSummary): SessionVM {
-  return { id: s.id, config: { ...DEFAULT_CONFIG, surface: s.surface }, title: s.title, preview: s.preview, updatedAtMs: s.updatedAt, loaded: false, messages: [], status: 'idle', error: null, interrupt: null, codePanelOpen: false, chatPanelOpen: false }
+  const cwd = typeof s.cwd === 'string' && s.cwd.trim() ? s.cwd.trim() : undefined
+  return {
+    id: s.id,
+    config: { ...DEFAULT_CONFIG, surface: s.surface, ...(cwd ? { cwd } : {}) },
+    title: s.title,
+    preview: s.preview,
+    updatedAtMs: s.updatedAt,
+    loaded: false,
+    messages: [],
+    status: 'idle',
+    error: null,
+    interrupt: null,
+    codePanelOpen: false,
+    chatPanelOpen: false,
+  }
 }
 
 /** Surface state for a plugin installation driven by WebSocket messages. */
@@ -335,10 +349,25 @@ export function applyServerMessage(
     case 'session:list:result': {
       const incoming = msg.sessions.map(summaryToVM)
       // 保留已加载会话；用摘要替换/插入；按更新时间倒序。
+      // Always refresh surface/cwd from the authoritative list so sidebar grouping
+      // and project-path gates work before a session is fully loaded.
       const byId = new Map(state.sessions.map((s) => [s.id, s]))
       for (const vm of incoming) {
         const prev = byId.get(vm.id)
-        byId.set(vm.id, prev?.loaded ? { ...prev, title: vm.title, preview: vm.preview, updatedAtMs: vm.updatedAtMs } : vm)
+        if (prev?.loaded) {
+          const nextConfig = { ...prev.config, surface: vm.config.surface ?? prev.config.surface }
+          if (vm.config.cwd?.trim()) nextConfig.cwd = vm.config.cwd.trim()
+          else delete nextConfig.cwd
+          byId.set(vm.id, {
+            ...prev,
+            title: vm.title,
+            preview: vm.preview,
+            updatedAtMs: vm.updatedAtMs,
+            config: nextConfig,
+          })
+        } else {
+          byId.set(vm.id, vm)
+        }
       }
       return { sessions: [...byId.values()].sort((a, b) => b.updatedAtMs - a.updatedAtMs) }
     }

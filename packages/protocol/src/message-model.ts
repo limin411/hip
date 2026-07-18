@@ -139,6 +139,8 @@ export interface SessionSummary {
   updatedAt: number
   messageCount: number
   surface: 'chat' | 'code'
+  /** Absolute project root when bound; omitted for sandbox / unbound code sessions. */
+  cwd?: string
 }
 export interface SearchHit {
   sessionId: string

@@ -134,8 +134,11 @@ export const zhTW = {
       missingProject: {
         title: '專案資料夾不可用',
         desc: '資料夾已不存在或無法存取：{{path}}',
-        rebind: '重新選擇資料夾',
-        unbind: '僅保留對話',
+        unboundTitle: '需要綁定專案路徑',
+        unboundDesc: '請先選擇專案資料夾。未綁定路徑時無法傳送訊息或繼續對話。',
+        rebind: '選擇資料夾',
+        inputBlocked: '請先選擇專案資料夾後再傳送…',
+        sendBlocked: '請先綁定專案資料夾後再傳送訊息。',
       },
       stop: '停止',
       copy: '複製',

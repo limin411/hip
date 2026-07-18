@@ -469,7 +469,9 @@ describe('SessionStore listSessions surface', () => {
     store.insertSession({ id: 'h', title: 't', config: chatCfg, createdAt: 1, updatedAt: 1 })
     const list = store.listSessions()
     expect(list.find((s) => s.id === 'c')!.surface).toBe('code')
+    expect(list.find((s) => s.id === 'c')!.cwd).toBe('/proj')
     expect(list.find((s) => s.id === 'h')!.surface).toBe('chat')
+    expect(list.find((s) => s.id === 'h')!.cwd).toBeUndefined()
   })
 
   it('infers a legacy session: scratch cwd ⇒ chat, real cwd ⇒ code', () => {

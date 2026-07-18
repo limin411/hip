@@ -112,6 +112,59 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0]).toMatchObject({ id: 's1', title: 'T', loaded: false, updatedAtMs: 1000 })
   })
 
+  it('session:list:result carries cwd onto unloaded code sessions', () => {
+    const next = applyServerMessage(
+      { sessions: [] },
+      {
+        type: 'session:list:result',
+        sessions: [
+          {
+            id: 's1',
+            title: 'T',
+            preview: 'P',
+            updatedAt: 1000,
+            messageCount: 2,
+            surface: 'code',
+            cwd: '/Users/me/proj',
+          },
+        ],
+      },
+      2000,
+    )
+    expect(next.sessions[0].config.cwd).toBe('/Users/me/proj')
+    expect(next.sessions[0].config.surface).toBe('code')
+  })
+
+  it('session:list:result refreshes cwd on already-loaded sessions', () => {
+    const loaded = {
+      ...emptySession('s1'),
+      loaded: true,
+      config: { ...emptySession('s1').config, surface: 'code' as const, cwd: '/old' },
+      title: 'Old',
+    }
+    const next = applyServerMessage(
+      { sessions: [loaded] },
+      {
+        type: 'session:list:result',
+        sessions: [
+          {
+            id: 's1',
+            title: 'New',
+            preview: 'P',
+            updatedAt: 2000,
+            messageCount: 3,
+            surface: 'code',
+            cwd: '/new/path',
+          },
+        ],
+      },
+      3000,
+    )
+    expect(next.sessions[0].loaded).toBe(true)
+    expect(next.sessions[0].title).toBe('New')
+    expect(next.sessions[0].config.cwd).toBe('/new/path')
+  })
+
   it('session:loaded fills messages and marks loaded', () => {
     const base = { sessions: [{ ...emptySession('s1'), loaded: false }] }
     const next = applyServerMessage(base, {

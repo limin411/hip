@@ -252,8 +252,24 @@ export class SessionStore {
     `).all() as { id: string; title: string; config: string; updatedAt: number; preview: string | null; messageCount: number }[]
     return rows.map((r) => {
       let surface: 'chat' | 'code' = 'code'
-      try { surface = surfaceOf(JSON.parse(r.config) as SessionConfig, r.id) } catch { surface = 'code' }
-      return { id: r.id, title: r.title, surface, updatedAt: r.updatedAt, messageCount: r.messageCount, preview: (r.preview ?? '').slice(0, PREVIEW_LEN) }
+      let cwd: string | undefined
+      try {
+        const cfg = JSON.parse(r.config) as SessionConfig
+        surface = surfaceOf(cfg, r.id)
+        const raw = typeof cfg.cwd === 'string' ? cfg.cwd.trim() : ''
+        if (raw) cwd = raw
+      } catch {
+        surface = 'code'
+      }
+      return {
+        id: r.id,
+        title: r.title,
+        surface,
+        updatedAt: r.updatedAt,
+        messageCount: r.messageCount,
+        preview: (r.preview ?? '').slice(0, PREVIEW_LEN),
+        ...(cwd ? { cwd } : {}),
+      }
     })
   }
 

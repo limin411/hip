@@ -20,7 +20,9 @@ import { AttachmentButton } from './AttachmentButton'
 import { ParallelRunButton } from './ParallelRunButton'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveSessionStatus, useConnectionStatus } from '@/domain'
 import { formatDiffAnnotationsForComposer, useDiffAnnotationStore } from '@/store/diffAnnotationStore'
+import { isProjectPathBlocked } from '@/lib/projectPathGate'
 import { surfaceOf } from '@/lib/sessions'
+import { useProjectPathStore } from '@/store/projectPathStore'
 import { hasPlanApproval } from './planApproval'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
 import { activeModelKey } from '@/lib/modelKey'
@@ -50,6 +52,8 @@ export function InputBar() {
   const active = useActiveSession()
   const isCode = active ? surfaceOf(active.config) === 'code' : false
   const surface: ComposerSurface = isCode ? 'code' : 'chat'
+  const pathStatus = useProjectPathStore((s) => s.statusOf(active?.config.cwd))
+  const projectPathBlocked = active ? isProjectPathBlocked(active.config, pathStatus) : false
   const planApprovalPending = hasPlanApproval(active)
   // Any non-connected state (connecting/disconnected/error) means cancel() can't reach the sidecar
   // (it would only queue), so we disable Stop and show "reconnecting…". The ws-client retries
@@ -207,6 +211,7 @@ export function InputBar() {
   }, [attachmentsSupported, attachments.length])
 
   const submit = () => {
+    if (projectPathBlocked) return
     const text = value.trim()
     if (!text && attachments.length === 0) return
     const sessionKey = activeId ?? 'draft'
@@ -273,6 +278,13 @@ export function InputBar() {
               running={status === 'running'}
               onStop={() => sessionService.cancel()}
               reconnecting={reconnecting}
+              submitDisabled={projectPathBlocked}
+              inputDisabled={projectPathBlocked}
+              placeholder={
+                projectPathBlocked
+                  ? t('chat.missingProject.inputBlocked')
+                  : undefined
+              }
               leftSlot={
                 isCode ? (
                   <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><ParallelRunButton draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>

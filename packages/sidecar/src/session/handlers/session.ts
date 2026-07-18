@@ -164,6 +164,7 @@ export function handleSessionMessage(
         sessions: sessions.map((s) => ({
           id: s.id,
           surface: s.surface,
+          cwd: s.cwd,
           title: s.title,
           messageCount: s.messageCount,
           updatedAt: s.updatedAt,

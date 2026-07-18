@@ -136,8 +136,11 @@ export const en = {
       missingProject: {
         title: 'Project folder unavailable',
         desc: 'The folder no longer exists or is not accessible: {{path}}',
+        unboundTitle: 'Project folder required',
+        unboundDesc: 'Bind a project folder to continue. Sending messages is disabled until a path is set.',
         rebind: 'Choose folder',
-        unbind: 'Keep chat only',
+        inputBlocked: 'Choose a project folder to send messages…',
+        sendBlocked: 'Bind a project folder before sending messages.',
       },
       stop: 'Stop',
       copy: 'Copy',

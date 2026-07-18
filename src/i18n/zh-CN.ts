@@ -134,8 +134,11 @@ export const zhCN = {
       missingProject: {
         title: '项目文件夹不可用',
         desc: '文件夹已不存在或无法访问：{{path}}',
-        rebind: '重新选择文件夹',
-        unbind: '仅保留对话',
+        unboundTitle: '需要绑定项目路径',
+        unboundDesc: '请先选择项目文件夹。未绑定路径时无法发送消息或继续对话。',
+        rebind: '选择文件夹',
+        inputBlocked: '请先选择项目文件夹后再发送…',
+        sendBlocked: '请先绑定项目文件夹后再发送消息。',
       },
       stop: '停止',
       copy: '复制',

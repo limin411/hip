@@ -9,6 +9,7 @@ import { useUiStore } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import { useProjectPathStore } from '@/store/projectPathStore'
 import type { ConnectionStatus, Transport } from './transport'
 
 class FakeTransport implements Transport {
@@ -60,7 +61,8 @@ beforeEach(() => {
   // NOTE: drop the `true` (replace) flag — Zustand v5 setState with replace=true
   // wipes action methods from the store, causing "X is not a function" errors.
   // Using merge (no second arg) keeps actions intact and resets only data fields.
-  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
+  // Default fixture is chat (sandbox): code sessions require a live cwd to send.
+  useDomainStore.setState({ sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'm', tools: [], surface: 'chat' }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }], activeSessionId: 's1', connection: 'disconnected' })
   useFsStore.setState({ bySession: {} })
   useDraftStore.setState({ draft: null })
   useDiffStore.setState({ bySession: {} })
@@ -78,6 +80,55 @@ describe('SessionService', () => {
     expect(useDomainStore.getState().sessions[0].status).toBe('running')
     expect(t.sent.at(-1)).toMatchObject({ type: 'message:send', sessionId: 's1', content: 'hello' })
     expect((t.sent.at(-1) as { id?: string }).id).toBeTruthy()
+  })
+
+  it('sendMessage blocks code sessions without a project folder', () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { llmProvider: 'deepseek', model: 'm', tools: [], surface: 'code' },
+          title: 'T',
+          preview: 'P',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: 's1',
+    })
+    const t = new FakeTransport()
+    new SessionService(t).sendMessage('hello')
+    expect(t.sent.filter((m) => m.type === 'message:send')).toHaveLength(0)
+    expect(useDomainStore.getState().sessions[0].messages).toHaveLength(0)
+  })
+
+  it('sendMessage blocks code sessions when project path is missing', () => {
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 's1',
+          config: { llmProvider: 'deepseek', model: 'm', tools: [], surface: 'code', cwd: '/gone' },
+          title: 'T',
+          preview: 'P',
+          updatedAtMs: 0,
+          loaded: true,
+          messages: [],
+          status: 'idle',
+          error: null,
+        },
+      ],
+      activeSessionId: 's1',
+    })
+    useProjectPathStore.setState({
+      byKey: { '/gone': { exists: false, checkedAt: Date.now() } },
+    })
+    const t = new FakeTransport()
+    new SessionService(t).sendMessage('hello')
+    expect(t.sent.filter((m) => m.type === 'message:send')).toHaveLength(0)
+    useProjectPathStore.setState({ byKey: {} })
   })
 
   it('sendMessage ignores blank input', () => {
@@ -524,7 +575,7 @@ describe('SessionService', () => {
 
   it('sendMessage with an image does not switch the active session model', () => {
     useDomainStore.setState({
-      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [] }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }],
+      sessions: [{ id: 's1', config: { llmProvider: 'deepseek', model: 'deepseek-v4-flash', tools: [], surface: 'chat' }, title: 'T', preview: 'P', updatedAtMs: 0, loaded: true, messages: [], status: 'idle', error: null }],
       activeSessionId: 's1',
     })
     const t = new FakeTransport()
@@ -621,7 +672,7 @@ describe('workspace diff', () => {
     expect(t.sent.filter((m) => m.type === 'fs:diff' && m.sessionId === 's3')).toHaveLength(1)
   })
 
-  it('simulateAgentWriteFinished seeds write_file and debounces fs:diff on code surface', () => {
+  it('simulateAgentWriteFinished seeds write_file and refreshes fs:diff on code surface', () => {
     vi.useFakeTimers()
     const t = new FakeTransport()
     const svc = new SessionService(t)
@@ -631,9 +682,9 @@ describe('workspace diff', () => {
     const sess = useDomainStore.getState().sessions.find((s) => s.id === 's1')!
     const turn = sess.messages.find((m) => m.id === ids.turnId)
     expect(turn?.toolCalls?.[0]).toMatchObject({ name: 'write_file', callId: ids.callId, status: 'finished' })
-    expect(t.sent.filter((m) => m.type === 'fs:diff')).toHaveLength(0)
-    vi.advanceTimersByTime(300)
+    // Immediate requestDiff (E2E reliability) plus debounced summary/diff from tool:finished.
     expect(t.sent.some((m) => m.type === 'fs:diff' && m.sessionId === 's1')).toBe(true)
+    vi.advanceTimersByTime(300)
     expect(t.sent.some((m) => m.type === 'fs:diffSummary' && m.sessionId === 's1')).toBe(true)
     vi.useRealTimers()
   })

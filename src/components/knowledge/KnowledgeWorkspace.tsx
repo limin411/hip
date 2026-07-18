@@ -510,9 +510,9 @@ export function KnowledgeWorkspace() {
             <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">
               {t('knowledge.tree.sectionLabel')}
             </span>
-            {nodes.length > 0 && (
+            {docCount > 0 && (
               <span className="tabular-nums text-[11px] text-ink-tertiary/80">
-                {nodes.length}
+                {docCount}
               </span>
             )}
           </div>

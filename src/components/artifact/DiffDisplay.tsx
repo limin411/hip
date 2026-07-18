@@ -127,7 +127,11 @@ function FileDiff({
       <DeclarativeContextMenu
         kind="diffFile"
         payload={{ path: file.path, status: file.status, sessionId, cwd }}
-        className="sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 border-b border-border bg-surface-muted px-3"
+        className={cn(
+          'sticky top-0 z-[1] flex h-9 items-center justify-between gap-2 bg-surface-muted px-3',
+          // Expanded: hairline under sticky bar. Collapsed: shell border-b alone (no double).
+          !isCollapsed && 'border-b border-border',
+        )}
         data-testid="diff-file-header"
       >
         <span className="flex min-w-0 flex-1 items-center gap-1.5 text-meta leading-none">

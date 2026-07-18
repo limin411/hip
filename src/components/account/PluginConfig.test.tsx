@@ -32,6 +32,11 @@ vi.mock('@/components/chat/MarkdownBody', () => ({
   MarkdownBody: ({ content }: { content: string }) => <div data-testid="md">{content}</div>,
 }))
 
+const shellOpen = vi.fn(async () => {})
+vi.mock('@tauri-apps/plugin-shell', () => ({
+  open: (...args: unknown[]) => shellOpen(...args),
+}))
+
 function basePlugin(overrides: Partial<PluginMeta> = {}): PluginMeta {
   return {
     id: 'test-plugin',
@@ -123,6 +128,30 @@ describe('PluginConfigView', () => {
     )
     fireEvent.click(screen.getByTestId('plugin-view'))
     expect(onView).toHaveBeenCalled()
+  })
+
+  it('opens source URL via shell when 来源 is clicked', async () => {
+    shellOpen.mockClear()
+    render(
+      <PluginConfigView
+        plugins={[
+          basePlugin({
+            sourceUrl: 'https://github.com/obra/superpowers',
+          }),
+        ]}
+        error={null}
+        onDelete={vi.fn()}
+        onToggle={vi.fn()}
+        onView={vi.fn()}
+        t={mockT}
+      />,
+    )
+    const link = screen.getByTestId('plugin-source-link')
+    expect(link).toHaveAttribute('href', 'https://github.com/obra/superpowers')
+    fireEvent.click(link)
+    await waitFor(() => {
+      expect(shellOpen).toHaveBeenCalledWith('https://github.com/obra/superpowers')
+    })
   })
 })
 

@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react'
 import { Package, Trash2, ExternalLink, Eye, FileText } from 'lucide-react'
 import type { Components } from 'react-markdown'
 import type { PluginMeta } from '@hip/protocol'
+import { open } from '@tauri-apps/plugin-shell'
 import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { Modal } from '@/components/ui/Modal'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { readPluginFile } from '@/ipc/plugins'
+
+/** Open a URL in the system browser (Tauri shell; falls back to window.open). */
+async function openExternalUrl(url: string): Promise<void> {
+  try {
+    await open(url)
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
 
 export type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -142,10 +152,13 @@ function PluginCard({
           {plugin.sourceUrl && (
             <a
               href={plugin.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
+              data-testid="plugin-source-link"
               className="inline-flex items-center gap-0.5 text-caption text-accent-strong hover:underline"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                void openExternalUrl(plugin.sourceUrl!)
+              }}
             >
               <ExternalLink size={12} />
               {t('settings.plugins.source')}

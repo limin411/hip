@@ -1,8 +1,12 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 export type SegmentedOption<T extends string> = {
   value: T
-  label: string
+  /** Visible label; may include icon + text. */
+  label: ReactNode
+  /** Accessible name when `label` is not plain text-only. */
+  ariaLabel?: string
 }
 
 export function SegmentedControl<T extends string>({
@@ -28,7 +32,8 @@ export function SegmentedControl<T extends string>({
       aria-label={ariaLabel}
       data-testid={dataTestId}
       className={cn(
-        'inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface-muted p-0.5',
+        // Soft track only — no outer border (avoids double-box with selected segment).
+        'inline-flex items-center rounded-md bg-surface-muted p-0.5',
         className,
       )}
     >
@@ -40,15 +45,18 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="tab"
             aria-selected={selected}
+            aria-label={opt.ariaLabel}
             data-mode={opt.value}
             data-testid={dataTestId ? `${dataTestId}-${opt.value}` : undefined}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
-              size === 'sm' ? 'h-6 px-2 text-caption' : 'h-7 px-2.5 text-body',
+              'inline-flex items-center justify-center gap-1 rounded-[5px] font-medium transition-colors duration-100',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
+              size === 'sm' ? 'h-7 px-2.5 text-meta' : 'h-8 px-3 text-body',
               selected
-                ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-border'
-                : 'text-ink-tertiary hover:text-ink',
+                ? // Elevated chip on muted track; no ring (keeps chrome quiet per design tokens).
+                  'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                : 'text-ink-secondary hover:bg-state-hover/70 hover:text-ink',
             )}
           >
             {opt.label}

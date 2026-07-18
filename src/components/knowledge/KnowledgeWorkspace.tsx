@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next'
 import {
   BookOpen,
   ChevronRight,
+  Code2,
   Download,
+  Eye,
   FilePlus,
   ImagePlus,
   History,
   MoreHorizontal,
+  Pencil,
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -267,17 +270,63 @@ export function KnowledgeWorkspace() {
     {},
   )
   const modeOptions = useMemo(() => {
+    const iconCls = 'shrink-0 opacity-80'
     if (liveEnabled) {
       return [
-        { value: 'live' as const, label: t('knowledge.doc.live') },
-        { value: 'source' as const, label: t('knowledge.doc.source') },
-        { value: 'preview' as const, label: t('knowledge.doc.preview') },
+        {
+          value: 'live' as const,
+          ariaLabel: t('knowledge.doc.live'),
+          label: (
+            <>
+              <Pencil size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
+              {t('knowledge.doc.live')}
+            </>
+          ),
+        },
+        {
+          value: 'source' as const,
+          ariaLabel: t('knowledge.doc.source'),
+          label: (
+            <>
+              <Code2 size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
+              {t('knowledge.doc.source')}
+            </>
+          ),
+        },
+        {
+          value: 'preview' as const,
+          ariaLabel: t('knowledge.doc.preview'),
+          label: (
+            <>
+              <Eye size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
+              {t('knowledge.doc.preview')}
+            </>
+          ),
+        },
       ]
     }
     // Flag off: keep familiar Edit | Preview labels (source maps to Edit).
     return [
-      { value: 'source' as const, label: t('knowledge.doc.edit') },
-      { value: 'preview' as const, label: t('knowledge.doc.preview') },
+      {
+        value: 'source' as const,
+        ariaLabel: t('knowledge.doc.edit'),
+        label: (
+          <>
+            <Pencil size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
+            {t('knowledge.doc.edit')}
+          </>
+        ),
+      },
+      {
+        value: 'preview' as const,
+        ariaLabel: t('knowledge.doc.preview'),
+        label: (
+          <>
+            <Eye size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
+            {t('knowledge.doc.preview')}
+          </>
+        ),
+      },
     ]
   }, [liveEnabled, t])
   const bodyLen = Math.max(docBody.length, draftBody.length)
@@ -633,6 +682,7 @@ export function KnowledgeWorkspace() {
                 value={toggleMode}
                 onChange={onEditorModeChange}
                 options={modeOptions}
+                className="shrink-0"
               />
               {/* modal={false}: modal menu + version-history / save-as-template Modal both lock
                   body pointer-events; stacking leaves the app unclickable after close. */}

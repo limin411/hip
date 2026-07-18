@@ -519,7 +519,7 @@ export function KnowledgeWorkspace() {
           {/* Blank-area right-click creates at root; node rows use knowledgeNode menu. */}
           <DeclarativeContextMenu
             kind="knowledgeTree"
-            className="min-h-0 flex-1 overflow-y-auto px-2 pb-3"
+            className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3"
             data-testid="knowledge-tree-pane"
             payload={{
               onNewDoc: () => newDoc(null),

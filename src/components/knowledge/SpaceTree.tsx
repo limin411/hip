@@ -30,8 +30,11 @@ type DropHint = { targetId: string; mode: DropMode } | null
 
 /** Horizontal indent per nesting level (px). */
 const DEPTH_STEP = 12
-/** Base left padding so grip + chevron stay aligned. */
-const BASE_PAD = 6
+/**
+ * Base left padding for row content (active rail + tight inset).
+ * Drag grip is absolutely positioned and does not reserve a column.
+ */
+const BASE_PAD = 4
 /** Pointer move distance before a press becomes a drag (px). */
 const DRAG_THRESHOLD_PX = 5
 /**
@@ -447,11 +450,11 @@ export function SpaceTree({
               key={i}
               aria-hidden
               className="pointer-events-none absolute top-0 bottom-0 w-px bg-border/40"
-              style={{ left: i * DEPTH_STEP + BASE_PAD + 10 }}
+              style={{ left: i * DEPTH_STEP + BASE_PAD + 6 }}
             />
           ))}
 
-        {/* Drag handle only — title/icon clicks open or toggle, never start a drag. */}
+        {/* Drag handle overlays the left edge — not a permanent flex column. */}
         <button
           type="button"
           tabIndex={-1}
@@ -461,13 +464,15 @@ export function SpaceTree({
           aria-label={t('knowledge.tree.dragHandle')}
           title={t('knowledge.tree.dragHandle')}
           onPointerDown={(e) => onGripPointerDown(node.id, e)}
+          style={{ left: depth * DEPTH_STEP + 1 }}
           className={cn(
-            'flex h-6 w-4 shrink-0 cursor-grab items-center justify-center rounded-md text-ink-tertiary/80 transition-[opacity,background-color,color] touch-none active:cursor-grabbing',
+            'absolute top-1/2 z-[1] flex h-6 w-3.5 -translate-y-1/2 cursor-grab items-center justify-center rounded-md text-ink-tertiary/80 transition-[opacity,background-color,color] touch-none active:cursor-grabbing',
             'hover:bg-state-hover hover:text-ink-secondary',
             'disabled:pointer-events-none disabled:opacity-40',
+            // Invisible at rest and not hit-target so chevron/title keep full row.
             draggingId === node.id
-              ? 'opacity-100 text-ink-secondary'
-              : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+              ? 'pointer-events-auto opacity-100 text-ink-secondary'
+              : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
           )}
         >
           <GripVertical size={12} strokeWidth={2} />

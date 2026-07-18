@@ -32,8 +32,8 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
   return (
     <div
       className={cn(
-        'flex flex-col rounded-lg border border-border border-l-2 bg-surface transition-colors',
-        running ? 'border-accent/40' : isError ? 'border-danger/40' : '',
+        'flex flex-col rounded-lg border border-l-2 bg-surface transition-colors',
+        running ? 'border-accent/40' : isError ? 'border-danger/40' : 'border-border',
       )}
       style={{ borderLeftColor: isError ? 'var(--danger)' : color }}
       data-testid="agent-card"

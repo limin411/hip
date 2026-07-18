@@ -166,7 +166,8 @@ describe('TurnTimeline', () => {
     expect(supervisor.style.borderLeftColor).toBe('var(--role-supervisor)')
     // subagent maps to worker color
     expect(child.style.borderLeftColor).toBe('var(--role-worker)')
-    // non-supervisor keeps extra top margin
+    // non-supervisor keeps extra top margin; supervisor omits mt-1
     expect(child.className).toContain('mt-1')
+    expect(supervisor.className.split(/\s+/)).not.toContain('mt-1')
   })
 })

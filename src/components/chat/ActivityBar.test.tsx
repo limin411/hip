@@ -108,6 +108,29 @@ describe('ActivityBar', () => {
     expect(html).not.toContain('lucide-loader-circle')
   })
 
+  it('running with activity but no activeRole: Loader2 only (no pulse, no Circle)', () => {
+    // Tools only — no steps/runs means no lastStep.role / last agentRuns role.
+    const html = renderToStaticMarkup(
+      <ActivityBar
+        toolCalls={[
+          {
+            callId: 'c-run',
+            agentId: 'orphan',
+            name: 'grep',
+            input: '{"pattern":"x"}',
+            status: 'running' as const,
+            seq: 1,
+          },
+        ]}
+        streaming
+      />,
+    )
+    expect(html).toContain('data-testid="activity-bar-summary"')
+    expect(html).toContain('animate-spin')
+    expect(html).not.toContain('animate-pulse')
+    expect(html).not.toContain('data-role=')
+  })
+
   it('success status uses CheckCircle2 only — no completion flash classes', () => {
     const html = renderToStaticMarkup(
       <ActivityBar steps={baseSteps} toolCalls={baseTools} agentRuns={baseRuns} hasAssistantContent />,

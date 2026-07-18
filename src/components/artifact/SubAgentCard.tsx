@@ -71,7 +71,7 @@ export function SubAgentCard({
             {title}
           </span>
           {hasTaskTitle && (
-            <span className="hidden shrink-0 text-ink-tertiary sm:inline">{roleLabel}</span>
+            <span className="shrink-0 text-ink-tertiary">{roleLabel}</span>
           )}
           <span className="hidden min-w-0 shrink-0 truncate font-mono text-ink-tertiary sm:inline" title={agent.agentId}>
             {agent.agentId}

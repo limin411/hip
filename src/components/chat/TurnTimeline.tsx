@@ -310,9 +310,7 @@ export function TurnTimeline({ steps, toolCalls, agentRuns, hidePlan }: TurnTime
         {sections.map((s) => (
           <div
             key={s.agentId}
-            className={cn(
-              multi && (s.role !== 'supervisor' ? 'mt-1 border-l-2 pl-2' : 'border-l-2 pl-2'),
-            )}
+            className={cn(multi && 'border-l-2 pl-2', multi && s.role !== 'supervisor' && 'mt-1')}
             style={multi ? { borderLeftColor: ROLE_COLOR[s.role] } : undefined}
             data-testid="agent-timeline-section"
             data-agent-id={s.agentId}

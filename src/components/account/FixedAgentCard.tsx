@@ -26,7 +26,7 @@ export function FixedAgentCard({ agent, enabled, onToggle }: FixedAgentCardProps
           <Avatar name={agent.name} shape="square" size={40} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-body font-medium text-ink">{agent.name}</div>
-            <Badge className="mt-1 bg-accent-subtle text-accent-strong">
+            <Badge variant="accent" className="mt-1">
               {t('settings.agents.builtin')}
             </Badge>
           </div>

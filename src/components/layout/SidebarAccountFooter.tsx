@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { History, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 
 interface SidebarAccountFooterProps {
   onOpenHistory: () => void
@@ -63,11 +64,9 @@ function FooterNavButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
+        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-        active
-          ? 'bg-state-active text-ink'
-          : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
+        active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
       <Icon

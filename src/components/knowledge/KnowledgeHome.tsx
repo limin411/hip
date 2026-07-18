@@ -6,6 +6,7 @@ import { groupSearchHitsBySpace } from '@/domain/knowledge/search'
 import { scheduleActiveExpandPersist, useKnowledgeStore } from '@/store/knowledgeStore'
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { HipLogo } from '@/components/login/HipLogo'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -351,7 +352,7 @@ export function KnowledgeHome() {
 
               {filteredSpaces.length === 0 ? (
                 <EmptyState
-                  icon={BookOpen}
+                  tier="friendly"
                   title={t('knowledge.home.emptyTitle')}
                   description={t('knowledge.home.emptyHint')}
                   action={{
@@ -359,7 +360,9 @@ export function KnowledgeHome() {
                     onClick: () => setCreateOpen(true),
                   }}
                   className="border-0"
-                />
+                >
+                  <HipLogo size={32} decorative />
+                </EmptyState>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredSpaces.map((space) => {

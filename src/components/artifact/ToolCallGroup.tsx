@@ -26,7 +26,7 @@ export function ToolCallGroup({
   return (
     <div className="flex flex-col gap-0.5" data-testid="tool-call-group" data-category={category}>
       <div
-        className="flex min-h-5 items-center gap-1.5 text-meta leading-5"
+        className="flex min-h-[var(--trail-min-h)] items-center gap-[var(--meta-gap)] text-meta leading-5"
         data-testid="tool-call-group-header"
       >
         <span className="shrink-0 font-medium text-ink-secondary">{t(CATEGORY_I18N[category])}</span>

@@ -101,6 +101,7 @@ export function ActivityBar({
 
   if (!hasActivity) {
     if (!streaming) return null
+    // Initializing: Loader2 only — no pulse dot (single motion).
     return (
       <div
         className={cn('mb-2', TRAIL_ROW, 'text-ink-tertiary')}
@@ -109,24 +110,28 @@ export function ActivityBar({
         aria-live="polite"
       >
         <Loader2 aria-hidden size={14} className="block shrink-0 animate-spin text-accent-strong" />
-        <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
         <span className="min-w-0 truncate">{t('chat.activity.initializing')}</span>
       </div>
     )
   }
 
-  const statusIcon =
-    status === 'running' ? (
-      <Loader2 size={14} className="block shrink-0 animate-spin text-accent-strong" />
-    ) : status === 'error' ? (
-      <XCircle size={14} className="block shrink-0 text-danger" data-testid="activity-status-error" />
-    ) : status === 'success_partial' ? (
-      <AlertTriangle size={14} className="block shrink-0 text-warning" data-testid="activity-status-partial" />
-    ) : status === 'stopped' ? (
-      <Circle size={14} className="block shrink-0 text-ink-tertiary" data-testid="activity-status-stopped" />
-    ) : (
-      <CheckCircle2 size={14} className="block shrink-0 text-success" data-testid="activity-status-success" />
-    )
+  const isRunning = status === 'running'
+  // Running + activeRole: no Loader2 (pulse on AgentBadge only). Running without role: Loader2 only.
+  const statusIcon = isRunning
+    ? activeRole
+      ? null
+      : (
+          <Loader2 size={14} className="block shrink-0 animate-spin text-accent-strong" />
+        )
+    : status === 'error' ? (
+        <XCircle size={14} className="block shrink-0 text-danger" data-testid="activity-status-error" />
+      ) : status === 'success_partial' ? (
+        <AlertTriangle size={14} className="block shrink-0 text-warning" data-testid="activity-status-partial" />
+      ) : status === 'stopped' ? (
+        <Circle size={14} className="block shrink-0 text-ink-tertiary" data-testid="activity-status-stopped" />
+      ) : (
+        <CheckCircle2 size={14} className="block shrink-0 text-success" data-testid="activity-status-success" />
+      )
 
   // Always expanded (CLI-style process trail) — one min-h-5 row for icon/dot/text alignment.
   return (
@@ -138,12 +143,12 @@ export function ActivityBar({
       >
         {statusIcon}
         {activeRole ? (
-          <span className={cn('inline-flex items-center', status === 'running' && 'animate-pulse')}>
+          <span className={cn('inline-flex items-center', isRunning && 'animate-pulse')}>
             <AgentBadge role={activeRole} />
           </span>
-        ) : (
+        ) : !isRunning ? (
           <Circle size={14} className="block shrink-0 text-ink-tertiary" />
-        )}
+        ) : null}
         {activeRole && (
           <span className="shrink-0 font-medium text-ink-secondary">{t(`artifact.roles.${activeRole}`)}</span>
         )}

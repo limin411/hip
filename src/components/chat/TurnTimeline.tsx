@@ -26,7 +26,7 @@ export function AgentBadge({ role }: { role: AgentRole }) {
 
 /** Shared single-line trail row: fixed line box so icons + text share one baseline. */
 export const TRAIL_ROW =
-  'flex min-h-5 w-full items-center gap-1.5 text-left text-meta leading-5'
+  'flex min-h-[var(--trail-min-h)] w-full items-center gap-[var(--meta-gap)] text-left text-meta leading-5'
 
 function ThinkingDisclosure({
   role,
@@ -310,7 +310,8 @@ export function TurnTimeline({ steps, toolCalls, agentRuns, hidePlan }: TurnTime
         {sections.map((s) => (
           <div
             key={s.agentId}
-            className={cn(multi && s.role !== 'supervisor' && 'mt-1 border-l border-border pl-2')}
+            className={cn(multi && 'border-l-2 pl-2', multi && s.role !== 'supervisor' && 'mt-1')}
+            style={multi ? { borderLeftColor: ROLE_COLOR[s.role] } : undefined}
             data-testid="agent-timeline-section"
             data-agent-id={s.agentId}
           >

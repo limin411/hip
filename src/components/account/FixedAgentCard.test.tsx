@@ -45,6 +45,14 @@ describe('FixedAgentCard', () => {
     expect(screen.getByText(/内置|Built-in|內建/)).toBeInTheDocument()
   })
 
+  it('built-in badge uses accent identity chip', () => {
+    render(<FixedAgentCard agent={coder} enabled onToggle={() => {}} />)
+    const badge = screen.getByText(/内置|Built-in|內建/)
+    expect(badge).toHaveClass('bg-accent/10')
+    expect(badge).toHaveClass('text-accent')
+    expect(badge).not.toHaveClass('bg-accent-subtle')
+  })
+
   it('shows lock icon', () => {
     const { container } = render(<FixedAgentCard agent={coder} enabled onToggle={() => {}} />)
     // Lock icon is rendered via lucide-react Lock component

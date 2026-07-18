@@ -3,12 +3,14 @@ import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { CodeBlock } from './CodeBlock'
+import { markdownProseClassName } from './MarkdownBody'
 import { copyText } from '@/ipc/clipboard'
 
 vi.mock('@/ipc/clipboard', () => ({ copyText: vi.fn() }))
 
 describe('CodeBlock', () => {
   beforeEach(() => cleanup())
+
   it('renders code and copy button', () => {
     render(
       <CodeBlock>
@@ -19,6 +21,59 @@ describe('CodeBlock', () => {
     expect(screen.getByTestId('code-copy')).toBeInTheDocument()
   })
 
+  it('host owns external my-2 spacing', () => {
+    render(
+      <CodeBlock>
+        <code>const x = 1</code>
+      </CodeBlock>,
+    )
+    expect(screen.getByTestId('code-block-context-menu')).toHaveClass('my-2')
+  })
+
+  it('chrome unit has border and no my-*', () => {
+    render(
+      <CodeBlock>
+        <code>const x = 1</code>
+      </CodeBlock>,
+    )
+    const chrome = screen.getByTestId('code-block')
+    expect(chrome).toHaveClass('rounded-md', 'border', 'border-border', 'overflow-hidden', 'bg-surface-muted')
+    expect(chrome.className).not.toMatch(/\bmy-/)
+  })
+
+  it('inner pre is m-0', () => {
+    render(
+      <CodeBlock>
+        <code>const x = 1</code>
+      </CodeBlock>,
+    )
+    const pre = screen.getByText('const x = 1').closest('pre')
+    expect(pre).toHaveClass('m-0')
+  })
+
+  it('shows language label from language-* class', () => {
+    render(
+      <CodeBlock>
+        <code className="language-ts">const x = 1</code>
+      </CodeBlock>,
+    )
+    expect(screen.getByText('ts')).toBeInTheDocument()
+  })
+
+  it('keeps header strip when language is missing', () => {
+    render(
+      <CodeBlock>
+        <code>plain</code>
+      </CodeBlock>,
+    )
+    const chrome = screen.getByTestId('code-block')
+    const copy = screen.getByTestId('code-copy')
+    expect(chrome).toContainElement(copy)
+    // Empty label still occupies header row (no language text node).
+    expect(screen.queryByText(/^(ts|js|tsx|py|rust)$/i)).not.toBeInTheDocument()
+    expect(chrome.querySelector('.border-b')).toBeTruthy()
+  })
+
   it('copies code and shows check icon', async () => {
     vi.mocked(copyText).mockResolvedValue(true)
     render(
@@ -26,8 +81,11 @@ describe('CodeBlock', () => {
         <code>hello</code>
       </CodeBlock>,
     )
-    fireEvent.click(screen.getByTestId('code-copy'))
+    const btn = screen.getByTestId('code-copy')
+    expect(btn.querySelector('.lucide-copy')).toBeTruthy()
+    fireEvent.click(btn)
     await waitFor(() => expect(copyText).toHaveBeenCalledWith('hello'))
+    await waitFor(() => expect(btn.querySelector('.lucide-check')).toBeTruthy())
   })
 
   it('does not change icon when copy fails', async () => {
@@ -37,8 +95,47 @@ describe('CodeBlock', () => {
         <code>fail</code>
       </CodeBlock>,
     )
-    fireEvent.click(screen.getByTestId('code-copy'))
+    const btn = screen.getByTestId('code-copy')
+    fireEvent.click(btn)
     await waitFor(() => expect(copyText).toHaveBeenCalled())
-    expect(screen.getByTestId('code-copy')).toBeInTheDocument()
+    expect(btn.querySelector('.lucide-copy')).toBeTruthy()
+    expect(btn.querySelector('.lucide-check')).toBeNull()
+  })
+})
+
+describe('markdownProseClassName (KD11 + prose contract)', () => {
+  it('has no [&_pre]:* selectors', () => {
+    expect(markdownProseClassName).not.toMatch(/\[&_pre\]/)
+  })
+
+  it('pins full prose hierarchy and denser table/task selectors', () => {
+    // Headings h3–h6 (h1/h2 pre-existed; full scale is the PR2 contract)
+    expect(markdownProseClassName).toContain('[&_h3]:text-body')
+    expect(markdownProseClassName).toContain('[&_h3]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h4]:text-meta')
+    expect(markdownProseClassName).toContain('[&_h4]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h5]:text-meta')
+    expect(markdownProseClassName).toContain('[&_h5]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h6]:text-meta')
+    expect(markdownProseClassName).toContain('[&_h6]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_h6]:text-ink-secondary')
+    // List rhythm
+    expect(markdownProseClassName).toContain('[&_li]:my-0.5')
+    expect(markdownProseClassName).toContain('[&_li>p]:my-0.5')
+    // Horizontal rule
+    expect(markdownProseClassName).toContain('[&_hr]:my-4')
+    expect(markdownProseClassName).toContain('[&_hr]:border-t')
+    expect(markdownProseClassName).toContain('[&_hr]:border-border')
+    // Denser table cells
+    expect(markdownProseClassName).toContain('[&_th]:px-2.5')
+    expect(markdownProseClassName).toContain('[&_th]:py-1.5')
+    expect(markdownProseClassName).toContain('[&_th]:text-meta')
+    expect(markdownProseClassName).toContain('[&_th]:font-semibold')
+    expect(markdownProseClassName).toContain('[&_td]:px-2.5')
+    expect(markdownProseClassName).toContain('[&_td]:py-1.5')
+    expect(markdownProseClassName).toContain('[&_td]:text-meta')
+    // GFM task list checkboxes
+    expect(markdownProseClassName).toContain('[&_input[type=checkbox]]:mr-2')
+    expect(markdownProseClassName).toContain('[&_input[type=checkbox]]:align-middle')
   })
 })

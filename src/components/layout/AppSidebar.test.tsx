@@ -40,9 +40,13 @@ vi.mock('@/components/context-menu', () => ({
   DeclarativeContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
+const knowledgeState = {
+  spaces: [] as { id: string; name: string }[],
+  activeSpaceId: null as string | null,
+}
+
 vi.mock('@/store/knowledgeStore', () => ({
-  useKnowledgeStore: (sel: (s: { spaces: unknown[]; activeSpaceId: null }) => unknown) =>
-    sel({ spaces: [], activeSpaceId: null }),
+  useKnowledgeStore: (sel: (s: typeof knowledgeState) => unknown) => sel(knowledgeState),
 }))
 
 import { AppSidebar } from './AppSidebar'
@@ -55,6 +59,8 @@ describe('AppSidebar', () => {
     openHistoryFromChrome.mockClear()
     newConversationFromSidebar.mockClear()
     selectSessionFromSidebar.mockClear()
+    knowledgeState.spaces = []
+    knowledgeState.activeSpaceId = null
     useUiStore.setState({
       activeView: 'chat',
       sidebarSection: 'chats',
@@ -102,6 +108,26 @@ describe('AppSidebar', () => {
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
   })
 
+  it('active nav uses sage rail without hairline ring', () => {
+    render(<AppSidebar />)
+    const chats = screen.getByTestId('sidebar-nav-chats')
+    expect(chats).toHaveClass('before:bg-accent')
+    expect(chats).toHaveClass('bg-surface')
+    expect(chats.className).not.toMatch(/shadow-\[0_0_0_1px/)
+    const projects = screen.getByTestId('sidebar-nav-projects')
+    expect(projects).not.toHaveClass('before:bg-accent')
+    expect(projects).toHaveClass('hover:bg-state-hover')
+  })
+
+  it('active session row uses sage rail without hairline ring', () => {
+    render(<AppSidebar />)
+    const sessionBtn = screen.getByTestId('sidebar-session-chat-1')
+    const row = sessionBtn.closest('div')
+    expect(row).toHaveClass('before:bg-accent')
+    expect(row).toHaveClass('bg-surface')
+    expect(row?.className).not.toMatch(/shadow-\[0_0_0_1px/)
+  })
+
   it('shows session counts on projects and chats nav', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveTextContent('1')
@@ -146,6 +172,17 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-manage-spaces'))
     expect(openKnowledgeHome).toHaveBeenCalled()
+  })
+
+  it('active knowledge space uses sage rail without hairline ring', () => {
+    knowledgeState.spaces = [{ id: 'space-1', name: 'Notes' }]
+    knowledgeState.activeSpaceId = 'space-1'
+    useUiStore.setState({ sidebarSection: 'knowledge', activeView: 'knowledge' })
+    render(<AppSidebar />)
+    const space = screen.getByTestId('sidebar-space-space-1')
+    expect(space).toHaveClass('before:bg-accent')
+    expect(space).toHaveClass('bg-surface')
+    expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
   it('session row calls selectSessionFromSidebar', () => {
@@ -254,6 +291,66 @@ describe('AppSidebar', () => {
       'false',
     )
     expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
+  })
+
+  it('active worktree slot uses sage rail without hairline ring', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'code-1',
+          title: 'Code project',
+          preview: 'repo work',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'slot-1',
+          title: 'P1 slot',
+          preview: 'slot',
+          updatedAtMs: Date.now(),
+          config: {
+            ...DEFAULT_CONFIG,
+            surface: 'code',
+            cwd: '/tmp/wt/run-abc/hip-p-1',
+          },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'slot-1',
+    } as never)
+    useParallelStore.setState({
+      runs: [
+        {
+          id: 'run-abc',
+          baseCwd: '/tmp/repo',
+          prompt: 'parallel fix',
+          hostSessionId: 'code-1',
+          source: 'agent',
+          createdAt: Date.now(),
+          slots: [
+            {
+              index: 1,
+              sessionId: 'slot-1',
+              taskId: 'pwt-1',
+              worktreePath: '/tmp/wt/run-abc/hip-p-1',
+              branch: 'hip-p-1',
+              status: 'ready',
+            },
+          ],
+        },
+      ],
+    })
+    render(<AppSidebar />)
+    const slot = screen.getByTestId('sidebar-parallel-slot-slot-1')
+    expect(slot).toHaveClass('before:bg-accent')
+    expect(slot).toHaveClass('bg-surface')
+    expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
   it('does not promote worktree slot sessions to top-level project rows', () => {

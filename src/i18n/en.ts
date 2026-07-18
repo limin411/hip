@@ -456,6 +456,12 @@ export const en = {
         dark: 'Dark',
         system: 'System',
       },
+      density: 'Density',
+      densityDesc: 'Control sidebar and activity row spacing.',
+      densities: {
+        comfortable: 'Comfortable',
+        compact: 'Compact',
+      },
       contextMenu: {
         title: 'Context menus',
         description: 'Choose which right-click actions appear and in what order.',

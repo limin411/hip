@@ -9,12 +9,15 @@ afterEach(() => {
 })
 
 describe('Button variants', () => {
+  // Non-goal (KD2): primary stays soft monochrome inverse — never sage accent fill.
   it('primary is soft solid inverse monochrome, not sage or elevated outline', () => {
     const { getByRole } = render(<Button variant="primary">Save</Button>)
     const cls = getByRole('button', { name: 'Save' }).className
     expect(cls).toMatch(/bg-btn-primary/)
     expect(cls).toMatch(/text-on-btn-primary/)
+    // Guard against sage accent as primary fill/hover/text
     expect(cls).not.toMatch(/\bbg-accent\b/)
+    expect(cls).not.toMatch(/hover:bg-accent/)
     expect(cls).not.toMatch(/text-on-accent/)
     expect(cls).not.toMatch(/border-ink/)
   })
@@ -23,7 +26,9 @@ describe('Button variants', () => {
     const { getByRole } = render(<Button>Default</Button>)
     const cls = getByRole('button', { name: 'Default' }).className
     expect(cls).toMatch(/bg-btn-primary/)
+    expect(cls).toMatch(/text-on-btn-primary/)
     expect(cls).not.toMatch(/\bbg-accent\b/)
+    expect(cls).not.toMatch(/hover:bg-accent/)
   })
 
   it('secondary uses soft fill without heavy stroke', () => {

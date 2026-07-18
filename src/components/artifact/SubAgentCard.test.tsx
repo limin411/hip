@@ -56,6 +56,22 @@ describe('SubAgentCard context menu', () => {
     expect(screen.getByTestId('subagent-card')).toBeInTheDocument()
   })
 
+  it('uses role-colored left rail (border-l-2 + ROLE_COLOR)', () => {
+    render(<SubAgentCard agent={agent} />)
+    const card = screen.getByTestId('subagent-card')
+    expect(card.className).toContain('border-l-2')
+    expect(card.className).not.toContain('border-border')
+    // subagent maps to worker color token
+    expect(card.style.borderLeftColor).toBe('var(--role-worker)')
+  })
+
+  it('shows role name as secondary meta when taskInput is the title', () => {
+    render(<SubAgentCard agent={agent} />)
+    const card = screen.getByTestId('subagent-card')
+    expect(card).toHaveTextContent('fix bug')
+    expect(card).toHaveTextContent('artifact.roles.subagent')
+  })
+
   it('always shows content (no collapse) when agent is done', () => {
     render(<SubAgentCard agent={agent} showTools />)
     const card = screen.getByTestId('subagent-card')

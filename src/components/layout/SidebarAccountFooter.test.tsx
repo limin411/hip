@@ -52,4 +52,19 @@ describe('SidebarAccountFooter', () => {
     )
     expect(screen.getByTestId('account-settings-button')).toHaveAttribute('aria-current', 'page')
   })
+
+  it('active footer uses sage rail without hairline ring', () => {
+    render(
+      <SidebarAccountFooter onOpenHistory={vi.fn()} onOpenSettings={vi.fn()} active="settings" />,
+    )
+    const settings = screen.getByTestId('account-settings-button')
+    expect(settings).toHaveClass('before:bg-accent')
+    expect(settings).toHaveClass('bg-surface')
+    expect(settings.className).not.toMatch(/shadow-\[0_0_0_1px/)
+    expect(settings).not.toHaveClass('bg-state-active')
+
+    const history = screen.getByTestId('account-history-button')
+    expect(history).not.toHaveClass('before:bg-accent')
+    expect(history).toHaveClass('hover:bg-state-hover')
+  })
 })

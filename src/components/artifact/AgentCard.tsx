@@ -32,9 +32,10 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
   return (
     <div
       className={cn(
-        'flex flex-col rounded-lg border bg-surface transition-colors',
+        'flex flex-col rounded-lg border border-l-2 bg-surface transition-colors',
         running ? 'border-accent/40' : isError ? 'border-danger/40' : 'border-border',
       )}
+      style={{ borderLeftColor: isError ? 'var(--danger)' : color }}
       data-testid="agent-card"
       data-status={agent.status}
     >
@@ -46,7 +47,6 @@ export function AgentCard({ agent, live }: { agent: TurnAgent; live: boolean }) 
       >
         <ChevronRight size={14} className={cn('block shrink-0 text-ink-tertiary transition-transform', open && 'rotate-90')} />
         <StatusDot status={agent.status} color={color} />
-        <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: isError ? 'var(--danger)' : color }} />
         <span className="min-w-0 truncate font-semibold text-ink">{t(ROLE_NAME_KEY[agent.role])}</span>
         {agent.tools.length > 0 && <Badge className="shrink-0">{t('artifact.toolsCount', { count: agent.tools.length })}</Badge>}
         {isError && (

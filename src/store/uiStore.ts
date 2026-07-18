@@ -11,6 +11,7 @@ export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents' | 'outline'
 export type Theme = 'light' | 'dark' | 'system'
 export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
+export type UiDensity = 'comfortable' | 'compact'
 /** Left sidebar primary section (memory-only; cold launch always 'chats'). */
 export type SidebarSection = 'knowledge' | 'projects' | 'chats'
 
@@ -18,9 +19,19 @@ export type SidebarSection = 'knowledge' | 'projects' | 'chats'
 export type SettingsPageId = 'general' | 'model' | 'agents' | 'mcp' | 'skill' | 'plugins' | 'hooks' | 'memory'
 
 const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
+const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'compact']
 
 function isAppLanguage(v: unknown): v is AppLanguage {
   return typeof v === 'string' && (APP_LANGUAGES as readonly string[]).includes(v)
+}
+
+export function isUiDensity(v: unknown): v is UiDensity {
+  return typeof v === 'string' && (UI_DENSITIES as readonly string[]).includes(v)
+}
+
+/** Invalid / missing → comfortable (FOUC-safe default). */
+export function normalizeUiDensity(raw: unknown): UiDensity {
+  return isUiDensity(raw) ? raw : 'comfortable'
 }
 
 /** Resolve a stored / browser language tag to one of the three app locales. */
@@ -57,6 +68,7 @@ export type UiPersistedState = {
   // activeView is intentionally NOT persisted — cold launch always New Conversation (chat).
   theme: Theme
   language: AppLanguage
+  density: UiDensity
   settingsPage: SettingsPageId
   diffViewMode: 'unified' | 'split'
   checkpointMode: CheckpointMode
@@ -93,6 +105,7 @@ export function mergeUiPersistedState<
     // Always cold-start on chat New Conversation (product rule).
     activeView: 'chat' as const,
     sidebarSection: 'chats' as const,
+    density: normalizeUiDensity((rest as { density?: unknown }).density),
   }
 }
 
@@ -144,6 +157,9 @@ interface UiState {
 
   language: AppLanguage
   setLanguage: (l: AppLanguage) => void
+
+  density: UiDensity
+  setDensity: (d: UiDensity) => void
 }
 
 // In-memory fallback so node test runs (no localStorage/DOM) don't crash on persist.
@@ -234,6 +250,9 @@ export const useUiStore = create<UiState>()(
 
       language: seedLanguage(),
       setLanguage: (l) => set((s) => (s.language === l ? s : { language: l })),
+
+      density: 'comfortable',
+      setDensity: (d) => set((s) => (s.density === d ? s : { density: d })),
     }),
     {
       name: 'hip-ui',
@@ -245,6 +264,7 @@ export const useUiStore = create<UiState>()(
         // activeView:"knowledge" and reopened the KB shell after restart.
         theme: s.theme,
         language: s.language,
+        density: s.density,
         settingsPage: s.settingsPage,
         diffViewMode: s.diffViewMode,
         checkpointMode: s.checkpointMode,
@@ -258,11 +278,14 @@ export const useUiStore = create<UiState>()(
         // Calling useUiStore.setState here throws, aborts the hydrate chain.
         // Defer any setState to a microtask (after the export binding exists).
         const language = state.language
+        const density = state.density
         queueMicrotask(() => {
           const lang = isAppLanguage(language) ? language : seedLanguage()
-          if (useUiStore.getState().language !== lang) {
-            useUiStore.setState({ language: lang })
-          }
+          const dens = normalizeUiDensity(density)
+          const patch: Partial<UiState> = {}
+          if (useUiStore.getState().language !== lang) patch.language = lang
+          if (useUiStore.getState().density !== dens) patch.density = dens
+          if (Object.keys(patch).length > 0) useUiStore.setState(patch)
           applyColdLaunchShell()
         })
       },

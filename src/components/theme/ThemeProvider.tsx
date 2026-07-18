@@ -8,6 +8,7 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const theme = useUiStore((s) => s.theme)
+  const density = useUiStore((s) => s.density)
 
   useEffect(() => {
     const root = document.documentElement
@@ -40,6 +41,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       mediaQuery.removeEventListener('change', handleChange)
     }
   }, [theme])
+
+  useEffect(() => {
+    document.documentElement.dataset.density = density
+  }, [density])
 
   return <>{children}</>
 }

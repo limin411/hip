@@ -195,4 +195,31 @@ describe('AppSidebar', () => {
     )
     expect(screen.queryByTestId('sidebar-session-worktrees-code-1')).not.toBeInTheDocument()
   })
+
+  it('does not promote worktree slot sessions to top-level project rows', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: [
+        ...(st.sessions as never[]),
+        {
+          id: 'slot-orphan',
+          title: 'P1/2 · deadrun',
+          preview: 'slot',
+          updatedAtMs: Date.now(),
+          config: {
+            ...DEFAULT_CONFIG,
+            surface: 'code',
+            cwd: '/Users/x/.hip/worktrees/h1/slot-orphan',
+          },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+    }) as never)
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-session-slot-orphan')).not.toBeInTheDocument()
+  })
 })

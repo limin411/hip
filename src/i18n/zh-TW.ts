@@ -451,6 +451,7 @@ export const zhTW = {
           codeBlock: '程式碼區塊',
           sessionTab: '工作階段分頁',
           sessionHistory: '歷史紀錄',
+          worktree: 'Worktree',
           fileEntry: '檔案樹',
           filePreview: '檔案預覽',
           toolCall: '工具呼叫',
@@ -1255,6 +1256,17 @@ export const zhTW = {
       sessionHistory: {
         open: '開啟',
         rename: '重新命名…',
+      },
+      worktree: {
+        openHost: '開啟',
+        copyPath: '複製路徑',
+        pathCopied: '路徑已複製',
+        copyFailed: '無法複製路徑',
+        remove: '刪除 worktree',
+        removeForce: '強制刪除 worktree',
+        removed: '已刪除 worktree {{label}}',
+        removedForce: '已強制刪除 worktree {{label}}',
+        removeFailed: '無法刪除 worktree {{label}}',
       },
       renameSession: {
         title: '重新命名工作階段',

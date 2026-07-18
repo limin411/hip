@@ -23,6 +23,10 @@ interface WorktreeCatalogState {
   lastRepoKey?: string
   /** Path to expand/scroll after create */
   pendingRevealPath?: string
+  /**
+   * Apply an authoritative git worktree list snapshot (delta upsert + prune).
+   * Rows for repoKeys covered by the list but absent from it are removed.
+   */
   upsertFromList: (worktrees: WorktreeInfo[], hostSessionId?: string) => void
   applyChanged: (record: WorktreeRecord, kind: string, reveal?: boolean) => void
   removeByPath: (path: string) => void
@@ -82,12 +86,42 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
     set((st) => {
       const next = { ...st.byId }
       let lastRepoKey = st.lastRepoKey
+      const presentIds = new Set<string>()
+      const presentPaths = new Set<string>()
+      const repoKeys = new Set<string>()
+
       for (const w of worktrees) {
         const row = fromInfo(w, hostSessionId)
-        if (!isCatalogVisible(row) && !row.isPrimary) continue
-        next[row.id] = row
-        if (row.repoKey) lastRepoKey = row.repoKey
+        presentIds.add(row.id)
+        presentPaths.add(pathKey(row.path))
+        if (row.repoKey) {
+          repoKeys.add(row.repoKey)
+          lastRepoKey = row.repoKey
+        }
+        // Invisible rows (ephemeral / bg) must not linger if they were ever catalogued.
+        if (!isCatalogVisible(row) && !row.isPrimary) {
+          delete next[row.id]
+          continue
+        }
+        const prev = next[row.id]
+        next[row.id] = {
+          ...row,
+          // List payloads omit host; keep association when re-hydrating.
+          hostSessionId: row.hostSessionId ?? prev?.hostSessionId,
+        }
       }
+
+      // Snapshot prune: drop non-primary rows for covered repos that are gone from git.
+      for (const [id, row] of Object.entries(next)) {
+        if (row.isPrimary) continue
+        if (row.repoKey && !repoKeys.has(row.repoKey)) continue
+        // Rows without repoKey only prune when the snapshot includes a path match set
+        // and we can prove the path is missing — skip unkeyed orphans from other sources.
+        if (!row.repoKey) continue
+        if (presentIds.has(id) || presentPaths.has(pathKey(row.path))) continue
+        delete next[id]
+      }
+
       return { byId: next, lastRepoKey }
     })
   },

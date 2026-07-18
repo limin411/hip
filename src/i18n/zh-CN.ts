@@ -451,6 +451,7 @@ export const zhCN = {
           codeBlock: '代码块',
           sessionTab: '会话标签',
           sessionHistory: '历史记录',
+          worktree: 'Worktree',
           fileEntry: '文件树',
           filePreview: '文件预览',
           toolCall: '工具调用',
@@ -1255,6 +1256,17 @@ export const zhCN = {
       sessionHistory: {
         open: '打开',
         rename: '重命名…',
+      },
+      worktree: {
+        openHost: '打开',
+        copyPath: '复制路径',
+        pathCopied: '路径已复制',
+        copyFailed: '无法复制路径',
+        remove: '删除 worktree',
+        removeForce: '强制删除 worktree',
+        removed: '已删除 worktree {{label}}',
+        removedForce: '已强制删除 worktree {{label}}',
+        removeFailed: '无法删除 worktree {{label}}',
       },
       renameSession: {
         title: '重命名会话',

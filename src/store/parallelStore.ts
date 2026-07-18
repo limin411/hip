@@ -32,6 +32,17 @@ export interface ParallelRun {
   source?: 'agent' | 'host'
 }
 
+function pathKey(p: string): string {
+  return p.replace(/\\/g, '/').replace(/\/+$/, '')
+}
+
+function clearStaleSelection(run: ParallelRun, slots: ParallelSlot[]): ParallelRun {
+  const selected = run.selectedSessionId
+  if (!selected) return { ...run, slots }
+  if (slots.some((s) => s.sessionId === selected)) return { ...run, slots }
+  return { ...run, slots, selectedSessionId: undefined }
+}
+
 interface ParallelState {
   runs: ParallelRun[]
   addRun: (run: ParallelRun) => void
@@ -43,6 +54,18 @@ interface ParallelState {
   /** All parallel runs hosted by this session (agent-driven worktrees). */
   runsForHost: (sessionId: string) => ParallelRun[]
   pruneMissingSessions: (existingIds: Set<string>) => void
+  /**
+   * Drop slots that match removed worktrees (by path and/or catalog id).
+   * Empty runs are removed — live projection, not tombstones.
+   */
+  pruneSlotsMatching: (match: { paths?: string[]; worktreeIds?: string[] }) => void
+  /**
+   * Reconcile against an authoritative git worktree list snapshot.
+   * Slots with a non-empty path not present in livePaths are dropped.
+   * In-flight creates (empty path / status creating) are kept.
+   * When hostSessionId is set, only that host's runs are touched.
+   */
+  reconcileToLivePaths: (livePaths: Iterable<string>, hostSessionId?: string) => void
 }
 
 const MAX_RUNS = 30
@@ -120,6 +143,40 @@ export const useParallelStore = create<ParallelState>()(
               slots: r.slots.filter((s) => !s.sessionId || existingIds.has(s.sessionId)),
             }))
             .filter((r) => r.slots.length > 0 || existingIds.has(r.hostSessionId)),
+        }))
+      },
+
+      pruneSlotsMatching: ({ paths = [], worktreeIds = [] }) => {
+        const pathKeys = new Set(paths.filter(Boolean).map(pathKey))
+        const ids = new Set(worktreeIds.filter(Boolean))
+        if (pathKeys.size === 0 && ids.size === 0) return
+        set((st) => ({
+          runs: st.runs
+            .map((r) => {
+              const slots = r.slots.filter((s) => {
+                if (s.worktreeId && ids.has(s.worktreeId)) return false
+                if (s.worktreePath && pathKeys.has(pathKey(s.worktreePath))) return false
+                return true
+              })
+              return clearStaleSelection(r, slots)
+            })
+            .filter((r) => r.slots.length > 0),
+        }))
+      },
+
+      reconcileToLivePaths: (livePaths, hostSessionId) => {
+        const live = new Set([...livePaths].map(pathKey))
+        set((st) => ({
+          runs: st.runs
+            .map((r) => {
+              if (hostSessionId && r.hostSessionId !== hostSessionId) return r
+              const slots = r.slots.filter((s) => {
+                if (!s.worktreePath || s.status === 'creating') return true
+                return live.has(pathKey(s.worktreePath))
+              })
+              return clearStaleSelection(r, slots)
+            })
+            .filter((r) => r.slots.length > 0),
         }))
       },
     }),

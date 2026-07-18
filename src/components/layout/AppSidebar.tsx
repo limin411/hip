@@ -20,6 +20,10 @@ import {
   useWorktreeStore,
   type CatalogWorktree,
 } from '@/store/worktreeStore'
+import {
+  collectNestedWorktreeSessionIds,
+  extractParallelNestingHints,
+} from '@/lib/worktreeNesting'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import {
@@ -57,16 +61,16 @@ export function AppSidebar() {
     sessionService.requestWorktreeList(sessionId)
   }
 
-  /** Slot-only session ids (legacy multi-session fan-out) — hide from top-level list. */
-  const nestedSlotSessionIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const run of parallelRuns) {
-      for (const slot of run.slots) {
-        if (slot.sessionId) ids.add(slot.sessionId)
-      }
-    }
-    return ids
-  }, [parallelRuns])
+  /** Nested worktree / parallel-slot sessions — never top-level first-class rows. */
+  const nestedWorktreeSessionIds = useMemo(() => {
+    const hints = extractParallelNestingHints(parallelRuns)
+    const catalogPaths = Object.values(catalogById).map((r) => r.path)
+    return collectNestedWorktreeSessionIds({
+      sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
+      slotSessionIds: hints.slotSessionIds,
+      worktreePaths: [...hints.worktreePaths, ...catalogPaths],
+    })
+  }, [parallelRuns, catalogById, sessions])
 
   const runsByHost = useMemo(() => {
     const map = new Map<string, ParallelRun[]>()
@@ -84,8 +88,8 @@ export function AppSidebar() {
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
     let list = sessions
       .filter((s) => surfaceOf(s.config) === surface)
-      // Nested slot sessions (legacy) stay under parent expand, not as top-level rows.
-      .filter((s) => !nestedSlotSessionIds.has(s.id))
+      // Worktree-bound / slot sessions only appear nested under the host expand tree.
+      .filter((s) => !nestedWorktreeSessionIds.has(s.id))
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     if (q) {
       list = list.filter(
@@ -99,7 +103,7 @@ export function AppSidebar() {
       )
     }
     return list
-  }, [sessions, sidebarSection, q, nestedSlotSessionIds, runsByHost])
+  }, [sessions, sidebarSection, q, nestedWorktreeSessionIds, runsByHost])
 
   const filteredSpaces = useMemo(() => {
     if (sidebarSection !== 'knowledge') return []
@@ -109,8 +113,11 @@ export function AppSidebar() {
   }, [spaces, sidebarSection, q])
 
   const projectCount = useMemo(
-    () => sessions.filter((s) => surfaceOf(s.config) === 'code').length,
-    [sessions],
+    () =>
+      sessions.filter(
+        (s) => surfaceOf(s.config) === 'code' && !nestedWorktreeSessionIds.has(s.id),
+      ).length,
+    [sessions, nestedWorktreeSessionIds],
   )
   const chatCount = useMemo(
     () => sessions.filter((s) => surfaceOf(s.config) === 'chat').length,
@@ -415,10 +422,12 @@ export function AppSidebar() {
                             {hasWorktrees ? (
                               <span
                                 className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
-                                title={t('sidebar.parallel.slotCount', { count: slots.length })}
+                                title={t('sidebar.parallel.slotCount', {
+                                  count: slots.length + catalogRows.length,
+                                })}
                                 data-testid={`sidebar-session-wt-badge-${session.id}`}
                               >
-                                {slots.length}
+                                {slots.length + catalogRows.length}
                               </span>
                             ) : null}
                           </span>
@@ -526,31 +535,41 @@ function CatalogWorktreeRow({
   hostSessionId: string
 }) {
   const pathLabel = shortWorktreeLabel(row.path, row.branch)
+  const label = row.label || row.branch || pathLabel
   return (
     <li>
-      <button
-        type="button"
-        data-testid={`sidebar-catalog-wt-${row.id}`}
-        data-no-drag
-        onClick={() => void selectSessionFromSidebar(hostSessionId)}
-        title={row.path}
-        className={cn(
-          'mb-0.5 flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-          'hover:bg-state-hover',
-        )}
+      <DeclarativeContextMenu
+        kind="worktree"
+        payload={{
+          hostSessionId,
+          worktreePath: row.path,
+          label,
+          worktreeId: row.id,
+        }}
+        className="mb-0.5 block w-full"
       >
-        <GitBranch size={12} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-medium text-ink">
-            {row.label || row.branch || pathLabel}
+        <button
+          type="button"
+          data-testid={`sidebar-catalog-wt-${row.id}`}
+          data-no-drag
+          onClick={() => void selectSessionFromSidebar(hostSessionId)}
+          title={row.path}
+          className={cn(
+            'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+            'hover:bg-state-hover',
+          )}
+        >
+          <GitBranch size={12} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[12px] font-medium text-ink">{label}</span>
+            <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={row.path}>
+              {pathLabel}
+              {row.source ? ` · ${row.source}` : ''}
+            </span>
           </span>
-          <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={row.path}>
-            {pathLabel}
-            {row.source ? ` · ${row.source}` : ''}
-          </span>
-        </span>
-      </button>
+        </button>
+      </DeclarativeContextMenu>
     </li>
   )
 }
@@ -577,49 +596,69 @@ function WorktreeSlotRow({
   const key = slot.sessionId || slot.taskId || `${run.id}-${slot.index}`
   const isAgentSlot = run.source === 'agent' || (!!slot.taskId && !slot.sessionId)
   const pathLabel = shortWorktreeLabel(slot.worktreePath, slot.branch)
+  const label = session?.title || slot.branch || `P${slot.index}`
+
+  const rowButton = (
+    <button
+      type="button"
+      data-testid={`sidebar-parallel-slot-${key}`}
+      data-no-drag
+      aria-current={active ? 'true' : undefined}
+      onClick={() => {
+        if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
+        else if (run.hostSessionId) void selectSessionFromSidebar(run.hostSessionId)
+      }}
+      onDoubleClick={() => {
+        if (slot.sessionId) sessionService.selectParallelWinner(run.id, slot.sessionId)
+      }}
+      title={
+        isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint')
+      }
+      className={cn(
+        'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+        active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
+      )}
+    >
+      <GitBranch
+        size={12}
+        className={cn(
+          'mt-0.5 shrink-0',
+          slot.status === 'error' ? 'text-danger' : 'text-ink-tertiary',
+        )}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[12px] font-medium text-ink">{label}</span>
+        <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={slot.worktreePath}>
+          {pathLabel}
+          {slot.taskId ? ` · ${slot.taskId}` : ''}
+          {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
+        </span>
+      </span>
+    </button>
+  )
+
+  // No path yet (still creating) — no remove menu.
+  if (!slot.worktreePath || !run.hostSessionId) {
+    return <li className="mb-0.5">{rowButton}</li>
+  }
 
   return (
     <li>
-      <button
-        type="button"
-        data-testid={`sidebar-parallel-slot-${key}`}
-        data-no-drag
-        aria-current={active ? 'true' : undefined}
-        onClick={() => {
-          if (slot.sessionId) void selectSessionFromSidebar(slot.sessionId)
-          else if (run.hostSessionId) void selectSessionFromSidebar(run.hostSessionId)
+      <DeclarativeContextMenu
+        kind="worktree"
+        payload={{
+          hostSessionId: run.hostSessionId,
+          worktreePath: slot.worktreePath,
+          label,
+          slotSessionId: slot.sessionId || undefined,
+          worktreeId: slot.worktreeId,
         }}
-        onDoubleClick={() => {
-          if (slot.sessionId) sessionService.selectParallelWinner(run.id, slot.sessionId)
-        }}
-        title={
-          isAgentSlot ? t('sidebar.parallel.agentSlotHint') : t('sidebar.parallel.slotHint')
-        }
-        className={cn(
-          'mb-0.5 flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-          active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
-        )}
+        className="mb-0.5 block w-full"
       >
-        <GitBranch
-          size={12}
-          className={cn(
-            'mt-0.5 shrink-0',
-            slot.status === 'error' ? 'text-danger' : 'text-ink-tertiary',
-          )}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-medium text-ink">
-            {session?.title || slot.branch || `P${slot.index}`}
-          </span>
-          <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={slot.worktreePath}>
-            {pathLabel}
-            {slot.taskId ? ` · ${slot.taskId}` : ''}
-            {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
-          </span>
-        </span>
-      </button>
+        {rowButton}
+      </DeclarativeContextMenu>
     </li>
   )
 }

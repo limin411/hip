@@ -4,6 +4,8 @@ import { useDomainStore } from './sessionStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { useUiStore } from '@/store/uiStore'
+import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
 import type { WorkflowDef } from '@hip/protocol'
 import '@/i18n'
 
@@ -64,6 +66,8 @@ describe('applyServerMessageEffects', () => {
     useDiffStore.setState({ bySession: {} })
     useWorkflowStore.setState({ bySession: {} })
     useUiStore.setState({ activeTab: 'files' })
+    useParallelStore.setState({ runs: [] })
+    useWorktreeStore.getState().clear()
   })
 
   it('ready resets diff transient and requests session:list', () => {
@@ -365,6 +369,205 @@ describe('applyServerMessageEffects', () => {
         deps,
       )
       expect(useDomainStore.getState().sessions.find((s) => s.id === 's1')!.chatPanelOpen).toBe(false)
+    })
+  })
+
+  describe('worktree catalog + parallel slot consistency', () => {
+    it('worktree:changed removed clears catalog and parallel slots', async () => {
+      useParallelStore.getState().addRun({
+        id: 'run-1',
+        baseCwd: '/repo',
+        prompt: 'p',
+        hostSessionId: 's1',
+        source: 'host',
+        createdAt: 1,
+        slots: [
+          {
+            index: 0,
+            sessionId: 'slot-sess-0',
+            taskId: 't0',
+            worktreeId: 'wt-0',
+            worktreePath: '/Users/x/.hip/worktrees/hip-parallel-0',
+            branch: 'hip-parallel-0',
+            status: 'ready',
+          },
+          {
+            index: 1,
+            sessionId: 'slot-sess-1',
+            taskId: 't1',
+            worktreeId: 'wt-1',
+            worktreePath: '/Users/x/.hip/worktrees/hip-parallel-1',
+            branch: 'hip-parallel-1',
+            status: 'ready',
+          },
+        ],
+      })
+      useDomainStore.setState((st) => ({
+        ...st,
+        sessions: [
+          ...st.sessions,
+          {
+            id: 'slot-sess-0',
+            config: {
+              llmProvider: 'deepseek',
+              model: '',
+              tools: [],
+              surface: 'code',
+              cwd: '/Users/x/.hip/worktrees/hip-parallel-0',
+            },
+            title: 'P1/2 · run',
+            preview: '',
+            updatedAtMs: 0,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+          },
+        ],
+      }))
+      useWorktreeStore.getState().upsertFromList(
+        [
+          {
+            id: 'wt-0',
+            path: '/Users/x/.hip/worktrees/hip-parallel-0',
+            branch: 'hip-parallel-0',
+            head: 'h',
+            managed: true,
+            isPrimary: false,
+            source: 'parallel',
+            repoKey: 'rk',
+          },
+          {
+            id: 'wt-1',
+            path: '/Users/x/.hip/worktrees/hip-parallel-1',
+            branch: 'hip-parallel-1',
+            head: 'h',
+            managed: true,
+            isPrimary: false,
+            source: 'parallel',
+            repoKey: 'rk',
+          },
+        ],
+        's1',
+      )
+
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'worktree:changed',
+          sessionId: 's1',
+          repoKey: 'rk',
+          kind: 'removed',
+          worktree: {
+            id: 'wt-0',
+            path: '/Users/x/.hip/worktrees/hip-parallel-0',
+            branch: '',
+            head: '',
+            repoKey: 'rk',
+            isPrimary: false,
+            managed: true,
+            source: 'parallel',
+          },
+        },
+        deps,
+      )
+
+      expect(useWorktreeStore.getState().byId['wt-0']).toBeUndefined()
+      expect(useWorktreeStore.getState().byId['wt-1']).toBeDefined()
+      const slots = useParallelStore.getState().runs[0]!.slots
+      expect(slots).toHaveLength(1)
+      expect(slots[0]!.worktreeId).toBe('wt-1')
+      // Bound slot conversation is deleted so it cannot reappear as a top-level row.
+      await vi.waitFor(() => {
+        expect(useDomainStore.getState().sessions.some((s) => s.id === 'slot-sess-0')).toBe(false)
+      })
+    })
+
+    it('git:worktree:list:result reconciles catalog and host parallel slots', () => {
+      useParallelStore.getState().addRun({
+        id: 'run-1',
+        baseCwd: '/repo',
+        prompt: 'p',
+        hostSessionId: 's1',
+        source: 'agent',
+        createdAt: 1,
+        slots: [
+          {
+            index: 0,
+            sessionId: '',
+            worktreePath: '/wt/stale',
+            branch: 'stale',
+            status: 'ready',
+          },
+          {
+            index: 1,
+            sessionId: '',
+            worktreePath: '/wt/live',
+            branch: 'live',
+            status: 'ready',
+          },
+        ],
+      })
+      useWorktreeStore.getState().upsertFromList(
+        [
+          {
+            id: 'stale',
+            path: '/wt/stale',
+            branch: 'stale',
+            head: 'h',
+            managed: true,
+            isPrimary: false,
+            source: 'parallel',
+            repoKey: 'rk',
+          },
+          {
+            id: 'live',
+            path: '/wt/live',
+            branch: 'live',
+            head: 'h',
+            managed: true,
+            isPrimary: false,
+            source: 'parallel',
+            repoKey: 'rk',
+          },
+        ],
+        's1',
+      )
+
+      const deps = makeDeps()
+      applyServerMessageEffects(
+        {
+          type: 'git:worktree:list:result',
+          sessionId: 's1',
+          worktrees: [
+            {
+              id: 'primary',
+              path: '/repo',
+              branch: 'main',
+              head: 'h',
+              managed: false,
+              isPrimary: true,
+              source: 'primary',
+              repoKey: 'rk',
+            },
+            {
+              id: 'live',
+              path: '/wt/live',
+              branch: 'live',
+              head: 'h',
+              managed: true,
+              isPrimary: false,
+              source: 'parallel',
+              repoKey: 'rk',
+            },
+          ],
+        },
+        deps,
+      )
+
+      expect(useWorktreeStore.getState().byId['stale']).toBeUndefined()
+      expect(useWorktreeStore.getState().byId['live']).toBeDefined()
+      expect(useParallelStore.getState().runs[0]!.slots.map((s) => s.worktreePath)).toEqual(['/wt/live'])
     })
   })
 })

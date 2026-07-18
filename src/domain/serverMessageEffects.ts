@@ -427,6 +427,47 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
 
     case 'worktree:changed': {
       useWorktreeStore.getState().applyChanged(msg.worktree, msg.kind, msg.reveal)
+      // Dual-store consistency: parallel sidebar slots are a live projection of worktrees.
+      // Domain event is the fast path; list snapshot (below) is the safety net.
+      if (msg.kind === 'removed') {
+        const removedPath = msg.worktree.path
+        // Capture bound slot sessions before pruning so they do not float up as top-level rows.
+        const boundSessionIds = new Set<string>()
+        if (removedPath) {
+          const key = removedPath.replace(/\\/g, '/').replace(/\/+$/, '')
+          for (const run of useParallelStore.getState().runs) {
+            for (const slot of run.slots) {
+              if (!slot.sessionId) continue
+              if (slot.worktreeId && msg.worktree.id && slot.worktreeId === msg.worktree.id) {
+                boundSessionIds.add(slot.sessionId)
+                continue
+              }
+              if (slot.worktreePath) {
+                const sk = slot.worktreePath.replace(/\\/g, '/').replace(/\/+$/, '')
+                if (sk === key) boundSessionIds.add(slot.sessionId)
+              }
+            }
+          }
+          for (const s of useDomainStore.getState().sessions) {
+            const cwd = s.config.cwd
+            if (!cwd) continue
+            const ck = cwd.replace(/\\/g, '/').replace(/\/+$/, '')
+            if (ck === key) boundSessionIds.add(s.id)
+          }
+        }
+        useParallelStore.getState().pruneSlotsMatching({
+          paths: removedPath ? [removedPath] : [],
+          worktreeIds: msg.worktree.id ? [msg.worktree.id] : [],
+        })
+        if (boundSessionIds.size > 0) {
+          // Lazy import avoids circular graph: sessionService → effects → sessionService.
+          void import('./sessionService').then(({ sessionService }) => {
+            for (const id of boundSessionIds) {
+              sessionService.deleteSession(id)
+            }
+          })
+        }
+      }
       // Same-process only toast (not CLI spawn).
       if (msg.kind === 'created' && msg.reveal) {
         toast.success(
@@ -440,8 +481,12 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     }
 
     case 'git:worktree:list:result': {
-      // Hydrate catalog (CLI creates / focus refresh).
+      // Authoritative snapshot: upsert + prune catalog, then reconcile parallel slots for this host.
       useWorktreeStore.getState().upsertFromList(msg.worktrees, msg.sessionId)
+      useParallelStore.getState().reconcileToLivePaths(
+        msg.worktrees.map((w) => w.path),
+        msg.sessionId,
+      )
       return
     }
 

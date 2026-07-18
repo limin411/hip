@@ -57,6 +57,32 @@ const STATIC_CATALOG: ContextMenuItemMeta[] = [
     danger: true,
   },
   {
+    id: 'worktree.openHost',
+    labelKey: 'contextMenu.worktree.openHost',
+    kind: 'worktree',
+    group: 'primary',
+  },
+  {
+    id: 'worktree.copyPath',
+    labelKey: 'contextMenu.worktree.copyPath',
+    kind: 'worktree',
+    group: 'clipboard',
+  },
+  {
+    id: 'worktree.remove',
+    labelKey: 'contextMenu.worktree.remove',
+    kind: 'worktree',
+    group: 'danger',
+    danger: true,
+  },
+  {
+    id: 'worktree.removeForce',
+    labelKey: 'contextMenu.worktree.removeForce',
+    kind: 'worktree',
+    group: 'danger',
+    danger: true,
+  },
+  {
     id: 'file.open',
     labelKey: 'contextMenu.file.open',
     kind: 'fileEntry',

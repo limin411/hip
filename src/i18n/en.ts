@@ -454,6 +454,7 @@ export const en = {
           codeBlock: 'Code blocks',
           sessionTab: 'Session tabs',
           sessionHistory: 'History',
+          worktree: 'Worktrees',
           fileEntry: 'File tree',
           filePreview: 'File preview',
           toolCall: 'Tool calls',
@@ -1266,6 +1267,17 @@ export const en = {
       sessionHistory: {
         open: 'Open',
         rename: 'Rename…',
+      },
+      worktree: {
+        openHost: 'Open',
+        copyPath: 'Copy path',
+        pathCopied: 'Path copied',
+        copyFailed: 'Could not copy path',
+        remove: 'Remove worktree',
+        removeForce: 'Force remove worktree',
+        removed: 'Removed worktree {{label}}',
+        removedForce: 'Force-removed worktree {{label}}',
+        removeFailed: 'Could not remove worktree {{label}}',
       },
       renameSession: {
         title: 'Rename conversation',

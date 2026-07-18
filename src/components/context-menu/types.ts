@@ -24,6 +24,7 @@ export type ContextKind =
   | 'chatEmpty'
   | 'artifactChrome'
   | 'knowledgeNode'
+  | 'worktree'
 
 export type ContextGroupId =
   | 'primary'
@@ -49,6 +50,14 @@ export type ContextPayloadMap = {
   }
   codeBlock: { code: string; language?: string }
   sessionHistory: { sessionId: string; title: string; surface: 'chat' | 'code' }
+  /** Nested worktree row under a host project (not a top-level conversation). */
+  worktree: {
+    hostSessionId: string
+    worktreePath: string
+    label: string
+    slotSessionId?: string
+    worktreeId?: string
+  }
   fileEntry: {
     path: string
     name: string

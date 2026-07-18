@@ -3,6 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { Search, MessageSquare, Code2, Trash2 } from 'lucide-react'
 import { useSessions, sessionService } from '@/domain'
 import { surfaceOf } from '@/lib/sessions'
+import {
+  collectNestedWorktreeSessionIds,
+  extractParallelNestingHints,
+} from '@/lib/worktreeNesting'
+import { useParallelStore } from '@/store/parallelStore'
+import { useWorktreeStore } from '@/store/worktreeStore'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
@@ -18,13 +24,23 @@ type SurfaceFilter = 'all' | 'chat' | 'code'
 export function SessionHistory() {
   const { t } = useTranslation()
   const sessions = useSessions()
+  const parallelRuns = useParallelStore((s) => s.runs)
+  const catalogById = useWorktreeStore((s) => s.byId)
   const [query, setQuery] = useState('')
   const [surfaceFilter, setSurfaceFilter] = useState<SurfaceFilter>('all')
   const [page, setPage] = useState(1)
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
   const [clearAllOpen, setClearAllOpen] = useState(false)
 
-  // ... 现有派生计算不变
+  const nestedWorktreeSessionIds = useMemo(() => {
+    const hints = extractParallelNestingHints(parallelRuns)
+    const catalogPaths = Object.values(catalogById).map((r) => r.path)
+    return collectNestedWorktreeSessionIds({
+      sessions: sessions.map((s) => ({ id: s.id, title: s.title, config: { cwd: s.config.cwd } })),
+      slotSessionIds: hints.slotSessionIds,
+      worktreePaths: [...hints.worktreePaths, ...catalogPaths],
+    })
+  }, [sessions, parallelRuns, catalogById])
 
   const deletingSession = useMemo(
     () => sessions.find((s) => s.id === deletingSessionId) ?? null,
@@ -33,7 +49,10 @@ export function SessionHistory() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = [...sessions].sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+    // Worktree-bound slot sessions are nested under projects, not first-class history rows.
+    const list = [...sessions]
+      .filter((s) => !nestedWorktreeSessionIds.has(s.id))
+      .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
     let result = list
     if (q) {
       result = result.filter(
@@ -44,7 +63,7 @@ export function SessionHistory() {
       result = result.filter((s) => surfaceOf(s.config) === surfaceFilter)
     }
     return result
-  }, [sessions, query, surfaceFilter])
+  }, [sessions, query, surfaceFilter, nestedWorktreeSessionIds])
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)),

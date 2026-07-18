@@ -131,6 +131,12 @@ export const zhCN = {
       },
       pickFolder: '选择项目文件夹',
       clearFolder: '纯对话',
+      missingProject: {
+        title: '项目文件夹不可用',
+        desc: '文件夹已不存在或无法访问：{{path}}',
+        rebind: '重新选择文件夹',
+        unbind: '仅保留对话',
+      },
       stop: '停止',
       copy: '复制',
       copyCode: '复制代码',
@@ -1042,6 +1048,11 @@ export const zhCN = {
       emptySearch: '无匹配项',
       emptySessions: '暂无会话',
       emptySpaces: '暂无知识空间',
+      projectGroup: {
+        unbound: '未绑定项目路径',
+        missingBadge: '不可用',
+        missingTitle: '文件夹不可用：{{path}}',
+      },
       parallel: {
         group: '并行 · {{id}}',
         winner: '已选用',

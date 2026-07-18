@@ -38,6 +38,7 @@ import { useWorkflowStore } from '@/store/workflowStore'
 import { useFocusStore } from '@/store/focusStore'
 import { useGoalStore } from '@/store/goalStore'
 import { useParallelStore } from '@/store/parallelStore'
+import { useProjectPathStore } from '@/store/projectPathStore'
 import { planParallelFanout } from '@/lib/parallelFanout'
 import {
   formatDiffAnnotationsForComposer,
@@ -1460,13 +1461,23 @@ export class SessionService {
   }
 
   setProjectDir(id: string, cwd: string): void {
+    const prevCwd = useDomainStore.getState().sessions.find((s) => s.id === id)?.config.cwd
     useDomainStore.getState().apply({ type: 'session:cwd', sessionId: id, cwd }) // optimistic
     useFsStore.getState().clearSession(id)
     useDiffStore.getState().clearSession(id)
     // Terminal: kill old shell + clear ring; TerminalView re-opens on cwd change if tab visible.
     void ptyKill(id).catch(() => {})
     useTerminalStore.getState().clearSession(id)
+    // Path existence cache: old path may still be missing; new path is known-ok when non-empty.
+    useProjectPathStore.getState().invalidate(prevCwd)
+    if (cwd.trim()) useProjectPathStore.getState().markOk(cwd)
+    else useProjectPathStore.getState().invalidate(cwd)
     this.transport.send({ type: 'session:setCwd', sessionId: id, cwd })
+  }
+
+  /** Unbind the project folder (clear cwd) while keeping the session and history. */
+  clearProjectDir(id: string): void {
+    this.setProjectDir(id, '')
   }
 
   setThinking(id: string, thinking: boolean): void {

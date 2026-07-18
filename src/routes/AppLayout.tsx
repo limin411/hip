@@ -8,6 +8,7 @@ import { ChatPane } from '@/components/chat/ChatPane'
 import { ComposerPlanPanel } from '@/components/chat/ComposerPlanPanel'
 import { GoalStatusChip } from '@/components/chat/GoalStatusChip'
 import { InputBar } from '@/components/chat/InputBar'
+import { MissingProjectBanner } from '@/components/chat/MissingProjectBanner'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { AppSidebar } from '@/components/layout/AppSidebar'
@@ -22,12 +23,14 @@ import {
 import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { startPtyBridge } from '@/ipc/pty'
+import { useProjectPathStore } from '@/store/projectPathStore'
 
 export function AppLayout() {
   const rightPanelRef = useRef<ImperativePanelHandle>(null)
   const activeSession = useActiveSession()
   const activeSessionId = activeSession?.id ?? null
   const activeView = useUiStore((s) => s.activeView)
+  const activeCwd = activeSession?.config.cwd
 
   useEffect(() => {
     if (!useProvidersStore.getState().loaded) {
@@ -37,6 +40,22 @@ export function AppLayout() {
     }
     sessionService.connect()
     return () => sessionService.disconnect()
+  }, [])
+
+  // Probe active session project folder (and re-probe on window focus).
+  useEffect(() => {
+    useProjectPathStore.getState().ensureChecked([activeCwd])
+  }, [activeCwd, activeSessionId])
+
+  useEffect(() => {
+    const onFocus = () => {
+      const store = useProjectPathStore.getState()
+      store.invalidate()
+      const st = useDomainStore.getState()
+      store.ensureChecked(st.sessions.map((s) => s.config.cwd))
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   // App-lifetime PTY event bridge → terminalStore only (D6a). Never writes xterm.
@@ -92,6 +111,7 @@ export function AppLayout() {
       <NewConversation />
     ) : (
       <>
+        <MissingProjectBanner />
         <GoalStatusChip />
         <ChatPane />
         {/* Sticky plan/todo checklist directly above the composer */}

@@ -133,6 +133,12 @@ export const en = {
       },
       pickFolder: 'Choose project folder',
       clearFolder: 'Pure chat',
+      missingProject: {
+        title: 'Project folder unavailable',
+        desc: 'The folder no longer exists or is not accessible: {{path}}',
+        rebind: 'Choose folder',
+        unbind: 'Keep chat only',
+      },
       stop: 'Stop',
       copy: 'Copy',
       copyCode: 'Copy code',
@@ -1049,6 +1055,11 @@ export const en = {
       emptySearch: 'No matches',
       emptySessions: 'No sessions yet',
       emptySpaces: 'No spaces yet',
+      projectGroup: {
+        unbound: 'No project folder',
+        missingBadge: 'Unavailable',
+        missingTitle: 'Folder unavailable: {{path}}',
+      },
       parallel: {
         group: 'Parallel · {{id}}',
         winner: 'selected',

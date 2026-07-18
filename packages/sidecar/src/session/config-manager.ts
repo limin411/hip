@@ -98,9 +98,15 @@ export class ConfigManager {
     this.loadPluginComponents()
   }
 
-  /** Bind/replace the project directory and rebuild the agent. */
+  /** Bind/replace the project directory and rebuild the agent. Empty string clears cwd. */
   setCwd(cwd: string): void {
-    this.updateConfig({ ...this.getConfig(), cwd })
+    const next = cwd.trim()
+    if (!next) {
+      const { cwd: _cleared, ...rest } = this.getConfig()
+      this.updateConfig(rest)
+    } else {
+      this.updateConfig({ ...this.getConfig(), cwd: next })
+    }
     this.reloadPlugins()
     this.rebuildAgent()
   }

@@ -196,7 +196,8 @@ export function handleSessionMessage(
       s.setCwd(msg.cwd)
       ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
       void s.captureSnapshot().catch(() => {})
-      send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: msg.cwd })
+      // Empty string means unbound; echo what the session actually stores.
+      send({ type: 'session:cwd', sessionId: msg.sessionId, cwd: s.config.cwd ?? '' })
       return
     }
     case 'session:setOrchMode': {

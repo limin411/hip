@@ -43,3 +43,17 @@ pub fn which_binaries(names: Vec<String>) -> Result<std::collections::HashMap<St
         .collect();
     Ok(find_on_path(&names, &dirs))
 }
+
+/// True when `path` exists and is a directory (project workspace roots).
+/// False when missing, not a directory, or inaccessible — never throws.
+#[tauri::command]
+pub fn path_is_dir(path: String) -> bool {
+    let p = std::path::Path::new(path.trim());
+    if p.as_os_str().is_empty() {
+        return false;
+    }
+    match std::fs::metadata(p) {
+        Ok(m) => m.is_dir(),
+        Err(_) => false,
+    }
+}

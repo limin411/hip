@@ -270,6 +270,21 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:setCwd', sessionId: 's1', cwd: '/proj' })
   })
 
+  it('clearProjectDir clears cwd and sends empty session:setCwd', () => {
+    const t = new FakeTransport()
+    useDomainStore.setState({
+      sessions: [
+        {
+          ...useDomainStore.getState().sessions[0],
+          config: { ...useDomainStore.getState().sessions[0].config, cwd: '/proj' },
+        },
+      ],
+    })
+    new SessionService(t).clearProjectDir('s1')
+    expect(useDomainStore.getState().sessions[0].config.cwd).toBeUndefined()
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setCwd', sessionId: 's1', cwd: '' })
+  })
+
   it('setSystemPrompt optimistically sets config and sends session:setSystemPrompt', () => {
     const t = new FakeTransport()
     new SessionService(t).setSystemPrompt('s1', 'Be terse')

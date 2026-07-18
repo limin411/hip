@@ -536,6 +536,7 @@ pub fn run() {
             delete_plugin,
             list_worktrees,
             path_tools::which_binaries,
+            path_tools::path_is_dir,
             pty::pty_open,
             pty::pty_write,
             pty::pty_resize,

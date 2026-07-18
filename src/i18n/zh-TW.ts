@@ -131,6 +131,12 @@ export const zhTW = {
       },
       pickFolder: '選擇專案資料夾',
       clearFolder: '純對話',
+      missingProject: {
+        title: '專案資料夾不可用',
+        desc: '資料夾已不存在或無法存取：{{path}}',
+        rebind: '重新選擇資料夾',
+        unbind: '僅保留對話',
+      },
       stop: '停止',
       copy: '複製',
       copyCode: '複製程式碼',
@@ -1042,6 +1048,11 @@ export const zhTW = {
       emptySearch: '無符合項目',
       emptySessions: '尚無會話',
       emptySpaces: '尚無知識空間',
+      projectGroup: {
+        unbound: '未綁定專案路徑',
+        missingBadge: '不可用',
+        missingTitle: '資料夾不可用：{{path}}',
+      },
       parallel: {
         group: '並行 · {{id}}',
         winner: '已選用',

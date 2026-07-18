@@ -1,13 +1,25 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronDown, ChevronRight, Code2, GitBranch, MessageSquare, Search } from 'lucide-react'
-import { sessionService, useActiveSessionId, useSessions } from '@/domain'
+import {
+  AlertTriangle,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Code2,
+  Folder,
+  GitBranch,
+  MessageSquare,
+  Search,
+} from 'lucide-react'
+import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
+import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
 import { cn } from '@/lib/utils'
 import { useWindowDrag } from '@/lib/useWindowDrag'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
+import { useProjectPathStore } from '@/store/projectPathStore'
 import {
   shortWorktreeLabel,
   slotsForHost,
@@ -98,6 +110,7 @@ export function AppSidebar() {
         (s) =>
           s.title.toLowerCase().includes(q) ||
           s.preview.toLowerCase().includes(q) ||
+          (s.config.cwd ?? '').toLowerCase().includes(q) ||
           // Match worktree branch when searching
           (runsByHost.get(s.id) ?? []).some((r) =>
             r.slots.some((sl) => sl.branch.toLowerCase().includes(q)),
@@ -106,6 +119,20 @@ export function AppSidebar() {
     }
     return list
   }, [sessions, sidebarSection, q, nestedWorktreeSessionIds, runsByHost])
+
+  /** Project sessions only: group top-level rows by workspace path. */
+  const projectSessionGroups = useMemo(() => {
+    if (sidebarSection !== 'projects') return []
+    return groupSessionsByProjectPath(filteredSessions)
+  }, [sidebarSection, filteredSessions])
+
+  const pathStatusByKey = useProjectPathStore((s) => s.byKey)
+
+  // Probe project folder existence when viewing Projects (lazy + TTL-cached).
+  useEffect(() => {
+    if (sidebarSection !== 'projects') return
+    useProjectPathStore.getState().ensureChecked(projectSessionGroups.map((g) => g.cwd ?? g.pathKey))
+  }, [sidebarSection, projectSessionGroups])
 
   const filteredSpaces = useMemo(() => {
     if (sidebarSection !== 'knowledge') return []
@@ -321,189 +348,101 @@ export function AppSidebar() {
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
             {q ? t('sidebar.emptySearch') : t('sidebar.emptySessions')}
           </p>
-        ) : (
+        ) : sidebarSection === 'projects' ? (
           <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
-            {filteredSessions.map((session) => {
-              const surface = surfaceOf(session.config)
-              const active =
-                session.id === activeSessionId &&
-                (activeView === 'chat' || activeView === 'code')
-              const surfaceLabel =
-                surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
-              const hostRuns = runsByHost.get(session.id) ?? []
-              const slots = slotsForHost(parallelRuns, session.id)
-              const parallelPaths = new Set(slots.map((s) => s.worktreePath).filter(Boolean))
-              const catalogRows = catalogMinusParallelPaths(
-                useWorktreeStore.getState().catalogForHost(session.id),
-                parallelPaths,
-              ).filter((c) => !c.isPrimary)
-              const hasWorktrees = slots.length > 0 || catalogRows.length > 0
-              const expanded = hasWorktrees && isWorktreeExpanded(session.id)
-              void catalogById // subscribe to catalog updates
-
+            {projectSessionGroups.map((group) => {
+              const groupId = group.pathKey || '__unbound'
+              const groupLabel = group.label || t('sidebar.projectGroup.unbound')
+              const groupTitle = group.cwd || t('sidebar.projectGroup.unbound')
+              const pathEntry = group.pathKey
+                ? pathStatusByKey[projectPathKey(group.pathKey)]
+                : undefined
+              const pathMissing = !!group.pathKey && pathEntry?.exists === false
+              const headerTitle = pathMissing
+                ? t('sidebar.projectGroup.missingTitle', { path: groupTitle })
+                : groupTitle
               return (
-                <li key={session.id} data-testid={`sidebar-session-group-${session.id}`}>
-                  <DeclarativeContextMenu
-                    kind="sessionHistory"
-                    payload={{
-                      sessionId: session.id,
-                      title: session.title,
-                      surface,
-                    }}
-                    className="mb-0.5 block w-full"
+                <li
+                  key={groupId}
+                  className="mb-2"
+                  data-testid={`sidebar-project-group-${groupId}`}
+                  data-path-missing={pathMissing ? 'true' : undefined}
+                >
+                  <div
+                    className="mb-0.5 flex items-center gap-1.5 px-2 py-1"
+                    title={headerTitle}
+                    data-testid={`sidebar-project-group-header-${groupId}`}
                   >
-                    <div
+                    {pathMissing ? (
+                      <AlertTriangle
+                        size={12}
+                        className="shrink-0 text-warning"
+                        aria-hidden
+                      />
+                    ) : (
+                      <Folder size={12} className="shrink-0 text-ink-tertiary" aria-hidden />
+                    )}
+                    <span
                       className={cn(
-                        'flex w-full items-center gap-0.5 rounded-lg transition-colors',
-                        active
-                          ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
-                          : 'hover:bg-state-hover',
+                        'min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide',
+                        pathMissing ? 'text-warning' : 'text-ink-tertiary',
                       )}
                     >
-                      {hasWorktrees ? (
-                        <button
-                          type="button"
-                          data-testid={`sidebar-session-expand-${session.id}`}
-                          data-no-drag
-                          aria-expanded={expanded}
-                          aria-label={
-                            expanded
-                              ? t('sidebar.parallel.collapseWorktrees')
-                              : t('sidebar.parallel.expandWorktrees')
-                          }
-                          title={
-                            expanded
-                              ? t('sidebar.parallel.collapseWorktrees')
-                              : t('sidebar.parallel.expandWorktrees')
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const next = !isWorktreeExpanded(session.id)
-                            toggleWorktree(session.id)
-                            if (next) hydrateWorktrees(session.id)
-                          }}
-                          className={cn(
-                            'ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
-                            'hover:bg-state-hover hover:text-ink',
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-                          )}
-                        >
-                          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        </button>
-                      ) : (
-                        <span className="ml-1 size-5 shrink-0" aria-hidden />
-                      )}
-                      <button
-                        type="button"
-                        data-testid={`sidebar-session-${session.id}`}
-                        // Legacy e2e gate selectors (title-bar tabs removed).
-                        data-session-tab="true"
-                        data-session-id={session.id}
-                        aria-selected={active ? 'true' : 'false'}
-                        data-no-drag
-                        aria-current={active ? 'true' : undefined}
-                        aria-label={`${session.title}, ${surfaceLabel}`}
-                        onClick={() => void selectSessionFromSidebar(session.id)}
-                        className={cn(
-                          'flex min-w-0 flex-1 items-center gap-2 py-2 pr-2.5 text-left',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
-                        )}
+                      {groupLabel}
+                    </span>
+                    {pathMissing ? (
+                      <span
+                        className="shrink-0 rounded bg-warning/15 px-1 py-px text-[10px] font-medium text-warning"
+                        data-testid={`sidebar-project-group-missing-${groupId}`}
                       >
-                        <span
-                          className={cn(
-                            'size-1.5 shrink-0 rounded-full',
-                            active ? 'bg-accent' : 'bg-transparent',
-                          )}
-                          aria-hidden
-                        />
-                        <span className="flex min-w-0 flex-1 items-center gap-1">
-                          <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
-                            {session.title}
-                          </span>
-                          {hasWorktrees ? (
-                            <span
-                              className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
-                              title={t('sidebar.parallel.slotCount', {
-                                count: slots.length + catalogRows.length,
-                              })}
-                              data-testid={`sidebar-session-wt-badge-${session.id}`}
-                            >
-                              {slots.length + catalogRows.length}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span
-                          className={cn(
-                            'shrink-0 rounded px-1 py-px text-[10px]',
-                            surface === 'code'
-                              ? 'bg-success/10 text-success'
-                              : 'bg-surface-muted text-ink-tertiary',
-                          )}
-                          aria-hidden
-                        >
-                          {surfaceLabel}
-                        </span>
-                      </button>
-                    </div>
-                  </DeclarativeContextMenu>
-
-                  {expanded ? (
-                    <ul
-                      className="relative m-0 mb-1 ml-3 list-none border-l border-border/80 py-0.5 pl-0"
-                      data-testid={`sidebar-session-worktrees-${session.id}`}
-                      aria-label={t('sidebar.parallel.worktreeTree', { title: session.title })}
-                    >
-                      {hostRuns.map((run) => (
-                        <li key={run.id} className="m-0 p-0">
-                          {hostRuns.length > 1 ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
-                              <GitBranch size={10} aria-hidden />
-                              <span className="truncate">
-                                {t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}
-                              </span>
-                            </div>
-                          ) : null}
-                          <ul className="m-0 list-none p-0">
-                            {run.slots.map((slot) => (
-                              <WorktreeSlotRow
-                                key={slot.sessionId || slot.taskId || `${run.id}-${slot.index}`}
-                                run={run}
-                                slot={slot}
-                                activeSessionId={activeSessionId}
-                                activeView={activeView}
-                              />
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                      {catalogRows.length > 0 ? (
-                        <li className="m-0 p-0">
-                          {hostRuns.length > 0 ? (
-                            <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
-                              <GitBranch size={10} aria-hidden />
-                              <span className="truncate">
-                                {t('sidebar.parallel.catalogGroup', {
-                                  defaultValue: 'Worktrees',
-                                })}
-                              </span>
-                            </div>
-                          ) : null}
-                          <ul className="m-0 list-none p-0">
-                            {catalogRows.map((row) => (
-                              <CatalogWorktreeRow
-                                key={row.id}
-                                row={row}
-                                hostSessionId={session.id}
-                              />
-                            ))}
-                          </ul>
-                        </li>
-                      ) : null}
-                    </ul>
-                  ) : null}
+                        {t('sidebar.projectGroup.missingBadge')}
+                      </span>
+                    ) : group.sessions.length > 1 ? (
+                      <span className="shrink-0 tabular-nums text-[10px] text-ink-tertiary">
+                        {group.sessions.length}
+                      </span>
+                    ) : null}
+                  </div>
+                  <ul className="m-0 list-none p-0" aria-label={groupTitle}>
+                    {group.sessions.map((session) => (
+                      <SidebarSessionRow
+                        key={session.id}
+                        session={session}
+                        activeSessionId={activeSessionId}
+                        activeView={activeView}
+                        parallelRuns={parallelRuns}
+                        runsByHost={runsByHost}
+                        worktreeExpanded={isWorktreeExpanded(session.id)}
+                        onToggleWorktree={() => {
+                          const next = !isWorktreeExpanded(session.id)
+                          toggleWorktree(session.id)
+                          if (next) hydrateWorktrees(session.id)
+                        }}
+                      />
+                    ))}
+                  </ul>
                 </li>
               )
             })}
+          </ul>
+        ) : (
+          <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
+            {filteredSessions.map((session) => (
+              <SidebarSessionRow
+                key={session.id}
+                session={session}
+                activeSessionId={activeSessionId}
+                activeView={activeView}
+                parallelRuns={parallelRuns}
+                runsByHost={runsByHost}
+                worktreeExpanded={isWorktreeExpanded(session.id)}
+                onToggleWorktree={() => {
+                  const next = !isWorktreeExpanded(session.id)
+                  toggleWorktree(session.id)
+                  if (next) hydrateWorktrees(session.id)
+                }}
+              />
+            ))}
           </ul>
         )}
       </div>
@@ -516,6 +455,197 @@ export function AppSidebar() {
         onOpenSettings={() => void openSettingsFromChrome()}
       />
     </aside>
+  )
+}
+
+function SidebarSessionRow({
+  session,
+  activeSessionId,
+  activeView,
+  parallelRuns,
+  runsByHost,
+  worktreeExpanded,
+  onToggleWorktree,
+}: {
+  session: SessionVM
+  activeSessionId: string | null
+  activeView: string
+  parallelRuns: ParallelRun[]
+  runsByHost: Map<string, ParallelRun[]>
+  worktreeExpanded: boolean
+  onToggleWorktree: () => void
+}) {
+  const { t } = useTranslation()
+  const catalogById = useWorktreeStore((s) => s.byId)
+  void catalogById // subscribe to catalog updates
+
+  const surface = surfaceOf(session.config)
+  const active =
+    session.id === activeSessionId && (activeView === 'chat' || activeView === 'code')
+  const surfaceLabel = surface === 'code' ? t('sidebar.badge.code') : t('sidebar.badge.chat')
+  const hostRuns = runsByHost.get(session.id) ?? []
+  const slots = slotsForHost(parallelRuns, session.id)
+  const parallelPaths = new Set(slots.map((s) => s.worktreePath).filter(Boolean))
+  const catalogRows = catalogMinusParallelPaths(
+    useWorktreeStore.getState().catalogForHost(session.id),
+    parallelPaths,
+  ).filter((c) => !c.isPrimary)
+  const hasWorktrees = slots.length > 0 || catalogRows.length > 0
+  const expanded = hasWorktrees && worktreeExpanded
+
+  return (
+    <li data-testid={`sidebar-session-group-${session.id}`}>
+      <DeclarativeContextMenu
+        kind="sessionHistory"
+        payload={{
+          sessionId: session.id,
+          title: session.title,
+          surface,
+        }}
+        className="mb-0.5 block w-full"
+      >
+        <div
+          className={cn(
+            'flex w-full items-center gap-0.5 rounded-lg transition-colors',
+            active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
+          )}
+        >
+          {hasWorktrees ? (
+            <button
+              type="button"
+              data-testid={`sidebar-session-expand-${session.id}`}
+              data-no-drag
+              aria-expanded={expanded}
+              aria-label={
+                expanded
+                  ? t('sidebar.parallel.collapseWorktrees')
+                  : t('sidebar.parallel.expandWorktrees')
+              }
+              title={
+                expanded
+                  ? t('sidebar.parallel.collapseWorktrees')
+                  : t('sidebar.parallel.expandWorktrees')
+              }
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleWorktree()
+              }}
+              className={cn(
+                'ml-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-tertiary',
+                'hover:bg-state-hover hover:text-ink',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
+              )}
+            >
+              {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </button>
+          ) : (
+            <span className="ml-1 size-5 shrink-0" aria-hidden />
+          )}
+          <button
+            type="button"
+            data-testid={`sidebar-session-${session.id}`}
+            // Legacy e2e gate selectors (title-bar tabs removed).
+            data-session-tab="true"
+            data-session-id={session.id}
+            aria-selected={active ? 'true' : 'false'}
+            data-no-drag
+            aria-current={active ? 'true' : undefined}
+            aria-label={`${session.title}, ${surfaceLabel}`}
+            onClick={() => void selectSessionFromSidebar(session.id)}
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2 py-2 pr-2.5 text-left',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring rounded-r-lg',
+            )}
+          >
+            <span
+              className={cn(
+                'size-1.5 shrink-0 rounded-full',
+                active ? 'bg-accent' : 'bg-transparent',
+              )}
+              aria-hidden
+            />
+            <span className="flex min-w-0 flex-1 items-center gap-1">
+              <span className="block min-w-0 truncate text-body font-medium text-ink" aria-hidden>
+                {session.title}
+              </span>
+              {hasWorktrees ? (
+                <span
+                  className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
+                  title={t('sidebar.parallel.slotCount', {
+                    count: slots.length + catalogRows.length,
+                  })}
+                  data-testid={`sidebar-session-wt-badge-${session.id}`}
+                >
+                  {slots.length + catalogRows.length}
+                </span>
+              ) : null}
+            </span>
+            <span
+              className={cn(
+                'shrink-0 rounded px-1 py-px text-[10px]',
+                surface === 'code'
+                  ? 'bg-success/10 text-success'
+                  : 'bg-surface-muted text-ink-tertiary',
+              )}
+              aria-hidden
+            >
+              {surfaceLabel}
+            </span>
+          </button>
+        </div>
+      </DeclarativeContextMenu>
+
+      {expanded ? (
+        <ul
+          className="relative m-0 mb-1 ml-3 list-none border-l border-border/80 py-0.5 pl-0"
+          data-testid={`sidebar-session-worktrees-${session.id}`}
+          aria-label={t('sidebar.parallel.worktreeTree', { title: session.title })}
+        >
+          {hostRuns.map((run) => (
+            <li key={run.id} className="m-0 p-0">
+              {hostRuns.length > 1 ? (
+                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                  <GitBranch size={10} aria-hidden />
+                  <span className="truncate">
+                    {t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}
+                  </span>
+                </div>
+              ) : null}
+              <ul className="m-0 list-none p-0">
+                {run.slots.map((slot) => (
+                  <WorktreeSlotRow
+                    key={slot.sessionId || slot.taskId || `${run.id}-${slot.index}`}
+                    run={run}
+                    slot={slot}
+                    activeSessionId={activeSessionId}
+                    activeView={activeView}
+                  />
+                ))}
+              </ul>
+            </li>
+          ))}
+          {catalogRows.length > 0 ? (
+            <li className="m-0 p-0">
+              {hostRuns.length > 0 ? (
+                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                  <GitBranch size={10} aria-hidden />
+                  <span className="truncate">
+                    {t('sidebar.parallel.catalogGroup', {
+                      defaultValue: 'Worktrees',
+                    })}
+                  </span>
+                </div>
+              ) : null}
+              <ul className="m-0 list-none p-0">
+                {catalogRows.map((row) => (
+                  <CatalogWorktreeRow key={row.id} row={row} hostSessionId={session.id} />
+                ))}
+              </ul>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+    </li>
   )
 }
 

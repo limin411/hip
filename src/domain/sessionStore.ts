@@ -376,7 +376,15 @@ export function applyServerMessage(
       return update(msg.sessionId, (s) => ({ ...s, title: msg.title }))
 
     case 'session:cwd':
-      return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, cwd: msg.cwd } }))
+      return update(msg.sessionId, (s) => {
+        const config = { ...s.config }
+        if (!msg.cwd?.trim()) {
+          delete config.cwd
+        } else {
+          config.cwd = msg.cwd
+        }
+        return { ...s, config }
+      })
 
     case 'agent:notification':
       return update(msg.sessionId, (s) => ({

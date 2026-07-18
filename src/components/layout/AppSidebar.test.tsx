@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
 import { useParallelStore } from '@/store/parallelStore'
 import { useWorktreeStore } from '@/store/worktreeStore'
+import { useProjectPathStore } from '@/store/projectPathStore'
 
 const enterKnowledge = vi.fn(async () => {})
 const openKnowledgeHome = vi.fn(async () => {})
@@ -29,6 +30,10 @@ vi.mock('./sidebarActions', () => ({
 
 vi.mock('./SidebarAccountFooter', () => ({
   SidebarAccountFooter: () => <div data-testid="sidebar-account-footer" />,
+}))
+
+vi.mock('@/ipc/pathExists', () => ({
+  isDirectory: vi.fn(async () => null),
 }))
 
 vi.mock('@/components/context-menu', () => ({
@@ -84,6 +89,7 @@ describe('AppSidebar', () => {
   afterEach(() => {
     useParallelStore.setState({ runs: [] })
     useWorktreeStore.getState().clear()
+    useProjectPathStore.setState({ byKey: {} })
     cleanup()
   })
 
@@ -273,5 +279,119 @@ describe('AppSidebar', () => {
     )
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
+  })
+
+  it('marks project group when path is missing on disk', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'code-gone',
+          title: 'Orphan task',
+          preview: 'x',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/deleted/repo' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-gone',
+    } as never)
+    useProjectPathStore.setState({
+      byKey: { '/deleted/repo': { exists: false, checkedAt: Date.now() } },
+    })
+    render(<AppSidebar />)
+    expect(screen.getByTestId('sidebar-project-group-/deleted/repo')).toHaveAttribute(
+      'data-path-missing',
+      'true',
+    )
+    expect(screen.getByTestId('sidebar-project-group-missing-/deleted/repo')).toBeInTheDocument()
+  })
+
+  it('groups project sessions by project path', () => {
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'code-hip-1',
+          title: 'Hip task A',
+          preview: 'a',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/hip' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'code-hip-2',
+          title: 'Hip task B',
+          preview: 'b',
+          updatedAtMs: Date.now() - 1000,
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/hip/' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'code-other',
+          title: 'Other repo',
+          preview: 'c',
+          updatedAtMs: Date.now() - 500,
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/Users/x/data/other' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+        {
+          id: 'code-unbound',
+          title: 'No folder',
+          preview: 'd',
+          updatedAtMs: Date.now() - 2000,
+          config: { ...DEFAULT_CONFIG, surface: 'code' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-hip-1',
+    } as never)
+
+    render(<AppSidebar />)
+
+    expect(screen.getByTestId('sidebar-project-group-/Users/x/data/hip')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-project-group-/Users/x/data/other')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-project-group-__unbound')).toBeInTheDocument()
+
+    const hipGroup = screen.getByTestId('sidebar-project-group-/Users/x/data/hip')
+    expect(hipGroup).toHaveTextContent('hip')
+    expect(hipGroup).toHaveTextContent('2')
+    expect(within(hipGroup).getByTestId('sidebar-session-code-hip-1')).toBeInTheDocument()
+    expect(within(hipGroup).getByTestId('sidebar-session-code-hip-2')).toBeInTheDocument()
+
+    const otherGroup = screen.getByTestId('sidebar-project-group-/Users/x/data/other')
+    expect(within(otherGroup).getByTestId('sidebar-session-code-other')).toBeInTheDocument()
+
+    // Chats section stays flat (no project path groups).
+    cleanup()
+    useUiStore.setState({ sidebarSection: 'chats', activeView: 'chat' })
+    useDomainStore.setState({
+      sessions: [
+        {
+          id: 'chat-1',
+          title: 'Hello chat',
+          preview: 'preview',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'chat' },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'chat-1',
+    } as never)
+    render(<AppSidebar />)
+    expect(screen.queryByTestId(/^sidebar-project-group-/)).not.toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
   })
 })

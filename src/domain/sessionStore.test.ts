@@ -693,6 +693,12 @@ describe('applyServerMessage session:cwd', () => {
     const next = applyServerMessage({ sessions: [base] }, { type: 'session:cwd', sessionId: 's1', cwd: '/proj' }, 0)
     expect(next.sessions[0].config.cwd).toBe('/proj')
   })
+
+  it('clears cwd when payload is empty', () => {
+    const base = { ...emptySession('s1'), config: { ...emptySession('s1').config, cwd: '/proj' } }
+    const next = applyServerMessage({ sessions: [base] }, { type: 'session:cwd', sessionId: 's1', cwd: '' }, 0)
+    expect(next.sessions[0].config.cwd).toBeUndefined()
+  })
 })
 
 describe('regenerateLastTurn', () => {

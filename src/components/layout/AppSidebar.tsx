@@ -324,7 +324,7 @@ export function AppSidebar() {
                         'mb-0.5 flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
                         active
-                          ? 'bg-surface shadow-[0_0_0_1px_var(--border)]'
+                          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
                           : 'hover:bg-state-hover',
                       )}
                     >
@@ -511,7 +511,9 @@ function SidebarSessionRow({
         <div
           className={cn(
             'flex w-full items-center gap-0.5 rounded-lg transition-colors',
-            active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
+            active
+              ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
+              : 'hover:bg-state-hover',
           )}
         >
           {hasWorktrees ? (
@@ -757,7 +759,9 @@ function WorktreeSlotRow({
       className={cn(
         'flex w-full items-start gap-2 rounded-lg py-1.5 pl-3 pr-2 text-left transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
-        active ? 'bg-surface shadow-[0_0_0_1px_var(--border)]' : 'hover:bg-state-hover',
+        active
+          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
+          : 'hover:bg-state-hover',
       )}
     >
       <GitBranch
@@ -839,7 +843,7 @@ function NavItem({
         'flex h-[34px] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active
-          ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--border)]'
+          ? 'relative bg-surface text-ink before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent'
           : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >

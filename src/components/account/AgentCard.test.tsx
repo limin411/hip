@@ -131,6 +131,41 @@ describe('AgentCard — grid view', () => {
     expect(sw).not.toBeDisabled()
   })
 
+  it('internal category badge uses accent identity chip', () => {
+    render(
+      <AgentCard
+        agent={internalAgent()}
+        viewMode="grid"
+        installed={{}}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const badge = screen.getByText('Internal')
+    expect(badge).toHaveClass('bg-accent/10')
+    expect(badge).toHaveClass('text-accent')
+    expect(badge).not.toHaveClass('bg-accent-subtle')
+  })
+
+  it('ACP category badge stays neutral default', () => {
+    render(
+      <AgentCard
+        agent={acpAgent()}
+        viewMode="grid"
+        installed={{ opencode: true }}
+        detectionChecked
+        onToggle={() => {}}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />,
+    )
+    const badge = screen.getByText('ACP agent')
+    expect(badge).toHaveClass('bg-surface-muted')
+    expect(badge).not.toHaveClass('bg-accent/10')
+  })
+
   it('does not force off before detection has run', () => {
     render(
       <AgentCard

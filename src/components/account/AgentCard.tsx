@@ -63,12 +63,8 @@ export function AgentCard({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-body font-medium text-ink">{agent.name}</div>
                 <Badge
-                  className={cn(
-                    'mt-1',
-                    cat === 'internal'
-                      ? 'bg-accent-subtle text-accent-strong'
-                      : 'bg-surface-muted text-ink-tertiary',
-                  )}
+                  variant={cat === 'internal' ? 'accent' : 'default'}
+                  className="mt-1"
                 >
                   {catLabel}
                 </Badge>
@@ -127,7 +123,7 @@ export function AgentCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-body font-medium text-ink">{agent.name}</span>
-              <Badge className={cat === 'internal' ? 'bg-accent-subtle text-accent-strong' : undefined}>{catLabel}</Badge>
+              <Badge variant={cat === 'internal' ? 'accent' : 'default'}>{catLabel}</Badge>
 
               {cat === 'internal' && (
                 <Badge>

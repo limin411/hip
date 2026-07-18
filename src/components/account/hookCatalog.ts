@@ -52,7 +52,41 @@ export function pathNoteKey(event: HookEvent): string {
   return HOOK_EVENT_PATH_NOTE_KEYS[event]
 }
 
-export type LifecyclePhaseId = 'session' | 'turn' | 'turnEnd' | 'activity'
+export type LifecyclePhaseId = 'session' | 'turn' | 'tool' | 'turnEnd' | 'activity'
+
+/** Lifecycle phases for list grouping (order matches agent loop). */
+export const HOOK_EVENT_PHASES: ReadonlyArray<{
+  id: LifecyclePhaseId
+  /** i18n key under settings.hooks.diagram.* */
+  labelKey: string
+  events: readonly HookEvent[]
+}> = [
+  {
+    id: 'session',
+    labelKey: 'settings.hooks.diagram.phaseSession',
+    events: ['SessionStart'],
+  },
+  {
+    id: 'turn',
+    labelKey: 'settings.hooks.diagram.phaseTurn',
+    events: ['UserPromptSubmit', 'TurnStart'],
+  },
+  {
+    id: 'tool',
+    labelKey: 'settings.hooks.diagram.toolLoop',
+    events: ['PreToolUse', 'PermissionRequest', 'PostToolUse', 'PostToolUseFailure'],
+  },
+  {
+    id: 'turnEnd',
+    labelKey: 'settings.hooks.diagram.phaseTurnEnd',
+    events: ['Stop', 'TurnComplete'],
+  },
+  {
+    id: 'activity',
+    labelKey: 'settings.hooks.diagram.phaseActivity',
+    events: ['ActivityStart', 'ActivityBudgetRequest', 'ActivityEnd'],
+  },
+]
 
 const CATALOG_SET = new Set<string>(HOOK_EVENT_CATALOG)
 

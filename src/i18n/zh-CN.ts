@@ -903,18 +903,18 @@ export const zhCN = {
         title: '挂钩配置',
         intro: '查看插件声明的生命周期挂钩与可挂接事件。本页只读，修改请编辑本地配置文件。',
         introShort:
-          '只读概览：展示插件声明的生命周期事件（静态扫描，非当前会话探针）。工具类挂钩生效于主循环、task 子智能体与工作流 agent 节点；不含 gate 与外部 ACP 会话。点击节点查看来源与路径说明；修改请编辑插件 hooks 文件。',
+          '只读概览：展示插件声明的生命周期事件（静态扫描，非当前会话探针）。工具类挂钩生效于主循环、task 子智能体与工作流 agent 节点；不含 gate 与外部 ACP 会话。展开行查看来源与路径说明；修改请编辑插件 hooks 文件。',
         pluginManagedHint:
           '插件挂钩无法在此删除。要移除请在「插件市场」卸载整个插件。',
         editHint:
           '挂钩通过插件清单（plugin.json 的 hooks 字段）声明，handler 写在插件目录下的 CJS 模块中。安装或更新插件后，在此刷新可见。',
         loading: '正在加载…',
         configuredTitle: '已声明的挂钩',
-        configuredDesc: '当前已安装插件中声明了挂钩的来源；流程图中高亮的事件来自对这些文件的静态扫描（非当前会话 live 注册表）。',
+        configuredDesc: '当前已安装插件中声明了挂钩的来源；列表中高亮的事件来自对这些文件的静态扫描（非当前会话 live 注册表）。',
         configuredSummary: '{{sources}} 个插件 · {{count}} 条',
         eventsOn: '{{count}} 个事件已声明',
         configuredEmpty: '尚未声明任何挂钩',
-        configuredEmptyHint: '尚未声明挂钩。在插件中声明 hooks 后会出现在图上。',
+        configuredEmptyHint: '尚未声明挂钩。在插件中声明 hooks 后会出现在列表中。',
         sourcePlugin: '插件',
         hookCount: '{{count}} 个挂钩',
         catalogTitle: '生命周期挂钩事件',
@@ -924,12 +924,12 @@ export const zhCN = {
         howToStep2: '在对应 CJS 模块中导出数组：每项含 event、可选 matcher、以及 async handler。',
         howToStep3: '重新安装或刷新插件后重启会话，挂钩会在 sidecar 中注册；本页只展示声明计数与扫描到的事件名。',
         diagram: {
-          title: '生命周期流程图',
+          title: '生命周期事件',
           subtitle: '挂钩按会话 → 轮次 → 工具调用 → 收尾的顺序触发；高亮表示已在插件中声明（静态扫描）。',
           subtitleFishbone:
-            '鱼骨图：主脊为会话阶段，肋骨为 hook 事件。高亮 = 插件声明。点击节点查看来源与路径说明。',
-          clickHint: '点击节点展开',
-          ariaLabel: '挂钩生命周期流程图，其中 {{count}} 个事件已声明',
+            '按生命周期阶段列表展示。高亮 = 插件声明。展开行查看来源与路径说明。',
+          clickHint: '点击行展开',
+          ariaLabel: '挂钩生命周期列表，其中 {{count}} 个事件已声明',
           legendConfigured: '已声明',
           legendAvailable: '未声明',
           configuredBadge: '已声明',

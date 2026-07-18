@@ -2,11 +2,11 @@
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
-import React from 'react'
 import type { PluginMeta } from '@hip/protocol'
 import {
   HOOK_EVENT_CATALOG,
   HOOK_EVENT_PATH_NOTE_KEYS,
+  HOOK_EVENT_PHASES,
   configuredHookEvents,
   pluginsWithHooks,
   sourcesByHookEvent,
@@ -35,46 +35,6 @@ vi.mock('@/store/pluginsStore', () => ({
     load,
   }),
 }))
-
-vi.mock('@xyflow/react', () => ({
-  ReactFlowProvider: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'rf-provider' }, children),
-  ReactFlow: ({
-    nodes,
-    onNodeClick,
-    nodeTypes,
-    children,
-  }: {
-    nodes: Array<{ id: string; data: Record<string, unknown>; type: string }>
-    onNodeClick?: (_e: unknown, node: { id: string; data: Record<string, unknown> }) => void
-    nodeTypes?: Record<string, React.ComponentType<{ data: Record<string, unknown> }>>
-    children?: React.ReactNode
-  }) =>
-    React.createElement(
-      'div',
-      { 'data-testid': 'react-flow' },
-      ...nodes.map((node) => {
-        const Comp = nodeTypes?.[node.type]
-        return React.createElement(
-          'div',
-          {
-            key: node.id,
-            'data-testid': `rf-node-${node.id}`,
-            onClick: () => onNodeClick?.(null, { id: node.id, data: node.data }),
-          },
-          Comp ? React.createElement(Comp, { data: node.data }) : node.id,
-        )
-      }),
-      children,
-    ),
-  Background: () => React.createElement('div', { 'data-testid': 'rf-background' }),
-  BackgroundVariant: { Dots: 'dots', Lines: 'lines', Cross: 'cross' },
-  Controls: () => React.createElement('div', { 'data-testid': 'rf-controls' }),
-  Handle: () => React.createElement('div', { 'data-testid': 'rf-handle' }),
-  Position: { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' },
-}))
-
-vi.mock('./HookLifecycleDiagram.css', () => ({ default: {} }))
 
 import { HookConfig } from './HookConfig'
 
@@ -109,6 +69,15 @@ describe('hookCatalog helpers', () => {
     }
   })
 
+  it('groups all catalog events into phases without duplicates', () => {
+    const flat = HOOK_EVENT_PHASES.flatMap((p) => [...p.events])
+    expect(flat).toHaveLength(HOOK_EVENT_CATALOG.length)
+    expect(new Set(flat).size).toBe(HOOK_EVENT_CATALOG.length)
+    for (const event of HOOK_EVENT_CATALOG) {
+      expect(flat).toContain(event)
+    }
+  })
+
   it('filters plugins and aggregates sources', () => {
     const list = [
       plugin({ id: 'a', name: 'A', hookCount: 0 }),
@@ -132,7 +101,7 @@ describe('hookCatalog helpers', () => {
   })
 })
 
-describe('HookConfig (compact page)', () => {
+describe('HookConfig (list page)', () => {
   beforeEach(() => {
     mockPlugins = []
     mockLoaded = true
@@ -143,16 +112,19 @@ describe('HookConfig (compact page)', () => {
     cleanup()
   })
 
-  it('renders title + fishbone only (no catalog / how-to clutter)', () => {
+  it('renders title + phased list only (no catalog / how-to clutter)', () => {
     render(<HookConfig />)
     expect(screen.getByTestId('settings-hooks-page')).toBeInTheDocument()
-    expect(screen.getByTestId('hook-lifecycle-diagram')).toBeInTheDocument()
-    expect(screen.getByTestId('react-flow')).toBeInTheDocument()
-    expect(screen.getByTestId('hook-diagram-path-chips')).toBeInTheDocument()
-    expect(screen.getByTestId('hook-diagram-scan-hint')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-event-list')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-list-path-chips')).toBeInTheDocument()
+    expect(screen.getByTestId('hook-list-scan-hint')).toBeInTheDocument()
     expect(screen.queryByTestId('hooks-howto-heading')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('hook-lifecycle-diagram')).not.toBeInTheDocument()
     for (const event of HOOK_EVENT_CATALOG) {
-      expect(screen.getByTestId(`hook-diagram-node-${event}`)).toBeInTheDocument()
+      expect(screen.getByTestId(`hook-list-row-${event}`)).toBeInTheDocument()
+    }
+    for (const phase of HOOK_EVENT_PHASES) {
+      expect(screen.getByTestId(`hook-phase-${phase.id}`)).toBeInTheDocument()
     }
   })
 
@@ -163,7 +135,7 @@ describe('HookConfig (compact page)', () => {
     expect(screen.queryByTestId('hook-source-plain')).not.toBeInTheDocument()
   })
 
-  it('shows summary and expand panel with path note on node click', () => {
+  it('shows summary and expand panel with path note on row click', () => {
     mockPlugins = [
       plugin({
         id: 'guard',
@@ -175,19 +147,20 @@ describe('HookConfig (compact page)', () => {
     ]
     render(<HookConfig />)
     expect(screen.getByTestId('hooks-summary')).toBeInTheDocument()
-    expect(screen.getByTestId('hook-diagram-node-PreToolUse')).toHaveAttribute('data-configured', 'true')
+    expect(screen.getByTestId('hook-list-row-PreToolUse')).toHaveAttribute('data-configured', 'true')
 
-    fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
-    expect(screen.getByTestId('hook-diagram-expand-panel')).toHaveTextContent('Guard Plugin')
-    expect(screen.getByTestId('hook-diagram-path-note')).toHaveTextContent(
+    fireEvent.click(screen.getByTestId('hook-list-toggle-PreToolUse'))
+    expect(screen.getByTestId('hook-list-expand-panel')).toHaveTextContent('Guard Plugin')
+    expect(screen.getByTestId('hook-list-path-note')).toHaveTextContent(
       'settings.hooks.events.pathNotes.PreToolUse',
     )
+    expect(screen.getByTestId('hook-list-source-guard')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('rf-node-event-PreToolUse'))
-    expect(screen.queryByTestId('hook-diagram-expand-panel')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('hook-list-toggle-PreToolUse'))
+    expect(screen.queryByTestId('hook-list-expand-panel')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('rf-node-event-PermissionRequest'))
-    expect(screen.getByTestId('hook-diagram-path-note')).toHaveTextContent(
+    fireEvent.click(screen.getByTestId('hook-list-toggle-PermissionRequest'))
+    expect(screen.getByTestId('hook-list-path-note')).toHaveTextContent(
       'settings.hooks.events.pathNotes.PermissionRequest',
     )
   })

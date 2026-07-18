@@ -903,18 +903,18 @@ export const zhTW = {
         title: '掛鉤設定',
         intro: '檢視外掛宣告的生命週期掛鉤與可掛接事件。本頁唯讀，修改請編輯本機設定檔。',
         introShort:
-          '唯讀概覽：展示外掛宣告的生命週期事件（靜態掃描，非目前工作階段探測）。工具類掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點；不含 gate 與外部 ACP 工作階段。點擊節點查看來源與路徑說明；修改請編輯外掛 hooks 檔案。',
+          '唯讀概覽：展示外掛宣告的生命週期事件（靜態掃描，非目前工作階段探測）。工具類掛鉤生效於主迴圈、task 子智能體與工作流 agent 節點；不含 gate 與外部 ACP 工作階段。展開列查看來源與路徑說明；修改請編輯外掛 hooks 檔案。',
         pluginManagedHint:
           '外掛掛鉤無法在此刪除。要移除請在「外掛市集」卸載整個外掛。',
         editHint:
           '掛鉤由外掛清單（plugin.json 的 hooks 欄位）宣告，handler 寫在外掛目錄下的 CJS 模組。安裝或更新外掛後可在此查看宣告計數。',
         loading: '載入中…',
         configuredTitle: '已宣告的掛鉤',
-        configuredDesc: '目前已安裝外掛中宣告了掛鉤的來源；流程圖中反白的事件來自對這些檔案的靜態掃描（非目前工作階段 live 註冊表）。',
+        configuredDesc: '目前已安裝外掛中宣告了掛鉤的來源；列表中反白的事件來自對這些檔案的靜態掃描（非目前工作階段 live 註冊表）。',
         configuredSummary: '{{sources}} 個外掛 · {{count}} 條',
         eventsOn: '{{count}} 個事件已宣告',
         configuredEmpty: '尚未宣告任何掛鉤',
-        configuredEmptyHint: '尚未宣告掛鉤。在外掛中宣告 hooks 後會顯示於圖上。',
+        configuredEmptyHint: '尚未宣告掛鉤。在外掛中宣告 hooks 後會顯示於列表中。',
         sourcePlugin: '外掛',
         hookCount: '{{count}} 個掛鉤',
         catalogTitle: '生命週期掛鉤事件',
@@ -924,12 +924,12 @@ export const zhTW = {
         howToStep2: '在對應 CJS 模組匯出陣列：每項含 event、可選 matcher，以及 async handler。',
         howToStep3: '重新安裝或重新整理外掛後重啟工作階段，掛鉤會在 sidecar 註冊；本頁顯示宣告計數與掃描到的事件名。',
         diagram: {
-          title: '生命週期流程圖',
+          title: '生命週期事件',
           subtitle: '掛鉤依工作階段 → 輪次 → 工具呼叫 → 收尾順序觸發；反白表示已在外掛中宣告（靜態掃描）。',
           subtitleFishbone:
-            '魚骨圖：主脊為工作階段時間線，肋骨為 hook 事件。反白 = 外掛宣告。點擊節點查看來源與路徑說明。',
-          clickHint: '點擊節點展開',
-          ariaLabel: '掛鉤生命週期流程圖，其中 {{count}} 個事件已宣告',
+            '依生命週期階段列表展示。反白 = 外掛宣告。展開列查看來源與路徑說明。',
+          clickHint: '點擊列展開',
+          ariaLabel: '掛鉤生命週期列表，其中 {{count}} 個事件已宣告',
           legendConfigured: '已宣告',
           legendAvailable: '未宣告',
           configuredBadge: '已宣告',

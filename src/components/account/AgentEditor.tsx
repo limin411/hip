@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Plug, Terminal } from 'lucide-react'
+import { ArrowLeft, Plug, Terminal, Search, Sparkles, Wrench } from 'lucide-react'
 import type { AgentConfig } from '@hip/protocol'
 import { useProvidersStore } from '@/store/providersStore'
 import { Modal } from '@/components/ui/Modal'
@@ -92,6 +92,17 @@ export function AgentEditor({
     setForm((f) => ({ ...f, allowedSkills: on ? [...f.allowedSkills, id] : f.allowedSkills.filter((x) => x !== id) }))
   const toggleMcpServer = (id: string, on: boolean) =>
     setForm((f) => ({ ...f, allowedMcpServers: on ? [...f.allowedMcpServers, id] : f.allowedMcpServers.filter((x) => x !== id) }))
+  const setSkills = (ids: string[]) => setForm((f) => ({ ...f, allowedSkills: ids }))
+  const setMcpServers = (ids: string[]) => setForm((f) => ({ ...f, allowedMcpServers: ids }))
+
+  const skillItems = useMemo(
+    () => skills.map((s) => ({ id: s.id, label: s.name, desc: s.description })),
+    [skills],
+  )
+  const mcpItems = useMemo(
+    () => mcpServers.map((s) => ({ id: s.id, label: s.name, desc: s.id })),
+    [mcpServers],
+  )
 
   const pickPreset = (preset: AcpPreset) => {
     patch({
@@ -117,215 +128,193 @@ export function AgentEditor({
     }
   }
 
-  const body = (
-    <div className="flex flex-col">
-      {isPickStep ? (
-        <>
-          <div className="p-5 sm:p-6">
-            <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
+  const formBody = (
+    <div className="space-y-5 p-5 sm:p-6">
+      {isNewAcp && (
+        <button
+          type="button"
+          onClick={() => setAcpStep('pick')}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5',
+            'text-meta font-medium text-accent-strong transition-colors',
+            'hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+          )}
+        >
+          <ArrowLeft size={14} />
+          {t('settings.agents.backToProviders')}
+        </button>
+      )}
+
+      {isNewAcp && selectedPreset && (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-subtle/80 px-3.5 py-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
+            <Terminal size={16} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-body font-semibold text-ink">{selectedPreset.name}</span>
+              {adapterPkg && (
+                <Badge size="sm">
+                  <Plug size={10} />
+                  {adapterPkg}
+                </Badge>
+              )}
+            </div>
+            <div className="mt-0.5 truncate font-mono text-caption text-ink-tertiary">
+              {selectedPreset.command}
+              {selectedPreset.args.length > 0 ? ` ${selectedPreset.args.join(' ')}` : ''}
+            </div>
           </div>
-          <div className="flex items-center justify-end gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-            <Button variant="ghost" size="sm" onClick={onCancel}>
-              {t('settings.agents.cancel')}
-            </Button>
+        </div>
+      )}
+
+      <Field label={t('settings.agents.name')}>
+        <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
+      </Field>
+
+      <Field label={t('settings.agents.description')}>
+        <textarea
+          className={cn(inputCls, 'min-h-[56px] resize-y')}
+          value={form.description ?? ''}
+          onChange={(e) => patch({ description: e.target.value })}
+          placeholder={t('settings.agents.descriptionPlaceholder')}
+          rows={2}
+        />
+      </Field>
+
+      {isInternal ? (
+        <>
+          <Field label={t('settings.agents.prompt')}>
+            <textarea
+              className={cn(inputCls, 'min-h-[100px] resize-y font-mono')}
+              value={form.prompt}
+              onChange={(e) => patch({ prompt: e.target.value })}
+              placeholder={t('settings.agents.promptPlaceholder')}
+              rows={5}
+            />
+          </Field>
+
+          <Section label={t('settings.agents.sectionModel')}>
+            <select className={inputCls} value={form.boundModelKey} onChange={(e) => patch({ boundModelKey: e.target.value })}>
+              <option value="">{t('settings.agents.modelGlobal')}</option>
+              {groups.map((g) => (
+                <optgroup key={g.providerID} label={g.providerName}>
+                  {g.models.map((m) => (
+                    <option key={m.key} value={m.key}>{m.modelID}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </Section>
+
+          {/* Side-by-side grant panels with independent scroll — keeps identity fields above the fold. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+            <GrantPanel
+              icon={<Sparkles size={14} />}
+              title={t('settings.agents.toolSkillsSection')}
+              description={t('settings.agents.toolSkillsSectionDesc')}
+              emptyLabel={t('settings.agents.toolSkillsEmpty')}
+              items={skillItems}
+              selected={form.allowedSkills}
+              onToggle={toggleSkill}
+              onSetSelected={setSkills}
+            />
+            <GrantPanel
+              icon={<Wrench size={14} />}
+              title={t('settings.agents.toolMcpServers')}
+              description={t('settings.agents.toolMcpServersDesc')}
+              emptyLabel={t('settings.agents.toolMcpServersEmpty')}
+              items={mcpItems}
+              selected={form.allowedMcpServers}
+              onToggle={toggleMcpServer}
+              onSetSelected={setMcpServers}
+            />
           </div>
         </>
       ) : (
         <>
-          <div className="space-y-5 p-5 sm:p-6">
-            {isNewAcp && (
-              <button
-                type="button"
-                onClick={() => setAcpStep('pick')}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 -ml-1.5',
-                  'text-meta font-medium text-accent-strong transition-colors',
-                  'hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
-                )}
-              >
-                <ArrowLeft size={14} />
-                {t('settings.agents.backToProviders')}
-              </button>
-            )}
-
-            {isNewAcp && selectedPreset && (
-              <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-subtle/80 px-3.5 py-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-subtle text-accent-strong">
-                  <Terminal size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-body font-semibold text-ink">{selectedPreset.name}</span>
-                    {adapterPkg && (
-                      <Badge size="sm">
-                        <Plug size={10} />
-                        {adapterPkg}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="mt-0.5 truncate font-mono text-caption text-ink-tertiary">
-                    {selectedPreset.command}
-                    {selectedPreset.args.length > 0 ? ` ${selectedPreset.args.join(' ')}` : ''}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <Field label={t('settings.agents.name')}>
-              <input className={inputCls} value={form.name} onChange={(e) => patch({ name: e.target.value })} placeholder="My Agent" />
-            </Field>
-
-            <Field label={t('settings.agents.description')}>
-              <textarea
-                className={cn(inputCls, 'min-h-[64px] resize-y')}
-                value={form.description ?? ''}
-                onChange={(e) => patch({ description: e.target.value })}
-                placeholder={t('settings.agents.descriptionPlaceholder')}
-                rows={3}
+          <Section label={t('settings.agents.sectionCommand')}>
+            <Field label={t('settings.agents.command')}>
+              <input
+                className={cn(inputCls, 'font-mono')}
+                value={form.command}
+                onChange={(e) => patch({ command: e.target.value })}
+                placeholder="/usr/local/bin/my-agent"
               />
             </Field>
-
-            {isInternal ? (
-              <>
-                <Field label={t('settings.agents.prompt')}>
-                  <textarea
-                    className={cn(inputCls, 'min-h-[140px] resize-y font-mono')}
-                    value={form.prompt}
-                    onChange={(e) => patch({ prompt: e.target.value })}
-                    placeholder={t('settings.agents.promptPlaceholder')}
-                    rows={7}
-                  />
-                </Field>
-
-                <Section label={t('settings.agents.sectionModel')}>
-                  <select className={inputCls} value={form.boundModelKey} onChange={(e) => patch({ boundModelKey: e.target.value })}>
-                    <option value="">{t('settings.agents.modelGlobal')}</option>
-                    {groups.map((g) => (
-                      <optgroup key={g.providerID} label={g.providerName}>
-                        {g.models.map((m) => (
-                          <option key={m.key} value={m.key}>{m.modelID}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </Section>
-
-                <Section label={t('settings.agents.toolSkillsSection')}>
-                  <div className="text-caption text-ink-tertiary">{t('settings.agents.toolSkillsSectionDesc')}</div>
-                  {skills.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                      {t('settings.agents.toolSkillsEmpty')}
-                    </div>
-                  ) : (
-                    skills.map((s) => (
-                      <ToolToggle
-                        key={s.id}
-                        label={s.name}
-                        desc={s.description}
-                        checked={form.allowedSkills.includes(s.id)}
-                        onChange={(v) => toggleSkill(s.id, v)}
-                      />
-                    ))
-                  )}
-                </Section>
-
-                <Section label={t('settings.agents.toolMcpServers')}>
-                  <div className="text-caption text-ink-tertiary">{t('settings.agents.toolMcpServersDesc')}</div>
-                  {mcpServers.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border px-3 py-2.5 text-caption text-ink-tertiary">
-                      {t('settings.agents.toolMcpServersEmpty')}
-                    </div>
-                  ) : (
-                    mcpServers.map((s) => (
-                      <ToolToggle
-                        key={s.id}
-                        label={s.name}
-                        desc={s.id}
-                        checked={form.allowedMcpServers.includes(s.id)}
-                        onChange={(v) => toggleMcpServer(s.id, v)}
-                      />
-                    ))
-                  )}
-                </Section>
-              </>
-            ) : (
-              <>
-                <Section label={t('settings.agents.sectionCommand')}>
-                  <Field label={t('settings.agents.command')}>
-                    <input
-                      className={cn(inputCls, 'font-mono')}
-                      value={form.command}
-                      onChange={(e) => patch({ command: e.target.value })}
-                      placeholder="/usr/local/bin/my-agent"
-                    />
-                  </Field>
-                  <Field label={t('settings.agents.args')}>
-                    <input
-                      className={cn(inputCls, 'font-mono')}
-                      value={form.args}
-                      onChange={(e) => patch({ args: e.target.value })}
-                      placeholder="--loop --json"
-                    />
-                  </Field>
-                </Section>
-
-                {adapterPkg && (
-                  <div className="flex gap-2.5 rounded-xl border border-border bg-surface-subtle/60 px-3.5 py-2.5">
-                    <Plug size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
-                    <p className="text-caption leading-relaxed text-ink-secondary">
-                      {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
-                    </p>
-                  </div>
-                )}
-
-                {isAcp && (
-                  <Field label={t('settings.agents.quirks')}>
-                    <input
-                      className={cn(inputCls, 'font-mono')}
-                      value={form.quirks ?? ''}
-                      onChange={(e) => patch({ quirks: e.target.value || undefined })}
-                      placeholder={t('settings.agents.quirksPlaceholder')}
-                    />
-                  </Field>
-                )}
-
-                {isAcp && form.authEnvVar && (
-                  <Field label={t('settings.agents.apiKey')}>
-                    <input
-                      className={cn(inputCls, 'font-mono')}
-                      type="password"
-                      value={form.apiKey ?? ''}
-                      onChange={(e) => patch({ apiKey: e.target.value })}
-                      placeholder={form.authEnvVar}
-                    />
-                    <div className="mt-1 text-caption text-ink-tertiary">{t('settings.agents.apiKeyHint', { env: form.authEnvVar })}</div>
-                  </Field>
-                )}
-
-              </>
-            )}
-
-            {error && <div className="text-meta text-danger">{error}</div>}
-          </div>
-
-          <div className="flex items-center gap-2 border-t border-border bg-surface-subtle px-5 py-3">
-            <div className="flex flex-1 items-center gap-2">
-              <Switch
-                checked={form.enabled}
-                onCheckedChange={(v) => patch({ enabled: v })}
-                ariaLabel={t('settings.agents.enableThis')}
+            <Field label={t('settings.agents.args')}>
+              <input
+                className={cn(inputCls, 'font-mono')}
+                value={form.args}
+                onChange={(e) => patch({ args: e.target.value })}
+                placeholder="--loop --json"
               />
-              <span className="text-body text-ink-secondary">{t('settings.agents.enableThis')}</span>
+            </Field>
+          </Section>
+
+          {adapterPkg && (
+            <div className="flex gap-2.5 rounded-xl border border-border bg-surface-subtle/60 px-3.5 py-2.5">
+              <Plug size={14} className="mt-0.5 shrink-0 text-ink-tertiary" />
+              <p className="text-caption leading-relaxed text-ink-secondary">
+                {t('settings.agents.acpAdapterNote', { pkg: adapterPkg })}
+              </p>
             </div>
-            <Button variant="ghost" size="sm" onClick={onCancel}>
-              {t('settings.agents.cancel')}
-            </Button>
-            <Button variant="primary" size="sm" disabled={busy || !isAgentDraftValid(form)} onClick={() => void submit()}>
-              {t('settings.agents.save')}
-            </Button>
-          </div>
+          )}
+
+          {isAcp && (
+            <Field label={t('settings.agents.quirks')}>
+              <input
+                className={cn(inputCls, 'font-mono')}
+                value={form.quirks ?? ''}
+                onChange={(e) => patch({ quirks: e.target.value || undefined })}
+                placeholder={t('settings.agents.quirksPlaceholder')}
+              />
+            </Field>
+          )}
+
+          {isAcp && form.authEnvVar && (
+            <Field label={t('settings.agents.apiKey')}>
+              <input
+                className={cn(inputCls, 'font-mono')}
+                type="password"
+                value={form.apiKey ?? ''}
+                onChange={(e) => patch({ apiKey: e.target.value })}
+                placeholder={form.authEnvVar}
+              />
+              <div className="mt-1 text-caption text-ink-tertiary">{t('settings.agents.apiKeyHint', { env: form.authEnvVar })}</div>
+            </Field>
+          )}
         </>
       )}
+
+      {error && <div className="text-meta text-danger">{error}</div>}
+    </div>
+  )
+
+  const formFooter = (
+    <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center gap-2">
+        <Switch
+          checked={form.enabled}
+          onCheckedChange={(v) => patch({ enabled: v })}
+          ariaLabel={t('settings.agents.enableThis')}
+        />
+        <span className="text-body text-ink-secondary">{t('settings.agents.enableThis')}</span>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        {t('settings.agents.cancel')}
+      </Button>
+      <Button variant="primary" size="sm" disabled={busy || !isAgentDraftValid(form)} onClick={() => void submit()}>
+        {t('settings.agents.save')}
+      </Button>
+    </div>
+  )
+
+  const pickFooter = (
+    <div className="flex items-center justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        {t('settings.agents.cancel')}
+      </Button>
     </div>
   )
 
@@ -336,9 +325,16 @@ export function AgentEditor({
         if (!o) onCancel()
       }}
       title={title}
-      className={isPickStep ? 'max-w-2xl' : undefined}
+      className={isPickStep || isInternal ? 'max-w-2xl' : undefined}
+      footer={isPickStep ? pickFooter : formFooter}
     >
-      {body}
+      {isPickStep ? (
+        <div className="p-5 sm:p-6">
+          <AcpProviderPicker checked={detectionChecked} installed={installed} agents={agents} onPick={pickPreset} onRefresh={() => void refreshDetection()} />
+        </div>
+      ) : (
+        formBody
+      )}
     </Modal>
   )
 }
@@ -361,14 +357,148 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-function ToolToggle({ label, desc, checked, onChange }: { label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
+type GrantItem = { id: string; label: string; desc: string }
+
+/** Compact, independently-scrollable multi-select for skills / MCP grants. */
+function GrantPanel({
+  icon,
+  title,
+  description,
+  emptyLabel,
+  items,
+  selected,
+  onToggle,
+  onSetSelected,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  emptyLabel: string
+  items: GrantItem[]
+  selected: string[]
+  onToggle: (id: string, on: boolean) => void
+  onSetSelected: (ids: string[]) => void
+}) {
+  const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const selectedSet = useMemo(() => new Set(selected), [selected])
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return items
+    return items.filter(
+      (it) => it.label.toLowerCase().includes(q) || it.desc.toLowerCase().includes(q) || it.id.toLowerCase().includes(q),
+    )
+  }, [items, query])
+
+  const showSearch = items.length > 6
+  const allFilteredSelected = filtered.length > 0 && filtered.every((it) => selectedSet.has(it.id))
+  const noneFilteredSelected = filtered.every((it) => !selectedSet.has(it.id))
+
+  const selectFiltered = () => {
+    const next = new Set(selected)
+    for (const it of filtered) next.add(it.id)
+    onSetSelected([...next])
+  }
+  const clearFiltered = () => {
+    const drop = new Set(filtered.map((it) => it.id))
+    onSetSelected(selected.filter((id) => !drop.has(id)))
+  }
+
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
-      <div className="flex-1">
-        <div className="text-body text-ink">{label}</div>
-        <div className="mt-0.5 font-mono text-caption text-ink-tertiary">{desc}</div>
+    <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="shrink-0 space-y-2 border-b border-border bg-surface-subtle/50 px-3 py-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-body font-semibold text-ink">
+              <span className="text-ink-tertiary">{icon}</span>
+              {title}
+            </div>
+            <p className="mt-0.5 text-caption leading-snug text-ink-tertiary">{description}</p>
+          </div>
+          {items.length > 0 && (
+            <Badge size="sm" className="shrink-0 tabular-nums">
+              {t('settings.agents.toolGrantSelected', { selected: selected.length, total: items.length })}
+            </Badge>
+          )}
+        </div>
+
+        {items.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {showSearch && (
+              <div className="relative min-w-0 flex-1">
+                <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t('settings.agents.toolGrantSearch')}
+                  className={cn(
+                    'h-7 w-full rounded-md border border-border bg-surface pl-7 pr-2 text-caption text-ink',
+                    'placeholder:text-ink-tertiary focus:outline-none focus:ring-2 focus:ring-accent/50',
+                  )}
+                />
+              </div>
+            )}
+            <div className={cn('flex shrink-0 items-center gap-0.5', !showSearch && 'ml-auto')}>
+              <button
+                type="button"
+                disabled={allFilteredSelected || filtered.length === 0}
+                onClick={selectFiltered}
+                className={cn(
+                  'rounded-md px-1.5 py-1 text-caption font-medium text-accent-strong transition-colors',
+                  'hover:bg-accent-subtle disabled:pointer-events-none disabled:opacity-40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                )}
+              >
+                {t('settings.agents.toolGrantSelectAll')}
+              </button>
+              <span className="text-ink-tertiary/50">·</span>
+              <button
+                type="button"
+                disabled={noneFilteredSelected}
+                onClick={clearFiltered}
+                className={cn(
+                  'rounded-md px-1.5 py-1 text-caption font-medium text-ink-secondary transition-colors',
+                  'hover:bg-state-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60',
+                )}
+              >
+                {t('settings.agents.toolGrantClear')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-      <Switch checked={checked} onCheckedChange={onChange} ariaLabel={label} />
+
+      {items.length === 0 ? (
+        <div className="px-3 py-6 text-center text-caption text-ink-tertiary">{emptyLabel}</div>
+      ) : filtered.length === 0 ? (
+        <div className="px-3 py-6 text-center text-caption text-ink-tertiary">{t('settings.agents.toolGrantNoMatch')}</div>
+      ) : (
+        <div className="max-h-52 divide-y divide-border overflow-y-auto overscroll-contain sm:max-h-60">
+          {filtered.map((it) => {
+            const checked = selectedSet.has(it.id)
+            return (
+              <div
+                key={it.id}
+                className={cn(
+                  'flex items-center gap-2.5 px-3 py-2 transition-colors',
+                  checked ? 'bg-accent-subtle/40' : 'hover:bg-state-hover',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-body text-ink">{it.label}</div>
+                  {it.desc && it.desc !== it.label && (
+                    <div className="truncate text-caption text-ink-tertiary" title={it.desc}>
+                      {it.desc}
+                    </div>
+                  )}
+                </div>
+                <Switch checked={checked} onCheckedChange={(v) => onToggle(it.id, v)} ariaLabel={it.label} />
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

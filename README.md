@@ -1,17 +1,22 @@
 # hip
 
-A desktop AI agent app (à la Claude Code Desktop / Codex Desktop). A single
-Node.js **sidecar** process manages multiple [LangGraph](https://langchain-ai.github.io/langgraphjs/)
-agent instances; each UI tab is an independent session. The product default is a
-**Supervisor ReAct** loop: the agent decides when to delegate via tools
-(`task` / `dispatch_agent` / `task_batch`). There is no forced Planner → Coder →
-Reviewer pipeline on ordinary turns.
+**English** | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md)
 
-## Memory
+**hip** is a desktop AI workbench (in the spirit of Claude Code Desktop / Codex Desktop): a Tauri shell, React UI, and Node.js sidecar that runs [LangGraph](https://langchain-ai.github.io/langgraphjs/) agents in your project.
 
-Cross-session memory is **off by default**. Enable under **Settings → Memory**.
-SQLite is the source of truth; `~/.hip/memories/` holds markdown export mirrors.
-Product copy for the agent (and optional maintainer reading): [packages/product-content/references/memory.md](./packages/product-content/references/memory.md).
+Each UI tab is an independent session. The product default is a **Supervisor ReAct** loop — the agent uses tools and decides when to delegate via `task` / `dispatch_agent` / `task_batch`. Ordinary turns do **not** force a Planner → Coder → Reviewer pipeline.
+
+## Highlights
+
+| Area | What you get |
+|------|----------------|
+| **Surfaces** | **Code** — full project workbench (files, git guidance, MCP, tools). **Chat** — lighter conversation; write previewable deliverables into the workspace for the artifacts panel. |
+| **Permissions** | **edit** (default, project sandbox), **chat** (read-only), **full** (user-granted whole filesystem). |
+| **Agents** | Supervisor plus roster agents (**explore** / **plan** / **coder**); agent-driven isolation and true parallel work via `task_batch`. |
+| **Extensibility** | Skills (`SKILL.md`), plugins, MCP servers, hooks — global under `~/.hip/` and project under `.hip/`. |
+| **Memory** | Cross-session memory **off by default**; enable under **Settings → Memory**. |
+| **CLI** | Attach-only `@hip/cli` for the **running** desktop app (`doctor`, `session`, `run`, `repl`). |
+| **Local-first** | Config, SQLite DB, skills, plugins, and logs live under `~/.hip/`. |
 
 ## Architecture
 
@@ -23,16 +28,11 @@ Three processes communicate at runtime:
 | **Frontend** | React + Vite (`src/`) | Tabs, chat, agent execution tree |
 | **Sidecar** | Node.js (`packages/sidecar/`) | LangGraph agent runtime, WebSocket server |
 
-The Tauri shell spawns the sidecar on startup (via `tauri-plugin-shell`'s
-sidecar mechanism). The sidecar binds a WebSocket server on a free port and
-prints `{"port":NNNN}` to stdout; Rust captures it and exposes it through the
-`get_sidecar_port` command. The frontend then connects to `ws://localhost:NNNN`.
+The Tauri shell spawns the sidecar on startup (via `tauri-plugin-shell`'s sidecar mechanism). The sidecar binds a WebSocket server on a free port and prints `{"port":NNNN}` to stdout; Rust captures it and exposes it through the `get_sidecar_port` command. The frontend then connects to `ws://localhost:NNNN`.
 
 ### Delegation entries (agent runtime)
 
-Product turns enter one of three paths. Only an **explicit** workflow def
-switches off the default ReAct loop; session `orchMode` is ignored for routing
-(UI toggle removed; API remains deprecated).
+Product turns enter one of three paths. Only an **explicit** workflow def switches off the default ReAct loop; session `orchMode` is ignored for routing (UI toggle removed; API remains deprecated).
 
 | Entry | When | Behavior |
 |-------|------|----------|
@@ -45,17 +45,42 @@ This is a **yarn workspaces** monorepo:
 ```
 packages/protocol/   @hip/protocol — shared WebSocket message types
 packages/sidecar/    @hip/sidecar  — LangGraph WS server
+packages/cli/        @hip/cli      — attach-only product CLI
+packages/product-content/  agent embeds + Settings Help locales
 src/                 React frontend
 src-tauri/           Rust shell
 ```
 
 ## Development setup
 
-> The DeepSeek API key is entered in the app's **Settings** panel and stored in
+> API keys (e.g. DeepSeek) are entered in the app's **Settings** panel and stored in
 > `~/.hip/config/auth.json` (file mode `0600`) — the single source of truth. The
 > desktop app, the standalone sidecar (`scripts/dev.sh start sidecar`), and the
 > test suite all read the key from there. **`~/.hip/config/` holds plaintext API
 > keys; do not sync it to cloud drives or dotfile repos.**
+
+### Prerequisites
+
+- Node.js + [Yarn](https://yarnpkg.com/) (workspaces)
+- Rust toolchain (for Tauri)
+- Platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/)
+
+### Quick start
+
+```bash
+# 1. Install workspace dependencies
+yarn install
+
+# 2. Generate the dev-mode sidecar wrapper (one-time, and after toolchain changes).
+#    src-tauri/binaries/ is a gitignored build-artifact dir, so this step is
+#    required before the Rust build can resolve the sidecar.
+yarn sidecar:dev-bin
+
+# 3. Run the app (launches Vite, the sidecar, and the Tauri window)
+yarn tauri dev
+```
+
+Then open **Settings**, add a provider API key, and start a session on the **Code** or **Chat** surface.
 
 ### LangSmith tracing (optional)
 
@@ -95,25 +120,13 @@ LLM spans are named `hip.model`. Keep `api_key` out of git; hip.toml lives under
 | `~/.hip/data/tool-output/` | Large tool outputs (kept out of the DB) |
 | `~/.hip/logs/` | Sidecar / Tauri logs |
 | `~/.hip/skills/`, `plugins/`, `scratch/` | Skills, plugins, install scratch |
+| `~/.hip/memories/` | Markdown export mirrors when memory is enabled |
 
 Session delete removes DB rows for that session (including event log).
 
 ```bash
 # Optional: reclaim free pages after large deletes (app must be closed)
 sqlite3 ~/.hip/db/hip.db 'VACUUM;'
-```
-
-```bash
-# 1. Install workspace dependencies
-yarn install
-
-# 2. Generate the dev-mode sidecar wrapper (one-time, and after toolchain changes).
-#    src-tauri/binaries/ is a gitignored build-artifact dir, so this step is
-#    required before the Rust build can resolve the sidecar.
-yarn sidecar:dev-bin
-
-# 3. Run the app (launches Vite, the sidecar, and the Tauri window)
-yarn tauri dev
 ```
 
 ### Useful scripts
@@ -127,6 +140,8 @@ yarn tauri dev
 | `yarn cli:test` | CLI unit tests (no paid LLM) |
 | `yarn type-check` | Type-check the frontend |
 | `yarn workspace @hip/sidecar type-check` | Type-check the sidecar |
+| `yarn test` | Frontend + unit tests (Vitest) |
+| `yarn product:content` | Regenerate agent/UI product content embeds |
 
 ### Product CLI (`@hip/cli`)
 
@@ -175,19 +190,36 @@ yarn cli:dev repl --cwd .
 | `repl` | Multi-turn interactive chat |
 | `HIP_CLI_DEV_SPAWN=1` | Dev only: isolated spawn (never product DB) |
 
-## Recommended IDE Setup
+## Memory
+
+Cross-session memory is **off by default**. Enable under **Settings → Memory**.
+SQLite is the source of truth; `~/.hip/memories/` holds markdown export mirrors.
+Product copy for the agent (and optional maintainer reading): [packages/product-content/references/memory.md](./packages/product-content/references/memory.md).
+
+## Recommended IDE setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
 ## Product content (agent embeds)
 
-Builtin product / coding skills are embedded for the agent (not a user-facing Help page).
+Builtin product / coding skills are embedded for the agent (not a user-facing Help page in the repo sense — Settings Help uses localized bodies).
 
 Source of truth (not under `docs/`):
 
 - Product: [packages/product-content/](./packages/product-content/)
 - Coding / delegation ops skill: [packages/product-content/ops/](./packages/product-content/ops/)
+- UI locales: `packages/product-content/locales/zh-CN/`, `zh-TW/`
 
 Regenerate embeds after editing those trees: `yarn product:content`.
 
-Repo root [`docs/`](./docs/) is optional developer notes only and is never read by the app.
+Repo root `docs/` (if present) is optional developer notes only and is never read by the app.
+
+## Documentation languages
+
+| Language | File |
+|----------|------|
+| English | [README.md](./README.md) |
+| 简体中文 | [README.zh-CN.md](./README.zh-CN.md) |
+| 繁體中文 | [README.zh-TW.md](./README.zh-TW.md) |
+
+English is the default for GitHub and agent-facing product embeds. Keep technical identifiers (paths, CLI flags, tool names) identical across locales.

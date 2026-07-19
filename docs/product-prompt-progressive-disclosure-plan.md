@@ -15,7 +15,7 @@
 | **P2b** | Surfaces | UI Help/About panel from same SoT | **Yes** |
 | **P3** | Operational progressive | Split fat BASE into optional skills (delegation, git); keep core + anti-phantom always | **Yes** |
 | **P3b** | Measurement | Dogfood script: N product questions → use_skill hit rate | **Yes** (offline matrix; live LLM optional later) |
-| **P4** | i18n / docs site | Bilingual packs or public docs URL (Hermes-style) | No |
+| **P4** | i18n / docs site | Bilingual packs or public docs URL (Hermes-style) | **Yes** |
 
 ---
 
@@ -97,6 +97,7 @@ W1 content/fingerprint → W2 prompt/pin → W3 ConfigManager tests → yarn vit
 - 2026-07-19: P3 ops progressive — compact always-on `BASE` + built-in `hip-coding` skill (delegation/edit/git depth); pin `hip` + `hip-coding` under skills budget.
 - 2026-07-19: P3b + ops SoT — `docs/ops/`, `generate-ops-content.mjs`, `yarn prompt:dogfood` offline matrix (hitRate=1).
 - 2026-07-19: Settings → General links to Help; `yarn prompt:dogfood:live` optional skill-routing probe (skips without API key).
+- 2026-07-19: **P4** — `docs/product/locales/{zh-CN,zh-TW}` UI packs; `getProductHelpPack(lang)`; README + docs/product index as local docs site; agent embeds remain English.
 
 ### P2 commands
 

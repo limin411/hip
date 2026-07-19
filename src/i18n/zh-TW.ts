@@ -972,7 +972,8 @@ export const zhTW = {
         version: '版本 {{version}}',
         docsRev: '文件修訂 {{rev}}',
         sectionsLabel: '說明主題',
-        sourceNote: '來源：倉庫 docs/product/（與智能體產品 skill 同源）。',
+        sourceNote:
+          '來源：倉庫 docs/product/（英文 agent skill）與 locales/zh-CN|zh-TW。說明頁跟隨介面語言。',
         sections: {
           overview: '概覽',
           memory: '記憶',

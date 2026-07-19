@@ -179,3 +179,14 @@ yarn cli:dev repl --cwd .
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+## Product documentation
+
+In-app: **Settings → Help** (follows UI language: en / zh-CN / zh-TW).
+
+In-repo source of truth (local docs site):
+
+- Product: [docs/product/](./docs/product/)
+- Coding / delegation ops skill: [docs/ops/](./docs/ops/)
+
+Regenerate embeds after editing those docs: `yarn product:content`.

@@ -220,12 +220,12 @@ Model-facing English (matches existing system prompts). L2 may note: answer prod
 
 ---
 
-## 9. Future (after P3b)
+## 9. Future (after P4)
 
-- Live-LLM dogfood (optional): measure actual `use_skill("hip"|"hip-coding")` call rate on a fixed Q set
-- Bilingual L2/L3 or locale pack
-- Expand README/path contract beyond the small smoke list in the generator
-- zh-TW full locale parity with en/zh-CN
+- Live-LLM dogfood: measure actual `use_skill("hip"|"hip-coding")` call rate on a fixed Q set
+- Hosted public docs site (optional); local `docs/product` remains SoT
+- Full app zh-TW string parity with en/zh-CN (beyond product Help packs)
+- Optional: locale-specific agent skill bodies (today agent stays English; UI is localized)
 
 ---
 

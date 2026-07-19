@@ -729,7 +729,8 @@ export const en = {
         version: 'Version {{version}}',
         docsRev: 'Docs rev {{rev}}',
         sectionsLabel: 'Help topics',
-        sourceNote: 'Source: docs/product/ in the hip repository (shared with the agent product skill).',
+        sourceNote:
+          'Source: docs/product/ (en) and locales/zh-CN|zh-TW in the hip repository. Agent skill stays English; Help follows UI language.',
         sections: {
           overview: 'Overview',
           memory: 'Memory',

@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { BookOpen } from 'lucide-react'
 import {
   HIP_PRODUCT_VERSION,
-  HIP_SKILL_DESCRIPTION,
-  PRODUCT_CAPABILITY_MAP,
-  PRODUCT_HELP_SECTIONS,
   PRODUCT_SKILL_VERSION,
+  getProductHelpPack,
   type ProductHelpSectionId,
 } from '@/domain/product'
+import { useUiStore } from '@/store/uiStore'
 import { MarkdownBody } from '@/components/chat/MarkdownBody'
 import { cn } from '@/lib/utils'
 
@@ -23,11 +22,13 @@ function capabilityMapMarkdown(map: string): string {
 
 export function ProductHelpSettings() {
   const { t } = useTranslation()
+  const language = useUiStore((s) => s.language)
   const [sectionId, setSectionId] = useState<ProductHelpSectionId>('overview')
 
+  const pack = useMemo(() => getProductHelpPack(language), [language])
   const section = useMemo(
-    () => PRODUCT_HELP_SECTIONS.find((s) => s.id === sectionId) ?? PRODUCT_HELP_SECTIONS[0]!,
-    [sectionId],
+    () => pack.sections.find((s) => s.id === sectionId) ?? pack.sections[0]!,
+    [pack, sectionId],
   )
 
   return (
@@ -50,8 +51,14 @@ export function ProductHelpSettings() {
               <span data-testid="product-help-docs-rev">
                 {t('settings.productHelp.docsRev', { rev: PRODUCT_SKILL_VERSION })}
               </span>
+              <span aria-hidden className="text-border">
+                ·
+              </span>
+              <span data-testid="product-help-locale">{language}</span>
             </div>
-            <p className="mt-2 text-meta text-ink-secondary">{HIP_SKILL_DESCRIPTION}</p>
+            <p className="mt-2 text-meta text-ink-secondary" data-testid="product-help-description">
+              {pack.description}
+            </p>
           </div>
         </div>
 
@@ -59,7 +66,7 @@ export function ProductHelpSettings() {
           className="mt-4 rounded-lg border border-border bg-surface-muted/40 px-3 py-2.5"
           data-testid="product-help-capability"
         >
-          <MarkdownBody content={capabilityMapMarkdown(PRODUCT_CAPABILITY_MAP)} />
+          <MarkdownBody content={capabilityMapMarkdown(pack.capabilityMap)} />
         </div>
       </div>
 
@@ -69,7 +76,7 @@ export function ProductHelpSettings() {
           aria-label={t('settings.productHelp.sectionsLabel')}
           className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-4 py-2"
         >
-          {PRODUCT_HELP_SECTIONS.map((s) => {
+          {pack.sections.map((s) => {
             const active = s.id === section.id
             return (
               <button

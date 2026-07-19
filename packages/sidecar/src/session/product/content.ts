@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=6f7d8fb68b4b3915 skillVersion=2 productVersion=0.1.0
+ * contentHash=b1d60ae1f8980a9f skillVersion=2 productVersion=0.1.0
  */
 
 /** Schema / materialization version for builtin skill files (from docs/product/meta.json). */

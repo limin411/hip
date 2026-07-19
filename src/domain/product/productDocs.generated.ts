@@ -4,17 +4,26 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=6f7d8fb68b4b3915 skillVersion=2 productVersion=0.1.0
+ * contentHash=b1d60ae1f8980a9f skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
+
+/** UI product-help locale ids (matches app language tags). */
+export type ProductHelpLocale = 'en' | 'zh-CN' | 'zh-TW'
 
 export interface ProductHelpSection {
   id: ProductHelpSectionId
   /** i18n key for the tab / nav label */
   titleKey: string
-  /** Markdown body (English SoT; agent + UI share the same text). */
+  /** Markdown body for this locale. */
   markdown: string
+}
+
+export interface ProductHelpLocalePack {
+  description: string
+  capabilityMap: string
+  sections: readonly ProductHelpSection[]
 }
 
 /** App version from root package.json. */
@@ -23,9 +32,10 @@ export const HIP_PRODUCT_VERSION = '0.1.0'
 /** Content schema version from docs/product/meta.json. */
 export const PRODUCT_SKILL_VERSION = '2'
 
+/** English defaults (agent-aligned). Prefer getProductHelpPack(lang) in UI. */
 export const HIP_SKILL_DESCRIPTION = 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.'
 
-/** L0 capability map (also shown as About summary). */
+/** L0 capability map English (agent + default UI). */
 export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Version: 0.1.0.
 - Desktop workbench agent in the user's project with real file tools and optional sub-agents.
@@ -35,7 +45,7 @@ export const PRODUCT_CAPABILITY_MAP = `Product facts (hip):
 - Cross-session memory: off by default (Settings → Memory).
 - Local data: ~/.hip/ (config, db, skills, plugins, logs).`
 
-/** Ordered help sections for Settings → Product help. */
+/** English help sections (backward compatible). */
 export const PRODUCT_HELP_SECTIONS: readonly ProductHelpSection[] = [
   {
     id: 'overview',
@@ -312,3 +322,828 @@ Do not claim work ran "in parallel" if only sequential dispatch was used.
 `,
   }
 ] as const
+
+/** All UI locales for Settings → Product help. Agent embeds stay English. */
+export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePack> = {
+  en: {
+  description: 'Product help for the hip desktop agent: Chat/Code surfaces, permission modes, Settings, skills, plugins, MCP, memory, agents, CLI, troubleshooting, and local data. Load when the user asks how hip works or how to configure it.',
+  capabilityMap: `Product facts (hip):
+- Version: 0.1.0.
+- Desktop workbench agent in the user's project with real file tools and optional sub-agents.
+- Surfaces: Code (full workbench) vs Chat (lighter; previewable files → write_file for artifacts).
+- Permission modes: chat = read-only; edit = project sandbox (default); full = user-granted whole FS.
+- API keys: ~/.hip/config/auth.json (0600 plaintext by design).
+- Cross-session memory: off by default (Settings → Memory).
+- Local data: ~/.hip/ (config, db, skills, plugins, logs).`,
+  sections: [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
+
+hip is a **desktop AI workbench** (Tauri shell + React UI + Node sidecar), product version **0.1.0**. Each UI tab is an independent session. The default product loop is a **Supervisor ReAct** agent that uses tools and may delegate with \`task\` / \`dispatch_agent\` / \`task_batch\` — there is no forced Planner → Coder → Reviewer pipeline on ordinary turns.
+
+This skill is the authoritative product guide for *hip itself*. For ordinary coding work in the user's project, do **not** load this skill.
+
+Answer product questions in the **user's language** (e.g. Chinese if they wrote in Chinese), but keep config paths and identifiers exact.
+
+## Progressive disclosure
+
+- **Level 1** (system prompt Skills list): name + description only
+- **Level 2** (this file): overview below, loaded via \`use_skill({ name: "hip" })\`
+- **Level 3**: deeper topics in \`references/\` — read those absolute paths with \`read_file\` when needed
+
+If a product detail is not documented here, say so rather than inventing UI labels or config keys.
+
+## Surfaces
+
+| Surface | Intent |
+|---------|--------|
+| **Code** | Project workbench: file tools, git guidance, MCP catalog, full agent tools |
+| **Chat** | Lighter conversation surface: shorter prompt, no git-commit guidance, prefer writing previewable deliverables (\`page.html\`, \`notes.md\`, SVG, etc.) into the workspace for the artifacts panel |
+
+Surface is chosen in the UI; the system prompt already reflects the active surface.
+
+## Permission modes
+
+| Mode | Effect |
+|------|--------|
+| **edit** (default) | Filesystem tools sandboxed to the project root |
+| **chat** | Read-only: no write/edit/script/git mutations |
+| **full** | Un-sandboxed filesystem (user-granted); prefer absolute paths |
+
+Path convention in edit/chat: project-root form starting with \`/\` (e.g. \`/src/index.ts\` maps to \`<cwd>/src/index.ts\`). Never invent shell tool names — use \`run_script\` when available.
+
+## Settings (desktop UI)
+
+Typical destinations (wording may vary slightly in the UI):
+
+- **Providers / API keys** — stored as plaintext under \`~/.hip/config/auth.json\` (mode 0600 by design)
+- **Memory** — cross-session memory is **off by default**; enable under Settings → Memory (see \`references/memory.md\`)
+- **Skills** — enable/disable installed skills (\`hip.toml\` + skill folders)
+- **Plugins** — install/enable plugins (skills, agents, MCP, hooks)
+- **Agents** — fixed profiles (supervisor / plan / explore / coder) and custom internal or external agents
+- **Network policy** — optional allow/deny for outbound tools
+
+## Skills, plugins, MCP
+
+- **Skills**: Claude-format folders with \`SKILL.md\`. Global: \`~/.hip/skills/<id>/\`. Project: \`.hip/skills/<id>/\`. Progressive disclosure: L1 metadata → \`use_skill\` body → \`references/\` + \`assets/\`.
+- **Plugins**: under \`~/.hip/plugins/\`; can contribute skills, agents, MCP servers, and hooks. See \`references/agents-and-plugins.md\`.
+- **MCP**: configured servers expose tools. In Code surface the system prompt may list a catalog; use \`mcp_search\` then call namespaced tools \`mcp__<server>__<tool>\`.
+
+## Agents & delegation
+
+- Default session agent decides when to use tools or delegate.
+- Prefer specialized roster agents when available: **explore** (read-only search), **plan** (design-only), **coder** (implementation).
+- Parallel independent sub-tasks → one \`task_batch\` (not sequential \`dispatch_agent\`).
+- Explicit workflows / multi-agent handoff exist but are **not** the ordinary product path.
+- Depth: \`references/agents-and-plugins.md\`.
+
+## CLI (\`@hip/cli\`)
+
+Attach-only companion to a **running** hip app (shared sidecar + \`~/.hip\` data). Does not start the product sidecar.
+
+\`\`\`bash
+yarn cli:dev doctor
+yarn cli:dev config auth-status
+yarn cli:dev session list
+yarn cli:dev run --stream none --json "Reply with exactly: pong"
+yarn cli:dev repl --cwd .
+\`\`\`
+
+If the app is not running, CLI fails with \`APP_NOT_RUNNING\`.
+
+## Project guidance files
+
+When present under the project, hip may inject guidance such as \`AGENTS.md\` / \`Claude.md\` / \`.hip\` config. Prefer following those for **project** conventions; this skill is for **product** behavior.
+
+## Level 3 references
+
+After loading this skill, \`use_skill\` returns absolute paths. When the user needs depth:
+
+- Memory enablement, inject, extract, privacy → \`references/memory.md\`
+- Local data layout, config files, env overrides → \`references/config-and-data.md\`
+- Common failures (no key, CLI not running, empty memory) → \`references/troubleshooting.md\`
+- Agents, plugins, MCP wiring → \`references/agents-and-plugins.md\`
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip memory (Level 3)
+
+Cross-session memory is **disabled by default** (privacy / cost).
+
+## Enable
+
+1. Open **Settings → Memory**.
+2. Enable **use** and/or **generate**.
+3. Enabling both from a cold install may apply a dogfood preset (shorter idle / extract interval) when gates are still defaults.
+4. Ensure a provider API key is configured (Settings → Providers). Extraction needs an API key.
+
+## What is stored
+
+Structured items in SQLite (\`memory_items\`): preferences, conventions, lessons, workflows, profiles — scoped **global**, **project**, or **session**.
+
+**Source of truth is SQLite.** Markdown under \`~/.hip/memories/\` is an export mirror. Project \`MEMORY.md\` / \`.hip/MEMORY.md\` is separate project-notes injection, not auto-imported into SQLite.
+
+## Runtime behavior
+
+| Path | Behavior |
+|------|----------|
+| **Use** | Core snapshot + per-turn prefetch + \`memory_*\` tools |
+| **Generate** | After idle → Phase1 extract → Phase2 consolidate |
+| **Incognito** | Session flag: no inject and no extract |
+| **Learn now** | Settings control to force extract/consolidate when dogfooding |
+
+Managed sub-agents may get read-only core injection; external ACP agents default off.
+
+## Privacy notes
+
+- Cold defaults: use/generate off
+- Hybrid search (optional) may send snippets to embedding providers
+- Threat-scan + secret redact on write
+- Soft-delete trash + retention
+
+For architecture detail see the repo docs \`docs/memory.md\` and \`docs/memory-longterm-design.md\` when developing hip itself.
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip config & local data (Level 3)
+
+## Layout (\`~/.hip/\`)
+
+| Path | Purpose |
+|------|---------|
+| \`~/.hip/config/auth.json\` | Provider API keys (0600 plaintext by design) |
+| \`~/.hip/config/hip.toml\` | Global product config (skills, agent loop, langsmith, …) |
+| \`~/.hip/config/memory.json\` | Memory feature flags / pipeline knobs |
+| \`~/.hip/config/network.json\` | Optional network policy |
+| \`~/.hip/config/hip-plugins.json\` | Installed plugins registry |
+| \`~/.hip/db/hip.db\` | SQLite sessions, messages, memory items, events |
+| \`~/.hip/data/tool-output/\` | Large tool outputs (kept out of the DB) |
+| \`~/.hip/logs/\` | Sidecar / shell logs |
+| \`~/.hip/skills/\` | Global skills |
+| \`~/.hip/plugins/\` | Installed plugins |
+| \`~/.hip/memories/\` | Memory markdown mirrors |
+| \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
+| \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+
+Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \`.hip/hip.toml\`).
+
+## Env / isolation (advanced)
+
+| Variable | Role |
+|----------|------|
+| \`HIP_DATA_DIR\` | Redirect data/config roots (tests / isolation) |
+| \`HIP_SKILLS_DIR\` | Override global skills root |
+| \`HIP_PLUGINS_DIR\` | Override plugins root |
+| \`HIP_AUTH_PATH\` | Override auth.json path |
+| \`HIP_CONFIG_PATH\` | Override hip.toml path |
+| \`HIP_MEMORY_CONFIG_PATH\` | Override memory.json path |
+| \`LANGSMITH_*\` | Optional LangSmith tracing (also \`[langsmith]\` in hip.toml) |
+
+**Do not** sync \`~/.hip/config/\` to public cloud or public dotfile repos — it may contain API keys.
+
+## Auth model
+
+Keys are entered in the app Settings panel and stored in \`auth.json\`. Desktop app, standalone sidecar, and tests all read from that store. This is intentional plaintext-on-disk with tight file modes — not a keychain migration target.
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip troubleshooting (Level 3)
+
+## No API / model calls work
+
+1. Open **Settings → Providers** and confirm a key is saved.
+2. Keys live in \`~/.hip/config/auth.json\` (never print secrets to the user).
+3. Restart the app after changing auth outside the UI.
+4. Check sidecar logs under \`~/.hip/logs/\`.
+
+## CLI: \`APP_NOT_RUNNING\`
+
+The product CLI attaches to a **running** hip desktop app. Start the app first (\`yarn tauri dev\` or installed app), then \`yarn cli:dev doctor\`.
+
+## Memory list empty after enabling
+
+1. Confirm **Settings → Memory** has **use** and **generate** as intended.
+2. Need enough chat turns + API key for extract; try **Learn now**.
+3. Status may show \`no_llm\`, \`rate_limited\`, or empty extract — fix key / quota / wait.
+4. SQLite is source of truth; stale mirrors under \`~/.hip/memories/\` are not the DB.
+
+## Agent cannot write files
+
+- Permission mode **chat** is read-only.
+- Default **edit** is sandboxed to the project root — paths outside fail.
+- Use **full** only when the user explicitly granted whole-machine FS access.
+
+## Skill not listed / use_skill fails
+
+- Skill may be disabled in \`hip.toml\` or plugin disabled.
+- Project skill \`paths\` globs may exclude the cwd.
+- Built-in product skill id is \`hip\` under \`~/.hip/builtin-skills/hip/\`.
+
+## Sidecar / connection issues
+
+- Desktop shell spawns the sidecar and exposes its WS port.
+- If the UI cannot connect, restart the app; check \`~/.hip/logs/\`.
+- Dev: regenerate sidecar binary wrapper with \`yarn sidecar:dev-bin\` after toolchain changes.
+
+## Stale DMG / build (macOS)
+
+Stale \`rw.*.dmg\` mounts can break \`yarn tauri build\`; remove them and detach \`/Volumes/hip\` if needed.
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip agents, plugins & MCP (Level 3)
+
+## Built-in agent profiles
+
+Typical fixed profiles (enable/disable in Agents UI):
+
+| Profile | Role |
+|---------|------|
+| **supervisor** | Default orchestrator: tools, commit, scripts, delegation |
+| **plan** | Design / planning oriented (narrower write posture depending on config) |
+| **explore** | Read-only codebase search |
+| **coder** | Implementation-focused with scripts |
+
+Custom **internal** agents: persona prompt + bound model + tool grants.  
+**External / ACP** agents: separate process; product memory defaults off unless configured.
+
+## Delegation tools (main agent)
+
+| Tool | Use |
+|------|-----|
+| \`task\` | One sub-task (foreground or background) |
+| \`dispatch_agent\` | Named roster agent; blocking unless parallel tool-calls |
+| \`task_batch\` | **Preferred** for 2+ independent sub-tasks (true parallel) |
+
+Do not claim work ran "in parallel" if only sequential dispatch was used.
+
+## Plugins
+
+- Installed under \`~/.hip/plugins/\`; registry in \`~/.hip/config/hip-plugins.json\`.
+- A plugin may ship skills, agents, MCP server configs, and hooks.
+- Disable a plugin to drop its contributions from the session.
+
+## MCP
+
+- Server configs come from hip.toml / plugin synthesis.
+- Code surface may inject a short catalog; discover with \`mcp_search\`.
+- Call tools as \`mcp__<server>__<tool>\`.
+- Network policy (if configured) may block outbound MCP/web tools.
+
+## Skills scopes
+
+| Scope | Location |
+|-------|----------|
+| global | \`~/.hip/skills/<id>/\` |
+| project | \`.hip/skills/<id>/\` (wins over global same id) |
+| plugin | plugin-owned skill dirs |
+| builtin product | \`~/.hip/builtin-skills/hip/\` (lowest priority; overridable by same id) |
+`,
+  }
+  ],
+},
+  'zh-CN': {
+  description: 'hip 桌面智能体产品帮助：Chat/Code 界面、权限模式、设置、技能、插件、MCP、记忆、智能体、CLI、故障排查与本地数据布局。当用户询问 hip 如何工作或如何配置时加载。',
+  capabilityMap: `产品要点（hip）：
+- 版本：0.1.0。
+- 桌面 AI 工作台智能体，在用户项目中使用真实文件工具，并可委派子智能体。
+- 界面：Code（完整工作台）与 Chat（更轻；可预览交付物请 write_file 到工件面板）。
+- 权限：chat = 只读；edit = 项目沙箱（默认）；full = 用户授权的整机文件系统。
+- API 密钥：~/.hip/config/auth.json（按设计为 0600 明文）。
+- 跨会话记忆：默认关闭（设置 → 记忆）。
+- 本地数据：~/.hip/（配置、数据库、技能、插件、日志）。`,
+  sections: [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
+
+hip 是一款**桌面 AI 工作台**（Tauri 壳 + React UI + Node sidecar），产品版本 **0.1.0**。每个 UI 标签页是独立会话。默认产品回路是 **Supervisor ReAct** 智能体：用工具完成工作，并可通过 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——普通轮次**不会**强制 Planner → Coder → Reviewer 流水线。
+
+本技能是 *hip 产品本身* 的权威指南。用户项目中的普通编码任务**不要**加载本技能。
+
+用**用户的语言**回答产品问题（例如用户用中文提问则用中文答），但配置路径与标识符请保持原文准确。
+
+## 渐进式披露
+
+- **Level 1**（系统提示 Skills 列表）：仅名称 + 描述
+- **Level 2**（本文件）：下方概览，通过 \`use_skill({ name: "hip" })\` 加载
+- **Level 3**：\`references/\` 中的深入主题——需要时用 \`read_file\` 读绝对路径
+
+若某产品细节未写在此处，请如实说明，不要编造 UI 文案或配置键。
+
+## 界面（Surfaces）
+
+| 界面 | 用途 |
+|------|------|
+| **Code** | 项目工作台：文件工具、git 指导、MCP 目录、完整智能体工具 |
+| **Chat** | 更轻的会话面：更短提示、无 git 提交指导；可预览交付物（\`page.html\`、\`notes.md\`、SVG 等）请 \`write_file\` 到工作区以便工件面板展示 |
+
+界面在 UI 中选择；系统提示会反映当前界面。
+
+## 权限模式
+
+| 模式 | 效果 |
+|------|------|
+| **edit**（默认） | 文件系统工具限制在项目根沙箱内 |
+| **chat** | 只读：不能写/改文件，不能跑脚本 |
+| **full** | 未沙箱的文件系统（用户明确授权）；优先绝对路径 |
+
+edit/chat 下的路径约定：以 \`/\` 开头的项目根相对形式（如 \`/src/index.ts\` 映射到 \`<cwd>/src/index.ts\`）。不要发明 shell 工具名——有则用 \`run_script\`。
+
+## 设置（桌面 UI）
+
+常见入口（具体文案可能随 UI 微调）：
+
+- **提供商 / API 密钥** — 明文保存在 \`~/.hip/config/auth.json\`（按设计为 0600）
+- **记忆** — 跨会话记忆**默认关闭**；在 设置 → 记忆 开启（见 \`references/memory.md\`）
+- **技能** — 启用/禁用已安装技能（\`hip.toml\` + 技能目录）
+- **插件** — 安装/启用插件（技能、智能体、MCP、钩子）
+- **智能体** — 固定配置（supervisor / plan / explore / coder）与自定义内部或外部智能体
+- **网络策略** — 可选的出站工具允许/拒绝
+
+## 技能、插件、MCP
+
+- **技能**：Claude 格式 \`SKILL.md\` 文件夹。全局：\`~/.hip/skills/<id>/\`。项目：\`.hip/skills/<id>/\`。渐进披露：L1 元数据 → \`use_skill\` 正文 → \`references/\` + \`assets/\`。
+- **插件**：位于 \`~/.hip/plugins/\`；可贡献技能、智能体、MCP 与钩子。见 \`references/agents-and-plugins.md\`。
+- **MCP**：配置的服务器暴露工具。Code 面系统提示可能列出目录；用 \`mcp_search\` 查找，再调用 \`mcp__<server>__<tool>\`。
+
+## 智能体与委派
+
+- 默认会话智能体决定何时用工具或委派。
+- 有专用花名册时优先：**explore**（只读搜索）、**plan**（仅设计）、**coder**（带脚本实现）。
+- 多个独立子任务 → 一次 \`task_batch\`（不要顺序多个 \`dispatch_agent\`）。
+- 显式工作流 / 多智能体 handoff **不是**普通产品路径。
+- 深入：\`references/agents-and-plugins.md\`。
+
+## CLI（\`@hip/cli\`）
+
+仅附着到**已运行**的 hip 应用（共享 sidecar 与 \`~/.hip\` 数据）。不会启动产品 sidecar。
+
+\`\`\`bash
+yarn cli:dev doctor
+yarn cli:dev config auth-status
+yarn cli:dev session list
+yarn cli:dev run --stream none --json "Reply with exactly: pong"
+yarn cli:dev repl --cwd .
+\`\`\`
+
+应用未运行时 CLI 失败并返回 \`APP_NOT_RUNNING\`。
+
+## 项目指导文件
+
+项目中若存在 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 配置等，hip 可能注入。**项目**约定优先遵循那些文件；本技能描述**产品**行为。
+
+## Level 3 参考
+
+加载本技能后，\`use_skill\` 会返回绝对路径。需要深度时：
+
+- 记忆启用、注入、抽取、隐私 → \`references/memory.md\`
+- 本地数据布局、配置、环境变量 → \`references/config-and-data.md\`
+- 常见故障（无密钥、CLI 未运行、记忆为空） → \`references/troubleshooting.md\`
+- 智能体、插件、MCP → \`references/agents-and-plugins.md\`
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip 记忆（Level 3）
+
+跨会话记忆**默认关闭**（隐私 / 成本）。
+
+## 启用
+
+1. 打开 **设置 → 记忆**。
+2. 开启 **使用** 和/或 **生成**。
+3. 冷安装时若同时开启两者，可能在门控仍为默认时应用 dogfood 预设（更短空闲 / 抽取间隔）。
+4. 确保已配置提供商 API 密钥（设置 → 提供商）。抽取需要 API 密钥。
+
+## 存什么
+
+SQLite（\`memory_items\`）中的结构化条目：偏好、约定、教训、工作流、档案 — 范围可为 **global**、**project** 或 **session**。
+
+**真相源是 SQLite。** \`~/.hip/memories/\` 下 Markdown 是导出镜像。项目 \`MEMORY.md\` / \`.hip/MEMORY.md\` 是独立的项目笔记注入，不会自动导入 SQLite。
+
+## 运行时行为
+
+| 路径 | 行为 |
+|------|------|
+| **使用** | 核心快照 + 每轮预取 + \`memory_*\` 工具 |
+| **生成** | 空闲后 → Phase1 抽取 → Phase2 巩固 |
+| **隐身** | 会话标志：不注入、不抽取 |
+| **立即学习** | 设置中的控件，dogfood 时强制抽取/巩固 |
+
+托管子智能体可能只读注入核心；外部 ACP 智能体默认关闭。
+
+## 隐私
+
+- 冷默认：使用/生成关闭
+- 混合检索（可选）可能向嵌入服务发送片段
+- 写入时威胁扫描 + 密钥脱敏
+- 软删除回收站 + 保留期
+
+架构细节见仓库 \`docs/memory.md\` 与 \`docs/memory-longterm-design.md\`（开发 hip 时）。
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip 配置与本地数据（Level 3）
+
+## 布局（\`~/.hip/\`）
+
+| 路径 | 用途 |
+|------|------|
+| \`~/.hip/config/auth.json\` | 提供商 API 密钥（0600 明文，按设计） |
+| \`~/.hip/config/hip.toml\` | 全局产品配置（技能、agent loop、langsmith 等） |
+| \`~/.hip/config/memory.json\` | 记忆功能开关 / 流水线参数 |
+| \`~/.hip/config/network.json\` | 可选网络策略 |
+| \`~/.hip/config/hip-plugins.json\` | 已安装插件注册表 |
+| \`~/.hip/db/hip.db\` | SQLite 会话、消息、记忆、事件 |
+| \`~/.hip/data/tool-output/\` | 大型工具输出（不进 DB） |
+| \`~/.hip/logs/\` | Sidecar / 壳日志 |
+| \`~/.hip/skills/\` | 全局技能 |
+| \`~/.hip/plugins/\` | 已安装插件 |
+| \`~/.hip/memories/\` | 记忆 Markdown 镜像 |
+| \`~/.hip/builtin-skills/\` | 内置渐进产品技能（如 \`hip\`） |
+| \`~/.hip/scratch/\`、worktrees | 临时区 / 并行 worktree |
+
+项目覆盖常在 \`<project>/.hip/\`（如 \`.hip/skills/\`、\`.hip/hip.toml\`）。
+
+## 环境 / 隔离（进阶）
+
+| 变量 | 作用 |
+|------|------|
+| \`HIP_DATA_DIR\` | 重定向数据/配置根（测试 / 隔离） |
+| \`HIP_SKILLS_DIR\` | 覆盖全局技能根 |
+| \`HIP_PLUGINS_DIR\` | 覆盖插件根 |
+| \`HIP_AUTH_PATH\` | 覆盖 auth.json 路径 |
+| \`HIP_CONFIG_PATH\` | 覆盖 hip.toml 路径 |
+| \`HIP_MEMORY_CONFIG_PATH\` | 覆盖 memory.json 路径 |
+| \`LANGSMITH_*\` | 可选 LangSmith 追踪（也可用 hip.toml \`[langsmith]\`） |
+
+**不要**把 \`~/.hip/config/\` 同步到公开云或公开 dotfile 仓库——可能含 API 密钥。
+
+## 鉴权模型
+
+密钥在应用设置中填写并写入 \`auth.json\`。桌面应用、独立 sidecar 与测试都从该存储读取。这是有意的磁盘明文 + 紧文件权限，不是钥匙串迁移目标。
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip 故障排查（Level 3）
+
+## API / 模型调用失败
+
+1. 打开 **设置 → 提供商**，确认已保存密钥。
+2. 密钥在 \`~/.hip/config/auth.json\`（切勿向用户打印密钥）。
+3. 在 UI 外改鉴权后请重启应用。
+4. 查看 \`~/.hip/logs/\` 下 sidecar 日志。
+
+## CLI：\`APP_NOT_RUNNING\`
+
+产品 CLI 附着到**正在运行**的 hip 桌面应用。请先启动应用（\`yarn tauri dev\` 或已安装应用），再 \`yarn cli:dev doctor\`。
+
+## 开启记忆后列表仍空
+
+1. 确认 **设置 → 记忆** 中 **使用** / **生成** 符合预期。
+2. 需要足够对话轮次 + API 密钥才能抽取；可试 **立即学习**。
+3. 状态可能显示 \`no_llm\`、\`rate_limited\` 或空抽取 — 检查密钥 / 配额 / 等待。
+4. SQLite 是真相源；\`~/.hip/memories/\` 镜像陈旧不等于库空。
+
+## 智能体无法写文件
+
+- 权限 **chat** 为只读。
+- 默认 **edit** 沙箱在项目根 — 根外路径会失败。
+- 仅当用户明确授权整机 FS 时使用 **full**。
+
+## 技能未列出 / use_skill 失败
+
+- 可能在 \`hip.toml\` 或插件中被禁用。
+- 项目技能 \`paths\` 通配可能排除当前 cwd。
+- 内置产品技能 id 为 \`hip\`，目录 \`~/.hip/builtin-skills/hip/\`。
+
+## Sidecar / 连接问题
+
+- 桌面壳启动 sidecar 并暴露其 WebSocket 端口。
+- UI 连不上时重启应用；查看 \`~/.hip/logs/\`。
+- 开发：工具链变更后用 \`yarn sidecar:dev-bin\` 重新生成 sidecar 包装。
+
+## macOS 构建 DMG 残留
+
+陈旧的 \`rw.*.dmg\` 挂载可能导致 \`yarn tauri build\` 失败；删除它们并卸除 \`/Volumes/hip\`（如有）。
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip 智能体、插件与 MCP（Level 3）
+
+## 内置智能体配置
+
+常见固定配置（在智能体 UI 中启用/禁用）：
+
+| 配置 | 角色 |
+|------|------|
+| **supervisor** | 默认编排：工具、提交、脚本、委派 |
+| **plan** | 偏设计 / 规划（写权限视配置收窄） |
+| **explore** | 只读代码库搜索 |
+| **coder** | 偏实现，可带脚本 |
+
+自定义 **internal** 智能体：人设提示 + 绑定模型 + 工具授权。  
+**外部 / ACP** 智能体：独立进程；产品记忆默认关闭（除非配置开启）。
+
+## 委派工具（主智能体）
+
+| 工具 | 用途 |
+|------|------|
+| \`task\` | 单个子任务（前台或后台） |
+| \`dispatch_agent\` | 命名花名册智能体；阻塞，除非同批多个调用 |
+| \`task_batch\` | **2+ 独立子任务的首选**（真并行） |
+
+若只用顺序 dispatch，不要声称「并行」完成。
+
+## 插件
+
+- 安装于 \`~/.hip/plugins/\`；注册表在 \`~/.hip/config/hip-plugins.json\`。
+- 插件可附带技能、智能体、MCP 配置与钩子。
+- 禁用插件会从会话中移除其贡献。
+
+## MCP
+
+- 服务器配置来自 hip.toml / 插件合成。
+- Code 面可能注入短目录；用 \`mcp_search\` 发现。
+- 调用形式：\`mcp__<server>__<tool>\`。
+- 若配置了网络策略，可能拦截出站 MCP/web 工具。
+
+## 技能作用域
+
+| 作用域 | 位置 |
+|--------|------|
+| global | \`~/.hip/skills/<id>/\` |
+| project | \`.hip/skills/<id>/\`（同 id 覆盖 global） |
+| plugin | 插件自有技能目录 |
+| 内置产品 | \`~/.hip/builtin-skills/hip/\`（优先级最低；可被同 id 覆盖） |
+`,
+  }
+  ],
+},
+  'zh-TW': {
+  description: 'hip 桌面智能體產品說明：Chat/Code 介面、權限模式、設定、技能、外掛、MCP、記憶、智能體、CLI、故障排除與本機資料配置。當使用者詢問 hip 如何運作或如何設定時載入。',
+  capabilityMap: `產品要點（hip）：
+- 版本：0.1.0。
+- 桌面 AI 工作台智能體，在使用者專案中使用真實檔案工具，並可委派子智能體。
+- 介面：Code（完整工作台）與 Chat（較輕；可預覽交付物請 write_file 到工件面板）。
+- 權限：chat = 唯讀；edit = 專案沙箱（預設）；full = 使用者授權的整機檔案系統。
+- API 金鑰：~/.hip/config/auth.json（依設計為 0600 明文）。
+- 跨工作階段記憶：預設關閉（設定 → 記憶）。
+- 本機資料：~/.hip/（設定、資料庫、技能、外掛、日誌）。`,
+  sections: [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
+
+hip 是一款**桌面 AI 工作台**（Tauri 殼 + React UI + Node sidecar），產品版本 **0.1.0**。每個 UI 分頁是獨立工作階段。預設產品迴路是 **Supervisor ReAct** 智能體：用工具完成工作，並可透過 \`task\` / \`dispatch_agent\` / \`task_batch\` 委派——一般回合**不會**強制 Planner → Coder → Reviewer 流水線。
+
+本技能是 *hip 產品本身* 的權威指南。使用者專案中的一般編碼任務**不要**載入本技能。
+
+用**使用者的語言**回答產品問題，但設定路徑與識別符請保持原文準確。
+
+## 漸進式揭露
+
+- **Level 1**（系統提示 Skills 列表）：僅名稱 + 描述
+- **Level 2**（本檔）：下方概覽，透過 \`use_skill({ name: "hip" })\` 載入
+- **Level 3**：\`references/\` 中的深入主題——需要時用 \`read_file\` 讀絕對路徑
+
+若某產品細節未寫在此處，請如實說明，不要編造 UI 文案或設定鍵。
+
+## 介面（Surfaces）
+
+| 介面 | 用途 |
+|------|------|
+| **Code** | 專案工作台：檔案工具、git 指導、MCP 目錄、完整智能體工具 |
+| **Chat** | 較輕的對話面：更短提示、無 git 提交指導；可預覽交付物請 \`write_file\` 到工作區以便工件面板展示 |
+
+介面在 UI 中選擇；系統提示會反映目前介面。
+
+## 權限模式
+
+| 模式 | 效果 |
+|------|------|
+| **edit**（預設） | 檔案系統工具限制在專案根沙箱內 |
+| **chat** | 唯讀：不能寫/改檔案，不能跑腳本 |
+| **full** | 未沙箱的檔案系統（使用者明確授權）；優先絕對路徑 |
+
+edit/chat 下的路徑約定：以 \`/\` 開頭的專案根相對形式。不要發明 shell 工具名——有則用 \`run_script\`。
+
+## 設定（桌面 UI）
+
+常見入口（具體文案可能隨 UI 微調）：
+
+- **提供者 / API 金鑰** — 明文保存在 \`~/.hip/config/auth.json\`（依設計為 0600）
+- **記憶** — 跨工作階段記憶**預設關閉**；在 設定 → 記憶 開啟（見 \`references/memory.md\`）
+- **技能** — 啟用/停用已安裝技能
+- **外掛** — 安裝/啟用外掛（技能、智能體、MCP、掛鉤）
+- **智能體** — 固定設定（supervisor / plan / explore / coder）與自訂內部或外部智能體
+- **網路原則** — 可選的出站工具允許/拒絕
+
+## 技能、外掛、MCP
+
+- **技能**：Claude 格式 \`SKILL.md\`。全域：\`~/.hip/skills/<id>/\`。專案：\`.hip/skills/<id>/\`。
+- **外掛**：位於 \`~/.hip/plugins/\`。見 \`references/agents-and-plugins.md\`。
+- **MCP**：用 \`mcp_search\` 尋找，再呼叫 \`mcp__<server>__<tool>\`。
+
+## 智能體與委派
+
+- 預設工作階段智能體決定何時用工具或委派。
+- 有專用名冊時優先：**explore**、**plan**、**coder**。
+- 多個獨立子任務 → 一次 \`task_batch\`。
+- 深入：\`references/agents-and-plugins.md\`。
+
+## CLI（\`@hip/cli\`）
+
+僅附著到**已執行**的 hip 應用。應用未執行時 CLI 失敗並回傳 \`APP_NOT_RUNNING\`。
+
+\`\`\`bash
+yarn cli:dev doctor
+yarn cli:dev config auth-status
+yarn cli:dev session list
+yarn cli:dev run --stream none --json "Reply with exactly: pong"
+yarn cli:dev repl --cwd .
+\`\`\`
+
+## 專案指導檔
+
+專案中的 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 等描述**專案**約定；本技能描述**產品**行為。
+
+## Level 3 參考
+
+- 記憶 → \`references/memory.md\`
+- 本機資料與設定 → \`references/config-and-data.md\`
+- 故障排除 → \`references/troubleshooting.md\`
+- 智能體與外掛 → \`references/agents-and-plugins.md\`
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip 記憶（Level 3）
+
+跨工作階段記憶**預設關閉**（隱私 / 成本）。
+
+## 啟用
+
+1. 開啟 **設定 → 記憶**。
+2. 開啟 **使用** 和/或 **產生**。
+3. 冷安裝時若同時開啟兩者，可能套用 dogfood 預設（更短閒置 / 抽取間隔）。
+4. 確保已設定提供者 API 金鑰。抽取需要 API 金鑰。
+
+## 存什麼
+
+SQLite（\`memory_items\`）結構化條目：偏好、約定、教訓、工作流程、檔案 — 範圍 **global** / **project** / **session**。
+
+**真相來源是 SQLite。** \`~/.hip/memories/\` 下 Markdown 是匯出鏡像。
+
+## 執行時行為
+
+| 路徑 | 行為 |
+|------|------|
+| **使用** | 核心快照 + 每輪預取 + \`memory_*\` 工具 |
+| **產生** | 閒置後 → Phase1 抽取 → Phase2 鞏固 |
+| **隱身** | 工作階段旗標：不注入、不抽取 |
+| **立即學習** | 設定中的控制項，強制抽取/鞏固 |
+
+## 隱私
+
+- 冷預設：使用/產生關閉
+- 混合檢索（可選）可能向嵌入服務傳送片段
+- 寫入時威脅掃描 + 金鑰脫敏
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip 設定與本機資料（Level 3）
+
+## 配置（\`~/.hip/\`）
+
+| 路徑 | 用途 |
+|------|------|
+| \`~/.hip/config/auth.json\` | 提供者 API 金鑰（0600 明文，依設計） |
+| \`~/.hip/config/hip.toml\` | 全域產品設定 |
+| \`~/.hip/config/memory.json\` | 記憶功能開關 |
+| \`~/.hip/config/network.json\` | 可選網路原則 |
+| \`~/.hip/config/hip-plugins.json\` | 已安裝外掛登錄 |
+| \`~/.hip/db/hip.db\` | SQLite 工作階段、訊息、記憶、事件 |
+| \`~/.hip/data/tool-output/\` | 大型工具輸出 |
+| \`~/.hip/logs/\` | Sidecar / 殼日誌 |
+| \`~/.hip/skills/\` | 全域技能 |
+| \`~/.hip/plugins/\` | 已安裝外掛 |
+| \`~/.hip/memories/\` | 記憶 Markdown 鏡像 |
+| \`~/.hip/builtin-skills/\` | 內建漸進產品技能（如 \`hip\`） |
+
+**不要**把 \`~/.hip/config/\` 同步到公開雲或公開 dotfile 倉庫。
+
+## 環境變數（進階）
+
+\`HIP_DATA_DIR\`、\`HIP_SKILLS_DIR\`、\`HIP_PLUGINS_DIR\`、\`HIP_AUTH_PATH\`、\`HIP_CONFIG_PATH\`、\`HIP_MEMORY_CONFIG_PATH\`、\`LANGSMITH_*\`。
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip 故障排除（Level 3）
+
+## API / 模型呼叫失敗
+
+1. 開啟 **設定 → 提供者**，確認已儲存金鑰。
+2. 金鑰在 \`~/.hip/config/auth.json\`（切勿向使用者列印金鑰）。
+3. 在 UI 外改鑑權後請重新啟動應用。
+4. 查看 \`~/.hip/logs/\`。
+
+## CLI：\`APP_NOT_RUNNING\`
+
+請先啟動 hip 桌面應用，再執行 \`yarn cli:dev doctor\`。
+
+## 開啟記憶後列表仍空
+
+確認使用/產生開關、對話輪次、API 金鑰；可試 **立即學習**。SQLite 是真相來源。
+
+## 智能體無法寫檔
+
+- **chat** 唯讀；**edit** 沙箱在專案根；**full** 需使用者明確授權。
+
+## 技能未列出
+
+可能在 \`hip.toml\` 停用；內建產品技能 id 為 \`hip\`（\`~/.hip/builtin-skills/hip/\`）。
+
+## Sidecar 連線
+
+重新啟動應用；開發時工具鏈變更後執行 \`yarn sidecar:dev-bin\`。
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip 智能體、外掛與 MCP（Level 3）
+
+## 內建智能體設定
+
+| 設定 | 角色 |
+|------|------|
+| **supervisor** | 預設編排：工具、提交、腳本、委派 |
+| **plan** | 偏設計 / 規劃 |
+| **explore** | 唯讀程式庫搜尋 |
+| **coder** | 偏實作，可帶腳本 |
+
+**內部**智能體：人設 + 綁定模型 + 工具授權。  
+**外部 / ACP**：獨立行程；產品記憶預設關閉。
+
+## 委派工具
+
+| 工具 | 用途 |
+|------|------|
+| \`task\` | 單個子任務 |
+| \`dispatch_agent\` | 名冊智能體（通常阻塞） |
+| \`task_batch\` | **2+ 獨立子任務首選**（真平行） |
+
+## 外掛與 MCP
+
+- 外掛：\`~/.hip/plugins/\`；登錄 \`~/.hip/config/hip-plugins.json\`。
+- MCP：\`mcp_search\` 後呼叫 \`mcp__<server>__<tool>\`。
+
+## 技能作用域
+
+全域 \`~/.hip/skills/\`、專案 \`.hip/skills/\`、外掛目錄、內建 \`~/.hip/builtin-skills/hip/\`（優先權最低）。
+`,
+  }
+  ],
+},
+}
+
+/** Map app language / BCP-47 tag → product help locale. */
+export function resolveProductHelpLocale(lang: string | null | undefined): ProductHelpLocale {
+  const raw = (lang ?? '').trim()
+  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en') return raw
+  if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
+  if (raw.startsWith('zh')) return 'zh-CN'
+  if (raw.startsWith('en')) return 'en'
+  return 'en'
+}
+
+/** Locale pack for Settings Help; falls back to English. */
+export function getProductHelpPack(lang: string | null | undefined): ProductHelpLocalePack {
+  return PRODUCT_HELP_LOCALES[resolveProductHelpLocale(lang)]
+}

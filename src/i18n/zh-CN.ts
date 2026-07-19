@@ -722,7 +722,8 @@ export const zhCN = {
         version: '版本 {{version}}',
         docsRev: '文档修订 {{rev}}',
         sectionsLabel: '帮助主题',
-        sourceNote: '来源：仓库 docs/product/（与智能体产品 skill 同源）。',
+        sourceNote:
+          '来源：仓库 docs/product/（英文 agent skill）与 locales/zh-CN|zh-TW。帮助页跟随界面语言。',
         sections: {
           overview: '概览',
           memory: '记忆',

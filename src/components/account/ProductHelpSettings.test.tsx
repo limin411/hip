@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { ProductHelpSettings } from './ProductHelpSettings'
-import { HIP_PRODUCT_VERSION, PRODUCT_HELP_SECTIONS } from '@/domain/product'
+import { HIP_PRODUCT_VERSION, getProductHelpPack } from '@/domain/product'
+
+let language = 'en'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -17,30 +19,58 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
+vi.mock('@/store/uiStore', () => ({
+  useUiStore: (sel: (s: { language: string }) => unknown) => sel({ language }),
+}))
+
 vi.mock('@/components/chat/MarkdownBody', () => ({
   MarkdownBody: ({ content }: { content: string }) => (
-    <div data-testid="md-body">{content.slice(0, 80)}</div>
+    <div data-testid="md-body">{content.slice(0, 120)}</div>
   ),
 }))
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  language = 'en'
+})
 
 describe('ProductHelpSettings', () => {
-  it('shows version and capability summary from product SoT', () => {
+  beforeEach(() => {
+    language = 'en'
+  })
+
+  it('shows version and English capability summary', () => {
     render(<ProductHelpSettings />)
     expect(screen.getByTestId('settings-product-help')).toBeInTheDocument()
     expect(screen.getByTestId('product-help-version')).toHaveTextContent(`v${HIP_PRODUCT_VERSION}`)
+    expect(screen.getByTestId('product-help-locale')).toHaveTextContent('en')
     expect(screen.getByTestId('product-help-capability')).toBeInTheDocument()
     expect(screen.getByTestId('product-help-panel-overview')).toBeInTheDocument()
+    expect(screen.getByTestId('product-help-description').textContent).toMatch(/Product help/i)
   })
 
   it('switches L3 sections via tabs', () => {
     render(<ProductHelpSettings />)
-    const memory = PRODUCT_HELP_SECTIONS.find((s) => s.id === 'memory')
-    expect(memory).toBeDefined()
     fireEvent.click(screen.getByTestId('product-help-tab-memory'))
     const panel = screen.getByTestId('product-help-panel-memory')
     expect(panel).toBeInTheDocument()
     expect(panel.textContent).toMatch(/memory/i)
+  })
+
+  it('uses zh-CN pack when UI language is zh-CN', () => {
+    language = 'zh-CN'
+    const pack = getProductHelpPack('zh-CN')
+    expect(pack.capabilityMap).toMatch(/产品要点|版本/)
+    render(<ProductHelpSettings />)
+    expect(screen.getByTestId('product-help-locale')).toHaveTextContent('zh-CN')
+    expect(screen.getByTestId('product-help-description').textContent).toMatch(/产品帮助|桌面/)
+    expect(screen.getByTestId('product-help-capability').textContent).toMatch(/产品要点|版本/)
+  })
+
+  it('uses zh-TW pack when UI language is zh-TW', () => {
+    language = 'zh-TW'
+    render(<ProductHelpSettings />)
+    expect(screen.getByTestId('product-help-locale')).toHaveTextContent('zh-TW')
+    expect(screen.getByTestId('product-help-description').textContent).toMatch(/產品說明|桌面/)
   })
 })

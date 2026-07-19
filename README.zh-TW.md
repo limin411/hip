@@ -1,6 +1,6 @@
 # hip
 
-[English](./README.md) | [简体中文](./README.zh-CN.md) | **繁體中文**
+[English](./README.md) | [简体中文](./README.zh-CN.md) | **繁體中文** | [日本語](./README.ja.md) | [한국어](./README.ko.md)
 
 **hip** 是一款桌面 AI 工作台（定位類似 Claude Code Desktop / Codex Desktop）：Tauri 殼 + React UI + Node.js sidecar，在本機專案中執行 [LangGraph](https://langchain-ai.github.io/langgraphjs/) 智能體。
 
@@ -215,7 +215,7 @@ SQLite 為權威資料來源；`~/.hip/memories/` 存放 Markdown 匯出鏡像�
 
 - 產品：[packages/product-content/](./packages/product-content/)
 - 編碼 / 委派 ops 技能：[packages/product-content/ops/](./packages/product-content/ops/)
-- UI 在地化：`packages/product-content/locales/zh-CN/`、`zh-TW/`
+- UI 在地化：`packages/product-content/locales/zh-CN/`、`zh-TW/`、`ja/`、`ko/`
 
 編輯上述目錄後重新產生嵌入：`yarn product:content`。
 
@@ -228,5 +228,9 @@ SQLite 為權威資料來源；`~/.hip/memories/` 存放 Markdown 匯出鏡像�
 | English | [README.md](./README.md) |
 | 简体中文 | [README.zh-CN.md](./README.zh-CN.md) |
 | 繁體中文 | [README.zh-TW.md](./README.zh-TW.md) |
+| 日本語 | [README.ja.md](./README.ja.md) |
+| 한국어 | [README.ko.md](./README.ko.md) |
 
 英文為 GitHub 與智能體側產品嵌入的預設語言。技術識別符（路徑、CLI 旗標、工具名）在各語言版本中保持一致。
+
+應用介面語言（設定 → 介面語言）：**English**、**简体中文**、**繁體中文**、**日本語**、**한국어**。

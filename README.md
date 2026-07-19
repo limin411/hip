@@ -1,6 +1,6 @@
 # hip
 
-**English** | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md)
+**English** | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
 
 **hip** is a desktop AI workbench (in the spirit of Claude Code Desktop / Codex Desktop): a Tauri shell, React UI, and Node.js sidecar that runs [LangGraph](https://langchain-ai.github.io/langgraphjs/) agents in your project.
 
@@ -244,7 +244,7 @@ Source of truth (not under `docs/`):
 
 - Product: [packages/product-content/](./packages/product-content/)
 - Coding / delegation ops skill: [packages/product-content/ops/](./packages/product-content/ops/)
-- UI locales: `packages/product-content/locales/zh-CN/`, `zh-TW/`
+- UI locales: `packages/product-content/locales/zh-CN/`, `zh-TW/`, `ja/`, `ko/`
 
 Regenerate embeds after editing those trees: `yarn product:content`.
 
@@ -257,5 +257,9 @@ Repo root `docs/` (if present) is optional developer notes only and is never rea
 | English | [README.md](./README.md) |
 | 简体中文 | [README.zh-CN.md](./README.zh-CN.md) |
 | 繁體中文 | [README.zh-TW.md](./README.zh-TW.md) |
+| 日本語 | [README.ja.md](./README.ja.md) |
+| 한국어 | [README.ko.md](./README.ko.md) |
 
 English is the default for GitHub and agent-facing product embeds. Keep technical identifiers (paths, CLI flags, tool names) identical across locales.
+
+App UI languages (Settings → Interface Language): **English**, **简体中文**, **繁體中文**, **日本語**, **한국어**.

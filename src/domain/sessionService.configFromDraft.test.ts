@@ -61,8 +61,41 @@ describe('configFromDraft', () => {
     expect(cfg.cwd).toBe('/work')
     expect(cfg.llmProvider).toBe('openai')
   })
-  it('never sets agentId', () => {
-    expect('agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' })).toBe(false)
+  it('does not set agentId for builtin / empty draft agent', () => {
+    expect(
+      'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' }),
+    ).toBe(false)
+    expect(
+      'agentId' in
+        configFromDraft({
+          tempId: 't',
+          mode: 'chat',
+          text: '',
+          modelKey: 'openai/gpt-4o',
+          agentId: 'builtin',
+        }),
+    ).toBe(false)
+  })
+  it('sets agentId when draft selects an external agent', () => {
+    const cfg = configFromDraft({
+      tempId: 't',
+      mode: 'chat',
+      text: '',
+      modelKey: 'openai/gpt-4o',
+      agentId: 'acp-opencode',
+    })
+    expect(cfg.agentId).toBe('acp-opencode')
+  })
+  it('carries external agentId on project drafts too', () => {
+    const cfg = configFromDraft({
+      tempId: 't',
+      mode: 'project',
+      cwd: '/p',
+      text: '',
+      agentId: 'acp-grok',
+    })
+    expect(cfg.agentId).toBe('acp-grok')
+    expect(cfg.surface).toBe('code')
   })
   it('project (code) draft carries permissionMode', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', permissionMode: 'full' })

@@ -2002,9 +2002,17 @@ export function configFromDraft(draft: Draft | null): SessionConfig {
   const modelKey = draft?.modelKey ?? activeModelKey(config)
   const effort = clampEffortForKey(catalog, modelKey, draft?.effort)
   const withEffort: SessionConfig = effort ? { ...withPlan, effort } : withPlan
-  if (!draft?.modelKey) return withEffort
-  const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
-  return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
+  const withModel: SessionConfig = !draft?.modelKey
+    ? withEffort
+    : (() => {
+        const { llmProvider, model, baseURL } = resolveModelConfig(catalog, config, draft.modelKey)
+        return { ...withEffort, llmProvider, model, ...(baseURL ? { baseURL } : {}) }
+      })()
+  // Primary agent: only set when draft picks an external ACP agent (not builtin / empty).
+  if (draft?.agentId && draft.agentId !== 'builtin') {
+    return { ...withModel, agentId: draft.agentId }
+  }
+  return withModel
 }
 
 /** App singleton: connects to the live sidecar over WsTransport. */

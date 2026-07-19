@@ -299,6 +299,13 @@ export const zhTW = {
     "styleDelete": "刪除風格",
     "styleEmpty": "還沒有儲存的風格，請在下方新建。",
     "agentRestarted": "外部智慧體已重啟 —— 之前的上下文未保留。",
+    "acpCliff": {
+      "title": "外部智慧體模式",
+      "body": "目前工作階段由 {{name}} 驅動。Hip 工具、技能與委派不可用。",
+      "mcpOff": "未轉發 Hip MCP 伺服器（可在 設定 → ACP 中開啟）。",
+      "mcpOn": "已將設定的 Hip MCP 伺服器轉發到此智慧體。",
+      "dismiss": "知道了"
+    },
     "modelHint": "選擇模型",
     "noModelSelected": "選擇模型",
     "attach": "新增附件",
@@ -378,6 +385,13 @@ export const zhTW = {
     "subagent": {
       "noSummary": "子任務已完成（無文字總結）",
       "toolsCount": "{{count}} 步"
+    }
+  },
+  "composer": {
+    "agentPicker": {
+      "label": "智慧體",
+      "builtin": "hip（內建）",
+      "empty": "尚未啟用外部智慧體。請在設定中新增。"
     }
   },
   "artifact": {

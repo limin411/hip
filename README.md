@@ -11,7 +11,7 @@ Reviewer pipeline on ordinary turns.
 
 Cross-session memory is **off by default**. Enable under **Settings → Memory**.
 SQLite is the source of truth; `~/.hip/memories/` holds markdown export mirrors.
-In-app help: **Settings → Help** (or [packages/product-content/references/memory.md](./packages/product-content/references/memory.md)).
+Product copy for the agent (and optional maintainer reading): [packages/product-content/references/memory.md](./packages/product-content/references/memory.md).
 
 ## Architecture
 
@@ -179,11 +179,11 @@ yarn cli:dev repl --cwd .
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 
-## Product content (ships with the app)
+## Product content (agent embeds)
 
-In-app: **Settings → Help** (follows UI language: en / zh-CN / zh-TW).
+Builtin product / coding skills are embedded for the agent (not a user-facing Help page).
 
-Source of truth for Help + builtin skills (not under `docs/`):
+Source of truth (not under `docs/`):
 
 - Product: [packages/product-content/](./packages/product-content/)
 - Coding / delegation ops skill: [packages/product-content/ops/](./packages/product-content/ops/)

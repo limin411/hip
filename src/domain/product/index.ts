@@ -1,8 +1,7 @@
 /**
- * Product help docs for UI (Settings → Help).
- * Bodies are generated from packages/product-content/ (+ locales) — see yarn product:content.
- *
- * Agent embeds stay English in packages/sidecar; UI uses getProductHelpPack(language).
+ * Generated product-help strings (from packages/product-content/).
+ * No longer shown as a Settings page; kept for tests / optional future use.
+ * Agent embeds live in packages/sidecar (English).
  */
 export {
   HIP_PRODUCT_VERSION,

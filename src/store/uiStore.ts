@@ -25,7 +25,24 @@ export type SettingsPageId =
   | 'plugins'
   | 'hooks'
   | 'memory'
-  | 'help'
+
+const SETTINGS_PAGE_IDS: readonly SettingsPageId[] = [
+  'general',
+  'model',
+  'agents',
+  'mcp',
+  'skill',
+  'plugins',
+  'hooks',
+  'memory',
+]
+
+function normalizeSettingsPage(v: unknown): SettingsPageId {
+  if (typeof v === 'string' && (SETTINGS_PAGE_IDS as readonly string[]).includes(v)) {
+    return v as SettingsPageId
+  }
+  return 'general'
+}
 
 const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
 const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'compact']
@@ -115,6 +132,8 @@ export function mergeUiPersistedState<
     activeView: 'chat' as const,
     sidebarSection: 'chats' as const,
     density: normalizeUiDensity((rest as { density?: unknown }).density),
+    // Drop removed pages (e.g. legacy 'help') so tabs stay valid.
+    settingsPage: normalizeSettingsPage((rest as { settingsPage?: unknown }).settingsPage),
   }
 }
 

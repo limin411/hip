@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import type { TerminalShellPref } from '@hip/protocol'
 import { cn } from '@/lib/utils'
 import { detectHipPlatform } from '@/lib/platform'
@@ -41,7 +41,6 @@ export function GeneralSettings() {
   const setTheme = useUiStore((s) => s.setTheme)
   const density = useUiStore((s) => s.density)
   const setDensity = useUiStore((s) => s.setDensity)
-  const setSettingsPage = useUiStore((s) => s.setSettingsPage)
 
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
   const updateSection = useHipConfigStore((s) => s.updateSection)
@@ -167,21 +166,6 @@ export function GeneralSettings() {
           </div>
         </div>
       ) : null}
-      <button
-        type="button"
-        data-testid="settings-open-product-help"
-        onClick={() => setSettingsPage('help')}
-        className="flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition-colors hover:bg-state-hover"
-      >
-        <div className="flex min-w-0 items-start gap-3">
-          <BookOpen size={18} className="mt-0.5 shrink-0 text-ink-secondary" aria-hidden />
-          <div className="min-w-0">
-            <div className="text-prose font-medium text-ink">{t('settings.productHelp.navLabel')}</div>
-            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.productHelp.intro')}</div>
-          </div>
-        </div>
-        <ChevronRight size={16} className="shrink-0 text-ink-tertiary" aria-hidden />
-      </button>
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>
   )

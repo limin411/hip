@@ -114,7 +114,6 @@ export function GlobalCommandPalette() {
         plugins: t('commandPalette.settings.plugins'),
         hooks: t('commandPalette.settings.hooks'),
         memory: t('commandPalette.settings.memory'),
-        help: t('commandPalette.settings.help'),
       },
       context: {
         diff: t('commandPalette.context.diff'),

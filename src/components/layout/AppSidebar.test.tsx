@@ -103,10 +103,11 @@ describe('AppSidebar', () => {
     cleanup()
   })
 
-  it('renders search, nav, and chat sessions for chats section', () => {
+  it('renders search icon, nav, and chat sessions for chats section', () => {
     render(<AppSidebar />)
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
@@ -138,12 +139,12 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-nav-projects')).toHaveTextContent('1')
   })
 
-  it('filters sessions by search query', () => {
+  it('search icon opens command palette', async () => {
+    const { useCommandPaletteStore } = await import('@/store/commandPaletteStore')
+    useCommandPaletteStore.setState({ open: false })
     render(<AppSidebar />)
-    fireEvent.change(screen.getByTestId('sidebar-search'), { target: { value: 'nope' } })
-    expect(screen.queryByTestId('sidebar-session-chat-1')).not.toBeInTheDocument()
-    fireEvent.change(screen.getByTestId('sidebar-search'), { target: { value: 'Hello' } })
-    expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('sidebar-search'))
+    expect(useCommandPaletteStore.getState().open).toBe(true)
   })
 
   it('nav knowledge calls enterKnowledge', () => {

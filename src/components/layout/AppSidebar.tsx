@@ -56,7 +56,6 @@ import { SidebarAccountFooter } from './SidebarAccountFooter'
 export function AppSidebar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
-  const [query, setQuery] = useState('')
   /** Session ids whose worktree subtree is collapsed (default = expanded when slots exist). */
   const [worktreeCollapsed, setWorktreeCollapsed] = useState<Record<string, boolean>>({})
   const sidebarSection = useUiStore((s) => s.sidebarSection)
@@ -68,9 +67,6 @@ export function AppSidebar() {
   const parallelRuns = useParallelStore((s) => s.runs)
   const catalogById = useWorktreeStore((s) => s.byId)
   const isMac = isMacPlatform()
-  const mod = isMac ? '⌘' : 'Ctrl+'
-
-  const q = query.trim().toLowerCase()
 
   const hydrateWorktrees = (sessionId: string) => {
     sessionService.requestWorktreeList(sessionId)
@@ -102,25 +98,12 @@ export function AppSidebar() {
   const filteredSessions = useMemo(() => {
     const surface = sidebarSection === 'projects' ? 'code' : 'chat'
     if (sidebarSection !== 'projects' && sidebarSection !== 'chats') return []
-    let list = sessions
+    return sessions
       .filter((s) => surfaceOf(s.config) === surface)
       // Worktree-bound / slot sessions only appear nested under the host expand tree.
       .filter((s) => !nestedWorktreeSessionIds.has(s.id))
       .sort((a, b) => b.updatedAtMs - a.updatedAtMs)
-    if (q) {
-      list = list.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.preview.toLowerCase().includes(q) ||
-          (s.config.cwd ?? '').toLowerCase().includes(q) ||
-          // Match worktree branch when searching
-          (runsByHost.get(s.id) ?? []).some((r) =>
-            r.slots.some((sl) => sl.branch.toLowerCase().includes(q)),
-          ),
-      )
-    }
-    return list
-  }, [sessions, sidebarSection, q, nestedWorktreeSessionIds, runsByHost])
+  }, [sessions, sidebarSection, nestedWorktreeSessionIds])
 
   /** Project sessions only: group top-level rows by workspace path. */
   const projectSessionGroups = useMemo(() => {
@@ -138,12 +121,11 @@ export function AppSidebar() {
 
   const filteredSpaces = useMemo(() => {
     if (sidebarSection !== 'knowledge') return []
-    let list = [...spaces]
-    if (q) list = list.filter((sp) => sp.name.toLowerCase().includes(q))
+    const list = [...spaces]
     // Ascending by name (locale-aware, case-insensitive).
     list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
     return list
-  }, [spaces, sidebarSection, q])
+  }, [spaces, sidebarSection])
 
   const projectCount = useMemo(
     () =>
@@ -185,7 +167,7 @@ export function AppSidebar() {
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
         onPointerDown={handlePointerDown}
-        className={cn('flex shrink-0 items-center', isMac ? 'h-10' : 'h-3')}
+        className="flex h-10 shrink-0 items-center gap-1 pr-2"
       >
         {isMac ? (
           <div
@@ -193,43 +175,20 @@ export function AppSidebar() {
             style={{ width: 'var(--titlebar-lights-inset, 90px)' }}
             aria-hidden
           />
-        ) : null}
-      </div>
-
-      <div className="shrink-0 px-3 pb-2">
-        <label htmlFor="sidebar-search-input" className="sr-only">
-          {t('sidebar.searchPlaceholder')}
-        </label>
-        <div
-          className={cn(
-            'flex h-[var(--row-h-sidebar)] items-center gap-2 rounded-lg border border-border bg-surface px-2.5',
-            'focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
-          )}
+        ) : (
+          <div className="w-2 shrink-0" aria-hidden />
+        )}
+        <button
+          type="button"
+          data-testid="sidebar-search"
+          data-no-drag
+          title={t('commandPalette.openTrigger')}
+          aria-label={t('commandPalette.openTriggerAria')}
+          onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
-          <Search size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-          <input
-            id="sidebar-search-input"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('sidebar.searchPlaceholder')}
-            data-testid="sidebar-search"
-            data-no-drag
-            autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-ink-tertiary"
-          />
-          <button
-            type="button"
-            data-testid="sidebar-search-palette"
-            data-no-drag
-            title={t('commandPalette.openTrigger')}
-            aria-label={t('commandPalette.openTriggerAria')}
-            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-            className="shrink-0 rounded border border-border bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-ink-tertiary transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-          >
-            {mod}K
-          </button>
-        </div>
+          <Search size={16} aria-hidden />
+        </button>
       </div>
 
       <nav className="flex shrink-0 flex-col gap-0.5 border-b border-border px-2 pb-2" aria-label={t('sidebar.navAria')}>
@@ -310,7 +269,7 @@ export function AppSidebar() {
         {sidebarSection === 'knowledge' ? (
           filteredSpaces.length === 0 ? (
             <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
-              {q ? t('sidebar.emptySearch') : t('sidebar.emptySpaces')}
+              {t('sidebar.emptySpaces')}
             </p>
           ) : (
             <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">
@@ -363,7 +322,7 @@ export function AppSidebar() {
           )
         ) : filteredSessions.length === 0 ? (
           <p className="px-2 py-4 text-center text-meta text-ink-tertiary" role="status">
-            {q ? t('sidebar.emptySearch') : t('sidebar.emptySessions')}
+            {t('sidebar.emptySessions')}
           </p>
         ) : sidebarSection === 'projects' ? (
           <ul className="m-0 list-none p-0" aria-labelledby="sidebar-list-heading">

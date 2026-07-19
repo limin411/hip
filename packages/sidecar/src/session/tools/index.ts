@@ -130,6 +130,8 @@ export function buildAllTools(
   extras.push(...buildMediaTools({ enabled: opts.mediaEnabled }))
 
   // parallel_worktrees — agent proposes N isolated worktrees; user confirms count via HITL
+  // (optionIds n1–n4 / reject). UI localizes option labels client-side by optionId (PR8 / D19);
+  // create path stays unified with host fan-out via WorktreeService (D26) — do not re-split.
   if (
     profile.toolPolicy.allowParallelWorktrees &&
     cwd &&

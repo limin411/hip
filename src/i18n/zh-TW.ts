@@ -47,7 +47,17 @@ export const zhTW = {
         "n2": "2 路",
         "n3": "3 路",
         "n4": "4 路",
-        "reject": "拒絕"
+        "reject": "不要並行"
+      },
+      "source": {
+        "protocol": "手動建立",
+        "parallel": "智慧體並行",
+        "host_fanout": "並行探索",
+        "agent_tool": "智慧體工具",
+        "background": "背景",
+        "import": "匯入",
+        "discovered": "已發現",
+        "primary": "主工作區"
       },
       "chipAria": "隔離工作區",
       "chipPurpose": "瀏覽、切換或新建隔離工作區",

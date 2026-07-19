@@ -39,13 +39,24 @@ export const zhCN = {
           single: '检测到单一聚焦改动，建议 1 路隔离工作区',
           default: '默认建议 2 路，便于轻量 A/B 对比',
         },
-        /** parallel_worktrees HITL optionId → 文案桩（PR8 消费）。 */
+        /** parallel_worktrees HITL optionId → 文案（PermissionModal 按 optionId 映射）。 */
         hitlOption: {
           n1: '1 路',
           n2: '2 路',
           n3: '3 路',
           n4: '4 路',
-          reject: '拒绝',
+          reject: '不要并行',
+        },
+        /** 目录行 WorktreeSource 人读文案（PR7 source 接线后）。 */
+        source: {
+          protocol: '手动创建',
+          parallel: '智能体并行',
+          host_fanout: '并行探索',
+          agent_tool: '智能体工具',
+          background: '后台',
+          import: '导入',
+          discovered: '已发现',
+          primary: '主工作区',
         },
         /** 浏览弹层（PR3） */
         chipAria: '隔离工作区',

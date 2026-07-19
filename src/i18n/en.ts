@@ -40,13 +40,24 @@ export const en = {
           single: 'Single focused change → 1 isolated workspace',
           default: 'Default: 2 tracks for a light A/B comparison',
         },
-        /** HITL optionId → label stubs for parallel_worktrees (PR8 consumes). */
+        /** HITL optionId → labels for parallel_worktrees (PermissionModal maps by optionId). */
         hitlOption: {
           n1: '1 track',
           n2: '2 tracks',
           n3: '3 tracks',
           n4: '4 tracks',
-          reject: 'Reject',
+          reject: "Don't parallelize",
+        },
+        /** Humanized WorktreeSource subtitles for catalog rows (after PR7 source wire). */
+        source: {
+          protocol: 'Manual',
+          parallel: 'Agent parallel',
+          host_fanout: 'Parallel explore',
+          agent_tool: 'Agent tool',
+          background: 'Background',
+          import: 'Imported',
+          discovered: 'Discovered',
+          primary: 'Main',
         },
         /** Browse popover (PR3) */
         chipAria: 'Isolated workspaces',

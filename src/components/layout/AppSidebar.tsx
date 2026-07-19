@@ -37,6 +37,7 @@ import {
   extractParallelNestingHints,
   nestableCatalogPaths,
 } from '@/lib/worktreeNesting'
+import { resolveWorktreeSourceLabel } from '@/lib/worktreeHitlLabels'
 import { useUiStore, type SidebarSection } from '@/store/uiStore'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { openCreateKnowledgeSpaceDialog } from '@/components/knowledge/knowledgeSpaceDialogStore'
@@ -687,8 +688,11 @@ function CatalogWorktreeRow({
   row: CatalogWorktree
   hostSessionId: string
 }) {
+  const { t } = useTranslation()
   const pathLabel = shortWorktreeLabel(row.path, row.branch)
   const label = row.label || row.branch || pathLabel
+  // After PR7 source wire: humanize known enums; never leak raw WorktreeSource strings (D18).
+  const sourceLabel = resolveWorktreeSourceLabel(row.source, t)
   return (
     <li>
       <DeclarativeContextMenu
@@ -719,7 +723,7 @@ function CatalogWorktreeRow({
             <span className="block truncate text-[12px] font-medium text-ink">{label}</span>
             <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={row.path}>
               {pathLabel}
-              {row.source ? ` · ${row.source}` : ''}
+              {sourceLabel ? ` · ${sourceLabel}` : ''}
             </span>
           </span>
         </button>

@@ -68,6 +68,9 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
         'Choose how many isolated git worktrees to create. Each slot runs a worker on a separate branch under ~/.hip/worktrees (main tree is not modified by workers).',
       ].join('\n')
 
+      // `name` is CN fallback only. Desktop PermissionModal rewrites labels by optionId
+      // (n1–n4, reject) via chat.worktreeControl.hitlOption.* (D19 / PR8). Do not add a
+      // Node i18n bundle here — the app owns localization. optionId values are the contract.
       const options: PermissionOption[] = [
         {
           optionId: 'n1',

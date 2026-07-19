@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import i18n from '@/i18n'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
 import { DEFAULT_CONFIG } from '@/domain/sessionStore'
@@ -448,6 +449,57 @@ describe('AppSidebar', () => {
     )
     render(<AppSidebar />)
     expect(screen.getByTestId('sidebar-session-code-1')).toBeInTheDocument()
+  })
+
+  it('humanizes catalog worktree source subtitle (no raw enum leak)', async () => {
+    await i18n.changeLanguage('en')
+    const hostCwd = '/Users/x/data/code-repository/project-go/forgejo'
+    useUiStore.setState({ sidebarSection: 'projects', activeView: 'code' })
+    useDomainStore.setState((st) => ({
+      ...st,
+      sessions: [
+        {
+          id: 'code-1',
+          title: 'Forgejo',
+          preview: 'repo',
+          updatedAtMs: Date.now(),
+          config: { ...DEFAULT_CONFIG, surface: 'code', cwd: hostCwd },
+          messages: [],
+          status: 'idle',
+          loaded: true,
+        },
+      ],
+      activeSessionId: 'code-1',
+    }) as never)
+    useWorktreeStore.getState().upsertFromList(
+      [
+        {
+          id: 'primary',
+          path: hostCwd,
+          branch: 'main',
+          head: 'abc',
+          managed: false,
+          isPrimary: true,
+          source: 'primary',
+          repoKey: 'rk',
+        },
+        {
+          id: 'slot-wt',
+          path: '/Users/x/.hip/worktrees/forgejo-p1',
+          branch: 'hip-p-1',
+          head: 'def',
+          managed: true,
+          isPrimary: false,
+          source: 'host_fanout',
+          repoKey: 'rk',
+        },
+      ],
+      'code-1',
+    )
+    render(<AppSidebar />)
+    const row = screen.getByTestId('sidebar-catalog-wt-slot-wt')
+    expect(row).toHaveTextContent('Parallel explore')
+    expect(row).not.toHaveTextContent('host_fanout')
   })
 
   it('marks project group when path is missing on disk', () => {

@@ -3,6 +3,7 @@ import type { PermissionOption } from '@hip/protocol'
 import { sessionService, useActiveSessionId, useActivePendingPermission } from '@/domain'
 import { useDomainStore } from '@/domain/sessionStore'
 import { Button } from '@/components/ui/Button'
+import { resolvePermissionOptionLabel } from '@/lib/worktreeHitlLabels'
 
 const REJECT_PREFIX = 'reject'
 
@@ -18,6 +19,9 @@ function orderOptions(options: PermissionOption[]): PermissionOption[] {
  * an inline panel above the composer shows the gated tool and one button per advertised option.
  * Non-modal: other sessions and chrome stay usable; only this session's turn waits on the choice.
  * Picking an option forwards it to the agent and clears the local queue so the blocked tool proceeds.
+ *
+ * For `parallel_worktrees`, button labels are rewritten from optionId (n1–n4, reject) via
+ * `chat.worktreeControl.hitlOption.*` so EN/zh-TW are not stuck on sidecar CN fallbacks (D19).
  */
 export function PermissionModal() {
   const { t } = useTranslation()
@@ -76,6 +80,7 @@ export function PermissionModal() {
         <div className="flex flex-wrap gap-2">
           {orderOptions(options).map((o) => {
             const isReject = o.kind.startsWith(REJECT_PREFIX)
+            const label = resolvePermissionOptionLabel(o, tool.kind, t)
             return (
               <Button
                 key={o.optionId}
@@ -84,7 +89,7 @@ export function PermissionModal() {
                 onClick={() => respond({ optionId: o.optionId })}
                 data-testid={`permission-option-${o.optionId}`}
               >
-                {o.name}
+                {label}
               </Button>
             )
           })}

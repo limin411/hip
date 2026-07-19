@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import {
   acpReadTextFile,
   acpWriteTextFile,
-  AcpFsError,
   type FsBridgeContext,
 } from './acp-fs-bridge.js'
 
@@ -99,7 +98,10 @@ describe('acpWriteTextFile', () => {
   it('rejects write outside jail in edit mode', async () => {
     await expect(
       acpWriteTextFile({ path: '../escape.txt', content: 'x' }, ctx({ permissionMode: 'edit' })),
-    ).rejects.toBeInstanceOf(AcpFsError)
+    ).rejects.toMatchObject({
+      code: 'permission_denied',
+      message: expect.stringContaining('ACP fs: permission denied'),
+    })
   })
 
   it('allows write outside cwd in full mode', async () => {

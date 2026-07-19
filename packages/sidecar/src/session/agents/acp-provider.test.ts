@@ -42,6 +42,17 @@ describe('AcpAgentProvider', () => {
     p.dispose()
   })
 
+  it('consumes turn FS context — second runTurn without re-set fails', async () => {
+    const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
+    const a = cap()
+    await p.runTurn('first', a.emit, new AbortController().signal)
+    // Context was consumed; must re-set before next turn
+    const b = cap()
+    await expect(p.runTurn('second', b.emit, new AbortController().signal))
+      .rejects.toThrow(/setTurnFsContext required/)
+    p.dispose()
+  })
+
   it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished', async () => {
     const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()

@@ -414,6 +414,12 @@ const DEFAULT_FS_READ_MAX_BYTES = 2_000_000
  *
  * When `cwd` is provided, merges global + project `.hip/hip.toml` (project wholesale-replaces).
  * When omitted, reads only the global `HIP_CONFIG_PATH` config.
+ *
+ * Note: `AcpConnection` captures `fsBridge` at construct from the global config only
+ * (pool is agent-keyed, not cwd-keyed). Project-level `fs_bridge=false` affects
+ * `resolveAcpHostConfig(cwd).fsReadMaxBytes` / `forwardMcp` callers, but does **not**
+ * re-init an already-warm child's advertise/handler kill-switch — restart or set
+ * global `HIP_CONFIG_PATH` for process-wide FS disable.
  */
 export function resolveAcpHostConfig(cwd?: string): ResolvedAcpHostConfig {
   const raw = cwd ? resolveEffectiveConfig(cwd).acp : readHipConfig().acp

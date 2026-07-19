@@ -40,8 +40,16 @@ export class AcpConnection {
   private readonly fsContexts = new Map<string, FsBridgeContext>()
   /** Tail of the child's stderr, kept for diagnostics on death. */
   private stderrTail = ''
+  /**
+   * FS bridge kill-switch captured at construct (global HIP_CONFIG_PATH only — pool is agent-keyed,
+   * not cwd-keyed; project `.hip/hip.toml` [acp] does not re-init an existing warm child).
+   * Same flag gates advertise + handlers so non-compliant agents cannot bypass fs_bridge=false.
+   */
+  private readonly fsEnabled: boolean
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
+    // Resolve once so advertise and handlers cannot diverge for this child.
+    this.fsEnabled = resolveAcpHostConfig().fsBridge !== false
     const { command, args, env } = buildAcpSpawn(agent, model)
     this.child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'pipe'] })
     this.child.stderr.setEncoding('utf8')
@@ -58,28 +66,8 @@ export class AcpConnection {
           if (!sink) return { outcome: { outcome: 'cancelled' } }
           return sink.onPermission(p)
         },
-        readTextFile: async (p) => {
-          try {
-            const ctx = this.fsContexts.get(p.sessionId)
-            if (!ctx) {
-              throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
-            }
-            return await acpReadTextFile(p, ctx)
-          } catch (e) {
-            throw toFsRequestError(e)
-          }
-        },
-        writeTextFile: async (p) => {
-          try {
-            const ctx = this.fsContexts.get(p.sessionId)
-            if (!ctx) {
-              throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
-            }
-            return await acpWriteTextFile(p, ctx)
-          } catch (e) {
-            throw toFsRequestError(e)
-          }
-        },
+        readTextFile: async (p) => this.handleFsRead(p),
+        writeTextFile: async (p) => this.handleFsWrite(p),
       }),
       ndJsonStream(Writable.toWeb(this.child.stdin), Readable.toWeb(this.child.stdout) as ReadableStream<Uint8Array>),
     )
@@ -89,15 +77,9 @@ export class AcpConnection {
   /** Number of ACP sessions currently held open over this warm child. */
   get sessionCount(): number { return this.openSessions.size }
 
-  /** Whether initialize advertised fs read/write (set during ensureInit). */
-  private fsAdvertised = false
-
   private ensureInit(): Promise<void> {
     if (!this.initPromise) {
-      const host = resolveAcpHostConfig()
-      const fsOn = host.fsBridge !== false
-      this.fsAdvertised = fsOn
-      const clientCapabilities = fsOn
+      const clientCapabilities = this.fsEnabled
         ? { fs: { readTextFile: true, writeTextFile: true } }
         : {}
       this.initPromise = this.conn
@@ -105,6 +87,53 @@ export class AcpConnection {
         .then((r) => { this.authMethods = (r as { authMethods?: Array<{ id: string }> }).authMethods ?? [] })
     }
     return this.initPromise
+  }
+
+  /**
+   * Client FS read with kill-switch + per-session jail gates.
+   * Exposed for unit tests (same path as JSON-RPC handler).
+   */
+  async handleFsRead(p: {
+    sessionId: string
+    path: string
+    line?: number | null
+    limit?: number | null
+  }): Promise<{ content: string }> {
+    try {
+      if (!this.fsEnabled) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      const ctx = this.fsContexts.get(p.sessionId)
+      if (!ctx) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      return await acpReadTextFile(p, ctx)
+    } catch (e) {
+      throw toFsRequestError(e)
+    }
+  }
+
+  /**
+   * Client FS write with kill-switch + per-session jail gates.
+   * Exposed for unit tests (same path as JSON-RPC handler).
+   */
+  async handleFsWrite(p: {
+    sessionId: string
+    path: string
+    content: string
+  }): Promise<Record<string, never>> {
+    try {
+      if (!this.fsEnabled) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      const ctx = this.fsContexts.get(p.sessionId)
+      if (!ctx) {
+        throw new AcpFsError('permission_denied', `ACP fs: permission denied: ${p.path}`)
+      }
+      return await acpWriteTextFile(p, ctx)
+    } catch (e) {
+      throw toFsRequestError(e)
+    }
   }
 
   /** Bind FS jail/mode for an ACP session (call before prompt; per-session, no cross-leak). */
@@ -117,9 +146,9 @@ export class AcpConnection {
     this.fsContexts.delete(acpSessionId)
   }
 
-  /** True when this connection advertised fs client capabilities at initialize. */
+  /** True when this connection advertises + serves fs client capabilities (construct-time flag). */
   get advertisedFs(): boolean {
-    return this.fsAdvertised
+    return this.fsEnabled
   }
 
   /** Create a new ACP session (cwd-scoped). Authenticates on demand if the agent demands it. */
@@ -263,9 +292,7 @@ function toFsRequestError(e: unknown): RequestError {
     if (e.code === 'not_found') {
       return new RequestError(-32002, e.message, { code: e.code })
     }
-    if (e.code === 'permission_denied') {
-      return new RequestError(-32603, e.message, { code: e.code })
-    }
+    // permission_denied | too_large | io_error → internal with data.code taxonomy
     return new RequestError(-32603, e.message, { code: e.code })
   }
   const msg = e instanceof Error ? e.message : String(e)

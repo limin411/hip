@@ -95,4 +95,45 @@ describe('AcpConnectionManager', () => {
     await conn.newSession(process.cwd())
     expect(conn.advertisedFs).toBe(false)
   })
+
+  it('denies FS read/write when no setFsContext (no cross-session leak)', async () => {
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-no-ctx' }), null)
+    const sid = await conn.newSession(process.cwd())
+    // Intentionally do NOT call setFsContext
+    await expect(conn.handleFsRead({ sessionId: sid, path: 'any.txt' })).rejects.toMatchObject({
+      message: expect.stringContaining('ACP fs: permission denied'),
+      data: { code: 'permission_denied' },
+    })
+    await expect(
+      conn.handleFsWrite({ sessionId: sid, path: 'any.txt', content: 'x' }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('ACP fs: permission denied'),
+      data: { code: 'permission_denied' },
+    })
+  })
+
+  it('hard-denies FS when fs_bridge=false even if context is set (kill-switch)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'acp-cfg-'))
+    tmpDirs.push(dir)
+    const cfgPath = join(dir, 'hip.toml')
+    writeFileSync(cfgPath, `version = 1\n\n[acp]\nfs_bridge = false\n`)
+    process.env.HIP_CONFIG_PATH = cfgPath
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-fs-kill' }), null)
+    const sid = await conn.newSession(process.cwd())
+    conn.setFsContext(sid, {
+      cwd: process.cwd(),
+      permissionMode: 'edit',
+      readMaxBytes: 2_000_000,
+    })
+    await expect(conn.handleFsRead({ sessionId: sid, path: 'package.json' })).rejects.toMatchObject({
+      message: expect.stringContaining('ACP fs: permission denied'),
+      data: { code: 'permission_denied' },
+    })
+    await expect(
+      conn.handleFsWrite({ sessionId: sid, path: 'x.txt', content: 'nope' }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('ACP fs: permission denied'),
+      data: { code: 'permission_denied' },
+    })
+  })
 })

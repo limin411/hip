@@ -72,7 +72,10 @@ export class AcpAgentProvider implements AgentProvider {
 
   async runTurn(text: string, emit: GraphEmit, signal: AbortSignal, hooks?: ExternalAgentHooks): Promise<void> {
     if (signal.aborted) throw abortError()
-    if (!this.turnCtx) {
+    // Consume turn context so each runTurn requires a fresh setTurnFsContext (no stale mode reuse).
+    const turnCtx = this.turnCtx
+    this.turnCtx = null
+    if (!turnCtx) {
       throw new Error('AcpAgentProvider: setTurnFsContext required before runTurn')
     }
     this.currentHooks = hooks ?? null
@@ -89,7 +92,7 @@ export class AcpAgentProvider implements AgentProvider {
       conn = session.conn; sid = session.sid
       if (aborted) throw abortError() // aborted during session setup, before the prompt started
 
-      conn.setFsContext(sid, this.turnCtx)
+      conn.setFsContext(sid, turnCtx)
 
       conn.registerSink(sid, {
         onUpdate: (u) => this.applyUpdate(u, emit),

@@ -34,7 +34,8 @@
     "product:content": "node scripts/generate-product-content.mjs && node scripts/generate-ops-content.mjs",
     "product:content:check": "node scripts/generate-product-content.mjs --check && node scripts/generate-ops-content.mjs --check",
     "prompt:dogfood": "node --import tsx scripts/product-prompt-dogfood.mjs",
-    "prompt:dogfood:live": "DOGFOOD_LIVE=1 node --import tsx scripts/product-prompt-dogfood.mjs"
+    "prompt:dogfood:live": "DOGFOOD_LIVE=1 node --import tsx scripts/product-prompt-dogfood.mjs",
+    "i18n:sync-zh-TW": "python3 scripts/sync-zh-TW-i18n.py"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",

@@ -115,7 +115,7 @@ describe('SidebarAccountFooter', () => {
     )
     const settings = screen.getByTestId('account-settings-button')
     expect(settings).toHaveClass('before:bg-accent')
-    expect(settings).toHaveClass('bg-surface')
+    expect(settings).toHaveClass('bg-state-hover')
     expect(settings.className).not.toMatch(/shadow-\[0_0_0_1px/)
     expect(settings).not.toHaveClass('bg-state-active')
 

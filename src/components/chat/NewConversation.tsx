@@ -131,21 +131,21 @@ export function NewConversation() {
   }, [globalPaletteOpen, text, handleDismiss])
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-5 pb-28" data-testid="new-conversation">
-      <div className="w-full max-w-3xl">
-        <div className="mb-1 flex justify-center">
+    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 pb-32" data-testid="new-conversation">
+      <div className="w-full max-w-2xl">
+        <div className="mb-3 flex justify-center">
           <MascotActor
             key={surface}
-            size={420}
+            size={360}
             initialAction={surface === 'code' ? 'code' : 'wave'}
             transition="slide"
           />
         </div>
         <div key={surface} className="animate-greeting-enter">
-          <h1 className="mb-1 text-center text-display font-semibold text-ink">
+          <h1 className="mb-2 text-center text-display font-semibold tracking-tight text-ink">
             {greeting}
           </h1>
-          <p className="mb-4 text-center text-body text-ink-secondary">
+          <p className="mb-8 text-center text-body text-ink-secondary">
             {t('chat.greetingSub.default', '')}
           </p>
         </div>

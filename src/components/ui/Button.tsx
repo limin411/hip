@@ -3,11 +3,11 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition active:scale-[0.985] duration-100 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:pointer-events-none',
+  'inline-flex items-center justify-center gap-1.5 border border-transparent font-medium transition-[background-color,color,border-color,transform,opacity] duration-chrome active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 disabled:opacity-40 disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        // Cursor-inspired solid inverse — soft monochrome (not pure ink-black), never sage paint
+        // Solid inverse CTA — soft monochrome (not pure ink-black), never sage paint
         primary:
           'bg-btn-primary text-on-btn-primary hover:bg-btn-primary-hover focus-visible:ring-ink/25',
         secondary:
@@ -23,9 +23,9 @@ export const buttonVariants = cva(
       },
       size: {
         sm: 'h-7 rounded-md px-2.5 text-body',
-        md: 'h-8 rounded-lg px-3 text-body',
+        md: 'h-8 rounded-md px-3 text-body',
         lg: 'h-9 rounded-lg px-3.5 text-body',
-        icon: 'h-7 w-7 rounded-lg p-0 text-body',
+        icon: 'h-7 w-7 rounded-md p-0 text-body',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },

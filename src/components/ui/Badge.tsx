@@ -2,15 +2,15 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded transition active:scale-[0.97]',
+  'inline-flex items-center gap-1 rounded-md transition-colors duration-chrome active:scale-[0.97]',
   {
     variants: {
       variant: {
         default: 'bg-surface-muted text-ink-tertiary hover:bg-surface-subtle hover:text-ink-secondary',
-        accent: 'bg-accent/10 text-accent hover:bg-accent/20',
-        success: 'bg-success/10 text-success hover:bg-success/20',
-        warning: 'bg-warning/10 text-warning hover:bg-warning/20',
-        danger: 'bg-danger/10 text-danger hover:bg-danger/20',
+        accent: 'bg-accent/10 text-accent hover:bg-accent/15',
+        success: 'bg-success/10 text-success hover:bg-success/15',
+        warning: 'bg-warning/10 text-warning hover:bg-warning/15',
+        danger: 'bg-danger/10 text-danger hover:bg-danger/15',
       },
       size: {
         sm: 'px-1 py-0 text-meta',

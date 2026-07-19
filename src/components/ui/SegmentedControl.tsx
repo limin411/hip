@@ -50,12 +50,12 @@ export function SegmentedControl<T extends string>({
             data-testid={dataTestId ? `${dataTestId}-${opt.value}` : undefined}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1 rounded-[5px] font-medium transition-colors duration-100',
+              'inline-flex items-center justify-center gap-1 rounded-[5px] font-medium transition-colors duration-chrome',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20',
               size === 'sm' ? 'h-7 px-2.5 text-meta' : 'h-8 px-3 text-body',
               selected
-                ? // Elevated chip on muted track; no ring (keeps chrome quiet per design tokens).
-                  'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+                ? // Elevated chip on muted track — surface only, no shadow (flat chrome rule).
+                  'bg-surface text-ink'
                 : 'text-ink-secondary hover:bg-state-hover/70 hover:text-ink',
             )}
           >

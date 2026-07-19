@@ -132,7 +132,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const chats = screen.getByTestId('sidebar-nav-chats')
     expect(chats).toHaveClass('before:bg-accent')
-    expect(chats).toHaveClass('bg-surface')
+    expect(chats).toHaveClass('bg-state-hover')
     expect(chats.className).not.toMatch(/shadow-\[0_0_0_1px/)
     const projects = screen.getByTestId('sidebar-nav-projects')
     expect(projects).not.toHaveClass('before:bg-accent')
@@ -144,7 +144,7 @@ describe('AppSidebar', () => {
     const sessionBtn = screen.getByTestId('sidebar-session-chat-1')
     const row = sessionBtn.closest('div')
     expect(row).toHaveClass('before:bg-accent')
-    expect(row).toHaveClass('bg-surface')
+    expect(row).toHaveClass('bg-state-hover')
     expect(row?.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
@@ -235,7 +235,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const space = screen.getByTestId('sidebar-space-space-1')
     expect(space).toHaveClass('before:bg-accent')
-    expect(space).toHaveClass('bg-surface')
+    expect(space).toHaveClass('bg-state-hover')
     expect(space.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 
@@ -420,7 +420,7 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     const slot = screen.getByTestId('sidebar-parallel-slot-slot-1')
     expect(slot).toHaveClass('before:bg-accent')
-    expect(slot).toHaveClass('bg-surface')
+    expect(slot).toHaveClass('bg-state-hover')
     expect(slot.className).not.toMatch(/shadow-\[0_0_0_1px/)
   })
 

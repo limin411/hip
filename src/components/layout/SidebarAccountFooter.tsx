@@ -81,20 +81,21 @@ function FooterNavButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
+        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
       <Icon
         size={16}
-        className={cn('shrink-0', active ? 'text-accent-strong' : 'opacity-85')}
+        strokeWidth={1.75}
+        className={cn('shrink-0', active ? 'text-ink' : 'opacity-70')}
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {badge ? (
         <span
-          className="shrink-0 rounded-full bg-state-hover px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-secondary"
+          className="shrink-0 rounded-full bg-surface-muted px-1.5 py-0.5 text-caption font-medium tabular-nums text-ink-tertiary"
           data-testid="account-trash-badge"
         >
           {badge}

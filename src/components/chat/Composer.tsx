@@ -72,7 +72,7 @@ export function Composer({
     <div
       className={cn(
         isCard
-          ? 'rounded-xl border border-border bg-surface p-2 transition-shadow focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/8'
+          ? 'rounded-xl border border-border bg-surface p-2.5 transition-[border-color,box-shadow] duration-chrome focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/10'
           // Flat dock: no focus chrome — InputBar already draws the top rule.
           : 'bg-surface',
       )}
@@ -181,8 +181,8 @@ export function Composer({
           locked && 'cursor-not-allowed opacity-60',
         )}
       />
-      <div className={cn('flex items-center justify-between pt-1', isCard && 'px-1')}>
-        <div className={cn('flex items-center gap-1', locked && 'pointer-events-none opacity-50')}>
+      <div className={cn('flex items-center justify-between pt-1.5', isCard && 'px-0.5')}>
+        <div className={cn('flex items-center gap-0.5', locked && 'pointer-events-none opacity-50')}>
           {leftSlot}
         </div>
         {running && onStop ? (
@@ -192,26 +192,26 @@ export function Composer({
               type="button"
               variant="primary"
               size="icon"
-              className={cn('h-7 w-7 shrink-0', isCard && 'rounded-full')}
+              className={cn('h-7 w-7 shrink-0 rounded-full')}
               onClick={onStop}
               disabled={reconnecting}
               data-testid="composer-stop"
               title={t('chat.stop')}
             >
-              <Square size={14} />
+              <Square size={12} strokeWidth={2} />
             </Button>
           </div>
         ) : (
           <Button
             variant="primary"
             size="icon"
-            className={cn('h-7 w-7 shrink-0', isCard && 'rounded-full')}
+            className={cn('h-7 w-7 shrink-0 rounded-full')}
             onClick={onSubmit}
             disabled={locked || (!value.trim() && attachments.length === 0) || submitDisabled}
             data-testid="composer-send"
             title={t('chat.send')}
           >
-            <ArrowUp size={15} />
+            <ArrowUp size={15} strokeWidth={2} />
           </Button>
         )}
       </div>

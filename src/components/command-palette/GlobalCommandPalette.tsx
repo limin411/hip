@@ -303,7 +303,7 @@ export function GlobalCommandPalette() {
     <>
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[200] bg-ink/20 motion-reduce:transition-none" />
+          <Dialog.Overlay className="fixed inset-0 z-[200] bg-overlay backdrop-blur-[2px] motion-reduce:transition-none motion-reduce:backdrop-blur-none" />
           <Dialog.Content
             aria-describedby={undefined}
             onEscapeKeyDown={(e) => {
@@ -330,9 +330,9 @@ export function GlobalCommandPalette() {
                   data-testid="global-command-palette-back"
                   onClick={goBack}
                   aria-label={t('commandPalette.back')}
-                  className="flex w-full items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-caption text-ink-secondary transition-colors hover:text-ink"
+                  className="flex w-full items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-caption text-ink-secondary transition-colors duration-chrome hover:text-ink"
                 >
-                  <ChevronLeft className="size-3.5" />
+                  <ChevronLeft className="size-3.5" strokeWidth={1.75} />
                   <span>{t('commandPalette.back')}</span>
                   <span className="text-ink-tertiary">/</span>
                   <span className="font-medium text-ink">{pageTitle}</span>
@@ -352,20 +352,20 @@ export function GlobalCommandPalette() {
                 placeholder={t('commandPalette.searchPlaceholder')}
                 data-testid="global-command-palette-input"
                 aria-label={t('commandPalette.searchPlaceholder')}
-                className="h-11 w-full border-b border-border bg-transparent px-4 text-body text-ink outline-none placeholder:text-ink-tertiary"
+                className="h-12 w-full border-b border-border bg-transparent px-4 text-body text-ink outline-none placeholder:text-ink-tertiary"
               />
               <Command.List
-                className="max-h-[min(20rem,56vh)] overflow-y-auto p-1"
+                className="max-h-[min(20rem,56vh)] overflow-y-auto p-1.5"
                 aria-label={t('commandPalette.title')}
               >
                 {!hasItems && (
                   <div
-                    className="px-3 py-6 text-center text-meta text-ink-secondary"
+                    className="px-3 py-8 text-center text-meta text-ink-secondary"
                     data-testid="global-command-palette-empty"
                     role="status"
                   >
                     <div>{t('commandPalette.noResults')}</div>
-                    <div className="mt-1 text-caption text-ink-tertiary">
+                    <div className="mt-1.5 text-caption text-ink-tertiary">
                       {t('commandPalette.noResultsHint')}
                     </div>
                   </div>
@@ -374,7 +374,7 @@ export function GlobalCommandPalette() {
                   <Command.Group
                     key={group.heading ?? group.id ?? `group-${gi}`}
                     heading={group.heading}
-                    className="px-1 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-tertiary"
+                    className="px-0.5 py-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-tertiary"
                   >
                     {group.items.map((item) => {
                       const idx = !page ? hotkeyIndexForId(hotkeyItems, item.id) : undefined
@@ -384,8 +384,8 @@ export function GlobalCommandPalette() {
                           value={`${item.label}\u0001${item.id}`}
                           onSelect={() => handleSelect(item)}
                           className={cn(
-                            'flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-body text-ink',
-                            'data-[selected=true]:bg-accent-subtle',
+                            'flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-body text-ink transition-colors duration-chrome',
+                            'data-[selected=true]:bg-state-hover',
                           )}
                           data-testid={`global-cmd-${item.id}`}
                         >

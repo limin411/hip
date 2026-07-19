@@ -8,13 +8,13 @@ import { CodeBlock } from './CodeBlock'
 /** Shared prose chrome for chat bubbles, file preview, skill docs. */
 export const markdownProseClassName = [
   'max-w-none text-prose leading-relaxed text-ink',
-  // Headings
-  '[&_h1]:mb-3 [&_h1]:mt-1 [&_h1]:text-display [&_h1]:font-bold [&_h1]:tracking-tight',
-  '[&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-title [&_h2]:font-bold [&_h2]:tracking-tight',
+  // Headings — semibold + tracking for a quieter editorial feel
+  '[&_h1]:mb-3 [&_h1]:mt-1 [&_h1]:text-display [&_h1]:font-semibold [&_h1]:tracking-tight',
+  '[&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-title [&_h2]:font-semibold [&_h2]:tracking-tight',
   '[&_h3]:mb-1.5 [&_h3]:mt-4 [&_h3]:text-body [&_h3]:font-semibold',
-  '[&_h4]:mb-1 [&_h4]:mt-3 [&_h4]:text-meta [&_h4]:font-semibold',
-  '[&_h5]:mb-1 [&_h5]:mt-3 [&_h5]:text-meta [&_h5]:font-semibold',
-  '[&_h6]:mb-1 [&_h6]:mt-3 [&_h6]:text-meta [&_h6]:font-semibold [&_h6]:text-ink-secondary',
+  '[&_h4]:mb-1 [&_h4]:mt-3 [&_h4]:text-meta [&_h4]:font-medium',
+  '[&_h5]:mb-1 [&_h5]:mt-3 [&_h5]:text-meta [&_h5]:font-medium',
+  '[&_h6]:mb-1 [&_h6]:mt-3 [&_h6]:text-meta [&_h6]:font-medium [&_h6]:text-ink-secondary',
   // Body
   '[&_p]:my-1.5',
   '[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5',
@@ -23,10 +23,10 @@ export const markdownProseClassName = [
   '[&_li>p]:my-0.5',
   // Fenced pre: NO [&_pre]:* — CodeBlock host owns my-2 + chrome (KD11)
   // Inline code
-  '[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-surface-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-px',
+  '[&_:not(pre)>code]:rounded-md [&_:not(pre)>code]:bg-surface-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-px',
   '[&_code]:font-mono [&_code]:text-meta',
   // Quote / rule
-  '[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-ink-secondary',
+  '[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border-strong [&_blockquote]:pl-3 [&_blockquote]:text-ink-secondary',
   '[&_hr]:my-4 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border',
   // Tables (no sticky thead, no zebra — deferred)
   '[&_table]:my-2 [&_table]:w-full [&_table]:border-collapse',

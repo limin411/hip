@@ -222,13 +222,13 @@ export function AppSidebar() {
       </div>
 
       <div
-        className="px-3 pb-1 pt-0.5 text-[10px] tabular-nums tracking-wide text-ink-tertiary"
+        className="px-3 pb-1.5 pt-0 text-caption tabular-nums tracking-wide text-ink-tertiary/70"
         data-testid="sidebar-app-version"
       >
         HIP {HIP_PRODUCT_VERSION}
       </div>
 
-      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-2" aria-label={t('sidebar.navAria')}>
+      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-3" aria-label={t('sidebar.navAria')}>
         <NavItem
           section="workbench"
           active={sidebarSection === 'workbench' && activeView === 'workbench'}
@@ -289,10 +289,10 @@ export function AppSidebar() {
         role="region"
         aria-label={listLabel}
       >
-        <div className="mb-1 flex items-center justify-between px-2">
+        <div className="mb-1.5 flex items-center justify-between px-2">
           <span
             id="sidebar-list-heading"
-            className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary"
+            className="text-caption font-medium text-ink-tertiary"
           >
             {listLabel}
           </span>
@@ -302,7 +302,7 @@ export function AppSidebar() {
               data-testid="sidebar-new-space"
               data-no-drag
               onClick={() => openCreateKnowledgeSpaceDialog()}
-              className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               {t('sidebar.newSpace')}
             </button>
@@ -313,7 +313,7 @@ export function AppSidebar() {
               data-new-session="code"
               data-no-drag
               onClick={() => void newConversationFromSidebar('code')}
-              className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               {t('sidebar.newTask')}
             </button>
@@ -324,7 +324,7 @@ export function AppSidebar() {
               data-new-session="chat"
               data-no-drag
               onClick={() => void newConversationFromSidebar('chat')}
-              className="rounded px-1 py-0.5 text-[11px] text-ink-tertiary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="rounded-md px-1.5 py-0.5 text-caption text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               {t('sidebar.newChat')}
             </button>
@@ -429,7 +429,7 @@ export function AppSidebar() {
                     )}
                     <span
                       className={cn(
-                        'min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide',
+                        'min-w-0 flex-1 truncate text-caption font-medium',
                         pathMissing ? 'text-warning' : 'text-ink-tertiary',
                       )}
                     >
@@ -437,13 +437,13 @@ export function AppSidebar() {
                     </span>
                     {pathMissing ? (
                       <span
-                        className="shrink-0 rounded bg-warning/15 px-1 py-px text-[10px] font-medium text-warning"
+                        className="shrink-0 rounded-md bg-warning/15 px-1.5 py-px text-caption font-medium text-warning"
                         data-testid={`sidebar-project-group-missing-${groupId}`}
                       >
                         {t('sidebar.projectGroup.missingBadge')}
                       </span>
                     ) : group.sessions.length > 1 ? (
-                      <span className="shrink-0 tabular-nums text-[10px] text-ink-tertiary">
+                      <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">
                         {group.sessions.length}
                       </span>
                     ) : null}
@@ -637,7 +637,7 @@ function SidebarSessionRow({
               </span>
               {hasWorktrees ? (
                 <span
-                  className="shrink-0 rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
+                  className="shrink-0 rounded-md bg-accent/10 px-1.5 py-px text-caption font-medium text-accent"
                   title={t('sidebar.parallel.slotCount', {
                     count: slots.length + catalogRows.length,
                   })}
@@ -649,7 +649,7 @@ function SidebarSessionRow({
             </span>
             <span
               className={cn(
-                'shrink-0 rounded px-1 py-px text-[10px]',
+                'shrink-0 rounded-md px-1.5 py-px text-caption',
                 surface === 'code'
                   ? 'bg-success/10 text-success'
                   : 'bg-surface-muted text-ink-tertiary',
@@ -664,14 +664,14 @@ function SidebarSessionRow({
 
       {expanded ? (
         <ul
-          className="relative m-0 mb-1 ml-3 list-none border-l border-border/80 py-0.5 pl-0"
+          className="relative m-0 mb-1 ml-3 list-none border-l border-border/60 py-0.5 pl-0"
           data-testid={`sidebar-session-worktrees-${session.id}`}
           aria-label={t('sidebar.parallel.worktreeTree', { title: session.title })}
         >
           {hostRuns.map((run) => (
             <li key={run.id} className="m-0 p-0">
               {hostRuns.length > 1 ? (
-                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-caption font-medium text-ink-tertiary">
                   <GitBranch size={10} aria-hidden />
                   <span className="truncate">
                     {t('sidebar.parallel.group', { id: run.id.slice(0, 6) })}
@@ -694,7 +694,7 @@ function SidebarSessionRow({
           {catalogRows.length > 0 ? (
             <li className="m-0 p-0">
               {hostRuns.length > 0 ? (
-                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+                <div className="flex items-center gap-1 px-2 py-0.5 pl-3 text-caption font-medium text-ink-tertiary">
                   <GitBranch size={10} aria-hidden />
                   <span className="truncate">
                     {t('sidebar.parallel.catalogGroup', {
@@ -753,10 +753,10 @@ function CatalogWorktreeRow({
             'hover:bg-state-hover',
           )}
         >
-          <GitBranch size={12} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
+          <GitBranch size={12} strokeWidth={1.75} className="mt-0.5 shrink-0 text-ink-tertiary" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12px] font-medium text-ink">{label}</span>
-            <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={row.path}>
+            <span className="block truncate text-meta font-medium text-ink">{label}</span>
+            <span className="mt-0.5 block truncate text-caption text-ink-tertiary" title={row.path}>
               {pathLabel}
               {sourceLabel ? ` · ${sourceLabel}` : ''}
             </span>
@@ -834,9 +834,9 @@ function WorktreeSlotRow({
               aria-hidden
             />
           ) : null}
-          <span className="block min-w-0 truncate text-[12px] font-medium text-ink">{label}</span>
+          <span className="block min-w-0 truncate text-meta font-medium text-ink">{label}</span>
         </span>
-        <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary" title={slot.worktreePath}>
+        <span className="mt-0.5 block truncate text-caption text-ink-tertiary" title={slot.worktreePath}>
           {pathLabel}
           {slot.taskId ? ` · ${slot.taskId}` : ''}
           {isWinner ? ` · ${t('sidebar.parallel.winner')}` : ''}
@@ -893,15 +893,15 @@ function NavItem({
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors',
+        'flex h-[var(--row-h-sidebar)] w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-body font-medium transition-colors duration-chrome',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring',
         active ? SIDEBAR_ACTIVE_RAIL : 'text-ink-secondary hover:bg-state-hover hover:text-ink',
       )}
     >
-      <span className="shrink-0 opacity-80">{icon}</span>
+      <span className="shrink-0 opacity-70">{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count != null ? (
-        <span className="shrink-0 tabular-nums text-[11px] text-ink-tertiary">{count}</span>
+        <span className="shrink-0 tabular-nums text-caption text-ink-tertiary">{count}</span>
       ) : null}
     </button>
   )

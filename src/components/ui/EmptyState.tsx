@@ -36,17 +36,17 @@ export function EmptyState({
     <div
       data-tier={tier}
       className={cn(
-        'flex flex-col items-center justify-center rounded-lg py-12 text-center',
+        'flex flex-col items-center justify-center rounded-lg py-14 text-center',
         className,
       )}
     >
-      {children ?? <Icon className="h-8 w-8 text-ink-tertiary" />}
-      <div className="mt-3 text-body font-medium text-ink">{title}</div>
+      {children ?? <Icon className="h-7 w-7 text-ink-tertiary" strokeWidth={1.5} />}
+      <div className="mt-4 text-body font-medium tracking-tight text-ink">{title}</div>
       {description && (
-        <div className="mt-1 max-w-xs text-meta text-ink-secondary">{description}</div>
+        <div className="mt-1.5 max-w-xs text-meta leading-relaxed text-ink-secondary">{description}</div>
       )}
       {action && (
-        <Button variant="secondary" size="sm" className="mt-4" onClick={action.onClick}>
+        <Button variant="secondary" size="sm" className="mt-5" onClick={action.onClick}>
           {action.label}
         </Button>
       )}

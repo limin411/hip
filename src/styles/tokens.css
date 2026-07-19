@@ -11,20 +11,24 @@
  * 交互 hover：--state-hover ≡ --accent-subtle；新代码优先 hover:bg-state-hover。
  */
 :root {
-  /* 单色 chrome —— 纯白背景、近黑正文、灰色辅助文字 */
+  /*
+   * 单色 chrome —— 纯中性灰阶（无暖/冷色偏）。
+   * 精修原则：边框更轻、表面阶差更细、文字对比够用即可，避免「网格感」与过曝。
+   */
   --bg-app: #ffffff;
-  --bg-subtle: #f5f5f5;
-  --bg-muted: #efefef;
-  --border: #e4e4e4;
+  --bg-subtle: #f6f6f6;
+  --bg-muted: #eeeeee;
+  --border: #ebebeb;
+  --border-strong: #e0e0e0; /* 需要明确分隔时（输入框、卡片外框） */
   --text-primary: #111111;
-  --text-secondary: #666666;
-  --text-tertiary: #757575; /* AA 4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
-  /* 品牌强调色：Sage Gray */
+  --text-secondary: #5e5e5e;
+  --text-tertiary: #757575; /* AA ~4.4:1 on bg-app —— 时间戳/占位符/元数据可读 */
+  /* 品牌强调色：Sage Gray —— 仅作焦点 / 当前 / 极少量点缀 */
   --accent: #6b7c5c; /* 品牌填充色（按钮底、激活条、focus ring）—— 鼠尾草灰，正文/图标可用 */
   --accent-hover: #5d6d50;
   --accent-strong: #556647; /* Sage Gray 作正文/图标时用 */
-  --accent-subtle: #efefef; /* 中性浅底 —— hover/头像/chip 底（刻意保持中性灰，不带品牌色调） */
-  --accent-active: #e2e2e2; /* 中性选中底 —— 比 hover 更深以区分（刻意保持中性灰，不带品牌色调） */
+  --accent-subtle: #f0f0f0; /* 中性浅底 —— hover/头像/chip 底（刻意保持中性灰，不带品牌色调） */
+  --accent-active: #e6e6e6; /* 中性选中底 —— 比 hover 更深以区分（刻意保持中性灰，不带品牌色调） */
   --on-accent: #ffffff; /* 填充按钮/强调底上的文字与图标 */
   /* 功能状态色 —— 保留语义 */
   --success: #2f7d40; /* AA on bg-app（旧 #3d9a50 仅 3.4:1） */
@@ -48,13 +52,15 @@
   --titlebar-height: 40px;
   /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生材质见 data-vibrancy=mac-sidebar|win-mica|… */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
-  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border: rgba(0, 0, 0, 0.05);
   --glass-backdrop: blur(24px) saturate(180%);
   /* 标题栏默认背景（非 macOS 平台使用纯色） */
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: var(--glass-backdrop);
-  /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档） */
-  --shadow-panel: 0 2px 12px -2px rgba(17, 17, 17, 0.12), 0 1px 3px rgba(17, 17, 17, 0.06);
+  /* 右侧浮动 panel 阴影（与 menu/overlay 并列的第三档）—— 更轻、更弥散 */
+  --shadow-panel: 0 2px 14px -4px rgba(17, 17, 17, 0.1), 0 1px 3px rgba(17, 17, 17, 0.04);
+  /* 浮层遮罩（Modal / 全屏 palette） */
+  --overlay-scrim: rgba(17, 17, 17, 0.28);
   /* 公共交互状态 —— 由现有变量派生，不引入新的硬编码颜色 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);
@@ -107,20 +113,21 @@ html[data-platform="linux"] {
 }
 
 .dark {
-  /* 单色 chrome —— 压低背景亮度、提升文字对比 */
+  /* 单色 chrome —— 压低背景亮度、边框更轻、文字对比够用 */
   --bg-app: #0f0f0f;
-  --bg-subtle: #1a1a1a;
-  --bg-muted: #262626;
-  --border: #333333;
+  --bg-subtle: #171717;
+  --bg-muted: #222222;
+  --border: #2c2c2c;
+  --border-strong: #3a3a3a;
   --text-primary: #f0f0f0;
-  --text-secondary: #a0a0a0;
-  --text-tertiary: #808080;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #7a7a7a;
   /* 品牌强调色：更亮的 Sage Gray，保证在暗底上可识别 */
   --accent: #a8b89a;
   --accent-hover: #b7c7a9;
   --accent-strong: #c6d4b8;
-  --accent-subtle: #262626; /* 暗色中性 hover/头像/chip 底 */
-  --accent-active: #333333; /* 暗色选中底 */
+  --accent-subtle: #222222; /* 暗色中性 hover/头像/chip 底 */
+  --accent-active: #2e2e2e; /* 暗色选中底 */
   --on-accent: #111111; /* 浅 accent 填充上的近黑字，保证暗色对比 */
   /* 功能状态色 —— 提升亮度以在暗底保持可读 */
   --success: #4caf50;
@@ -134,11 +141,12 @@ html[data-platform="linux"] {
   --role-worker: #2ee6e6;
   /* 毛玻璃：暗色 CSS 回退；原生材质见 data-vibrancy 模式 */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
-  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.05);
   --glass-backdrop: blur(24px) saturate(180%);
   --titlebar-bg: var(--glass-bg);
   --titlebar-backdrop: var(--glass-backdrop);
-  --shadow-panel: 0 2px 12px -2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-panel: 0 2px 14px -4px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.28);
+  --overlay-scrim: rgba(0, 0, 0, 0.48);
   /* 公共交互状态 —— 复用暗色令牌 */
   --state-hover: var(--accent-subtle);
   --state-active: var(--accent-active);

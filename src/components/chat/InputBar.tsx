@@ -259,7 +259,7 @@ export function InputBar() {
           className="absolute inset-x-0 top-0 z-10 h-2 -translate-y-1/2 cursor-ns-resize"
         />
       )}
-      <div className="w-full px-4 py-3">
+      <div className="w-full px-4 py-2.5">
         {sessionActionBlocked ? (
           <div className="border-y border-border bg-surface px-1 py-3 text-left text-meta text-ink-secondary">
             {pendingPermission

@@ -5,7 +5,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: 'var(--border)',
+        border: {
+          DEFAULT: 'var(--border)',
+          strong: 'var(--border-strong)',
+        },
         surface: {
           DEFAULT: 'var(--bg-app)',
           subtle: 'var(--bg-subtle)',
@@ -38,6 +41,7 @@ export default {
           disabled: 'var(--state-disabled)',
         },
         'focus-ring': 'var(--focus-ring)',
+        overlay: 'var(--overlay-scrim)',
         glass: {
           DEFAULT: 'var(--glass-bg)',
           border: 'var(--glass-border)',
@@ -115,8 +119,9 @@ export default {
         pop: 'none',
         float: 'none',
         panel: 'var(--shadow-panel)',
-        menu: '0 6px 20px -6px rgba(17, 17, 17, 0.14), 0 2px 6px -2px rgba(17, 17, 17, 0.08)',
-        overlay: '0 16px 48px -12px rgba(17, 17, 17, 0.22), 0 6px 16px -8px rgba(17, 17, 17, 0.12)',
+        // 浮层阴影：更轻、更弥散 —— 高级感来自柔和而非浓重
+        menu: '0 8px 24px -8px rgba(17, 17, 17, 0.12), 0 2px 8px -4px rgba(17, 17, 17, 0.06)',
+        overlay: '0 20px 56px -16px rgba(17, 17, 17, 0.18), 0 8px 20px -10px rgba(17, 17, 17, 0.08)',
         'card-hover': 'none',
         'sticky-top': 'none',
       },

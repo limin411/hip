@@ -57,7 +57,7 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]" />
         <DialogPrimitive.Content
           className="fixed inset-0 z-50 flex items-center justify-center outline-none"
           // Opt out of required Description when chrome only supplies a title (avoids Radix stderr noise).
@@ -71,31 +71,31 @@ export function Modal({
         >
           <div
             className={cn(
-              'relative z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none animate-menu-in',
+              'relative z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-overlay outline-none animate-menu-in',
               !resizable && 'max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg',
               className,
             )}
             style={resizable ? { width: size.width, height: size.height } : undefined}
           >
-            <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-5">
-              <DialogPrimitive.Title className="text-title font-bold tracking-tight text-ink">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-5">
+              <DialogPrimitive.Title className="text-title font-semibold tracking-tight text-ink">
                 {title}
               </DialogPrimitive.Title>
               <DialogPrimitive.Close
                 disabled={closeDisabled}
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted',
+                  'flex h-7 w-7 items-center justify-center rounded-md text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink',
                   closeDisabled && 'pointer-events-none opacity-40',
                 )}
                 title={t('common.close')}
                 data-testid="modal-close"
               >
-                <X size={18} />
+                <X size={16} strokeWidth={1.75} />
               </DialogPrimitive.Close>
             </div>
             <div className="flex-1 overflow-y-auto">{children}</div>
             {footer && (
-              <div className="shrink-0 border-t border-border bg-surface-subtle px-5 py-3">{footer}</div>
+              <div className="shrink-0 border-t border-border bg-surface-subtle/80 px-5 py-3">{footer}</div>
             )}
             {resizable &&
               RESIZE_HANDLES.map((h) => (

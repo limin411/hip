@@ -5,6 +5,7 @@ import type { AgentConfig } from '@hip/protocol'
 import { logDebug } from '../../debug-logger.js'
 import type { ResolvedModel } from './registry.js'
 import { buildAcpSpawn, resolveAcpHostConfig } from './acp-config.js'
+import { buildMcpServersForAcp } from './acp-mcp-list.js'
 import {
   extractAcpConfigOptions,
   patchConfigOptionValue,
@@ -218,17 +219,27 @@ export class AcpConnection {
     return this.fsEnabled
   }
 
+  /**
+   * MCP servers for session/new|loadSession.
+   * Empty unless `[acp].forwardMcp = true`; includes hip.toml + enabled plugin MCP.
+   * Call after ensureInit so runtime caps are available for http/sse filtering.
+   */
+  private mcpServersFor(cwd: string) {
+    return buildMcpServersForAcp(cwd, this._runtimeCaps!)
+  }
+
   /** Create a new ACP session (cwd-scoped). Authenticates on demand if the agent demands it. */
   async newSession(cwd: string): Promise<string> {
     await this.ensureInit()
+    const mcpServers = this.mcpServersFor(cwd)
     try {
-      const r = await this.conn.newSession({ cwd, mcpServers: [] })
+      const r = await this.conn.newSession({ cwd, mcpServers })
       this.openSessions.add(r.sessionId)
       return r.sessionId
     } catch (e: any) {
       if (this.isAuthRequired(e)) {
         await this.conn.authenticate({ methodId: this.firstAuthMethod() })
-        const r = await this.conn.newSession({ cwd, mcpServers: [] })
+        const r = await this.conn.newSession({ cwd, mcpServers })
         this.openSessions.add(r.sessionId)
         return r.sessionId
       }
@@ -242,19 +253,21 @@ export class AcpConnection {
       // Prefer caller fallthrough to newSession (provider openFreshSession).
       throw new Error('ACP agent does not support session/load')
     }
-    await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers: [] })
+    const mcpServers = this.mcpServersFor(cwd)
+    await this.conn.loadSession({ sessionId: acpSessionId, cwd, mcpServers })
     this.openSessions.add(acpSessionId)
   }
 
   async newSessionWithOptions(cwd: string): Promise<{ sessionId: string; configOptions: any[] }> {
     await this.ensureInit()
+    const mcpServers = this.mcpServersFor(cwd)
     let r: unknown
     try {
-      r = await this.conn.newSession({ cwd, mcpServers: [] })
+      r = await this.conn.newSession({ cwd, mcpServers })
     } catch (e: any) {
       if (!this.isAuthRequired(e)) throw e
       await this.conn.authenticate({ methodId: this.firstAuthMethod() })
-      r = await this.conn.newSession({ cwd, mcpServers: [] })
+      r = await this.conn.newSession({ cwd, mcpServers })
     }
     const sessionId = (r as { sessionId: string }).sessionId
     const configOptions = extractAcpConfigOptions(r)

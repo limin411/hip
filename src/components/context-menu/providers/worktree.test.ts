@@ -71,6 +71,7 @@ describe('worktreeProvider', () => {
           hostSessionId: 'host',
           worktreePath: '/wt/a',
           label: 'branch-a',
+          branch: 'hip-iso-a',
           slotSessionId: 'slot-1',
         },
       },
@@ -81,6 +82,7 @@ describe('worktreeProvider', () => {
       hostSessionId: 'host',
       worktreePath: '/wt/a',
       label: 'branch-a',
+      branch: 'hip-iso-a',
       slotSessionId: 'slot-1',
       reason: 'worktree-menu',
     })

@@ -1687,12 +1687,8 @@ export const en = {
         copyPath: 'Copy path',
         pathCopied: 'Path copied',
         copyFailed: 'Could not copy path',
-        /** Opens WorktreeDeleteDialog (confirm always; force is progressive inside dialog). */
+        /** Opens WorktreeDeleteDialog (confirm always; force progressive inside dialog). */
         remove: 'Delete…',
-        removeForce: 'Force delete (discard changes)',
-        removed: 'Deleted isolated workspace {{label}}',
-        removedForce: 'Force-deleted isolated workspace {{label}}',
-        removeFailed: 'Could not delete isolated workspace {{label}}',
       },
       renameSession: {
         title: 'Rename conversation',

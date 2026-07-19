@@ -129,4 +129,28 @@ describe('WorktreeDeleteDialog', () => {
     expect(screen.queryByTestId('worktree-delete-force')).toBeNull()
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('ignores rapid double-click (busy ref prevents concurrent remove)', async () => {
+    const onClose = vi.fn()
+    let resolveRemove: (v: { ok: true }) => void = () => {}
+    removeManagedWorktree.mockImplementation(
+      () =>
+        new Promise<{ ok: true }>((resolve) => {
+          resolveRemove = resolve
+        }),
+    )
+
+    render(<WorktreeDeleteDialog target={target} onClose={onClose} />)
+    const confirm = screen.getByTestId('worktree-delete-confirm')
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+
+    expect(removeManagedWorktree).toHaveBeenCalledTimes(1)
+
+    resolveRemove({ ok: true })
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
 })

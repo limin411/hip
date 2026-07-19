@@ -1656,10 +1656,6 @@ export const zhCN = {
         copyFailed: '无法复制路径',
         /** 打开 WorktreeDeleteDialog（始终确认；强制删除在对话框内渐进）。 */
         remove: '删除…',
-        removeForce: '强制删除（丢弃更改）',
-        removed: '已删除隔离工作区 {{label}}',
-        removedForce: '已强制删除隔离工作区 {{label}}',
-        removeFailed: '无法删除隔离工作区 {{label}}',
       },
       renameSession: {
         title: '重命名会话',

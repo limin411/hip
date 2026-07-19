@@ -6,7 +6,7 @@ import type { ContextMenuItemDef, ContextProvider } from '../types'
 /** Nested worktree row: open host/slot, copy path, delete (confirm Modal + dirty progressive force). */
 export const worktreeProvider: ContextProvider = (req, ctx) => {
   if (req.kind !== 'worktree') return []
-  const { hostSessionId, worktreePath, label, slotSessionId } = req.payload
+  const { hostSessionId, worktreePath, label, branch, slotSessionId } = req.payload
   const t = (key: string, opts?: Record<string, string>) =>
     opts ? ctx.t(key, opts) : ctx.t(key)
 
@@ -44,6 +44,7 @@ export const worktreeProvider: ContextProvider = (req, ctx) => {
           hostSessionId,
           worktreePath,
           label,
+          branch: branch || undefined,
           slotSessionId,
           reason: 'worktree-menu',
         })

@@ -1617,11 +1617,7 @@ export const zhTW = {
       "copyPath": "複製路徑",
       "pathCopied": "路徑已複製",
       "copyFailed": "無法複製路徑",
-      "remove": "刪除…",
-      "removeForce": "強制刪除（丟棄變更）",
-      "removed": "已刪除隔離工作區 {{label}}",
-      "removedForce": "已強制刪除隔離工作區 {{label}}",
-      "removeFailed": "無法刪除隔離工作區 {{label}}"
+      "remove": "刪除…"
     },
     "renameSession": {
       "title": "重新命名工作階段",

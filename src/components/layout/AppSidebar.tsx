@@ -697,6 +697,7 @@ function CatalogWorktreeRow({
           hostSessionId,
           worktreePath: row.path,
           label,
+          branch: row.branch || undefined,
           worktreeId: row.id,
         }}
         className="mb-0.5 block w-full"
@@ -818,6 +819,7 @@ function WorktreeSlotRow({
           hostSessionId: run.hostSessionId,
           worktreePath: slot.worktreePath,
           label,
+          branch: slot.branch || undefined,
           slotSessionId: slot.sessionId || undefined,
           worktreeId: slot.worktreeId,
         }}

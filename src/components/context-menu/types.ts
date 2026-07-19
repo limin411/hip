@@ -57,6 +57,8 @@ export type ContextPayloadMap = {
     hostSessionId: string
     worktreePath: string
     label: string
+    /** Git branch when known (shown in delete confirm Modal). */
+    branch?: string
     slotSessionId?: string
     worktreeId?: string
   }

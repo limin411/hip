@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { toast } from 'sonner'
@@ -22,16 +22,24 @@ export function WorktreeDeleteDialog({ target, onClose }: WorktreeDeleteDialogPr
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [forceMode, setForceMode] = useState(false)
+  /** Sync lock — React `busy` alone can double-fire before re-render (remove result is sessionId-only). */
+  const busyRef = useRef(false)
+  /** Bump when target changes so in-flight completions are ignored. */
+  const genRef = useRef(0)
 
   // Reset progressive force when the target worktree changes.
   useEffect(() => {
+    genRef.current += 1
+    busyRef.current = false
     setForceMode(false)
     setBusy(false)
   }, [target.hostSessionId, target.worktreePath])
 
   const runRemove = async (force: boolean) => {
-    if (busy) return
+    if (busyRef.current) return
+    busyRef.current = true
     setBusy(true)
+    const gen = genRef.current
     try {
       const r = await removeManagedWorktree({
         hostSessionId: target.hostSessionId,
@@ -41,6 +49,7 @@ export function WorktreeDeleteDialog({ target, onClose }: WorktreeDeleteDialogPr
         label: target.label,
         reason: target.reason ?? 'worktree-delete-dialog',
       })
+      if (gen !== genRef.current) return
       if (r.ok) {
         toast.success(
           force
@@ -58,13 +67,17 @@ export function WorktreeDeleteDialog({ target, onClose }: WorktreeDeleteDialogPr
         r.error || t('chat.worktreeControl.delete.failed', { label: target.label }),
       )
     } catch (e) {
+      if (gen !== genRef.current) return
       toast.error(
         e instanceof Error
           ? e.message
           : t('chat.worktreeControl.delete.failed', { label: target.label }),
       )
     } finally {
-      setBusy(false)
+      if (gen === genRef.current) {
+        busyRef.current = false
+        setBusy(false)
+      }
     }
   }
 
@@ -72,8 +85,9 @@ export function WorktreeDeleteDialog({ target, onClose }: WorktreeDeleteDialogPr
     <Modal
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose()
+        if (!open && !busyRef.current) onClose()
       }}
+      closeDisabled={busy}
       title={t('chat.worktreeControl.delete.title', { label: target.label })}
       className="max-w-md"
       footer={
@@ -84,7 +98,9 @@ export function WorktreeDeleteDialog({ target, onClose }: WorktreeDeleteDialogPr
             size="sm"
             disabled={busy}
             data-testid="worktree-delete-cancel"
-            onClick={onClose}
+            onClick={() => {
+              if (!busyRef.current) onClose()
+            }}
           >
             {t('common.cancel')}
           </Button>

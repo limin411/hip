@@ -15,6 +15,8 @@ interface ModalProps {
   defaultSize?: Size
   minSize?: Size
   storageKey?: string
+  /** When true, header X is disabled and Escape/outside dismiss is prevented (busy operations). */
+  closeDisabled?: boolean
 }
 
 const DEFAULT_SIZE: Size = { width: 960, height: 700 }
@@ -42,6 +44,7 @@ export function Modal({
   defaultSize,
   minSize,
   storageKey,
+  closeDisabled = false,
 }: ModalProps) {
   const { t } = useTranslation()
   const { size, onResizeStart } = useResizableBox({
@@ -59,6 +62,12 @@ export function Modal({
           className="fixed inset-0 z-50 flex items-center justify-center outline-none"
           // Opt out of required Description when chrome only supplies a title (avoids Radix stderr noise).
           aria-describedby={undefined}
+          onEscapeKeyDown={(e) => {
+            if (closeDisabled) e.preventDefault()
+          }}
+          onPointerDownOutside={(e) => {
+            if (closeDisabled) e.preventDefault()
+          }}
         >
           <div
             className={cn(
@@ -73,8 +82,13 @@ export function Modal({
                 {title}
               </DialogPrimitive.Title>
               <DialogPrimitive.Close
-                className="flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted"
+                disabled={closeDisabled}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-surface-muted',
+                  closeDisabled && 'pointer-events-none opacity-40',
+                )}
                 title={t('common.close')}
+                data-testid="modal-close"
               >
                 <X size={18} />
               </DialogPrimitive.Close>

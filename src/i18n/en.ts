@@ -84,6 +84,25 @@ export const en = {
         agentTaskOnly: 'This track runs as a background task — check progress in the sidebar',
         noSessionToast: 'No chat bound to this workspace yet',
         openHere: 'Open chat here',
+        /** Delete confirm Modal (PR6 / D6 / D15) */
+        delete: {
+          menuItem: 'Delete…',
+          title: 'Delete isolated workspace “{{label}}”?',
+          pathLabel: 'Path',
+          path: 'Path: {{path}}',
+          branchLabel: 'Branch',
+          branch: 'Branch: {{branch}}',
+          cascadeNote:
+            'Linked isolated chats may also close (the system cleans up conversations bound to this directory).',
+          dirtyWarning:
+            'Uncommitted changes detected. Force delete will permanently discard those changes.',
+          confirm: 'Delete',
+          forceConfirm: 'Force delete and discard changes',
+          deleting: 'Deleting…',
+          removed: 'Deleted isolated workspace {{label}}',
+          removedForce: 'Force-deleted isolated workspace {{label}}',
+          failed: 'Could not delete isolated workspace {{label}}',
+        },
       },
       worktree: {
         created: 'Worktree ready: {{label}}',
@@ -1668,11 +1687,12 @@ export const en = {
         copyPath: 'Copy path',
         pathCopied: 'Path copied',
         copyFailed: 'Could not copy path',
-        remove: 'Remove worktree',
-        removeForce: 'Force remove worktree',
-        removed: 'Removed worktree {{label}}',
-        removedForce: 'Force-removed worktree {{label}}',
-        removeFailed: 'Could not remove worktree {{label}}',
+        /** Opens WorktreeDeleteDialog (confirm always; force is progressive inside dialog). */
+        remove: 'Delete…',
+        removeForce: 'Force delete (discard changes)',
+        removed: 'Deleted isolated workspace {{label}}',
+        removedForce: 'Force-deleted isolated workspace {{label}}',
+        removeFailed: 'Could not delete isolated workspace {{label}}',
       },
       renameSession: {
         title: 'Rename conversation',

@@ -79,7 +79,23 @@ export const zhTW = {
       "rowMenu": "工作區操作",
       "agentTaskOnly": "該方案由背景任務執行，請從側欄查看進度",
       "noSessionToast": "此工作區尚未綁定對話",
-      "openHere": "在此工作區開啟對話"
+      "openHere": "在此工作區開啟對話",
+      "delete": {
+        "menuItem": "刪除…",
+        "title": "刪除隔離工作區「{{label}}」？",
+        "pathLabel": "路徑",
+        "path": "路徑：{{path}}",
+        "branchLabel": "分支",
+        "branch": "分支：{{branch}}",
+        "cascadeNote": "關聯的隔離對話可能會一併關閉（系統會自動清理綁定到該目錄的對話）。",
+        "dirtyWarning": "偵測到未提交變更。強制刪除將永久丟棄這些變更。",
+        "confirm": "刪除",
+        "forceConfirm": "強制刪除並丟棄變更",
+        "deleting": "刪除中…",
+        "removed": "已刪除隔離工作區 {{label}}",
+        "removedForce": "已強制刪除隔離工作區 {{label}}",
+        "failed": "無法刪除隔離工作區 {{label}}"
+      }
     },
     "worktree": {
       "created": "Worktree 已就緒：{{label}}"
@@ -1601,11 +1617,11 @@ export const zhTW = {
       "copyPath": "複製路徑",
       "pathCopied": "路徑已複製",
       "copyFailed": "無法複製路徑",
-      "remove": "刪除 worktree",
-      "removeForce": "強制刪除 worktree",
-      "removed": "已刪除 worktree {{label}}",
-      "removedForce": "已強制刪除 worktree {{label}}",
-      "removeFailed": "無法刪除 worktree {{label}}"
+      "remove": "刪除…",
+      "removeForce": "強制刪除（丟棄變更）",
+      "removed": "已刪除隔離工作區 {{label}}",
+      "removedForce": "已強制刪除隔離工作區 {{label}}",
+      "removeFailed": "無法刪除隔離工作區 {{label}}"
     },
     "renameSession": {
       "title": "重新命名工作階段",

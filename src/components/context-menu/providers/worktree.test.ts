@@ -2,17 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { worktreeProvider } from './worktree'
 import type { ContextMenuBuildContext } from '../types'
 
-const removeWorktree = vi.fn()
-const deleteSession = vi.fn()
+const openWorktreeDeleteDialog = vi.fn()
 const selectSessionFromSidebar = vi.fn()
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
 
-vi.mock('@/domain', () => ({
-  sessionService: {
-    removeWorktree: (...a: unknown[]) => removeWorktree(...a),
-    deleteSession: (...a: unknown[]) => deleteSession(...a),
-  },
+vi.mock('@/components/chat/WorktreeControl/worktreeDeleteDialogStore', () => ({
+  openWorktreeDeleteDialog: (...a: unknown[]) => openWorktreeDeleteDialog(...a),
 }))
 
 vi.mock('@/components/layout/sidebarActions', () => ({
@@ -41,14 +37,13 @@ function makeCtx(): ContextMenuBuildContext {
 
 describe('worktreeProvider', () => {
   beforeEach(() => {
-    removeWorktree.mockReset()
-    deleteSession.mockReset()
+    openWorktreeDeleteDialog.mockReset()
     selectSessionFromSidebar.mockReset()
     toastSuccess.mockReset()
     toastError.mockReset()
   })
 
-  it('offers open, copy path, remove, and force remove', () => {
+  it('offers open, copy path, and remove (confirm dialog — no direct force menu)', () => {
     const items = worktreeProvider(
       {
         kind: 'worktree',
@@ -65,12 +60,10 @@ describe('worktreeProvider', () => {
       'worktree.openHost',
       'worktree.copyPath',
       'worktree.remove',
-      'worktree.removeForce',
     ])
   })
 
-  it('remove calls removeWorktree then deletes slot session', async () => {
-    removeWorktree.mockResolvedValue({ ok: true })
+  it('remove opens shared delete confirm dialog (does not remove immediately)', () => {
     const items = worktreeProvider(
       {
         kind: 'worktree',
@@ -84,17 +77,16 @@ describe('worktreeProvider', () => {
       makeCtx(),
     )
     items.find((i) => i.id === 'worktree.remove')!.run()
-    await vi.waitFor(() => {
-      expect(removeWorktree).toHaveBeenCalledWith('host', '/wt/a', false)
-      expect(deleteSession).toHaveBeenCalledWith(
-        'slot-1',
-        expect.objectContaining({ reason: 'worktree-menu' }),
-      )
+    expect(openWorktreeDeleteDialog).toHaveBeenCalledWith({
+      hostSessionId: 'host',
+      worktreePath: '/wt/a',
+      label: 'branch-a',
+      slotSessionId: 'slot-1',
+      reason: 'worktree-menu',
     })
   })
 
-  it('force remove uses force:true', async () => {
-    removeWorktree.mockResolvedValue({ ok: true })
+  it('open selects slot when present', () => {
     const items = worktreeProvider(
       {
         kind: 'worktree',
@@ -102,13 +94,12 @@ describe('worktreeProvider', () => {
           hostSessionId: 'host',
           worktreePath: '/wt/a',
           label: 'branch-a',
+          slotSessionId: 'slot-1',
         },
       },
       makeCtx(),
     )
-    items.find((i) => i.id === 'worktree.removeForce')!.run()
-    await vi.waitFor(() => {
-      expect(removeWorktree).toHaveBeenCalledWith('host', '/wt/a', true)
-    })
+    items.find((i) => i.id === 'worktree.openHost')!.run()
+    expect(selectSessionFromSidebar).toHaveBeenCalledWith('slot-1')
   })
 })

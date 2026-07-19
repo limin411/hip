@@ -81,6 +81,24 @@ export const zhCN = {
         agentTaskOnly: '该方案由后台任务运行，请从侧栏查看进度',
         noSessionToast: '此工作区尚未绑定对话',
         openHere: '在此工作区打开对话',
+        /** 删除确认（PR6 / D6 / D15） */
+        delete: {
+          menuItem: '删除…',
+          title: '删除隔离工作区「{{label}}」？',
+          pathLabel: '路径',
+          path: '路径：{{path}}',
+          branchLabel: '分支',
+          branch: '分支：{{branch}}',
+          cascadeNote:
+            '关联的隔离对话可能会一并关闭（系统会自动清理绑定到该目录的对话）。',
+          dirtyWarning: '检测到未提交更改。强制删除将永久丢弃这些更改。',
+          confirm: '删除',
+          forceConfirm: '强制删除并丢弃更改',
+          deleting: '删除中…',
+          removed: '已删除隔离工作区 {{label}}',
+          removedForce: '已强制删除隔离工作区 {{label}}',
+          failed: '无法删除隔离工作区 {{label}}',
+        },
       },
       worktree: {
         created: 'Worktree 已就绪：{{label}}',
@@ -1636,11 +1654,12 @@ export const zhCN = {
         copyPath: '复制路径',
         pathCopied: '路径已复制',
         copyFailed: '无法复制路径',
-        remove: '删除 worktree',
-        removeForce: '强制删除 worktree',
-        removed: '已删除 worktree {{label}}',
-        removedForce: '已强制删除 worktree {{label}}',
-        removeFailed: '无法删除 worktree {{label}}',
+        /** 打开 WorktreeDeleteDialog（始终确认；强制删除在对话框内渐进）。 */
+        remove: '删除…',
+        removeForce: '强制删除（丢弃更改）',
+        removed: '已删除隔离工作区 {{label}}',
+        removedForce: '已强制删除隔离工作区 {{label}}',
+        removeFailed: '无法删除隔离工作区 {{label}}',
       },
       renameSession: {
         title: '重命名会话',

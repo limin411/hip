@@ -41,8 +41,11 @@ interface WorktreeListProps {
   empty: boolean
   onOpenRow: (row: WorktreeListRow) => void
   onCopyPath: (path: string) => void
+  onDeleteRow?: (row: WorktreeListRow) => void
   onOpenCreateSingle: () => void
   createDisabled: boolean
+  /** When true, delete menu item is disabled (e.g. unresolved host). */
+  deleteDisabled?: boolean
 }
 
 export function WorktreeList({
@@ -51,8 +54,10 @@ export function WorktreeList({
   empty,
   onOpenRow,
   onCopyPath,
+  onDeleteRow,
   onOpenCreateSingle,
   createDisabled,
+  deleteDisabled = false,
 }: WorktreeListProps) {
   const { t } = useTranslation()
 
@@ -163,6 +168,19 @@ export function WorktreeList({
                   >
                     {t('chat.worktreeControl.copyPath')}
                   </DropdownMenuItem>
+                  {onDeleteRow ? (
+                    <DropdownMenuItem
+                      disabled={deleteDisabled}
+                      onSelect={() => {
+                        if (deleteDisabled) return
+                        onDeleteRow(row)
+                      }}
+                      data-testid={`worktree-control-delete-${row.key}`}
+                      className="text-danger focus:text-danger"
+                    >
+                      {t('chat.worktreeControl.delete.menuItem')}
+                    </DropdownMenuItem>
+                  ) : null}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

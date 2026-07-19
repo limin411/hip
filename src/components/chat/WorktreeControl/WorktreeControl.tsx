@@ -36,6 +36,7 @@ import {
 import { WorktreeList, type WorktreeListRow } from './WorktreeList'
 import { WorktreeCreateSingleModal } from './WorktreeCreateSingleModal'
 import { WorktreeParallelModal } from './WorktreeParallelModal'
+import { openWorktreeDeleteDialog } from './worktreeDeleteDialogStore'
 
 export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) {
   const { t } = useTranslation()
@@ -303,6 +304,23 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
     [t],
   )
 
+  const handleDeleteRow = useCallback(
+    (row: WorktreeListRow) => {
+      if (!hostSessionId || hostCtx.unresolved) return
+      // Close popover before Modal (D17 stacking / pointer-events).
+      setPopoverOpen(false)
+      openWorktreeDeleteDialog({
+        hostSessionId,
+        worktreePath: row.path,
+        label: row.label,
+        branch: row.branch || undefined,
+        slotSessionId: row.kind === 'slot' ? row.sessionId : undefined,
+        reason: 'worktree-control',
+      })
+    },
+    [hostSessionId, hostCtx.unresolved],
+  )
+
   // D25: Code-only; hide without cwd
   if (!isCodeWithCwd || !active) return null
 
@@ -443,8 +461,10 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
                 empty={empty}
                 onOpenRow={(row) => void handleOpenRow(row)}
                 onCopyPath={handleCopyPath}
+                onDeleteRow={handleDeleteRow}
                 onOpenCreateSingle={openCreateSingle}
                 createDisabled={createDisabled}
+                deleteDisabled={hostCtx.unresolved || !hostSessionId}
               />
             </div>
 

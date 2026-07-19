@@ -24,6 +24,7 @@ import {
   GlobalHotkeysBinder,
 } from '@/components/command-palette'
 import { SessionMenuDialogHost } from '@/components/history/SessionMenuDialogHost'
+import { WorktreeDeleteDialogHost } from '@/components/chat/WorktreeControl/WorktreeDeleteDialogHost'
 import { KnowledgeSpaceDialogHost } from '@/components/knowledge/KnowledgeSpaceDialogHost'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 import { startPtyBridge } from '@/ipc/pty'
@@ -201,6 +202,7 @@ export function AppLayout() {
       <GlobalCommandPalette />
       <GlobalHotkeysBinder />
       <SessionMenuDialogHost />
+      <WorktreeDeleteDialogHost />
       <KnowledgeSpaceDialogHost />
     </div>
   )

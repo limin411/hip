@@ -13,10 +13,12 @@ vi.mock('react-i18next', () => ({
         'composer.agentPicker.label': 'Agent',
         'composer.agentPicker.builtin': 'hip (built-in)',
         'composer.agentPicker.empty': 'No external agents enabled. Add one in Settings.',
-        'composer.agentSwitch.title': 'Switch agent?',
+        'composer.agentSwitch.title': 'Switch agent',
+        'composer.agentSwitch.summary': 'Change the primary agent for this conversation',
         'composer.agentSwitch.body': 'Switching restarts external context.',
+        'composer.agentSwitch.hint': 'Prefer New session to keep this thread.',
         'composer.agentSwitch.target': `Switch to ${opts?.name ?? ''}`,
-        'composer.agentSwitch.thisSession': 'Switch this session',
+        'composer.agentSwitch.thisSession': 'Switch here',
         'composer.agentSwitch.newSession': 'New session',
         'composer.agentSwitch.cancel': 'Cancel',
         'composer.agentSwitch.busy': 'Cannot switch agent while a turn is running',
@@ -30,6 +32,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Bot: () => React.createElement('span', { 'data-testid': 'icon-bot' }),
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
+  ArrowRight: () => React.createElement('span', { 'data-testid': 'icon-arrow-right' }),
   X: () => React.createElement('span', { 'data-testid': 'icon-x' }),
 }))
 

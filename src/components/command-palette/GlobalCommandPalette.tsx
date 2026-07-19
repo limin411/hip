@@ -18,6 +18,7 @@ import {
   enterSection,
   openHistoryFromChrome,
   openSettingsFromChrome,
+  openTrashFromChrome,
 } from '@/components/layout/sidebarActions'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -92,6 +93,7 @@ export function GlobalCommandPalette() {
       navChat: t('nav.chat'),
       navCode: t('nav.code'),
       navHistory: t('nav.history'),
+      navTrash: t('nav.trash'),
       navSettings: t('nav.settings'),
       navKnowledge: t('commandPalette.navKnowledge'),
       knowledgeHome: t('commandPalette.knowledgeHome'),
@@ -157,6 +159,7 @@ export function GlobalCommandPalette() {
       skillsEnabled,
       enterSection: (section: 'projects' | 'chats') => void enterSection(section),
       openHistoryFromChrome: () => void openHistoryFromChrome(),
+      openTrashFromChrome: () => void openTrashFromChrome(),
       openSettingsFromChrome: () => void openSettingsFromChrome(),
       enterKnowledge: () => void enterKnowledge(),
       openKnowledgeView: () => {

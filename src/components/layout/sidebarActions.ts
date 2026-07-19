@@ -122,6 +122,19 @@ export async function openHistoryFromChrome(): Promise<void> {
   useUiStore.getState().setActiveView('history')
 }
 
+export async function openTrashFromChrome(): Promise<void> {
+  const wasKnowledge = useUiStore.getState().activeView === 'knowledge'
+  if (wasKnowledge) {
+    await leaveKnowledge()
+    assignSectionAfterLeavingKnowledge()
+  }
+  useUiStore.getState().setActiveView('trash')
+  // Opportunistic list + purge
+  void import('@/domain').then(({ sessionService }) => {
+    sessionService.requestTrashList()
+  })
+}
+
 /** MainToolbar / special-view back — keep section in sync with restored view. */
 export function handleMainToolbarBack(): void {
   const target = useUiStore.getState().previousView ?? 'chat'

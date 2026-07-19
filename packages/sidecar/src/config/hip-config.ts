@@ -15,6 +15,7 @@ import type {
   LangSmithConfig,
   TerminalConfig,
   TerminalShellPref,
+  TrashConfig,
   AcpHostConfig,
 } from '@hip/protocol'
 import { parseDoomLoopStrategy } from '../session/doom-loop.js'
@@ -238,6 +239,15 @@ function normalizeTerminal(raw: Record<string, unknown>): TerminalConfig {
   return out
 }
 
+function normalizeTrash(raw: Record<string, unknown>): TrashConfig {
+  const out: TrashConfig = {}
+  const days = raw.retentionDays ?? raw.retention_days
+  if (typeof days === 'number' && Number.isFinite(days)) {
+    out.retentionDays = Math.floor(days)
+  }
+  return out
+}
+
 /** Normalize `[acp]` host policy (camelCase + snake_case aliases). */
 function normalizeAcpHost(raw: Record<string, unknown>): AcpHostConfig {
   const out: AcpHostConfig = {}
@@ -313,6 +323,11 @@ function validateConfig(parsed: unknown, filePath: string): HipConfig {
   const terminal = obj.terminal
   if (terminal && typeof terminal === 'object' && !Array.isArray(terminal)) {
     config.terminal = normalizeTerminal(terminal as Record<string, unknown>)
+  }
+
+  const trash = obj.trash
+  if (trash && typeof trash === 'object' && !Array.isArray(trash)) {
+    config.trash = normalizeTrash(trash as Record<string, unknown>)
   }
 
   const acp = obj.acp

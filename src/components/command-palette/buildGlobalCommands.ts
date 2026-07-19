@@ -31,6 +31,7 @@ export type GlobalCommandLabels = {
   navChat: string
   navCode: string
   navHistory: string
+  navTrash: string
   navSettings: string
   navKnowledge: string
   knowledgeHome: string
@@ -106,6 +107,7 @@ export type GlobalCommandContext = {
   /** Shell helpers (preferred over bare setActiveView for leave-knowledge flush). */
   enterSection?: (section: 'projects' | 'chats') => void | Promise<void>
   openHistoryFromChrome?: () => void | Promise<void>
+  openTrashFromChrome?: () => void | Promise<void>
   openSettingsFromChrome?: () => void | Promise<void>
   enterKnowledge?: () => void | Promise<void>
   /** Open knowledge surface (chip + activeView). Fallback when enterKnowledge missing. */
@@ -310,6 +312,17 @@ export function buildGlobalCommandGroups(
       run: () => {
         if (ctx.openHistoryFromChrome) void ctx.openHistoryFromChrome()
         else ctx.setActiveView('history')
+      },
+    },
+    {
+      id: 'nav-trash',
+      label: labels.navTrash,
+      icon: 'history',
+      keywords: ['recycle', 'bin', 'trash', '回收站', '回收'],
+      group: 'navigation',
+      run: () => {
+        if (ctx.openTrashFromChrome) void ctx.openTrashFromChrome()
+        else ctx.setActiveView('trash')
       },
     },
     {

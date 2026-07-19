@@ -170,14 +170,14 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:create', id })
   })
 
-  it('deleteSession permanently removes session and notifies backend', () => {
+  it('deleteSession soft-deletes (recycle bin) and notifies backend', () => {
     const t = new FakeTransport()
     const svc = new SessionService(t)
     const id = svc.createSession()
     svc.deleteSession(id, { reason: 'user' })
     expect(useDomainStore.getState().sessions.some((s) => s.id === id)).toBe(false)
     expect(t.sent.at(-1)).toMatchObject({
-      type: 'session:delete',
+      type: 'session:softDelete',
       sessionId: id,
       reason: 'user',
     })
@@ -189,9 +189,21 @@ describe('SessionService', () => {
     const id = svc.createSession()
     svc.deleteSession(id)
     expect(t.sent.at(-1)).toMatchObject({
-      type: 'session:delete',
+      type: 'session:softDelete',
       sessionId: id,
       reason: 'unknown',
+    })
+  })
+
+  it('hardDeleteSession permanently removes via session:delete', () => {
+    const t = new FakeTransport()
+    const svc = new SessionService(t)
+    const id = svc.createSession()
+    svc.hardDeleteSession(id, { reason: 'trash-permanent' })
+    expect(t.sent.at(-1)).toMatchObject({
+      type: 'session:delete',
+      sessionId: id,
+      reason: 'trash-permanent',
     })
   })
 

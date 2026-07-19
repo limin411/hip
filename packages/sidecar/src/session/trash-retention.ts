@@ -3,6 +3,7 @@
  * Knowledge purge is Tauri-side; this module only covers SQLite sessions.
  */
 import type { SessionStore } from '../persistence/store.js'
+import { readHipConfig } from '../config/hip-config.js'
 import { logInfo } from '../debug-logger.js'
 
 export const DEFAULT_TRASH_RETENTION_DAYS = 7
@@ -13,11 +14,19 @@ export const TRASH_RETENTION_INTERVAL_MS = 60 * 60 * 1000
 
 /**
  * Clamp retention to [1, 365]. Non-finite / missing → default 7.
- * Settings (PR 3) will pass hip.toml `[trash] retentionDays` through this.
+ * When `raw` omitted, reads hip.toml `[trash] retentionDays` if present.
  */
 export function resolveTrashRetentionDays(raw?: number | null): number {
-  if (raw == null || !Number.isFinite(raw)) return DEFAULT_TRASH_RETENTION_DAYS
-  const n = Math.floor(Number(raw))
+  let value = raw
+  if (value == null || !Number.isFinite(value)) {
+    try {
+      value = readHipConfig().trash?.retentionDays
+    } catch {
+      value = undefined
+    }
+  }
+  if (value == null || !Number.isFinite(value)) return DEFAULT_TRASH_RETENTION_DAYS
+  const n = Math.floor(Number(value))
   if (n < TRASH_RETENTION_MIN_DAYS) return TRASH_RETENTION_MIN_DAYS
   if (n > TRASH_RETENTION_MAX_DAYS) return TRASH_RETENTION_MAX_DAYS
   return n

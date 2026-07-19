@@ -22,6 +22,7 @@ const labels: GlobalCommandLabels = {
   navChat: 'Work',
   navCode: 'Coding',
   navHistory: 'History',
+  navTrash: 'Recycle bin',
   navSettings: 'Settings',
   navKnowledge: 'Knowledge base',
   knowledgeHome: 'Knowledge home',

@@ -394,6 +394,34 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
     case 'session:deleted':
       useWorkflowStore.getState().clearSession(msg.sessionId)
       return
+    case 'session:trashed':
+      useWorkflowStore.getState().clearSession(msg.sessionId)
+      return
+    case 'session:restored':
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().adjustSessions(-1)
+      })
+      toast.success(i18n.t('trash.restoredToast', { defaultValue: 'Restored from recycle bin' }))
+      return
+    case 'session:trash:list:result':
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().setSessionCount(msg.sessions.length)
+      })
+      void import('@/store/trashListStore').then(({ useTrashListStore }) => {
+        useTrashListStore.getState().setSessions(msg.sessions)
+      })
+      return
+    case 'session:trash:purge:result':
+      if (msg.purgedIds.length > 0) {
+        void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+          useTrashBadgeStore.getState().adjustSessions(-msg.purgedIds.length)
+        })
+        void import('@/store/trashListStore').then(({ useTrashListStore }) => {
+          const st = useTrashListStore.getState()
+          st.setSessions(st.sessions.filter((s) => !msg.purgedIds.includes(s.id)))
+        })
+      }
+      return
 
     case 'parallel:started': {
       useParallelStore.getState().addRun({

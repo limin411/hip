@@ -115,6 +115,22 @@ export interface TerminalConfig {
 }
 
 /**
+ * Optional `[trash]` section in hip.toml — product recycle-bin retention.
+ *
+ * ```toml
+ * [trash]
+ * retentionDays = 7
+ * ```
+ */
+export interface TrashConfig {
+  /**
+   * Days soft-deleted Chat/Code sessions (and knowledge trash) stay recoverable.
+   * Default 7; clamped to [1, 365] by resolvers.
+   */
+  retentionDays?: number
+}
+
+/**
  * Optional `[acp]` host policy in hip.toml.
  * Controls ACP client capabilities advertised to external agents and host-side bridges.
  *
@@ -167,6 +183,8 @@ export interface HipConfig {
   langsmith?: LangSmithConfig
   /** Optional interactive Terminal defaults. */
   terminal?: TerminalConfig
+  /** Optional product recycle-bin retention. */
+  trash?: TrashConfig
   /** Optional ACP host policy (FS bridge, MCP forward). */
   acp?: AcpHostConfig
 }

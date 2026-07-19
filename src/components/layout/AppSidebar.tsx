@@ -50,6 +50,7 @@ import {
   openHistoryFromChrome,
   openSettingsFromChrome,
   openSpaceFromSidebar,
+  openTrashFromChrome,
   selectSessionFromSidebar,
 } from './sidebarActions'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
@@ -449,8 +450,15 @@ export function AppSidebar() {
 
       <SidebarAccountFooter
         active={
-          activeView === 'settings' ? 'settings' : activeView === 'history' ? 'history' : null
+          activeView === 'settings'
+            ? 'settings'
+            : activeView === 'history'
+              ? 'history'
+              : activeView === 'trash'
+                ? 'trash'
+                : null
         }
+        onOpenTrash={() => void openTrashFromChrome()}
         onOpenHistory={() => void openHistoryFromChrome()}
         onOpenSettings={() => void openSettingsFromChrome()}
       />

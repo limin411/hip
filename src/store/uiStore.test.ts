@@ -119,8 +119,19 @@ describe('uiStore - activeView', () => {
     expect(useUiStore.getState().activeView).toBe('history')
     expect(useUiStore.getState().previousView).toBe('code')
 
+    useUiStore.getState().setActiveView('trash')
+    expect(useUiStore.getState().activeView).toBe('trash')
+    expect(useUiStore.getState().previousView).toBe('code')
+
     useUiStore.getState().setActiveView('chat')
     expect(useUiStore.getState().previousView).toBeNull()
+  })
+
+  it('treats trash as ephemeral special view', () => {
+    expect(isEphemeralActiveView('trash')).toBe(true)
+    useUiStore.setState({ activeView: 'chat', previousView: null })
+    useUiStore.getState().setActiveView('trash')
+    expect(useUiStore.getState().previousView).toBe('chat')
   })
 
   it('setActiveView to the same value is a no-op (same reference)', () => {

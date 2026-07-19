@@ -436,7 +436,15 @@ export function applyServerMessage(
       })
 
     case 'session:deleted':
+    case 'session:trashed':
+      // Soft and hard both remove from the active domain list.
       return { sessions: state.sessions.filter((s) => s.id !== msg.sessionId) }
+
+    case 'session:restored': {
+      // Merge summary into list without auto-select (design restore rules).
+      if (state.sessions.some((s) => s.id === msg.summary.id)) return state
+      return { sessions: [summaryToVM(msg.summary), ...state.sessions] }
+    }
 
     case 'session:title':
       return update(msg.sessionId, (s) => ({ ...s, title: msg.title }))

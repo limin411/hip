@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import { resolveTrashRetentionDays } from '@/lib/trashRetention'
 
 export interface DeleteSessionDialogProps {
   title: string
@@ -13,6 +15,9 @@ export interface DeleteSessionDialogProps {
 export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessionDialogProps) {
   const { t } = useTranslation()
   const [deleteDerivedMemories, setDeleteDerivedMemories] = useState(false)
+  const retentionDays = resolveTrashRetentionDays(
+    useHipConfigStore((s) => s.config.trash?.retentionDays),
+  )
 
   return (
     <Modal
@@ -25,7 +30,7 @@ export function DeleteSessionDialog({ title, onConfirm, onCancel }: DeleteSessio
     >
       <div className="p-5">
         <DialogPrimitive.Description className="text-body text-ink-secondary">
-          {t('history.deleteSessionConfirmBody')}
+          {t('history.deleteSessionConfirmBody', { title, days: retentionDays })}
         </DialogPrimitive.Description>
         <label className="mt-4 flex cursor-pointer items-start gap-2 text-body text-ink-secondary">
           <input

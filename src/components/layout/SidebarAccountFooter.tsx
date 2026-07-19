@@ -1,30 +1,45 @@
 import { useTranslation } from 'react-i18next'
-import { History, Settings } from 'lucide-react'
+import { History, Settings, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
+import { formatTrashBadge, trashBadgeTotal, useTrashBadgeStore } from '@/store/trashBadgeStore'
 
 interface SidebarAccountFooterProps {
+  onOpenTrash: () => void
   onOpenHistory: () => void
   onOpenSettings: () => void
   /** Which footer destination is currently active. */
-  active?: 'history' | 'settings' | null
+  active?: 'trash' | 'history' | 'settings' | null
 }
 
 /**
- * Sidebar footer: History + Settings single-row entries (icon + label).
+ * Sidebar footer: Recycle Bin + History + Settings (icon + label).
+ * Order: trash above history (product recycle bin).
  */
 export function SidebarAccountFooter({
+  onOpenTrash,
   onOpenHistory,
   onOpenSettings,
   active = null,
 }: SidebarAccountFooterProps) {
   const { t } = useTranslation()
+  const sessionCount = useTrashBadgeStore((s) => s.sessionCount)
+  const knowledgeCount = useTrashBadgeStore((s) => s.knowledgeCount)
+  const badge = formatTrashBadge(trashBadgeTotal(sessionCount, knowledgeCount))
 
   return (
     <div
       className="relative flex shrink-0 flex-col gap-0.5 px-1.5 pb-2 pt-1"
       data-testid="sidebar-account-footer"
     >
+      <FooterNavButton
+        testId="account-trash-button"
+        active={active === 'trash'}
+        label={t('nav.trash')}
+        icon={Trash2}
+        onClick={onOpenTrash}
+        badge={badge}
+      />
       <FooterNavButton
         testId="account-history-button"
         active={active === 'history'}
@@ -49,12 +64,14 @@ function FooterNavButton({
   label,
   icon: Icon,
   onClick,
+  badge,
 }: {
   testId: string
   active: boolean
   label: string
   icon: typeof Settings
   onClick: () => void
+  badge?: string
 }) {
   return (
     <button
@@ -75,6 +92,14 @@ function FooterNavButton({
         aria-hidden
       />
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge ? (
+        <span
+          className="shrink-0 rounded-full bg-state-hover px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-secondary"
+          data-testid="account-trash-badge"
+        >
+          {badge}
+        </span>
+      ) : null}
     </button>
   )
 }

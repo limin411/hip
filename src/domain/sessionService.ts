@@ -1326,10 +1326,19 @@ export class SessionService {
   }
 
   /**
-   * Permanently delete a session (History page / sidebar / cascade).
+   * Soft-delete a session into the product recycle bin (History / sidebar / clear-all / cascade).
+   * Live runtime + PTY tear down; SQLite messages and scratch stay until hard purge.
    * Always send `reason` so sidecar audit logs can attribute mass wipes.
    */
   deleteSession(
+    id: string,
+    opts?: { deleteDerivedMemories?: boolean; reason?: string; meta?: Record<string, unknown> },
+  ): void {
+    this.trashSession(id, opts)
+  }
+
+  /** Soft-delete → recycle bin (`session:softDelete`). */
+  trashSession(
     id: string,
     opts?: { deleteDerivedMemories?: boolean; reason?: string; meta?: Record<string, unknown> },
   ): void {
@@ -1338,6 +1347,7 @@ export class SessionService {
     auditSessionDelete('request', {
       sessionId: id,
       reason,
+      soft: true,
       title: snap?.title,
       surface: snap ? surfaceOf(snap.config) : undefined,
       cwd: snap?.config.cwd,
@@ -1347,17 +1357,17 @@ export class SessionService {
       stack: new Error().stack?.split('\n').slice(1, 8).join(' | '),
       ...opts?.meta,
     })
-    debugSessionDelete('local store delete + transport', { sessionId: id, reason })
+    debugSessionDelete('local trash + softDelete transport', { sessionId: id, reason })
 
     useDomainStore.getState().deleteSession(id)
-    // Terminal / PTY only die on permanent delete, not soft-close.
+    void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+      useTrashBadgeStore.getState().adjustSessions(1)
+    })
+    // Tear down live terminal; scratch dir stays on disk for restore.
     void ptyKill(id).catch(() => {})
     useTerminalStore.getState().clearSession(id)
     if (useUiStore.getState().chatSessionId === id) useUiStore.getState().setChatSessionId(null)
     if (useUiStore.getState().codeSessionId === id) useUiStore.getState().setCodeSessionId(null)
-    // The domain delete-fallback may auto-select sessions[0] from the GLOBAL list, which can belong
-    // to the other surface. Reconcile: if the now-active session doesn't match the current surface,
-    // pick the newest same-surface session, else show new-conversation.
     const view = useUiStore.getState().activeView
     if (view === 'chat' || view === 'code') {
       const st = useDomainStore.getState()
@@ -1369,10 +1379,65 @@ export class SessionService {
       }
     }
     this.transport.send({
+      type: 'session:softDelete',
+      sessionId: id,
+      reason,
+      ...(opts?.deleteDerivedMemories ? { deleteDerivedMemories: true } : {}),
+    })
+  }
+
+  /**
+   * Permanent hard-delete (`session:delete`). Used by Recycle Bin "Delete forever" / Empty.
+   */
+  hardDeleteSession(
+    id: string,
+    opts?: { deleteDerivedMemories?: boolean; reason?: string; meta?: Record<string, unknown> },
+  ): void {
+    const reason = opts?.reason ?? 'trash-permanent'
+    auditSessionDelete('request', {
+      sessionId: id,
+      reason,
+      hard: true,
+      activeSessionId: useDomainStore.getState().activeSessionId,
+      activeView: useUiStore.getState().activeView,
+      sessionsBefore: useDomainStore.getState().sessions.length,
+      stack: new Error().stack?.split('\n').slice(1, 8).join(' | '),
+      ...opts?.meta,
+    })
+    useDomainStore.getState().deleteSession(id)
+    void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+      useTrashBadgeStore.getState().adjustSessions(-1)
+    })
+    void ptyKill(id).catch(() => {})
+    useTerminalStore.getState().clearSession(id)
+    this.transport.send({
       type: 'session:delete',
       sessionId: id,
       reason,
       ...(opts?.deleteDerivedMemories ? { deleteDerivedMemories: true } : {}),
+    })
+  }
+
+  /** Restore a soft-deleted session from the recycle bin. */
+  restoreSession(id: string): void {
+    this.transport.send({ type: 'session:restore', sessionId: id })
+  }
+
+  /** Request trash list (also opportunistic purge on sidecar). */
+  requestTrashList(): void {
+    this.transport.send({ type: 'session:trash:list' })
+  }
+
+  /** Empty all soft-deleted sessions (hard). */
+  emptySessionTrash(): void {
+    this.transport.send({ type: 'session:trash:empty' })
+  }
+
+  /** Run session trash retention once with optional override. */
+  purgeSessionTrash(retentionDays?: number): void {
+    this.transport.send({
+      type: 'session:trash:purge',
+      ...(retentionDays != null ? { retentionDays } : {}),
     })
   }
 

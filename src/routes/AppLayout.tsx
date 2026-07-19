@@ -17,6 +17,7 @@ import { AppSidebar } from '@/components/layout/AppSidebar'
 import { MainToolbar } from '@/components/layout/MainToolbar'
 import { SettingsPage } from '@/components/account/SettingsPage'
 import { SessionHistory } from '@/components/history/SessionHistory'
+import { RecycleBinPage } from '@/components/history/RecycleBinPage'
 import { KnowledgePage } from '@/components/knowledge/KnowledgePage'
 import { KnowledgeOutlinePanel } from '@/components/knowledge/KnowledgeOutlinePanel'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
@@ -125,6 +126,7 @@ export function AppLayout() {
 
   const renderMainContent = () => {
     if (activeView === 'history') return <SessionHistory />
+    if (activeView === 'trash') return <RecycleBinPage />
     if (activeView === 'settings') return <SettingsPage />
     if (activeView === 'knowledge') return <KnowledgePage />
     return activeSessionId == null ? (

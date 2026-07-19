@@ -579,6 +579,9 @@ export const zhTW = {
       "bash": "Bash",
       "zsh": "Zsh"
     },
+    "trashRetention": "回收站保留天數",
+    "trashRetentionDesc": "移入回收站的會話將在此天數後自動永久刪除（1–365）。",
+    "trashRetentionUnit": "天",
     "contextMenu": {
       "title": "右鍵選單",
       "description": "選擇要顯示的右鍵操作及其順序。",
@@ -1222,21 +1225,39 @@ export const zhTW = {
     "previous": "上一頁",
     "next": "下一頁",
     "pageInfo": "第 {{page}} 頁 / 共 {{total}} 頁",
-    "delete": "刪除",
+    "delete": "移入回收站",
     "deleteSession": "刪除會話",
     "deleteSessionConfirmTitle": "刪除會話「{{title}}」？",
-    "deleteSessionConfirmBody": "此操作無法復原。",
+    "deleteSessionConfirmBody": "「{{title}}」將移入回收站，{{days}} 天內可恢復。",
     "deleteDerivedMemories": "同時刪除本會話衍生的長期記憶",
     "clearAll": "清空列表",
     "clearAllConfirmTitle": "清空目前列表中的會話？",
-    "clearAllConfirmBody": "將永久刪除目前列表中的 {{count}} 條會話（範圍：{{scope}}）。不在目前篩選/搜尋結果中的會話不會被刪除。此操作無法復原。",
-    "clearAllConfirmAction": "清空列表",
+    "clearAllConfirmBody": "將 {{count}} 條會話移入回收站（範圍：{{scope}}）。可在回收站恢復或永久刪除；預設 {{days}} 天後自動清除。不在目前篩選/搜尋結果中的會話不會被移動。",
+    "clearAllConfirmAction": "移入回收站",
     "clearAllScope": {
       "all": "全部場景",
       "chat": "僅辦公",
       "code": "僅編碼",
       "search": "搜尋結果"
     }
+  },
+  "trash": {
+    "title": "回收站",
+    "subtitle": "項目將在刪除 {{retentionDays}} 天後永久清除。",
+    "searchPlaceholder": "搜尋回收站…",
+    "emptyState": "回收站為空",
+    "filterAll": "全部",
+    "filterChat": "辦公",
+    "filterCode": "編碼",
+    "restore": "恢復",
+    "deleteForever": "永久刪除",
+    "deleteForeverTitle": "永久刪除「{{title}}」？",
+    "deleteForeverBody": "將永久刪除該會話，此操作無法復原。",
+    "empty": "清空回收站",
+    "emptyConfirmTitle": "清空回收站？",
+    "emptyConfirmBody": "將永久刪除回收站中的 {{count}} 個項目，此操作無法復原。",
+    "daysLeft": "剩餘 {{days}} 天",
+    "restoredToast": "已從回收站恢復"
   },
   "account": {
     "menu": "賬戶選單",
@@ -1275,6 +1296,7 @@ export const zhTW = {
   "nav": {
     "chat": "辦公",
     "code": "編碼",
+    "trash": "回收站",
     "history": "歷史會話",
     "settings": "設定"
   },

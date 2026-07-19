@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronDown } from 'lucide-react'
 import type { TerminalShellPref } from '@hip/protocol'
@@ -6,6 +6,11 @@ import { cn } from '@/lib/utils'
 import { detectHipPlatform } from '@/lib/platform'
 import { useUiStore, type AppLanguage, type Theme, type UiDensity } from '@/store/uiStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
+import {
+  resolveTrashRetentionDays,
+  TRASH_RETENTION_MAX_DAYS,
+  TRASH_RETENTION_MIN_DAYS,
+} from '@/lib/trashRetention'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,17 +48,31 @@ export function GeneralSettings() {
   const setDensity = useUiStore((s) => s.setDensity)
 
   const terminalShell = useHipConfigStore((s) => s.config.terminal?.shell ?? 'default')
+  const trashRetention = resolveTrashRetentionDays(
+    useHipConfigStore((s) => s.config.trash?.retentionDays),
+  )
   const updateSection = useHipConfigStore((s) => s.updateSection)
   const loadHipConfig = useHipConfigStore((s) => s.load)
   const hipLoaded = useHipConfigStore((s) => s.loaded)
+  const [retentionDraft, setRetentionDraft] = useState(String(trashRetention))
 
   useEffect(() => {
     if (!hipLoaded) void loadHipConfig()
   }, [hipLoaded, loadHipConfig])
 
+  useEffect(() => {
+    setRetentionDraft(String(trashRetention))
+  }, [trashRetention])
+
   const shellKeys = shellOptionsForPlatform()
   const setTerminalShell = (shell: TerminalShellPref) => {
     void updateSection('terminal', { shell })
+  }
+
+  const commitTrashRetention = () => {
+    const n = resolveTrashRetentionDays(Number(retentionDraft))
+    setRetentionDraft(String(n))
+    void updateSection('trash', { retentionDays: n })
   }
 
   return (
@@ -166,6 +185,35 @@ export function GeneralSettings() {
           </div>
         </div>
       ) : null}
+      <div
+        className="flex items-center justify-between px-6 py-5"
+        data-testid="settings-trash-retention"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-prose font-medium text-ink">{t('settings.trashRetention')}</div>
+          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.trashRetentionDesc')}</div>
+        </div>
+        <div className="relative ml-4 flex shrink-0 items-center gap-2">
+          <input
+            type="number"
+            min={TRASH_RETENTION_MIN_DAYS}
+            max={TRASH_RETENTION_MAX_DAYS}
+            value={retentionDraft}
+            data-testid="settings-trash-retention-input"
+            onChange={(e) => setRetentionDraft(e.target.value)}
+            onBlur={commitTrashRetention}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur()
+              }
+            }}
+            className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-body text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/60"
+          />
+          <span className="text-meta text-ink-tertiary">
+            {t('settings.trashRetentionUnit', { defaultValue: 'days' })}
+          </span>
+        </div>
+      </div>
       {CONTEXT_MENUS ? <ContextMenuSettings /> : null}
     </div>
   )

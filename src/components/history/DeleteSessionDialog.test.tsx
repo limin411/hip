@@ -21,7 +21,9 @@ describe('DeleteSessionDialog', () => {
   it('renders title and body', () => {
     render(<DeleteSessionDialog title="Session A" onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText('history.deleteSessionConfirmTitle:{"title":"Session A"}')).toBeInTheDocument()
-    expect(screen.getByText('history.deleteSessionConfirmBody')).toBeInTheDocument()
+    expect(
+      screen.getByText('history.deleteSessionConfirmBody:{"title":"Session A","days":7}'),
+    ).toBeInTheDocument()
   })
 
   it('calls onConfirm when delete button is clicked', () => {

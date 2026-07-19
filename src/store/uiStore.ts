@@ -6,7 +6,7 @@ import type { CheckpointMode } from '@hip/protocol'
 
 export type ArtifactTab = 'files' | 'agents' | 'outline' | 'timeline' | 'changes' | 'terminal'
 
-export type ActiveView = 'chat' | 'code' | 'settings' | 'history' | 'knowledge'
+export type ActiveView = 'chat' | 'code' | 'settings' | 'history' | 'knowledge' | 'trash'
 export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents' | 'outline'
 export type Theme = 'light' | 'dark' | 'system'
@@ -102,9 +102,9 @@ export type UiPersistedState = {
   sidebarOpen: boolean
 }
 
-/** Settings / history / knowledge are session-ephemeral; cold launch always lands on chat. */
+/** Settings / history / trash / knowledge are session-ephemeral; cold launch always lands on chat. */
 export function isEphemeralActiveView(v: ActiveView): boolean {
-  return v === 'settings' || v === 'history' || v === 'knowledge'
+  return v === 'settings' || v === 'history' || v === 'trash' || v === 'knowledge'
 }
 
 /** Merge hip-ui storage into runtime state; strip legacy shell fields. */
@@ -247,7 +247,8 @@ export const useUiStore = create<UiState>()(
       setActiveView: (v) =>
         set((s) => {
           if (s.activeView === v) return s
-          const isSpecial = (view: ActiveView) => view === 'settings' || view === 'history'
+          const isSpecial = (view: ActiveView) =>
+            view === 'settings' || view === 'history' || view === 'trash'
           const enteringSpecial = isSpecial(v) && !isSpecial(s.activeView)
           const leavingSpecial = isSpecial(s.activeView) && !isSpecial(v)
           return {

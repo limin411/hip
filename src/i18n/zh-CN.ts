@@ -833,6 +833,9 @@ export const zhCN = {
         useMemories: '使用记忆',
         useMemoriesDesc: '在每轮对话中将相关记忆注入智能体上下文。',
         useMemoriesPlain: '每轮对话把已存事实注入智能体上下文。',
+        useMemoriesWithExternal: '在外部（ACP）智能体中使用记忆',
+        useMemoriesWithExternalHint:
+          '开启后，ACP 主会话每轮会带上只读记忆前缀。不适用于子智能体派发。可能增加 token。',
         generateMemories: '自动学习',
         generateMemoriesDesc: '在对话结束后抽取并巩固长期记忆。',
         generateMemoriesPlain: '你停聊一段时间后，后台抽取可复用的事实（会用 API）。',

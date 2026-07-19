@@ -54,6 +54,19 @@ export {
   type RefreshMemoryCoreSnapshotResult,
 } from './inject.js'
 export {
+  ACP_MEMORY_PREFIX_MAX_CHARS,
+  ACP_MEMORY_PREFIX_MIN_USABLE_CHARS,
+  HIP_MEMORY_FENCE_CLOSE,
+  HIP_MEMORY_FENCE_OPEN,
+  buildAcpExternalMemoryPrefix,
+  resolveAcpExternalMemoryPrefix,
+  sanitizeMemoryFenceBody,
+  shouldInjectExternalMemory,
+  truncateMemoryBodyWithMarker,
+  type BuildAcpExternalMemoryPrefixArgs,
+  type ShouldInjectExternalMemoryArgs,
+} from './external-prefix.js'
+export {
   MemoryStore,
   type MemoryListFilter,
   type MemorySearchOpts,

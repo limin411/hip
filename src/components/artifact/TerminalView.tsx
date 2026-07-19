@@ -339,7 +339,7 @@ export function TerminalView() {
       <DeclarativeContextMenu
         kind="terminal"
         payload={{ sessionId, status }}
-        className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border px-2.5"
+        className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border/80 px-2.5"
         data-testid="terminal-chrome"
       >
         <div className="flex min-w-0 flex-1 items-center justify-between gap-2" data-tauri-drag-region="false">

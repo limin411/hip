@@ -128,31 +128,31 @@ export default {
       keyframes: {
         blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
         pulse: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.4' } },
+        // Individual transform props so they compose with Tailwind translate utilities
+        // (e.g. -translate-x-1/2 centering is not wiped mid-animation).
         'message-enter': {
-          from: { opacity: '0', transform: 'translateY(8px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
+          from: { opacity: '0', translate: '0 8px' },
+          to: { opacity: '1', translate: '0 0' },
         },
-        // Use individual transform properties so Tailwind translate-* on the element
-        // (e.g. -translate-x-1/2 centering) is not wiped for the animation duration.
         'menu-in': {
           from: { opacity: '0', translate: '0 -4px', scale: '0.97' },
           to: { opacity: '1', translate: '0 0', scale: '1' },
         },
         'panel-in': {
-          from: { opacity: '0', transform: 'translateX(8px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
+          from: { opacity: '0', translate: '8px 0' },
+          to: { opacity: '1', translate: '0 0' },
         },
         'dot-bounce': {
-          '0%,60%,100%': { opacity: '0.3', transform: 'translateY(0)' },
-          '30%': { opacity: '1', transform: 'translateY(-2px)' },
+          '0%,60%,100%': { opacity: '0.3', translate: '0 0' },
+          '30%': { opacity: '1', translate: '0 -2px' },
         },
         'msg-enter-right': {
-          from: { opacity: '0', transform: 'translateX(12px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
+          from: { opacity: '0', translate: '12px 0' },
+          to: { opacity: '1', translate: '0 0' },
         },
         'msg-enter-left': {
-          from: { opacity: '0', transform: 'translateX(-12px)' },
-          to: { opacity: '1', transform: 'translateX(0)' },
+          from: { opacity: '0', translate: '-12px 0' },
+          to: { opacity: '1', translate: '0 0' },
         },
       },
       animation: {

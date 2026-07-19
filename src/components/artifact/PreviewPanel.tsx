@@ -73,9 +73,12 @@ export function PreviewPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col border-l border-border bg-surface">
-      <div data-tauri-drag-region className="flex h-10 shrink-0 items-center justify-between border-b border-border px-2">
+      <div
+        data-tauri-drag-region
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
+      >
         <span
-          className="truncate px-1 text-body font-medium text-ink"
+          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >
@@ -88,7 +91,7 @@ export function PreviewPanel() {
           title={t('artifact.closePanel')}
           data-tauri-drag-region="false"
         >
-          <X size={16} />
+          <X size={16} strokeWidth={1.75} />
         </Button>
       </div>
 
@@ -111,11 +114,11 @@ export function PreviewPanel() {
                         onClick={() => select(a.path)}
                         title={a.path}
                         className={cn(
-                          'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-meta transition-colors',
-                          selected === a.path ? 'bg-accent-active text-accent-strong' : 'text-ink hover:bg-surface-muted',
+                          'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-meta transition-colors duration-chrome',
+                          selected === a.path ? 'bg-state-hover font-medium text-ink' : 'text-ink hover:bg-state-hover',
                         )}
                       >
-                        <Icon size={14} className="shrink-0 text-ink-tertiary" />
+                        <Icon size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
                         <span className="truncate">{a.name}</span>
                       </button>
                     </li>

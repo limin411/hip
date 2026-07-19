@@ -16,25 +16,26 @@ export function ShortcutsHelpDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[220] bg-ink/20" />
+        <Dialog.Overlay className="fixed inset-0 z-[220] bg-overlay backdrop-blur-[2px] motion-reduce:backdrop-blur-none" />
         <Dialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-[230] w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2',
-            'rounded-xl border border-border bg-surface p-4 shadow-overlay outline-none',
+            // Center with flex + inset (not translate) so enter animations cannot wipe centering.
+            'fixed inset-0 z-[230] m-auto h-fit w-[min(24rem,calc(100vw-2rem))]',
+            'rounded-xl border border-border bg-surface p-5 shadow-overlay outline-none animate-menu-in motion-reduce:animate-none',
           )}
           data-testid="keyboard-shortcuts-dialog"
         >
-          <Dialog.Title className="text-body font-medium text-ink">
+          <Dialog.Title className="text-body font-semibold tracking-tight text-ink">
             {t('commandPalette.shortcuts.title')}
           </Dialog.Title>
           <Dialog.Description className="mt-1 text-meta text-ink-secondary">
             {t('commandPalette.shortcuts.description')}
           </Dialog.Description>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-1">
             {entries.map((e) => (
-              <div key={e.id} className="flex items-center justify-between gap-3 text-body">
+              <div key={e.id} className="flex items-center justify-between gap-3 rounded-md px-1 py-1.5 text-body">
                 <span className="text-ink-secondary">{t(e.labelKey)}</span>
-                <kbd className="rounded bg-surface-muted px-2 py-0.5 font-mono text-caption text-ink-tertiary">
+                <kbd className="rounded-md bg-surface-muted px-2 py-0.5 font-mono text-caption text-ink-tertiary">
                   {e.combo}
                 </kbd>
               </div>

@@ -71,17 +71,17 @@ function Node({
           data-path={entry.path}
           onClick={onClick}
           className={cn(
-            'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors',
-            active ? 'bg-accent-active font-medium text-accent-strong' : 'text-ink hover:bg-surface-muted',
+            'flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 text-body transition-colors duration-chrome',
+            active ? 'bg-state-hover font-medium text-ink' : 'text-ink hover:bg-state-hover',
           )}
           style={{ paddingLeft: depth * 14 + 6 }}
         >
           {entry.isDir
-            ? open ? <ChevronDown size={14} className="text-ink-tertiary" /> : <ChevronRight size={14} className="text-ink-tertiary" />
+            ? open ? <ChevronDown size={14} strokeWidth={1.75} className="text-ink-tertiary" /> : <ChevronRight size={14} strokeWidth={1.75} className="text-ink-tertiary" />
             : <span className="w-3.5" />}
           {entry.isDir
-            ? open ? <FolderOpen size={15} className="text-accent-strong" /> : <Folder size={15} className="text-accent-strong" />
-            : <File size={15} className="text-ink-tertiary" />}
+            ? open ? <FolderOpen size={15} strokeWidth={1.75} className="text-ink-tertiary" /> : <Folder size={15} strokeWidth={1.75} className="text-ink-tertiary" />
+            : <File size={15} strokeWidth={1.75} className="text-ink-tertiary" />}
           <span className="truncate">{entry.name}</span>
         </div>
       </DeclarativeContextMenu>
@@ -138,10 +138,10 @@ export function FileTree() {
 
   return (
     <div className="flex h-full flex-col" data-testid="file-tree">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-2">
-        <span className="flex items-center gap-1.5 truncate text-meta font-medium text-ink-secondary" title={rootPath}>
-          <FolderGit2 size={13} className="shrink-0 text-ink-tertiary" />
-          {basename(rootPath)}
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/80 px-2">
+        <span className="flex items-center gap-1.5 truncate text-caption font-medium text-ink-tertiary" title={rootPath}>
+          <FolderGit2 size={13} strokeWidth={1.75} className="shrink-0" />
+          <span className="truncate text-ink-secondary">{basename(rootPath)}</span>
         </span>
         <div className="flex items-center gap-0.5">
           {isDraft && (
@@ -150,25 +150,25 @@ export function FileTree() {
               aria-label={t('artifact.backToChat')}
               data-testid="tree-back-to-chat"
               onClick={() => useDraftStore.getState().clearProject()}
-              className="rounded p-1 text-accent-strong transition-colors hover:bg-surface-muted"
+              className="rounded-md p-1 text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
             >
-              <MessageSquare size={13} />
+              <MessageSquare size={13} strokeWidth={1.75} />
             </button>
           )}
           <button
             title={t('artifact.refresh')}
             data-testid="refresh-tree"
             onClick={() => scopeId && (isDraft ? sessionService.lsDraft(scopeId, rootPath) : sessionService.lsDir(scopeId, rootPath))}
-            className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={13} strokeWidth={1.75} />
           </button>
           <button
             title={t('artifact.changeFolder')}
             onClick={choose}
-            className="rounded p-1 text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+            className="rounded-md p-1 text-ink-tertiary transition-colors duration-chrome hover:bg-state-hover hover:text-ink"
           >
-            <Folder size={13} />
+            <Folder size={13} strokeWidth={1.75} />
           </button>
         </div>
       </div>

@@ -156,7 +156,7 @@ export function WorktreeCreateSingleModal({
             >
               {t('chat.worktreeControl.createSingleOpenSession')}
             </label>
-            <p className="mt-0.5 text-[11px] leading-snug text-ink-tertiary">
+            <p className="mt-0.5 text-caption leading-snug text-ink-tertiary">
               {t('chat.worktreeControl.createSingleOpenSessionHint')}
             </p>
           </div>

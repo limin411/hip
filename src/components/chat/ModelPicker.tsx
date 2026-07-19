@@ -40,7 +40,7 @@ export function ModelPicker() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <ComposerChip title={t('chat.modelHint')} data-testid="model-chip">
-          <Cpu size={13} className="shrink-0" aria-hidden />
+          <Cpu size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
           <span className="max-w-[140px] truncate">{label}</span>
         </ComposerChip>
       </DropdownMenuTrigger>

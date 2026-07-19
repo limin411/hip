@@ -17,8 +17,12 @@ export const ComposerChip = forwardRef<HTMLButtonElement, ComposerChipProps>(
         ref={ref}
         type={type}
         className={cn(
-          'flex items-center gap-1.5 px-2 py-1 text-meta transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-          active ? 'text-accent-strong' : 'text-ink-tertiary hover:text-ink-secondary',
+          'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-meta font-medium transition-colors duration-chrome',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          active
+            ? 'bg-state-hover text-ink'
+            : 'text-ink-tertiary hover:bg-state-hover hover:text-ink-secondary',
           className,
         )}
         {...props}

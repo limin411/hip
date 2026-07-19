@@ -36,7 +36,7 @@ function shellOptionsForPlatform(): TerminalShellPref[] {
 }
 
 const selectTriggerCls =
-  'flex cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent/60'
+  'flex h-8 cursor-pointer items-center justify-between gap-6 rounded-md border border-border bg-surface py-1.5 pl-2.5 pr-2 text-body text-ink-secondary transition-colors duration-chrome hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring/40'
 
 export function GeneralSettings() {
   const { t } = useTranslation()
@@ -77,13 +77,13 @@ export function GeneralSettings() {
 
   return (
     <div className="flex flex-col">
-      <div className="px-6 pt-6 pb-2">
-        <h2 className="text-title font-semibold text-ink">{t('settings.general')}</h2>
+      <div className="px-8 pb-3 pt-7">
+        <h2 className="text-title font-semibold tracking-tight text-ink">{t('settings.general')}</h2>
       </div>
-      <div className="flex items-center justify-between px-6 py-5">
+      <div className="flex items-center justify-between gap-6 px-8 py-4">
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.language')}</div>
-          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.languageDesc')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.language')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">{t('settings.languageDesc')}</div>
         </div>
         <div className="relative ml-4 shrink-0">
           <DropdownMenu modal={false}>
@@ -104,17 +104,17 @@ export function GeneralSettings() {
           </DropdownMenu>
         </div>
       </div>
-      <div className="flex items-center justify-between px-6 py-5">
+      <div className="flex items-center justify-between gap-6 px-8 py-4">
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.theme')}</div>
-          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.themeDesc')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.theme')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">{t('settings.themeDesc')}</div>
         </div>
-        <div className="relative ml-4 shrink-0">
+        <div className="relative shrink-0">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={selectTriggerCls}>
                 <span>{t(`settings.themes.${theme}`)}</span>
-                <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+                <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -128,17 +128,17 @@ export function GeneralSettings() {
           </DropdownMenu>
         </div>
       </div>
-      <div className="flex items-center justify-between px-6 py-5">
+      <div className="flex items-center justify-between gap-6 px-8 py-4">
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.density')}</div>
-          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.densityDesc')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.density')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">{t('settings.densityDesc')}</div>
         </div>
-        <div className="relative ml-4 shrink-0">
+        <div className="relative shrink-0">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={selectTriggerCls}>
                 <span>{t(`settings.densities.${density}`)}</span>
-                <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+                <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -153,17 +153,17 @@ export function GeneralSettings() {
         </div>
       </div>
       {CODE_TERMINAL ? (
-        <div className="flex items-center justify-between px-6 py-5" data-testid="settings-terminal-shell">
+        <div className="flex items-center justify-between gap-6 px-8 py-4" data-testid="settings-terminal-shell">
           <div className="min-w-0 flex-1">
-            <div className="text-prose font-medium text-ink">{t('settings.terminalShell')}</div>
-            <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.terminalShellDesc')}</div>
+            <div className="text-body font-medium text-ink">{t('settings.terminalShell')}</div>
+            <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">{t('settings.terminalShellDesc')}</div>
           </div>
-          <div className="relative ml-4 shrink-0">
+          <div className="relative shrink-0">
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={selectTriggerCls} data-testid="settings-terminal-shell-trigger">
                   <span>{t(`settings.terminalShells.${terminalShell}`)}</span>
-                  <ChevronDown size={14} className="shrink-0 text-ink-tertiary" />
+                  <ChevronDown size={14} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -186,14 +186,14 @@ export function GeneralSettings() {
         </div>
       ) : null}
       <div
-        className="flex items-center justify-between px-6 py-5"
+        className="flex items-center justify-between gap-6 px-8 py-4"
         data-testid="settings-trash-retention"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.trashRetention')}</div>
-          <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.trashRetentionDesc')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.trashRetention')}</div>
+          <div className="mt-0.5 text-meta leading-relaxed text-ink-tertiary">{t('settings.trashRetentionDesc')}</div>
         </div>
-        <div className="relative ml-4 flex shrink-0 items-center gap-2">
+        <div className="relative flex shrink-0 items-center gap-2">
           <input
             type="number"
             min={TRASH_RETENTION_MIN_DAYS}
@@ -207,7 +207,7 @@ export function GeneralSettings() {
                 e.currentTarget.blur()
               }
             }}
-            className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-left text-body text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/60"
+            className="h-8 w-20 rounded-md border border-border bg-surface px-2 text-left text-body tabular-nums text-ink transition-[border-color,box-shadow] duration-chrome focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
           />
           <span className="text-meta text-ink-tertiary">
             {t('settings.trashRetentionUnit', { defaultValue: 'days' })}

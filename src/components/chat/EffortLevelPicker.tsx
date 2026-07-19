@@ -69,7 +69,7 @@ export function EffortLevelPicker() {
           disabled={busy}
           aria-disabled={busy}
         >
-          <Gauge size={13} className="shrink-0" aria-hidden />
+          <Gauge size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
           <span className="max-w-[160px] truncate" data-testid="effort-chip-label">
             <span className="text-ink-tertiary">{t('chat.effort.chipPrefix')}</span>
             <span className="mx-0.5 text-ink-tertiary" aria-hidden>

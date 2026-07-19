@@ -175,8 +175,8 @@ export function RecycleBinPage() {
         </button>
       </p>
 
-      <div className="relative mb-4 max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+      <div className="relative mb-5 max-w-md">
+        <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
         <input
           type="text"
           value={query}
@@ -185,7 +185,7 @@ export function RecycleBinPage() {
             setPage(1)
           }}
           placeholder={t('trash.searchPlaceholder')}
-          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink placeholder:text-ink-tertiary focus:border-accent focus:outline-none"
+          className="h-9 w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
         />
       </div>
 
@@ -222,7 +222,7 @@ export function RecycleBinPage() {
         </p>
       ) : (
         <>
-          <div className="divide-y divide-border rounded-lg border border-border bg-surface">
+          <div className="divide-y divide-border/80 overflow-hidden rounded-lg border border-border/80 bg-surface">
             {paged.map((row) => {
               const left = daysLeftInTrash(row.deletedAt, retentionDays)
               const Icon =
@@ -238,15 +238,15 @@ export function RecycleBinPage() {
               return (
                 <div
                   key={row.key}
-                  className="flex items-center gap-3 px-4 py-3"
+                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-chrome hover:bg-state-hover/60"
                   data-testid="recycle-bin-row"
                   data-row-key={row.key}
                 >
-                  <Icon size={16} className="shrink-0 text-ink-tertiary" aria-hidden />
+                  <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-tertiary" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-body font-medium text-ink">{row.title}</div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-meta text-ink-tertiary">
-                      <span className="rounded bg-state-hover px-1.5 py-0.5 text-[11px] font-medium text-ink-secondary">
+                      <span className="rounded-md bg-surface-muted px-1.5 py-0.5 text-caption font-medium text-ink-secondary">
                         {kindLabel}
                       </span>
                       <span>{t('trash.daysLeft', { days: left })}</span>

@@ -38,7 +38,7 @@ export function PermissionModePicker() {
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <ComposerChip active={current !== 'edit'} title={t('chat.permission.label')} data-testid="permission-chip">
-          <ShieldCheck size={13} className="shrink-0" aria-hidden />
+          <ShieldCheck size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
           <span className="max-w-[140px] truncate">{t(`chat.permission.modes.${current}`)}</span>
         </ComposerChip>
       </DropdownMenuTrigger>

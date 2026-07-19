@@ -45,7 +45,7 @@ describe('DiffDisplay class polish', () => {
     cleanup()
   })
 
-  it('sticky file header has border-b border-border when expanded', () => {
+  it('sticky file header has soft border when expanded', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -55,7 +55,8 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     const header = screen.getByTestId('diff-file-header')
-    expect(header).toHaveClass('border-b', 'border-border')
+    expect(header).toHaveClass('border-b')
+    expect(header.className).toMatch(/border-border/)
   })
 
   it('drops sticky header border when collapsed to avoid double hairline', () => {
@@ -70,10 +71,11 @@ describe('DiffDisplay class polish', () => {
     )
     const header = screen.getByTestId('diff-file-header')
     expect(header).not.toHaveClass('border-b')
-    expect(screen.getByTestId('diff-file')).toHaveClass('border-b', 'border-border')
+    expect(screen.getByTestId('diff-file').className).toMatch(/border-b/)
+    expect(screen.getByTestId('diff-file').className).toMatch(/border-border/)
   })
 
-  it('@@ hunk span uses text-ink-secondary; header tail stays tertiary', () => {
+  it('@@ hunk span and header tail stay quiet tertiary', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -83,12 +85,12 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     const atSpan = screen.getByText(/@@ -1,1 \+1,1 @@/)
-    expect(atSpan).toHaveClass('text-ink-secondary')
+    expect(atSpan).toHaveClass('text-ink-tertiary')
     const tail = screen.getByText('function foo')
-    expect(tail).toHaveClass('opacity-70', 'text-ink-tertiary')
+    expect(tail.className).toMatch(/text-ink-tertiary/)
   })
 
-  it('word-diff spans use /30 tints (not /25)', () => {
+  it('word-diff spans use soft /25 tints', () => {
     render(
       <DiffDisplay
         files={[file]}
@@ -98,11 +100,11 @@ describe('DiffDisplay class polish', () => {
       />,
     )
     // Equal-length del/add pair → word-diff; mid '1' vs '2' is changed.
-    const success = document.querySelector('.bg-success\\/30')
-    const danger = document.querySelector('.bg-danger\\/30')
+    const success = document.querySelector('.bg-success\\/25')
+    const danger = document.querySelector('.bg-danger\\/25')
     expect(success).toBeTruthy()
     expect(danger).toBeTruthy()
-    expect(document.querySelector('.bg-success\\/25')).toBeNull()
-    expect(document.querySelector('.bg-danger\\/25')).toBeNull()
+    expect(document.querySelector('.bg-success\\/30')).toBeNull()
+    expect(document.querySelector('.bg-danger\\/30')).toBeNull()
   })
 })

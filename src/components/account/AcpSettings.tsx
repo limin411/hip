@@ -51,7 +51,7 @@ export function AcpHostPolicySection() {
         data-testid="acp-settings-forward-mcp"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.acp.forwardMcp')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.acp.forwardMcp')}</div>
           <div className="mt-0.5 text-meta text-ink-tertiary">
             {t('settings.acp.forwardMcpHint')}
           </div>
@@ -75,7 +75,7 @@ export function AcpHostPolicySection() {
         data-testid="acp-settings-fs-bridge"
       >
         <div className="min-w-0 flex-1">
-          <div className="text-prose font-medium text-ink">{t('settings.acp.fsBridge')}</div>
+          <div className="text-body font-medium text-ink">{t('settings.acp.fsBridge')}</div>
           <div className="mt-0.5 text-meta text-ink-tertiary">{t('settings.acp.fsBridgeHint')}</div>
         </div>
         <Switch

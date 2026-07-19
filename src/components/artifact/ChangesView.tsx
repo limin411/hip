@@ -51,9 +51,9 @@ export function ChangesView() {
   return (
     <div className="flex h-full flex-col" data-testid="changes-view">
       {/* uncommitted (top) */}
-      <div className="flex min-h-0 flex-[3] flex-col border-b border-border">
-        <div className="flex h-8 shrink-0 items-center justify-between px-3 text-meta text-ink-secondary">
-          <span>{t('artifact.changesView.uncommitted')}</span>
+      <div className="flex min-h-0 flex-[3] flex-col border-b border-border/80">
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/60 px-3">
+          <span className="text-caption font-medium text-ink-tertiary">{t('artifact.changesView.uncommitted')}</span>
           <SegmentedControl
             data-testid="diff-view-toggle"
             aria-label={t('artifact.diffView.viewUnified')}
@@ -89,14 +89,16 @@ export function ChangesView() {
       </div>
       {/* commit log (bottom) — read-only */}
       <div className="flex min-h-0 flex-[2] flex-col">
-        <div className="flex h-8 shrink-0 items-center px-3 text-meta text-ink-secondary">{t('artifact.changesView.commitLog')}</div>
+        <div className="flex h-8 shrink-0 items-center border-b border-border/60 px-3">
+          <span className="text-caption font-medium text-ink-tertiary">{t('artifact.changesView.commitLog')}</span>
+        </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {log.status === 'loading' ? (
             <div className="flex h-full items-center justify-center text-ink-tertiary"><Loader2 size={16} className="animate-spin" /></div>
           ) : log.state && log.state !== 'ok' ? (
             <Empty title={t('artifact.changesView.commitLogError')} desc={log.error} />
           ) : log.commits.length === 0 ? (
-            <Empty icon={<GitCommit size={24} />} title={t('artifact.changesView.noCommits')} />
+            <Empty icon={<GitCommit size={24} strokeWidth={1.5} />} title={t('artifact.changesView.noCommits')} />
           ) : (
             <ul>
               {log.commits.map((c) => (
@@ -104,10 +106,10 @@ export function ChangesView() {
                   <DeclarativeContextMenu
                     kind="commit"
                     payload={{ sha: c.sha, shortSha: c.shortSha, message: c.message, sessionId }}
-                    className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5 text-meta"
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-meta transition-colors duration-chrome hover:bg-state-hover"
                   >
                     <span className="flex min-w-0 items-center gap-2">
-                      <span className="shrink-0 font-mono text-caption text-ink-tertiary">{c.shortSha}</span>
+                      <span className="shrink-0 font-mono text-caption tabular-nums text-ink-tertiary">{c.shortSha}</span>
                       <span className="min-w-0 truncate text-ink">{c.message}</span>
                     </span>
                     <span className="shrink-0 text-caption text-ink-tertiary">{c.author} · {formatRelativeTime(c.timestamp, i18n.language)}</span>

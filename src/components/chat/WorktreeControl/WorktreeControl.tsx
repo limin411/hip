@@ -358,13 +358,13 @@ export function WorktreeControl() {
             aria-expanded={popoverOpen}
             data-testid="worktree-control-chip"
             data-worktree-control-chip=""
-            className={cn(popoverOpen && 'text-accent-strong')}
+            className={cn(popoverOpen && 'bg-state-hover text-ink')}
           >
-            <Folders size={13} className="shrink-0" aria-hidden />
+            <Folders size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
             <span className="max-w-[120px] truncate">{chipLabel}</span>
             {isolationCount > 0 ? (
               <span
-                className="rounded bg-accent/10 px-1 py-px text-[10px] font-medium text-accent"
+                className="rounded-md bg-surface-muted px-1.5 py-px text-caption font-medium text-ink-secondary"
                 data-testid="worktree-control-badge"
               >
                 {isolationCount}
@@ -393,7 +393,7 @@ export function WorktreeControl() {
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 <span
-                  className="min-w-0 flex-1 truncate text-[11px] text-ink-tertiary"
+                  className="min-w-0 flex-1 truncate text-caption text-ink-tertiary"
                   title={displayPath}
                 >
                   {displayPath}
@@ -479,7 +479,7 @@ export function WorktreeControl() {
               </button>
             </div>
 
-            <div className="px-3 py-2 text-[10px] leading-snug text-ink-tertiary">
+            <div className="px-3 py-2 text-caption leading-snug text-ink-tertiary">
               {t('chat.worktreeControl.footerHint')}
             </div>
           </div>

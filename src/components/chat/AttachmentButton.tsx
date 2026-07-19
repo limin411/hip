@@ -56,7 +56,7 @@ export function AttachmentButton({ onAttach }: AttachmentButtonProps) {
       title={t('chat.attach')}
       data-testid="attachment-button"
     >
-      <Paperclip size={16} />
+      <Paperclip size={15} strokeWidth={1.75} />
     </Button>
   )
 }

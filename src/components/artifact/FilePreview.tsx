@@ -15,7 +15,7 @@ function Centered({ text, testid }: { text: string; testid: string }) {
 }
 
 function TruncBanner({ text }: { text: string }) {
-  return <div className="mb-2 rounded bg-surface-muted px-2 py-1 text-meta text-ink-tertiary">{text}</div>
+  return <div className="mb-2 rounded-md bg-surface-muted/80 px-2.5 py-1 text-meta text-ink-tertiary">{text}</div>
 }
 
 /**
@@ -34,7 +34,7 @@ function IframePreviewChrome({
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid={testid}>
       <div
-        className="shrink-0 truncate border-b border-border bg-surface-muted px-2 py-1 font-mono text-meta text-ink-tertiary"
+        className="shrink-0 truncate border-b border-border/80 bg-surface-subtle px-2.5 py-1.5 font-mono text-caption text-ink-tertiary"
         data-testid="preview-chrome"
         title={path}
       >

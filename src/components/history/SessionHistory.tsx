@@ -99,14 +99,14 @@ export function SessionHistory() {
           </Button>
         )}
       </div>
-      <div className="relative mb-4 max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+      <div className="relative mb-5 max-w-md">
+        <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
         <input
           type="text"
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
           placeholder={t('history.searchPlaceholder')}
-          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink placeholder:text-ink-tertiary focus:border-accent focus:outline-none"
+          className="h-9 w-full rounded-md border border-border bg-surface py-2 pl-9 pr-3 text-body text-ink transition-[border-color,box-shadow] duration-chrome placeholder:text-ink-tertiary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/10"
         />
       </div>
 
@@ -153,14 +153,14 @@ export function SessionHistory() {
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {paged.map((session) => {
               const surface = surfaceOf(session.config)
               const Icon = surface === 'code' ? Code2 : MessageSquare
               return (
                 <div
                   key={session.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-surface p-3 text-left transition-colors hover:border-accent"
+                  className="flex items-center justify-between rounded-lg border border-border/80 bg-surface p-3 text-left transition-colors duration-chrome hover:bg-state-hover"
                 >
                   {/* Layout on permanent outer so CONTEXT_MENUS=false keeps flex sizing. */}
                   <div
@@ -191,13 +191,13 @@ export function SessionHistory() {
                         </div>
                         <span
                           className={cn(
-                            'ml-3 flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-caption',
+                            'ml-3 flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-caption',
                             surface === 'code'
-                              ? 'bg-accent-subtle text-accent-strong'
-                              : 'bg-surface-subtle text-ink-secondary',
+                              ? 'bg-surface-muted text-ink-secondary'
+                              : 'bg-surface-muted text-ink-tertiary',
                           )}
                         >
-                          <Icon size={12} />
+                          <Icon size={12} strokeWidth={1.75} />
                           {t(`nav.${surface}`)}
                         </span>
                       </button>

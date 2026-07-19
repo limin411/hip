@@ -111,7 +111,7 @@ export function SessionAgentPicker() {
             title={t('composer.agentPicker.label')}
             data-testid={activeId ? 'session-agent-chip-active' : 'session-agent-chip'}
           >
-            <Bot size={13} className="shrink-0" aria-hidden />
+            <Bot size={13} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
             <span className="max-w-[120px] truncate">{currentName}</span>
           </ComposerChip>
         </DropdownMenuTrigger>

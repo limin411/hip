@@ -128,14 +128,15 @@ export function WorktreeList({
               >
                 <GitBranch
                   size={12}
+                  strokeWidth={1.75}
                   className="mt-0.5 shrink-0 text-ink-tertiary"
                   aria-hidden
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-medium text-ink">
+                  <span className="block truncate text-meta font-medium text-ink">
                     {row.label}
                   </span>
-                  <span className="mt-0.5 block truncate text-[10px] text-ink-tertiary">
+                  <span className="mt-0.5 block truncate text-caption text-ink-tertiary">
                     {pathLabel}
                   </span>
                 </span>

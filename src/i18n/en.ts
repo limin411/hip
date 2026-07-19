@@ -313,7 +313,7 @@ export const en = {
       acpCliff: {
         title: 'External agent mode',
         body: 'This session is driven by {{name}}. Hip tools, skills, and delegation are unavailable.',
-        mcpOff: 'Hip MCP servers are not forwarded (enable in Settings → ACP if needed).',
+        mcpOff: 'Hip MCP servers are not forwarded (enable in Settings → Agent Management if needed).',
         mcpOn: 'Configured Hip MCP servers are forwarded into this agent.',
         dismiss: 'Got it',
       },
@@ -826,6 +826,19 @@ export const en = {
         generic: 'Install failed. See the detail message for more.',
       },
       agentsLabel: 'Agent Management',
+      acp: {
+        sectionTitle: 'ACP host policy',
+        intro:
+          'Host policy for external (ACP) primary agents. These options apply when a session is driven by an external agent such as Grok Build or Claude Code — not when hip is the primary agent.',
+        forwardMcp: 'Forward Hip MCP servers',
+        forwardMcpHint:
+          'When on, enabled Hip MCP servers (and enabled plugin MCP) are passed into external ACP sessions. Off by default for security.',
+        forwardMcpWarning:
+          'Warning: this exposes MCP launch commands, environment variables, and headers to the external agent process.',
+        fsBridge: 'File system bridge',
+        fsBridgeHint:
+          'Advertise and handle ACP fs/read_text_file and fs/write_text_file so external agents can read and write workspace files through hip. On by default.',
+      },
       skillLabel: 'Skills',
       pluginsLabel: 'Plugin Market',
       hooksLabel: 'Hooks',

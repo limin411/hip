@@ -302,7 +302,7 @@ export const zhTW = {
     "acpCliff": {
       "title": "外部智慧體模式",
       "body": "目前工作階段由 {{name}} 驅動。Hip 工具、技能與委派不可用。",
-      "mcpOff": "未轉發 Hip MCP 伺服器（可在 設定 → ACP 中開啟）。",
+      "mcpOff": "未轉發 Hip MCP 伺服器（可在 設定 → 智慧體管理 中開啟）。",
       "mcpOn": "已將設定的 Hip MCP 伺服器轉發到此智慧體。",
       "dismiss": "知道了"
     },
@@ -811,6 +811,15 @@ export const zhTW = {
       "generic": "安裝失敗。詳見錯誤資訊。"
     },
     "agentsLabel": "智慧體管理",
+    "acp": {
+      "sectionTitle": "ACP 主機策略",
+      "intro": "外部（ACP）主智慧體的主機策略。僅在工作階段由 Grok Build、Claude Code 等外部智慧體驅動時生效；hip 作為主智慧體時不受影響。",
+      "forwardMcp": "轉發 Hip MCP 伺服器",
+      "forwardMcpHint": "開啟後，已啟用的 Hip MCP 伺服器（及已啟用外掛的 MCP）會傳入外部 ACP 工作階段。預設關閉以保障安全。",
+      "forwardMcpWarning": "警告：會將 MCP 啟動命令、環境變數與請求頭暴露給外部智慧體程序。",
+      "fsBridge": "檔案系統橋接",
+      "fsBridgeHint": "對外宣告並處理 ACP 的 fs/read_text_file 與 fs/write_text_file，使外部智慧體可透過 hip 讀寫工作區檔案。預設開啟。"
+    },
     "skillLabel": "技能",
     "pluginsLabel": "外掛市場",
     "hooksLabel": "掛鉤配置",

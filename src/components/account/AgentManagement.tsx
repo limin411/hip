@@ -11,6 +11,7 @@ import { AgentGrid } from './AgentGrid'
 import { AgentEditor } from './AgentEditor'
 import { DeleteAgentDialog } from './DeleteAgentDialog'
 import { FixedAgentCard } from './FixedAgentCard'
+import { AcpHostPolicySection } from './AcpSettings'
 
 type Editing =
   | { mode: 'add'; kind: AgentConfig['kind'] }
@@ -102,8 +103,10 @@ export function AgentManagement() {
 
       <div className="mt-6 min-h-0 flex-1 overflow-y-auto">
         <div className="space-y-6">
+          <AcpHostPolicySection />
+
           {/* Fixed agents section */}
-          <section className="rounded-lg border border-border bg-surface p-4">
+          <section className="rounded-lg border border-border bg-surface p-4" data-testid="agents-section-builtin">
             <div className="mb-3 flex items-center gap-2">
               <h3 className="text-caption font-semibold uppercase tracking-wider text-ink-tertiary">
                 {t('settings.agents.sectionBuiltin')}

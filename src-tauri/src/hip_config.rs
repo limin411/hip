@@ -153,6 +153,22 @@ pub(crate) struct TerminalConfig {
     pub(crate) shell: Option<String>,
 }
 
+/// Optional `[acp]` host policy. JSON uses camelCase for the UI.
+/// Must be preserved on set_hip_config rewrites so MCP forward / FS bridge flags are not stripped.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AcpHostConfig {
+    /// Advertise + implement fs/read_text_file & fs/write_text_file. Default true when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) fs_bridge: Option<bool>,
+    /// Forward enabled hip + plugin MCP configs into ACP session/new|load. Default false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) forward_mcp: Option<bool>,
+    /// Max bytes for one fs/read_text_file. Default 2_000_000 when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) fs_read_max_bytes: Option<u64>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HipConfig {
@@ -180,6 +196,9 @@ pub(crate) struct HipConfig {
     /// Optional Terminal defaults. Preserved on set_hip_config rewrites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TerminalConfig>,
+    /// Optional ACP host policy. Preserved on set_hip_config rewrites.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) acp: Option<AcpHostConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -356,6 +375,19 @@ pub(crate) struct TomlTerminalConfig {
     pub(crate) shell: Option<String>,
 }
 
+/// TOML mirror for `[acp]` (snake_case keys; camelCase aliases for hand-edited files).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[allow(dead_code)]
+pub(crate) struct TomlAcpHostConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fsBridge")]
+    pub(crate) fs_bridge: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "forwardMcp")]
+    pub(crate) forward_mcp: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "fsReadMaxBytes")]
+    pub(crate) fs_read_max_bytes: Option<u64>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -381,6 +413,8 @@ pub(crate) struct TomlHipConfig {
     pub(crate) langsmith: Option<TomlLangSmithConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) terminal: Option<TomlTerminalConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) acp: Option<TomlAcpHostConfig>,
 }
 
 // ── From impls: HipConfig ↔ TomlHipConfig (recursive field mapping) ──
@@ -639,6 +673,26 @@ impl From<TomlTerminalConfig> for TerminalConfig {
     }
 }
 
+impl From<AcpHostConfig> for TomlAcpHostConfig {
+    fn from(a: AcpHostConfig) -> Self {
+        TomlAcpHostConfig {
+            fs_bridge: a.fs_bridge,
+            forward_mcp: a.forward_mcp,
+            fs_read_max_bytes: a.fs_read_max_bytes,
+        }
+    }
+}
+
+impl From<TomlAcpHostConfig> for AcpHostConfig {
+    fn from(a: TomlAcpHostConfig) -> Self {
+        AcpHostConfig {
+            fs_bridge: a.fs_bridge,
+            forward_mcp: a.forward_mcp,
+            fs_read_max_bytes: a.fs_read_max_bytes,
+        }
+    }
+}
+
 impl From<HipConfig> for TomlHipConfig {
     fn from(cfg: HipConfig) -> Self {
         TomlHipConfig {
@@ -653,6 +707,7 @@ impl From<HipConfig> for TomlHipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
+            acp: cfg.acp.map(|x| x.into()),
         }
     }
 }
@@ -671,6 +726,7 @@ impl From<TomlHipConfig> for HipConfig {
             agent_loop: cfg.agent_loop.map(|x| x.into()),
             langsmith: cfg.langsmith.map(|x| x.into()),
             terminal: cfg.terminal.map(|x| x.into()),
+            acp: cfg.acp.map(|x| x.into()),
         }
     }
 }

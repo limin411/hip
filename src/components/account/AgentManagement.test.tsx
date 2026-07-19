@@ -114,8 +114,9 @@ describe('AgentManagement — toggle failure handling', () => {
       expect(screen.getByText('Coder')).toBeInTheDocument()
     })
 
-    // All three switches should be checked initially (coder, explore, plan)
-    const switches = screen.getAllByRole('switch')
+    // Fixed agents section has three switches (coder, explore, plan); ACP host policy adds more.
+    const builtin = screen.getByTestId('agents-section-builtin')
+    const switches = builtin.querySelectorAll('[role="switch"]')
     expect(switches).toHaveLength(3)
     expect(switches[0]).toBeChecked()
 

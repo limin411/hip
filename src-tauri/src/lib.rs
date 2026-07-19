@@ -94,6 +94,7 @@ fn get_hip_config(app: tauri::AppHandle) -> Result<String, String> {
                 agent_loop: None,
                 langsmith: None,
                 terminal: None,
+                acp: None,
             };
             serde_json::to_string(&cfg).map_err(|e| e.to_string())
         }
@@ -750,6 +751,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            acp: None,
         }
     }
 
@@ -932,6 +934,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            acp: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1104,6 +1107,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            acp: None,
         };
 
         let toml_str = toml::to_string_pretty(&cfg).unwrap();
@@ -1219,6 +1223,7 @@ mod tests {
             agent_loop: None,
             langsmith: None,
             terminal: None,
+            acp: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1256,6 +1261,7 @@ mod tests {
             }),
             langsmith: None,
             terminal: None,
+            acp: None,
         };
 
         // UI path: JSON (camelCase) → HipConfig → TomlHipConfig → TOML → back
@@ -1328,6 +1334,7 @@ doomLoopStrategy = "auto_continue"
             terminal: Some(super::hip_config::TerminalConfig {
                 shell: Some("cmd".into()),
             }),
+            acp: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();
@@ -1353,6 +1360,78 @@ doomLoopStrategy = "auto_continue"
     }
 
     #[test]
+    fn acp_survives_json_toml_roundtrip() {
+        // set_hip_config rewrites hip.toml from typed HipConfig; acp host policy must not be stripped.
+        let cfg = super::HipConfig {
+            version: 1,
+            providers: vec![],
+            active_model: None,
+            mcp_servers: vec![],
+            skills: vec![],
+            agents: vec![],
+            fixed_agents: None,
+            permissions: None,
+            agent_loop: None,
+            langsmith: None,
+            terminal: None,
+            acp: Some(super::hip_config::AcpHostConfig {
+                fs_bridge: Some(true),
+                forward_mcp: Some(true),
+                fs_read_max_bytes: Some(1_000_000),
+            }),
+        };
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"acp\""), "JSON must emit acp: {json}");
+        assert!(json.contains("\"forwardMcp\""), "JSON must emit forwardMcp: {json}");
+        assert!(json.contains("\"fsBridge\""), "JSON must emit fsBridge: {json}");
+        let from_json: super::HipConfig = serde_json::from_str(&json).unwrap();
+        let toml_cfg: super::TomlHipConfig = from_json.into();
+        let toml_str = toml::to_string_pretty(&toml_cfg).unwrap();
+        assert!(
+            toml_str.contains("[acp]") || toml_str.contains("acp"),
+            "TOML should contain acp: {toml_str}"
+        );
+        assert!(
+            toml_str.contains("forward_mcp") || toml_str.contains("true"),
+            "TOML should preserve forward_mcp: {toml_str}"
+        );
+        let from_toml: super::TomlHipConfig = toml::from_str(&toml_str).unwrap();
+        let back: super::HipConfig = from_toml.into();
+        let acp = back.acp.as_ref().expect("acp preserved");
+        assert_eq!(acp.fs_bridge, Some(true));
+        assert_eq!(acp.forward_mcp, Some(true));
+        assert_eq!(acp.fs_read_max_bytes, Some(1_000_000));
+
+        // snake_case + camelCase aliases
+        let snake = r#"
+version = 1
+[acp]
+fs_bridge = false
+forward_mcp = true
+fs_read_max_bytes = 500000
+"#;
+        let from_snake: super::TomlHipConfig = toml::from_str(snake).unwrap();
+        let snake_acp = from_snake.acp.as_ref().expect("snake acp");
+        assert_eq!(snake_acp.fs_bridge, Some(false));
+        assert_eq!(snake_acp.forward_mcp, Some(true));
+        assert_eq!(snake_acp.fs_read_max_bytes, Some(500_000));
+
+        let camel = r#"
+version = 1
+[acp]
+fsBridge = true
+forwardMcp = false
+fsReadMaxBytes = 2000000
+"#;
+        let from_camel: super::TomlHipConfig = toml::from_str(camel).unwrap();
+        let camel_acp = from_camel.acp.as_ref().expect("camel acp");
+        assert_eq!(camel_acp.fs_bridge, Some(true));
+        assert_eq!(camel_acp.forward_mcp, Some(false));
+        assert_eq!(camel_acp.fs_read_max_bytes, Some(2_000_000));
+    }
+
+    #[test]
     fn langsmith_survives_json_toml_roundtrip() {
         // set_hip_config rewrites hip.toml from typed HipConfig; langsmith must not be stripped.
         let cfg = super::HipConfig {
@@ -1372,6 +1451,7 @@ doomLoopStrategy = "auto_continue"
                 endpoint: Some("https://eu.api.smith.langchain.com".into()),
             }),
             terminal: None,
+            acp: None,
         };
 
         let json = serde_json::to_string(&cfg).unwrap();

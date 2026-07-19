@@ -304,7 +304,7 @@ export const zhCN = {
       acpCliff: {
         title: '外部智能体模式',
         body: '当前会话由 {{name}} 驱动。Hip 工具、技能与委派不可用。',
-        mcpOff: '未转发 Hip MCP 服务器（可在 设置 → ACP 中开启）。',
+        mcpOff: '未转发 Hip MCP 服务器（可在 设置 → 智能体管理 中开启）。',
         mcpOn: '已将配置的 Hip MCP 服务器转发到该智能体。',
         dismiss: '知道了',
       },
@@ -813,6 +813,19 @@ export const zhCN = {
         generic: '安装失败。详见错误信息。',
       },
       agentsLabel: '智能体管理',
+      acp: {
+        sectionTitle: 'ACP 主机策略',
+        intro:
+          '外部（ACP）主智能体的主机策略。仅在会话由 Grok Build、Claude Code 等外部智能体驱动时生效；hip 作为主智能体时不受影响。',
+        forwardMcp: '转发 Hip MCP 服务器',
+        forwardMcpHint:
+          '开启后，已启用的 Hip MCP 服务器（及已启用插件的 MCP）会传入外部 ACP 会话。默认关闭以保障安全。',
+        forwardMcpWarning:
+          '警告：会将 MCP 启动命令、环境变量与请求头暴露给外部智能体进程。',
+        fsBridge: '文件系统桥接',
+        fsBridgeHint:
+          '对外声明并处理 ACP 的 fs/read_text_file 与 fs/write_text_file，使外部智能体可通过 hip 读写工作区文件。默认开启。',
+      },
       skillLabel: '技能',
       pluginsLabel: '插件市场',
       hooksLabel: '挂钩配置',

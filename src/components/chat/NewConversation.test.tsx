@@ -27,16 +27,35 @@ vi.mock('sonner', () => ({
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
 let mockActiveView: 'chat' | 'code' | 'settings' = 'chat'
+let mockLanguage: 'en' | 'zh-CN' | 'zh-TW' = 'en'
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(
-    (selector?: (s: { activeView: typeof mockActiveView; setActiveView: typeof mockSetActiveView; setTab: typeof mockSetTab }) => unknown) => {
-      if (typeof selector === 'function') {
-        return selector({ activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab })
+    (selector?: (s: {
+      activeView: typeof mockActiveView
+      setActiveView: typeof mockSetActiveView
+      setTab: typeof mockSetTab
+      language: typeof mockLanguage
+    }) => unknown) => {
+      const state = {
+        activeView: mockActiveView,
+        setActiveView: mockSetActiveView,
+        setTab: mockSetTab,
+        language: mockLanguage,
       }
-      return { activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab }
+      if (typeof selector === 'function') {
+        return selector(state)
+      }
+      return state
     },
-    { getState: () => ({ activeView: mockActiveView, setActiveView: mockSetActiveView, setTab: mockSetTab }) },
+    {
+      getState: () => ({
+        activeView: mockActiveView,
+        setActiveView: mockSetActiveView,
+        setTab: mockSetTab,
+        language: mockLanguage,
+      }),
+    },
   ),
 }))
 
@@ -77,9 +96,15 @@ describe('NewConversation', () => {
     vi.restoreAllMocks()
     await i18n.changeLanguage('en')
     mockActiveView = 'chat'
+    mockLanguage = 'en'
     mockSetActiveView.mockClear()
     mockSetTab.mockClear()
     toastMessage.mockClear()
+    try {
+      sessionStorage.removeItem('hip-empty-greeting-recent')
+    } catch {
+      // ignore
+    }
     providersStore.useProvidersStore.setState({
       catalog,
       config: { providers: {}, activeModel: { providerID: 'openai', modelID: 'gpt-4o' } },

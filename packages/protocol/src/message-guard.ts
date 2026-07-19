@@ -86,6 +86,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'memory:rewriteMirrors',
   'memory:importMirror',
   'session:setMemoryFlags',
+  'ui:emptyGreeting:generate',
 ] as const
 
 export type ClientMessageType = (typeof CLIENT_MESSAGE_TYPES)[number]

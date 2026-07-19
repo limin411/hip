@@ -3,6 +3,7 @@ import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
 import { runProviderProbe } from '../../config/provider-probe.js'
 import { CodedError, safeErrorMessage } from '../error.js'
 import { logDebug, logInfo } from '../../debug-logger.js'
+import { generateEmptyGreeting } from '../empty-greeting-generate.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
 
 /** Reject mutations / load against soft-deleted sessions. */
@@ -49,6 +50,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setModel',
   'config:setActiveModel',
   'config:testProvider',
+  'ui:emptyGreeting:generate',
   'workflow:run',
   'workflow:getActive',
 ])
@@ -405,6 +407,42 @@ export function handleSessionMessage(
             code: 'INTERNAL',
             message: safeErrorMessage(err),
             checkedAt: Date.now(),
+          })
+        }
+      })()
+    }
+    case 'ui:emptyGreeting:generate': {
+      const { requestId, providerID, modelID, context } = msg
+      // Always-reply; built-in model path only (no session/tools/ACP).
+      return (async () => {
+        try {
+          const result = await generateEmptyGreeting({
+            providerID,
+            modelID,
+            context,
+          })
+          if (result.ok) {
+            send({
+              type: 'ui:emptyGreeting:generate:result',
+              requestId,
+              ok: true,
+              title: result.title,
+              sub: result.sub,
+            })
+          } else {
+            send({
+              type: 'ui:emptyGreeting:generate:result',
+              requestId,
+              ok: false,
+              error: result.error,
+            })
+          }
+        } catch (err) {
+          send({
+            type: 'ui:emptyGreeting:generate:result',
+            requestId,
+            ok: false,
+            error: safeErrorMessage(err),
           })
         }
       })()

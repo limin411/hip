@@ -216,6 +216,73 @@ export const en = {
         spin: '360 degrees!',
         tumble: 'Gymnastics time',
       },
+      /** Dynamic empty-state title/subtitle under the mascot (see src/lib/emptyGreeting*). */
+      emptyGreeting: {
+        timeOfDay: {
+          earlyMorning: { title: 'Early bird?', sub: 'Quiet hours — a small start still counts.' },
+          morning: { title: 'Good morning', sub: 'Ready when you are.' },
+          afternoon: { title: 'Good afternoon', sub: 'What shall we tackle?' },
+          evening: { title: 'Good evening', sub: 'Still building something great?' },
+          lateEvening: { title: 'Still at it this evening?', sub: 'One more tidy win, or call it.' },
+          lateNight: { title: 'Late night session', sub: 'I am here — no rush, no judgment.' },
+          deepNight: { title: 'Deep night, still curious?', sub: 'Keep it small; I will keep you company.' },
+        },
+        weekend: {
+          title: 'Happy weekend',
+          sub: 'Ship something fun — or rest. Your call.',
+        },
+        weekEdge: {
+          'sunday-evening': {
+            title: 'Sunday evening',
+            sub: 'Weekend winding down — ease into what matters.',
+          },
+          'sunday-late': {
+            title: 'Almost Monday…',
+            sub: 'New week is close. One gentle step is enough.',
+          },
+          'monday-early': {
+            title: 'Monday before dawn',
+            sub: 'New week, soft start — no corporate hype needed.',
+          },
+        },
+        holiday: {
+          'new-year': { title: 'Happy New Year', sub: 'A clean slate for the next build.' },
+          'cn-spring-festival': {
+            title: 'Happy Spring Festival',
+            sub: 'Wishing you a great year of shipping.',
+          },
+          'cn-labor-day': { title: 'Happy Labor Day', sub: 'Rest well — or tinker if you like.' },
+          'cn-national-day': {
+            title: 'Happy National Day',
+            sub: 'Celebrate — and maybe ship one small win.',
+          },
+          'tw-national-day': {
+            title: 'Happy National Day',
+            sub: 'A good day for something worthwhile.',
+          },
+          'cn-mid-autumn': { title: 'Happy Mid-Autumn Festival', sub: 'Round moon, sharp code.' },
+          'jp-golden-week': { title: 'Happy Golden Week', sub: 'Rest or build — both count.' },
+          'us-independence-day': {
+            title: 'Happy Fourth of July',
+            sub: 'Freedom to refactor awaits.',
+          },
+          'us-thanksgiving': {
+            title: 'Happy Thanksgiving',
+            sub: 'Grateful for good tools and good bugs to fix.',
+          },
+          christmas: {
+            title: "Season's greetings",
+            sub: 'Hope your builds are merry and bright.',
+          },
+        },
+        tip: {
+          'chat-paste': { sub: 'Paste an error, a file path, or a goal.' },
+          'chat-slash': { sub: 'Tip: type /help for slash commands.' },
+          'chat-model': { sub: 'Switch models anytime from the chip below.' },
+          'code-folder': { sub: 'Pick a project folder to unlock coding tools.' },
+          'code-plan': { sub: 'Use plan mode for larger changes.' },
+        },
+      },
       pickFolder: 'Choose project folder',
       clearFolder: 'Pure chat',
       missingProject: {

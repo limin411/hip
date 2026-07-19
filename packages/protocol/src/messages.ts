@@ -204,6 +204,55 @@ export type ClientMessage =
   | { type: 'memory:rewriteMirrors'; projectKeyHash?: string }
   | { type: 'memory:importMirror'; projectKeyHash?: string; conflict?: 'keep' | 'overwrite' }
   | { type: 'session:setMemoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
+  /**
+   * One-shot empty-state greeting generation (built-in model path only — no ACP/tools/session).
+   * Uses the caller's last-used model when provided; otherwise sidecar active model.
+   */
+  | {
+      type: 'ui:emptyGreeting:generate'
+      requestId: string
+      /** Optional pin to last-used model from the UI. */
+      providerID?: string
+      modelID?: string
+      context: EmptyGreetingGenerateContext
+    }
+
+/** Context for LLM empty-state title/sub generation (UI chrome only). */
+export interface EmptyGreetingGenerateContext {
+  language: 'zh-CN' | 'zh-TW' | 'en'
+  surface: 'chat' | 'code'
+  /**
+   * Fine local time slot:
+   * earlyMorning | morning | afternoon | evening | lateEvening | lateNight | deepNight
+   */
+  timeOfDay: string
+  /** Local hour 0–23 in the user's timezone. */
+  localHour?: number
+  /** 0=Sunday … 6=Saturday */
+  weekday?: number
+  /**
+   * Calendar-edge tone:
+   * none | sunday-evening | sunday-late | monday-early
+   */
+  weekEdge?: string
+  /** Short English tone brief for the model (optional). */
+  toneHint?: string
+  region: string
+  tier: 'holiday' | 'weekend' | 'weekEdge' | 'timeOfDay' | 'default'
+  /** Rule-based title already shown (inspiration + fallback). */
+  baseTitle: string
+  /** Rule-based subtitle already shown. */
+  baseSub: string
+  /** Optional holiday id when tier is holiday. */
+  holidayId?: string
+  /** Recent session titles (sanitized, short), most recent first. */
+  recentSessionTitles?: string[]
+  /**
+   * Soft memory hints for warmer copy (sanitized one-liners only).
+   * Prefer preferences / profile / light lessons — never raw secrets.
+   */
+  memoryHints?: string[]
+}
 
 type AttachmentSendPayload = Attachment & { path: string }
 
@@ -424,6 +473,14 @@ export type ServerMessage =
   | { type: 'memory:rewriteMirrors:result'; written: string[]; error?: string }
   | { type: 'memory:importMirror:result'; imported: number; skipped: number; error?: string }
   | { type: 'session:memoryFlags'; sessionId: string; useMemories?: boolean; generateMemories?: boolean; incognito?: boolean }
+  | {
+      type: 'ui:emptyGreeting:generate:result'
+      requestId: string
+      ok: boolean
+      title?: string
+      sub?: string
+      error?: string
+    }
 
 /** Taxonomy for provider key usability probes (config:testProvider). */
 export type KeyProbeCode =

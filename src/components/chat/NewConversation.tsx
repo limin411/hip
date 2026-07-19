@@ -7,7 +7,7 @@ import { useProvidersStore } from '@/store/providersStore'
 import { useHipConfigStore } from '@/store/hipConfigStore'
 import { useSkillsStore } from '@/store/skillsStore'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
-import { sessionService, useActiveSessionId } from '@/domain'
+import { sessionService, useActiveSessionId, useDomainStore } from '@/domain'
 import { Composer } from './Composer'
 import { SlashCommandPalette, extractSlashQuery } from './SlashCommandPalette'
 import { SkillArgInput, extractSkillInvocation } from './SkillArgInput'
@@ -22,14 +22,34 @@ import { AttachmentButton } from './AttachmentButton'
 import { SessionAgentPicker } from './SessionAgentPicker'
 import { AcpCapabilityCliffBanner } from './AcpCapabilityCliffBanner'
 import { isAttachmentSupported } from '@/lib/attachmentEligibility'
-import { activeModelKey } from '@/lib/modelKey'
+import { activeModelKey, parseModelKey } from '@/lib/modelKey'
 import { isExternalPrimary } from '@/lib/sessionAgent'
 import type { LocalAttachment } from './attachmentTypes'
 import { MascotActor } from '@/components/login/MascotActor'
+import {
+  selectEmptyGreeting,
+  resolveSystemTimeZone,
+  localParts,
+  timeCacheBucket,
+} from '@/lib/emptyGreeting'
+import { EMPTY_GREETING } from '@/lib/emptyGreeting.keys'
+import { readRecentTipIds, pushRecentTipId } from '@/lib/emptyGreeting.recent'
+import {
+  buildGenerateContext,
+  llmGreetingCacheKey,
+  llmGreetingCacheTtlMs,
+  memoryHintsFingerprint,
+  readLlmGreetingCache,
+  sanitizeMemoryHintsForGreeting,
+  validateLlmGreeting,
+  writeLlmGreetingCache,
+  type LlmGreetingPair,
+} from '@/lib/emptyGreeting.llm'
 
 export function NewConversation() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const activeView = useUiStore((s) => s.activeView)
+  const language = useUiStore((s) => s.language)
   const surface = activeView === 'code' ? 'code' : 'chat'
   const draft = useDraftStore((s) => s.draft)
   const text = draft?.text ?? ''
@@ -82,7 +102,138 @@ export function NewConversation() {
     setAttachments([])
   }
 
-  const greeting = surface === 'code' ? t('chat.codeGreeting') : t('chat.newConversationGreeting')
+  // Dynamic empty-state title/sub under the mascot (locale + TZ + holiday + tips).
+  // Recompute only on language/surface; no midnight ticker (accepted for v1).
+  const pick = useMemo(
+    () =>
+      selectEmptyGreeting({
+        now: new Date(),
+        timeZone: resolveSystemTimeZone(),
+        language,
+        surface,
+        recentTipIds: readRecentTipIds(),
+      }),
+    [language, surface],
+  )
+
+  useEffect(() => {
+    if (pick.tipId) pushRecentTipId(pick.tipId)
+  }, [pick.tipId])
+
+  const surfaceFb = EMPTY_GREETING.surface[surface]
+  // Dynamic keys from emptyGreeting selector; cast because i18n typed keys don't cover runtime selection.
+  const tDyn = t as unknown as (key: string) => string
+  const resolveKey = useCallback(
+    (key: string, fallbackKey: string): string => {
+      if (i18n.exists(key)) return tDyn(key)
+      return tDyn(fallbackKey)
+    },
+    [i18n, tDyn],
+  )
+  const baseGreeting = resolveKey(pick.titleKey, surfaceFb.title)
+  const baseGreetingSub = resolveKey(pick.subKey, surfaceFb.sub)
+
+  // Always-on LLM enrich (built-in model only): rule text first, then replace when ready.
+  // Pulls light global/project memory hints so copy feels continuous rather than template-stiff.
+  const [llmGreeting, setLlmGreeting] = useState<LlmGreetingPair | null>(null)
+  useEffect(() => {
+    setLlmGreeting(null)
+    const modelKey = currentKey
+    const { providerID, modelID } = modelKey ? parseModelKey(modelKey) : { providerID: '', modelID: '' }
+    const parts = localParts(new Date(), resolveSystemTimeZone())
+    const holidayId =
+      pick.tier === 'holiday' && pick.id.startsWith('holiday:')
+        ? pick.id.slice('holiday:'.length)
+        : undefined
+
+    let cancelled = false
+
+    const loadMemoryHints = async (): Promise<string[]> => {
+      try {
+        // Respect global memory toggle when available; fail open to empty hints.
+        const cfg = await Promise.race([
+          sessionService.getMemoryConfig(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 600)),
+        ])
+        if (cfg && cfg.useMemories === false) return []
+
+        const items = await Promise.race([
+          sessionService.listMemories({ scope: 'global', limit: 24 }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
+        ])
+        if (!items) return []
+        return sanitizeMemoryHintsForGreeting(items, 3)
+      } catch {
+        return []
+      }
+    }
+
+    void (async () => {
+      const memoryHints = await loadMemoryHints()
+      if (cancelled) return
+
+      // Timely cache: key includes local hour + weekEdge + timeOfDay so night→Monday dawn refreshes.
+      const cacheKey = llmGreetingCacheKey({
+        timeBucket: timeCacheBucket(parts, pick.weekEdge),
+        language,
+        region: pick.region,
+        surface,
+        tier: pick.tier,
+        timeOfDay: pick.timeOfDay,
+        modelKey: modelKey || 'default',
+        holidayId,
+        memoryFp: memoryHintsFingerprint(memoryHints),
+      })
+      const cached = readLlmGreetingCache(cacheKey)
+      if (cached) {
+        setLlmGreeting(cached)
+        return
+      }
+
+      const recentTitles = useDomainStore
+        .getState()
+        .sessions.map((s) => s.title)
+        .filter(Boolean)
+      const context = buildGenerateContext({
+        pick,
+        baseTitle: baseGreeting,
+        baseSub: baseGreetingSub,
+        language,
+        surface,
+        recentSessionTitles: recentTitles,
+        memoryHints,
+      })
+
+      try {
+        const result = await sessionService.generateEmptyGreeting({
+          ...(providerID ? { providerID } : {}),
+          ...(modelID ? { modelID } : {}),
+          context,
+          timeoutMs: 4_000,
+        })
+        if (cancelled || !result.ok) return
+        const valid = validateLlmGreeting(result)
+        if (!valid) return
+        // Write cache immediately so reopen within the same hour hits cache.
+        writeLlmGreetingCache(cacheKey, valid, {
+          ttlMs: llmGreetingCacheTtlMs(pick.timeOfDay, pick.weekEdge),
+        })
+        setLlmGreeting(valid)
+      } catch {
+        // Keep rule-based fallback silently.
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+    // baseGreeting/sub intentionally included so cache miss regenerates after language change.
+  }, [pick, language, surface, currentKey, baseGreeting, baseGreetingSub])
+
+  const greeting = llmGreeting?.title ?? baseGreeting
+  const greetingSub = llmGreeting?.sub ?? baseGreetingSub
+  const mascotInitial =
+    pick.tier === 'holiday' ? 'gift' : surface === 'code' ? 'code' : 'wave'
   // J1 empty-state CTA identity for e2e (@smooth-p4)
 
   const setText = useCallback((value: string) => useDraftStore.getState().setText(value), [])
@@ -137,7 +288,7 @@ export function NewConversation() {
           <MascotActor
             key={surface}
             size={360}
-            initialAction={surface === 'code' ? 'code' : 'wave'}
+            initialAction={mascotInitial}
             transition="slide"
           />
         </div>
@@ -146,7 +297,7 @@ export function NewConversation() {
             {greeting}
           </h1>
           <p className="mb-8 text-center text-body text-ink-secondary">
-            {t('chat.greetingSub.default', '')}
+            {greetingSub}
           </p>
         </div>
         <AcpCapabilityCliffBanner />

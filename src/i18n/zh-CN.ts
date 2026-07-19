@@ -208,6 +208,73 @@ export const zhCN = {
         spin: '360 度无死角',
         tumble: '体操选手上线',
       },
+      /** 新对话空态吉祥物下方的动态文案（见 src/lib/emptyGreeting*） */
+      emptyGreeting: {
+        timeOfDay: {
+          earlyMorning: { title: '起得真早', sub: '安静的时间，先做一件小事也很好。' },
+          morning: { title: '早上好', sub: '准备好了，随时开始。' },
+          afternoon: { title: '下午好', sub: '我们今天解决点什么？' },
+          evening: { title: '晚上好', sub: '还在打磨些好东西？' },
+          lateEvening: { title: '晚上还在忙？', sub: '再收一个小成果，或先歇会儿。' },
+          lateNight: { title: '夜深了', sub: '我在这儿——不催你，也不评判。' },
+          deepNight: { title: '凌晨了还在？', sub: '做得小一点就好，我陪着。' },
+        },
+        weekend: {
+          title: '周末好',
+          sub: '做点好玩的，或者好好休息——都行。',
+        },
+        weekEdge: {
+          'sunday-evening': {
+            title: '周日晚上',
+            sub: '周末尾声——从容收个尾，或轻轻铺一下下周。',
+          },
+          'sunday-late': {
+            title: '马上周一了…',
+            sub: '新的一周就在眼前。迈一小步就够。',
+          },
+          'monday-early': {
+            title: '周一凌晨',
+            sub: '新的一周，轻启动就好——不用鸡血。',
+          },
+        },
+        holiday: {
+          'new-year': { title: '新年快乐', sub: '新的一年，新的构建。' },
+          'cn-spring-festival': {
+            title: '春节快乐',
+            sub: '祝你开工大吉，代码顺顺。',
+          },
+          'cn-labor-day': { title: '劳动节快乐', sub: '好好休息，或者随便捣鼓点什么。' },
+          'cn-national-day': {
+            title: '国庆快乐',
+            sub: '庆祝一下，也捎带交付一个小成果。',
+          },
+          'tw-national-day': {
+            title: '国庆快乐',
+            sub: '适合做一件值得做的事。',
+          },
+          'cn-mid-autumn': { title: '中秋快乐', sub: '月圆人圆，代码也圆满。' },
+          'jp-golden-week': { title: '黄金周快乐', sub: '休息或开工，都算数。' },
+          'us-independence-day': {
+            title: '独立日快乐',
+            sub: '重构的自由就在眼前。',
+          },
+          'us-thanksgiving': {
+            title: '感恩节快乐',
+            sub: '感谢好工具，也感谢值得修的 bug。',
+          },
+          christmas: {
+            title: '节日快乐',
+            sub: '愿你的构建顺利又明亮。',
+          },
+        },
+        tip: {
+          'chat-paste': { sub: '可以粘贴报错、路径或目标。' },
+          'chat-slash': { sub: '提示：输入 /help 查看斜杠命令。' },
+          'chat-model': { sub: '随时可以从下方切换模型。' },
+          'code-folder': { sub: '选择项目文件夹以解锁编码工具。' },
+          'code-plan': { sub: '大改动可以先用计划模式。' },
+        },
+      },
       pickFolder: '选择项目文件夹',
       clearFolder: '纯对话',
       missingProject: {

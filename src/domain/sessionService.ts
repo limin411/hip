@@ -14,6 +14,7 @@ import type {
   KeyProbeCode,
   WorktreeSource,
   WorktreeRemoveErrorCode,
+  EmptyGreetingGenerateContext,
 } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
@@ -1691,6 +1692,43 @@ export class SessionService {
       ...flags,
     })
     this.transport.send({ type: 'session:setMemoryFlags', sessionId, ...flags })
+  }
+
+  /**
+   * One-shot empty-state greeting via built-in model path (no ACP/tools/session).
+   * Uses last-used model when provided. Always-on product path; caller keeps rule-based fallback.
+   */
+  async generateEmptyGreeting(opts: {
+    requestId?: string
+    providerID?: string
+    modelID?: string
+    context: EmptyGreetingGenerateContext
+    timeoutMs?: number
+  }): Promise<{ ok: true; title: string; sub: string } | { ok: false; error: string }> {
+    const requestId = opts.requestId ?? nanoid()
+    const timeoutMs = opts.timeoutMs ?? 4_000
+    const wait = this.waitForServerMessageWhere(
+      'ui:emptyGreeting:generate:result',
+      (msg) => msg.requestId === requestId,
+      timeoutMs,
+    )
+    this.transport.send({
+      type: 'ui:emptyGreeting:generate',
+      requestId,
+      ...(opts.providerID ? { providerID: opts.providerID } : {}),
+      ...(opts.modelID ? { modelID: opts.modelID } : {}),
+      context: opts.context,
+    })
+    try {
+      const msg = await wait
+      if (!msg.ok || !msg.title || !msg.sub) {
+        return { ok: false, error: msg.error ?? 'empty greeting generation failed' }
+      }
+      return { ok: true, title: msg.title, sub: msg.sub }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: message || 'timeout' }
+    }
   }
 
   renameSession(id: string, title: string): void {

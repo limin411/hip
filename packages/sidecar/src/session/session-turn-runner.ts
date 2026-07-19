@@ -1178,25 +1178,26 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
       const userText = lastUserText(base?.messages !== undefined ? modelReady(base.messages) : visibleMessages)
       const cronPrefix = cronMessages.length ? cronMessages.map((m) => m.content as string).join('\n\n') + '\n\n' : ''
       // ACP primary only: optional fenced memory prefix (not for subagent invoker).
+      // Single gate lives in resolveAcpExternalMemoryPrefix — pass real flag values.
       let memoryPrefix = ''
       {
-        if (!host.memoryService && host.store) {
+        const memCfgEarly = host.memoryService?.getConfig() ?? loadMemoryConfig()
+        const flagsEarly = resolveSessionMemoryFlags(memCfgEarly, host._config)
+        const mayInject =
+          flagsEarly.use && !!memCfgEarly.useMemoriesWithExternal && !flagsEarly.incognito
+        if (mayInject && !host.memoryService && host.store) {
           const db = host.store.getDb()
           const memoriesFts = tryEnableMemoriesFts(db)
           const memoriesVec = tryEnableSqliteVec(db)
           host.memoryService = new MemoryService(new MemoryStore(db, memoriesFts, memoriesVec))
           host.memoryService.runStartupDecayOnce()
         }
-        const memCfg = host.memoryService?.getConfig() ?? loadMemoryConfig()
+        const memCfg = host.memoryService?.getConfig() ?? memCfgEarly
         const flags = resolveSessionMemoryFlags(memCfg, host._config)
-        if (
-          flags.use &&
-          memCfg.useMemoriesWithExternal &&
-          !flags.incognito &&
-          host.memoryService
-        ) {
+        let coreBody = ''
+        if (mayInject && host.memoryService) {
           const snapshotResult = refreshMemoryCoreSnapshot({
-            useMemories: true,
+            useMemories: flags.use,
             cwd,
             hostSnapshot: host.memoryCoreSnapshot,
             hostCoreIds: host.memoryCoreIds,
@@ -1210,15 +1211,16 @@ export async function runTurn(host: SessionTurnHost, rawSend: SendFn, base?: {
           host.memoryCoreIds = snapshotResult.coreIds
           host.memorySnapshotProjectKey = snapshotResult.projectKey
           host.memoryCoreGeneration = snapshotResult.generation
-          memoryPrefix = resolveAcpExternalMemoryPrefix({
-            useMemories: true,
-            useMemoriesWithExternal: true,
-            incognito: false,
-            memoryServiceAvailable: true,
-            coreSnapshotBody: snapshotResult.snapshot ?? '',
-            maxCoreSummaryChars: memCfg.maxCoreSummaryChars,
-          })
+          coreBody = snapshotResult.snapshot ?? ''
         }
+        memoryPrefix = resolveAcpExternalMemoryPrefix({
+          useMemories: flags.use,
+          useMemoriesWithExternal: !!memCfg.useMemoriesWithExternal,
+          incognito: flags.incognito,
+          memoryServiceAvailable: !!host.memoryService,
+          coreSnapshotBody: coreBody,
+          maxCoreSummaryChars: memCfg.maxCoreSummaryChars,
+        })
       }
       const hooks: ExternalAgentHooks = {
         requestPermission: (req) => {

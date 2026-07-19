@@ -55,10 +55,12 @@ export {
 } from './inject.js'
 export {
   ACP_MEMORY_PREFIX_MAX_CHARS,
+  ACP_MEMORY_PREFIX_MIN_USABLE_CHARS,
   HIP_MEMORY_FENCE_CLOSE,
   HIP_MEMORY_FENCE_OPEN,
   buildAcpExternalMemoryPrefix,
   resolveAcpExternalMemoryPrefix,
+  sanitizeMemoryFenceBody,
   shouldInjectExternalMemory,
   truncateMemoryBodyWithMarker,
   type BuildAcpExternalMemoryPrefixArgs,

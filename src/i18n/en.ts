@@ -68,6 +68,21 @@ export const en = {
         emptyTitle: 'No isolated workspaces yet',
         createSingle: 'New isolated workspace…',
         createSingleSoon: 'Single isolation create is coming soon',
+        /** Single isolation create Modal (PR4) */
+        createSingleTitle: 'New isolated workspace',
+        createSingleHint:
+          'Creates one clean isolated workspace from the current main workspace HEAD. Branch name is assigned automatically.',
+        createSingleBranch: 'Branch',
+        createSingleBase: 'Based on',
+        createSingleBaseHead: 'HEAD (main workspace)',
+        createSingleOpenSession: 'Open new chat after create',
+        createSingleOpenSessionHint:
+          'On: open a Code chat at the new path. Off: create the directory only.',
+        createSingleConfirm: 'Create',
+        createSingleCreating: 'Creating…',
+        createSingleFailed: 'Could not create isolated workspace',
+        /** D24: only after create/op error — never from empty list alone. */
+        nonGitBanner: 'This folder is not a git repository. Create is disabled.',
         parallelExplore: 'Parallel explore…',
         footerHint: 'Manage in the sidebar · Background temporary isolates do not appear here',
         unresolvedBanner: 'Could not determine the main workspace. Create and delete are disabled.',

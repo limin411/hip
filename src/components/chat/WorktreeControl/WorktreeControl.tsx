@@ -35,6 +35,7 @@ import {
   useWorktreeStore,
 } from '@/store/worktreeStore'
 import { WorktreeList, type WorktreeListRow } from './WorktreeList'
+import { WorktreeCreateSingleModal } from './WorktreeCreateSingleModal'
 
 export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) {
   const { t } = useTranslation()
@@ -47,6 +48,9 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
 
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [parallelOpen, setParallelOpen] = useState(false)
+  const [createSingleOpen, setCreateSingleOpen] = useState(false)
+  /** D24: set only after create/op fails as non-git — never from empty list. */
+  const [nonGit, setNonGit] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const [listHydrated, setListHydrated] = useState(false)
   const listRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,7 +95,12 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   // Never enable create/parallel without a real main-tree path (avoid isolated cwd as baseCwd).
   const opsBaseCwd = hostCtx.primaryPath
   const createDisabled =
-    hostCtx.unresolved || projectBlocked || !opsBaseCwd || !hostSessionId
+    hostCtx.unresolved || projectBlocked || nonGit || !opsBaseCwd || !hostSessionId
+
+  // Clear non-git when host/cwd context changes (new project or resolved host).
+  useEffect(() => {
+    setNonGit(false)
+  }, [hostSessionId, opsBaseCwd])
 
   const nestHints = useMemo(() => extractParallelNestingHints(runs), [runs])
   const nestedSessionIds = useMemo(
@@ -226,9 +235,11 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   }, [])
 
   const openCreateSingle = useCallback(() => {
+    if (createDisabled || !hostSessionId) return
     setPopoverOpen(false)
-    toast.message(t('chat.worktreeControl.createSingleSoon'))
-  }, [t])
+    // Close popover before Modal (D17 — avoid pointer-events stacking).
+    window.setTimeout(() => setCreateSingleOpen(true), 0)
+  }, [createDisabled, hostSessionId])
 
   const handleOpenRow = useCallback(
     async (row: WorktreeListRow) => {
@@ -397,6 +408,16 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
               </div>
             ) : null}
 
+            {nonGit && !hostCtx.unresolved ? (
+              <div
+                className="border-b border-border bg-warning/10 px-3 py-2 text-meta text-ink"
+                data-testid="worktree-control-non-git"
+                role="status"
+              >
+                {t('chat.worktreeControl.nonGitBanner')}
+              </div>
+            ) : null}
+
             <div className="border-b border-border">
               <div className="flex items-center justify-between px-3 py-1.5">
                 <span className="text-meta font-medium text-ink-secondary">
@@ -474,6 +495,15 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
         // Never fall back to isolated active cwd as fan-out base.
         baseCwd={opsBaseCwd}
       />
+
+      {hostSessionId ? (
+        <WorktreeCreateSingleModal
+          open={createSingleOpen}
+          onOpenChange={setCreateSingleOpen}
+          hostSessionId={hostSessionId}
+          onNonGitError={() => setNonGit(true)}
+        />
+      ) : null}
     </>
   )
 }

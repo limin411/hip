@@ -38,12 +38,16 @@ function collectingEmit() {
 class FakeProvider implements AgentProvider {
   disposed = false
   turnFs: any = null
+  disposeDelayMs = 0
   constructor(private readonly script: (emit: GraphEmit) => Promise<void>) {}
   setTurnFsContext(ctx: any) { this.turnFs = ctx }
   async runTurn(_t: string, emit: GraphEmit, _s: AbortSignal, _h?: ExternalAgentHooks) {
     await this.script(emit)
   }
-  dispose() { this.disposed = true }
+  async dispose() {
+    if (this.disposeDelayMs > 0) await new Promise((r) => setTimeout(r, this.disposeDelayMs))
+    this.disposed = true
+  }
 }
 
 const baseAgent: AgentConfig = {
@@ -136,6 +140,38 @@ describe('createAgentInvoker', () => {
     const invoker = createAgentInvoker('/tmp', { readAgents: () => [baseAgent], createProvider: () => provider, resolveModel: () => null })
     await expect(invoker.invoke('echo', 'hi', collectingEmit().emit, new AbortController().signal)).rejects.toThrow('boom')
     expect(provider.disposed).toBe(true)
+  })
+
+  it('awaits dispose before sequential invoke can start the next provider (no close race)', async () => {
+    const order: string[] = []
+    let n = 0
+    const invoker = createAgentInvoker('/tmp', {
+      readAgents: () => [baseAgent],
+      createProvider: () => {
+        const id = ++n
+        order.push(`create:${id}`)
+        const p = new FakeProvider(async (emit) => {
+          order.push(`run:${id}`)
+          emit.token(`t${id}`)
+        })
+        p.disposeDelayMs = 40
+        const orig = p.dispose.bind(p)
+        p.dispose = async () => {
+          order.push(`dispose-start:${id}`)
+          await orig()
+          order.push(`dispose-end:${id}`)
+        }
+        return p
+      },
+      resolveModel: () => null,
+    })
+    await invoker.invoke('echo', 'a', collectingEmit().emit, new AbortController().signal)
+    await invoker.invoke('echo', 'b', collectingEmit().emit, new AbortController().signal)
+    // First dispose fully settles before second create/run
+    expect(order).toEqual([
+      'create:1', 'run:1', 'dispose-start:1', 'dispose-end:1',
+      'create:2', 'run:2', 'dispose-start:2', 'dispose-end:2',
+    ])
   })
 
   it('routes an internal agent to runInternal with the resolved model + persona, returns its text', async () => {

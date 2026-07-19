@@ -31,8 +31,72 @@ describe('AcpConnectionManager', () => {
     expect(conn.childPid).toBeGreaterThan(0)
     expect(a).not.toBe(b)
     expect(conn.sessionCount).toBe(2)
-    conn.releaseSession(a)
+    await conn.closeSession(a)
     expect(conn.sessionCount).toBe(1)
+  })
+
+  it('detachSink keeps openSessions; closeSession drops them and rejects further prompt', async () => {
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-detach' }), null)
+    const { sessionId } = await conn.newSessionWithOptions(process.cwd())
+    expect(conn.sessionCount).toBe(1)
+    conn.registerSink(sessionId, {
+      onUpdate: () => {},
+      onPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    })
+    conn.detachSink(sessionId)
+    // openSessions + configOptions preserved across turn boundary
+    expect(conn.sessionCount).toBe(1)
+    const res = await conn.setConfigOption(sessionId, 'model', 'mock/other')
+    expect(res.configOptions?.find((o: any) => o.id === 'model')?.currentValue).toBe('mock/other')
+    await conn.closeSession(sessionId)
+    expect(conn.sessionCount).toBe(0)
+    // Mock rejects prompt after session/close (SDK may wrap as Internal error)
+    await expect(conn.prompt(sessionId, 'hi')).rejects.toThrow()
+  })
+
+  it('closeSession settles only after agent close RPC when advertised', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-close-slow',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '80' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    const t0 = Date.now()
+    await conn.closeSession(sid)
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(60)
+    expect(conn.sessionCount).toBe(0)
+  })
+
+  it('closeSession is re-entrant: second call is no-op; concurrent closes coalesce', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-close-reentry',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '80' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    const t0 = Date.now()
+    await Promise.all([conn.closeSession(sid), conn.closeSession(sid)])
+    // One RPC only — not 2× slow close
+    expect(Date.now() - t0).toBeLessThan(160)
+    expect(conn.sessionCount).toBe(0)
+    // Already closed — still settles without throwing
+    await conn.closeSession(sid)
+    expect(conn.sessionCount).toBe(0)
+  })
+
+  it('closeSession clears local maps without SDK RPC when close capability omitted (MOCK_ACP_NO_CLOSE)', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-no-close',
+      // CLOSE_SLOW would delay if RPC ran; with NO_CLOSE host must not call it.
+      env: { MOCK_ACP_NO_CLOSE: '1', MOCK_ACP_CLOSE_SLOW_MS: '200' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    expect(conn.sessionCount).toBe(1)
+    const t0 = Date.now()
+    await conn.closeSession(sid)
+    expect(Date.now() - t0).toBeLessThan(100)
+    expect(conn.sessionCount).toBe(0)
   })
 
   it('evicts a dead connection so the next acquire spawns a fresh child', async () => {
@@ -76,7 +140,7 @@ describe('AcpConnectionManager', () => {
     })
     await conn.prompt(sessionId, 'hi')
     expect(text).toContain('mock/other')
-    conn.releaseSession(sessionId)
+    conn.detachSink(sessionId)
   })
 
   it('advertises fs capabilities by default', async () => {

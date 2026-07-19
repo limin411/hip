@@ -15,6 +15,8 @@ export class AcpAgentProvider implements AgentProvider {
   private currentHooks: ExternalAgentHooks | null = null
   /** Required before each runTurn — set by primary runner / invoker. */
   private turnCtx: FsBridgeContext | null = null
+  /** Singleflight: concurrent dispose() awaits the same close. */
+  private disposePromise: Promise<void> | null = null
 
   constructor(
     private readonly agent: AgentConfig,
@@ -111,7 +113,8 @@ export class AcpAgentProvider implements AgentProvider {
       if (aborted) throw abortError()
     } finally {
       signal.removeEventListener('abort', onAbort)
-      if (conn && sid) conn.releaseSession(sid)
+      // Turn end: detach sink only — keep openSessions + sessionConfigOptions for multi-turn.
+      if (conn && sid) conn.detachSink(sid)
     }
   }
 
@@ -152,8 +155,18 @@ export class AcpAgentProvider implements AgentProvider {
     this.currentHooks?.configOptions(normalizeConfigOptions(res?.configOptions ?? []))
   }
 
-  dispose(): void {
-    if (this.conn && this.acpSessionId) this.conn.releaseSession(this.acpSessionId)
+  /** Settles after session/close (if advertised); does not kill the warm-pool child. */
+  async dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise
+    this.disposePromise = this.runDispose()
+    return this.disposePromise
+  }
+
+  private async runDispose(): Promise<void> {
+    if (this.conn && this.acpSessionId) {
+      await this.conn.closeSession(this.acpSessionId)
+    }
+    this.acpSessionId = null
     // The connection stays warm for other conversations; the manager disposes it on shutdown.
     this.conn = null
   }

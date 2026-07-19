@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION, RequestError } from '@agentclientprotocol/sdk'
 import type { AgentConfig } from '@hip/protocol'
+import { logDebug } from '../../debug-logger.js'
 import type { ResolvedModel } from './registry.js'
 import { buildAcpSpawn, resolveAcpHostConfig } from './acp-config.js'
 import {
@@ -15,6 +16,11 @@ import {
   acpWriteTextFile,
   type FsBridgeContext,
 } from './acp-fs-bridge.js'
+
+/** Minimal runtime caps captured at initialize (PR-4 expands). */
+interface AcpRuntimeCaps {
+  closeSession: boolean
+}
 
 /** Per-ACP-session handlers, registered by the provider for the duration of a turn. */
 export interface AcpSessionSink {
@@ -46,6 +52,10 @@ export class AcpConnection {
    * Same flag gates advertise + handlers so non-compliant agents cannot bypass fs_bridge=false.
    */
   private readonly fsEnabled: boolean
+  /** Agent runtime caps from initialize (closeSession gated on sessionCapabilities.close). */
+  private runtimeCaps: AcpRuntimeCaps | null = null
+  /** In-flight closeSession RPCs keyed by acp session id (singleflight / re-entrant safe). */
+  private readonly closing = new Map<string, Promise<void>>()
 
   constructor(private readonly agent: AgentConfig, private readonly model: ResolvedModel | null) {
     // Resolve once so advertise and handlers cannot diverge for this child.
@@ -84,7 +94,19 @@ export class AcpConnection {
         : {}
       this.initPromise = this.conn
         .initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities })
-        .then((r) => { this.authMethods = (r as { authMethods?: Array<{ id: string }> }).authMethods ?? [] })
+        .then((r) => {
+          const res = r as {
+            authMethods?: Array<{ id: string }>
+            agentCapabilities?: {
+              sessionCapabilities?: { close?: unknown }
+            }
+          }
+          this.authMethods = res.authMethods ?? []
+          // sessionCapabilities.close present (including `{}`) means session/close is supported.
+          this.runtimeCaps = {
+            closeSession: res.agentCapabilities?.sessionCapabilities?.close != null,
+          }
+        })
     }
     return this.initPromise
   }
@@ -196,11 +218,50 @@ export class AcpConnection {
     if (!this.sinks.has(acpSessionId)) this.refs++
     this.sinks.set(acpSessionId, sink)
   }
-  releaseSession(acpSessionId: string): void {
+
+  /** Turn end: remove streaming sink only. Keeps openSessions + sessionConfigOptions + fs context. */
+  detachSink(acpSessionId: string): void {
     if (this.sinks.delete(acpSessionId)) this.refs = Math.max(0, this.refs - 1)
-    this.openSessions.delete(acpSessionId)
+  }
+
+  /**
+   * Session end (provider.dispose / setAgent / shutdown).
+   * Prefer SDK closeSession when the agent advertised sessionCapabilities.close.
+   * Re-entrant / concurrent closes coalesce on one in-flight RPC per id; skip RPC
+   * when the id was not open or the child is already dead.
+   */
+  async closeSession(acpSessionId: string): Promise<void> {
+    const inflight = this.closing.get(acpSessionId)
+    if (inflight) return inflight
+
+    const work = this.runCloseSession(acpSessionId)
+    this.closing.set(acpSessionId, work)
+    try {
+      await work
+    } finally {
+      this.closing.delete(acpSessionId)
+    }
+  }
+
+  private async runCloseSession(acpSessionId: string): Promise<void> {
+    this.detachSink(acpSessionId)
+    const wasOpen = this.openSessions.delete(acpSessionId)
     this.sessionConfigOptions.delete(acpSessionId)
-    this.fsContexts.delete(acpSessionId)
+    this.clearFsContext(acpSessionId)
+    if (!wasOpen || this.closed || !this.runtimeCaps?.closeSession) return
+    try {
+      await this.conn.closeSession({ sessionId: acpSessionId })
+    } catch (e) {
+      logDebug('acp', 'closeSession failed', { error: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  /**
+   * @deprecated Prefer detachSink (turn end) or closeSession (session end). Migration wrapper
+   * that fully closes the session (fire-and-forget async close RPC).
+   */
+  releaseSession(acpSessionId: string): void {
+    void this.closeSession(acpSessionId)
   }
 
   prompt(acpSessionId: string, text: string): Promise<{ stopReason: string }> {
@@ -270,6 +331,9 @@ export class AcpConnection {
     if (this.closed) return
     this.closed = true
     this.sinks.clear()
+    this.refs = 0
+    this.openSessions.clear()
+    this.sessionConfigOptions.clear()
     this.fsContexts.clear()
     this.onClosed?.()
     // In-flight conn.prompt(...) promises reject on their own when the ndJson stream closes.

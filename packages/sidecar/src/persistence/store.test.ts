@@ -445,6 +445,16 @@ describe('SessionStore', () => {
       store.setAcpSessionId('s1', 'ses_abc')
       expect(store.getAcpSessionId('s1')).toBe('ses_abc')
     })
+
+    it('clears acp_session_id to SQL NULL when set to null', () => {
+      store.insertSession({ id: 's1', title: 'title', config: JSON.stringify({ agentId: 'opencode' }), createdAt: 1, updatedAt: 1 })
+      store.setAcpSessionId('s1', 'ses_abc')
+      expect(store.getAcpSessionId('s1')).toBe('ses_abc')
+      store.setAcpSessionId('s1', null)
+      expect(store.getAcpSessionId('s1')).toBeNull()
+      const row = store.getDb().prepare('SELECT acp_session_id FROM sessions WHERE id=?').get('s1') as { acp_session_id: string | null }
+      expect(row.acp_session_id).toBeNull()
+    })
   })
 
   it('promoteSessionInputById is idempotent — second call does not overwrite promoted_seq', () => {

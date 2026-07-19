@@ -9,7 +9,7 @@ describe('AgentProvider widened contract', () => {
     // NOT on AgentProvider — so the provider object exposes only runTurn/dispose/setConfigOption.
     const p: AgentProvider = {
       async runTurn(_t: string, _e: GraphEmit, _s: AbortSignal, _h?: ExternalAgentHooks) {},
-      dispose() {},
+      async dispose() {},
       async setConfigOption() {},
     }
     expect(typeof p.runTurn).toBe('function')

@@ -7,7 +7,7 @@ const root = join(import.meta.dirname, '../../../../../')
 const script = join(root, 'scripts/generate-product-content.mjs')
 
 describe('product content SoT generator', () => {
-  it('yarn product:content:check — content.ts matches docs/product/', () => {
+  it('yarn product:content:check — content.ts matches packages/product-content/', () => {
     expect(() =>
       execFileSync(process.execPath, [script, '--check'], {
         cwd: root,
@@ -17,7 +17,7 @@ describe('product content SoT generator', () => {
     ).not.toThrow()
   })
 
-  it('ops content.ts matches docs/ops/', () => {
+  it('ops content.ts matches packages/product-content/ops/', () => {
     const opsScript = join(root, 'scripts/generate-ops-content.mjs')
     expect(() =>
       execFileSync(process.execPath, [opsScript, '--check'], {

@@ -1,6 +1,6 @@
 /**
  * Product help docs for UI (Settings → Help).
- * Bodies are generated from docs/product/ (+ locales) — see yarn product:content.
+ * Bodies are generated from packages/product-content/ (+ locales) — see yarn product:content.
  *
  * Agent embeds stay English in packages/sidecar; UI uses getProductHelpPack(language).
  */

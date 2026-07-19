@@ -6,7 +6,7 @@
  * - pi: system prompt lists doc paths; agent reads only when asked
  * - hip skills: L1 metadata → use_skill L2 body → L3 references via read_file
  *
- * Product copy SoT: docs/product/ → scripts/generate-product-content.mjs → content.ts
+ * Product copy SoT: packages/product-content/ → scripts/generate-product-content.mjs → content.ts
  * Content is embedded in content.ts (ncc does not ship loose markdown). We materialize to
  * `~/.hip/builtin-skills/<id>/` so use_skill / read_file can use absolute paths
  * outside the project root (same seam as ~/.hip/skills).

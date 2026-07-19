@@ -75,7 +75,14 @@ export const useDraftStore = create<DraftStore>()(
       setAgentId: (agentId) =>
         set((s) => {
           const base: Draft = s.draft ?? { tempId: nanoid(), mode: 'chat', text: '' }
-          return { draft: { ...base, agentId } }
+          // builtin / empty → clear field (undefined = hip). External → drop hip-only controls.
+          const id = typeof agentId === 'string' ? agentId.trim() : ''
+          if (!id || id === 'builtin') {
+            const { agentId: _a, ...rest } = base
+            return { draft: rest }
+          }
+          const { forcePlan: _f, modelKey: _m, effort: _e, ...rest } = base
+          return { draft: { ...rest, agentId: id } }
         }),
       setModelKey: (modelKey) =>
         set((s) => {

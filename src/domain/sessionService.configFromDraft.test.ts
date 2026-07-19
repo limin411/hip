@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { configFromDraft } from './sessionService'
 import { useProvidersStore } from '@/store/providersStore'
+import { useHipConfigStore } from '@/store/hipConfigStore'
+import type { AgentConfig } from '@hip/protocol'
+
+const acpAgent = (id: string, overrides?: Partial<AgentConfig>): AgentConfig => ({
+  id,
+  name: id,
+  kind: 'acp',
+  command: 'cmd',
+  args: [],
+  enabled: true,
+  ...overrides,
+})
 
 describe('configFromDraft', () => {
   beforeEach(() => {
@@ -13,6 +25,20 @@ describe('configFromDraft', () => {
         providers: { openai: { enabled: true } },
         activeModel: { providerID: 'openai', modelID: 'gpt-4o' },
       },
+    })
+    useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          acpAgent('acp-opencode'),
+          acpAgent('acp-grok'),
+          acpAgent('legacy-oc', { kind: 'opencode' }),
+          acpAgent('disabled-acp', { enabled: false }),
+          acpAgent('internal-coder', { kind: 'internal', command: '', prompt: 'x' }),
+        ],
+      },
+      loaded: true,
+      error: null,
     })
   })
 
@@ -61,7 +87,7 @@ describe('configFromDraft', () => {
     expect(cfg.cwd).toBe('/work')
     expect(cfg.llmProvider).toBe('openai')
   })
-  it('does not set agentId for builtin / empty draft agent', () => {
+  it('does not set agentId for builtin / empty / whitespace draft agent', () => {
     expect(
       'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o' }),
     ).toBe(false)
@@ -75,8 +101,16 @@ describe('configFromDraft', () => {
           agentId: 'builtin',
         }),
     ).toBe(false)
+    expect(
+      'agentId' in
+        configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o', agentId: '' }),
+    ).toBe(false)
+    expect(
+      'agentId' in
+        configFromDraft({ tempId: 't', mode: 'chat', text: '', modelKey: 'openai/gpt-4o', agentId: '  ' }),
+    ).toBe(false)
   })
-  it('sets agentId when draft selects an external agent', () => {
+  it('sets agentId when draft selects an enabled ACP agent', () => {
     const cfg = configFromDraft({
       tempId: 't',
       mode: 'chat',
@@ -85,6 +119,22 @@ describe('configFromDraft', () => {
       agentId: 'acp-opencode',
     })
     expect(cfg.agentId).toBe('acp-opencode')
+  })
+  it('sets agentId for legacy kind opencode', () => {
+    expect(
+      configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'legacy-oc' }).agentId,
+    ).toBe('legacy-oc')
+  })
+  it('omits agentId when agent is missing, disabled, or not ACP-capable', () => {
+    expect(
+      'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'gone' }),
+    ).toBe(false)
+    expect(
+      'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'disabled-acp' }),
+    ).toBe(false)
+    expect(
+      'agentId' in configFromDraft({ tempId: 't', mode: 'chat', text: '', agentId: 'internal-coder' }),
+    ).toBe(false)
   })
   it('carries external agentId on project drafts too', () => {
     const cfg = configFromDraft({
@@ -96,6 +146,23 @@ describe('configFromDraft', () => {
     })
     expect(cfg.agentId).toBe('acp-grok')
     expect(cfg.surface).toBe('code')
+  })
+  it('skips forcePlan and hip model/effort when ACP primary', () => {
+    const cfg = configFromDraft({
+      tempId: 't',
+      mode: 'project',
+      cwd: '/p',
+      text: '',
+      agentId: 'acp-grok',
+      forcePlan: true,
+      modelKey: 'openai/gpt-4o',
+      effort: 'high',
+    })
+    expect(cfg.agentId).toBe('acp-grok')
+    expect(cfg.forcePlan).toBeUndefined()
+    expect(cfg.effort).toBeUndefined()
+    // modelKey resolution skipped for ACP primary — keep DEFAULT_CONFIG provider
+    expect(cfg.llmProvider).toBe('deepseek')
   })
   it('project (code) draft carries permissionMode', () => {
     const cfg = configFromDraft({ tempId: 't', mode: 'project', cwd: '/p', text: '', permissionMode: 'full' })

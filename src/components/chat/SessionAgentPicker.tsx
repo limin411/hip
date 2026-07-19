@@ -6,16 +6,18 @@ import { ComposerChip } from './ComposerChip'
 import { useDraftStore } from '@/store/draftStore'
 import { useAgents } from '@/store/hipConfigStore'
 import { useActiveSession, useActiveSessionId } from '@/domain'
+import { isAcpCapableAgent } from '@/lib/sessionAgent'
 import { cn } from '@/lib/utils'
 
-/** Enabled ACP agents available as session primary (excludes internal sub-agents). */
+/** Enabled ACP-capable agents available as session primary (acp + legacy opencode). */
 export function enabledAcpAgents(agents: AgentConfig[]): AgentConfig[] {
-  return agents.filter((a) => a.enabled && a.kind === 'acp')
+  return agents.filter((a) => isAcpCapableAgent(a))
 }
 
 /** Normalize draft/session agent id for display (empty → builtin). */
 export function resolvePrimaryAgentId(agentId: string | undefined): string {
-  return agentId && agentId !== '' ? agentId : 'builtin'
+  const id = typeof agentId === 'string' ? agentId.trim() : ''
+  return id || 'builtin'
 }
 
 /**
@@ -32,9 +34,9 @@ export function SessionAgentPicker() {
 
   const enabled = enabledAcpAgents(agents)
 
-  // Active session: read-only badge (no mid-switch in PR-6a).
-  if (activeId && session) {
-    const aid = resolvePrimaryAgentId(session.config.agentId)
+  // Any active session id: read-only badge (no mid-switch in PR-6a), even if row is briefly missing.
+  if (activeId) {
+    const aid = resolvePrimaryAgentId(session?.config.agentId)
     const isExternal = aid !== 'builtin'
     const name = isExternal
       ? (agents.find((a) => a.id === aid)?.name ?? aid)

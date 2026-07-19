@@ -1319,6 +1319,13 @@ export const en = {
       filterAll: 'All',
       filterChat: 'Work',
       filterCode: 'Coding',
+      filterKnowledge: 'Knowledge',
+      kind: {
+        space: 'Space',
+        doc: 'Document',
+        folder: 'Folder',
+      },
+      parentMissing: 'Restore the parent node or space first',
       restore: 'Restore',
       deleteForever: 'Delete forever',
       deleteForeverTitle: 'Permanently delete "{{title}}"?',

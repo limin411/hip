@@ -40,6 +40,62 @@ export async function knowledgeDeleteSpace(id: string): Promise<void> {
   await invoke('knowledge_delete_space', { args: { id } })
 }
 
+/** Soft-delete space into product recycle bin. */
+export async function knowledgeSoftDeleteSpace(id: string): Promise<void> {
+  await invoke('knowledge_soft_delete_space', { args: { id } })
+}
+
+/** Soft-delete tree nodes (doc or folder subtree) into recycle bin. */
+export async function knowledgeSoftDeleteNodes(
+  spaceId: string,
+  nodeIds: string[],
+): Promise<string[]> {
+  return invoke<string[]>('knowledge_soft_delete_nodes', {
+    args: { spaceId, nodeIds },
+  })
+}
+
+export type KnowledgeTrashKind = 'space' | 'doc' | 'folder'
+
+export interface KnowledgeTrashItem {
+  id: string
+  kind: KnowledgeTrashKind
+  entityId: string
+  spaceId: string
+  title: string
+  deletedAt: number
+  spaceName?: string
+  parentId?: string | null
+}
+
+export async function knowledgeListTrash(): Promise<KnowledgeTrashItem[]> {
+  return invoke<KnowledgeTrashItem[]>('knowledge_list_trash')
+}
+
+export async function knowledgeRestoreTrashEntry(entryId: string): Promise<KnowledgeTrashItem> {
+  return invoke<KnowledgeTrashItem>('knowledge_restore_trash_entry', {
+    args: { entryId },
+  })
+}
+
+export async function knowledgeHardDeleteTrashEntry(entryId: string): Promise<void> {
+  await invoke('knowledge_hard_delete_trash_entry', { args: { entryId } })
+}
+
+export async function knowledgeEmptyTrash(): Promise<number> {
+  return invoke<number>('knowledge_empty_trash')
+}
+
+export async function knowledgePurgeExpiredTrash(retentionDays?: number): Promise<string[]> {
+  return invoke<string[]>('knowledge_purge_expired_trash', {
+    args: { retentionDays },
+  })
+}
+
+export async function knowledgeReconcileTrash(): Promise<number> {
+  return invoke<number>('knowledge_reconcile_trash')
+}
+
 export async function knowledgeGetTree(spaceId: string): Promise<KnowledgeTreeFile> {
   return invoke<KnowledgeTreeFile>('knowledge_get_tree', { args: { spaceId } })
 }

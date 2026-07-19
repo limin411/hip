@@ -1249,6 +1249,13 @@ export const zhTW = {
     "filterAll": "全部",
     "filterChat": "辦公",
     "filterCode": "編碼",
+    "filterKnowledge": "知識庫",
+    "kind": {
+      "space": "知識空間",
+      "doc": "文件",
+      "folder": "資料夾"
+    },
+    "parentMissing": "請先恢復父節點或知識空間",
     "restore": "恢復",
     "deleteForever": "永久刪除",
     "deleteForeverTitle": "永久刪除「{{title}}」？",

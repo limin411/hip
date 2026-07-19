@@ -45,10 +45,12 @@ import {
 } from '@/domain/knowledge/editorMode'
 import {
   knowledgeCreateSpace,
-  knowledgeDeleteDocFile,
-  knowledgeDeleteSpace,
   knowledgeDeleteTemplate,
   knowledgeEnsureRoot,
+  knowledgeSoftDeleteSpace,
+  knowledgeSoftDeleteNodes,
+  knowledgeReconcileTrash,
+  knowledgePurgeExpiredTrash,
   knowledgeErrorMessage,
   knowledgeGetTree,
   knowledgeListSpaces,
@@ -627,9 +629,30 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     set({ error: null })
     try {
       await knowledgeEnsureRoot()
+      // Best-effort trash reconcile + retention purge on knowledge bootstrap / app launch.
+      try {
+        await knowledgeReconcileTrash()
+        const { resolveTrashRetentionDays } = await import('@/lib/trashRetention')
+        const { useHipConfigStore } = await import('@/store/hipConfigStore')
+        const days = resolveTrashRetentionDays(
+          useHipConfigStore.getState().config.trash?.retentionDays,
+        )
+        await knowledgePurgeExpiredTrash(days)
+      } catch {
+        // non-Tauri / trash unavailable
+      }
       const spaces = await knowledgeListSpaces()
       set({ spaces, loaded: true, recent: loadRecent() })
       void get().rebuildSearchIndex()
+      // Refresh knowledge trash badge when list is available.
+      try {
+        const { knowledgeListTrash } = await import('@/ipc/knowledge')
+        const items = await knowledgeListTrash()
+        const { useTrashBadgeStore } = await import('@/store/trashBadgeStore')
+        useTrashBadgeStore.getState().setKnowledgeCount(items.length)
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       set({ error: knowledgeErrorMessage(e), loaded: true })
     }
@@ -829,7 +852,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           pendingReveal: null,
         })
       }
-      await knowledgeDeleteSpace(id)
+      await knowledgeSoftDeleteSpace(id)
       dropExpandedForSpace(id)
       // Drop all index entries for this space (best-effort full rebuild also fine).
       for (const hit of get().searchHits) {
@@ -850,6 +873,9 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       })
       persistRecent(get().recent)
       void get().rebuildSearchIndex()
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().adjustKnowledge(1)
+      })
     } catch (e) {
       const msg = knowledgeErrorMessage(e)
       set({ busy: false, error: msg })
@@ -1392,12 +1418,15 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     set({ busy: true })
     try {
       const { nodes, removedDocIds } = removeNodeSubtree(get().nodes, id)
-      await knowledgeSaveTree(spaceId, { version: 1, nodes })
+      // Soft-delete into recycle bin (tree + files moved by Tauri).
+      await knowledgeSoftDeleteNodes(spaceId, [id])
       for (const docId of removedDocIds) {
-        await knowledgeDeleteDocFile(spaceId, docId)
         removeSearchDoc(kbIndex, docKey(spaceId, docId), kbMeta)
       }
       await removeLinkIndexDocs(spaceId, removedDocIds)
+      void import('@/store/trashBadgeStore').then(({ useTrashBadgeStore }) => {
+        useTrashBadgeStore.getState().adjustKnowledge(1)
+      })
       const activeRemoved = get().activeDocId != null && removedDocIds.includes(get().activeDocId!)
       set((s) => {
         const prevCount = s.spaceDocCounts[spaceId]

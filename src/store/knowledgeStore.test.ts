@@ -7,6 +7,11 @@ const knowledgeGetTree = vi.fn()
 const knowledgeEnsureRoot = vi.fn()
 const knowledgeListSpaces = vi.fn()
 const knowledgeDeleteSpace = vi.fn()
+const knowledgeSoftDeleteSpace = vi.fn()
+const knowledgeSoftDeleteNodes = vi.fn()
+const knowledgeReconcileTrash = vi.fn()
+const knowledgePurgeExpiredTrash = vi.fn()
+const knowledgeListTrash = vi.fn()
 const knowledgeSaveTree = vi.fn()
 const knowledgeListTemplates = vi.fn()
 const knowledgeSaveTemplate = vi.fn()
@@ -26,6 +31,11 @@ vi.mock('@/ipc/knowledge', () => ({
   knowledgeCreateSpace: (...a: unknown[]) => knowledgeCreateSpace(...a),
   knowledgeUpdateSpace: (...a: unknown[]) => knowledgeUpdateSpace(...a),
   knowledgeDeleteSpace: (...a: unknown[]) => knowledgeDeleteSpace(...a),
+  knowledgeSoftDeleteSpace: (...a: unknown[]) => knowledgeSoftDeleteSpace(...a),
+  knowledgeSoftDeleteNodes: (...a: unknown[]) => knowledgeSoftDeleteNodes(...a),
+  knowledgeReconcileTrash: (...a: unknown[]) => knowledgeReconcileTrash(...a),
+  knowledgePurgeExpiredTrash: (...a: unknown[]) => knowledgePurgeExpiredTrash(...a),
+  knowledgeListTrash: (...a: unknown[]) => knowledgeListTrash(...a),
   knowledgeGetTree: (...a: unknown[]) => knowledgeGetTree(...a),
   knowledgeSaveTree: (...a: unknown[]) => knowledgeSaveTree(...a),
   knowledgeReadDoc: (...a: unknown[]) => knowledgeReadDoc(...a),
@@ -152,7 +162,11 @@ describe('knowledgeStore deleteSpace', () => {
   beforeEach(() => {
     knowledgeWriteDoc.mockReset()
     knowledgeDeleteSpace.mockReset()
-    knowledgeDeleteSpace.mockResolvedValue(undefined)
+    knowledgeSoftDeleteSpace.mockReset()
+    knowledgeSoftDeleteSpace.mockResolvedValue(undefined)
+    knowledgeReconcileTrash.mockResolvedValue(0)
+    knowledgePurgeExpiredTrash.mockResolvedValue([])
+    knowledgeListTrash.mockResolvedValue([])
     knowledgeGetTree.mockReset()
     knowledgeGetTree.mockResolvedValue({ version: 1, nodes: [] })
     useKnowledgeStore.setState({
@@ -204,7 +218,7 @@ describe('knowledgeStore deleteSpace', () => {
     })
     await useKnowledgeStore.getState().deleteSpace('spc_1')
     const s = useKnowledgeStore.getState()
-    expect(knowledgeDeleteSpace).toHaveBeenCalledWith('spc_1')
+    expect(knowledgeSoftDeleteSpace).toHaveBeenCalledWith('spc_1')
     expect(knowledgeWriteDoc).not.toHaveBeenCalled()
     expect(s.mode).toBe('home')
     expect(s.activeSpaceId).toBeNull()
@@ -990,6 +1004,9 @@ describe('knowledgeStore index progress + openSearchHit', () => {
   })
 
   it('deleteNode of active doc clears pendingReveal', async () => {
+    knowledgeSoftDeleteNodes.mockReset()
+    knowledgeSoftDeleteNodes.mockResolvedValue(['tentry_1'])
+    knowledgeSaveTree.mockResolvedValue(undefined)
     useKnowledgeStore.setState({
       activeSpaceId: 'spc_1',
       mode: 'workspace',
@@ -1010,6 +1027,7 @@ describe('knowledgeStore index progress + openSearchHit', () => {
       editorMode: 'source',
       pendingReveal: { query: 'q', spaceId: 'spc_1', docId: 'doc_1' },
       spaceDocCounts: { spc_1: 1 },
+      busy: false,
     })
     await useKnowledgeStore.getState().deleteNode('doc_1')
     const s = useKnowledgeStore.getState()

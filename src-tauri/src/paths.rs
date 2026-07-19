@@ -102,6 +102,16 @@ pub fn knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
     hip_subdir(app, "knowledge")
 }
 
+/// Product recycle-bin root (`<base>/trash`).
+pub fn trash_dir(app: &AppHandle) -> Option<PathBuf> {
+    hip_subdir(app, "trash")
+}
+
+/// Knowledge quarantine under trash (`<base>/trash/knowledge`).
+pub fn trash_knowledge_dir(app: &AppHandle) -> Option<PathBuf> {
+    trash_dir(app).map(|p| p.join("knowledge"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::hip_base_from;
@@ -130,6 +140,17 @@ mod tests {
         let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
         // `skills_dir(app)` → `hip_subdir(app, "skills")` → `<base>/skills`.
         assert_eq!(base.join("skills"), PathBuf::from("/Users/x/.hip/skills"));
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn trash_knowledge_layout_lives_under_base() {
+        let base = hip_base_from(Some(PathBuf::from("/Users/x")), None).unwrap();
+        assert_eq!(base.join("trash"), PathBuf::from("/Users/x/.hip/trash"));
+        assert_eq!(
+            base.join("trash").join("knowledge"),
+            PathBuf::from("/Users/x/.hip/trash/knowledge")
+        );
     }
 
     #[test]

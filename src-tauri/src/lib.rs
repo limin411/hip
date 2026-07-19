@@ -9,6 +9,7 @@ mod hip_config;
 mod path_tools;
 mod pty;
 mod knowledge;
+mod knowledge_trash;
 mod knowledge_link_index;
 
 // Re-export so command handlers and unit tests can use `super::HipConfig` etc.
@@ -598,6 +599,14 @@ pub fn run() {
             knowledge::knowledge_create_space,
             knowledge::knowledge_update_space,
             knowledge::knowledge_delete_space,
+            knowledge_trash::knowledge_soft_delete_space,
+            knowledge_trash::knowledge_soft_delete_nodes,
+            knowledge_trash::knowledge_list_trash,
+            knowledge_trash::knowledge_restore_trash_entry,
+            knowledge_trash::knowledge_hard_delete_trash_entry,
+            knowledge_trash::knowledge_empty_trash,
+            knowledge_trash::knowledge_purge_expired_trash,
+            knowledge_trash::knowledge_reconcile_trash,
             knowledge::knowledge_get_tree,
             knowledge::knowledge_save_tree,
             knowledge::knowledge_read_doc,

@@ -1289,6 +1289,13 @@ export const zhCN = {
       filterAll: '全部',
       filterChat: '办公',
       filterCode: '编码',
+      filterKnowledge: '知识库',
+      kind: {
+        space: '知识空间',
+        doc: '文档',
+        folder: '文件夹',
+      },
+      parentMissing: '请先恢复父节点或知识空间',
       restore: '恢复',
       deleteForever: '永久删除',
       deleteForeverTitle: '永久删除「{{title}}」？',

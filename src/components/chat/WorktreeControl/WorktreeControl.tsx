@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Folders, Copy, RefreshCw, Plus, Layers } from 'lucide-react'
+import { Folders, Copy, RefreshCw, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { ComposerChip } from '../ComposerChip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
@@ -35,10 +35,10 @@ import {
 } from '@/store/worktreeStore'
 import { WorktreeList, type WorktreeListRow } from './WorktreeList'
 import { WorktreeCreateSingleModal } from './WorktreeCreateSingleModal'
-import { WorktreeParallelModal } from './WorktreeParallelModal'
 import { openWorktreeDeleteDialog } from './worktreeDeleteDialogStore'
 
-export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) {
+/** Composer control for isolated workspaces (browse / create single / switch / delete). */
+export function WorktreeControl() {
   const { t } = useTranslation()
   const active = useActiveSession()
   const sessions = useSessions()
@@ -48,7 +48,6 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   const pathStatus = useProjectPathStore((s) => s.statusOf(active?.config.cwd))
 
   const [popoverOpen, setPopoverOpen] = useState(false)
-  const [parallelOpen, setParallelOpen] = useState(false)
   const [createSingleOpen, setCreateSingleOpen] = useState(false)
   /** D24: set only after create/op fails as non-git — never from empty list. */
   const [nonGit, setNonGit] = useState(false)
@@ -93,7 +92,7 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   )
 
   const hostSessionId = hostCtx.hostSessionId
-  // Never enable create/parallel without a real main-tree path (avoid isolated cwd as baseCwd).
+  // Never enable create without a real main-tree path (avoid isolated cwd as baseCwd).
   const opsBaseCwd = hostCtx.primaryPath
   const createDisabled =
     hostCtx.unresolved || projectBlocked || nonGit || !opsBaseCwd || !hostSessionId
@@ -230,11 +229,6 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
     }
   }, [catalogById, isolationCount, listLoading, popoverOpen])
 
-  const openParallel = useCallback(() => {
-    setPopoverOpen(false)
-    window.setTimeout(() => setParallelOpen(true), 0)
-  }, [])
-
   const openCreateSingle = useCallback(() => {
     if (createDisabled || !hostSessionId) return
     setPopoverOpen(false)
@@ -362,7 +356,7 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
             aria-label={t('chat.worktreeControl.chipAria')}
             aria-haspopup="dialog"
             aria-expanded={popoverOpen}
-            data-testid="parallel-run-button"
+            data-testid="worktree-control-chip"
             data-worktree-control-chip=""
             className={cn(popoverOpen && 'text-accent-strong')}
           >
@@ -483,20 +477,6 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
                 <Plus size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
                 {t('chat.worktreeControl.createSingle')}
               </button>
-              <button
-                type="button"
-                disabled={createDisabled}
-                data-testid="worktree-control-parallel"
-                onClick={openParallel}
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-meta text-ink',
-                  'hover:bg-state-hover',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                )}
-              >
-                <Layers size={14} className="shrink-0 text-ink-tertiary" aria-hidden />
-                {t('chat.worktreeControl.parallelExplore')}
-              </button>
             </div>
 
             <div className="px-3 py-2 text-[10px] leading-snug text-ink-tertiary">
@@ -505,16 +485,6 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
           </div>
         </PopoverContent>
       </Popover>
-
-      {/* Close popover before Modal (D17); form owns parallel-run-* testids. */}
-      <WorktreeParallelModal
-        open={parallelOpen}
-        onOpenChange={setParallelOpen}
-        draftPrompt={draftPrompt}
-        hostSessionId={opsBaseCwd && hostSessionId ? hostSessionId : ''}
-        // Never fall back to isolated active cwd as fan-out base.
-        baseCwd={opsBaseCwd || ''}
-      />
 
       {hostSessionId ? (
         <WorktreeCreateSingleModal

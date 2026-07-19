@@ -292,7 +292,7 @@ export function InputBar() {
               }
               leftSlot={
                 isCode ? (
-                  <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><WorktreeControl draftPrompt={value} /><AttachmentButton onAttach={setAttachments} /></>
+                  <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><ProjectGuidanceChip /><WorktreeControl /><AttachmentButton onAttach={setAttachments} /></>
                 ) : (
                   <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
                 )

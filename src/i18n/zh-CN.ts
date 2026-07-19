@@ -10,35 +10,13 @@ export const zhCN = {
       resizeInput: '拖拽调整输入框高度',
       /**
        * Agent HITL parallel:started 成功 toast（serverMessageEffects）。
-       * 主机 UI 使用 chat.worktreeControl.* — 勿再引入「智能体决定」主机文案。
+       * 主机「并行探索」UI 已移除；此处仅服务智能体并行工具。
        */
       parallel: {
-        started: '已启动 {{count}} 路并行探索',
+        started: '已启动 {{count}} 路并行',
       },
-      /** WorktreeControl 最终命名空间（PR1+）。主机并行路径为启发式 — 非智能体决定。 */
+      /** WorktreeControl：浏览 / 单路创建 / 删除（主机并行探索入口已移除）。 */
       worktreeControl: {
-        buttonTitle: '并行探索（根据描述建议路数）',
-        dialogTitle: '并行探索',
-        dialogHint:
-          '描述目标。系统将根据描述建议开启多少路隔离工作区（1–4）。只准备工作区，不会自动发消息。',
-        promptPlaceholder: '要探索或对比什么？',
-        suggests: '建议 {{count}} 路',
-        confirm: '创建 {{count}} 路隔离工作区',
-        creating: '创建中…',
-        starting: '正在创建 {{count}} 路隔离工作区…',
-        started: '并行探索 {{runId}}：已就绪 {{count}} 路',
-        partialStarted: '并行探索 {{runId}}：已就绪 {{count}} 路，失败 {{failed}} 路',
-        partialFooter: '部分路创建失败：',
-        noneCreated: '未创建任何隔离工作区。当前目录是 git 仓库吗？',
-        failed: '并行探索失败',
-        reason: {
-          empty: '未填写目标，默认建议 2 路对比方案',
-          four: '检测到多路/穷举探索意图，建议 4 路',
-          three: '检测到三种方案，建议 3 路',
-          compare: '检测到对比/双方案表述，建议 2 路',
-          single: '检测到单一聚焦改动，建议 1 路隔离工作区',
-          default: '默认建议 2 路，便于轻量 A/B 对比',
-        },
         /** parallel_worktrees HITL optionId → 文案（PermissionModal 按 optionId 映射）。 */
         hitlOption: {
           n1: '1 路',
@@ -47,18 +25,17 @@ export const zhCN = {
           n4: '4 路',
           reject: '不要并行',
         },
-        /** 目录行 WorktreeSource 人读文案（PR7 source 接线后）。 */
+        /** 目录行 WorktreeSource 人读文案 */
         source: {
           protocol: '手动创建',
           parallel: '智能体并行',
-          host_fanout: '并行探索',
+          host_fanout: '批量创建',
           agent_tool: '智能体工具',
           background: '后台',
           import: '导入',
           discovered: '已发现',
           primary: '主工作区',
         },
-        /** 浏览弹层（PR3） */
         chipAria: '隔离工作区',
         chipPurpose: '浏览、切换或新建隔离工作区',
         mainWorkspace: '主工作区',
@@ -68,7 +45,6 @@ export const zhCN = {
         refresh: '刷新',
         emptyTitle: '还没有隔离工作区',
         createSingle: '新建隔离工作区…',
-        /** 单路隔离创建 Modal（PR4） */
         createSingleTitle: '新建隔离工作区',
         createSingleHint: '从主工作区当前 HEAD 创建一路干净的隔离工作区。分支名由系统自动分配。',
         createSingleBranch: '分支',
@@ -79,9 +55,7 @@ export const zhCN = {
         createSingleConfirm: '创建',
         createSingleCreating: '创建中…',
         createSingleFailed: '无法创建隔离工作区',
-        /** D24：仅在创建/操作报非 git 错误后 — 不可因空列表单独判定 */
         nonGitBanner: '当前文件夹不是 git 仓库，已禁用创建。',
-        parallelExplore: '并行探索…',
         footerHint: '在侧栏中管理 · 后台临时隔离不会出现在此列表',
         unresolvedBanner: '无法确定主工作区，创建/删除已禁用',
         openChat: '打开对话',

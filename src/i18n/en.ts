@@ -13,34 +13,11 @@ export const en = {
        * Host UI uses chat.worktreeControl.* — do not reintroduce agent-worded host keys.
        */
       parallel: {
-        started: 'Started {{count}} parallel explore track(s)',
+        started: 'Started {{count}} parallel track(s)',
       },
-      /** Final WorktreeControl namespace (PR1+). Host parallel path is heuristic — not agent. */
+      /** WorktreeControl: browse / single create / delete (host parallel explore UI removed). */
       worktreeControl: {
-        buttonTitle: 'Parallel explore (suggested tracks from prompt)',
-        dialogTitle: 'Parallel explore',
-        dialogHint:
-          'Describe the goal. Suggested track count (1–4) is based on your prompt. Only prepares workspaces — won’t start chat automatically.',
-        promptPlaceholder: 'What should be explored or compared?',
-        suggests: 'Suggested {{count}} track(s)',
-        confirm: 'Create {{count}} isolated workspace(s)',
-        creating: 'Creating…',
-        starting: 'Creating {{count}} isolated workspace(s)…',
-        started: 'Parallel run {{runId}}: {{count}} track(s) ready',
-        partialStarted:
-          'Parallel run {{runId}}: {{count}} track(s) ready, {{failed}} failed',
-        partialFooter: 'Some tracks failed to create:',
-        noneCreated: 'No isolated workspaces created. Is this folder a git repo?',
-        failed: 'Parallel explore failed',
-        reason: {
-          empty: 'Empty goal — default to 2 comparable approaches',
-          four: 'Multi-way / exhaustive exploration → 4 tracks',
-          three: 'Three distinct approaches → 3 tracks',
-          compare: 'Compare / dual approach language → 2 tracks',
-          single: 'Single focused change → 1 isolated workspace',
-          default: 'Default: 2 tracks for a light A/B comparison',
-        },
-        /** HITL optionId → labels for parallel_worktrees (PermissionModal maps by optionId). */
+        /** HITL optionId → labels for agent parallel_worktrees (PermissionModal maps by optionId). */
         hitlOption: {
           n1: '1 track',
           n2: '2 tracks',
@@ -48,18 +25,18 @@ export const en = {
           n4: '4 tracks',
           reject: "Don't parallelize",
         },
-        /** Humanized WorktreeSource subtitles for catalog rows (after PR7 source wire). */
+        /** Humanized WorktreeSource subtitles for catalog rows. */
         source: {
           protocol: 'Manual',
           parallel: 'Agent parallel',
-          host_fanout: 'Parallel explore',
+          host_fanout: 'Batch create',
           agent_tool: 'Agent tool',
           background: 'Background',
           import: 'Imported',
           discovered: 'Discovered',
           primary: 'Main',
         },
-        /** Browse popover (PR3) */
+        /** Browse popover */
         chipAria: 'Isolated workspaces',
         chipPurpose: 'Browse, switch, or create isolated workspaces',
         mainWorkspace: 'Main workspace',
@@ -69,7 +46,7 @@ export const en = {
         refresh: 'Refresh',
         emptyTitle: 'No isolated workspaces yet',
         createSingle: 'New isolated workspace…',
-        /** Single isolation create Modal (PR4) */
+        /** Single isolation create Modal */
         createSingleTitle: 'New isolated workspace',
         createSingleHint:
           'Creates one clean isolated workspace from the current main workspace HEAD. Branch name is assigned automatically.',
@@ -84,7 +61,6 @@ export const en = {
         createSingleFailed: 'Could not create isolated workspace',
         /** D24: only after create/op error — never from empty list alone. */
         nonGitBanner: 'This folder is not a git repository. Create is disabled.',
-        parallelExplore: 'Parallel explore…',
         footerHint: 'Manage in the sidebar · Background temporary isolates do not appear here',
         unresolvedBanner: 'Could not determine the main workspace. Create and delete are disabled.',
         openChat: 'Open chat',

@@ -16,32 +16,11 @@ export const zhTW = {
     "sendMessage": "發送一條消息開始對話",
     "inputPlaceholder": "給 hip 發消息…（Enter 發送，Shift+Enter 換行）",
     "resizeInput": "拖曳調整輸入框高度",
-    // Agent HITL parallel:started toast only; host UI uses worktreeControl (PR5 cleaned agent-worded leftovers).
+    // Agent HITL parallel:started toast only (host parallel explore UI removed).
     "parallel": {
-      "started": "已啟動 {{count}} 路並行探索"
+      "started": "已啟動 {{count}} 路並行"
     },
     "worktreeControl": {
-      "buttonTitle": "並行探索（根據描述建議路數）",
-      "dialogTitle": "並行探索",
-      "dialogHint": "描述目標。系統將根據描述建議開啟多少路隔離工作區（1–4）。只準備工作區，不會自動發訊息。",
-      "promptPlaceholder": "要探索或對比什麼？",
-      "suggests": "建議 {{count}} 路",
-      "confirm": "建立 {{count}} 路隔離工作區",
-      "creating": "建立中…",
-      "starting": "正在建立 {{count}} 路隔離工作區…",
-      "started": "並行探索 {{runId}}：已就緒 {{count}} 路",
-      "partialStarted": "並行探索 {{runId}}：已就緒 {{count}} 路，失敗 {{failed}} 路",
-      "partialFooter": "部分路建立失敗：",
-      "noneCreated": "未建立任何隔離工作區。目前目錄是 git 倉庫嗎？",
-      "failed": "並行探索失敗",
-      "reason": {
-        "empty": "未填寫目標，預設建議 2 路對比方案",
-        "four": "偵測到多路/窮舉探索意圖，建議 4 路",
-        "three": "偵測到三種方案，建議 3 路",
-        "compare": "偵測到對比/雙方案表述，建議 2 路",
-        "single": "偵測到單一聚焦改動，建議 1 路隔離工作區",
-        "default": "預設建議 2 路，便於輕量 A/B 對比"
-      },
       "hitlOption": {
         "n1": "1 路",
         "n2": "2 路",
@@ -52,7 +31,7 @@ export const zhTW = {
       "source": {
         "protocol": "手動建立",
         "parallel": "智慧體並行",
-        "host_fanout": "並行探索",
+        "host_fanout": "批次建立",
         "agent_tool": "智慧體工具",
         "background": "背景",
         "import": "匯入",
@@ -79,7 +58,6 @@ export const zhTW = {
       "createSingleCreating": "建立中…",
       "createSingleFailed": "無法建立隔離工作區",
       "nonGitBanner": "目前資料夾不是 git 倉庫，已停用建立。",
-      "parallelExplore": "並行探索…",
       "footerHint": "在側欄中管理 · 背景臨時隔離不會出現在此列表",
       "unresolvedBanner": "無法確定主工作區，建立/刪除已停用",
       "openChat": "開啟對話",

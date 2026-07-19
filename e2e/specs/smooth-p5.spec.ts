@@ -1,4 +1,5 @@
-// Smoothness P5: real parallel fan-out + goal chrome + dirty preflight (unpaid harness).
+// Smoothness P5: worktree control + goal chrome + dirty preflight (unpaid harness).
+// Host "parallel explore" UI removed — multi-worktree via createManagedWorktree / startParallelRun API only.
 import { expect } from 'expect-webdriverio'
 import { execSync } from 'node:child_process'
 import * as fs from 'node:fs'
@@ -9,13 +10,13 @@ import { skipLoginIfPresent } from '../helpers/auth.js'
 import { createCodeSessionForE2e, injectServerMessage, waitForHipE2E } from '../helpers/e2e-hooks.js'
 
 function initGitRepo(dir: string): void {
-  fs.writeFileSync(path.join(dir, 'README.md'), 'e2e parallel base\n')
+  fs.writeFileSync(path.join(dir, 'README.md'), 'e2e worktree base\n')
   execSync('git init', { cwd: dir })
   execSync('git add -A', { cwd: dir })
   execSync('git -c user.email=e2e@hip.test -c user.name=e2e commit -m init', { cwd: dir })
 }
 
-describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
+describe('smooth P5 worktree + goal @smooth-p5 @harness', () => {
   let dir: string
 
   before(async () => {
@@ -38,68 +39,15 @@ describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
     }
   })
 
-  it('P5-E1 real startParallelRun creates N slots (agent-decided count path)', async () => {
-    // Host binding session (cwd must be a git repo for worktree create).
+  it('P5 worktree control chip opens popover with single create (no parallel explore)', async () => {
     await createCodeSessionForE2e(dir)
-    // Fixed goal language locks N=2 via suggestParallelCount heuristics.
-    const goal = 'compare two approaches without LLM work'
-    const result = await browser.execute(
-      async (baseCwd: string, prompt: string) => {
-        const hooks = (window as unknown as {
-          __hipE2E?: {
-            startParallelRun?: (o: {
-              prompt: string
-              baseCwd: string
-              count: number
-            }) => Promise<{ runId: string; slotSessionIds: string[]; slotPaths: string[] }>
-          }
-        }).__hipE2E
-        if (!hooks?.startParallelRun) throw new Error('startParallelRun missing')
-        const out = await hooks.startParallelRun({
-          prompt,
-          baseCwd,
-          count: 2,
-        })
-        return out
-      },
-      dir,
-      goal,
-    )
-
-    expect(result.slotSessionIds.length).toBe(2)
-    expect(result.slotPaths.length).toBe(2)
-    for (const p of result.slotPaths) {
-      expect(fs.existsSync(p)).toBe(true)
-    }
-  })
-
-  it('P5 agent-suggest UI shows N for compare goal', async () => {
-    await createCodeSessionForE2e(dir)
-    // PR5: chip keeps parallel-run-button; form testids live on WorktreeParallelModal.
-    // Flow: chip → popover parallel CTA → Modal (popover closes first).
-    const btn = await browser.$('[data-testid="parallel-run-button"]')
+    const btn = await browser.$('[data-testid="worktree-control-chip"]')
     await btn.waitForExist({ timeout: 15000 })
     await browser.execute((el: HTMLElement) => el.click(), btn)
+    const createCta = await browser.$('[data-testid="worktree-control-create-single"]')
+    await createCta.waitForExist({ timeout: 10000 })
     const parallelCta = await browser.$('[data-testid="worktree-control-parallel"]')
-    await parallelCta.waitForExist({ timeout: 10000 })
-    await browser.execute((el: HTMLElement) => el.click(), parallelCta)
-    const ta = await browser.$('[data-testid="parallel-run-prompt"]')
-    await ta.waitForExist({ timeout: 10000 })
-    await browser.execute((el: HTMLTextAreaElement, text: string) => {
-      el.focus()
-      const proto = window.HTMLTextAreaElement.prototype
-      const desc = Object.getOwnPropertyDescriptor(proto, 'value')
-      desc?.set?.call(el, text)
-      el.dispatchEvent(new Event('input', { bubbles: true }))
-      el.dispatchEvent(new Event('change', { bubbles: true }))
-    }, ta, 'compare two approaches for caching')
-    const chip = await browser.$('[data-testid="parallel-run-suggestion"]')
-    await chip.waitForExist({ timeout: 5000 })
-    await browser.waitUntil(
-      async () => (await chip.getAttribute('data-suggest-n')) === '2',
-      { timeout: 5000, timeoutMsg: 'agent suggest N for compare goal should be 2' },
-    )
-    // Dismiss without creating (avoid extra worktrees in shared app).
+    expect(await parallelCta.isExisting()).toBe(false)
     await browser.keys('Escape')
   })
 
@@ -147,6 +95,7 @@ describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
 
   it('P5-E4 dirty worktree preflight rejects remove without force', async () => {
     await createCodeSessionForE2e(dir)
+    // Internal multi-create API (host parallel UI removed) — still valid for dirty preflight.
     const fanout = await browser.execute(
       async (baseCwd: string) => {
         const hooks = (window as unknown as {
@@ -162,7 +111,7 @@ describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
         return hooks.startParallelRun({
           prompt: 'preflight slot',
           baseCwd,
-          count: 2,
+          count: 1,
         })
       },
       dir,
@@ -175,10 +124,7 @@ describe('smooth P5 parallel + goal @smooth-p5 @harness', () => {
     // Dirty the managed worktree so preflight must fail.
     fs.writeFileSync(path.join(wtPath, 'dirty-e2e.txt'), 'uncommitted\n')
 
-    // Host session for remove is the parallel host; use first session that owns cwd=base
-    // removeWorktree needs a sessionId with cwd = main repo for git worktree remove.
-    // startParallelRun creates host then slots; host has cwd=baseCwd.
-    // We re-create a host binding session on base for the remove RPC.
+    // removeWorktree needs a session whose cwd is the main repo.
     const hostId = await createCodeSessionForE2e(dir)
     // Avoid returning a raw `{ error }` object from execute — some WebDriver paths
     // treat that shape as a script failure. Normalize + catch throws.

@@ -96,12 +96,13 @@ describe('WorktreeControl non-git wiring (PR4 / D24)', () => {
     render(<WorktreeControl />)
 
     // Open browse popover
-    fireEvent.click(screen.getByTestId('parallel-run-button'))
+    fireEvent.click(screen.getByTestId('worktree-control-chip'))
     await waitFor(() => {
       expect(screen.getByTestId('worktree-control-create-single')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('worktree-control-non-git')).toBeNull()
     expect(screen.getByTestId('worktree-control-create-single')).not.toBeDisabled()
+    expect(screen.queryByTestId('worktree-control-parallel')).toBeNull()
 
     // Open single create modal (popover closes first via setTimeout(0))
     fireEvent.click(screen.getByTestId('worktree-control-create-single'))
@@ -122,11 +123,10 @@ describe('WorktreeControl non-git wiring (PR4 / D24)', () => {
     })
 
     // Re-open popover — non-git banner + disabled create (D24)
-    fireEvent.click(screen.getByTestId('parallel-run-button'))
+    fireEvent.click(screen.getByTestId('worktree-control-chip'))
     await waitFor(() => {
       expect(screen.getByTestId('worktree-control-non-git')).toBeInTheDocument()
     })
     expect(screen.getByTestId('worktree-control-create-single')).toBeDisabled()
-    expect(screen.getByTestId('worktree-control-parallel')).toBeDisabled()
   })
 })

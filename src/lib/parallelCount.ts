@@ -9,7 +9,7 @@ export const PARALLEL_COUNT_MIN = 1
 export const PARALLEL_COUNT_MAX = 4
 
 /**
- * Structured reason for UI i18n (`chat.worktreeControl.reason.<code>`).
+ * Structured reason code (host parallel-explore UI removed; kept for internal/heuristic use).
  * English `rationale` is a frozen diagnostic for unit tests only — UI must use {@link reasonCode}.
  * Keep wording aligned with product “track” terminology (not “slot”) for consistency with i18n.
  */
@@ -21,7 +21,7 @@ export type ParallelSuggestReason =
   | 'single'
   | 'default'
 
-/** Exhaustive list of reason codes — keep in sync with `chat.worktreeControl.reason.*` keys. */
+/** Exhaustive list of reason codes returned by `suggestParallelCount`. */
 export const PARALLEL_SUGGEST_REASONS: readonly ParallelSuggestReason[] = [
   'empty',
   'compare',
@@ -35,7 +35,7 @@ export interface ParallelCountSuggestion {
   n: number
   /**
    * English diagnostic for unit tests only (never render in UI).
-   * Intentionally uses “track(s)” to match `chat.worktreeControl.reason.*` product terms.
+   * English diagnostic only; not shown in product chrome.
    */
   rationale: string
   reasonCode: ParallelSuggestReason

@@ -969,7 +969,7 @@ export class Session {
       this.backgroundManager.clear()
     }
     this.spawnedSubagentIds.clear()
-    this.agentProv.dispose()
+    await this.agentProv.dispose()
   }
 }
 

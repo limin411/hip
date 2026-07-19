@@ -31,8 +31,40 @@ describe('AcpConnectionManager', () => {
     expect(conn.childPid).toBeGreaterThan(0)
     expect(a).not.toBe(b)
     expect(conn.sessionCount).toBe(2)
-    conn.releaseSession(a)
+    await conn.closeSession(a)
     expect(conn.sessionCount).toBe(1)
+  })
+
+  it('detachSink keeps openSessions; closeSession drops them and rejects further prompt', async () => {
+    const conn = await mgr.acquire(agentCfg({ id: 'mock-detach' }), null)
+    const { sessionId } = await conn.newSessionWithOptions(process.cwd())
+    expect(conn.sessionCount).toBe(1)
+    conn.registerSink(sessionId, {
+      onUpdate: () => {},
+      onPermission: async () => ({ outcome: { outcome: 'cancelled' } }),
+    })
+    conn.detachSink(sessionId)
+    // openSessions + configOptions preserved across turn boundary
+    expect(conn.sessionCount).toBe(1)
+    const res = await conn.setConfigOption(sessionId, 'model', 'mock/other')
+    expect(res.configOptions?.find((o: any) => o.id === 'model')?.currentValue).toBe('mock/other')
+    await conn.closeSession(sessionId)
+    expect(conn.sessionCount).toBe(0)
+    // Mock rejects prompt after session/close (SDK may wrap as Internal error)
+    await expect(conn.prompt(sessionId, 'hi')).rejects.toThrow()
+  })
+
+  it('closeSession settles only after agent close RPC when advertised', async () => {
+    const conn = await mgr.acquire({
+      ...agentCfg(),
+      id: 'mock-close-slow',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '80' },
+    }, null)
+    const sid = await conn.newSession(process.cwd())
+    const t0 = Date.now()
+    await conn.closeSession(sid)
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(60)
+    expect(conn.sessionCount).toBe(0)
   })
 
   it('evicts a dead connection so the next acquire spawns a fresh child', async () => {
@@ -76,7 +108,7 @@ describe('AcpConnectionManager', () => {
     })
     await conn.prompt(sessionId, 'hi')
     expect(text).toContain('mock/other')
-    conn.releaseSession(sessionId)
+    conn.detachSink(sessionId)
   })
 
   it('advertises fs capabilities by default', async () => {

@@ -80,8 +80,11 @@ export class SessionStore {
     return { currentBranch: row?.current_branch ?? null, sessionStartCommit: row?.session_start_commit ?? null }
   }
 
-  /** Record the external ACP agent's session handle so a reopened session can resume it. */
-  setAcpSessionId(id: string, acpSessionId: string): void {
+  /**
+   * Record the external ACP agent's session handle so a reopened session can resume it.
+   * Pass `null` to clear (SQL NULL) — used on agent switch / dispose.
+   */
+  setAcpSessionId(id: string, acpSessionId: string | null): void {
     this.db.prepare('UPDATE sessions SET acp_session_id = ? WHERE id = ?').run(acpSessionId, id)
   }
 

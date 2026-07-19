@@ -31,7 +31,7 @@ describe('AcpAgentProvider', () => {
     const a = cap()
     await p.runTurn('hi', a.emit, new AbortController().signal)
     expect(a.out.text).toContain('hello world')
-    p.dispose()
+    await p.dispose()
   })
 
   it('requires setTurnFsContext before runTurn', async () => {
@@ -39,7 +39,7 @@ describe('AcpAgentProvider', () => {
     const a = cap()
     await expect(p.runTurn('hi', a.emit, new AbortController().signal))
       .rejects.toThrow(/setTurnFsContext required/)
-    p.dispose()
+    await p.dispose()
   })
 
   it('consumes turn FS context — second runTurn without re-set fails', async () => {
@@ -50,7 +50,7 @@ describe('AcpAgentProvider', () => {
     const b = cap()
     await expect(p.runTurn('second', b.emit, new AbortController().signal))
       .rejects.toThrow(/setTurnFsContext required/)
-    p.dispose()
+    await p.dispose()
   })
 
   it('maps thought chunks to reasoning and tool calls to toolStarted/toolFinished', async () => {
@@ -63,7 +63,7 @@ describe('AcpAgentProvider', () => {
     expect(a.out.reasoning).toContain('thinking')
     expect(a.out.tools).toEqual([['t1', 'edit hello.txt']])
     expect(a.out.toolEnds).toEqual([['t1', 'finished']])
-    p.dispose()
+    await p.dispose()
   })
 
   it('cancel mid-stream rejects with AbortError even though the agent reports end_turn', async () => {
@@ -73,19 +73,43 @@ describe('AcpAgentProvider', () => {
     const turn = p.runTurn('hi', a.emit, ac.signal)
     setTimeout(() => ac.abort(), 120) // abort after the first chunk
     await expect(turn).rejects.toThrowError(/abort/i)
-    p.dispose()
+    await p.dispose()
   })
 
   it('switches the live model via setConfigOption and the backend uses it', async () => {
     const p = withFs(new AcpAgentProvider(cfg(), process.cwd(), null))
     const a = cap()
     await p.runTurn('first', a.emit, new AbortController().signal) // answer(mock/base): ...
+    // Multi-turn: after detachSink, openSessions still held and setConfigOption still works
+    const conns = acpConnections.getConnections()
+    expect(conns[0]?.sessionCount).toBe(1)
     await p.setConfigOption('model', 'mock/other')
     const b = cap()
     withFs(p)
     await p.runTurn('second', b.emit, new AbortController().signal)
     expect(b.out.text).toContain('mock/other')  // backend actually switched (mock echoes model)
-    p.dispose()
+    expect(conns[0]?.sessionCount).toBe(1) // still open across turns; no close mid-turn
+    await p.dispose()
+  })
+
+  it('dispose awaits closeSession — openSessions cleared and closed session rejects prompt', async () => {
+    const p = withFs(new AcpAgentProvider(cfg({
+      id: 'mock-dispose-close',
+      env: { MOCK_ACP_CLOSE_SLOW_MS: '60' },
+    }), process.cwd(), null))
+    const a = cap()
+    await p.runTurn('hi', a.emit, new AbortController().signal)
+    const sid = p.sessionId!
+    expect(sid).toBeTruthy()
+    const conn = acpConnections.getConnections()[0]!
+    expect(conn.sessionCount).toBe(1)
+    const t0 = Date.now()
+    await p.dispose()
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(40)
+    expect(conn.sessionCount).toBe(0)
+    expect(p.sessionId).toBeNull()
+    // Mock rejects prompt after session/close (SDK may wrap as Internal error)
+    await expect(conn.prompt(sid, 'after-close')).rejects.toThrow()
   })
 
   it('maps ACP plan sessionUpdate to planUpdated', async () => {
@@ -106,7 +130,7 @@ describe('AcpAgentProvider', () => {
       { content: 'step one', status: 'completed' },
       { content: 'step two', status: 'in_progress' },
     ]])
-    p.dispose()
+    await p.dispose()
   })
 
   it('recovers from a warm-child death — the next turn re-acquires a fresh child and succeeds (C1)', async () => {
@@ -122,6 +146,6 @@ describe('AcpAgentProvider', () => {
     withFs(p)
     await p.runTurn('second', b.emit, new AbortController().signal)
     expect(b.out.text).toContain('hello world')
-    p.dispose()
+    await p.dispose()
   })
 })

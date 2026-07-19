@@ -215,7 +215,7 @@ export function createAgentInvoker(cwd: string, deps: InvokerDeps = {}): AgentIn
         await provider.runTurn(task, teed, signal, externalHooks)
         return text
       } finally {
-        provider.dispose()
+        await provider.dispose()
       }
     },
   }

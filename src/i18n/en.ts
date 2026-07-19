@@ -310,6 +310,13 @@ export const en = {
       styleDelete: 'Delete style',
       styleEmpty: 'No saved styles yet. Create one below.',
       agentRestarted: 'External agent restarted — earlier context was not carried over.',
+      acpCliff: {
+        title: 'External agent mode',
+        body: 'This session is driven by {{name}}. Hip tools, skills, and delegation are unavailable.',
+        mcpOff: 'Hip MCP servers are not forwarded (enable in Settings → ACP if needed).',
+        mcpOn: 'Configured Hip MCP servers are forwarded into this agent.',
+        dismiss: 'Got it',
+      },
       modelHint: 'Choose the model',
       noModelSelected: 'Select a model',
       attach: 'Attach file',
@@ -389,6 +396,13 @@ export const en = {
       subagent: {
         noSummary: 'Sub-task finished (no text summary)',
         toolsCount: '{{count}} steps',
+      },
+    },
+    composer: {
+      agentPicker: {
+        label: 'Agent',
+        builtin: 'hip (built-in)',
+        empty: 'No external agents enabled. Add one in Settings.',
       },
     },
     artifact: {

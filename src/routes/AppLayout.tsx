@@ -10,6 +10,7 @@ import { PermissionModal } from '@/components/chat/PermissionModal'
 import { GoalStatusChip } from '@/components/chat/GoalStatusChip'
 import { InputBar } from '@/components/chat/InputBar'
 import { MissingProjectBanner } from '@/components/chat/MissingProjectBanner'
+import { AcpCapabilityCliffBanner } from '@/components/chat/AcpCapabilityCliffBanner'
 import { ArtifactPanel } from '@/components/artifact/ArtifactPanel'
 import { PreviewPanel } from '@/components/artifact/PreviewPanel'
 import { AppSidebar } from '@/components/layout/AppSidebar'
@@ -137,6 +138,8 @@ export function AppLayout() {
         <ComposerPlanPanel />
         {/* Session-scoped HITL permission prompt above the composer (not a global modal) */}
         <PermissionModal />
+        {/* ACP primary capability cliff — sticky above InputBar (not in timeline). */}
+        <AcpCapabilityCliffBanner />
         <InputBar />
       </>
     )

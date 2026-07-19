@@ -103,6 +103,74 @@ describe('NewConversation', () => {
     expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
   })
 
+  it('shows agent picker and cliff banner; hides hip model/effort when ACP primary', () => {
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          {
+            id: 'oc',
+            name: 'OpenCode',
+            kind: 'acp',
+            command: 'opencode',
+            args: [],
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+      error: null,
+    })
+    useDraftStore.setState({
+      draft: {
+        tempId: 'draft-1',
+        mode: 'chat',
+        text: '',
+        modelKey: 'openai/gpt-5.4',
+        agentId: 'oc',
+      },
+    })
+    render(<NewConversation />)
+    expect(screen.getByTestId('session-agent-chip')).toBeInTheDocument()
+    expect(screen.getByTestId('acp-capability-cliff-banner')).toBeInTheDocument()
+    expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
+  })
+
+  it('on code surface with ACP primary: keeps permission, hides plan', () => {
+    mockActiveView = 'code'
+    hipConfigStore.useHipConfigStore.setState({
+      config: {
+        version: 1,
+        agents: [
+          {
+            id: 'oc',
+            name: 'OpenCode',
+            kind: 'acp',
+            command: 'opencode',
+            args: [],
+            enabled: true,
+          },
+        ],
+      },
+      loaded: true,
+      error: null,
+    })
+    useDraftStore.setState({
+      draft: {
+        tempId: 'draft-1',
+        mode: 'project',
+        cwd: '/tmp/p',
+        text: '',
+        agentId: 'oc',
+      },
+    })
+    render(<NewConversation />)
+    expect(screen.getByTestId('permission-chip')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-mode-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('model-chip')).not.toBeInTheDocument()
+  })
+
   it('clears existing attachments when the draft model loses attachment support', async () => {
     setDraftModel('openai/gpt-4o')
     vi.mocked(pickAttachmentFiles).mockResolvedValue(['/path/to/image.png'])

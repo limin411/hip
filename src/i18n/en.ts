@@ -1315,6 +1315,10 @@ export const en = {
       aria: 'Navigation and session history',
       navAria: 'Primary navigation',
       searchPlaceholder: 'Search sessions, knowledge…',
+      collapse: 'Hide sidebar',
+      collapseAria: 'Hide left sidebar',
+      expand: 'Show sidebar',
+      expandAria: 'Show left sidebar',
       nav: {
         knowledge: 'Knowledge',
         projects: 'Projects',

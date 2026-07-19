@@ -1,12 +1,15 @@
 import { useTranslation } from 'react-i18next'
-import { Command } from 'lucide-react'
+import { Command, PanelLeft } from 'lucide-react'
 import { useActiveSession } from '@/domain'
+import { isMacPlatform } from '@/lib/platform'
 import { useCommandPaletteStore } from '@/store/commandPaletteStore'
 import { useKnowledgeStore } from '@/store/knowledgeStore'
 import { useUiStore } from '@/store/uiStore'
 import { useWindowDrag } from '@/lib/useWindowDrag'
+import { cn } from '@/lib/utils'
 import { ConnectionStatus } from './ConnectionStatus'
 import { PanelToggle } from './PanelToggle'
+import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
 import { useCaptionTitleDoubleClick, WindowCaptionButtons } from './WindowCaptionButtons'
 
 /**
@@ -14,19 +17,24 @@ import { useCaptionTitleDoubleClick, WindowCaptionButtons } from './WindowCaptio
  * Special views hide ConnectionStatus + PanelToggle; leave via sidebar.
  * History keeps page h2 as sole title.
  * On Windows frameless chrome, hosts WindowCaptionButtons (min/max/close).
+ * When the left sidebar is collapsed, hosts traffic-light inset + expand control
+ * so top-left chrome stays aligned with macOS window controls.
  */
 export function MainToolbar() {
   const { t } = useTranslation()
   const handlePointerDown = useWindowDrag()
   const handleTitleDblClick = useCaptionTitleDoubleClick()
   const activeView = useUiStore((s) => s.activeView)
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const activeSession = useActiveSession()
   const kbMode = useKnowledgeStore((s) => s.mode)
   const kbSpaces = useKnowledgeStore((s) => s.spaces)
   const kbActiveSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
+  const isMac = isMacPlatform()
 
   const isSpecial = activeView === 'settings' || activeView === 'history'
   const showPanelChrome = !isSpecial
+  const showSidebarExpand = !sidebarOpen
 
   let title = ''
   if (activeView === 'settings') {
@@ -51,17 +59,53 @@ export function MainToolbar() {
       data-tauri-drag-region
       onPointerDown={handlePointerDown}
       aria-label={t('mainToolbar.aria')}
-      className="flex h-10 shrink-0 items-center gap-2 border-b border-border bg-surface px-3"
+      className={cn(
+        titlebarRowClass,
+        'gap-2 bg-surface',
+        showSidebarExpand ? 'pr-3' : 'px-3',
+      )}
     >
+      {showSidebarExpand ? (
+        <div
+          className="flex h-full shrink-0 items-center gap-0.5"
+          data-testid="main-toolbar-sidebar-chrome"
+        >
+          {isMac ? (
+            <div
+              className="h-full shrink-0"
+              style={{ width: 'var(--titlebar-lights-inset, 90px)' }}
+              aria-hidden
+            />
+          ) : (
+            <div className="h-full w-2 shrink-0" aria-hidden />
+          )}
+          <button
+            type="button"
+            data-testid="sidebar-toggle"
+            data-tauri-drag-region="false"
+            data-no-drag
+            title={t('sidebar.expand')}
+            aria-label={t('sidebar.expandAria')}
+            aria-expanded={false}
+            onClick={() => useUiStore.getState().setSidebarOpen(true)}
+            className={titlebarIconBtnClass}
+          >
+            <PanelLeft {...titlebarIconProps} />
+          </button>
+        </div>
+      ) : null}
+
       <div
         data-testid="main-toolbar-title"
-        className="min-w-0 flex-1 truncate text-body font-medium text-ink"
+        className="flex min-w-0 flex-1 items-center self-stretch"
         onDoubleClick={handleTitleDblClick}
       >
-        {title}
+        <span className="min-w-0 truncate text-body font-medium leading-none text-ink">
+          {title}
+        </span>
       </div>
 
-      <div className="flex h-full shrink-0 items-center gap-1">
+      <div className="flex h-full shrink-0 items-center gap-0.5">
         <button
           type="button"
           data-testid="main-toolbar-command-palette"
@@ -70,9 +114,9 @@ export function MainToolbar() {
           aria-label={t('commandPalette.openTriggerAria')}
           title={t('commandPalette.openTrigger')}
           onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-          className="flex size-7 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className={titlebarIconBtnClass}
         >
-          <Command size={16} aria-hidden />
+          <Command {...titlebarIconProps} />
         </button>
         {showPanelChrome ? (
           <>

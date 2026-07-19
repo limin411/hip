@@ -68,6 +68,7 @@ describe('AppSidebar', () => {
     useUiStore.setState({
       activeView: 'chat',
       sidebarSection: 'chats',
+      sidebarOpen: true,
     })
     useDomainStore.setState({
       sessions: [
@@ -108,6 +109,7 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
+    expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()
@@ -145,6 +147,13 @@ describe('AppSidebar', () => {
     render(<AppSidebar />)
     fireEvent.click(screen.getByTestId('sidebar-search'))
     expect(useCommandPaletteStore.getState().open).toBe(true)
+  })
+
+  it('toggle button collapses the sidebar', () => {
+    useUiStore.setState({ sidebarOpen: true })
+    render(<AppSidebar />)
+    fireEvent.click(screen.getByTestId('sidebar-toggle'))
+    expect(useUiStore.getState().sidebarOpen).toBe(false)
   })
 
   it('nav knowledge calls enterKnowledge', () => {

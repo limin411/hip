@@ -9,6 +9,7 @@ import {
   Folder,
   GitBranch,
   MessageSquare,
+  PanelLeftClose,
   Search,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
@@ -52,6 +53,7 @@ import {
 } from './sidebarActions'
 import { SIDEBAR_ACTIVE_RAIL } from './sidebarActiveRail'
 import { SidebarAccountFooter } from './SidebarAccountFooter'
+import { titlebarIconBtnClass, titlebarIconProps, titlebarRowClass } from './titlebarChrome'
 
 export function AppSidebar() {
   const { t } = useTranslation()
@@ -167,28 +169,42 @@ export function AppSidebar() {
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
         onPointerDown={handlePointerDown}
-        className="flex h-10 shrink-0 items-center gap-1 pr-2"
+        className={titlebarRowClass}
       >
         {isMac ? (
           <div
-            className="shrink-0"
+            className="h-full shrink-0"
             style={{ width: 'var(--titlebar-lights-inset, 90px)' }}
             aria-hidden
           />
         ) : (
-          <div className="w-2 shrink-0" aria-hidden />
+          <div className="h-full w-2 shrink-0" aria-hidden />
         )}
-        <button
-          type="button"
-          data-testid="sidebar-search"
-          data-no-drag
-          title={t('commandPalette.openTrigger')}
-          aria-label={t('commandPalette.openTriggerAria')}
-          onClick={() => useCommandPaletteStore.getState().setOpen(true)}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-secondary transition-colors hover:bg-state-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-        >
-          <Search size={16} aria-hidden />
-        </button>
+        <div className="flex h-full shrink-0 items-center gap-0.5 pr-2">
+          <button
+            type="button"
+            data-testid="sidebar-search"
+            data-no-drag
+            title={t('commandPalette.openTrigger')}
+            aria-label={t('commandPalette.openTriggerAria')}
+            onClick={() => useCommandPaletteStore.getState().setOpen(true)}
+            className={titlebarIconBtnClass}
+          >
+            <Search {...titlebarIconProps} />
+          </button>
+          <button
+            type="button"
+            data-testid="sidebar-toggle"
+            data-no-drag
+            title={t('sidebar.collapse')}
+            aria-label={t('sidebar.collapseAria')}
+            aria-expanded={true}
+            onClick={() => useUiStore.getState().setSidebarOpen(false)}
+            className={titlebarIconBtnClass}
+          >
+            <PanelLeftClose {...titlebarIconProps} />
+          </button>
+        </div>
       </div>
 
       <nav className="flex shrink-0 flex-col gap-0.5 border-b border-border px-2 pb-2" aria-label={t('sidebar.navAria')}>

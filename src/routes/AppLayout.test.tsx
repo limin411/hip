@@ -10,7 +10,7 @@ vi.mock('@/components/history/SessionHistory', () => ({ SessionHistory: () => <d
 
 afterEach(() => {
   cleanup()
-  useUiStore.setState({ activeView: 'chat' })
+  useUiStore.setState({ activeView: 'chat', sidebarOpen: true })
 })
 
 vi.mock('react-resizable-panels', () => ({
@@ -37,11 +37,19 @@ vi.mock('@/components/knowledge/KnowledgePage', () => ({ KnowledgePage: () => <d
 
 describe('AppLayout', () => {
   it('renders final shell: sidebar + main toolbar, no title bar / floating avatar', () => {
+    useUiStore.setState({ sidebarOpen: true })
     render(<AppLayout />, { wrapper: MemoryRouter })
     expect(screen.getByTestId('app-sidebar')).toBeInTheDocument()
     expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
     expect(screen.queryByTestId('title-bar')).not.toBeInTheDocument()
     expect(screen.queryByTestId('floating-avatar')).not.toBeInTheDocument()
+  })
+
+  it('hides sidebar when sidebarOpen is false', () => {
+    useUiStore.setState({ sidebarOpen: false })
+    render(<AppLayout />, { wrapper: MemoryRouter })
+    expect(screen.queryByTestId('app-sidebar')).not.toBeInTheDocument()
+    expect(screen.getByTestId('main-toolbar')).toBeInTheDocument()
   })
 
   it('renders history view with main toolbar', () => {

@@ -40,6 +40,12 @@
   --rail-width: 72px;
   /* 标题栏左侧为红绿灯整簇预留的让位宽度（其右才放折叠按钮，留间距防撞绿灯）。 */
   --titlebar-lights-inset: 90px;
+  /*
+   * Titlebar content row (AppSidebar + MainToolbar), vertically centered.
+   * macOS: slightly taller so the content midline sits near Overlay traffic
+   * lights (tauri.conf trafficLightPosition y=26). Win/Linux stay 40px.
+   */
+  --titlebar-height: 40px;
   /* 毛玻璃：CSS 回退（Linux / 浏览器）；原生材质见 data-vibrancy=mac-sidebar|win-mica|… */
   --glass-bg: color-mix(in srgb, var(--bg-subtle) 78%, transparent);
   --glass-border: rgba(0, 0, 0, 0.06);
@@ -83,6 +89,12 @@ html[data-density="compact"] {
   --row-pad-y-session: 0.25rem; /* py-1 */
   --trail-min-h: 1.125rem; /* 18px */
   --meta-gap: 0.25rem;
+}
+
+/* macOS: 48px chrome — content center ≈24px, near traffic lights at y=26.
+   data-platform value is "mac" (see applyPlatformDataset). */
+html[data-platform="mac"] {
+  --titlebar-height: 48px;
 }
 
 /* Windows / Linux: no traffic lights. Caption may be custom (Win frameless) or OS chrome.

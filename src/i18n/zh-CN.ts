@@ -1286,6 +1286,10 @@ export const zhCN = {
       aria: '导航与历史会话',
       navAria: '主导航',
       searchPlaceholder: '搜索会话、知识库…',
+      collapse: '隐藏侧边栏',
+      collapseAria: '隐藏左侧边栏',
+      expand: '显示侧边栏',
+      expandAria: '显示左侧边栏',
       nav: {
         knowledge: '知识库',
         projects: '项目',

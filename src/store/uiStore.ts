@@ -98,6 +98,8 @@ export type UiPersistedState = {
   settingsPage: SettingsPageId
   diffViewMode: 'unified' | 'split'
   checkpointMode: CheckpointMode
+  /** Left nav rail open; default true when missing from older storage. */
+  sidebarOpen: boolean
 }
 
 /** Settings / history / knowledge are session-ephemeral; cold launch always lands on chat. */
@@ -169,6 +171,11 @@ interface UiState {
   /** Left sidebar section highlight (not persisted; cold launch 'chats'). */
   sidebarSection: SidebarSection
   setSidebarSection: (s: SidebarSection) => void
+
+  /** Left nav rail visible (persisted). */
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+  toggleSidebar: () => void
 
   openKnowledgeView: () => void
   /** Flush knowledge draft then restore chat/code from domain active session. */
@@ -253,6 +260,11 @@ export const useUiStore = create<UiState>()(
       setSidebarSection: (sec) =>
         set((s) => (s.sidebarSection === sec ? s : { sidebarSection: sec })),
 
+      sidebarOpen: true,
+      setSidebarOpen: (open) =>
+        set((s) => (s.sidebarOpen === open ? s : { sidebarOpen: open })),
+      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+
       openKnowledgeView: () => set({ activeView: 'knowledge' }),
       closeKnowledgeView: async () => {
         // Tier A: await draft flush before leaving.
@@ -307,6 +319,7 @@ export const useUiStore = create<UiState>()(
         settingsPage: s.settingsPage,
         diffViewMode: s.diffViewMode,
         checkpointMode: s.checkpointMode,
+        sidebarOpen: s.sidebarOpen,
       }),
       merge: (persistedState, currentState) =>
         mergeUiPersistedState(persistedState, currentState as UiState),

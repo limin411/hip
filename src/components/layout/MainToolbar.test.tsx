@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUiStore } from '@/store/uiStore'
 import { useDomainStore } from '@/domain'
@@ -25,6 +25,7 @@ describe('MainToolbar', () => {
       activeView: 'chat',
       previousView: null,
       sidebarSection: 'chats',
+      sidebarOpen: true,
     })
     useDomainStore.setState({
       sessions: [],
@@ -42,6 +43,16 @@ describe('MainToolbar', () => {
     // PanelToggle returns null without session in real impl; mock always renders —
     // just ensure toolbar chrome is present.
     expect(screen.getByTestId('main-toolbar-command-palette')).toBeInTheDocument()
+    expect(screen.queryByTestId('main-toolbar-sidebar-chrome')).not.toBeInTheDocument()
+  })
+
+  it('when sidebar collapsed, shows expand control and expands on click', () => {
+    useUiStore.setState({ sidebarOpen: false })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-sidebar-chrome')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('sidebar-toggle'))
+    expect(useUiStore.getState().sidebarOpen).toBe(true)
   })
 
   it('shows session title when active', () => {

@@ -1253,6 +1253,10 @@ export const zhTW = {
     "aria": "導航與歷史會話",
     "navAria": "主導航",
     "searchPlaceholder": "搜尋會話、知識庫…",
+    "collapse": "隱藏側邊欄",
+    "collapseAria": "隱藏左側邊欄",
+    "expand": "顯示側邊欄",
+    "expandAria": "顯示左側邊欄",
     "nav": {
       "knowledge": "知識庫",
       "projects": "專案",

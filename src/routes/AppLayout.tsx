@@ -83,6 +83,7 @@ export function AppLayout() {
   }, [])
 
   const knowledgePanelOpen = useUiStore((s) => s.knowledgePanelOpen)
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen)
   const knowledgeMode = useKnowledgeStore((s) => s.mode)
   const codeOpen = activeView === 'code' && activeSession?.codePanelOpen === true
   const chatOpen = activeView === 'chat' && activeSession?.chatPanelOpen === true
@@ -146,7 +147,7 @@ export function AppLayout() {
     // Shell is transparent so native vibrancy (macOS Sidebar / Win Mica) shows through
     // the left sidebar; main column stays opaque for readable content.
     <div className="flex h-dvh w-screen flex-row overflow-hidden bg-transparent">
-      <AppSidebar />
+      {sidebarOpen ? <AppSidebar /> : null}
       <PanelGroup direction="horizontal" className="min-w-0 flex-1 bg-surface">
         <Panel minSize={34} className="flex min-w-0 flex-col bg-surface">
           <MainToolbar />

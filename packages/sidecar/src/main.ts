@@ -39,8 +39,15 @@ async function main(): Promise<void> {
   // sidecar goes away, so we don't orphan `<agent> acp` children. 'exit' covers
   // the parent-watch EOF path (which calls process.exit(0)) and the fatal exit;
   // SIGTERM covers a direct signal kill of the sidecar itself.
-  process.on('exit', () => acpConnections.disposeAll())
-  process.on('SIGTERM', () => { acpConnections.disposeAll(); process.exit(0) })
+  process.on('exit', () => {
+    server.dispose()
+    acpConnections.disposeAll()
+  })
+  process.on('SIGTERM', () => {
+    server.dispose()
+    acpConnections.disposeAll()
+    process.exit(0)
+  })
 
   // When spawned by the Tauri shell (which sets HIP_PARENT_WATCH), tie our
   // lifetime to the app: exit if the parent's stdin pipe closes, i.e. the app

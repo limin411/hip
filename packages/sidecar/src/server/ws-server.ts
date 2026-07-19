@@ -51,6 +51,11 @@ export class WsServer {
     return this.sessionManager
   }
 
+  /** Stop background timers (trash retention). Call on sidecar shutdown. */
+  dispose(): void {
+    this.sessionManager.stopTrashRetentionHousekeeping()
+  }
+
   private broadcastClientsChanged(): void {
     if (!this.multiClient) return
     const msg: ServerMessage = {

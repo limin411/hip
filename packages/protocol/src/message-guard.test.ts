@@ -89,6 +89,24 @@ describe('message-guard', () => {
     expect(msg!.reason).toBe('clearAll')
   })
 
+  it('accepts session soft-delete / restore / trash RPCs', () => {
+    expect(parseClientMessage({ type: 'session:softDelete', sessionId: 's1' })?.type).toBe('session:softDelete')
+    expect(
+      parseClientMessage({
+        type: 'session:softDelete',
+        sessionId: 's1',
+        deleteDerivedMemories: true,
+        reason: 'user',
+      })?.type,
+    ).toBe('session:softDelete')
+    expect(parseClientMessage({ type: 'session:restore', sessionId: 's1' })?.type).toBe('session:restore')
+    expect(parseClientMessage({ type: 'session:trash:list' })?.type).toBe('session:trash:list')
+    expect(parseClientMessage({ type: 'session:trash:empty' })?.type).toBe('session:trash:empty')
+    expect(parseClientMessage({ type: 'session:trash:purge', retentionDays: 7 })?.type).toBe(
+      'session:trash:purge',
+    )
+  })
+
   it('accepts config:testProvider', () => {
     const msg = parseClientMessage({
       type: 'config:testProvider',

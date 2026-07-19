@@ -9,6 +9,7 @@ import type {
   PermissionOption,
   AgentFrame,
   SessionSummary,
+  TrashedSessionSummary,
   SearchHit,
 } from './message-model.js'
 import type {
@@ -59,9 +60,9 @@ export type ClientMessage =
   | { type: 'session:load'; sessionId: string }
   | { type: 'session:search'; query: string }
   /**
-   * Permanent session delete.
-   * `reason` is an audit tag (user / clearAll / worktree-cascade / worktree-menu / cli / …)
-   * so sidecar + UI logs can attribute mass wipes.
+   * Permanent session delete (HARD only).
+   * UI soft-delete uses `session:softDelete`. CLI and recycle-bin "Delete forever" use this.
+   * `reason` is an audit tag (user / clearAll / worktree-cascade / worktree-menu / cli / trash-empty / trash-retention / …).
    */
   | {
       type: 'session:delete'
@@ -70,6 +71,27 @@ export type ClientMessage =
       /** Why this delete was requested — optional for older clients. */
       reason?: string
     }
+  /**
+   * Soft-delete → product recycle bin. Does not purge SQLite messages, scratch, or checkpoints.
+   * Live runtime is torn down; restore via `session:restore`.
+   */
+  | {
+      type: 'session:softDelete'
+      sessionId: string
+      deleteDerivedMemories?: boolean
+      reason?: string
+    }
+  /** Restore a soft-deleted session from the recycle bin. */
+  | { type: 'session:restore'; sessionId: string }
+  /** List soft-deleted sessions (newest trash first). */
+  | { type: 'session:trash:list' }
+  /** Hard-delete every soft-deleted session (Empty recycle bin for sessions). */
+  | { type: 'session:trash:empty' }
+  /**
+   * Run session trash retention once (purge expired soft-deletes).
+   * Optional `retentionDays` overrides config for this call; default from product policy (7 until Settings wired).
+   */
+  | { type: 'session:trash:purge'; retentionDays?: number }
   | { type: 'session:rename'; sessionId: string; title: string }
   | { type: 'session:setCwd'; sessionId: string; cwd: string }
   | { type: 'session:setThinking'; sessionId: string; thinking: boolean }
@@ -243,7 +265,14 @@ export type ServerMessage =
   | { type: 'session:list:result'; sessions: SessionSummary[] }
   | { type: 'session:loaded'; sessionId: string; messages: Message[]; config?: SessionConfig }
   | { type: 'session:search:result'; query: string; hits: SearchHit[] }
+  /** Hard delete only. */
   | { type: 'session:deleted'; sessionId: string }
+  /** Soft-delete landed in recycle bin. */
+  | { type: 'session:trashed'; sessionId: string; deletedAt: number }
+  /** Soft-delete restored; client merges summary into active list without auto-select. */
+  | { type: 'session:restored'; sessionId: string; summary: SessionSummary }
+  | { type: 'session:trash:list:result'; sessions: TrashedSessionSummary[] }
+  | { type: 'session:trash:purge:result'; purgedIds: string[]; retentionDays: number }
   | { type: 'session:title'; sessionId: string; title: string }
   | { type: 'session:cwd'; sessionId: string; cwd: string }
   | { type: 'fs:ls:result'; sessionId: string; path: string; entries: FsEntry[]; error?: string }

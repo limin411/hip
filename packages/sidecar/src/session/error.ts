@@ -15,3 +15,22 @@ export function safeErrorMessage(err: unknown): string {
     .replace(/\b([a-zA-Z0-9_-]*api[_-]?key[a-zA-Z0-9_-]*)\s*[:=]\s*["']?[a-zA-Z0-9_\-./+=]{16,}["']?/gi, '$1=[REDACTED]')
     .replace(/\b(bearer\s+[a-zA-Z0-9_\-./+=]{8,})/gi, '[REDACTED]')
 }
+
+/** Thrown from session handlers when a stable protocol `code` should reach the client. */
+export class CodedError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'CodedError'
+  }
+}
+
+export function errorCodeOf(err: unknown): string | undefined {
+  if (err instanceof CodedError) return err.code
+  if (err && typeof err === 'object' && 'code' in err && typeof (err as { code: unknown }).code === 'string') {
+    return (err as { code: string }).code
+  }
+  return undefined
+}

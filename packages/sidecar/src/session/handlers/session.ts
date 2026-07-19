@@ -1,9 +1,16 @@
 import type { ClientMessage } from '@hip/protocol'
 import { SqliteWorkflowStore } from '../../persistence/workflow-store.js'
 import { runProviderProbe } from '../../config/provider-probe.js'
-import { safeErrorMessage } from '../error.js'
+import { CodedError, safeErrorMessage } from '../error.js'
 import { logDebug, logInfo } from '../../debug-logger.js'
 import type { SendFn, SessionLifecycleContext } from './types.js'
+
+/** Reject mutations / load against soft-deleted sessions. */
+function assertSessionActive(ctx: SessionLifecycleContext, sessionId: string): void {
+  if (ctx.isSessionTrashed(sessionId)) {
+    throw new CodedError('SESSION_TRASHED', 'Session is in the recycle bin; restore it first')
+  }
+}
 
 export const SESSION_MESSAGE_TYPES = new Set([
   'session:create',
@@ -25,6 +32,11 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:load',
   'session:search',
   'session:delete',
+  'session:softDelete',
+  'session:restore',
+  'session:trash:list',
+  'session:trash:empty',
+  'session:trash:purge',
   'session:rename',
   'session:setCwd',
   'session:setOrchMode',
@@ -63,6 +75,7 @@ export function handleSessionMessage(
     case 'session:destroy':
       return ctx.destroySession(msg.sessionId)
     case 'message:compact': {
+      assertSessionActive(ctx, msg.sessionId)
       const session = ctx.getSession(msg.sessionId)
       if (!session) {
         send({
@@ -100,10 +113,12 @@ export function handleSessionMessage(
       })()
     }
     case 'message:send':
+      assertSessionActive(ctx, msg.sessionId)
       return ctx
         .ensureSession(msg.sessionId, send)
         .sendMessage(msg.content, send, msg.id, msg.attachments, ctx.connectionId ?? null)
     case 'input:enqueue': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       s.enqueueInput({
         type: 'message',
@@ -114,6 +129,7 @@ export function handleSessionMessage(
       return s.drainInputQueue(send)
     }
     case 'input:steer': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       s.enqueueInput({
         type: 'steer',
@@ -127,8 +143,10 @@ export function handleSessionMessage(
       ctx.getSession(msg.sessionId)?.cancel()
       return
     case 'message:regenerate':
+      assertSessionActive(ctx, msg.sessionId)
       return ctx.ensureSession(msg.sessionId, send).regenerate(send)
     case 'message:resume':
+      assertSessionActive(ctx, msg.sessionId)
       return ctx.ensureSession(msg.sessionId, send).resume(msg.content, send, msg.attachments)
     case 'subagent:background': {
       const s = ctx.ensureSession(msg.sessionId, send)
@@ -200,6 +218,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:load': {
+      assertSessionActive(ctx, msg.sessionId)
       const { messages, config } = ctx.loadSession(msg.sessionId)
       send({ type: 'session:loaded', sessionId: msg.sessionId, messages, config })
       return
@@ -208,17 +227,40 @@ export function handleSessionMessage(
       send({ type: 'session:search:result', query: msg.query, hits: ctx.searchSessions(msg.query) })
       return
     case 'session:delete':
+      // HARD only — CLI + trash permanent + retention/empty
       ctx.deleteSessionSync(msg.sessionId, send, {
         deleteDerivedMemories: msg.deleteDerivedMemories,
         reason: typeof msg.reason === 'string' && msg.reason ? msg.reason : 'unknown',
       })
       return
+    case 'session:softDelete':
+      ctx.softDeleteSessionSync(msg.sessionId, send, {
+        deleteDerivedMemories: msg.deleteDerivedMemories,
+        reason: typeof msg.reason === 'string' && msg.reason ? msg.reason : 'unknown',
+      })
+      return
+    case 'session:restore':
+      ctx.restoreSessionSync(msg.sessionId, send)
+      return
+    case 'session:trash:list':
+      // Opportunistic purge of expired rows when the trash UI opens.
+      ctx.purgeTrashSync(send)
+      send({ type: 'session:trash:list:result', sessions: ctx.listTrashedSessions() })
+      return
+    case 'session:trash:empty':
+      ctx.emptyTrashSync(send)
+      return
+    case 'session:trash:purge':
+      ctx.purgeTrashSync(send, msg.retentionDays)
+      return
     case 'session:rename': {
+      assertSessionActive(ctx, msg.sessionId)
       const title = ctx.setCustomTitle(msg.sessionId, msg.title)
       send({ type: 'session:title', sessionId: msg.sessionId, title })
       return
     }
     case 'session:setCwd': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       s.setCwd(msg.cwd)
       ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -231,6 +273,7 @@ export function handleSessionMessage(
       // Deprecated API: product path ignores orchMode for turn routing (agent-driven).
       // Still persist for old clients; echo includes ignoredForTurnRouting for honesty.
       // Does not set pendingWorkflowDef or force workflow turns.
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setOrchMode(msg.orchMode)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -243,6 +286,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:setThinking': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setThinking(msg.thinking)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -250,6 +294,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:setEffort': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setEffort(msg.effort)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -257,6 +302,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:setSystemPrompt': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setSystemPrompt(msg.systemPrompt)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -264,6 +310,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:setPermissionMode': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setPermissionMode(msg.permissionMode)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -275,6 +322,7 @@ export function handleSessionMessage(
       return
     }
     case 'session:setForcePlan': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setForcePlan(msg.forcePlan)
       if (applied) ctx.store?.updateConfig(msg.sessionId, JSON.stringify(s.config))
@@ -286,10 +334,12 @@ export function handleSessionMessage(
       return
     }
     case 'session:setAgent': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       return s.setAgentId(msg.agentId, send).then(() => undefined)
     }
     case 'session:setModel': {
+      assertSessionActive(ctx, msg.sessionId)
       ctx.setGlobalActiveModel(msg.llmProvider, msg.model, msg.baseURL ?? '')
       const s = ctx.ensureSession(msg.sessionId, send)
       const applied = s.setModel(msg.llmProvider)
@@ -360,6 +410,7 @@ export function handleSessionMessage(
       })()
     }
     case 'workflow:run': {
+      assertSessionActive(ctx, msg.sessionId)
       const s = ctx.ensureSession(msg.sessionId, send)
       if (s.running || s.switchingAgent) {
         send({ type: 'error', sessionId: msg.sessionId, code: 'BUSY', message: 'Session is busy' })

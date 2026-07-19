@@ -22,6 +22,21 @@ describe('classify', () => {
   it('broadcasts lifecycle and streams', () => {
     expect(classify({ type: 'session:created', sessionId: 's' })).toBe('broadcast')
     expect(classify({ type: 'session:deleted', sessionId: 's' })).toBe('broadcast')
+    expect(classify({ type: 'session:trashed', sessionId: 's', deletedAt: 1 })).toBe('broadcast')
+    expect(
+      classify({
+        type: 'session:restored',
+        sessionId: 's',
+        summary: {
+          id: 's',
+          title: 't',
+          preview: '',
+          updatedAt: 1,
+          messageCount: 0,
+          surface: 'chat',
+        },
+      }),
+    ).toBe('broadcast')
     expect(classify({ type: 'token:stream', sessionId: 's', turnId: 't', agentId: 'a', delta: 'x' })).toBe(
       'broadcast',
     )

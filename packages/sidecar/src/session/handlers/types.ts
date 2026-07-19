@@ -5,6 +5,7 @@ import type {
   FsEntry,
   AgentProfileInfo,
   SessionSummary,
+  TrashedSessionSummary,
   SearchHit,
   Message,
 } from '@hip/protocol'
@@ -40,12 +41,28 @@ export interface SessionLifecycleContext extends SessionManagerContext {
   createSession(id: string, config: SessionConfig, send: SendFn): void
   destroySession(id: string): Promise<void>
   getSession(id: string): Session | undefined
-  /** Synchronous delete: store + memory + scratch (+ best-effort checkpoint cleanup). */
+  /**
+   * Hard delete: store cascade + scratch + checkpoints + `session:deleted`.
+   * Kept name for existing call sites / CLI.
+   */
   deleteSessionSync(
     id: string,
     send: SendFn,
     opts?: { deleteDerivedMemories?: boolean; reason?: string },
   ): void
+  /** Soft-delete into recycle bin: `session:trashed`; keeps SQLite rows + scratch. */
+  softDeleteSessionSync(
+    id: string,
+    send: SendFn,
+    opts?: { deleteDerivedMemories?: boolean; reason?: string },
+  ): void
+  /** Restore from recycle bin: `session:restored`. */
+  restoreSessionSync(id: string, send: SendFn): void
+  listTrashedSessions(): TrashedSessionSummary[]
+  emptyTrashSync(send: SendFn): void
+  purgeTrashSync(send: SendFn, retentionDays?: number): void
+  /** True when session row exists and is soft-deleted. */
+  isSessionTrashed(id: string): boolean
   listSessions(): SessionSummary[]
   loadSession(id: string): { messages: Message[]; config?: SessionConfig }
   searchSessions(query: string): SearchHit[]

@@ -142,6 +142,14 @@ export interface SessionSummary {
   /** Absolute project root when bound; omitted for sandbox / unbound code sessions. */
   cwd?: string
 }
+
+/** Session row currently in the product recycle bin (soft-deleted). */
+export interface TrashedSessionSummary extends SessionSummary {
+  /** Epoch ms when soft-deleted (write-once until restore). */
+  deletedAt: number
+  /** User chose to delete derived long-term memories at soft-delete time. */
+  deleteDerivedMemories: boolean
+}
 export interface SearchHit {
   sessionId: string
   messageId: string | null

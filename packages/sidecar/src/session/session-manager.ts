@@ -13,7 +13,7 @@ import * as workspaceGit from './workspace-git.js'
 import { setActiveModel } from '../config/providers.js'
 import { resolveApiKey } from '../config/auth-file.js'
 import { mcpManager } from './mcp/manager.js'
-import { safeErrorMessage } from './error.js'
+import { CodedError, errorCodeOf, safeErrorMessage } from './error.js'
 import { logDebug, logInfo } from '../debug-logger.js'
 import { validatePluginUrl, type PluginInstallResult } from './plugin-install.js'
 import { buildTools } from './tools.js'
@@ -29,6 +29,10 @@ import { tryEnableMemoriesFts, tryEnableSqliteVec } from '../persistence/schema.
 import { handleSessionMessage, isSessionMessage } from './handlers/session.js'
 import { handlePluginMessage, isPluginMessage, type PluginHandlerContext } from './handlers/plugin.js'
 import type { SendFn, SessionLifecycleContext } from './handlers/types.js'
+import {
+  resolveTrashRetentionDays,
+  TRASH_RETENTION_INTERVAL_MS,
+} from './trash-retention.js'
 
 type ModelFactory = (config: SessionConfig) => BaseLanguageModel | undefined
 
@@ -55,13 +59,19 @@ function idleTimeoutForConfig(cfg: SessionConfig): number {
 export class SessionManager {
   private readonly sessions = new Map<string, Session>()
   private memoryService?: MemoryService
+  private trashRetentionTimer?: ReturnType<typeof setInterval>
+  private trashRetentionStarted = false
 
   // modelFactory defaults to undefined → Session builds the real env-keyed model.
   constructor(
     private readonly store?: SessionStore,
     private readonly modelFactory: ModelFactory = () => undefined,
     private readonly scratchRoot: string = defaultScratchRoot(),
-  ) {}
+  ) {
+    // Boot purge + hourly housekeeping when a durable store is present.
+    // unref so tests / short-lived managers don't keep the event loop alive.
+    this.startTrashRetentionHousekeeping()
+  }
 
   handle(
     msg: ClientMessage,
@@ -71,12 +81,7 @@ export class SessionManager {
   ): void {
     // Fire-and-forget, but never let a rejection (e.g. a rehydrate failure) become
     // an unhandled promise rejection — surface it to the client instead.
-    this.handleAsync(msg, send, connectionId, connectionRole).catch((err) => {
-      console.error('[session-manager] handler error', err)
-      const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
-      const code = err instanceof AttachmentError ? err.code : 'INTERNAL'
-      send({ type: 'error', sessionId, code, message: safeErrorMessage(err) })
-    })
+    void this.handleAsync(msg, send, connectionId, connectionRole)
   }
 
   async handleAsync(
@@ -86,47 +91,66 @@ export class SessionManager {
     connectionRole?: 'gui' | 'cli' | 'unknown' | null,
   ): Promise<void> {
     const t0 = Date.now()
-    logDebug('mgr', 'msg:handle', {
-      type: msg.type,
-      sessionId: (msg as { sessionId?: string }).sessionId ?? undefined,
-      connectionId: connectionId ?? undefined,
-    })
+    try {
+      logDebug('mgr', 'msg:handle', {
+        type: msg.type,
+        sessionId: (msg as { sessionId?: string }).sessionId ?? undefined,
+        connectionId: connectionId ?? undefined,
+      })
 
-    // Tag session with current connection for ownership / background origin.
-    const sessionId =
-      'sessionId' in msg && typeof (msg as { sessionId?: string }).sessionId === 'string'
-        ? (msg as { sessionId: string }).sessionId
-        : msg.type === 'session:create'
-          ? msg.id
-          : undefined
-    if (sessionId && connectionId) {
-      const s = this.sessions.get(sessionId)
-      if (s) s.currentConnectionId = connectionId
+      // Tag session with current connection for ownership / background origin.
+      const sessionId =
+        'sessionId' in msg && typeof (msg as { sessionId?: string }).sessionId === 'string'
+          ? (msg as { sessionId: string }).sessionId
+          : msg.type === 'session:create'
+            ? msg.id
+            : undefined
+      if (sessionId && connectionId) {
+        const s = this.sessions.get(sessionId)
+        if (s) s.currentConnectionId = connectionId
+      }
+
+      // Sync type-gates first — never await an async handler for non-matching types
+      // (session:create must complete before fire-and-forget set* messages).
+      // Order: workspace, mcp, memory, session, plugin — memory before session so
+      // session:setMemoryFlags is handled here (not in SESSION_MESSAGE_TYPES).
+      if (isWorkspaceMessage(msg)) {
+        await handleWorkspaceMessage(this.handlerCtx(), msg, send)
+      } else if (isMcpMessage(msg)) {
+        await handleMcpMessage(msg, send)
+      } else if (isMemoryMessage(msg)) {
+        handleMemoryMessage(this.memoryCtx(), msg, send)
+      } else if (isSessionMessage(msg)) {
+        const r = handleSessionMessage(
+          this.lifecycleCtx(connectionId ?? null, connectionRole ?? null),
+          msg,
+          send,
+        )
+        if (r) await r
+      } else if (isPluginMessage(msg)) {
+        const r = handlePluginMessage(this.pluginCtx(), msg, send)
+        if (r) await r
+      }
+
+      logDebug('mgr', 'msg:done', {
+        type: msg.type,
+        sessionId: (msg as { sessionId?: string }).sessionId ?? undefined,
+        elapsedMs: Date.now() - t0,
+      })
+    } catch (err) {
+      const sessionId = 'sessionId' in msg ? (msg as { sessionId?: string }).sessionId : undefined
+      const code =
+        err instanceof AttachmentError
+          ? err.code
+          : errorCodeOf(err) ?? 'INTERNAL'
+      // Expected product guards (e.g. SESSION_TRASHED) are not internal faults.
+      if (code === 'INTERNAL' || code === 'BUSY') {
+        console.error('[session-manager] handler error', err)
+      } else {
+        logDebug('mgr', 'handler coded error', { code, sessionId, message: safeErrorMessage(err) })
+      }
+      send({ type: 'error', sessionId, code, message: safeErrorMessage(err) })
     }
-
-    // Sync type-gates first — never await an async handler for non-matching types
-    // (session:create must complete before fire-and-forget set* messages).
-    // Order: workspace, mcp, memory, session, plugin — memory before session so
-    // session:setMemoryFlags is handled here (not in SESSION_MESSAGE_TYPES).
-    if (isWorkspaceMessage(msg)) {
-      await handleWorkspaceMessage(this.handlerCtx(), msg, send)
-    } else if (isMcpMessage(msg)) {
-      await handleMcpMessage(msg, send)
-    } else if (isMemoryMessage(msg)) {
-      handleMemoryMessage(this.memoryCtx(), msg, send)
-    } else if (isSessionMessage(msg)) {
-      const r = handleSessionMessage(
-        this.lifecycleCtx(connectionId ?? null, connectionRole ?? null),
-        msg,
-        send,
-      )
-      if (r) await r
-    } else if (isPluginMessage(msg)) {
-      const r = handlePluginMessage(this.pluginCtx(), msg, send)
-      if (r) await r
-    }
-
-    logDebug('mgr', 'msg:done', { type: msg.type, sessionId: (msg as { sessionId?: string }).sessionId ?? undefined, elapsedMs: Date.now() - t0 })
   }
 
   /** Lazy singleton MemoryService bound to the manager's SQLite store. */
@@ -179,9 +203,18 @@ export class SessionManager {
       },
       destroySession: (id) => this.destroySession(id),
       getSession: (id) => this.sessions.get(id),
-      deleteSessionSync: (id, send, opts) => this.deleteSessionSync(id, send, opts),
+      deleteSessionSync: (id, send, opts) => this.hardDeleteSessionSync(id, send, opts),
+      softDeleteSessionSync: (id, send, opts) => this.softDeleteSessionSync(id, send, opts),
+      restoreSessionSync: (id, send) => this.restoreSessionSync(id, send),
+      listTrashedSessions: () => this.store?.listTrashedSessions() ?? [],
+      emptyTrashSync: (send) => this.emptyTrashSync(send),
+      purgeTrashSync: (send, retentionDays) => this.purgeTrashSync(send, retentionDays),
+      isSessionTrashed: (id) => this.isSessionTrashed(id),
       listSessions: () => this.store?.listSessions() ?? [],
       loadSession: (id) => {
+        if (this.isSessionTrashed(id)) {
+          throw new CodedError('SESSION_TRASHED', 'Session is in the recycle bin; restore it first')
+        }
         const config = this.store
           ? (JSON.parse(this.store.getSession(id)?.config ?? 'null') ?? undefined)
           : undefined
@@ -190,6 +223,9 @@ export class SessionManager {
       },
       searchSessions: (query) => this.store?.search(query) ?? [],
       setCustomTitle: (id, title) => {
+        if (this.isSessionTrashed(id)) {
+          throw new CodedError('SESSION_TRASHED', 'Session is in the recycle bin; restore it first')
+        }
         const sanitized = sanitizeRename(title)
         this.store?.setCustomTitle(id, sanitized)
         return sanitized
@@ -243,6 +279,9 @@ export class SessionManager {
 
   /** Get the in-memory session, or rebuild it from the DB (lazy resume). */
   private ensureSession(id: string, send: SendFn): Session {
+    if (this.isSessionTrashed(id)) {
+      throw new CodedError('SESSION_TRASHED', 'Session is in the recycle bin; restore it first')
+    }
     const existing = this.sessions.get(id)
     if (existing) return existing
     const row = this.store?.getSession(id)
@@ -261,26 +300,21 @@ export class SessionManager {
     return session
   }
 
-  /** Resolve a session's bound cwd without forcing a rehydrate: prefer the in-memory session, else
-   *  parse the persisted config blob. Returns undefined when there is no cwd / no row. */
-  private resolveSessionCwd(id: string): string | undefined {
-    const inMemory = this.sessions.get(id)?.config.cwd
-    if (inMemory) return inMemory
-    const raw = this.store?.getSession(id)?.config
-    if (!raw) return undefined
-    try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
+  private isSessionTrashed(id: string): boolean {
+    return this.store?.isSessionTrashed(id) ?? false
   }
 
-  private deleteSessionSync(
+  /**
+   * Soft-delete into the product recycle bin.
+   * Tears down live runtime; does **not** remove scratch, checkpoints, or SQLite cascade.
+   */
+  private softDeleteSessionSync(
     id: string,
     send: SendFn,
     opts?: { deleteDerivedMemories?: boolean; reason?: string },
   ): void {
-    // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
-    // store delete + session:deleted being immediate — no await before them). The shadow-ref
-    // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
-    const delCwd = this.resolveSessionCwd(id)
     const reason = opts?.reason ?? 'unknown'
+    const delCwd = this.resolveSessionCwd(id)
     let title: string | undefined
     let surface: string | undefined
     try {
@@ -293,6 +327,168 @@ export class SessionManager {
     } catch {
       /* audit best-effort */
     }
+    const deletedAt = Date.now()
+    logInfo('session-trash', 'audit.soft', {
+      sessionId: id,
+      reason,
+      title,
+      surface,
+      cwd: delCwd,
+      deleteDerivedMemories: !!opts?.deleteDerivedMemories,
+      inMemory: this.sessions.has(id),
+    })
+
+    if (this.store) {
+      this.store.softDeleteSession(id, {
+        deleteDerivedMemories: opts?.deleteDerivedMemories,
+        deletedAt,
+      })
+    }
+    const live = this.sessions.get(id)
+    this.sessions.delete(id)
+    // Soft path: keep scratch dir + checkpoint refs for restore.
+    const rowAfter = this.store?.getSession(id)
+    const at = rowAfter?.deleted_at ?? deletedAt
+    send({ type: 'session:trashed', sessionId: id, deletedAt: at })
+    if (live) {
+      void live.destroy().catch((e) => {
+        logDebug('session-trash', 'destroy after softDelete failed', {
+          sessionId: id,
+          error: e instanceof Error ? e.message : String(e),
+        })
+      })
+    }
+  }
+
+  private restoreSessionSync(id: string, send: SendFn): void {
+    if (!this.store) {
+      send({ type: 'error', sessionId: id, code: 'NO_STORE', message: 'No persistence store available' })
+      return
+    }
+    const ok = this.store.restoreSession(id)
+    if (!ok) {
+      send({
+        type: 'error',
+        sessionId: id,
+        code: 'SESSION_NOT_TRASHED',
+        message: 'Session is not in the recycle bin',
+      })
+      return
+    }
+    const summary = this.store.listSessions().find((s) => s.id === id)
+    if (!summary) {
+      send({ type: 'error', sessionId: id, code: 'SESSION_NOT_FOUND', message: 'Session missing after restore' })
+      return
+    }
+    logInfo('session-trash', 'audit.restore', { sessionId: id, title: summary.title, surface: summary.surface })
+    send({ type: 'session:restored', sessionId: id, summary })
+  }
+
+  private emptyTrashSync(send: SendFn): void {
+    const trash = this.store?.listTrashedSessions() ?? []
+    for (const t of trash) {
+      this.hardDeleteSessionSync(t.id, send, {
+        deleteDerivedMemories: t.deleteDerivedMemories,
+        reason: 'trash-empty',
+      })
+    }
+    logInfo('session-trash', 'empty', { count: trash.length })
+  }
+
+  private purgeTrashSync(send: SendFn, retentionDays?: number): void {
+    const days = resolveTrashRetentionDays(retentionDays)
+    if (!this.store) {
+      send({ type: 'session:trash:purge:result', purgedIds: [], retentionDays: days })
+      return
+    }
+    // Hard-purge expired rows via store; also drop any lingering live map entries / scratch for purged ids.
+    const candidates = this.store.listTrashedSessions().filter((t) => {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+      return t.deletedAt < cutoff
+    })
+    const purgedIds: string[] = []
+    for (const t of candidates) {
+      this.hardDeleteSessionSync(t.id, send, {
+        deleteDerivedMemories: t.deleteDerivedMemories,
+        reason: 'trash-retention',
+      })
+      purgedIds.push(t.id)
+    }
+    send({ type: 'session:trash:purge:result', purgedIds, retentionDays: days })
+  }
+
+  /** Boot + 1h interval purge (no client notify). Safe to call multiple times. */
+  startTrashRetentionHousekeeping(): void {
+    if (this.trashRetentionStarted || !this.store) return
+    this.trashRetentionStarted = true
+    this.runTrashRetentionQuiet()
+    this.trashRetentionTimer = setInterval(() => this.runTrashRetentionQuiet(), TRASH_RETENTION_INTERVAL_MS)
+    this.trashRetentionTimer.unref?.()
+  }
+
+  /** Clear interval (tests / shutdown). */
+  stopTrashRetentionHousekeeping(): void {
+    if (this.trashRetentionTimer) {
+      clearInterval(this.trashRetentionTimer)
+      this.trashRetentionTimer = undefined
+    }
+    this.trashRetentionStarted = false
+  }
+
+  private runTrashRetentionQuiet(): void {
+    if (!this.store) return
+    const days = resolveTrashRetentionDays()
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+    const expired = this.store.listTrashedSessions().filter((t) => t.deletedAt < cutoff)
+    const noop: SendFn = () => {}
+    for (const t of expired) {
+      this.hardDeleteSessionSync(t.id, noop, {
+        deleteDerivedMemories: t.deleteDerivedMemories,
+        reason: 'trash-retention',
+      })
+    }
+  }
+
+  /** Resolve a session's bound cwd without forcing a rehydrate: prefer the in-memory session, else
+   *  parse the persisted config blob. Returns undefined when there is no cwd / no row. */
+  private resolveSessionCwd(id: string): string | undefined {
+    const inMemory = this.sessions.get(id)?.config.cwd
+    if (inMemory) return inMemory
+    const raw = this.store?.getSession(id)?.config
+    if (!raw) return undefined
+    try { return (JSON.parse(raw) as SessionConfig).cwd } catch { return undefined }
+  }
+
+  /**
+   * Hard permanent delete (protocol `session:delete`).
+   * Cascades SQLite, removes scratch + checkpoint refs, emits `session:deleted`.
+   */
+  private hardDeleteSessionSync(
+    id: string,
+    send: SendFn,
+    opts?: { deleteDerivedMemories?: boolean; reason?: string },
+  ): void {
+    // Resolve cwd BEFORE the row is gone, then delete SYNCHRONOUSLY (clients + tests rely on the
+    // store delete + session:deleted being immediate — no await before them). The shadow-ref
+    // cleanup is best-effort and must not block or defer deletion, so fire it and forget.
+    const delCwd = this.resolveSessionCwd(id)
+    const reason = opts?.reason ?? 'unknown'
+    let title: string | undefined
+    let surface: string | undefined
+    let deleteDerived = opts?.deleteDerivedMemories
+    try {
+      const row = this.store?.getSession(id)
+      title = row?.title
+      if (row?.config) {
+        const cfg = JSON.parse(row.config) as { surface?: string }
+        surface = cfg.surface
+      }
+      if (deleteDerived === undefined && row && 'delete_derived_memories' in row) {
+        deleteDerived = !!row.delete_derived_memories
+      }
+    } catch {
+      /* audit best-effort */
+    }
     // Always-on INFO so mass wipes are greppable even without HIP_DEBUG=1.
     // Tag [session-delete] — match with: grep 'session-delete' ~/.hip/logs/sidecar*.log
     logInfo('session-delete', 'audit', {
@@ -301,11 +497,11 @@ export class SessionManager {
       title,
       surface,
       cwd: delCwd,
-      deleteDerivedMemories: !!opts?.deleteDerivedMemories,
+      deleteDerivedMemories: !!deleteDerived,
       inMemory: this.sessions.has(id),
       stack: new Error().stack?.split('\n').slice(1, 6).join(' | '),
     })
-    logDebug('session-delete', 'deleteSessionSync begin', {
+    logDebug('session-delete', 'hardDeleteSessionSync begin', {
       sessionId: id,
       reason,
       cwd: delCwd,
@@ -313,12 +509,12 @@ export class SessionManager {
     // Capture live Session before map/store drop so we can dispose ACP sessions
     // (closeSession). Delete + session:deleted stay synchronous for clients/tests.
     const live = this.sessions.get(id)
-    this.store?.deleteSession(id, opts)
+    this.store?.deleteSession(id, { deleteDerivedMemories: deleteDerived })
     this.sessions.delete(id)
     removeScratchDir(id, this.scratchRoot)
     if (delCwd) void workspaceGit.deleteCheckpointRefs(delCwd, id).catch(() => {})
     send({ type: 'session:deleted', sessionId: id })
-    logDebug('session-delete', 'deleteSessionSync done', { sessionId: id, reason })
+    logDebug('session-delete', 'hardDeleteSessionSync done', { sessionId: id, reason })
     // Fire-and-forget: cancel turn + await agentProv.dispose → closeSession.
     // Must not block session:deleted; errors are best-effort.
     if (live) {

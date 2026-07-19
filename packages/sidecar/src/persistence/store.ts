@@ -1,5 +1,20 @@
 import type { DatabaseSync } from './sqlite.js'
-import type { AgentRole, AgentRun, Attachment, Checkpoint, MemoryCitation, Message, SessionConfig, SessionSummary, SearchHit, TimelineStep, ToolCall, ToolStatus, TurnUsage } from '@hip/protocol'
+import type {
+  AgentRole,
+  AgentRun,
+  Attachment,
+  Checkpoint,
+  MemoryCitation,
+  Message,
+  SessionConfig,
+  SessionSummary,
+  TrashedSessionSummary,
+  SearchHit,
+  TimelineStep,
+  ToolCall,
+  ToolStatus,
+  TurnUsage,
+} from '@hip/protocol'
 import { sumUsage } from '../session/usage.js'
 import { surfaceOf } from '../session/surface.js'
 import { logInfo } from '../debug-logger.js'
@@ -16,11 +31,7 @@ export interface PendingInputRow {
   timeCreated: number
 }
 
-/** Active or trashed session list row (protocol SessionSummary + trash fields). */
-export interface TrashedSessionSummary extends SessionSummary {
-  deletedAt: number
-  deleteDerivedMemories: boolean
-}
+export type { TrashedSessionSummary }
 
 /** All persisted reads/writes for sessions. Synchronous (node:sqlite). */
 export class SessionStore {

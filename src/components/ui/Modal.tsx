@@ -55,7 +55,11 @@ export function Modal({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-ink/40" />
-        <DialogPrimitive.Content className="fixed inset-0 z-50 flex items-center justify-center outline-none">
+        <DialogPrimitive.Content
+          className="fixed inset-0 z-50 flex items-center justify-center outline-none"
+          // Opt out of required Description when chrome only supplies a title (avoids Radix stderr noise).
+          aria-describedby={undefined}
+        >
           <div
             className={cn(
               'relative z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-overlay outline-none animate-menu-in',

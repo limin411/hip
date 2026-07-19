@@ -129,17 +129,18 @@ describe('WorktreeCreateSingleModal (PR4)', () => {
     })
   })
 
-  it('non-git create error invokes onNonGitError (D24)', async () => {
+  it('non-git create error invokes onNonGitError, locks confirm, and closes modal (D24)', async () => {
     createManagedWorktree.mockResolvedValue({
       ok: false,
       error: 'not_a_repo',
     })
     const onNonGitError = vi.fn()
+    const onOpenChange = vi.fn()
     const toastError = vi.spyOn(toast, 'error').mockImplementation(() => '')
     render(
       <WorktreeCreateSingleModal
         open
-        onOpenChange={() => {}}
+        onOpenChange={onOpenChange}
         hostSessionId="host1"
         onNonGitError={onNonGitError}
       />,
@@ -148,7 +149,12 @@ describe('WorktreeCreateSingleModal (PR4)', () => {
     await waitFor(() => {
       expect(onNonGitError).toHaveBeenCalledTimes(1)
     })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(toastError).toHaveBeenCalled()
+    // Confirm stays disabled if parent has not unmounted yet (no re-submit).
+    expect(screen.getByTestId('worktree-create-single-confirm')).toBeDisabled()
+    // Only one create attempt
+    expect(createManagedWorktree).toHaveBeenCalledTimes(1)
     toastError.mockRestore()
   })
 

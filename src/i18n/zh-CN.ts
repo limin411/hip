@@ -67,7 +67,6 @@ export const zhCN = {
         refresh: '刷新',
         emptyTitle: '还没有隔离工作区',
         createSingle: '新建隔离工作区…',
-        createSingleSoon: '单路隔离创建即将推出',
         /** 单路隔离创建 Modal（PR4） */
         createSingleTitle: '新建隔离工作区',
         createSingleHint: '从主工作区当前 HEAD 创建一路干净的隔离工作区。分支名由系统自动分配。',

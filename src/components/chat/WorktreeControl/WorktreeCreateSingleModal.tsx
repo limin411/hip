@@ -30,6 +30,8 @@ export function WorktreeCreateSingleModal({
 }: WorktreeCreateSingleModalProps) {
   const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
+  /** D24: lock Confirm after non-git so create cannot re-submit while closing. */
+  const [createLocked, setCreateLocked] = useState(false)
   /** D9: default open new Code session. */
   const [openSession, setOpenSession] = useState(true)
   /** Preview only — regenerated on each open. */
@@ -41,10 +43,19 @@ export function WorktreeCreateSingleModal({
     setBranch(`hip-iso-${nanoid(6)}`)
     setOpenSession(true)
     setBusy(false)
+    setCreateLocked(false)
   }, [open])
 
+  const handleNonGit = () => {
+    // D24: notify parent (banner + popover create off), lock Confirm, close modal.
+    setCreateLocked(true)
+    onNonGitError?.()
+    toast.error(t('chat.worktreeControl.nonGitBanner'))
+    onOpenChange(false)
+  }
+
   const submit = async () => {
-    if (busy || !hostSessionId || !branch) return
+    if (busy || createLocked || !hostSessionId || !branch) return
     setBusy(true)
     try {
       // D23: reveal true → effects toast only; do not toast.success here.
@@ -59,8 +70,7 @@ export function WorktreeCreateSingleModal({
       if (!result.ok) {
         const err = result.error ?? t('chat.worktreeControl.createSingleFailed')
         if (isNonGitWorktreeError(err)) {
-          onNonGitError?.()
-          toast.error(t('chat.worktreeControl.nonGitBanner'))
+          handleNonGit()
         } else {
           toast.error(err || t('chat.worktreeControl.createSingleFailed'))
         }
@@ -70,8 +80,7 @@ export function WorktreeCreateSingleModal({
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).trim()
       if (isNonGitWorktreeError(msg)) {
-        onNonGitError?.()
-        toast.error(t('chat.worktreeControl.nonGitBanner'))
+        handleNonGit()
       } else {
         toast.error(msg || t('chat.worktreeControl.createSingleFailed'))
       }
@@ -100,7 +109,7 @@ export function WorktreeCreateSingleModal({
           <Button
             type="button"
             variant="primary"
-            disabled={busy || !hostSessionId || !branch}
+            disabled={busy || createLocked || !hostSessionId || !branch}
             data-testid="worktree-create-single-confirm"
             aria-busy={busy}
             onClick={() => void submit()}
@@ -125,7 +134,6 @@ export function WorktreeCreateSingleModal({
           <div
             className="rounded-md border border-border bg-surface-muted/50 px-3 py-2 font-mono text-meta text-ink"
             data-testid="worktree-create-single-branch"
-            aria-readonly="true"
           >
             {branch || '…'}
           </div>

@@ -66,7 +66,6 @@ export const zhTW = {
       "refresh": "重新整理",
       "emptyTitle": "還沒有隔離工作區",
       "createSingle": "新建隔離工作區…",
-      "createSingleSoon": "單路隔離建立即將推出",
       "createSingleTitle": "新建隔離工作區",
       "createSingleHint": "從主工作區目前 HEAD 建立一路乾淨的隔離工作區。分支名由系統自動分配。",
       "createSingleBranch": "分支",

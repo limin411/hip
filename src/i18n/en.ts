@@ -67,7 +67,6 @@ export const en = {
         refresh: 'Refresh',
         emptyTitle: 'No isolated workspaces yet',
         createSingle: 'New isolated workspace…',
-        createSingleSoon: 'Single isolation create is coming soon',
         /** Single isolation create Modal (PR4) */
         createSingleTitle: 'New isolated workspace',
         createSingleHint:

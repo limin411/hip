@@ -7,6 +7,7 @@ import * as path from 'node:path'
 import {
   createWorktreeService,
   isEphemeralWorktree,
+  mapRemoveError,
   resolveRepoBinding,
 } from './worktree-service.js'
 import { loadMeta, worktreeIdFromPath } from './worktree-meta.js'
@@ -68,6 +69,17 @@ describe('isEphemeralWorktree (KD14)', () => {
   it('path depth alone is not ephemeral — parallel runId/branch still durable', () => {
     // Two-segment path is irrelevant; only branch / meta.ephemeral matter
     expect(isEphemeralWorktree({ branch: 'hip-p-abc-1', ephemeral: false })).toBe(false)
+  })
+})
+
+describe('mapRemoveError', () => {
+  it('maps managed / found / dirty / unknown codes', () => {
+    expect(mapRemoveError('worktree path outside managed directory').errorCode).toBe('NOT_MANAGED')
+    expect(mapRemoveError('worktree not found').errorCode).toBe('NOT_FOUND')
+    expect(mapRemoveError('Worktree is dirty (uncommitted changes): /x').errorCode).toBe(
+      'WORKTREE_DIRTY',
+    )
+    expect(mapRemoveError('boom').errorCode).toBe('UNKNOWN')
   })
 })
 
@@ -136,6 +148,60 @@ describe('WorktreeService create → meta → list', () => {
     expect(events).toHaveLength(1)
     expect(events[0]!.kind).toBe('created')
     expect(events[0]!.reveal).toBe(false)
+  })
+
+  it('create persists host_fanout source and custom label (PR7)', async () => {
+    await git(root, 'branch', 'hip-p-fan-1')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'hip-p-fan-1',
+      pathKey: 'runfan/hip-p-fan-1',
+      source: 'host_fanout',
+      label: 'Track 1',
+      hostSessionId: 'host-fan',
+      reveal: false,
+    })
+    expect(created.ok).toBe(true)
+    expect(created.worktree?.source).toBe('host_fanout')
+    expect(created.worktree?.label).toBe('Track 1')
+    const listed = await svc.list({ cwd: root })
+    const row = listed.worktrees.find((w) => w.id === created.worktree!.id)
+    expect(row?.source).toBe('host_fanout')
+    expect(row?.label).toBe('Track 1')
+  })
+
+  it('remove dirty returns errorCode WORKTREE_DIRTY and dirtySummary (PR7)', async () => {
+    await git(root, 'branch', 'dirty-drop')
+    const svc = createWorktreeService()
+    const created = await svc.create({
+      cwd: root,
+      branch: 'dirty-drop',
+      source: 'protocol',
+      hostSessionId: 'host-dirty',
+    })
+    expect(created.ok).toBe(true)
+    await fs.writeFile(path.join(created.path!, 'dirty.txt'), 'uncommitted\n', 'utf8')
+
+    const removed = await svc.remove({
+      cwd: root,
+      worktreePath: created.path!,
+      force: false,
+      hostSessionId: 'host-dirty',
+    })
+    expect(removed.ok).toBe(false)
+    expect(removed.errorCode).toBe('WORKTREE_DIRTY')
+    expect(removed.error).toMatch(/dirty|uncommitted/i)
+    expect(removed.dirtySummary).toBeTruthy()
+    expect(removed.dirtySummary).toMatch(/dirty\.txt/)
+
+    const forced = await svc.remove({
+      cwd: root,
+      worktreePath: created.path!,
+      force: true,
+      hostSessionId: 'host-dirty',
+    })
+    expect(forced.ok).toBe(true)
   })
 
   it('parallel-shaped path (runId/hip-p-1) is NOT filtered as ephemeral', async () => {
@@ -220,7 +286,7 @@ describe('WorktreeService create → meta → list', () => {
       cwd: root,
       branch: 'realpath-slot',
       pathKey: 'dogfood/realpath-slot',
-      source: 'host_parallel',
+      source: 'host_fanout',
       parallelRunId: 'run-realpath',
     })
     expect(created.ok).toBe(true)

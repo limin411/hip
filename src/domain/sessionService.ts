@@ -12,6 +12,8 @@ import type {
   MemoryScope,
   MemoryStatus,
   KeyProbeCode,
+  WorktreeSource,
+  WorktreeRemoveErrorCode,
 } from '@hip/protocol'
 import { normalizeSessionConfig } from '@hip/protocol'
 import { nanoid } from 'nanoid'
@@ -995,9 +997,9 @@ export class SessionService {
   }
 
   /**
-   * Shared host create wait (G9/D20): send `git:worktree:create` (incl. `reveal`) and
-   * await matching result. On success, hydrate the worktree catalog list.
-   * Single create: reveal true (default). Parallel slots: reveal false (D23).
+   * Shared host create wait (G9/D20): send `git:worktree:create` (incl. `reveal`/`source`/`label`)
+   * and await matching result. On success, hydrate the worktree catalog list.
+   * Single create: reveal true (default), source protocol. Parallel slots: reveal false, host_fanout (D23/D26).
    */
   async waitCreateWorktree(
     hostSessionId: string,
@@ -1008,6 +1010,9 @@ export class SessionService {
       pathKey?: string
       /** Default true for single create. Parallel slots: false. */
       reveal?: boolean
+      /** Product source tag (PR7). Prefer explicit for product paths. */
+      source?: WorktreeSource
+      label?: string
     },
   ): Promise<{ ok: boolean; path?: string; id?: string; error?: string }> {
     const resultP = this.waitForServerMessageWhere(
@@ -1023,6 +1028,8 @@ export class SessionService {
       ...(params.baseRef !== undefined ? { baseRef: params.baseRef } : {}),
       ...(params.pathKey !== undefined ? { pathKey: params.pathKey } : {}),
       ...(params.reveal !== undefined ? { reveal: params.reveal } : {}),
+      ...(params.source !== undefined ? { source: params.source } : {}),
+      ...(params.label !== undefined ? { label: params.label } : {}),
     })
     const created = await resultP
     if (created.ok) {
@@ -1040,6 +1047,7 @@ export class SessionService {
   /**
    * Product single isolation create (D20/G9). Defaults reveal true — success toast is
    * owned by serverMessageEffects (D23); this method never toasts success.
+   * Source defaults to `protocol` (PR7 / D26).
    */
   async createManagedWorktree(opts: {
     hostSessionId: string
@@ -1047,6 +1055,9 @@ export class SessionService {
     createBranch?: boolean
     baseRef?: string
     pathKey?: string
+    label?: string
+    /** Default `protocol` for single isolation (PR7). */
+    source?: WorktreeSource
     /** Default true: open a code session on the new worktree path. */
     openSession?: boolean
     /** Default true; effects toast when true. UI must not toast success when true. */
@@ -1058,6 +1069,8 @@ export class SessionService {
       createBranch: opts.createBranch ?? true,
       baseRef: opts.baseRef,
       pathKey: opts.pathKey,
+      label: opts.label,
+      source: opts.source ?? 'protocol',
       reveal,
     })
     if (!created.ok || !created.path) {
@@ -1158,6 +1171,8 @@ export class SessionService {
           createBranch: true,
           pathKey,
           reveal: false,
+          // PR7 / D26: host composer fan-out — distinct from agent tool `parallel`.
+          source: 'host_fanout',
         })
         if (!created.ok || !created.path) {
           useParallelStore.getState().setSlot(runId, i, {
@@ -1876,12 +1891,17 @@ export class SessionService {
     return this.lastOutboundUserContent
   }
 
-  /** Product path: remove worktree (preflight when force=false). */
+  /** Product path: remove worktree (preflight when force=false). PR7: structured errorCode/dirtySummary. */
   async removeWorktree(
     sessionId: string,
     worktreePath: string,
     force = false,
-  ): Promise<{ ok: boolean; error?: string }> {
+  ): Promise<{
+    ok: boolean
+    error?: string
+    errorCode?: WorktreeRemoveErrorCode
+    dirtySummary?: string
+  }> {
     const resultP = this.waitForServerMessageWhere(
       'git:worktree:remove:result',
       (m) => m.sessionId === sessionId,
@@ -1894,7 +1914,12 @@ export class SessionService {
       force,
     })
     const res = await resultP
-    return { ok: res.ok, error: res.error }
+    return {
+      ok: res.ok,
+      ...(res.error ? { error: res.error } : {}),
+      ...(res.errorCode ? { errorCode: res.errorCode } : {}),
+      ...(res.dirtySummary ? { dirtySummary: res.dirtySummary } : {}),
+    }
   }
 
   /** Answer a paused turn's question: append the reply to the transcript (clears the interrupt) and
@@ -2101,7 +2126,12 @@ export type HipE2EHooks = {
     sessionId: string,
     worktreePath: string,
     force?: boolean,
-  ) => Promise<{ ok: boolean; error?: string }>
+  ) => Promise<{
+    ok: boolean
+    error?: string
+    errorCode?: WorktreeRemoveErrorCode
+    dirtySummary?: string
+  }>
   /** Seed pending diff annotations (InputBar product inject path). */
   seedDiffAnnotation: (
     sessionId: string,

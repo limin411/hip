@@ -133,14 +133,14 @@ export async function handleWorkspaceMessage(
       const svc = createWorktreeService({
         notify: (ev) => send({ type: 'worktree:changed', ...ev }),
       })
-      // D23: pass reveal through (omit → service default true). D26: product spine.
-      // source stays 'protocol' until PR7 optional source on create (host_fanout / etc.).
+      // D23: reveal pass-through. D7/D26: source/label pass-through (default protocol).
       const r = await createManagedProductWorktree(svc, {
         cwd,
         branch: msg.branch,
         pathKey: msg.pathKey,
-        source: 'protocol',
+        source: msg.source ?? 'protocol',
         hostSessionId: msg.sessionId,
+        ...(msg.label !== undefined ? { label: msg.label } : {}),
         ...(msg.reveal !== undefined ? { reveal: msg.reveal } : {}),
       })
       send({
@@ -175,7 +175,14 @@ export async function handleWorkspaceMessage(
         force: msg.force === true,
         hostSessionId: msg.sessionId,
       })
-      send({ type: 'git:worktree:remove:result', sessionId: msg.sessionId, ok: r.ok, ...(r.error ? { error: r.error } : {}) })
+      send({
+        type: 'git:worktree:remove:result',
+        sessionId: msg.sessionId,
+        ok: r.ok,
+        ...(r.error ? { error: r.error } : {}),
+        ...(r.errorCode ? { errorCode: r.errorCode } : {}),
+        ...(r.dirtySummary ? { dirtySummary: r.dirtySummary } : {}),
+      })
       return
     }
     default:

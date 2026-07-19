@@ -55,7 +55,11 @@ describe('parallel_worktrees tool', () => {
 
   it('creates worktrees and spawns workers after n2 approve', async () => {
     const spawns: Array<{ taskId: string; root: string }> = []
-    const changed: Array<{ kind: string; reveal?: boolean; worktree: { branch?: string; pathKey?: string; path: string } }> = []
+    const changed: Array<{
+      kind: string
+      reveal?: boolean
+      worktree: { branch?: string; pathKey?: string; path: string; source?: string }
+    }> = []
     const tools = buildParallelWorktreeTools({
       cwd: repo,
       sessionId: 'sess',
@@ -73,6 +77,7 @@ describe('parallel_worktrees tool', () => {
             branch: ev.worktree.branch,
             pathKey: ev.worktree.pathKey,
             path: ev.worktree.path,
+            source: ev.worktree.source,
           },
         })
       },
@@ -94,8 +99,10 @@ describe('parallel_worktrees tool', () => {
     }
 
     // D23: every slot create notifies with reveal false (via createManagedProductWorktree).
+    // PR7 / D26: agent tool source is `parallel` (not host_fanout / protocol).
     expect(changed).toHaveLength(2)
     expect(changed.every((e) => e.kind === 'created' && e.reveal === false)).toBe(true)
+    expect(changed.every((e) => e.worktree.source === 'parallel')).toBe(true)
 
     // D26: hip-p-{runShort}-{1..n} branches; pathKey = {runId}/{branch}; path under managed + runId.
     const parsed = JSON.parse(out) as {

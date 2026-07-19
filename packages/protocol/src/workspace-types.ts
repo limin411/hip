@@ -83,13 +83,20 @@ export type WorktreeId = string
 
 export type WorktreeSource =
   | 'agent_tool' // git_worktree_create
-  | 'protocol' // git:worktree:create / CLI
-  | 'parallel' // parallel_worktrees
-  | 'host_fanout' // sessionService.startParallelRun (legacy)
+  | 'protocol' // git:worktree:create / CLI / single isolation
+  | 'parallel' // parallel_worktrees agent HITL tool
+  | 'host_fanout' // sessionService.startParallelRun (host composer parallel)
   | 'background' // durable only when keepWorktree via pre-created root
   | 'import' // external inbox accept (P1)
   | 'discovered' // listed from git, not yet claimed
   | 'primary' // main tree
+
+/** Structured codes on `git:worktree:remove:result` (PR7 additive). */
+export type WorktreeRemoveErrorCode =
+  | 'WORKTREE_DIRTY'
+  | 'NOT_MANAGED'
+  | 'NOT_FOUND'
+  | 'UNKNOWN'
 
 /** First-class worktree product object (events + meta). */
 export interface WorktreeRecord {

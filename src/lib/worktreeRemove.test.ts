@@ -15,6 +15,13 @@ describe('isWorktreeDirtyError', () => {
     expect(isWorktreeDirtyError('DIRTY tree')).toBe(true)
   })
 
+  it('prefers errorCode WORKTREE_DIRTY (PR7)', () => {
+    expect(isWorktreeDirtyError(undefined, 'WORKTREE_DIRTY')).toBe(true)
+    expect(isWorktreeDirtyError('something else', 'WORKTREE_DIRTY')).toBe(true)
+    expect(isWorktreeDirtyError('not found', 'NOT_FOUND')).toBe(false)
+    expect(isWorktreeDirtyError(undefined, 'UNKNOWN')).toBe(false)
+  })
+
   it('is false for other errors and empty', () => {
     expect(isWorktreeDirtyError(undefined)).toBe(false)
     expect(isWorktreeDirtyError(null)).toBe(false)
@@ -94,13 +101,43 @@ describe('removeManagedWorktree', () => {
     expect(deleteSession).not.toHaveBeenCalled()
   })
 
+  it('returns dirty:true from errorCode even without dirty message (PR7)', async () => {
+    removeWorktree.mockResolvedValue({
+      ok: false,
+      error: 'cannot remove',
+      errorCode: 'WORKTREE_DIRTY',
+      dirtySummary: ' M a.ts',
+    })
+    const r = await removeManagedWorktree(
+      { hostSessionId: 'host', worktreePath: '/wt/a', slotSessionId: 'slot-1' },
+      { removeWorktree, deleteSession },
+    )
+    expect(r).toEqual({
+      ok: false,
+      dirty: true,
+      error: 'cannot remove',
+      errorCode: 'WORKTREE_DIRTY',
+      dirtySummary: ' M a.ts',
+    })
+    expect(deleteSession).not.toHaveBeenCalled()
+  })
+
   it('returns dirty:false for non-dirty failures', async () => {
-    removeWorktree.mockResolvedValue({ ok: false, error: 'not managed' })
+    removeWorktree.mockResolvedValue({
+      ok: false,
+      error: 'not managed',
+      errorCode: 'NOT_MANAGED',
+    })
     const r = await removeManagedWorktree(
       { hostSessionId: 'host', worktreePath: '/wt/a' },
       { removeWorktree, deleteSession },
     )
-    expect(r).toEqual({ ok: false, dirty: false, error: 'not managed' })
+    expect(r).toEqual({
+      ok: false,
+      dirty: false,
+      error: 'not managed',
+      errorCode: 'NOT_MANAGED',
+    })
   })
 
   it('skips slot delete when no slotSessionId', async () => {

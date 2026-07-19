@@ -1275,6 +1275,8 @@ describe('branches + revert', () => {
         createBranch: true,
         pathKey: 'hip-iso-abc',
         reveal: true,
+        source: 'protocol',
+        label: 'My iso',
       })
       const createMsg = t.sent.find((m) => m.type === 'git:worktree:create') as {
         type: string
@@ -1283,6 +1285,8 @@ describe('branches + revert', () => {
         reveal?: boolean
         createBranch?: boolean
         pathKey?: string
+        source?: string
+        label?: string
       }
       expect(createMsg).toMatchObject({
         type: 'git:worktree:create',
@@ -1291,6 +1295,8 @@ describe('branches + revert', () => {
         createBranch: true,
         pathKey: 'hip-iso-abc',
         reveal: true,
+        source: 'protocol',
+        label: 'My iso',
       })
       t.push({
         type: 'git:worktree:create:result',
@@ -1309,7 +1315,7 @@ describe('branches + revert', () => {
       )
     })
 
-    it('createManagedWorktree defaults reveal true and does not toast (opens session)', async () => {
+    it('createManagedWorktree defaults reveal true, source protocol, and does not toast (opens session)', async () => {
       const t = new FakeTransport()
       const svc = new SessionService(t)
       // D23: success toast is effects-owned when reveal true — method must not toast.
@@ -1341,10 +1347,12 @@ describe('branches + revert', () => {
         reveal?: boolean
         createBranch?: boolean
         branch: string
+        source?: string
       }
       expect(createMsg.reveal).toBe(true)
       expect(createMsg.createBranch).toBe(true)
       expect(createMsg.branch).toBe('hip-iso-xyz')
+      expect(createMsg.source).toBe('protocol')
       t.push({
         type: 'git:worktree:create:result',
         sessionId: 'host1',
@@ -1364,7 +1372,7 @@ describe('branches + revert', () => {
       toastMessage.mockRestore()
     })
 
-    it('startParallelRun uses reveal:false and hip-p-* pathKey convention', async () => {
+    it('startParallelRun uses reveal:false, source host_fanout, and hip-p-* pathKey convention', async () => {
       const t = new FakeTransport()
       // Auto-respond to sequential git:worktree:create messages.
       const origSend = t.send.bind(t)
@@ -1376,6 +1384,7 @@ describe('branches + revert', () => {
             branch: string
             pathKey?: string
             reveal?: boolean
+            source?: string
           }
           queueMicrotask(() => {
             t.push({
@@ -1422,14 +1431,42 @@ describe('branches + revert', () => {
         reveal?: boolean
         branch: string
         pathKey?: string
+        source?: string
       }>
       expect(creates).toHaveLength(2)
       for (const c of creates) {
         expect(c.reveal).toBe(false)
+        expect(c.source).toBe('host_fanout')
         expect(c.branch.startsWith('hip-p-')).toBe(true)
         expect(c.branch).toMatch(/^hip-p-[a-zA-Z0-9_-]+-[12]$/)
         expect(c.pathKey).toBe(`${result.runId}/${c.branch}`)
       }
+    })
+
+    it('removeWorktree passes through errorCode and dirtySummary', async () => {
+      const t = new FakeTransport()
+      const svc = new SessionService(t)
+      const p = svc.removeWorktree('s1', '/tmp/wt/a', false)
+      expect(t.sent.find((m) => m.type === 'git:worktree:remove')).toMatchObject({
+        type: 'git:worktree:remove',
+        sessionId: 's1',
+        worktreePath: '/tmp/wt/a',
+        force: false,
+      })
+      t.push({
+        type: 'git:worktree:remove:result',
+        sessionId: 's1',
+        ok: false,
+        error: 'Worktree is dirty (uncommitted changes): /tmp/wt/a',
+        errorCode: 'WORKTREE_DIRTY',
+        dirtySummary: ' M file.ts\n?? new.ts',
+      })
+      await expect(p).resolves.toEqual({
+        ok: false,
+        error: 'Worktree is dirty (uncommitted changes): /tmp/wt/a',
+        errorCode: 'WORKTREE_DIRTY',
+        dirtySummary: ' M file.ts\n?? new.ts',
+      })
     })
   })
 })

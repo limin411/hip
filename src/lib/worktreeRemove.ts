@@ -1,11 +1,16 @@
+import type { WorktreeRemoveErrorCode } from '@hip/protocol'
 import { sessionService } from '@/domain'
 
 /**
- * Interim dirty detection until PR7 wires `errorCode: 'WORKTREE_DIRTY'`.
- * Matches sidecar WorktreeDirtyError message: "Worktree is dirty (uncommitted changes): …"
- * No file-count parsing (D6 / PR6).
+ * Dirty detection: prefer structured `errorCode` (PR7); fall back to string match
+ * for older sidecars. Matches WorktreeDirtyError message: "Worktree is dirty…".
+ * No file-count parsing (D6); dirtySummary enables richer copy later.
  */
-export function isWorktreeDirtyError(error?: string | null): boolean {
+export function isWorktreeDirtyError(
+  error?: string | null,
+  errorCode?: WorktreeRemoveErrorCode | string | null,
+): boolean {
+  if (errorCode === 'WORKTREE_DIRTY') return true
   if (!error) return false
   return /dirty|uncommitted/i.test(error)
 }
@@ -22,14 +27,25 @@ export interface RemoveManagedWorktreeInput {
 
 export type RemoveManagedWorktreeResult =
   | { ok: true }
-  | { ok: false; dirty: boolean; error?: string }
+  | {
+      ok: false
+      dirty: boolean
+      error?: string
+      errorCode?: WorktreeRemoveErrorCode
+      dirtySummary?: string
+    }
 
 export type RemoveManagedWorktreeDeps = {
   removeWorktree: (
     sessionId: string,
     worktreePath: string,
     force?: boolean,
-  ) => Promise<{ ok: boolean; error?: string }>
+  ) => Promise<{
+    ok: boolean
+    error?: string
+    errorCode?: WorktreeRemoveErrorCode
+    dirtySummary?: string
+  }>
   deleteSession: (
     sessionId: string,
     opts?: { reason?: string; meta?: Record<string, unknown> },
@@ -58,8 +74,10 @@ export async function removeManagedWorktree(
   if (!r.ok) {
     return {
       ok: false,
-      dirty: isWorktreeDirtyError(r.error),
+      dirty: isWorktreeDirtyError(r.error, r.errorCode),
       error: r.error,
+      ...(r.errorCode ? { errorCode: r.errorCode } : {}),
+      ...(r.dirtySummary ? { dirtySummary: r.dirtySummary } : {}),
     }
   }
 

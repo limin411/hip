@@ -22,6 +22,8 @@ import type {
   Branch,
   WorktreeInfo,
   WorktreeRecord,
+  WorktreeSource,
+  WorktreeRemoveErrorCode,
   FsEntry,
 } from './workspace-types.js'
 import type { McpServerConfig } from './mcp-config.js'
@@ -126,6 +128,14 @@ export type ClientMessage =
        * Omit or true → WorktreeService default true (single product create).
        */
       reveal?: boolean
+      /**
+       * Product source tag (D7/D18/D26). Handler defaults to `protocol` when omitted.
+       * Callers should set explicitly: single → protocol, host parallel → host_fanout,
+       * agent tool → parallel (in-process, not this RPC).
+       */
+      source?: WorktreeSource
+      /** Optional display label stored in meta (durable once wired). */
+      label?: string
     }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string; force?: boolean }
@@ -258,7 +268,16 @@ export type ServerMessage =
   | { type: 'plugin:list:result'; plugins: PluginManifest[] }
   | { type: 'git:worktree:create:result'; sessionId: string; ok: boolean; path?: string; id?: string; error?: string }
   | { type: 'git:worktree:list:result'; sessionId: string; worktrees: WorktreeInfo[] }
-  | { type: 'git:worktree:remove:result'; sessionId: string; ok: boolean; error?: string }
+  | {
+      type: 'git:worktree:remove:result'
+      sessionId: string
+      ok: boolean
+      error?: string
+      /** Structured remove failure (PR7); prefer over string-match on `error`. */
+      errorCode?: WorktreeRemoveErrorCode
+      /** Optional porcelain summary when errorCode is WORKTREE_DIRTY (file-count copy later). */
+      dirtySummary?: string
+    }
   /**
    * Product worktree catalog change on the same WS as the creating client (KD5).
    * Server-only — not a client RPC; message-guard unchanged.

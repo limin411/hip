@@ -12,6 +12,7 @@ import type {
   WorktreeInfo,
   WorktreeMetaFile,
   WorktreeRecord,
+  WorktreeRemoveErrorCode,
   WorktreeSource,
 } from '@hip/protocol'
 import { getWorktreesDir } from './worktree-config.js'
@@ -195,10 +196,37 @@ function findMetaRecord(
   return null
 }
 
+export type RemoveWorktreeServiceResult = {
+  ok: boolean
+  error?: string
+  errorCode?: WorktreeRemoveErrorCode
+  /** Porcelain status when errorCode is WORKTREE_DIRTY. */
+  dirtySummary?: string
+}
+
+/** Map workspace-git / preflight remove failures to structured error codes (PR7). */
+export function mapRemoveError(error?: string): {
+  errorCode: WorktreeRemoveErrorCode
+  error: string
+} {
+  const msg = (error ?? '').trim() || 'remove failed'
+  const lower = msg.toLowerCase()
+  if (lower.includes('outside managed') || lower.includes('not managed')) {
+    return { errorCode: 'NOT_MANAGED', error: msg }
+  }
+  if (lower.includes('not found') || lower.includes('no such') || lower.includes('not a working tree')) {
+    return { errorCode: 'NOT_FOUND', error: msg }
+  }
+  if (lower.includes('dirty') || lower.includes('uncommitted')) {
+    return { errorCode: 'WORKTREE_DIRTY', error: msg }
+  }
+  return { errorCode: 'UNKNOWN', error: msg }
+}
+
 export interface WorktreeService {
   create(opts: CreateWorktreeServiceOpts): Promise<{ ok: boolean; path?: string; worktree?: WorktreeRecord; error?: string }>
   list(opts: ListWorktreeServiceOpts): Promise<{ ok: boolean; worktrees: WorktreeInfo[]; error?: string }>
-  remove(opts: RemoveWorktreeServiceOpts): Promise<{ ok: boolean; error?: string }>
+  remove(opts: RemoveWorktreeServiceOpts): Promise<RemoveWorktreeServiceResult>
 }
 
 export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeService {
@@ -354,14 +382,28 @@ export function createWorktreeService(opts: WorktreeServiceOpts = {}): WorktreeS
             typeof e === 'object' &&
             (e as { code?: string }).code === 'WORKTREE_DIRTY')
         if (dirty) {
-          return { ok: false, error: e instanceof Error ? e.message : String(e) }
+          const dirtySummary =
+            e instanceof WorktreeDirtyError
+              ? e.statusOutput
+              : typeof e === 'object' && e !== null && typeof (e as { statusOutput?: string }).statusOutput === 'string'
+                ? (e as { statusOutput: string }).statusOutput
+                : undefined
+          return {
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+            errorCode: 'WORKTREE_DIRTY',
+            ...(dirtySummary ? { dirtySummary } : {}),
+          }
         }
         throw e
       }
 
       // Product default: preflight (force false). Bg / explicit cleanup pass force: true.
       const r = await removeWorktree(cwd, worktreePath, 'git', removeOpts.force === true)
-      if (!r.ok) return { ok: false, error: r.error }
+      if (!r.ok) {
+        const mapped = mapRemoveError(r.error)
+        return { ok: false, error: mapped.error, errorCode: mapped.errorCode }
+      }
 
       removeMetaRecord(repoKey, id)
 

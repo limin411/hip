@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { sessionService, useActiveSession, useActiveSessionId, useActiveMessages, useActiveSessionError, useActiveSessionStatus, useActiveInterrupt } from '@/domain'
@@ -9,6 +9,7 @@ import { exportSessionDebugBundle } from '@/lib/exportSessionDebug'
 import { sessionDebugBundleJson } from '@/lib/sessionDebugBundle'
 import { selectLivePlan } from '@/lib/todos'
 import { toast } from 'sonner'
+import { scrollTranscriptToMessage } from '@/lib/transcriptJump'
 import { MessageBubble } from './MessageBubble'
 import { ThinkingBubble } from './ThinkingBubble'
 import { hasPlanApproval } from './planApproval'
@@ -27,6 +28,9 @@ export function ChatPane() {
   const setScrollTarget = useUiStore((s) => s.setScrollTarget)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Sync pin flag so autoscroll cannot re-stick to bottom in the same frame a jump clears
+  // scrollTarget (React state for atBottom is one paint behind).
+  const followBottomRef = useRef(true)
   const [atBottom, setAtBottom] = useState(true)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
@@ -56,38 +60,41 @@ export function ChatPane() {
   // target effect positions the view and we stay unpinned until the user scrolls back down.
   // Read the target via getState (not a subscription) so clearing it later does not re-arm autoscroll.
   useEffect(() => {
-    setAtBottom(!useUiStore.getState().scrollTargetMessageId)
+    const pendingJump = Boolean(useUiStore.getState().scrollTargetMessageId)
+    followBottomRef.current = !pendingJump
+    setAtBottom(!pendingJump)
   }, [activeSessionId])
 
   const onScroll = () => {
     const el = scrollRef.current
-    if (el) setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    followBottomRef.current = nearBottom
+    setAtBottom(nearBottom)
   }
 
   useEffect(() => {
-    if (!atBottom || scrollTargetMessageId) return
+    if (!followBottomRef.current || !atBottom || scrollTargetMessageId) return
     // Spec A4: pinned-to-bottom uses instant scroll — smooth + high-frequency tokens fights.
     bottomRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages.length, error, lastActivity, atBottom, scrollTargetMessageId])
 
-  // Search / outline jump: when a target message id is set, center it (if not already
-  // scrolled by the click path) and flash a highlight, then clear the target.
+  // Search / outline jump: pin the message (layout phase so stick-to-bottom can't paint first),
+  // flash a highlight, unpin follow, then clear the target.
   // If the session is still loading, `messages` is empty and the effect no-ops until they
   // arrive (it re-runs on `messages`). If messages are present but the anchor is gone (deleted/
   // regenerated since indexing), clear the stale target so it doesn't linger.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!scrollTargetMessageId) return
     const el = scrollRef.current?.querySelector(
       `[data-message-id="${CSS.escape(scrollTargetMessageId)}"]`,
     )
-    if (el) {
-      // Pin jumped message to the top of the transcript viewport.
-      el.scrollIntoView({ block: 'start', behavior: 'auto' })
-      setHighlightedId(scrollTargetMessageId)
-      // Unpin from the bottom so that clearing the target below (which re-runs the autoscroll
-      // effect) doesn't yank us to the latest message — covers a jump within the already-active
-      // session, where the session-switch reset doesn't fire to do this for us.
+    if (el instanceof HTMLElement) {
+      // Unpin first so any concurrent autoscroll effect skips on the next paint.
+      followBottomRef.current = false
       setAtBottom(false)
+      scrollTranscriptToMessage(scrollTargetMessageId)
+      setHighlightedId(scrollTargetMessageId)
     }
     // Either way the target is consumed: found → highlighted; absent (and messages present) → stale, drop it.
     if (el || messages.length > 0) setScrollTarget(null)
@@ -139,8 +146,14 @@ export function ChatPane() {
   }
 
   return (
-    <div className="relative flex-1 overflow-hidden">
-      <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto">
+    <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="h-full min-h-0 overflow-y-auto"
+        data-transcript-scroll=""
+        data-testid="chat-transcript-scroll"
+      >
         {/* CLI-style transcript: full-width left-aligned, no centered chat column */}
         <div className="flex w-full flex-col gap-5 px-4 py-4">
           {showAgentRestart && (
@@ -244,7 +257,11 @@ export function ChatPane() {
       </div>
       {!atBottom && (
         <button
-          onClick={() => { setAtBottom(true); bottomRef.current?.scrollIntoView({ behavior: 'auto' }) }}
+          onClick={() => {
+            followBottomRef.current = true
+            setAtBottom(true)
+            bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+          }}
           data-testid="jump-to-latest"
           title={t('chat.jumpToLatest')}
           className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-meta text-ink-secondary transition-colors hover:bg-surface-muted"

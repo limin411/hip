@@ -50,10 +50,10 @@ export function KnowledgeOutlinePanel() {
     >
       <div
         data-tauri-drag-region
-        className="flex h-10 shrink-0 items-center justify-between border-b border-border px-2"
+        className="flex h-[var(--titlebar-height)] shrink-0 items-center justify-between border-b border-border px-2"
       >
         <span
-          className="truncate px-1 text-body font-medium text-ink"
+          className="truncate px-1.5 text-body font-medium tracking-tight text-ink"
           data-tauri-drag-region="false"
           data-testid="panel-title"
         >

@@ -1,5 +1,6 @@
 import type { ClientMessage } from '@hip/protocol'
 import * as workspaceGit from '../workspace-git.js'
+import { createManagedProductWorktree } from '../worktree-product-create.js'
 import { createWorktreeService } from '../worktree-service.js'
 import type { SendFn, SessionManagerContext } from './types.js'
 
@@ -132,12 +133,14 @@ export async function handleWorkspaceMessage(
       const svc = createWorktreeService({
         notify: (ev) => send({ type: 'worktree:changed', ...ev }),
       })
-      const r = await svc.create({
+      // D23: pass reveal through (omit → service default true). D26: product spine.
+      const r = await createManagedProductWorktree(svc, {
         cwd,
         branch: msg.branch,
         pathKey: msg.pathKey,
         source: 'protocol',
         hostSessionId: msg.sessionId,
+        ...(msg.reveal !== undefined ? { reveal: msg.reveal } : {}),
       })
       send({
         type: 'git:worktree:create:result',

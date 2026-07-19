@@ -12,6 +12,12 @@ describe('parallelFanout (P5)', () => {
     expect(planParallelFanout({ n: 1, prompt: 'p', runId: 'z' }).slots).toHaveLength(1)
   })
 
+  it('uses agent-aligned hip-p-{runShort}-{1..n} branch convention (D26)', () => {
+    const p = planParallelFanout({ n: 2, prompt: 'p', runId: 'ab12cd' })
+    expect(p.slots.map((s) => s.branch)).toEqual(['hip-p-ab12cd-1', 'hip-p-ab12cd-2'])
+    expect(p.slots.map((s) => s.pathKey)).toEqual(['hip-p-ab12cd-1', 'hip-p-ab12cd-2'])
+  })
+
   it('detects primary path collision', () => {
     expect(assertPrimaryNotInSlotPaths('/repo', ['/repo/wt-a', '/repo/wt-b'])).toEqual({ ok: true })
     expect(assertPrimaryNotInSlotPaths('/repo', ['/repo'])).toMatchObject({ ok: false })

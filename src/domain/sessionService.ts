@@ -995,8 +995,100 @@ export class SessionService {
   }
 
   /**
+   * Shared host create wait (G9/D20): send `git:worktree:create` (incl. `reveal`) and
+   * await matching result. On success, hydrate the worktree catalog list.
+   * Single create: reveal true (default). Parallel slots: reveal false (D23).
+   */
+  async waitCreateWorktree(
+    hostSessionId: string,
+    params: {
+      branch: string
+      createBranch?: boolean
+      baseRef?: string
+      pathKey?: string
+      /** Default true for single create. Parallel slots: false. */
+      reveal?: boolean
+    },
+  ): Promise<{ ok: boolean; path?: string; id?: string; error?: string }> {
+    const resultP = this.waitForServerMessageWhere(
+      'git:worktree:create:result',
+      (m) => m.sessionId === hostSessionId,
+      45_000,
+    )
+    this.transport.send({
+      type: 'git:worktree:create',
+      sessionId: hostSessionId,
+      branch: params.branch,
+      ...(params.createBranch !== undefined ? { createBranch: params.createBranch } : {}),
+      ...(params.baseRef !== undefined ? { baseRef: params.baseRef } : {}),
+      ...(params.pathKey !== undefined ? { pathKey: params.pathKey } : {}),
+      ...(params.reveal !== undefined ? { reveal: params.reveal } : {}),
+    })
+    const created = await resultP
+    if (created.ok) {
+      // List hydrate after success (G9/4).
+      this.requestWorktreeList(hostSessionId)
+    }
+    return {
+      ok: created.ok,
+      ...(created.path ? { path: created.path } : {}),
+      ...(created.id ? { id: created.id } : {}),
+      ...(created.error ? { error: created.error } : {}),
+    }
+  }
+
+  /**
+   * Product single isolation create (D20/G9). Defaults reveal true — success toast is
+   * owned by serverMessageEffects (D23); this method never toasts success.
+   */
+  async createManagedWorktree(opts: {
+    hostSessionId: string
+    branch: string
+    createBranch?: boolean
+    baseRef?: string
+    pathKey?: string
+    /** Default true: open a code session on the new worktree path. */
+    openSession?: boolean
+    /** Default true; effects toast when true. UI must not toast success when true. */
+    reveal?: boolean
+  }): Promise<{ ok: boolean; path?: string; id?: string; sessionId?: string; error?: string }> {
+    const reveal = opts.reveal ?? true
+    const created = await this.waitCreateWorktree(opts.hostSessionId, {
+      branch: opts.branch,
+      createBranch: opts.createBranch ?? true,
+      baseRef: opts.baseRef,
+      pathKey: opts.pathKey,
+      reveal,
+    })
+    if (!created.ok || !created.path) {
+      return { ok: false, error: created.error ?? 'worktree create failed' }
+    }
+
+    let sessionId: string | undefined
+    if (opts.openSession !== false) {
+      const host = useDomainStore.getState().sessions.find((s) => s.id === opts.hostSessionId)
+      const slotConfig: SessionConfig = normalizeSessionConfig({
+        ...DEFAULT_CONFIG,
+        surface: 'code',
+        cwd: created.path,
+        permissionMode: host?.config.permissionMode ?? 'edit',
+        language: currentLanguage(),
+      })
+      sessionId = this.createSession(slotConfig)
+      this.selectSession(sessionId)
+    }
+    return {
+      ok: true,
+      path: created.path,
+      ...(created.id ? { id: created.id } : {}),
+      ...(sessionId ? { sessionId } : {}),
+    }
+  }
+
+  /**
    * Parallel Studio: fan out one prompt across N isolated git worktrees + sessions.
    * Uses a host session on `baseCwd` for git:worktree ops; agent turns run on slot sessions.
+   * Per-slot create uses waitCreateWorktree({ reveal: false }); summary toast is Modal-owned (D23).
    */
   async startParallelRun(opts: {
     prompt: string
@@ -1022,7 +1114,7 @@ export class SessionService {
     const n = clampParallelCount(opts.count)
     const runId = nanoid(10)
     const runShort = runId.slice(0, 6)
-    // Spec H1: branch/pathKey plan from shared pure helper (product path uses it).
+    // Spec H1 / D26: branch hip-p-{runShort}-{i}, pathKey runId/branch (matches agent tool).
     const fanout = planParallelFanout({ n, prompt, runId: runShort })
 
     // Reuse caller's session when it is already bound to baseCwd.
@@ -1058,21 +1150,15 @@ export class SessionService {
     for (const slotPlan of fanout.slots) {
       const i = slotPlan.index + 1
       const branch = slotPlan.branch
-      const pathKey = `${runId}/${slotPlan.pathKey}`
+      // D26: pathKey = {runId}/{branch} — same as agent parallel_worktrees.
+      const pathKey = `${runId}/${branch}`
       try {
-        const createP = this.waitForServerMessageWhere(
-          'git:worktree:create:result',
-          (m) => m.sessionId === hostSessionId,
-          45_000,
-        )
-        this.transport.send({
-          type: 'git:worktree:create',
-          sessionId: hostSessionId,
+        const created = await this.waitCreateWorktree(hostSessionId, {
           branch,
           createBranch: true,
           pathKey,
+          reveal: false,
         })
-        const created = await createP
         if (!created.ok || !created.path) {
           useParallelStore.getState().setSlot(runId, i, {
             index: i,

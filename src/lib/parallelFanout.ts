@@ -31,13 +31,15 @@ export function planParallelFanout(opts: {
   const runId = opts.runId ?? `prun-${Date.now().toString(36)}`
   const baseBranch = opts.baseBranch ?? 'HEAD'
   const slots: ParallelSlotPlan[] = []
+  // D26: match agent parallel_worktrees — hip-p-{runShort}-{1..n}, pathKey later = runId/branch.
   for (let i = 0; i < n; i++) {
-    const branch = `hip-parallel-${runId}-${i}`
+    const slotNum = i + 1
+    const branch = `hip-p-${runId}-${slotNum}`
     slots.push({
       index: i,
       branch,
       pathKey: branch,
-      label: `slot-${i + 1}`,
+      label: `slot-${slotNum}`,
     })
   }
   return { n, baseBranch, slots, prompt: opts.prompt }

@@ -1264,4 +1264,164 @@ describe('branches + revert', () => {
       await expect(p2).resolves.toMatchObject({ ok: false, code: 'AUTH_FAILED' })
     })
   })
+
+  describe('worktree create path (G9 / D23 / D26)', () => {
+    it('waitCreateWorktree sends reveal and hydrates list on success', async () => {
+      const t = new FakeTransport()
+      const svc = new SessionService(t)
+      const p = svc.waitCreateWorktree('s1', {
+        branch: 'hip-iso-abc',
+        createBranch: true,
+        pathKey: 'hip-iso-abc',
+        reveal: true,
+      })
+      const createMsg = t.sent.find((m) => m.type === 'git:worktree:create') as {
+        type: string
+        sessionId: string
+        branch: string
+        reveal?: boolean
+        createBranch?: boolean
+        pathKey?: string
+      }
+      expect(createMsg).toMatchObject({
+        type: 'git:worktree:create',
+        sessionId: 's1',
+        branch: 'hip-iso-abc',
+        createBranch: true,
+        pathKey: 'hip-iso-abc',
+        reveal: true,
+      })
+      t.push({
+        type: 'git:worktree:create:result',
+        sessionId: 's1',
+        ok: true,
+        path: '/tmp/wt/hip-iso-abc',
+        id: 'wtid1',
+      })
+      await expect(p).resolves.toEqual({
+        ok: true,
+        path: '/tmp/wt/hip-iso-abc',
+        id: 'wtid1',
+      })
+      expect(t.sent.some((m) => m.type === 'git:worktree:list' && (m as { sessionId: string }).sessionId === 's1')).toBe(
+        true,
+      )
+    })
+
+    it('createManagedWorktree defaults reveal true and does not toast (opens session)', async () => {
+      const t = new FakeTransport()
+      const svc = new SessionService(t)
+      // Host session with code cwd so create can open a child session.
+      useDomainStore.setState({
+        sessions: [
+          {
+            id: 'host1',
+            config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/repo' },
+            title: 'Host',
+            preview: '',
+            updatedAtMs: 0,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+          },
+        ],
+        activeSessionId: 'host1',
+        connection: 'disconnected',
+      })
+      const p = svc.createManagedWorktree({
+        hostSessionId: 'host1',
+        branch: 'hip-iso-xyz',
+      })
+      const createMsg = t.sent.find((m) => m.type === 'git:worktree:create') as {
+        reveal?: boolean
+        createBranch?: boolean
+        branch: string
+      }
+      expect(createMsg.reveal).toBe(true)
+      expect(createMsg.createBranch).toBe(true)
+      expect(createMsg.branch).toBe('hip-iso-xyz')
+      t.push({
+        type: 'git:worktree:create:result',
+        sessionId: 'host1',
+        ok: true,
+        path: '/tmp/wt/hip-iso-xyz',
+        id: 'iso1',
+      })
+      const result = await p
+      expect(result.ok).toBe(true)
+      expect(result.path).toBe('/tmp/wt/hip-iso-xyz')
+      expect(result.sessionId).toBeTruthy()
+      const child = useDomainStore.getState().sessions.find((s) => s.id === result.sessionId)
+      expect(child?.config.cwd).toBe('/tmp/wt/hip-iso-xyz')
+    })
+
+    it('startParallelRun uses reveal:false and hip-p-* pathKey convention', async () => {
+      const t = new FakeTransport()
+      // Auto-respond to sequential git:worktree:create messages.
+      const origSend = t.send.bind(t)
+      t.send = (msg: ClientMessage) => {
+        origSend(msg)
+        if (msg.type === 'git:worktree:create') {
+          const m = msg as {
+            sessionId: string
+            branch: string
+            pathKey?: string
+            reveal?: boolean
+          }
+          queueMicrotask(() => {
+            t.push({
+              type: 'git:worktree:create:result',
+              sessionId: m.sessionId,
+              ok: true,
+              path: `/tmp/wt/${m.branch}`,
+              id: `id-${m.branch}`,
+            })
+          })
+        }
+      }
+
+      const svc = new SessionService(t)
+      useDomainStore.setState({
+        sessions: [
+          {
+            id: 'host-p',
+            config: { ...DEFAULT_CONFIG, surface: 'code', cwd: '/repo' },
+            title: 'Host',
+            preview: '',
+            updatedAtMs: 0,
+            loaded: true,
+            messages: [],
+            status: 'idle',
+            error: null,
+          },
+        ],
+        activeSessionId: 'host-p',
+        connection: 'disconnected',
+      })
+
+      const result = await svc.startParallelRun({
+        prompt: 'explore two approaches',
+        baseCwd: '/repo',
+        count: 2,
+        hostSessionId: 'host-p',
+        autoSend: false,
+      })
+
+      expect(result.slotSessionIds).toHaveLength(2)
+      expect(result.slotPaths).toHaveLength(2)
+      const creates = t.sent.filter((m) => m.type === 'git:worktree:create') as Array<{
+        reveal?: boolean
+        branch: string
+        pathKey?: string
+      }>
+      expect(creates).toHaveLength(2)
+      for (const c of creates) {
+        expect(c.reveal).toBe(false)
+        expect(c.branch.startsWith('hip-p-')).toBe(true)
+        expect(c.branch).toMatch(/^hip-p-[a-zA-Z0-9_-]+-[12]$/)
+        expect(c.pathKey).toBe(`${result.runId}/${c.branch}`)
+      }
+    })
+  })
 })

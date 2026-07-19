@@ -119,6 +119,25 @@ describe('WorktreeService create → meta → list', () => {
     expect(listed.worktrees.filter((w) => w.isPrimary)).toHaveLength(1)
   })
 
+  it('create with reveal: false emits worktree:changed with reveal false (D23)', async () => {
+    await git(root, 'branch', 'feature-reveal-off')
+    const events: Array<{ kind: string; reveal?: boolean }> = []
+    const svc = createWorktreeService({
+      notify: (ev) => events.push({ kind: ev.kind, reveal: ev.reveal }),
+    })
+    const created = await svc.create({
+      cwd: root,
+      branch: 'feature-reveal-off',
+      source: 'parallel',
+      hostSessionId: 'sess-parallel',
+      reveal: false,
+    })
+    expect(created.ok).toBe(true)
+    expect(events).toHaveLength(1)
+    expect(events[0]!.kind).toBe('created')
+    expect(events[0]!.reveal).toBe(false)
+  })
+
   it('parallel-shaped path (runId/hip-p-1) is NOT filtered as ephemeral', async () => {
     await git(root, 'branch', 'hip-p-runx-1')
     const svc = createWorktreeService()

@@ -121,6 +121,11 @@ export type ClientMessage =
        * Segments are sanitized; default is `branch`.
        */
       pathKey?: string
+      /**
+       * When false, suppress UI reveal / per-create success toast (parallel slots).
+       * Omit or true → WorktreeService default true (single product create).
+       */
+      reveal?: boolean
     }
   | { type: 'git:worktree:list'; sessionId: string }
   | { type: 'git:worktree:remove'; sessionId: string; worktreePath: string; force?: boolean }

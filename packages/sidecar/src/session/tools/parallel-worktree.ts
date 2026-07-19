@@ -4,6 +4,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { z } from 'zod'
 import type { PermissionOption } from '@hip/protocol'
 import { gitCreateBranch, sanitizeRefComponent } from '../workspace-git.js'
+import { createManagedProductWorktree } from '../worktree-product-create.js'
 import { createWorktreeService } from '../worktree-service.js'
 import type { WorktreeChangedNotify } from '../worktree-service.js'
 
@@ -127,7 +128,8 @@ export function buildParallelWorktreeTools(opts: ParallelWorktreeToolOpts): Stru
         if (!br.ok && !/already exists/i.test(br.error ?? '')) {
           return `Error: failed to create branch ${branch}: ${br.error ?? 'unknown'}`
         }
-        const wt = await wtSvc.create({
+        // D26 product spine — same WorktreeService path as protocol create; reveal false (D23).
+        const wt = await createManagedProductWorktree(wtSvc, {
           cwd,
           branch,
           pathKey,

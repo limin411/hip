@@ -20,7 +20,7 @@ export type ActiveView =
 export type Surface = 'chat' | 'code'
 export type ChatTab = 'files' | 'agents' | 'outline'
 export type Theme = 'light' | 'dark' | 'system'
-export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en'
+export type AppLanguage = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
 export type UiDensity = 'comfortable' | 'compact'
 /** Left sidebar primary section (memory-only; cold launch always 'workbench'). */
 export type SidebarSection =
@@ -68,7 +68,7 @@ function normalizeSettingsPage(v: unknown): SettingsPageId {
   return 'general'
 }
 
-const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
+const APP_LANGUAGES: readonly AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
 const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'compact']
 
 function isAppLanguage(v: unknown): v is AppLanguage {
@@ -84,13 +84,15 @@ export function normalizeUiDensity(raw: unknown): UiDensity {
   return isUiDensity(raw) ? raw : 'comfortable'
 }
 
-/** Resolve a stored / browser language tag to one of the three app locales. */
+/** Resolve a stored / browser language tag to one of the app locales. */
 export function normalizeAppLanguage(raw: string | null | undefined): AppLanguage | null {
   if (!raw) return null
   if (isAppLanguage(raw)) return raw
   if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
   if (raw.startsWith('zh')) return 'zh-CN'
   if (raw.startsWith('en')) return 'en'
+  if (raw === 'ja' || raw.startsWith('ja-') || raw.startsWith('ja_')) return 'ja'
+  if (raw === 'ko' || raw.startsWith('ko-') || raw.startsWith('ko_')) return 'ko'
   return null
 }
 

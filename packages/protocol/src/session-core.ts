@@ -31,7 +31,7 @@ export interface SessionConfig {
    * model-specific (e.g. none|minimal|low|medium|high|xhigh|max). undefined ⇒ provider default.
    */
   effort?: string
-  language?: 'en' | 'zh-CN' | 'zh-TW'
+  language?: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko'
   /**
    * Session primary runtime.
    * undefined | 'builtin' → hip Supervisor graph.

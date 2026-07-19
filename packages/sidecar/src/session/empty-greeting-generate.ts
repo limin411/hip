@@ -51,7 +51,7 @@ Tone:
 Rules:
 - title: short welcome line (max ${TITLE_MAX} characters)
 - sub: one supporting line (max ${SUB_MAX} characters)
-- Language MUST match the "language" field (zh-CN, zh-TW, or en)
+- Language MUST match the "language" field (zh-CN, zh-TW, en, ja, or ko)
 - Do NOT copy baseTitle/baseSub verbatim; rephrase with fresh wording
 - You MAY rephrase both title and subtitle, including holidays
 - Use localHour + timeOfDay + weekEdge for nuance (lateEvening ≠ lateNight ≠ deepNight; sunday-late ≠ monday-early)
@@ -65,6 +65,8 @@ Rules:
 function languageLabel(lang: EmptyGreetingGenerateContext['language']): string {
   if (lang === 'zh-CN') return 'Simplified Chinese (zh-CN)'
   if (lang === 'zh-TW') return 'Traditional Chinese (zh-TW)'
+  if (lang === 'ja') return 'Japanese (ja)'
+  if (lang === 'ko') return 'Korean (ko)'
   return 'English (en)'
 }
 

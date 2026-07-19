@@ -21,7 +21,7 @@ import { ContextMenuSettings } from '@/components/context-menu/ContextMenuSettin
 import { CONTEXT_MENUS } from '@/components/context-menu/feature'
 import { CODE_TERMINAL } from '@/components/artifact/terminalFeature'
 
-const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en']
+const LANGUAGE_KEYS: AppLanguage[] = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko']
 
 const THEME_KEYS: Theme[] = ['light', 'dark', 'system']
 

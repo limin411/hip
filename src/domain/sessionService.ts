@@ -24,7 +24,7 @@ import { useDomainStore, DEFAULT_CONFIG } from './sessionStore'
 import { useFsStore } from '@/store/fsStore'
 import { useDraftStore } from '@/store/draftStore'
 import type { Draft } from '@/store/draftStore'
-import { useUiStore, type Surface } from '@/store/uiStore'
+import { useUiStore, normalizeAppLanguage, type AppLanguage, type Surface } from '@/store/uiStore'
 import { useDiffStore } from '@/store/diffStore'
 import { useTerminalStore } from '@/store/terminalStore'
 import { ptyKill } from '@/ipc/pty'
@@ -53,10 +53,12 @@ import {
 } from '@/store/diffAnnotationStore'
 import { auditSessionDelete, debugSessionDelete } from '@/lib/sessionDelete'
 
-/** Map the current i18next language to one of the three SessionConfig-supported values. */
-function currentLanguage(): 'en' | 'zh-CN' | 'zh-TW' {
-  const l = i18n.resolvedLanguage ?? i18n.language ?? 'en'
-  return l === 'zh-CN' || l === 'zh-TW' ? l : 'en'
+/**
+ * Map the current i18next language to a SessionConfig-supported value.
+ * Exported for unit tests — same path used when enriching session configs.
+ */
+export function currentLanguage(): AppLanguage {
+  return normalizeAppLanguage(i18n.resolvedLanguage ?? i18n.language) ?? 'en'
 }
 
 type ServerMessageWaiter = {

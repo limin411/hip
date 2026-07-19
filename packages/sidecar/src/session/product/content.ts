@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=cd652380c7b9f0ad skillVersion=2 productVersion=0.1.0
+ * contentHash=4fcb1fa84dac5618 skillVersion=2 productVersion=0.1.0
  */
 
 /** Schema / materialization version for builtin skill files (from packages/product-content/meta.json). */
@@ -167,6 +167,16 @@ export const CONFIG_REFERENCE_MD = `# hip config & local data (Level 3)
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+
+### Recycle bin & soft-delete
+
+| Behavior | Notes |
+|----------|--------|
+| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
+| CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
+| Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
 
 Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \`.hip/hip.toml\`).
 

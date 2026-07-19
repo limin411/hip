@@ -623,6 +623,8 @@ export const zhCN = {
         'zh-CN': '简体中文',
         'zh-TW': '繁體中文',
         'en': 'English',
+        'ja': '日本語',
+        'ko': '한국어',
       },
       theme: '主题',
       themeDesc: '选择应用界面的配色方案',
@@ -916,7 +918,7 @@ export const zhCN = {
         docsRev: '文档修订 {{rev}}',
         sectionsLabel: '帮助主题',
         sourceNote:
-          '来源：packages/product-content/（英文 agent skill）与 locales/zh-CN|zh-TW。帮助页跟随界面语言。',
+          '来源：packages/product-content/（英文 agent skill）与 locales/zh-CN|zh-TW|ja|ko。帮助页跟随界面语言。',
         sections: {
           overview: '概览',
           memory: '记忆',

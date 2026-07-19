@@ -4,6 +4,8 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 import { zhCN } from './zh-CN'
 import { zhTW } from './zh-TW'
 import { en } from './en'
+import { ja } from './ja'
+import { ko } from './ko'
 
 i18n
   .use(LanguageDetector)
@@ -13,12 +15,14 @@ i18n
       'zh-CN': zhCN,
       'zh-TW': zhTW,
       en,
+      ja,
+      ko,
     },
     fallbackLng: 'zh-CN',
     // Exact codes only. Do NOT enable nonExplicitSupportedLngs: it breaks lookup for
     // region-tagged locales like zh-CN / zh-TW (bundle exists but t() returns keys).
-    // Browser tags (en-US, zh, …) are normalized in uiStore / LanguageProvider instead.
-    supportedLngs: ['zh-CN', 'zh-TW', 'en'],
+    // Browser tags (en-US, zh, ja-JP, ko-KR, …) are normalized in uiStore / LanguageProvider instead.
+    supportedLngs: ['zh-CN', 'zh-TW', 'en', 'ja', 'ko'],
     detection: {
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],

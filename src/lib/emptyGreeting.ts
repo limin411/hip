@@ -178,6 +178,8 @@ export function resolveCalendarRegion(
   if (language === 'zh-CN') {
     return CJK_TZ_OVERRIDES[timeZone] ?? 'CN'
   }
+  if (language === 'ja') return 'JP'
+  // ko has no dedicated holiday region yet; fall through to TZ map / GENERIC
   return TZ_TO_REGION_EN[timeZone] ?? 'GENERIC'
 }
 

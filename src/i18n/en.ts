@@ -632,6 +632,8 @@ export const en = {
         'zh-CN': '简体中文',
         'zh-TW': '繁體中文',
         'en': 'English',
+        'ja': '日本語',
+        'ko': '한국어',
       },
       theme: 'Theme',
       themeDesc: 'Choose the color scheme of the app',
@@ -930,7 +932,7 @@ export const en = {
         docsRev: 'Docs rev {{rev}}',
         sectionsLabel: 'Help topics',
         sourceNote:
-          'Source: packages/product-content/ (en) and locales/zh-CN|zh-TW. Agent skill stays English; Help follows UI language.',
+          'Source: packages/product-content/ (en) and locales/zh-CN|zh-TW|ja|ko. Agent skill stays English; Help follows UI language.',
         sections: {
           overview: 'Overview',
           memory: 'Memory',

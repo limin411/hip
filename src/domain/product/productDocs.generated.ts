@@ -4,13 +4,13 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=cd652380c7b9f0ad skillVersion=2 productVersion=0.1.0
+ * contentHash=4fcb1fa84dac5618 skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
 
 /** UI product-help locale ids (matches app language tags). */
-export type ProductHelpLocale = 'en' | 'zh-CN' | 'zh-TW'
+export type ProductHelpLocale = 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko'
 
 export interface ProductHelpSection {
   id: ProductHelpSectionId
@@ -199,6 +199,16 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+
+### Recycle bin & soft-delete
+
+| Behavior | Notes |
+|----------|--------|
+| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
+| CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
+| Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
 
 Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \`.hip/hip.toml\`).
 
@@ -509,6 +519,16 @@ Managed sub-agents may get read-only core injection; external ACP agents default
 | \`~/.hip/memories/\` | Memory markdown mirrors |
 | \`~/.hip/builtin-skills/\` | Built-in progressive product skills (e.g. this \`hip\` skill) |
 | \`~/.hip/scratch/\`, worktrees | Scratch / parallel worktree helpers |
+| \`~/.hip/trash/\` | Product recycle bin (knowledge FS quarantine; sessions soft-delete via SQLite) |
+
+### Recycle bin & soft-delete
+
+| Behavior | Notes |
+|----------|--------|
+| UI delete (Chat / Code / Knowledge) | Soft-delete → sidebar **Recycle bin** (above History) |
+| Retention | Default **7** days; **Settings → General** or \`hip.toml\` \`[trash] retentionDays\` (1–365) |
+| CLI \`hip session delete --yes\` | **Permanent** hard-delete (not the recycle bin) |
+| Memory trash | Still **Settings → Memory** (separate retention, default 30 days) |
 
 Project overrides often live under \`<project>/.hip/\` (e.g. \`.hip/skills/\`, \`.hip/hip.toml\`).
 
@@ -1217,14 +1237,652 @@ hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主�
   }
   ],
 },
+  ja: {
+  description: 'hip デスクトップエージェントの製品ヘルプ：Chat/Code サーフェス、権限モード、設定、スキル、プラグイン、MCP、メモリ、エージェント、CLI、トラブルシューティング、ローカルデータ。ユーザーが hip の仕組みや設定方法を尋ねたときに読み込みます。',
+  capabilityMap: `製品要点（hip）：
+- バージョン：0.1.0。
+- ユーザーのプロジェクト内で実ファイルツールと任意のサブエージェントを使うデスクトップ AI ワークベンチエージェント。
+- サーフェス：Code（フルワークベンチ）と Chat（軽量；プレビュー可能な成果物は write_file でアーティファクトへ）。
+- Code のみのツールゲート（UI ラベル）：chat = 読み取り専用；edit = プロジェクトサンドボックス（既定）；full = ユーザー許可のファイルシステム全体。Chat サーフェスは Code の「編集モード」ではない。
+- API キー：~/.hip/config/auth.json（設計上 0600 平文）。
+- セッション横断メモリ：既定オフ（設定 → メモリ）。
+- ローカルデータ：~/.hip/（設定、DB、スキル、プラグイン、ログ）。`,
+  sections: [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
+
+hipは**デスクトップAIワークベンチ**（Tauriシェル + React UI + Nodeサイドカー）であり、製品バージョンは**0.1.0**です。各UIタブは独立したセッションです。デフォルトの製品ループは、ツールを使用し、\`task\` / \`dispatch_agent\` / \`task_batch\` で委譲を行う可能性のある**Supervisor ReAct**エージェントです。通常のターンで強制的なPlanner → Coder → Reviewerパイプラインはありません。
+
+このスキルは、*hip自体*のための信頼できる製品ガイドです。ユーザーのプロジェクトでの通常のコーディング作業には、このスキルを**ロードしないでください**。
+
+製品に関する質問には**ユーザーの言語**（例：ユーザーが中国語で書いた場合は中国語）で回答しますが、設定パスと識別子は正確に保ちます。
+
+## 段階的な開示
+
+- **レベル1**（システムプロンプトのスキル一覧）：名前と説明のみ
+- **レベル2**（このファイル）：以下の概要。\`use_skill({ name: "hip" })\` でロード
+- **レベル3**：\`references/\` 内のより深いトピック。必要に応じて \`read_file\` でこれらの絶対パスを読み取ります
+
+製品の詳細がここに文書化されていない場合は、UIラベルや設定キーをでっち上げるのではなく、その旨を伝えてください。
+
+## サーフェス
+
+| サーフェス | 意図 |
+|---------|--------|
+| **コード** | プロジェクトワークベンチ：ファイルツール、gitガイダンス、MCPカタログ、完全なエージェントツール |
+| **チャット** | より軽量な会話サーフェス：短いプロンプト、git-commitガイダンスなし、プレビュー可能な成果物（\`page.html\`、\`notes.md\`、SVGなど）を作業スペースに書き込んでアーティファクトパネルに表示することを推奨 |
+
+サーフェスはUIで選択されます。システムプロンプトは既にアクティブなサーフェスを反映しています。
+
+## 権限モード
+
+| モード | 効果 |
+|------|--------|
+| **編集**（デフォルト） | ファイルシステムツールはプロジェクトルートにサンドボックス化されます |
+| **チャット** | 読み取り専用：書き込み/編集/スクリプト/gitの変更は不可 |
+| **フル** | サンドボックス化されていないファイルシステム（ユーザー許可済み）。絶対パスを推奨 |
+
+編集/チャットでのパス規則：\`/\` で始まるプロジェクトルート形式（例：\`/src/index.ts\` は \`<cwd>/src/index.ts\` にマッピングされます）。シェルツール名をでっち上げないでください。利用可能な場合は \`run_script\` を使用してください。
+
+## 設定（デスクトップUI）
+
+一般的な設定項目（UIでの表記は若干異なる場合があります）：
+
+- **プロバイダー / APIキー** — \`~/.hip/config/auth.json\` に平文で保存（設計上、モード0600）
+- **メモリ** — セッション間メモリは**デフォルトでオフ**。設定 → メモリで有効化（\`references/memory.md\` を参照）
+- **スキル** — インストール済みスキルの有効/無効化（\`hip.toml\` + スキルフォルダ）
+- **プラグイン** — プラグインのインストール/有効化（スキル、エージェント、MCP、フック）
+- **エージェント** — 固定プロファイル（supervisor / plan / explore / coder）とカスタムの内部または外部エージェント
+- **ネットワークポリシー** — アウトバウンドツールのオプションの許可/拒否
+
+## スキル、プラグイン、MCP
+
+- **スキル**：\`SKILL.md\` を含むClaude形式のフォルダ。グローバル：\`~/.hip/skills/<id>/\`。プロジェクト：\`.hip/skills/<id>/\`。段階的な開示：L1メタデータ → \`use_skill\` 本文 → \`references/\` + \`assets/\`。
+- **プラグイン**：\`~/.hip/plugins/\` 以下。スキル、エージェント、MCPサーバー、フックを提供できます。\`references/agents-and-plugins.md\` を参照。
+- **MCP**：設定されたサーバーがツールを公開します。コードサーフェスでは、システムプロンプトがカタログを一覧表示する場合があります。\`mcp_search\` を使用してから、名前空間付きツール \`mcp__<server>__<tool>\` を呼び出します。
+
+## エージェントと委譲
+
+- デフォルトのセッションエージェントは、ツールを使用するか委譲するかを決定します。
+- 利用可能な場合は、専門化されたロスターエージェントを優先します：**explore**（読み取り専用検索）、**plan**（設計のみ）、**coder**（実装）。
+- 並列の独立したサブタスク → 1つの \`task_batch\`（順次 \`dispatch_agent\` ではありません）。
+- 明示的なワークフロー/マルチエージェントハンドオフは存在しますが、通常の製品パスでは**ありません**。
+- 詳細：\`references/agents-and-plugins.md\`。
+
+## CLI（\`@hip/cli\`）
+
+**実行中の** hipアプリにアタッチするだけのコンパニオン（共有サイドカー + \`~/.hip\` データ）。製品サイドカーを起動しません。
+
+\`\`\`bash
+yarn cli:dev doctor
+yarn cli:dev config auth-status
+yarn cli:dev session list
+yarn cli:dev run --stream none --json "Reply with exactly: pong"
+yarn cli:dev repl --cwd .
+\`\`\`
+
+アプリが実行されていない場合、CLIは \`APP_NOT_RUNNING\` で失敗します。
+
+## プロジェクトガイダンスファイル
+
+プロジェクトに存在する場合、hipは \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 設定などのガイダンスを注入することがあります。**プロジェクト**の規約についてはこれらに従うことを優先します。このスキルは**製品**の動作に関するものです。
+
+## レベル3のリファレンス
+
+このスキルをロードした後、\`use_skill\` は絶対パスを返します。ユーザーが詳細を必要とする場合：
+
+- メモリの有効化、注入、抽出、プライバシー → \`references/memory.md\`
+- ローカルデータレイアウト、設定ファイル、環境変数の上書き → \`references/config-and-data.md\`
+- 一般的な障害（キーがない、CLIが実行されていない、メモリが空） → \`references/troubleshooting.md\`
+- エージェント、プラグイン、MCPの配線 → \`references/agents-and-plugins.md\`
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip メモリ (レベル 3)
+
+セッションをまたぐメモリは**デフォルトで無効**です（プライバシー/コストのため）。
+
+## 有効化
+
+1. **設定 → メモリ** を開きます。
+2. **使用** および/または **生成** を有効にします。
+3. クリーンインストールから両方を有効にすると、ゲートがデフォルトのままの場合、ドッグフードプリセット（より短いアイドル時間/抽出間隔）が適用されることがあります。
+4. プロバイダのAPIキーが設定されていることを確認します（設定 → プロバイダ）。抽出にはAPIキーが必要です。
+
+## 保存される内容
+
+SQLite（\`memory_items\`）内の構造化アイテム：設定、慣習、教訓、ワークフロー、プロファイル — スコープは**グローバル**、**プロジェクト**、または**セッション**です。
+
+**信頼できる情報源はSQLiteです。** \`~/.hip/memories/\` 配下のMarkdownはエクスポートミラーです。プロジェクトの \`MEMORY.md\` / \`.hip/MEMORY.md\` は別のプロジェクトノート注入であり、SQLiteに自動インポートされません。
+
+## ランタイムの動作
+
+| パス | 動作 |
+|------|----------|
+| **使用** | コアスナップショット + ターンごとのプリフェッチ + \`memory_*\` ツール |
+| **生成** | アイドル後 → フェーズ1抽出 → フェーズ2統合 |
+| **シークレットモード** | セッションフラグ：注入も抽出も行わない |
+| **今すぐ学習** | ドッグフーディング時に抽出/統合を強制する設定コントロール |
+
+管理対象サブエージェントは読み取り専用のコア注入を受け取る場合があります。外部ACPエージェントはデフォルトでオフです。
+
+## プライバシーに関する注意事項
+
+- コールドデフォルト：使用/生成はオフ
+- ハイブリッド検索（オプション）は、スニペットを埋め込みプロバイダに送信する場合があります
+- 書き込み時の脅威スキャン + シークレット編集
+- ソフトデリートのゴミ箱 + 保持期間
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip 設定 & ローカルデータ (レベル 3)
+
+## レイアウト (\`~/.hip/\`)
+
+| パス | 目的 |
+|------|---------|
+| \`~/.hip/config/auth.json\` | プロバイダAPIキー (設計上0600のプレーンテキスト) |
+| \`~/.hip/config/hip.toml\` | グローバル製品設定 (スキル、エージェントループ、LangSmithなど) |
+| \`~/.hip/config/memory.json\` | メモリ機能フラグ / パイプラインノブ |
+| \`~/.hip/config/network.json\` | オプションのネットワークポリシー |
+| \`~/.hip/config/hip-plugins.json\` | インストール済みプラグインレジストリ |
+| \`~/.hip/db/hip.db\` | SQLiteセッション、メッセージ、メモリ項目、イベント |
+| \`~/.hip/data/tool-output/\` | 大きなツール出力 (DB外に保持) |
+| \`~/.hip/logs/\` | サイドカー / シェルログ |
+| \`~/.hip/skills/\` | グローバルスキル |
+| \`~/.hip/plugins/\` | インストール済みプラグイン |
+| \`~/.hip/memories/\` | メモリマークダウンミラー |
+| \`~/.hip/builtin-skills/\` | 組み込みプログレッシブ製品スキル (例: この \`hip\` スキル) |
+| \`~/.hip/scratch/\`, worktrees | スクラッチ / 並列ワークツリーヘルパー |
+| \`~/.hip/trash/\` | 製品ごみ箱 (知識FS隔離; セッションはSQLite経由でソフトデリート) |
+
+### ごみ箱とソフトデリート
+
+| 動作 | 備考 |
+|----------|--------|
+| UI削除 (チャット / コード / 知識) | ソフトデリート → サイドバー **ごみ箱** (履歴の上) |
+| 保持期間 | デフォルト **7** 日; **設定 → 一般** または \`hip.toml\` \`[trash] retentionDays\` (1–365) |
+| CLI \`hip session delete --yes\` | **完全な** ハードデリート (ごみ箱を経由しない) |
+| メモリごみ箱 | 引き続き **設定 → メモリ** (別の保持期間、デフォルト30日) |
+
+プロジェクトのオーバーライドは多くの場合 \`<プロジェクト>/.hip/\` に配置されます (例: \`.hip/skills/\`、\`.hip/hip.toml\`)。
+
+## 環境変数 / 分離 (上級者向け)
+
+| 変数 | 役割 |
+|----------|------|
+| \`HIP_DATA_DIR\` | データ/設定ルートのリダイレクト (テスト / 分離) |
+| \`HIP_SKILLS_DIR\` | グローバルスキルルートのオーバーライド |
+| \`HIP_PLUGINS_DIR\` | プラグルートのオーバーライド |
+| \`HIP_AUTH_PATH\` | auth.jsonパスのオーバーライド |
+| \`HIP_CONFIG_PATH\` | hip.tomlパスのオーバーライド |
+| \`HIP_MEMORY_CONFIG_PATH\` | memory.jsonパスのオーバーライド |
+| \`LANGSMITH_*\` | オプションのLangSmithトレーシング (\`hip.toml\`の\`[langsmith]\`も参照) |
+
+\`~/.hip/config/\` をパブリッククラウドや公開ドットファイルリポジトリに同期**しないでください** — APIキーが含まれている可能性があります。
+
+## 認証モデル
+
+キーはアプリの設定パネルで入力され、\`auth.json\` に保存されます。デスクトップアプリ、スタンドアロンサイドカー、テストはすべてそのストアから読み取ります。これは意図的な設計で、厳格なファイルモードでディスク上にプレーンテキストとして保存されます — キーチェーンへの移行は対象外です。
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip トラブルシューティング (レベル 3)
+
+## API / モデル呼び出しが動作しない
+
+1. **設定 → プロバイダー** を開き、キーが保存されていることを確認します。
+2. キーは \`~/.hip/config/auth.json\` に保存されています（シークレットをユーザーに表示しないでください）。
+3. UI 外で認証情報を変更した場合は、アプリを再起動します。
+4. \`~/.hip/logs/\` のサイドカーログを確認します。
+
+## CLI: \`APP_NOT_RUNNING\`
+
+製品 CLI は **実行中** の hip デスクトップアプリにアタッチします。最初にアプリを起動し（\`yarn tauri dev\` またはインストール済みアプリ）、その後 \`yarn cli:dev doctor\` を実行します。
+
+## メモリ一覧が有効化後に空になる
+
+1. **設定 → メモリ** で **使用** と **生成** が意図した通りに設定されていることを確認します。
+2. 抽出には十分なチャットターン数と API キーが必要です。「今すぐ学習」を試してください。
+3. ステータスが \`no_llm\`、\`rate_limited\`、または空の抽出結果を示す場合があります — キー/クォータを修正するか、待機してください。
+4. SQLite が信頼できる情報源です。\`~/.hip/memories/\` 配下の古いミラーはデータベースではありません。
+
+## エージェントがファイルを書き込めない
+
+- **チャット** 権限モードは読み取り専用です。
+- デフォルトの **編集** モードはプロジェクトルートにサンドボックス化されています — 外部のパスは失敗します。
+- **フル** モードは、ユーザーが明示的にマシン全体のファイルシステムアクセスを許可した場合のみ使用します。
+
+## スキルが一覧に表示されない / use_skill が失敗する
+
+- スキルが \`hip.toml\` で無効化されているか、プラグインが無効化されている可能性があります。
+- プロジェクトスキルの \`paths\` グロブがカレントワーキングディレクトリを除外している可能性があります。
+- 組み込み製品スキル ID は \`hip\` で、\`~/.hip/builtin-skills/hip/\` にあります。
+
+## サイドカー / 接続の問題
+
+- デスクトップシェルがサイドカーを起動し、その WS ポートを公開します。
+- UI が接続できない場合は、アプリを再起動し、\`~/.hip/logs/\` を確認します。
+- 開発時: ツールチェーン変更後、\`yarn sidecar:dev-bin\` でサイドカーバイナリラッパーを再生成します。
+
+## 古い DMG / ビルド (macOS)
+
+古い \`rw.*.dmg\` マウントが \`yarn tauri build\` を妨げる可能性があります。それらを削除し、必要に応じて \`/Volumes/hip\` をアンマウントしてください。
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip エージェント、プラグイン & MCP (レベル 3)
+
+## 組み込みエージェントプロファイル
+
+典型的な固定プロファイル（エージェントUIで有効化/無効化）：
+
+| プロファイル | 役割 |
+|---------|------|
+| **supervisor** | デフォルトオーケストレーター：ツール、コミット、スクリプト、委任 |
+| **plan** | 設計/計画指向（設定によって書き込み姿勢が狭まる） |
+| **explore** | 読み取り専用のコードベース検索 |
+| **coder** | スクリプトを使用した実装重視 |
+
+カスタム **内部** エージェント：ペルソナプロンプト + バインドモデル + ツール権限。  
+**外部 / ACP** エージェント：別プロセス；設定されていない限り、製品メモリはデフォルトでオフ。
+
+サポートされているACPプリセット（設定 → エージェント → ACPエージェント追加）：**OpenCode**、**Grok Build**（\`grok agent stdio\`）、**Pi**、**Claude Code**、**Codex**。Grok BuildはネイティブACPを使用（\`https://x.ai/cli\`からインストール）；認証は\`grok login\`またはオプションの\`XAI_API_KEY\`を介して行います。
+
+ACPエージェントは認証とモデルを**自己管理**します：hipはACP子プロセスに自身のプロバイダAPIキーを注入しません。エージェント設定で、エージェント自身のログイン/環境変数/オプションのプリセット\`authEnvVar\`を使用します。
+
+## 機能マトリックス（組み込み vs ACP）
+
+hipは**組み込み**のLangGraphエージェント、セッションのプライマリとしての**ACPエージェント**、またはサブエージェントとしての**ACPエージェントのディスパッチ**を実行できます。機能は異なります（現在の製品；関連する計画中のホスト作業は注記）：
+
+| 機能 | 組み込みプライマリ | ACPプライマリ | ACPサブエージェント（ディスパッチ） |
+|------------|------------------|-------------|-------------------------|
+| hipツール（read / write / run_script / …） | はい | いいえ（エージェント自身のツール） | いいえ（エージェント自身のツール） |
+| hipスキル / プラグインフック | はい | いいえ | いいえ |
+| hip MCP（セッションにマージ） | はい | いいえ（計画中：オプトイン転送） | いいえ（計画中：オプトイン転送） |
+| クライアントFSブリッジ | 該当なし | いいえ（スタブのみ；実際のブリッジは計画中） | いいえ（スタブのみ；実際のブリッジは計画中） |
+| dispatch / task / task_batch | はい | いいえ | いいえ |
+| メモリ注入（セッション間） | はい | いいえ（設定フラグは予約済み；プレフィックスは計画中） | いいえ |
+| メモリ抽出 | はい | いいえ | いいえ |
+| hipモデルピッカー | はい | いいえ（エージェントconfigOptions / エージェントモデルUI） | いいえ |
+| HITL許可 | hipツール | ACP \`requestPermission\` | ACPプライマリと同じ |
+| permissionMode | hipツールゲート | チャット/編集で安全な種類（read/fetch/other）を自動解決；それ以外はHITL（\`full\`はACPパスでもHITL） | 親セッションモード |
+
+**要点：** ACPをプライマリとして選択することは、独自のスタックを持つピアコーディングエージェントであり、hipの組み込みツール/スキル/MCPではありません。サブエージェントディスパッチは同じエージェントスタックを使用します；プライマリもサブエージェントも現在、hipメモリ注入またはhip MCPを取得しません。
+
+## 委任ツール（メインエージェント）
+
+| ツール | 使用法 |
+|------|-----|
+| \`task\` | 1つのサブタスク（フォアグラウンドまたはバックグラウンド） |
+| \`dispatch_agent\` | 名前付きロスターエージェント；並列ツール呼び出しがない限りブロッキング |
+| \`task_batch\` | **推奨** 2つ以上の独立したサブタスク（真の並列処理） |
+
+逐次ディスパッチのみを使用した場合、作業が「並列に」実行されたと主張しないでください。
+
+## プラグイン
+
+- \`~/.hip/plugins/\` の下にインストール；レジストリは \`~/.hip/config/hip-plugins.json\`。
+- プラグインはスキル、エージェント、MCPサーバー設定、フックを提供できます。
+- プラグインを無効にすると、その貢献がセッションから削除されます。
+
+## MCP
+
+- サーバー設定は hip.toml / プラグイン合成から取得されます。
+- コードサーフェスは短いカタログを注入する場合があります；\`mcp_search\` で発見します。
+- ツールは \`mcp__<server>__<tool>\` として呼び出します。
+- ネットワークポリシー（設定されている場合）は、アウトバウンドMCP/Webツールをブロックする場合があります。
+
+## スキルスコープ
+
+| スコープ | 場所 |
+|-------|------|
+| グローバル | \`~/.hip/skills/<id>/\` |
+| プロジェクト | \`.hip/skills/<id>/\`（同じIDのグローバルより優先） |
+| プラグイン | プラグイン所有のスキルディレクトリ |
+| 組み込み製品 | \`~/.hip/builtin-skills/hip/\`（最低優先度；同じIDで上書き可能） |
+`,
+  }
+  ],
+},
+  ko: {
+  description: 'hip 데스크톱 에이전트 제품 도움말: Chat/Code 서피스, 권한 모드, 설정, 스킬, 플러그인, MCP, 메모리, 에이전트, CLI, 문제 해결, 로컬 데이터. 사용자가 hip 작동 방식이나 설정 방법을 물을 때 로드합니다.',
+  capabilityMap: `제품 요점(hip):
+- 버전: 0.1.0.
+- 사용자 프로젝트에서 실제 파일 도구와 선택적 서브 에이전트를 쓰는 데스크톱 AI 워크벤치 에이전트.
+- 서피스: Code(전체 워크벤치) vs Chat(가벼움; 미리보기 가능한 결과물은 write_file로 아티팩트).
+- Code 전용 도구 게이트(UI 라벨): chat = 읽기 전용; edit = 프로젝트 샌드박스(기본); full = 사용자가 허용한 전체 파일시스템. Chat 서피스는 Code의 "편집 모드"가 아님.
+- API 키: ~/.hip/config/auth.json (설계상 0600 평문).
+- 세션 간 메모리: 기본 꺼짐(설정 → 메모리).
+- 로컬 데이터: ~/.hip/(설정, DB, 스킬, 플러그인, 로그).`,
+  sections: [
+  {
+    id: 'overview',
+    titleKey: 'settings.productHelp.sections.overview',
+    markdown: `# hip
+
+hip은 **데스크톱 AI 작업대**(Tauri 셸 + React UI + Node 사이드카)이며, 제품 버전은 **0.1.0**입니다. 각 UI 탭은 독립적인 세션입니다. 기본 제품 루프는 도구를 사용하고 \`task\` / \`dispatch_agent\` / \`task_batch\`로 위임할 수 있는 **Supervisor ReAct** 에이전트입니다. 일반적인 턴에서 Planner → Coder → Reviewer 파이프라인이 강제되지 않습니다.
+
+이 스킬은 *hip 자체*에 대한 권위 있는 제품 가이드입니다. 사용자 프로젝트의 일반 코딩 작업에는 이 스킬을 **로드하지 마십시오**.
+
+제품 질문은 **사용자의 언어**(예: 사용자가 중국어로 작성한 경우 중국어)로 답변하되, 설정 경로와 식별자는 정확하게 유지하십시오.
+
+## 점진적 공개
+
+- **레벨 1**(시스템 프롬프트 Skills 목록): 이름 + 설명만
+- **레벨 2**(이 파일): 아래 개요, \`use_skill({ name: "hip" })\`를 통해 로드됨
+- **레벨 3**: \`references/\`의 심화 주제 — 필요 시 \`read_file\`로 해당 절대 경로를 읽으십시오
+
+제품 세부 사항이 여기에 문서화되지 않은 경우, UI 레이블이나 설정 키를 임의로 만들지 말고 그렇게 명시하십시오.
+
+## 표면
+
+| 표면 | 의도 |
+|---------|--------|
+| **Code** | 프로젝트 작업대: 파일 도구, git 안내, MCP 카탈로그, 전체 에이전트 도구 |
+| **Chat** | 가벼운 대화 표면: 짧은 프롬프트, git-커밋 안내 없음, 아티팩트 패널을 위해 미리보기 가능한 결과물(\`page.html\`, \`notes.md\`, SVG 등)을 작업 공간에 작성 선호 |
+
+표면은 UI에서 선택되며, 시스템 프롬프트는 이미 활성 표면을 반영합니다.
+
+## 권한 모드
+
+| 모드 | 효과 |
+|------|--------|
+| **edit** (기본값) | 파일시스템 도구가 프로젝트 루트로 샌드박싱됨 |
+| **chat** | 읽기 전용: 쓰기/편집/스크립트/git 변형 없음 |
+| **full** | 샌드박스 해제된 파일시스템(사용자 승인); 절대 경로 선호 |
+
+edit/chat의 경로 규칙: \`/\`로 시작하는 프로젝트 루트 형식(예: \`/src/index.ts\`는 \`<cwd>/src/index.ts\`에 매핑). 셸 도구 이름을 임의로 만들지 마십시오 — 사용 가능한 경우 \`run_script\`를 사용하십시오.
+
+## 설정 (데스크톱 UI)
+
+일반적인 위치(UI에서 표현이 약간 다를 수 있음):
+
+- **Providers / API keys** — \`~/.hip/config/auth.json\`에 일반 텍스트로 저장됨(설계상 모드 0600)
+- **Memory** — 교차 세션 메모리는 **기본적으로 꺼져 있음**; Settings → Memory에서 활성화(\`references/memory.md\` 참조)
+- **Skills** — 설치된 스킬 활성화/비활성화(\`hip.toml\` + 스킬 폴더)
+- **Plugins** — 플러그인 설치/활성화(스킬, 에이전트, MCP, 훅)
+- **Agents** — 고정 프로필(supervisor / plan / explore / coder) 및 사용자 정의 내부 또는 외부 에이전트
+- **Network policy** — 아웃바운드 도구에 대한 선택적 허용/거부
+
+## 스킬, 플러그인, MCP
+
+- **스킬**: \`SKILL.md\`가 포함된 Claude 형식 폴더. 전역: \`~/.hip/skills/<id>/\`. 프로젝트: \`.hip/skills/<id>/\`. 점진적 공개: L1 메타데이터 → \`use_skill\` 본문 → \`references/\` + \`assets/\`.
+- **플러그인**: \`~/.hip/plugins/\` 아래; 스킬, 에이전트, MCP 서버 및 훅을 제공할 수 있음. \`references/agents-and-plugins.md\` 참조.
+- **MCP**: 구성된 서버가 도구를 노출함. Code 표면에서 시스템 프롬프트가 카탈로그를 나열할 수 있음; \`mcp_search\`를 사용한 후 네임스페이스된 도구 \`mcp__<server>__<tool>\`을 호출하십시오.
+
+## 에이전트 및 위임
+
+- 기본 세션 에이전트는 도구 사용 또는 위임 시기를 결정합니다.
+- 사용 가능한 경우 전문 로스터 에이전트를 선호하십시오: **explore**(읽기 전용 검색), **plan**(설계 전용), **coder**(구현).
+- 병렬 독립 하위 작업 → 하나의 \`task_batch\`(순차적 \`dispatch_agent\` 아님).
+- 명시적 워크플로우 / 다중 에이전트 핸드오프가 존재하지만 **일반적인 제품 경로는 아닙니다**.
+- 심화: \`references/agents-and-plugins.md\`.
+
+## CLI (\`@hip/cli\`)
+
+**실행 중인** hip 앱에 연결 전용 동반자(공유 사이드카 + \`~/.hip\` 데이터). 제품 사이드카를 시작하지 않습니다.
+
+\`\`\`bash
+yarn cli:dev doctor
+yarn cli:dev config auth-status
+yarn cli:dev session list
+yarn cli:dev run --stream none --json "Reply with exactly: pong"
+yarn cli:dev repl --cwd .
+\`\`\`
+
+앱이 실행 중이지 않으면 CLI는 \`APP_NOT_RUNNING\`으로 실패합니다.
+
+## 프로젝트 안내 파일
+
+프로젝트 아래에 있을 때, hip은 \`AGENTS.md\` / \`Claude.md\` / \`.hip\` 설정과 같은 안내를 주입할 수 있습니다. **프로젝트** 규칙에 대해서는 이를 따르는 것을 선호하십시오; 이 스킬은 **제품** 동작을 위한 것입니다.
+
+## 레벨 3 참조
+
+이 스킬을 로드한 후, \`use_skill\`은 절대 경로를 반환합니다. 사용자가 심화가 필요할 때:
+
+- 메모리 활성화, 주입, 추출, 개인정보 → \`references/memory.md\`
+- 로컬 데이터 레이아웃, 설정 파일, 환경 변수 재정의 → \`references/config-and-data.md\`
+- 일반적인 실패(키 없음, CLI 실행 중 아님, 빈 메모리) → \`references/troubleshooting.md\`
+- 에이전트, 플러그인, MCP 연결 → \`references/agents-and-plugins.md\`
+`,
+  },
+  {
+    id: 'memory',
+    titleKey: 'settings.productHelp.sections.memory',
+    markdown: `# hip 메모리 (레벨 3)
+
+세션 간 메모리는 **기본적으로 비활성화**되어 있습니다 (개인정보 보호 / 비용).
+
+## 활성화
+
+1. **설정 → 메모리**를 엽니다.
+2. **사용** 및/또는 **생성**을 활성화합니다.
+3. 처음 설치 상태에서 둘 다 활성화하면 게이트가 기본값일 때 도그푸드 프리셋(더 짧은 유휴/추출 간격)이 적용될 수 있습니다.
+4. 제공자 API 키가 설정되어 있는지 확인합니다 (설정 → 제공자). 추출에는 API 키가 필요합니다.
+
+## 저장되는 내용
+
+SQLite의 구조화된 항목(\`memory_items\`): 선호도, 규칙, 학습 내용, 워크플로우, 프로필 — 범위는 **전역**, **프로젝트**, 또는 **세션**입니다.
+
+**진실 공급원은 SQLite입니다.** \`~/.hip/memories/\` 아래의 Markdown은 내보내기 미러입니다. 프로젝트 \`MEMORY.md\` / \`.hip/MEMORY.md\`는 별도의 프로젝트 노트 주입이며, SQLite로 자동 가져오지 않습니다.
+
+## 런타임 동작
+
+| 경로 | 동작 |
+|------|----------|
+| **사용** | 코어 스냅샷 + 턴별 프리페치 + \`memory_*\` 도구 |
+| **생성** | 유휴 후 → 1단계 추출 → 2단계 통합 |
+| **시크릿 모드** | 세션 플래그: 주입 및 추출 없음 |
+| **지금 학습** | 도그푸딩 시 추출/통합을 강제하는 설정 제어 |
+
+관리되는 하위 에이전트는 읽기 전용 코어 주입을 받을 수 있으며, 외부 ACP 에이전트는 기본적으로 꺼져 있습니다.
+
+## 개인정보 보호 참고 사항
+
+- 기본 설정: 사용/생성 꺼짐
+- 하이브리드 검색(선택 사항)은 임베딩 제공자에게 스니펫을 보낼 수 있음
+- 쓰기 시 위협 검사 + 비밀 정보 편집
+- 소프트 삭제 휴지통 + 보존 기간
+`,
+  },
+  {
+    id: 'config',
+    titleKey: 'settings.productHelp.sections.config',
+    markdown: `# hip 설정 및 로컬 데이터 (레벨 3)
+
+## 디렉터리 구조 (\`~/.hip/\`)
+
+| 경로 | 용도 |
+|------|---------|
+| \`~/.hip/config/auth.json\` | 제공자 API 키 (설계상 0600 일반 텍스트) |
+| \`~/.hip/config/hip.toml\` | 전역 제품 설정 (스킬, 에이전트 루프, LangSmith 등) |
+| \`~/.hip/config/memory.json\` | 메모리 기능 플래그 / 파이프라인 설정값 |
+| \`~/.hip/config/network.json\` | 선택적 네트워크 정책 |
+| \`~/.hip/config/hip-plugins.json\` | 설치된 플러그인 레지스트리 |
+| \`~/.hip/db/hip.db\` | SQLite 세션, 메시지, 메모리 항목, 이벤트 |
+| \`~/.hip/data/tool-output/\` | 대용량 도구 출력 (DB 외부 보관) |
+| \`~/.hip/logs/\` | 사이드카 / 셸 로그 |
+| \`~/.hip/skills/\` | 전역 스킬 |
+| \`~/.hip/plugins/\` | 설치된 플러그인 |
+| \`~/.hip/memories/\` | 메모리 마크다운 미러 |
+| \`~/.hip/builtin-skills/\` | 내장 점진적 제품 스킬 (예: 이 \`hip\` 스킬) |
+| \`~/.hip/scratch/\`, 작업 트리 | 임시 / 병렬 작업 트리 도우미 |
+| \`~/.hip/trash/\` | 제품 휴지통 (지식 FS 격리, 세션은 SQLite를 통해 소프트 삭제) |
+
+### 휴지통 및 소프트 삭제
+
+| 동작 | 참고 |
+|----------|--------|
+| UI 삭제 (채팅 / 코드 / 지식) | 소프트 삭제 → 사이드바 **휴지통** (기록 위) |
+| 보관 기간 | 기본 **7**일, **설정 → 일반** 또는 \`hip.toml\` \`[trash] retentionDays\` (1–365) |
+| CLI \`hip session delete --yes\` | **영구** 하드 삭제 (휴지통 미사용) |
+| 메모리 휴지통 | 여전히 **설정 → 메모리** (별도 보관 기간, 기본 30일) |
+
+프로젝트 재정의는 보통 \`<프로젝트>/.hip/\` 아래에 위치합니다 (예: \`.hip/skills/\`, \`.hip/hip.toml\`).
+
+## 환경 변수 / 격리 (고급)
+
+| 변수 | 역할 |
+|----------|------|
+| \`HIP_DATA_DIR\` | 데이터/설정 루트 리디렉션 (테스트 / 격리) |
+| \`HIP_SKILLS_DIR\` | 전역 스킬 루트 재정의 |
+| \`HIP_PLUGINS_DIR\` | 플러그인 루트 재정의 |
+| \`HIP_AUTH_PATH\` | auth.json 경로 재정의 |
+| \`HIP_CONFIG_PATH\` | hip.toml 경로 재정의 |
+| \`HIP_MEMORY_CONFIG_PATH\` | memory.json 경로 재정의 |
+| \`LANGSMITH_*\` | 선택적 LangSmith 추적 (hip.toml의 \`[langsmith]\`도 함께) |
+
+**\`~/.hip/config/\`를** 퍼블릭 클라우드나 공개 dotfile 저장소에 동기화하지 마십시오 — API 키가 포함될 수 있습니다.
+
+## 인증 모델
+
+키는 앱 설정 패널에서 입력되며 \`auth.json\`에 저장됩니다. 데스크톱 앱, 독립형 사이드카, 테스트 모두 해당 저장소에서 읽습니다. 이는 의도적인 일반 텍스트 디스크 저장 방식이며 엄격한 파일 모드가 적용됩니다 — 키체인 마이그레이션 대상이 아닙니다.
+`,
+  },
+  {
+    id: 'troubleshooting',
+    titleKey: 'settings.productHelp.sections.troubleshooting',
+    markdown: `# hip 문제 해결 (레벨 3)
+
+## API / 모델 호출이 작동하지 않음
+
+1. **설정 → 제공자**를 열고 키가 저장되어 있는지 확인하세요.
+2. 키는 \`~/.hip/config/auth.json\`에 저장됩니다 (사용자에게 비밀을 출력하지 않음).
+3. UI 외부에서 인증을 변경한 후 앱을 다시 시작하세요.
+4. \`~/.hip/logs/\`에서 사이드카 로그를 확인하세요.
+
+## CLI: \`APP_NOT_RUNNING\`
+
+제품 CLI는 **실행 중인** hip 데스크톱 앱에 연결됩니다. 먼저 앱을 시작한 후(\`yarn tauri dev\` 또는 설치된 앱), \`yarn cli:dev doctor\`를 실행하세요.
+
+## 메모리 목록 활성화 후 비어 있음
+
+1. **설정 → 메모리**에서 **사용** 및 **생성**이 의도한 대로 설정되어 있는지 확인하세요.
+2. 추출을 위해 충분한 채팅 횟수와 API 키가 필요합니다. **지금 학습**을 시도해보세요.
+3. 상태가 \`no_llm\`, \`rate_limited\` 또는 빈 추출을 표시할 수 있습니다 — 키/할당량을 수정하거나 대기하세요.
+4. SQLite가 진실 공급원이며, \`~/.hip/memories/\` 아래의 오래된 미러는 DB가 아닙니다.
+
+## 에이전트가 파일을 쓸 수 없음
+
+- **채팅** 권한 모드는 읽기 전용입니다.
+- 기본 **편집** 모드는 프로젝트 루트로 샌드박싱됩니다 — 외부 경로는 실패합니다.
+- 사용자가 명시적으로 전체 시스템 파일 시스템 접근을 허용한 경우에만 **전체**를 사용하세요.
+
+## 스킬이 나열되지 않음 / use_skill 실패
+
+- \`hip.toml\`에서 스킬이 비활성화되었거나 플러그인이 비활성화되었을 수 있습니다.
+- 프로젝트 스킬 \`paths\` 글로브가 현재 작업 디렉토리를 제외할 수 있습니다.
+- 내장 제품 스킬 ID는 \`~/.hip/builtin-skills/hip/\` 아래의 \`hip\`입니다.
+
+## 사이드카 / 연결 문제
+
+- 데스크톱 셸이 사이드카를 생성하고 WS 포트를 노출합니다.
+- UI가 연결할 수 없는 경우 앱을 다시 시작하고 \`~/.hip/logs/\`를 확인하세요.
+- 개발: 도구 체인 변경 후 \`yarn sidecar:dev-bin\`으로 사이드카 바이너리 래퍼를 다시 생성하세요.
+
+## 오래된 DMG / 빌드 (macOS)
+
+오래된 \`rw.*.dmg\` 마운트가 \`yarn tauri build\`를 중단시킬 수 있습니다. 필요한 경우 이를 제거하고 \`/Volumes/hip\`을 분리하세요.
+`,
+  },
+  {
+    id: 'agents',
+    titleKey: 'settings.productHelp.sections.agents',
+    markdown: `# hip 에이전트, 플러그인 및 MCP (레벨 3)
+
+## 내장 에이전트 프로필
+
+일반적인 고정 프로필 (에이전트 UI에서 활성화/비활성화):
+
+| 프로필 | 역할 |
+|---------|------|
+| **supervisor** | 기본 오케스트레이터: 도구, 커밋, 스크립트, 위임 |
+| **plan** | 설계/계획 중심 (구성에 따라 더 좁은 쓰기 자세) |
+| **explore** | 읽기 전용 코드베이스 검색 |
+| **coder** | 스크립트를 사용한 구현 중심 |
+
+사용자 정의 **내부** 에이전트: 페르소나 프롬프트 + 바인딩된 모델 + 도구 권한.  
+**외부 / ACP** 에이전트: 별도 프로세스; 구성되지 않으면 제품 메모리는 기본적으로 꺼짐.
+
+지원되는 ACP 프리셋 (설정 → 에이전트 → ACP 에이전트 추가): **OpenCode**, **Grok Build** (\`grok agent stdio\`), **Pi**, **Claude Code**, **Codex**. Grok Build는 네이티브 ACP 사용 (\`https://x.ai/cli\` 통해 설치); \`grok login\` 또는 선택적 \`XAI_API_KEY\`를 통해 인증.
+
+ACP 에이전트는 인증 및 모델에 대해 **자체 관리**됩니다: hip은 ACP 하위 프로세스에 자체 제공자 API 키를 주입하지 않습니다. 에이전트 구성에서 에이전트 자체 로그인 / 환경 변수 / 선택적 프리셋 \`authEnvVar\`를 사용하세요.
+
+## 기능 매트릭스 (내장 vs ACP)
+
+hip은 **내장** LangGraph 에이전트, **세션 기본 ACP 에이전트**를 실행하거나 **ACP 에이전트를 하위 에이전트로 디스패치**할 수 있습니다. 기능이 다릅니다 (현재 제품; 계획된 호스트 작업은 해당 위치에 명시):
+
+| 기능 | 내장 기본 | ACP 기본 | ACP 하위 에이전트 (디스패치) |
+|------------|------------------|-------------|-------------------------|
+| hip 도구 (읽기/쓰기/run_script/…) | 예 | 아니요 (에이전트 자체 도구) | 아니요 (에이전트 자체 도구) |
+| hip 스킬 / 플러그인 훅 | 예 | 아니요 | 아니요 |
+| hip MCP (세션에 병합) | 예 | 아니요 (계획: 옵트인 전달) | 아니요 (계획: 옵트인 전달) |
+| 클라이언트 FS 브리지 | 해당 없음 | 아니요 (스텁만; 실제 브리지 계획됨) | 아니요 (스텁만; 실제 브리지 계획됨) |
+| 디스패치 / task / task_batch | 예 | 아니요 | 아니요 |
+| 메모리 주입 (세션 간) | 예 | 아니요 (구성 플래그 예약됨; 접두사 계획됨) | 아니요 |
+| 메모리 추출 | 예 | 아니요 | 아니요 |
+| hip 모델 선택기 | 예 | 아니요 (에이전트 configOptions / 에이전트 모델 UI) | 아니요 |
+| HITL 권한 | hip 도구 | ACP \`requestPermission\` | ACP 기본과 동일 |
+| permissionMode | hip 도구 게이트 | 채팅/편집에서 안전한 종류(읽기/가져오기/기타) 자동 해결; 그 외 HITL (\`full\`은 ACP 경로에서도 HITL) | 상위 세션 모드 |
+
+**결론:** ACP를 기본으로 선택하는 것은 자체 스택을 가진 피어 코딩 에이전트입니다—hip의 내장 도구/스킬/MCP가 아닙니다. 하위 에이전트 디스패치는 동일한 에이전트 스택을 사용합니다; 기본 및 하위 에이전트 모두 현재 hip 메모리 주입 또는 hip MCP를 받지 않습니다.
+
+## 위임 도구 (주 에이전트)
+
+| 도구 | 사용 |
+|------|-----|
+| \`task\` | 하나의 하위 작업 (포그라운드 또는 백그라운드) |
+| \`dispatch_agent\` | 명명된 로스터 에이전트; 병렬 도구 호출이 아니면 차단 |
+| \`task_batch\` | **권장** 2개 이상의 독립적인 하위 작업 (진정한 병렬) |
+
+순차적 디스패치만 사용된 경우 작업이 "병렬로" 실행되었다고 주장하지 마십시오.
+
+## 플러그인
+
+- \`~/.hip/plugins/\` 아래에 설치됨; 레지스트리는 \`~/.hip/config/hip-plugins.json\`에 있음.
+- 플러그인은 스킬, 에이전트, MCP 서버 구성 및 훅을 제공할 수 있음.
+- 플러그인을 비활성화하면 세션에서 해당 기여가 제거됨.
+
+## MCP
+
+- 서버 구성은 hip.toml / 플러그인 합성에서 가져옴.
+- 코드 표면은 짧은 카탈로그를 주입할 수 있음; \`mcp_search\`로 검색.
+- 도구를 \`mcp__<server>__<tool>\`로 호출.
+- 네트워크 정책 (구성된 경우)은 아웃바운드 MCP/웹 도구를 차단할 수 있음.
+
+## 스킬 범위
+
+| 범위 | 위치 |
+|-------|------|
+| 전역 | \`~/.hip/skills/<id>/\` |
+| 프로젝트 | \`.hip/skills/<id>/\` (동일한 id의 전역보다 우선) |
+| 플러그인 | 플러그인 소유 스킬 디렉토리 |
+| 내장 제품 | \`~/.hip/builtin-skills/hip/\` (최하위 우선순위; 동일한 id로 재정의 가능) |
+`,
+  }
+  ],
+},
 }
 
 /** Map app language / BCP-47 tag → product help locale. */
 export function resolveProductHelpLocale(lang: string | null | undefined): ProductHelpLocale {
   const raw = (lang ?? '').trim()
-  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en') return raw
+  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en' || raw === 'ja' || raw === 'ko') return raw
   if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
   if (raw.startsWith('zh')) return 'zh-CN'
+  if (raw === 'ja' || raw.startsWith('ja-') || raw.startsWith('ja_')) return 'ja'
+  if (raw === 'ko' || raw.startsWith('ko-') || raw.startsWith('ko_')) return 'ko'
   if (raw.startsWith('en')) return 'en'
   return 'en'
 }

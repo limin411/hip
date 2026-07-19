@@ -27,7 +27,7 @@ vi.mock('sonner', () => ({
 const mockSetActiveView = vi.fn()
 const mockSetTab = vi.fn()
 let mockActiveView: 'chat' | 'code' | 'settings' = 'chat'
-let mockLanguage: 'en' | 'zh-CN' | 'zh-TW' = 'en'
+let mockLanguage: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' = 'en'
 
 vi.mock('@/store/uiStore', () => ({
   useUiStore: Object.assign(

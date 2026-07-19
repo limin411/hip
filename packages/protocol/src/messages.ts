@@ -219,7 +219,7 @@ export type ClientMessage =
 
 /** Context for LLM empty-state title/sub generation (UI chrome only). */
 export interface EmptyGreetingGenerateContext {
-  language: 'zh-CN' | 'zh-TW' | 'en'
+  language: 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'ko'
   surface: 'chat' | 'code'
   /**
    * Fine local time slot:

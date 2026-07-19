@@ -236,6 +236,12 @@ describe('uiStore - language', () => {
 
     useUiStore.getState().setLanguage('zh-TW')
     expect(useUiStore.getState().language).toBe('zh-TW')
+
+    useUiStore.getState().setLanguage('ja')
+    expect(useUiStore.getState().language).toBe('ja')
+
+    useUiStore.getState().setLanguage('ko')
+    expect(useUiStore.getState().language).toBe('ko')
   })
 
   it('setLanguage to the same value is a no-op', () => {
@@ -254,6 +260,10 @@ describe('normalizeAppLanguage', () => {
     expect(normalizeAppLanguage('en-US')).toBe('en')
     expect(normalizeAppLanguage('zh-HK')).toBe('zh-TW')
     expect(normalizeAppLanguage('zh')).toBe('zh-CN')
+    expect(normalizeAppLanguage('ja')).toBe('ja')
+    expect(normalizeAppLanguage('ja-JP')).toBe('ja')
+    expect(normalizeAppLanguage('ko')).toBe('ko')
+    expect(normalizeAppLanguage('ko-KR')).toBe('ko')
     expect(normalizeAppLanguage('fr')).toBeNull()
   })
 })

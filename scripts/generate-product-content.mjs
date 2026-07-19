@@ -76,7 +76,7 @@ function asSingleQuoted(s) {
   return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
 }
 
-const UI_LOCALES = ['en', 'zh-CN', 'zh-TW']
+const UI_LOCALES = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko']
 
 function loadMeta() {
   const raw = JSON.parse(readText(join(SOT, 'meta.json')))
@@ -328,17 +328,17 @@ ${emitSections(localePacks.en.sections)}
 
 /** All UI locales for Settings → Product help. Agent embeds stay English. */
 export const PRODUCT_HELP_LOCALES: Record<ProductHelpLocale, ProductHelpLocalePack> = {
-  en: ${emitPack(localePacks.en)},
-  'zh-CN': ${emitPack(localePacks['zh-CN'])},
-  'zh-TW': ${emitPack(localePacks['zh-TW'])},
+${UI_LOCALES.map((loc) => `  ${loc.includes('-') ? asSingleQuoted(loc) : loc}: ${emitPack(localePacks[loc])},`).join('\n')}
 }
 
 /** Map app language / BCP-47 tag → product help locale. */
 export function resolveProductHelpLocale(lang: string | null | undefined): ProductHelpLocale {
   const raw = (lang ?? '').trim()
-  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en') return raw
+  if (raw === 'zh-CN' || raw === 'zh-TW' || raw === 'en' || raw === 'ja' || raw === 'ko') return raw
   if (raw.startsWith('zh-TW') || raw.startsWith('zh-HK') || raw === 'zh-Hant') return 'zh-TW'
   if (raw.startsWith('zh')) return 'zh-CN'
+  if (raw === 'ja' || raw.startsWith('ja-') || raw.startsWith('ja_')) return 'ja'
+  if (raw === 'ko' || raw.startsWith('ko-') || raw.startsWith('ko_')) return 'ko'
   if (raw.startsWith('en')) return 'en'
   return 'en'
 }

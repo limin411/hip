@@ -1,10 +1,12 @@
 import type { TraceRun } from './tool-trace.js'
 
 /** Localized note appended when the model claims a file write that never happened. */
-const NOTE: Record<'en' | 'zh-CN' | 'zh-TW', string> = {
+const NOTE: Record<'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko', string> = {
   en: '⚠️ No files were actually created this turn — no write tool was called.',
   'zh-CN': '⚠️ 本回合没有真正创建任何文件——没有调用写入工具。',
   'zh-TW': '⚠️ 本回合沒有真正建立任何檔案——沒有呼叫寫入工具。',
+  ja: '⚠️ このターンでは実際にはファイルが作成されていません——書き込みツールは呼び出されませんでした。',
+  ko: '⚠️ 이번 턴에서 실제로 생성된 파일이 없습니다——쓰기 도구가 호출되지 않았습니다.',
 }
 
 const WRITE_TOOLS = new Set(['write_file', 'edit_file'])
@@ -35,7 +37,7 @@ function claimsCreation(text: string): boolean {
 export function verifyWrites(
   trajectory: Map<string, TraceRun>,
   supervisorText: string,
-  language: 'en' | 'zh-CN' | 'zh-TW',
+  language: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko',
 ): { correction?: string } {
   let hasFinishedWrite = false
   outer: for (const run of trajectory.values()) {
@@ -44,7 +46,7 @@ export function verifyWrites(
     }
   }
   if (claimsCreation(supervisorText) && !hasFinishedWrite) {
-    return { correction: NOTE[language] }
+    return { correction: NOTE[language] ?? NOTE.en }
   }
   return {}
 }

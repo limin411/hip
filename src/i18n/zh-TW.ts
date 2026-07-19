@@ -668,7 +668,9 @@ export const zhTW = {
     "languages": {
       "zh-CN": "簡體中文",
       "zh-TW": "繁體中文",
-      "en": "English"
+      "en": "English",
+      "ja": "日本語",
+      "ko": "한국어"
     },
     "theme": "主題",
     "themeDesc": "選擇應用介面的配色方案",
@@ -950,7 +952,7 @@ export const zhTW = {
       "version": "版本 {{version}}",
       "docsRev": "文件修訂 {{rev}}",
       "sectionsLabel": "說明主題",
-      "sourceNote": "來源：packages/product-content/（英文 agent skill）與 locales/zh-CN|zh-TW。說明頁跟隨介面語言。",
+      "sourceNote": "來源：packages/product-content/（英文 agent skill）與 locales/zh-CN|zh-TW|ja|ko。說明頁跟隨介面語言。",
       "sections": {
         "overview": "概覽",
         "memory": "記憶",

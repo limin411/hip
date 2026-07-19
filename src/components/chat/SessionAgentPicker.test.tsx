@@ -8,11 +8,19 @@ import { enabledAcpAgents, resolvePrimaryAgentId, SessionAgentPicker } from './S
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, opts?: { name?: string }) => {
       const map: Record<string, string> = {
         'composer.agentPicker.label': 'Agent',
         'composer.agentPicker.builtin': 'hip (built-in)',
         'composer.agentPicker.empty': 'No external agents enabled. Add one in Settings.',
+        'composer.agentSwitch.title': 'Switch agent?',
+        'composer.agentSwitch.body': 'Switching restarts external context.',
+        'composer.agentSwitch.target': `Switch to ${opts?.name ?? ''}`,
+        'composer.agentSwitch.thisSession': 'Switch this session',
+        'composer.agentSwitch.newSession': 'New session',
+        'composer.agentSwitch.cancel': 'Cancel',
+        'composer.agentSwitch.busy': 'Cannot switch agent while a turn is running',
+        'common.close': 'Close',
       }
       return map[key] ?? key
     },
@@ -22,6 +30,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('lucide-react', () => ({
   Bot: () => React.createElement('span', { 'data-testid': 'icon-bot' }),
   Check: () => React.createElement('span', { 'data-testid': 'icon-check' }),
+  X: () => React.createElement('span', { 'data-testid': 'icon-x' }),
 }))
 
 vi.mock('@/components/ui/DropdownMenu', async () => {
@@ -31,8 +40,18 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
       React.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
     DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
       React.createElement('div', { 'data-testid': 'dropdown-trigger' }, children),
-    DropdownMenuContent: ({ children }: { children: React.ReactNode }) =>
-      React.createElement('div', { 'data-testid': 'dropdown-content' }, children),
+    DropdownMenuContent: ({
+      children,
+      ...rest
+    }: {
+      children: React.ReactNode
+      'data-testid'?: string
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': rest['data-testid'] ?? 'dropdown-content' },
+        children,
+      ),
     DropdownMenuItem: ({
       children,
       onSelect,
@@ -49,6 +68,45 @@ vi.mock('@/components/ui/DropdownMenu', async () => {
       ),
   }
 })
+
+vi.mock('@/components/ui/Modal', () => ({
+  Modal: ({
+    open,
+    title,
+    children,
+    footer,
+  }: {
+    open: boolean
+    title: string
+    children: React.ReactNode
+    footer?: React.ReactNode
+  }) =>
+    open
+      ? React.createElement(
+          'div',
+          { 'data-testid': 'modal', 'data-title': title },
+          children,
+          footer,
+        )
+      : null,
+}))
+
+vi.mock('@/components/ui/Button', () => ({
+  Button: ({
+    children,
+    onClick,
+    ...rest
+  }: {
+    children: React.ReactNode
+    onClick?: () => void
+    'data-testid'?: string
+  }) =>
+    React.createElement(
+      'button',
+      { type: 'button', onClick, 'data-testid': rest['data-testid'] },
+      children,
+    ),
+}))
 
 vi.mock('./ComposerChip', () => ({
   ComposerChip: ({
@@ -86,12 +144,19 @@ vi.mock('@/store/hipConfigStore', () => ({
   useAgents: () => mockAgents,
 }))
 
-let mockActiveSessionId: string | null = null
-let mockSession: { config: { agentId?: string } } | null = null
+const setAgent = vi.fn()
+const createSession = vi.fn(() => 'new-s')
 vi.mock('@/domain', () => ({
   useActiveSessionId: () => mockActiveSessionId,
   useActiveSession: () => mockSession,
+  sessionService: {
+    setAgent: (...args: unknown[]) => setAgent(...args),
+    createSession: (...args: unknown[]) => createSession(...args),
+  },
 }))
+
+let mockActiveSessionId: string | null = null
+let mockSession: { config: { llmProvider: string; model: string; tools: string[]; agentId?: string } } | null = null
 
 const acp = (id: string, name: string, enabled = true, kind: AgentConfig['kind'] = 'acp'): AgentConfig => ({
   id,
@@ -124,6 +189,8 @@ describe('SessionAgentPicker', () => {
   beforeEach(() => {
     cleanup()
     setAgentId.mockClear()
+    setAgent.mockClear()
+    createSession.mockClear()
     mockDraft = { tempId: 't1', mode: 'chat', text: '' }
     mockAgents = [acp('opencode', 'OpenCode'), acp('grok', 'Grok Build'), acp('legacy', 'Old OC', true, 'opencode')]
     mockActiveSessionId = null
@@ -152,24 +219,47 @@ describe('SessionAgentPicker', () => {
     expect(screen.getByTestId('session-agent-empty')).toHaveTextContent(/No external agents/)
   })
 
-  it('locks read-only on active session and shows agent name', () => {
+  it('unlocks on active session and confirms mid-switch via setAgent', () => {
     mockActiveSessionId = 's1'
-    mockSession = { config: { agentId: 'opencode' } }
+    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: undefined } }
     render(<SessionAgentPicker />)
-    const chip = screen.getByTestId('session-agent-chip-locked')
-    expect(chip).toBeInTheDocument()
-    expect(chip).toBeDisabled()
-    expect(chip).toHaveTextContent('OpenCode')
-    expect(screen.queryByTestId('session-agent-chip')).not.toBeInTheDocument()
-    fireEvent.click(chip)
+    expect(screen.getByTestId('session-agent-chip-active')).toBeInTheDocument()
+    expect(screen.getByTestId('session-agent-menu')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('session-agent-option-opencode'))
+    expect(screen.getByTestId('session-agent-switch-dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('session-agent-switch-this'))
+    expect(setAgent).toHaveBeenCalledWith('s1', 'opencode')
     expect(setAgentId).not.toHaveBeenCalled()
   })
 
-  it('locks when activeId is set even if session row is missing', () => {
-    mockActiveSessionId = 'orphan'
-    mockSession = null
+  it('new session option forks createSession with agentId', () => {
+    mockActiveSessionId = 's1'
+    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: undefined } }
     render(<SessionAgentPicker />)
-    expect(screen.getByTestId('session-agent-chip-locked')).toBeDisabled()
-    expect(screen.queryByTestId('session-agent-menu')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('session-agent-option-grok'))
+    fireEvent.click(screen.getByTestId('session-agent-switch-new'))
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'grok', llmProvider: 'deepseek' }),
+    )
+    expect(setAgent).not.toHaveBeenCalled()
+  })
+
+  it('cancel closes dialog without switching', () => {
+    mockActiveSessionId = 's1'
+    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [] } }
+    render(<SessionAgentPicker />)
+    fireEvent.click(screen.getByTestId('session-agent-option-opencode'))
+    fireEvent.click(screen.getByTestId('session-agent-switch-cancel'))
+    expect(setAgent).not.toHaveBeenCalled()
+    expect(createSession).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('session-agent-switch-dialog')).not.toBeInTheDocument()
+  })
+
+  it('does not open dialog when re-selecting current agent', () => {
+    mockActiveSessionId = 's1'
+    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: 'opencode' } }
+    render(<SessionAgentPicker />)
+    fireEvent.click(screen.getByTestId('session-agent-option-opencode'))
+    expect(screen.queryByTestId('session-agent-switch-dialog')).not.toBeInTheDocument()
   })
 })

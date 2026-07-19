@@ -89,6 +89,13 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       deps.resyncActiveIfRunning()
       return
 
+    case 'error':
+      // Mid-session agent switch (and other busy rejects) while a turn runs.
+      if (msg.code === 'BUSY' && /agent/i.test(msg.message ?? '')) {
+        toast.error(i18n.t('composer.agentSwitch.busy'))
+      }
+      return
+
     case 'fs:ls:result':
       useFsStore.getState().setEntries(msg.sessionId, msg.path, msg.entries)
       return

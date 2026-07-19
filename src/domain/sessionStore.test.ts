@@ -391,6 +391,28 @@ describe('applyServerMessage', () => {
     expect(next.sessions[0].config.permissionMode).toBe('full')
   })
 
+  it('session:agentChanged sets config.agentId and clears configOptions', () => {
+    const s0 = {
+      sessions: [
+        baseSession({
+          config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: 'old' },
+          configOptions: [{ id: 'model', name: 'Model', category: 'model', currentValue: 'a', options: [] }],
+        }),
+      ],
+    }
+    const next = applyServerMessage(s0, { type: 'session:agentChanged', sessionId: 's1', agentId: 'opencode' }, 0)
+    expect(next.sessions[0].config.agentId).toBe('opencode')
+    expect(next.sessions[0].configOptions).toBeUndefined()
+  })
+
+  it('session:agentChanged with null clears agentId to builtin', () => {
+    const s0 = {
+      sessions: [baseSession({ config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: 'opencode' } })],
+    }
+    const next = applyServerMessage(s0, { type: 'session:agentChanged', sessionId: 's1', agentId: null }, 0)
+    expect(next.sessions[0].config.agentId).toBeUndefined()
+  })
+
   it('session:forcePlan writes config.forcePlan', () => {
     const s0 = { sessions: [baseSession()] }
     const next = applyServerMessage(s0, { type: 'session:forcePlan', sessionId: 's1', forcePlan: true }, 0)

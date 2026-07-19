@@ -1716,6 +1716,15 @@ export class SessionService {
     this.transport.send({ type: 'agent:setConfigOption', sessionId, configId, value })
   }
 
+  /**
+   * Mid-session primary agent switch. Sidecar rejects with BUSY while a turn is running.
+   * Success is applied via session:agentChanged field-echo (no optimistic config write).
+   * Pass `'builtin'` or `''` to clear external primary.
+   */
+  setAgent(sessionId: string, agentId: string): void {
+    this.transport.send({ type: 'session:setAgent', sessionId, agentId })
+  }
+
   /** Answer a pending HITL tool-permission request: forward the user's choice (a chosen optionId, or
    *  a cancellation) so the blocked tool proceeds or is denied. The caller clears the local queue. */
   respondPermission(sessionId: string, requestId: string, choice: { optionId: string } | { cancelled: true }): void {

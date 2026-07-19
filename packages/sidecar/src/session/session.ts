@@ -505,6 +505,56 @@ export class Session {
   // ── Agent provider delegation ──
   async setAgentConfigOption(configId: string, value: string): Promise<void> { await this.agentProv.setAgentConfigOption(configId, value) }
 
+  /**
+   * Mid-session primary agent switch (session:setAgent).
+   * Idle only; validates enabled acp/opencode; awaits dispose; clears acp_session_id;
+   * reloads plugins; field-echoes session:agentChanged.
+   */
+  async setAgentId(agentId: string, send: (msg: ServerMessage) => void): Promise<boolean> {
+    if (this.running) {
+      send({
+        type: 'error',
+        sessionId: this.id,
+        code: 'BUSY',
+        message: 'Cannot change agent while a turn is running',
+      })
+      return false
+    }
+    const trimmed = typeof agentId === 'string' ? agentId.trim() : ''
+    const next = !trimmed || trimmed === 'builtin' ? undefined : trimmed
+    if (next) {
+      const agent = readAgentsConfig(this._config.cwd ?? process.cwd()).find(
+        (a) => a.id === next && a.enabled && (a.kind === 'acp' || a.kind === 'opencode'),
+      )
+      if (!agent) {
+        send({
+          type: 'error',
+          sessionId: this.id,
+          code: 'UNKNOWN_AGENT',
+          message: `Unknown or disabled agent: ${next}`,
+        })
+        return false
+      }
+    }
+    // 1. await dispose → closeSession RPC settles
+    await this.agentProv.dispose()
+    // 2. clear persisted ACP handle (CRITICAL — avoid loadSession on wrong agent)
+    this.store?.setAcpSessionId(this.id, null)
+    // 3. update config
+    if (next) {
+      this._config = { ...this._config, agentId: next }
+    } else {
+      const { agentId: _cleared, ...rest } = this._config
+      this._config = rest
+    }
+    this.store?.updateConfig(this.id, JSON.stringify(this._config))
+    // 4. reload plugins (external clears skills/MCP; builtin reloads)
+    this.configMgr.reloadPlugins()
+    // 5. field-echo (house style — not full SessionConfig)
+    send({ type: 'session:agentChanged', sessionId: this.id, agentId: next ?? null })
+    return true
+  }
+
   // ── Config delegation ──
   setCwd(cwd: string): void { this.configMgr.setCwd(cwd) }
   setThinking(thinking: boolean): boolean { return this.configMgr.setThinking(thinking) }

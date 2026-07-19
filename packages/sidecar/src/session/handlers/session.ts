@@ -33,6 +33,7 @@ export const SESSION_MESSAGE_TYPES = new Set([
   'session:setSystemPrompt',
   'session:setPermissionMode',
   'session:setForcePlan',
+  'session:setAgent',
   'session:setModel',
   'config:setActiveModel',
   'config:testProvider',
@@ -283,6 +284,10 @@ export function handleSessionMessage(
         forcePlan: Boolean(s.config.forcePlan),
       })
       return
+    }
+    case 'session:setAgent': {
+      const s = ctx.ensureSession(msg.sessionId, send)
+      return s.setAgentId(msg.agentId, send).then(() => undefined)
     }
     case 'session:setModel': {
       ctx.setGlobalActiveModel(msg.llmProvider, msg.model, msg.baseURL ?? '')

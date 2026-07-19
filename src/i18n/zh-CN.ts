@@ -395,6 +395,15 @@ export const zhCN = {
         builtin: 'hip（内置）',
         empty: '尚未启用外部智能体。请在设置中添加。',
       },
+      agentSwitch: {
+        title: '切换智能体？',
+        body: '切换主智能体会重启外部上下文，之前的外部上下文不会保留。',
+        target: '切换到 {{name}}',
+        thisSession: '在本会话切换',
+        newSession: '新会话',
+        cancel: '取消',
+        busy: '回合进行中，无法切换智能体',
+      },
     },
     artifact: {
       files: '文件',

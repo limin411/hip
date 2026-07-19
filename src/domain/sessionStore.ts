@@ -330,6 +330,16 @@ export function applyServerMessage(
     case 'session:permissionMode':
       return update(msg.sessionId, (s) => ({ ...s, config: { ...s.config, permissionMode: msg.permissionMode } }))
 
+    case 'session:agentChanged':
+      return update(msg.sessionId, (s) => {
+        const next = msg.agentId && msg.agentId !== 'builtin' ? msg.agentId : undefined
+        if (!next) {
+          const { agentId: _cleared, ...rest } = s.config
+          return { ...s, config: rest, configOptions: undefined }
+        }
+        return { ...s, config: { ...s.config, agentId: next }, configOptions: undefined }
+      })
+
     case 'session:forcePlan':
       return update(msg.sessionId, (s) => ({
         ...s,

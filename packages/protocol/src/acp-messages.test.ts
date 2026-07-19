@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ClientMessage, ServerMessage, AcpConfigOption } from './index.js'
+import { parseClientMessage } from './message-guard.js'
 
 // NOTE on coverage: vitest (esbuild) strips TS types, so these annotations are NOT type-checked here.
 // The type CONTRACT is enforced where it is consumed — the sidecar's `tsc --noEmit` checks session.ts
@@ -32,5 +33,15 @@ describe('acp control-plane messages', () => {
     expect(rt.options[0].category).toBe('model')
     expect(rt.options[0].options[0].value).toBe('a')
     expect((set as { configId: string }).configId).toBe('model')
+  })
+
+  it('session:setAgent / session:agentChanged round-trip (field-echo)', () => {
+    const set: ClientMessage = { type: 'session:setAgent', sessionId: 's', agentId: 'opencode' }
+    const echo: ServerMessage = { type: 'session:agentChanged', sessionId: 's', agentId: 'opencode' }
+    const clear: ServerMessage = { type: 'session:agentChanged', sessionId: 's', agentId: null }
+    expect(JSON.parse(JSON.stringify(set))).toEqual(set)
+    expect(JSON.parse(JSON.stringify(echo))).toEqual(echo)
+    expect(JSON.parse(JSON.stringify(clear))).toEqual(clear)
+    expect(parseClientMessage(set)?.type).toBe('session:setAgent')
   })
 })

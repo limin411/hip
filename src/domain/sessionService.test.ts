@@ -367,6 +367,23 @@ describe('SessionService', () => {
     expect(t.sent.at(-1)).toMatchObject({ type: 'session:setPermissionMode', sessionId: 's1', permissionMode: 'full' })
   })
 
+  it('setAgent sends session:setAgent without optimistic config write', () => {
+    const t = new FakeTransport()
+    useDomainStore.getState().sessions[0].config.agentId = undefined
+    new SessionService(t).setAgent('s1', 'opencode')
+    expect(useDomainStore.getState().sessions[0].config.agentId).toBeUndefined()
+    expect(t.sent.at(-1)).toMatchObject({ type: 'session:setAgent', sessionId: 's1', agentId: 'opencode' })
+  })
+
+  it('session:agentChanged from wire updates session agentId', () => {
+    const t = new FakeTransport()
+    new SessionService(t)
+    t.push({ type: 'session:agentChanged', sessionId: 's1', agentId: 'grok' })
+    expect(useDomainStore.getState().sessions[0].config.agentId).toBe('grok')
+    t.push({ type: 'session:agentChanged', sessionId: 's1', agentId: null })
+    expect(useDomainStore.getState().sessions[0].config.agentId).toBeUndefined()
+  })
+
   it('readFile marks the preview loading and sends fs:read', () => {
     const t = new FakeTransport()
     new SessionService(t).readFile('s1', '/proj/a.md')

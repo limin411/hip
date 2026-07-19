@@ -77,6 +77,12 @@ export type ClientMessage =
   | { type: 'session:setSystemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:setPermissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:setForcePlan'; sessionId: string; forcePlan: boolean }
+  /**
+   * Mid-session primary agent switch. `agentId` `'builtin'` or `''` clears external
+   * primary (hip Supervisor). Otherwise an enabled ACP-capable agent id.
+   * Rejected with BUSY while a turn is running.
+   */
+  | { type: 'session:setAgent'; sessionId: string; agentId: string }
   | { type: 'session:setModel'; sessionId: string; llmProvider: string; model: string; baseURL?: string }
   | { type: 'config:setActiveModel'; providerID: string; modelID: string; baseURL: string }
   | {
@@ -192,6 +198,11 @@ export type ServerMessage =
   | { type: 'session:systemPrompt'; sessionId: string; systemPrompt: string | null }
   | { type: 'session:permissionMode'; sessionId: string; permissionMode: PermissionMode }
   | { type: 'session:forcePlan'; sessionId: string; forcePlan: boolean }
+  /**
+   * Field-echo after session:setAgent. `agentId` is the resolved primary id, or `null`
+   * when cleared to the built-in Supervisor (no full SessionConfig merge).
+   */
+  | { type: 'session:agentChanged'; sessionId: string; agentId: string | null }
   | { type: 'session:model'; sessionId: string; llmProvider: string; model: string }
   /**
    * Echo of stored orchMode (compat). `ignoredForTurnRouting` is optional honesty:

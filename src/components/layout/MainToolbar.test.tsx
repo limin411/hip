@@ -99,4 +99,15 @@ describe('MainToolbar', () => {
     expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
     expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
   })
+
+  it('trash: empty toolbar title (page owns h2), hides connection and panel', () => {
+    useUiStore.setState({
+      activeView: 'trash',
+      previousView: 'chat',
+    })
+    render(<MainToolbar />)
+    expect(screen.getByTestId('main-toolbar-title')).toHaveTextContent('')
+    expect(screen.queryByTestId('connection-status')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('toggle-panel')).not.toBeInTheDocument()
+  })
 })

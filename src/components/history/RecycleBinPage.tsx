@@ -189,7 +189,7 @@ export function RecycleBinPage() {
         />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4" data-testid="recycle-bin-toolbar">
         <Tabs
           value={kindFilter}
           onValueChange={(v) => {
@@ -197,11 +197,19 @@ export function RecycleBinPage() {
             setPage(1)
           }}
         >
-          <TabsList>
-            <TabsTrigger value="all">{t('trash.filterAll')}</TabsTrigger>
-            <TabsTrigger value="chat">{t('trash.filterChat')}</TabsTrigger>
-            <TabsTrigger value="code">{t('trash.filterCode')}</TabsTrigger>
-            <TabsTrigger value="knowledge">{t('trash.filterKnowledge')}</TabsTrigger>
+          <TabsList className="h-9 gap-2">
+            <TabsTrigger className="px-4" value="all">
+              {t('trash.filterAll')}
+            </TabsTrigger>
+            <TabsTrigger className="px-4" value="chat">
+              {t('trash.filterChat')}
+            </TabsTrigger>
+            <TabsTrigger className="px-4" value="code">
+              {t('trash.filterCode')}
+            </TabsTrigger>
+            <TabsTrigger className="px-4" value="knowledge">
+              {t('trash.filterKnowledge')}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

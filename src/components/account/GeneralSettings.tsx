@@ -207,7 +207,7 @@ export function GeneralSettings() {
                 e.currentTarget.blur()
               }
             }}
-            className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-body text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/60"
+            className="w-20 rounded-md border border-border bg-surface px-2 py-1.5 text-left text-body text-ink tabular-nums focus:outline-none focus:ring-2 focus:ring-accent/60"
           />
           <span className="text-meta text-ink-tertiary">
             {t('settings.trashRetentionUnit', { defaultValue: 'days' })}

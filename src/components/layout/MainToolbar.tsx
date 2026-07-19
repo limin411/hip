@@ -15,7 +15,7 @@ import { useCaptionTitleDoubleClick, WindowCaptionButtons } from './WindowCaptio
 /**
  * Main-column context bar (not a window titlebar).
  * Special views hide ConnectionStatus + PanelToggle; leave via sidebar.
- * History keeps page h2 as sole title.
+ * History / recycle bin keep page h2 as sole title.
  * On Windows frameless chrome, hosts WindowCaptionButtons (min/max/close).
  * When the left sidebar is collapsed, hosts traffic-light inset + expand control
  * so top-left chrome stays aligned with macOS window controls.
@@ -32,14 +32,15 @@ export function MainToolbar() {
   const kbActiveSpaceId = useKnowledgeStore((s) => s.activeSpaceId)
   const isMac = isMacPlatform()
 
-  const isSpecial = activeView === 'settings' || activeView === 'history'
+  const isSpecial =
+    activeView === 'settings' || activeView === 'history' || activeView === 'trash'
   const showPanelChrome = !isSpecial
   const showSidebarExpand = !sidebarOpen
 
   let title = ''
   if (activeView === 'settings') {
     title = t('settings.title')
-  } else if (activeView === 'history') {
+  } else if (activeView === 'history' || activeView === 'trash') {
     title = '' // page keeps h2
   } else if (activeView === 'knowledge') {
     if (kbMode === 'workspace' && kbActiveSpaceId) {

@@ -161,6 +161,11 @@ export interface SessionTurnHost {
   messages: BaseMessage[]
   abortController: AbortController | null
   running: boolean
+  /**
+   * True while session:setAgent critical section runs (dispose → config → echo).
+   * Blocks concurrent turns so dispose cannot race a new prompt.
+   */
+  switchingAgent: boolean
   awaitingResume: boolean
   /** Multi-client: connection owning the active foreground turn. */
   ownerConnectionId: string | null

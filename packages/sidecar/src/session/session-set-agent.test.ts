@@ -76,7 +76,7 @@ describe('Session.setAgentId', () => {
     expect(sent.at(-1)).toEqual({ type: 'session:agentChanged', sessionId: 's2', agentId: null })
   })
 
-  it('rejects with BUSY while a turn is running', async () => {
+  it('rejects with AGENT_BUSY while a turn is running', async () => {
     const store = mockStore()
     const s = withStore(new Session('s3', makeConfig()), store)
     s.running = true
@@ -92,10 +92,52 @@ describe('Session.setAgentId', () => {
       {
         type: 'error',
         sessionId: 's3',
-        code: 'BUSY',
+        code: 'AGENT_BUSY',
         message: 'Cannot change agent while a turn is running',
       },
     ])
+  })
+
+  it('serializes switch: concurrent send is rejected while dispose is in flight', async () => {
+    vi.spyOn(agentsIndex, 'readAgentsConfig').mockReturnValue([
+      { id: 'opencode', name: 'OpenCode', kind: 'acp', command: 'x', args: [], enabled: true },
+    ])
+    const store = mockStore()
+    const s = withStore(new Session('s3b', makeConfig()), store)
+    let resolveDispose!: () => void
+    vi.spyOn(s.agentProv, 'dispose').mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDispose = resolve
+      }),
+    )
+    const sent: ServerMessage[] = []
+
+    const switchP = s.setAgentId('opencode', (m) => sent.push(m))
+    // Let setAgentId pass validation and set switchingAgent before dispose resolves.
+    await Promise.resolve()
+    expect(s.switchingAgent).toBe(true)
+
+    await s.sendMessage('hi during switch', (m) => sent.push(m), 'u1')
+    expect(sent.some((m) => m.type === 'error' && (m as { code?: string }).code === 'BUSY')).toBe(true)
+    expect(s.config.agentId).toBeUndefined()
+
+    resolveDispose()
+    expect(await switchP).toBe(true)
+    expect(s.switchingAgent).toBe(false)
+    expect(s.config.agentId).toBe('opencode')
+  })
+
+  it('clears forcePlan when switching to external ACP primary', async () => {
+    vi.spyOn(agentsIndex, 'readAgentsConfig').mockReturnValue([
+      { id: 'opencode', name: 'OpenCode', kind: 'acp', command: 'x', args: [], enabled: true },
+    ])
+    const store = mockStore()
+    const s = withStore(new Session('s3c', makeConfig({ forcePlan: true })), store)
+    vi.spyOn(s.agentProv, 'dispose').mockResolvedValue(undefined)
+    const sent: ServerMessage[] = []
+    expect(await s.setAgentId('opencode', (m) => sent.push(m))).toBe(true)
+    expect(s.config.agentId).toBe('opencode')
+    expect(s.config.forcePlan).toBeUndefined()
   })
 
   it('rejects unknown / disabled / wrong-kind agent', async () => {

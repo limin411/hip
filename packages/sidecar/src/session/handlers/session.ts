@@ -361,7 +361,7 @@ export function handleSessionMessage(
     }
     case 'workflow:run': {
       const s = ctx.ensureSession(msg.sessionId, send)
-      if (s.running) {
+      if (s.running || s.switchingAgent) {
         send({ type: 'error', sessionId: msg.sessionId, code: 'BUSY', message: 'Session is busy' })
         return
       }

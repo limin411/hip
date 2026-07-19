@@ -95,15 +95,17 @@ vi.mock('@/components/ui/Button', () => ({
   Button: ({
     children,
     onClick,
+    disabled,
     ...rest
   }: {
     children: React.ReactNode
     onClick?: () => void
+    disabled?: boolean
     'data-testid'?: string
   }) =>
     React.createElement(
       'button',
-      { type: 'button', onClick, 'data-testid': rest['data-testid'] },
+      { type: 'button', onClick, disabled: !!disabled, 'data-testid': rest['data-testid'] },
       children,
     ),
 }))
@@ -156,7 +158,10 @@ vi.mock('@/domain', () => ({
 }))
 
 let mockActiveSessionId: string | null = null
-let mockSession: { config: { llmProvider: string; model: string; tools: string[]; agentId?: string } } | null = null
+let mockSession: {
+  config: { llmProvider: string; model: string; tools: string[]; agentId?: string }
+  status?: 'idle' | 'running' | 'error'
+} | null = null
 
 const acp = (id: string, name: string, enabled = true, kind: AgentConfig['kind'] = 'acp'): AgentConfig => ({
   id,
@@ -221,7 +226,7 @@ describe('SessionAgentPicker', () => {
 
   it('unlocks on active session and confirms mid-switch via setAgent', () => {
     mockActiveSessionId = 's1'
-    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: undefined } }
+    mockSession = { config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: undefined }, status: 'idle' }
     render(<SessionAgentPicker />)
     expect(screen.getByTestId('session-agent-chip-active')).toBeInTheDocument()
     expect(screen.getByTestId('session-agent-menu')).toBeInTheDocument()
@@ -230,6 +235,20 @@ describe('SessionAgentPicker', () => {
     fireEvent.click(screen.getByTestId('session-agent-switch-this'))
     expect(setAgent).toHaveBeenCalledWith('s1', 'opencode')
     expect(setAgentId).not.toHaveBeenCalled()
+  })
+
+  it('disables switch-this-session while turn is running (new session still available)', () => {
+    mockActiveSessionId = 's1'
+    mockSession = {
+      config: { llmProvider: 'deepseek', model: 'm', tools: [], agentId: undefined },
+      status: 'running',
+    }
+    render(<SessionAgentPicker />)
+    fireEvent.click(screen.getByTestId('session-agent-option-opencode'))
+    expect(screen.getByTestId('session-agent-switch-this')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('session-agent-switch-this'))
+    expect(setAgent).not.toHaveBeenCalled()
+    expect(screen.getByTestId('session-agent-switch-new')).not.toBeDisabled()
   })
 
   it('new session option forks createSession with agentId', () => {

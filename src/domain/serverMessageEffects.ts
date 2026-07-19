@@ -90,8 +90,8 @@ export function applyServerMessageEffects(msg: ServerMessage, deps: ServerMessag
       return
 
     case 'error':
-      // Mid-session agent switch (and other busy rejects) while a turn runs.
-      if (msg.code === 'BUSY' && /agent/i.test(msg.message ?? '')) {
+      // Dedicated soft-reject from session:setAgent (running or already switching).
+      if (msg.code === 'AGENT_BUSY') {
         toast.error(i18n.t('composer.agentSwitch.busy'))
       }
       return

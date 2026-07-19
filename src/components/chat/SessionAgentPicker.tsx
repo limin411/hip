@@ -53,6 +53,8 @@ export function SessionAgentPicker() {
 
   const enabled = enabledAcpAgents(agents)
   const builtinLabel = t('composer.agentPicker.builtin')
+  /** Mid-switch while a turn runs is rejected server-side; hide the action on FE. */
+  const turnRunning = session?.status === 'running'
 
   const currentId = activeId
     ? resolvePrimaryAgentId(session?.config.agentId)
@@ -78,7 +80,7 @@ export function SessionAgentPicker() {
   const closeDialog = () => setPendingAgentId(null)
 
   const switchThisSession = () => {
-    if (!activeId || !pendingAgentId) return
+    if (!activeId || !pendingAgentId || turnRunning) return
     sessionService.setAgent(activeId, pendingAgentId)
     closeDialog()
   }
@@ -156,7 +158,14 @@ export function SessionAgentPicker() {
             <Button variant="secondary" size="sm" onClick={openNewSession} data-testid="session-agent-switch-new">
               {t('composer.agentSwitch.newSession')}
             </Button>
-            <Button variant="primary" size="sm" onClick={switchThisSession} data-testid="session-agent-switch-this">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={switchThisSession}
+              disabled={turnRunning}
+              title={turnRunning ? t('composer.agentSwitch.busy') : undefined}
+              data-testid="session-agent-switch-this"
+            >
               {t('composer.agentSwitch.thisSession')}
             </Button>
           </div>

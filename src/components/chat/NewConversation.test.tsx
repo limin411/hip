@@ -48,6 +48,12 @@ const catalog = {
     models: {
       'gpt-4o': { id: 'gpt-4o', name: 'GPT-4o', attachment: true },
       'gpt-4': { id: 'gpt-4', name: 'GPT-4', attachment: false },
+      'gpt-5.4': {
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        reasoning: true,
+        reasoning_options: [{ type: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh'] }],
+      },
     },
   },
 }
@@ -83,6 +89,18 @@ describe('NewConversation', () => {
     hipConfigStore.useHipConfigStore.setState({ config: { version: 1, agents: [] }, loaded: false, error: null })
     useDraftStore.setState({ draft: null })
     useSkillsStore.setState({ skills: [], enabled: {}, loaded: false })
+  })
+
+  it('shows effort picker when the draft model advertises effort levels', () => {
+    setDraftModel('openai/gpt-5.4')
+    render(<NewConversation />)
+    expect(screen.getByTestId('effort-chip')).toBeInTheDocument()
+  })
+
+  it('hides effort picker when the draft model has no effort options', () => {
+    setDraftModel('openai/gpt-4o')
+    render(<NewConversation />)
+    expect(screen.queryByTestId('effort-chip')).not.toBeInTheDocument()
   })
 
   it('clears existing attachments when the draft model loses attachment support', async () => {

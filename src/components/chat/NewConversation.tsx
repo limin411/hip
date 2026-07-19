@@ -15,6 +15,7 @@ import { useSlashCommandHandler } from './useSlashCommandHandler'
 import { readSkillFile } from '@/ipc/skills'
 import { FolderPill } from './FolderPill'
 import { ModelPicker } from './ModelPicker'
+import { EffortLevelPicker } from './EffortLevelPicker'
 import { PermissionModePicker } from './PermissionModePicker'
 import { PlanModeChip } from './PlanModeChip'
 import { AttachmentButton } from './AttachmentButton'
@@ -157,9 +158,9 @@ export function NewConversation() {
             inputRef={inputRef}
             leftSlot={
               surface === 'code' ? (
-                <><ModelPicker /><PermissionModePicker /><PlanModeChip /><AttachmentButton onAttach={setAttachments} /></>
+                <><ModelPicker /><EffortLevelPicker /><PermissionModePicker /><PlanModeChip /><AttachmentButton onAttach={setAttachments} /></>
               ) : (
-                <><ModelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
+                <><ModelPicker /><EffortLevelPicker /><AttachmentButton onAttach={(add) => setAttachments((prev) => [...prev, ...add])} /></>
               )
             }
             attachments={attachments}

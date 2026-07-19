@@ -66,8 +66,13 @@ export function ParallelRunButton({
   const suggestion = useMemo(() => suggestParallelCount(prompt), [prompt])
 
   const resolvedHost = useMemo(() => {
-    if (hostOverride && baseCwdOverride) {
-      return { hostSessionId: hostOverride, baseCwd: baseCwdOverride }
+    // WorktreeControl embed: only use explicit host + primary base; never isolated cwd.
+    if (hideTrigger || hostOverride !== undefined || baseCwdOverride !== undefined) {
+      return {
+        hostSessionId: hostOverride || '',
+        baseCwd: baseCwdOverride || '',
+        unresolved: !hostOverride || !baseCwdOverride,
+      }
     }
     const catalog = Object.values(catalogById)
     const ctx = resolveWorktreeHostContext({
@@ -79,18 +84,18 @@ export function ParallelRunButton({
       catalog,
     })
     const host = sessions.find((s) => s.id === ctx.hostSessionId)
+    // Prefer primaryPath / host session cwd only — never isolated active.cwd as fan-out base.
     const baseCwd =
-      baseCwdOverride ||
       ctx.primaryPath ||
+      (!ctx.isOnIsolated ? active?.config.cwd : undefined) ||
       host?.config.cwd ||
-      active?.config.cwd ||
       ''
     return {
-      hostSessionId: hostOverride || ctx.hostSessionId || active?.id || '',
+      hostSessionId: ctx.unresolved ? '' : ctx.hostSessionId || active?.id || '',
       baseCwd,
-      unresolved: ctx.unresolved,
+      unresolved: ctx.unresolved || !baseCwd,
     }
-  }, [active, sessions, runs, catalogById, hostOverride, baseCwdOverride])
+  }, [active, sessions, runs, catalogById, hostOverride, baseCwdOverride, hideTrigger])
 
   if (!active || surfaceOf(active.config) !== 'code' || !active.config.cwd) {
     if (!isControlled) return null

@@ -107,4 +107,58 @@ describe('worktreeStore', () => {
     )
     expect(useWorktreeStore.getState().byId['other']?.path).toBe('/other/wt')
   })
+
+  it('catalogForHost does not leak another host’s managed trees via source enum', () => {
+    useWorktreeStore.getState().upsertFromList(
+      [
+        {
+          id: 'p-a',
+          path: '/repo-a',
+          branch: 'main',
+          head: 'h',
+          managed: false,
+          isPrimary: true,
+          source: 'primary',
+          repoKey: 'repo-a',
+        },
+        managedInfo({
+          id: 'wt-a',
+          path: '/wt/a',
+          repoKey: 'repo-a',
+          branch: 'iso-a',
+          source: 'protocol',
+        }),
+      ],
+      'host-a',
+    )
+    useWorktreeStore.getState().upsertFromList(
+      [
+        {
+          id: 'p-b',
+          path: '/repo-b',
+          branch: 'main',
+          head: 'h',
+          managed: false,
+          isPrimary: true,
+          source: 'primary',
+          repoKey: 'repo-b',
+        },
+        managedInfo({
+          id: 'wt-b',
+          path: '/wt/b',
+          repoKey: 'repo-b',
+          branch: 'iso-b',
+          source: 'parallel',
+        }),
+      ],
+      'host-b',
+    )
+
+    const forA = useWorktreeStore.getState().catalogForHost('host-a')
+    const forB = useWorktreeStore.getState().catalogForHost('host-b')
+    expect(forA.map((r) => r.id).sort()).toEqual(['p-a', 'wt-a'])
+    expect(forB.map((r) => r.id).sort()).toEqual(['p-b', 'wt-b'])
+    expect(forA.some((r) => r.id === 'wt-b')).toBe(false)
+    expect(forB.some((r) => r.id === 'wt-a')).toBe(false)
+  })
 })

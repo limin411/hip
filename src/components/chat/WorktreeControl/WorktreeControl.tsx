@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Folders, Copy, RefreshCw, Plus, Layers } from 'lucide-react'
 import { toast } from 'sonner'
@@ -49,6 +49,14 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   const [parallelOpen, setParallelOpen] = useState(false)
   const [listLoading, setListLoading] = useState(false)
   const [listHydrated, setListHydrated] = useState(false)
+  const listRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearListRefreshTimer = useCallback(() => {
+    if (listRefreshTimerRef.current != null) {
+      clearTimeout(listRefreshTimerRef.current)
+      listRefreshTimerRef.current = null
+    }
+  }, [])
 
   const isCodeWithCwd =
     !!active && surfaceOf(active.config) === 'code' && !!active.config.cwd
@@ -80,7 +88,10 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   )
 
   const hostSessionId = hostCtx.hostSessionId
-  const createDisabled = hostCtx.unresolved || projectBlocked
+  // Never enable create/parallel without a real main-tree path (avoid isolated cwd as baseCwd).
+  const opsBaseCwd = hostCtx.primaryPath
+  const createDisabled =
+    hostCtx.unresolved || projectBlocked || !opsBaseCwd || !hostSessionId
 
   const nestHints = useMemo(() => extractParallelNestingHints(runs), [runs])
   const nestedSessionIds = useMemo(
@@ -116,7 +127,11 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
   const activeCwd = active?.config.cwd
   const listRows: WorktreeListRow[] = useMemo(() => {
     const activeCwdKey = activeCwd ? pathKey(activeCwd) : ''
-    const slotRows: WorktreeListRow[] = slots.map((slot) => {
+    // Skip in-flight creates with no path yet (empty labels / no_session toasts).
+    const readySlots = slots.filter(
+      (slot) => !(slot.status === 'creating' && !slot.worktreePath),
+    )
+    const slotRows: WorktreeListRow[] = readySlots.map((slot) => {
       const sess = slot.sessionId
         ? sessions.find((s) => s.id === slot.sessionId)
         : undefined
@@ -169,23 +184,41 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
 
   const refreshList = useCallback(() => {
     if (!hostSessionId || hostCtx.unresolved) return
+    clearListRefreshTimer()
     setListLoading(true)
+    // If we already have rows, treat as hydrated so empty CTA does not flash mid-refresh.
+    if (isolationCount > 0) setListHydrated(true)
     sessionService.requestWorktreeList(hostSessionId)
-    window.setTimeout(() => {
+    listRefreshTimerRef.current = setTimeout(() => {
+      listRefreshTimerRef.current = null
       setListLoading(false)
       setListHydrated(true)
     }, 400)
-  }, [hostSessionId, hostCtx.unresolved])
+  }, [hostSessionId, hostCtx.unresolved, clearListRefreshTimer, isolationCount])
 
   useEffect(() => {
-    if (!popoverOpen) return
+    if (!popoverOpen) {
+      clearListRefreshTimer()
+      return
+    }
     if (hostSessionId && !hostCtx.unresolved) {
       refreshList()
     } else {
       setListHydrated(true)
       setListLoading(false)
     }
-  }, [popoverOpen, hostSessionId, hostCtx.unresolved, refreshList])
+    return () => {
+      clearListRefreshTimer()
+    }
+  }, [popoverOpen, hostSessionId, hostCtx.unresolved, refreshList, clearListRefreshTimer])
+
+  // Best-effort: store updates after list:result while a refresh is in flight.
+  useEffect(() => {
+    if (!listLoading || !popoverOpen) return
+    if (isolationCount > 0) {
+      setListHydrated(true)
+    }
+  }, [catalogById, isolationCount, listLoading, popoverOpen])
 
   const openParallel = useCallback(() => {
     setPopoverOpen(false)
@@ -216,6 +249,7 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
         nestedSessionIds,
       })
 
+      // pendingRevealPath: written for future sidebar expand/scroll (not consumed yet).
       setPendingReveal(row.path)
       setPopoverOpen(false)
 
@@ -436,8 +470,9 @@ export function WorktreeControl({ draftPrompt = '' }: { draftPrompt?: string }) 
         open={parallelOpen}
         onOpenChange={setParallelOpen}
         hideTrigger
-        hostSessionId={hostSessionId || undefined}
-        baseCwd={hostCtx.primaryPath || active.config.cwd}
+        hostSessionId={opsBaseCwd && hostSessionId ? hostSessionId : undefined}
+        // Never fall back to isolated active cwd as fan-out base.
+        baseCwd={opsBaseCwd}
       />
     </>
   )

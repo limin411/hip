@@ -246,4 +246,84 @@ describe('resolveWorktreeHostContext', () => {
     expect(ctx.unresolved).toBe(true)
     expect(ctx.unresolvedReason).toBe('no_cwd')
   })
+
+  it('slot + missing host session + empty catalog → unresolved no_host', () => {
+    const runs = [
+      run({
+        id: 'r1',
+        hostSessionId: 'host-gone',
+        slots: [
+          {
+            index: 0,
+            sessionId: 'slot-a',
+            worktreePath: '/Users/x/.hip/worktrees/r1/a',
+            branch: 'hip-p-r1-0',
+            status: 'ready',
+          },
+        ],
+      }),
+    ]
+    const ctx = resolveWorktreeHostContext({
+      activeSession: {
+        id: 'slot-a',
+        config: { cwd: '/Users/x/.hip/worktrees/r1/a', surface: 'code' },
+      },
+      sessions: [
+        { id: 'slot-a', config: { cwd: '/Users/x/.hip/worktrees/r1/a' } },
+        // host-gone intentionally absent
+      ],
+      runs,
+      catalog: [],
+    })
+    expect(ctx.unresolved).toBe(true)
+    expect(ctx.unresolvedReason).toBe('no_host')
+    expect(ctx.primaryPath).toBeUndefined()
+    expect(ctx.isOnIsolated).toBe(true)
+    // Still surfaces candidate id for debugging / list attempt, but ops must not use isolated cwd as base
+    expect(ctx.hostSessionId).toBe('host-gone')
+  })
+
+  it('host-of-run stays not isolated even if cwd matches a non-primary catalog path', () => {
+    const runs = [
+      run({
+        id: 'r1',
+        hostSessionId: 'host',
+        slots: [
+          {
+            index: 0,
+            sessionId: 'slot-a',
+            worktreePath: '/Users/x/.hip/worktrees/r1/a',
+            branch: 'b',
+            status: 'ready',
+          },
+        ],
+      }),
+    ]
+    // Pathological: host cwd equals a managed catalog path (should not flip isOnIsolated).
+    const ctx = resolveWorktreeHostContext({
+      activeSession: {
+        id: 'host',
+        config: { cwd: '/Users/x/.hip/worktrees/r1/a', surface: 'code' },
+      },
+      sessions: [
+        { id: 'host', config: { cwd: '/Users/x/.hip/worktrees/r1/a' } },
+        { id: 'slot-a', config: { cwd: '/Users/x/.hip/worktrees/r1/a' } },
+      ],
+      runs,
+      catalog: catalog([
+        { id: 'p', path: '/repo', isPrimary: true },
+        {
+          id: 'w1',
+          path: '/Users/x/.hip/worktrees/r1/a',
+          managed: true,
+          hostSessionId: 'host',
+        },
+      ]),
+    })
+    expect(ctx.unresolved).toBe(false)
+    expect(ctx.hostSessionId).toBe('host')
+    expect(ctx.isOnIsolated).toBe(false)
+    expect(ctx.activeWorktreePath).toBeUndefined()
+    expect(ctx.primaryPath).toBe('/repo')
+  })
 })

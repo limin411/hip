@@ -36,6 +36,14 @@ type ActiveSession = {
 
 type SessionLike = { id: string; title?: string; config: { cwd?: string } }
 
+/**
+ * activeWorktreePath tri-state for finalize:
+ * - string → use as-is
+ * - null → force none (host-of-run / not isolated)
+ * - undefined → derive from cwd/catalog
+ */
+type ActiveWorktreeOverride = string | null | undefined
+
 function findRunBySessionId(runs: ParallelRun[], sessionId: string): ParallelRun | undefined {
   return runs.find(
     (r) => r.hostSessionId === sessionId || r.slots.some((s) => s.sessionId === sessionId),
@@ -85,12 +93,27 @@ function deriveActiveWorktreePath(
   return undefined
 }
 
+/**
+ * Host is anchored when we can safely run git ops / fan-out:
+ * host session still exists with a cwd, or we know the primary/main path.
+ */
+function hostIsAnchored(
+  hostSessionId: string,
+  primaryPath: string | undefined,
+  sessions: SessionLike[],
+): boolean {
+  if (primaryPath) return true
+  const host = sessions.find((s) => s.id === hostSessionId)
+  return !!(host?.config.cwd)
+}
+
 function finalize(
   partial: {
     hostSessionId: string
     primaryPath?: string
     activeCwd?: string
-    activeWorktreePath?: string
+    /** string = set; null = force none; undefined = derive */
+    activeWorktreePath?: ActiveWorktreeOverride
     runId?: string
     unresolved: boolean
     unresolvedReason?: WorktreeHostContext['unresolvedReason']
@@ -111,13 +134,29 @@ function finalize(
     primaryPath = hostPrimary?.path ?? hostSession?.config.cwd ?? primaryCatalogPath(catalog)
   }
 
-  const activeWorktreePath =
-    partial.activeWorktreePath ??
-    deriveActiveWorktreePath(partial.activeCwd, catalog, primaryPath)
+  let activeWorktreePath: string | undefined
+  if (partial.activeWorktreePath === null) {
+    // Force not-on-isolation (host-of-run)
+    activeWorktreePath = undefined
+  } else if (partial.activeWorktreePath !== undefined) {
+    activeWorktreePath = partial.activeWorktreePath
+  } else {
+    activeWorktreePath = deriveActiveWorktreePath(partial.activeCwd, catalog, primaryPath)
+  }
   const isOnIsolated = !!activeWorktreePath
 
   if (!primaryPath && !isOnIsolated && hostSession?.config.cwd) {
     primaryPath = hostSession.config.cwd
+  }
+
+  let unresolved = partial.unresolved
+  let unresolvedReason = partial.unresolvedReason
+  // Stale host id (deleted host session, empty catalog) must not look "resolved".
+  if (!unresolved && partial.hostSessionId) {
+    if (!hostIsAnchored(partial.hostSessionId, primaryPath, sessions)) {
+      unresolved = true
+      unresolvedReason = 'no_host'
+    }
   }
 
   return {
@@ -127,8 +166,8 @@ function finalize(
     activeWorktreePath,
     isOnIsolated,
     runId: partial.runId,
-    unresolved: partial.unresolved,
-    unresolvedReason: partial.unresolvedReason,
+    unresolved,
+    unresolvedReason,
   }
 }
 
@@ -166,8 +205,9 @@ export function resolveWorktreeHostContext(input: {
         {
           hostSessionId: run.hostSessionId,
           activeCwd,
-          // Host of run is not isolated even if catalog lists trees under it
-          activeWorktreePath: isSlot ? slot?.worktreePath || undefined : undefined,
+          // Host of run is never isolated; null forces skip of derive (Issue 4).
+          // Slot uses slot path when known.
+          activeWorktreePath: isSlot ? slot?.worktreePath || undefined : null,
           runId: run.id,
           unresolved: false,
         },
@@ -184,6 +224,7 @@ export function resolveWorktreeHostContext(input: {
       {
         hostSessionId: activeSession.id,
         activeCwd,
+        activeWorktreePath: null,
         runId: hosted[0]?.id,
         unresolved: false,
       },
@@ -285,6 +326,7 @@ export function resolveWorktreeHostContext(input: {
       {
         hostSessionId: activeSession.id,
         activeCwd,
+        activeWorktreePath: null,
         unresolved: false,
       },
       catalog,

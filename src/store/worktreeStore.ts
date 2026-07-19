@@ -170,20 +170,35 @@ export const useWorktreeStore = create<WorktreeCatalogState>()((set, get) => ({
 
   catalogForHost: (hostSessionId) => {
     const rows = Object.values(get().byId).filter(isCatalogVisible)
-    if (!hostSessionId) return rows.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.path.localeCompare(b.path))
-    // Host filter: primary always + rows with matching hostSessionId or no host (discovered)
-    return rows
-      .filter(
-        (r) =>
-          r.isPrimary ||
-          r.hostSessionId === hostSessionId ||
-          !r.hostSessionId ||
-          r.source === 'discovered' ||
-          r.source === 'agent_tool' ||
-          r.source === 'protocol' ||
-          r.source === 'parallel',
+    const sortRows = (list: CatalogWorktree[]) =>
+      list.sort(
+        (a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.path.localeCompare(b.path),
       )
-      .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.path.localeCompare(b.path))
+    if (!hostSessionId) return sortRows(rows)
+
+    // Repo keys associated with this host (bound rows + primary tagged to host).
+    // Do NOT admit all source=protocol|parallel rows globally (multi-project leak).
+    const repoKeys = new Set<string>()
+    for (const r of rows) {
+      if (r.hostSessionId === hostSessionId && r.repoKey) repoKeys.add(r.repoKey)
+    }
+
+    return sortRows(
+      rows.filter((r) => {
+        if (r.hostSessionId === hostSessionId) return true
+        if (r.isPrimary) {
+          if (r.repoKey && repoKeys.has(r.repoKey)) return true
+          // No host-bound rows yet: only untagged primary (list not hydrated for other hosts).
+          if (repoKeys.size === 0 && !r.hostSessionId) return true
+          return false
+        }
+        // Managed without hostSessionId: same repoKey as this host only.
+        if (!r.hostSessionId) {
+          return !!r.repoKey && repoKeys.has(r.repoKey)
+        }
+        return false
+      }),
+    )
   },
 }))
 

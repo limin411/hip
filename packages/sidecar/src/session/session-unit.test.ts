@@ -281,30 +281,4 @@ describe('tryAutoResolvePermission lock table (chat/edit/full × tool kinds)', (
   )('$mode × $kind → $want', ({ mode, kind, want }) => {
     expect(tryAutoResolvePermission(mode, kind, opts)).toEqual(want)
   })
-
-  it('auto-resolves read permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'read', opts)).toEqual({ optionId: 'allow_once' })
-    expect(tryAutoResolvePermission('edit', 'read', opts)).toEqual({ optionId: 'allow_once' })
-  })
-
-  it('auto-resolves fetch permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
-    expect(tryAutoResolvePermission('edit', 'fetch', opts)).toEqual({ optionId: 'allow_once' })
-  })
-
-  it('still prompts for execute permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'execute', opts)).toBeNull()
-    expect(tryAutoResolvePermission('edit', 'execute', opts)).toBeNull()
-  })
-
-  it('still prompts for write permission in chat and edit modes', () => {
-    expect(tryAutoResolvePermission('chat', 'write', opts)).toBeNull()
-    expect(tryAutoResolvePermission('edit', 'write', opts)).toBeNull()
-  })
-
-  it('full mode always returns null (HITL; not yolo)', () => {
-    for (const kind of kinds) {
-      expect(tryAutoResolvePermission('full', kind, opts)).toBeNull()
-    }
-  })
 })

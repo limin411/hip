@@ -4,7 +4,7 @@
  * Regenerate: yarn product:content
  * Check:      yarn product:content:check
  *
- * contentHash=757ff021883e2cc1 skillVersion=2 productVersion=0.1.0
+ * contentHash=cd652380c7b9f0ad skillVersion=2 productVersion=0.1.0
  */
 
 export type ProductHelpSectionId = 'overview' | 'memory' | 'config' | 'troubleshooting' | 'agents'
@@ -292,22 +292,22 @@ ACP agents are **self-managed** for auth and models: hip does not inject its pro
 
 ## Capability matrix (Built-in vs ACP)
 
-hip can run a **built-in** LangGraph agent, an **ACP agent as the session primary**, or **dispatch an ACP agent as a subagent**. Capabilities differ:
+hip can run a **built-in** LangGraph agent, an **ACP agent as the session primary**, or **dispatch an ACP agent as a subagent**. Capabilities differ (current product; planned host work noted where relevant):
 
 | Capability | Built-in primary | ACP primary | ACP subagent (dispatch) |
 |------------|------------------|-------------|-------------------------|
 | hip tools (read / write / run_script / …) | yes | no (agent’s own tools) | no (agent’s own tools) |
 | hip Skills / plugin hooks | yes | no | no |
-| hip MCP (merged into session) | yes | no (unless MCP forward is on) | no (unless MCP forward is on) |
-| Client FS bridge | n/a | yes | yes |
+| hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
+| Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
-| Memory inject (cross-session) | yes | opt-in prefix only | no (v1) |
-| Memory extract | yes | no (v1) | no |
+| Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
+| Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
 | HITL permission | hip tools | ACP \`requestPermission\` | same as ACP primary |
-| permissionMode | hip tool gates | FS bridge + auto-resolve for safe kinds | parent session mode |
+| permissionMode | hip tool gates | auto-resolve safe kinds (read/fetch/other) in chat/edit; else HITL (\`full\` also HITL on ACP path) | parent session mode |
 
-**Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Dispatching ACP as a subagent is the same agent stack without primary-only memory prefix.
+**Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
 ## Delegation tools (main agent)
 
@@ -602,22 +602,22 @@ ACP agents are **self-managed** for auth and models: hip does not inject its pro
 
 ## Capability matrix (Built-in vs ACP)
 
-hip can run a **built-in** LangGraph agent, an **ACP agent as the session primary**, or **dispatch an ACP agent as a subagent**. Capabilities differ:
+hip can run a **built-in** LangGraph agent, an **ACP agent as the session primary**, or **dispatch an ACP agent as a subagent**. Capabilities differ (current product; planned host work noted where relevant):
 
 | Capability | Built-in primary | ACP primary | ACP subagent (dispatch) |
 |------------|------------------|-------------|-------------------------|
 | hip tools (read / write / run_script / …) | yes | no (agent’s own tools) | no (agent’s own tools) |
 | hip Skills / plugin hooks | yes | no | no |
-| hip MCP (merged into session) | yes | no (unless MCP forward is on) | no (unless MCP forward is on) |
-| Client FS bridge | n/a | yes | yes |
+| hip MCP (merged into session) | yes | no (planned: opt-in forward) | no (planned: opt-in forward) |
+| Client FS bridge | n/a | no (stub only; real bridge planned) | no (stub only; real bridge planned) |
 | dispatch / task / task_batch | yes | no | no |
-| Memory inject (cross-session) | yes | opt-in prefix only | no (v1) |
-| Memory extract | yes | no (v1) | no |
+| Memory inject (cross-session) | yes | no (config flag reserved; prefix planned) | no |
+| Memory extract | yes | no | no |
 | hip model picker | yes | no (agent configOptions / agent model UI) | no |
 | HITL permission | hip tools | ACP \`requestPermission\` | same as ACP primary |
-| permissionMode | hip tool gates | FS bridge + auto-resolve for safe kinds | parent session mode |
+| permissionMode | hip tool gates | auto-resolve safe kinds (read/fetch/other) in chat/edit; else HITL (\`full\` also HITL on ACP path) | parent session mode |
 
-**Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Dispatching ACP as a subagent is the same agent stack without primary-only memory prefix.
+**Takeaway:** choosing ACP as primary is a peer coding agent with its own stack—not hip’s built-in tools/skills/MCP. Subagent dispatch uses the same agent stack; neither primary nor subagent currently gets hip memory inject or hip MCP.
 
 ## Delegation tools (main agent)
 
@@ -910,22 +910,22 @@ ACP 智能体的认证与模型为**自管**：hip **不会**把自身 provider 
 
 ## 能力矩阵（内置 vs ACP）
 
-hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能体**，或 **派发 ACP 作为子智能体**。能力不同：
+hip 可运行 **内置** LangGraph 智能体、将 **ACP 作为会话主智能体**，或 **派发 ACP 作为子智能体**。能力不同（当前产品；规划中的 host 能力另行标注）：
 
 | 能力 | 内置主智能体 | ACP 主智能体 | ACP 子智能体（dispatch） |
 |------|--------------|--------------|--------------------------|
 | hip 内置工具（read / write / run_script …） | 有 | 无（智能体自有工具） | 无（智能体自有工具） |
 | hip Skills / 插件钩子 | 有 | 无 | 无 |
-| hip MCP（会话内合并） | 有 | 无（除非开启 MCP 转发） | 无（除非开启 MCP 转发） |
-| 客户端 FS bridge | 不适用 | 有 | 有 |
+| hip MCP（会话内合并） | 有 | 无（规划：opt-in 转发） | 无（规划：opt-in 转发） |
+| 客户端 FS bridge | 不适用 | 无（仅 stub；真实 bridge 规划中） | 无（仅 stub；真实 bridge 规划中） |
 | dispatch / task / task_batch | 有 | 无 | 无 |
-| 跨会话 Memory 注入 | 有 | 仅 opt-in 前缀 | 无（v1） |
-| Memory 抽取 | 有 | 无（v1） | 无 |
+| 跨会话 Memory 注入 | 有 | 无（配置项预留；前缀规划中） | 无 |
+| Memory 抽取 | 有 | 无 | 无 |
 | hip 模型选择器 | 有 | 无（用 agent configOptions / 智能体侧模型 UI） | 无 |
 | HITL 权限 | hip 工具门禁 | ACP \`requestPermission\` | 同 ACP 主智能体 |
-| permissionMode | hip 工具门禁 | FS bridge + 安全 kind 自动放行 | 继承父会话 mode |
+| permissionMode | hip 工具门禁 | chat/edit 下安全 kind（read/fetch/other）自动放行；其余 HITL（ACP 路径上 \`full\` 亦为 HITL） | 继承父会话 mode |
 
-**要点：** 选 ACP 作主智能体时，它是对等的编程智能体栈，**不是** hip 内置工具/技能/MCP。派发 ACP 子智能体时是同一工具栈，但没有主会话专用的 memory 前缀。
+**要点：** 选 ACP 作主智能体时，它是对等的编程智能体栈，**不是** hip 内置工具/技能/MCP。子智能体派发使用同一工具栈；主智能体与子智能体目前均无 hip memory 注入或 hip MCP。
 
 ## 委派工具（主智能体）
 
@@ -1180,22 +1180,22 @@ ACP 智能體的認證與模型為**自管**：hip **不會**將自身 provider 
 
 ## 能力矩陣（內建 vs ACP）
 
-hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主智能體**，或 **派發 ACP 作為子智能體**。能力不同：
+hip 可執行 **內建** LangGraph 智能體、將 **ACP 作為工作階段主智能體**，或 **派發 ACP 作為子智能體**。能力不同（目前產品；規劃中的 host 能力另行標註）：
 
 | 能力 | 內建主智能體 | ACP 主智能體 | ACP 子智能體（dispatch） |
 |------|--------------|--------------|--------------------------|
 | hip 內建工具（read / write / run_script …） | 有 | 無（智能體自有工具） | 無（智能體自有工具） |
 | hip Skills / 外掛鉤子 | 有 | 無 | 無 |
-| hip MCP（工作階段內合併） | 有 | 無（除非開啟 MCP 轉發） | 無（除非開啟 MCP 轉發） |
-| 用戶端 FS bridge | 不適用 | 有 | 有 |
+| hip MCP（工作階段內合併） | 有 | 無（規劃：opt-in 轉發） | 無（規劃：opt-in 轉發） |
+| 用戶端 FS bridge | 不適用 | 無（僅 stub；真實 bridge 規劃中） | 無（僅 stub；真實 bridge 規劃中） |
 | dispatch / task / task_batch | 有 | 無 | 無 |
-| 跨工作階段 Memory 注入 | 有 | 僅 opt-in 前綴 | 無（v1） |
-| Memory 擷取 | 有 | 無（v1） | 無 |
+| 跨工作階段 Memory 注入 | 有 | 無（設定項預留；前綴規劃中） | 無 |
+| Memory 擷取 | 有 | 無 | 無 |
 | hip 模型選擇器 | 有 | 無（用 agent configOptions / 智能體側模型 UI） | 無 |
 | HITL 權限 | hip 工具門禁 | ACP \`requestPermission\` | 同 ACP 主智能體 |
-| permissionMode | hip 工具門禁 | FS bridge + 安全 kind 自動放行 | 繼承父工作階段 mode |
+| permissionMode | hip 工具門禁 | chat/edit 下安全 kind（read/fetch/other）自動放行；其餘 HITL（ACP 路徑上 \`full\` 亦為 HITL） | 繼承父工作階段 mode |
 
-**重點：** 選 ACP 作主智能體時，它是對等的程式智能體堆疊，**不是** hip 內建工具／技能／MCP。派發 ACP 子智能體時為同一工具堆疊，但沒有主工作階段專用的 memory 前綴。
+**重點：** 選 ACP 作主智能體時，它是對等的程式智能體堆疊，**不是** hip 內建工具／技能／MCP。子智能體派發使用同一工具堆疊；主智能體與子智能體目前均無 hip memory 注入或 hip MCP。
 
 ## 委派工具
 

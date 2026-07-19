@@ -233,7 +233,7 @@ mod tests {
                 r"AppData\Roaming\npm",
             ] {
                 assert!(
-                    dirs.contains(needle) || dirs.contains(&needle.replace('\\', "\\\\")),
+                    dirs.contains(needle),
                     "expected {needle} in common_dirs for ACP CLI discovery, got {dirs}"
                 );
             }

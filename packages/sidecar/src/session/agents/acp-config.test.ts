@@ -10,6 +10,7 @@ const HIP_PROVIDER_SPAWN_KEYS = [
   'OPENAI_API_KEY',
   'HIP_MODEL_DEEPSEEK_API_KEY',
   'HIP_MODEL_ANTHROPIC_API_KEY',
+  'HIP_MODEL_OPENAI_API_KEY',
 ] as const
 
 describe('buildAcpSpawn (model rollback)', () => {
@@ -37,8 +38,14 @@ describe('buildAcpSpawn (model rollback)', () => {
       baseURL: 'https://api.anthropic.com/v1',
       apiKey: 'sk-hip-anthropic-must-not-leak',
     }
+    const openaiModel = {
+      providerID: 'openai',
+      modelID: 'gpt-4o',
+      baseURL: 'https://api.openai.com/v1',
+      apiKey: 'sk-hip-openai-must-not-leak',
+    }
 
-    for (const model of [deepseekModel, anthropicModel]) {
+    for (const model of [deepseekModel, anthropicModel, openaiModel]) {
       const { env } = buildAcpSpawn(
         {
           ...baseAgent,

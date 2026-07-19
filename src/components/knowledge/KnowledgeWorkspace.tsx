@@ -3,15 +3,12 @@ import { useTranslation } from 'react-i18next'
 import {
   BookOpen,
   ChevronRight,
-  Code2,
   Download,
-  Eye,
   FilePlus,
   ImagePlus,
   History,
   MoreHorizontal,
   Network,
-  Pencil,
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,11 +19,7 @@ import {
   openDeleteKnowledgeSpaceDialog,
   openRenameKnowledgeSpaceDialog,
 } from './knowledgeSpaceDialogStore'
-import {
-  isKnowledgeLiveEnabled,
-  loadEditorModePref,
-  type EditorMode,
-} from '@/domain/knowledge/editorMode'
+import { isKnowledgeLiveEnabled } from '@/domain/knowledge/editorMode'
 import { KNOWLEDGE_LARGE_DOC_CHARS } from '@/domain/knowledge/limits'
 import { insertTextAtCursor } from '@/domain/knowledge/mdEdit'
 import { importAssetFromPath } from '@/domain/knowledge/importAsset'
@@ -38,7 +31,6 @@ import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { HipLogo } from '@/components/login/HipLogo'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -64,14 +56,9 @@ import {
   revealInPreviewRoot,
   revealLineInCodeMirror,
 } from '@/domain/knowledge/searchReveal'
-import {
-  extractDocOutline,
-  scrollToKnowledgeHeading,
-  slugifyHeading,
-} from '@/domain/knowledge/mdPreview'
+import { extractDocOutline } from '@/domain/knowledge/mdPreview'
 import { DeclarativeContextMenu } from '@/components/context-menu'
 import { SpaceTree } from './SpaceTree'
-import { DocReader } from './DocReader'
 import { DocEditor, type DocEditorHandle } from './DocEditor'
 import { InlineDocTitle } from './InlineDocTitle'
 import { DocPropertiesRow } from './DocPropertiesRow'
@@ -210,8 +197,8 @@ export function KnowledgeWorkspace() {
         return
       }
 
-      // Source/Live: CM source editor; Preview: markdown reader.
-      if (editorMode !== 'preview') {
+      // Live: ProseMirror host; Source fallback: CodeMirror.
+      if (editorMode === 'source') {
         const view = editorRef.current?.getView()
         if (view) {
           revealInCodeMirror(view, still.query)
@@ -219,9 +206,18 @@ export function KnowledgeWorkspace() {
           return
         }
       } else {
-        const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
-        if (root instanceof HTMLElement) {
-          revealInPreviewRoot(root, still.query)
+        const liveRoot =
+          document.querySelector('[data-testid="knowledge-doc-live-editor"]') ??
+          document.querySelector('.knowledge-live-editor')
+        if (liveRoot instanceof HTMLElement) {
+          revealInPreviewRoot(liveRoot, still.query)
+          useKnowledgeStore.getState().clearPendingReveal()
+          return
+        }
+        // Live still mounting — also try CM if source briefly visible.
+        const view = editorRef.current?.getView()
+        if (view) {
+          revealInCodeMirror(view, still.query)
           useKnowledgeStore.getState().clearPendingReveal()
           return
         }
@@ -248,19 +244,13 @@ export function KnowledgeWorkspace() {
     return () => setExpandPersistSuspended(false)
   }, [])
 
-  // Outline (AppLayout right rail) → scroll Source / Live / Preview.
+  // Outline (AppLayout right rail) → scroll Live / Source.
   const pendingOutlineJump = useKnowledgeStore((s) => s.pendingOutlineJump)
   useEffect(() => {
     if (!pendingOutlineJump || !activeDocId) return
     const item = pendingOutlineJump
     const clear = () => useKnowledgeStore.getState().clearPendingOutlineJump()
 
-    if (editorMode === 'preview') {
-      const root = document.querySelector('[data-testid="knowledge-doc-reader"]')
-      scrollToKnowledgeHeading(item.id, root instanceof HTMLElement ? root : null)
-      clear()
-      return
-    }
     if (editorMode === 'source') {
       const view = editorRef.current?.getView()
       if (view) {
@@ -339,83 +329,19 @@ export function KnowledgeWorkspace() {
     void requestCreateDoc(parentId, t('knowledge.doc.untitled'))
   }
 
-  // Live option only when flag on; parse failures force Source for the session.
+  // Always real-time (Live). Source only as silent fallback: flag off, large doc, parse fail.
   const liveEnabled = isKnowledgeLiveEnabled()
   /** Doc ids that failed Live parse this session — stay on Source. */
   const [liveBlockedDocIds, setLiveBlockedDocIds] = useState<Record<string, true>>(
     {},
   )
-  const modeOptions = useMemo(() => {
-    const iconCls = 'shrink-0 opacity-80'
-    if (liveEnabled) {
-      return [
-        {
-          value: 'live' as const,
-          ariaLabel: t('knowledge.doc.live'),
-          label: (
-            <>
-              <Pencil size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
-              {t('knowledge.doc.live')}
-            </>
-          ),
-        },
-        {
-          value: 'source' as const,
-          ariaLabel: t('knowledge.doc.source'),
-          label: (
-            <>
-              <Code2 size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
-              {t('knowledge.doc.source')}
-            </>
-          ),
-        },
-        {
-          value: 'preview' as const,
-          ariaLabel: t('knowledge.doc.preview'),
-          label: (
-            <>
-              <Eye size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
-              {t('knowledge.doc.preview')}
-            </>
-          ),
-        },
-      ]
-    }
-    // Flag off: keep familiar Edit | Preview labels (source maps to Edit).
-    return [
-      {
-        value: 'source' as const,
-        ariaLabel: t('knowledge.doc.edit'),
-        label: (
-          <>
-            <Pencil size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
-            {t('knowledge.doc.edit')}
-          </>
-        ),
-      },
-      {
-        value: 'preview' as const,
-        ariaLabel: t('knowledge.doc.preview'),
-        label: (
-          <>
-            <Eye size={13} strokeWidth={1.75} className={iconCls} aria-hidden />
-            {t('knowledge.doc.preview')}
-          </>
-        ),
-      },
-    ]
-  }, [liveEnabled, t])
   const bodyLen = Math.max(docBody.length, draftBody.length)
   const liveBlocked = Boolean(activeDocId && liveBlockedDocIds[activeDocId])
-  // Host and control share the same suppressions so the segment never lies.
   const liveSuppressed =
     liveBlocked || bodyLen > KNOWLEDGE_LARGE_DOC_CHARS
-  const toggleMode: EditorMode =
-    editorMode === 'live' && (!liveEnabled || liveSuppressed) ? 'source' : editorMode
   const showLiveEditor =
     editorMode === 'live' && liveEnabled && !liveSuppressed
-  const showSourceEditor = editorMode !== 'preview' && !showLiveEditor
-  const showPreview = editorMode === 'preview'
+  const showSourceEditor = !showLiveEditor
 
   const onLiveParseError = () => {
     toast.error(t('knowledge.doc.liveParseFailed'))
@@ -423,15 +349,6 @@ export function KnowledgeWorkspace() {
       setLiveBlockedDocIds((prev) => ({ ...prev, [activeDocId]: true }))
     }
     void setEditorMode('source')
-  }
-
-  /** Mode toggle: refuse Live re-entry when session-blocked; large clamp is in store. */
-  const onEditorModeChange = (v: EditorMode) => {
-    if (v === 'live' && liveBlocked) {
-      toast.error(t('knowledge.doc.liveParseFailed'))
-      return
-    }
-    void setEditorMode(v)
   }
 
   const exportActiveDoc = async () => {
@@ -528,7 +445,7 @@ export function KnowledgeWorkspace() {
   }
 
   const attachFiles = async () => {
-    if (!activeSpaceId || !activeDocId || editorMode === 'preview') return
+    if (!activeSpaceId || !activeDocId || showLiveEditor) return
     const paths = await pickAttachmentFiles()
     if (!paths?.length) return
     const view = editorRef.current?.getView()
@@ -859,65 +776,54 @@ export function KnowledgeWorkspace() {
             </span>
           )}
           {activeDocId && (
-            <>
-              <SegmentedControl
-                data-testid="knowledge-edit-toggle"
-                aria-label={t('knowledge.doc.modeLabel')}
-                size="sm"
-                value={toggleMode}
-                onChange={onEditorModeChange}
-                options={modeOptions}
-                className="shrink-0"
-              />
-              {/* modal={false}: modal menu + version-history / save-as-template Modal both lock
-                  body pointer-events; stacking leaves the app unclickable after close. */}
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
-                    aria-label={t('knowledge.space.menu')}
-                    data-testid="knowledge-doc-menu"
-                  >
-                    <MoreHorizontal size={16} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    data-testid="knowledge-save-version"
-                    onClick={() => void onSaveVersion()}
-                  >
-                    <History size={14} />
-                    {t('knowledge.versions.menuSave')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="knowledge-version-history"
-                    onClick={() => void openVersionHistory()}
-                  >
-                    <History size={14} />
-                    {t('knowledge.versions.menuHistory')}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    data-testid="knowledge-export-doc"
-                    onClick={() => void exportActiveDoc()}
-                  >
-                    <Download size={14} />
-                    {t('knowledge.export.doc')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    data-testid="knowledge-save-as-template"
-                    onClick={() => {
-                      setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
-                      setSaveTemplateOpen(true)
-                    }}
-                  >
-                    <FilePlus size={14} />
-                    {t('knowledge.template.saveAs')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
+            /* modal={false}: modal menu + version-history / save-as-template Modal both lock
+                body pointer-events; stacking leaves the app unclickable after close. */
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="rounded-md p-1.5 text-ink-tertiary hover:bg-state-hover hover:text-ink"
+                  aria-label={t('knowledge.space.menu')}
+                  data-testid="knowledge-doc-menu"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  data-testid="knowledge-save-version"
+                  onClick={() => void onSaveVersion()}
+                >
+                  <History size={14} />
+                  {t('knowledge.versions.menuSave')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="knowledge-version-history"
+                  onClick={() => void openVersionHistory()}
+                >
+                  <History size={14} />
+                  {t('knowledge.versions.menuHistory')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  data-testid="knowledge-export-doc"
+                  onClick={() => void exportActiveDoc()}
+                >
+                  <Download size={14} />
+                  {t('knowledge.export.doc')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  data-testid="knowledge-save-as-template"
+                  onClick={() => {
+                    setTemplateName(activeNode?.title ?? t('knowledge.doc.untitled'))
+                    setSaveTemplateOpen(true)
+                  }}
+                >
+                  <FilePlus size={14} />
+                  {t('knowledge.template.saveAs')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
         {!activeDocId ? (
@@ -1025,47 +931,6 @@ export function KnowledgeWorkspace() {
                 onAssetImportError={toastAssetError}
                 placeholder={t('knowledge.doc.placeholder')}
                 wikiNodes={nodes}
-              />
-            </KnowledgeDocCanvas>
-          </div>
-        ) : showPreview ? (
-          <div className="min-h-0 flex-1 overflow-y-auto pb-24">
-            <KnowledgeDocCanvas paperClassName="overflow-visible pb-10">
-              <InlineDocTitle
-                docId={activeDocId}
-                title={activeNode?.title ?? t('knowledge.doc.untitled')}
-                readOnly
-                onCommit={() => {}}
-              />
-              <DocPropertiesRow
-                body={draftBody || docBody}
-                schema={spaceSchema}
-                onBodyChange={(next) => setDraftBody(next, { persist: 'now' })}
-              />
-              <DocReader
-                // Prefer draft so preview task toggles are optimistic before flush.
-                content={draftBody || docBody}
-                onStartEdit={() => void setEditorMode(loadEditorModePref())}
-                nodes={nodes}
-                onWikiNavigate={(docId, fragment) => {
-                  void (async () => {
-                    await openDoc(docId)
-                    if (!fragment) return
-                    const body =
-                      useKnowledgeStore.getState().draftBody ||
-                      useKnowledgeStore.getState().docBody
-                    const outline = extractDocOutline(body)
-                    const slug = slugifyHeading(fragment)
-                    const hit =
-                      outline.find((o) => o.text === fragment) ||
-                      outline.find(
-                        (o) => o.text.toLowerCase() === fragment.toLowerCase(),
-                      ) ||
-                      outline.find((o) => o.id === slug || slugifyHeading(o.text) === slug)
-                    if (hit) useKnowledgeStore.getState().requestOutlineJump(hit)
-                  })()
-                }}
-                onWikiBroken={(title) => setWikiCreateTitle(title)}
               />
             </KnowledgeDocCanvas>
           </div>

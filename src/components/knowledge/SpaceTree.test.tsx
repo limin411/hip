@@ -46,7 +46,7 @@ function seedTree(activeDocId: string | null, extra?: Partial<ReturnType<typeof 
     treeFocusId: activeDocId,
     docBody: '',
     draftBody: '',
-    editorMode: 'preview',
+    editorMode: 'live',
     mode: 'workspace',
     searchQuery: '',
     searchHits: [],

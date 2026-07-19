@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
- * Thin CI lock for mode-specific paper overflow (PR1 paper surface).
- * Design risk: Source/Live need overflow-hidden; Preview must stay overflow-visible.
+ * Thin CI lock for paper overflow (Live/Source).
+ * Design risk: Live/Source need overflow-hidden on the paper surface.
  */
 import '@testing-library/jest-dom/vitest'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -34,10 +34,6 @@ vi.mock('./DocEditor', async () => {
 
 vi.mock('./DocLiveEditor', () => ({
   DocLiveEditor: () => <div data-testid="knowledge-doc-live-editor" />,
-}))
-
-vi.mock('./DocReader', () => ({
-  DocReader: () => <div data-testid="knowledge-doc-reader" />,
 }))
 
 vi.mock('./MarkdownToolbar', () => ({
@@ -115,13 +111,6 @@ describe('KnowledgeWorkspace paper overflow contract', () => {
     const paper = screen.getByTestId('knowledge-doc-paper')
     expect(paper.className).toContain('overflow-hidden')
     expect(paper.className).not.toContain('overflow-visible')
-  })
-
-  it('Preview paper uses overflow-visible (stage owns scroll)', () => {
-    seedWorkspace('preview')
-    render(<KnowledgeWorkspace />)
-    const paper = screen.getByTestId('knowledge-doc-paper')
-    expect(paper.className).toContain('overflow-visible')
-    expect(paper.className).not.toMatch(/(?:^|\s)overflow-hidden(?:\s|$)/)
+    expect(screen.queryByTestId('knowledge-edit-toggle')).toBeNull()
   })
 })

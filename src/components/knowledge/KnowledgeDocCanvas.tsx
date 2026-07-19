@@ -12,7 +12,7 @@ export const DOC_PAPER_SHELL = DOC_PAGE_SHELL
 
 /**
  * Document page column: fills the workspace main area (no rounded card).
- * Scroll ownership stays in KnowledgeWorkspace (edit: CM/Live scroller; preview: outer stage).
+ * Scroll ownership stays in KnowledgeWorkspace (Live/Source scroller).
  *
  * Mode overflow is applied by the parent via paperClassName — default classes omit
  * overflow so Workspace can pass mode-specific overflow without fighting the primitive.

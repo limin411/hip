@@ -1445,7 +1445,7 @@ export const zhCN = {
         placeholder: '开始写作…',
         untitled: '未命名',
         emptyTitle: '文档为空',
-        emptyHint: '切换到编辑开始写作。',
+        emptyHint: '开始写作…',
         saveFailed: '保存失败',
         loadFailed: '无法加载文档',
         saving: '保存中…',

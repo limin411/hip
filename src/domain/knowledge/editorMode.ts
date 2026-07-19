@@ -1,4 +1,9 @@
-/** Three-way document pane mode (Live / Source / Preview). */
+/**
+ * Document pane mode.
+ * Product path is always real-time Live (Notion/Feishu-style).
+ * `source` is a silent fallback (large doc / parse fail / live flag off).
+ * `preview` is legacy and unused by the workspace UI.
+ */
 export type EditorMode = 'live' | 'source' | 'preview'
 
 /** Writable modes that schedule autosave on draft changes. */
@@ -13,10 +18,10 @@ export type WritableEditorMode = 'live' | 'source'
  */
 export const KNOWLEDGE_LIVE_FLAG_KEY = 'hip-knowledge-live'
 
-/** localStorage: last non-preview mode preference (`live` | `source`). */
+/** localStorage: last writable mode preference (`live` | `source`). */
 export const KNOWLEDGE_EDITOR_MODE_PREF_KEY = 'hip-knowledge-editor-mode'
 
-/** Autosave default when user types in Live or Source (not Preview). */
+/** Autosave default when user types in Live or Source. */
 export function shouldAutosave(mode: EditorMode): boolean {
   return mode === 'live' || mode === 'source'
 }

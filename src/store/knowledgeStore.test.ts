@@ -130,11 +130,11 @@ describe('knowledgeStore openDoc editorMode default', () => {
     expect(useKnowledgeStore.getState().editorMode).toBe('source')
   })
 
-  it('openDoc respects stored source pref when live is on', async () => {
+  it('openDoc always opens Live even when a prior source pref is stored', async () => {
     localStorage.setItem('hip-knowledge-editor-mode', 'source')
     knowledgeReadDoc.mockResolvedValueOnce('# hello')
     await useKnowledgeStore.getState().openDoc('doc_1')
-    expect(useKnowledgeStore.getState().editorMode).toBe('source')
+    expect(useKnowledgeStore.getState().editorMode).toBe('live')
   })
 
   it('openDoc forces source when live on but body is large', async () => {

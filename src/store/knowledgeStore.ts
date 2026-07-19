@@ -39,7 +39,6 @@ import {
 import { isSpaceNameTaken, normalizeSpaceName } from '@/domain/knowledge/spaceName'
 import {
   type EditorMode,
-  loadEditorModePref,
   persistEditorModePref,
   resolveEditorMode,
   shouldAutosave,
@@ -377,7 +376,7 @@ interface KnowledgeState {
   clearPendingReveal: () => void
   /**
    * Request scroll to an outline heading. Workspace applies based on editorMode
-   * (preview id / source line / live text match).
+   * (source line / live text match).
    */
   requestOutlineJump: (item: {
     id: string
@@ -597,7 +596,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   activeDocId: null,
   docBody: '',
   draftBody: '',
-  editorMode: 'preview',
+  editorMode: 'live',
   mode: 'home',
   searchQuery: '',
   searchHits: [],
@@ -822,7 +821,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           treeFocusId: null,
           docBody: '',
           draftBody: '',
-          editorMode: 'preview',
+          editorMode: 'live',
           nodes: [],
           expandedFolderIds: {},
           templatePicker: null,
@@ -903,7 +902,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
           activeDocId: null,
           docBody: '',
           draftBody: '',
-          editorMode: 'preview',
+          editorMode: 'live',
           pendingReveal: null,
         })
       }
@@ -1142,7 +1141,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
       treeFocusId: null,
       docBody: '',
       draftBody: '',
-      editorMode: 'preview',
+      editorMode: 'live',
       // keep activeSpaceId for chip? design: clear active doc; can keep space or clear
       activeSpaceId: null,
       nodes: [],
@@ -1427,7 +1426,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
                 activeDocId: null,
                 docBody: '',
                 draftBody: '',
-                editorMode: 'preview' as const,
+                editorMode: 'live' as const,
                 pendingReveal: null,
               }
             : pendingTargetsRemoved
@@ -1465,14 +1464,16 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         treeFocusId: null,
         docBody: '',
         draftBody: '',
-        editorMode: 'preview',
+        editorMode: 'live',
         pendingReveal: null,
       })
       return
     }
     try {
       const body = await knowledgeReadDoc(spaceId, id)
-      let editorMode = resolveEditorMode(loadEditorModePref())
+      // Always real-time (Live). Source only when Live is off or doc is too large.
+      // Do not restore a prior Source preference — product is Notion/Feishu-style.
+      let editorMode = resolveEditorMode('live')
       // Large docs force Source (Live / Milkdown cost); toast once per open.
       if (editorMode === 'live' && body.length > KNOWLEDGE_LARGE_DOC_CHARS) {
         editorMode = 'source'
@@ -1524,7 +1525,7 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
         treeFocusId: null,
         docBody: '',
         draftBody: '',
-        editorMode: 'preview',
+        editorMode: 'live',
         pendingReveal: null,
       })
     }

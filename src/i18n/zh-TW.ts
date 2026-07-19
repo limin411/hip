@@ -787,7 +787,7 @@ export const zhTW = {
         placeholder: '開始寫作…',
         untitled: '未命名',
         emptyTitle: '文件為空',
-        emptyHint: '切換到編輯開始寫作。',
+        emptyHint: '開始寫作…',
         saveFailed: '儲存失敗',
         loadFailed: '無法載入文件',
         saving: '儲存中…',

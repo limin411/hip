@@ -1471,7 +1471,7 @@ export const en = {
         placeholder: 'Start writing…',
         untitled: 'Untitled',
         emptyTitle: 'Empty document',
-        emptyHint: 'Switch to Edit to start writing.',
+        emptyHint: 'Start writing…',
         saveFailed: 'Could not save document',
         loadFailed: 'Could not load document',
         saving: 'Saving…',

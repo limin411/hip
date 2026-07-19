@@ -13,6 +13,7 @@ import {
   Search,
 } from 'lucide-react'
 import { sessionService, useActiveSessionId, useSessions, type SessionVM } from '@/domain'
+import { HIP_PRODUCT_VERSION } from '@/domain/product'
 import { isMacPlatform } from '@/lib/platform'
 import { surfaceOf } from '@/lib/sessions'
 import { groupSessionsByProjectPath, projectPathKey } from '@/lib/sessionProjectGroups'
@@ -169,7 +170,7 @@ export function AppSidebar() {
         data-tauri-drag-region
         data-testid="sidebar-drag-region"
         onPointerDown={handlePointerDown}
-        className={titlebarRowClass}
+        className={cn(titlebarRowClass, 'border-b-0')}
       >
         {isMac ? (
           <div
@@ -207,7 +208,14 @@ export function AppSidebar() {
         </div>
       </div>
 
-      <nav className="flex shrink-0 flex-col gap-0.5 border-b border-border px-2 pb-2" aria-label={t('sidebar.navAria')}>
+      <div
+        className="px-3 pb-1 pt-0.5 text-[10px] tabular-nums tracking-wide text-ink-tertiary"
+        data-testid="sidebar-app-version"
+      >
+        HIP {HIP_PRODUCT_VERSION}
+      </div>
+
+      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-2" aria-label={t('sidebar.navAria')}>
         <NavItem
           section="chats"
           active={sidebarSection === 'chats'}

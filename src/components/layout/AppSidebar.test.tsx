@@ -110,6 +110,7 @@ describe('AppSidebar', () => {
     expect(screen.getByTestId('sidebar-search')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-search').tagName).toBe('BUTTON')
     expect(screen.getByTestId('sidebar-toggle')).toBeInTheDocument()
+    expect(screen.getByTestId('sidebar-app-version')).toHaveTextContent(/^HIP \d+\.\d+\.\d+/)
     expect(screen.getByTestId('sidebar-nav-chats')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sidebar-session-chat-1')).toBeInTheDocument()
     expect(screen.queryByTestId('sidebar-session-code-1')).not.toBeInTheDocument()

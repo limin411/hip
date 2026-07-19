@@ -18,6 +18,8 @@ vi.mock('@/store/hipConfigStore', () => ({
     }),
 }))
 
+const setSettingsPage = vi.fn()
+
 vi.mock('@/store/uiStore', () => ({
   useUiStore: (sel: (s: Record<string, unknown>) => unknown) =>
     sel({
@@ -27,6 +29,7 @@ vi.mock('@/store/uiStore', () => ({
       setTheme: vi.fn(),
       density: 'comfortable',
       setDensity: vi.fn(),
+      setSettingsPage,
     }),
 }))
 
@@ -73,6 +76,7 @@ describe('GeneralSettings terminal shell', () => {
   beforeEach(() => {
     updateSection.mockClear()
     load.mockClear()
+    setSettingsPage.mockClear()
   })
   afterEach(() => {
     cleanup()
@@ -93,5 +97,11 @@ describe('GeneralSettings terminal shell', () => {
     await waitFor(() => {
       expect(updateSection).toHaveBeenCalledWith('terminal', { shell: 'powershell' })
     })
+  })
+
+  it('opens product help settings page from the help row', () => {
+    render(<GeneralSettings />)
+    fireEvent.click(screen.getByTestId('settings-open-product-help'))
+    expect(setSettingsPage).toHaveBeenCalledWith('help')
   })
 })

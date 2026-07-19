@@ -9,11 +9,14 @@
  * 4. Product Q matrix: each question class maps to expected skill / always-on cue
  * 5. Parallel-fanout always-on cues present without loading hip-coding body
  *
- * Optional live mode (not implemented as paid calls here): set DOGFOOD_LIVE=1 later.
+ * Optional live mode (paid LLM skill-routing check):
+ *   DOGFOOD_LIVE=1 yarn prompt:dogfood:live
+ * Skips live cases when no API key is configured (not a failure).
  *
  * Usage:
  *   yarn prompt:dogfood
  *   node --import tsx scripts/product-prompt-dogfood.mjs
+ *   DOGFOOD_LIVE=1 node --import tsx scripts/product-prompt-dogfood.mjs
  *
  * Exit 0 on all pass; 1 on any failure. JSON summary on stdout last line if --json.
  */
@@ -203,9 +206,96 @@ try {
     }
   })
 
+  /** Live skill-routing accuracy (optional paid LLM). */
+  let liveHitRate = null
+  let liveSkipped = true
+  if (process.env.DOGFOOD_LIVE === '1') {
+    liveSkipped = false
+    try {
+      const { resolveApiKey } = await import(
+        join(ROOT, 'packages/sidecar/src/config/auth-file.ts')
+      )
+      const { getActiveModel, cheapModelFor } = await import(
+        join(ROOT, 'packages/sidecar/src/config/providers.ts')
+      )
+      const { buildChatModel } = await import(
+        join(ROOT, 'packages/sidecar/src/session/model-factory.ts')
+      )
+      const { HumanMessage, SystemMessage } = await import('@langchain/core/messages')
+
+      const active = getActiveModel()
+      const key = resolveApiKey(active.providerID)
+      if (!key) {
+        results.push({
+          id: 'live.skipped_no_api_key',
+          ok: true,
+          detail: `no key for ${active.providerID}`,
+        })
+        liveSkipped = true
+      } else {
+        const modelID = cheapModelFor(active.providerID, active.modelID)
+        const model = buildChatModel({
+          providerID: active.providerID,
+          modelID,
+          baseURL: active.baseURL,
+        })
+        // Prefer non-streaming invoke for one-shot routing.
+        const invocable = typeof model.invoke === 'function' ? model : null
+        if (!invocable) throw new Error('chat model has no invoke()')
+
+        const skillLines = skills
+          .map((s) => `- ${s.name}: ${s.description}`)
+          .join('\n')
+        let liveOk = 0
+        for (const row of PRODUCT_Q) {
+          const system =
+            'You route hip agent skills. Available skills:\n' +
+            skillLines +
+            '\n\nAlways-on product/coding facts are already in the system prompt; ' +
+            'you only choose which skill body to load with use_skill when depth is needed.\n' +
+            'Reply with EXACTLY one token from this set: hip | hip-coding | none\n' +
+            'Rules: product/setup/settings/memory/CLI questions → hip. ' +
+            'parallel fan-out / deep git / multi-agent policy → hip-coding. ' +
+            'trivial greetings with no product/coding depth → none.'
+          const res = await invocable.invoke([
+            new SystemMessage(system),
+            new HumanMessage(row.q),
+          ])
+          const text = typeof res?.content === 'string'
+            ? res.content
+            : Array.isArray(res?.content)
+              ? res.content.map((b) => (typeof b === 'string' ? b : b?.text ?? '')).join('')
+              : String(res?.content ?? '')
+          const token = text.trim().toLowerCase().split(/\s+/)[0]?.replace(/[^a-z-]/g, '') ?? ''
+          // Parallel/git depth must route to hip-coding. Product Qs accept hip or none (L0 may suffice).
+          const strictOk =
+            row.expectSkill === 'hip-coding'
+              ? token === 'hip-coding'
+              : token === 'hip' || token === 'none'
+          if (strictOk) liveOk++
+          results.push({
+            id: `live.route.${row.q.slice(0, 28)}`,
+            ok: strictOk,
+            detail: `got=${token} expect~=${row.expectSkill}`,
+          })
+        }
+        liveHitRate = PRODUCT_Q.length ? liveOk / PRODUCT_Q.length : 0
+        runCheck('live.hit_rate_ge_0.6', () => {
+          if (liveHitRate < 0.6) {
+            throw new Error(`live skill-routing hit rate ${liveHitRate} < 0.6`)
+          }
+        })
+      }
+    } catch (e) {
+      fail('live.error', e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const summary = {
     ok: results.every((r) => r.ok),
     hitRate,
+    liveHitRate,
+    liveSkipped,
     codeBareChars: codeBare.length,
     codeWithSkillsChars: codeWithSkills.length,
     builtinSkills: ids,
@@ -218,7 +308,9 @@ try {
       console.error(`${mark}  ${r.id}${r.detail ? ` — ${r.detail}` : ''}`)
     }
     console.error(
-      `\nsummary: ok=${summary.ok} hitRate=${hitRate} codeBare=${codeBare.length} withSkills=${codeWithSkills.length}`,
+      `\nsummary: ok=${summary.ok} hitRate=${hitRate}` +
+        (liveSkipped ? ' live=skipped' : ` liveHitRate=${liveHitRate}`) +
+        ` codeBare=${codeBare.length} withSkills=${codeWithSkills.length}`,
     )
   }
   // Always one-line JSON on stdout (tests parse the last non-empty line).

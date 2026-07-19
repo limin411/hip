@@ -33,7 +33,8 @@
     "cli:type-check": "yarn workspace @hip/cli type-check",
     "product:content": "node scripts/generate-product-content.mjs && node scripts/generate-ops-content.mjs",
     "product:content:check": "node scripts/generate-product-content.mjs --check && node scripts/generate-ops-content.mjs --check",
-    "prompt:dogfood": "node --import tsx scripts/product-prompt-dogfood.mjs"
+    "prompt:dogfood": "node --import tsx scripts/product-prompt-dogfood.mjs",
+    "prompt:dogfood:live": "DOGFOOD_LIVE=1 node --import tsx scripts/product-prompt-dogfood.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",

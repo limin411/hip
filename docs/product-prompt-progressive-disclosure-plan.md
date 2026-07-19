@@ -96,6 +96,7 @@ W1 content/fingerprint → W2 prompt/pin → W3 ConfigManager tests → yarn vit
 - 2026-07-19: P2b UI — Settings → Help (`ProductHelpSettings`), generator also writes `src/domain/product/productDocs.generated.ts`; command palette `Settings: Product help`.
 - 2026-07-19: P3 ops progressive — compact always-on `BASE` + built-in `hip-coding` skill (delegation/edit/git depth); pin `hip` + `hip-coding` under skills budget.
 - 2026-07-19: P3b + ops SoT — `docs/ops/`, `generate-ops-content.mjs`, `yarn prompt:dogfood` offline matrix (hitRate=1).
+- 2026-07-19: Settings → General links to Help; `yarn prompt:dogfood:live` optional skill-routing probe (skips without API key).
 
 ### P2 commands
 
